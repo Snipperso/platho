@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v549';
+const PLATHO_APP_RUNTIME_VERSION = 'v550';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11534,6 +11534,12 @@ function rememberConversationScroll() {
 messageStrip?.addEventListener('scroll', rememberConversationScroll, { passive: true });
 
 function renderConversation() {
+  // The conversation pane only exists on the Private (chats) tab. Boot opens on Public and the background sync runs
+  // on every tab, so without this guard we'd rebuild the whole strip — decoding every image — into a hidden pane on
+  // boot and on each sync from another tab. setView('chats') re-renders on entry, so the pane is always current the
+  // instant it becomes visible; rendering it while hidden is pure waste. (This is the "first render into the void"
+  // that re-rendering on tab open made redundant.)
+  if (appShell?.dataset.view !== 'chats') return;
   const thread = activeThread();
   if (!thread) {
     setAvatarNode(activeAvatar, 'P', null);
