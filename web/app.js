@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v564';
+const PLATHO_APP_RUNTIME_VERSION = 'v565';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -847,6 +847,7 @@ const WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX = 'platho.wallet.displayIdentity.v1
 // WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX above, which is keyed by MY OWN wallet (self-presentation).
 const CONTACT_DISPLAY_PREFERENCE_STORAGE_PREFIX = 'platho.contact.displayPreference.v1';
 const LINKED_PLATHO_USERNAME_STORAGE_PREFIX = 'platho.wallet.linkedPlathoUsername.v1';
+const KNOWN_PLATHO_USERNAMES_STORAGE_PREFIX = 'platho.wallet.knownPlathoUsernames.v1';
 const PRIVATE_SENDER_MODE_STORAGE_PREFIX = 'platho.privateSenderMode.v1';
 const PROFILE_AVATAR_POINTER_STORAGE_PREFIX = 'platho.profile.avatar.v1';
 const PROFILE_AVATAR_MEDIA_CACHE_PREFIX = 'platho.profile.avatar.media.v1';
@@ -2461,6 +2462,44 @@ function writeLinkedPlathoUsername(identity, owner = plathoWallet?.address) {
     localStorageOrNull()?.setItem(key, JSON.stringify(normalized));
   } catch {
     // Local display attachment is cosmetic and can be re-linked.
+  }
+}
+
+function knownPlathoUsernamesStorageKey(owner = plathoWallet?.address) {
+  return owner ? `${KNOWN_PLATHO_USERNAMES_STORAGE_PREFIX}:${deploymentStorageSuffix()}:${owner}` : null;
+}
+
+// The .ath names this profile is already known to own — the ones the user has successfully linked or minted on
+// this device. Offered as quick-picks in the "Link Platho name" dialog so a multi-username owner doesn't retype.
+// Always unions the currently-linked name. A picked name is still re-verified on submit (it could have been
+// transferred away since it was last seen).
+function readKnownPlathoUsernames(owner = plathoWallet?.address) {
+  const names = new Set();
+  const linked = readLinkedPlathoUsername(owner)?.label;
+  if (linked) names.add(linked);
+  const key = knownPlathoUsernamesStorageKey(owner);
+  if (key) {
+    try {
+      const stored = JSON.parse(localStorageOrNull()?.getItem(key) ?? '[]');
+      if (Array.isArray(stored)) {
+        for (const label of stored) if (typeof label === 'string' && label.trim()) names.add(label.trim());
+      }
+    } catch {
+      // A malformed local quick-pick list must not break the link dialog.
+    }
+  }
+  return [...names];
+}
+
+function addKnownPlathoUsername(label, owner = plathoWallet?.address) {
+  const normalized = typeof label === 'string' ? label.trim() : '';
+  const key = knownPlathoUsernamesStorageKey(owner);
+  if (!normalized || !key) return;
+  const next = [normalized, ...readKnownPlathoUsernames(owner).filter((entry) => entry !== normalized)].slice(0, 24);
+  try {
+    localStorageOrNull()?.setItem(key, JSON.stringify(next));
+  } catch {
+    // Cosmetic quick-pick list; safe to drop on a storage failure.
   }
 }
 
@@ -13704,27 +13743,61 @@ async function requestWalletDisplayIdentity(mode) {
     ? readLinkedPlathoUsername(plathoWallet?.address)
     : readWalletDisplayIdentity(plathoWallet?.address);
   let value = current?.mode === normalizedMode ? current.label : '';
+  // Quick-pick names this profile is already known to own (linked/minted before) so a multi-username owner can
+  // switch without retyping. Only for .ath display; the picked name is still re-verified on submit.
+  const knownNames = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
+    ? readKnownPlathoUsernames(plathoWallet?.address)
+    : [];
   while (true) {
-    const result = await openActionDialog({
-      title: 'Link Platho name',
-      hint: feedback,
-      tone,
-      submitLabel: 'Link name',
-      fields: [{
+    const fields = [];
+    if (knownNames.length > 0) {
+      fields.push({
+        id: 'pick',
+        type: 'select',
+        label: 'Your linked names',
+        required: false,
+        options: [{ value: '', label: 'Enter a name below…' }, ...knownNames.map((label) => ({ value: label, label }))],
+        value: knownNames.includes(value) ? value : '',
+      });
+      fields.push({
+        id: 'displayName',
+        label: `Or a different ${suffix} name`,
+        placeholder: 'name.ath',
+        autocomplete: 'off',
+        required: false,
+        value: '',
+      });
+    } else {
+      fields.push({
         id: 'displayName',
         label: WALLET_DISPLAY_MODE_LABELS[normalizedMode],
         placeholder: 'name.ath',
         autocomplete: 'off',
         value,
-      }],
-      summary: () => [
-        { label: 'Check', value: 'permanent name, currently owned by this wallet' },
-      ],
+      });
+    }
+    const result = await openActionDialog({
+      title: 'Link Platho name',
+      hint: feedback,
+      tone,
+      submitLabel: 'Link name',
+      fields,
+      summary: (values) => {
+        const chosen = (values.displayName?.trim() || values.pick || '').trim();
+        return [{
+          label: 'Check',
+          value: chosen ? `verify ${chosen} is owned by this wallet` : 'permanent name, currently owned by this wallet',
+        }];
+      },
     });
     if (!result) return null;
-    value = result.displayName?.trim() ?? '';
+    value = (result.displayName?.trim() || result.pick || '').trim();
     try {
-      return await verifyWalletDisplayIdentity(normalizedMode, value, plathoWallet);
+      const verified = await verifyWalletDisplayIdentity(normalizedMode, value, plathoWallet);
+      if (verified?.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && verified.label) {
+        addKnownPlathoUsername(verified.label, plathoWallet?.address);
+      }
+      return verified;
     } catch (error) {
       feedback = error?.message || `Use a verified ${suffix} name for this wallet.`;
       tone = 'error';
@@ -16564,6 +16637,7 @@ async function autoLinkMintedUsername(username, ownerWallet, options = {}) {
     verified_at: Date.now(),
   };
   writeLinkedPlathoUsername(linked, owner);
+  addKnownPlathoUsername(identity.label, owner);
   writeWalletDisplayIdentity(linked, owner);
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.PLATHO_NFT;
   clearPendingUsernameMint(username, owner);
