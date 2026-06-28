@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v543';
+const PLATHO_APP_RUNTIME_VERSION = 'v544';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11498,11 +11498,40 @@ function renderThreads() {
     });
 }
 
-// Conversation scroll memory. Jump to the latest messages ONLY when opening a chat (instant) or when the user
-// sends a new outbound message (smooth). Every other re-render — background message sync, send-status changes,
-// a newly received message — keeps the reader exactly where they were instead of yanking the view to the bottom.
+// Conversation scroll behaviour. Jump to the latest ONLY when opening a chat (after its messages actually render)
+// or when the user sends a new outbound message (smooth); every other re-render — background sync, status change,
+// a received message — keeps the reader where they were. The per-chat position (stored as distance from the
+// bottom, which stays stable as older history streams in) is persisted to localStorage so an app reload reopens
+// the conversation where it was left instead of at the top.
+const CONVERSATION_SCROLL_STORAGE_KEY = 'platho.conversation.scroll.v1';
+let conversationScrollByThread = (() => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CONVERSATION_SCROLL_STORAGE_KEY) || 'null');
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch { return {}; }
+})();
 let lastConversationThreadId = null;
 let lastConversationMsgCount = 0;
+let conversationPendingScrollRestore = false;
+let conversationScrollPersistTimer = null;
+
+function persistConversationScrollMemory() {
+  if (conversationScrollPersistTimer) { clearTimeout(conversationScrollPersistTimer); conversationScrollPersistTimer = null; }
+  try { localStorage.setItem(CONVERSATION_SCROLL_STORAGE_KEY, JSON.stringify(conversationScrollByThread)); } catch {}
+}
+
+function saveActiveConversationScroll({ persistNow = false } = {}) {
+  if (!messageStrip || conversationPendingScrollRestore) return;
+  const thread = activeThread();
+  if (!thread || messageStrip.scrollHeight <= messageStrip.clientHeight) return;
+  conversationScrollByThread[thread.id] = Math.max(0, Math.round(messageStrip.scrollHeight - messageStrip.scrollTop - messageStrip.clientHeight));
+  if (persistNow) persistConversationScrollMemory();
+  else if (!conversationScrollPersistTimer) conversationScrollPersistTimer = setTimeout(persistConversationScrollMemory, 800);
+}
+
+// Capture the live position right before the app is backgrounded or reloaded, so it can be restored on next open.
+window.addEventListener('pagehide', () => saveActiveConversationScroll({ persistNow: true }));
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveActiveConversationScroll({ persistNow: true }); });
 
 function renderConversation() {
   const thread = activeThread();
@@ -11530,6 +11559,7 @@ function renderConversation() {
     if (privateImageModeSelect) privateImageModeSelect.disabled = true;
     lastConversationThreadId = null;
     lastConversationMsgCount = 0;
+    conversationPendingScrollRestore = false;
     return;
   }
   setAvatarNode(activeAvatar, thread.avatar, thread.avatarImageUrl);
@@ -11541,6 +11571,7 @@ function renderConversation() {
   // Capture the pre-render scroll state so a background re-render can restore it instead of jumping to the bottom.
   const prevConversationScrollTop = messageStrip.scrollTop;
   const conversationThreadChanged = thread.id !== lastConversationThreadId;
+  if (conversationThreadChanged) conversationPendingScrollRestore = true;
   messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
   const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
@@ -11742,16 +11773,25 @@ function renderConversation() {
   });
 
   requestAnimationFrame(() => {
-    if (conversationThreadChanged) {
-      // Opening a chat — land on the latest messages (instant, no long animation).
-      messageStrip.scrollTop = messageStrip.scrollHeight;
-    } else if (conversationNewOutbound) {
+    if (conversationPendingScrollRestore) {
+      // Opening a chat (incl. right after an app reload): wait until the messages have actually rendered, then put
+      // the reader back at their saved spot for this chat (distance from the bottom; the bottom if none saved) —
+      // instead of leaving them at the top while the history streams in a tick later.
+      if (messageStrip.scrollHeight > messageStrip.clientHeight || conversationMsgCount > 0) {
+        conversationPendingScrollRestore = false;
+        const savedDistance = conversationScrollByThread[thread.id];
+        const distance = Number.isFinite(savedDistance) ? savedDistance : 0;
+        messageStrip.scrollTop = Math.max(0, messageStrip.scrollHeight - messageStrip.clientHeight - distance);
+      }
+      return;
+    }
+    if (conversationNewOutbound) {
       // The user just sent — scroll their message into view, as a scroll rather than a sudden jump.
       messageStrip.scrollTo({ top: messageStrip.scrollHeight, behavior: 'smooth' });
-    } else {
-      // Background sync / status change / received message — keep the reader where they were.
-      messageStrip.scrollTop = prevConversationScrollTop;
+      return;
     }
+    // Background sync / status change / received message — keep the reader where they were.
+    messageStrip.scrollTop = prevConversationScrollTop;
   });
 }
 
