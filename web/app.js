@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v562';
+const PLATHO_APP_RUNTIME_VERSION = 'v563';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -10045,6 +10045,7 @@ function privateSendRetryMeta(error = null) {
 }
 
 function privateSendRetryExhaustedStatusText(error = null) {
+  if (error?.code === 'RECIPIENT_OWNER_CHANGED') return 'not sent: username moved to a new wallet — resend';
   if (error?.code === 'STALE_PRIVATE_PUBLISH') return 'not sent: retry window expired';
   if (error?.code === 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED') {
     return /limit/i.test(String(error?.message ?? ''))
@@ -20082,6 +20083,31 @@ async function attemptPrivateComposerMessagePublish(context) {
   let capsules = Array.isArray(message.capsules) && message.capsules.length > 0
     ? message.capsules
     : (message.capsule ? [message.capsule] : null);
+  // Username-transfer guard (FM-2): persisted capsules are encrypted to the recipient resolved when they were
+  // built. If this dialog routes to a .ath whose owner has since moved (NFT transfer), reusing those capsules on a
+  // retry would re-publish them to the OLD owner. Re-resolve the current owner; if it changed, do NOT re-send the
+  // stale capsules — terminal-fail with a durable red status so the user resends (a fresh send rebuilds capsules for
+  // the current owner via resolveRecipientWalletForThread). We deliberately do NOT rebuild/re-sign here, to stay off
+  // the publish-nonce / double-publish path. Best-effort: a transient resolve failure keeps the normal retry path
+  // (most retries are not transfers). Only fires on retry — a first send has no capsules/recipientWallet yet.
+  if (capsules && message.recipientWallet) {
+    let currentRecipientWallet = null;
+    try {
+      currentRecipientWallet = await resolveRecipientWalletForThread(thread);
+    } catch (error) {
+      console.warn('Recipient re-check before retry failed; keeping existing capsules', error);
+    }
+    if (currentRecipientWallet && !sameWalletAddress(message.recipientWallet, currentRecipientWallet)) {
+      stopPrivateSendRetry(context, { code: 'RECIPIENT_OWNER_CHANGED', message: 'recipient username moved to a new wallet' });
+      // Manual retry of THIS message would just re-fail (it's still encrypted to the old owner); the user must
+      // resend, which builds fresh capsules for the new owner. Keep only the durable red status.
+      message.privateManualRetryAvailable = false;
+      refreshThreadAfterMessageChange(thread);
+      renderConversation();
+      await updateMessageInEncryptedHistory(thread, message).catch((err) => console.error(err));
+      return;
+    }
+  }
   if (!capsules) {
     const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
     refreshThreadIdentityFromVariants(thread, privateWalletIdentityVariants(recipientEntry.walletAddress));
