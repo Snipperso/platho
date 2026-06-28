@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v564<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v564'/);
+    expect(html).toMatch(/id="appVersionLabel">v565<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v565'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2301,6 +2301,25 @@ describe('PWA runtime config guard', () => {
     expect(newChatSource).toMatch(/sameWalletAddress\(ownerWallet, ownAddress\)/);
     // Old-owner dialog is revalidated on open (fire-and-forget).
     expect(app).toMatch(/void revalidateThreadUsernameVariants\(thread\)/);
+  });
+
+  it('PWA-LINK-NAME-PICKER-01: Link Platho name validates input and offers already-known profile usernames', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // A local set of the profile's already-known .ath names (linked/minted), unioning the current linked name.
+    expect(app).toMatch(/function readKnownPlathoUsernames\(owner = plathoWallet\?\.address\)/);
+    expect(app).toMatch(/function addKnownPlathoUsername\(label, owner = plathoWallet\?\.address\)/);
+    // Minting a name records it as known.
+    expect(app).toMatch(/writeLinkedPlathoUsername\(linked, owner\);\s*\n\s*addKnownPlathoUsername\(identity\.label, owner\);/);
+    // The Link dialog offers the known names as a select, still verifies the chosen/typed name on submit (validation),
+    // and records a successfully-linked name as known.
+    const linkSource = app.slice(
+      app.indexOf('async function requestWalletDisplayIdentity'),
+      app.indexOf('async function requestUsernameMintName'),
+    );
+    expect(linkSource).toMatch(/readKnownPlathoUsernames\(plathoWallet\?\.address\)/);
+    expect(linkSource).toMatch(/id: 'pick',\s*\n\s*type: 'select'/);
+    expect(linkSource).toMatch(/await verifyWalletDisplayIdentity\(normalizedMode, value, plathoWallet\)/);
+    expect(linkSource).toMatch(/addKnownPlathoUsername\(verified\.label, plathoWallet\?\.address\)/);
   });
 
   it('PWA-VAULT-ATH-DEPOSIT-PREFLIGHT-01: Vault ATH deposit preflights Vault ATHMaster and official wallet route', () => {
@@ -4791,11 +4810,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v635/);
+    expect(sw).toMatch(/platho-pwa-prototype-v636/);
     expect(sw).toMatch(/\.\/styles\.css\?v=185/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=564/);
+    expect(sw).toMatch(/\.\/app\.js\?v=565/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
