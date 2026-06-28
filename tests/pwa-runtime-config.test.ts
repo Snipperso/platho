@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v558<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v558'/);
+    expect(html).toMatch(/id="appVersionLabel">v559<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v559'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4730,8 +4730,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/publicChannelThreads = publicChannelsToThreads\(\s*feedSourcePublicChannels\(\)/);
     expect(app).toMatch(/for \(const channel of feedSourcePublicChannels\(\)\)/);
     expect(pubMjs).toMatch(/export function publicChannelsToThreads\(channels, feedCache = \{\}\)/);
-    // 5. "Private chat" is hidden on your own public post (no self-dialog).
-    expect(app).toMatch(/const isOwnPost = Boolean\(authorWallet && plathoWallet\?\.address && sameWalletAddress\(authorWallet, plathoWallet\.address\)\)/);
+    // 5. "Private chat" is hidden on your own public post (no self-dialog). Ownership uses isOwnPublicAuthor,
+    //    which falls back to the wallet address persisted in storage so own posts are recognised from the FIRST
+    //    render (before the full wallet finishes loading) and never flash the author-only actions (▼/Private chat/Unfollow).
+    expect(app).toMatch(/function isOwnPublicAuthor\(authorWallet\)/);
+    expect(app).toMatch(/const ownAddress = plathoWallet\?\.address \?\? storedPlathoWalletRecord\(\)\?\.address \?\? null/);
+    expect(app).toMatch(/const isOwnPost = isOwnPublicAuthor\(authorWallet\)/);
     expect(app).toMatch(/if \(!isOwnPost\) \{[\s\S]*?textContent = 'Private chat'/);
     // 6A. Feed posts get the "Display as" chevron in the AUTHOR ROW (top-right), FEED mode only — channels mode
     // omits it on post cards (the channel-detail header already carries it). Reuses the shared popover.
@@ -4756,11 +4760,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v629/);
+    expect(sw).toMatch(/platho-pwa-prototype-v630/);
     expect(sw).toMatch(/\.\/styles\.css\?v=184/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=558/);
+    expect(sw).toMatch(/\.\/app\.js\?v=559/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

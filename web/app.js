@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v558';
+const PLATHO_APP_RUNTIME_VERSION = 'v559';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4580,13 +4580,24 @@ function appendPublicItemComments(article, item) {
   article.append(commentList);
 }
 
+// Whether a public item is the logged-in user's OWN post. Falls back to the wallet address persisted in
+// storage (record.address is plaintext — no decryption needed) so ownership is known from the FIRST public
+// render, before the full wallet finishes loading. Without the fallback plathoWallet is briefly null at boot,
+// so a user's own posts flash the author-only actions (the ▼ "Display as" chevron, "Private chat", "Unfollow")
+// that only make sense for OTHER authors, until a later sync re-render corrects them.
+function isOwnPublicAuthor(authorWallet) {
+  if (!authorWallet) return false;
+  const ownAddress = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  return Boolean(ownAddress && sameWalletAddress(authorWallet, ownAddress));
+}
+
 // The "Display as" chevron for a public post — relabel another author (.ath / local name), shared
 // per-counterparty and in sync with their Private dialog. Returns null for your own post, the official
 // platho.app channel, or an item with no author wallet. Lives top-right in the post's author row in BOTH Feed
 // and Channels modes (the channel-detail header no longer carries it).
 function publicItemIdentityButton(item) {
   const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
-  const isOwnPost = Boolean(authorWallet && plathoWallet?.address && sameWalletAddress(authorWallet, plathoWallet.address));
+  const isOwnPost = isOwnPublicAuthor(authorWallet);
   if (!authorWallet || isOwnPost || item.channelId === DEFAULT_PUBLIC_CHANNEL_ID) return null;
   const identityButton = document.createElement('button');
   identityButton.type = 'button';
@@ -4640,7 +4651,7 @@ function appendPublicItemActions(article, item) {
   actions.append(commentButton);
 
   const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
-  const isOwnPost = Boolean(authorWallet && plathoWallet?.address && sameWalletAddress(authorWallet, plathoWallet.address));
+  const isOwnPost = isOwnPublicAuthor(authorWallet);
 
   // "Private chat" — open the author in Private. HIDDEN on your own post: a dialog with yourself is meaningless.
   if (!isOwnPost) {
