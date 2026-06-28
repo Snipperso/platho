@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v548';
+const PLATHO_APP_RUNTIME_VERSION = 'v549';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11416,11 +11416,13 @@ function setView(view) {
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
   if (view === 'chats' && activeThreadId) {
-    // The conversation is rendered while this tab is hidden (boot starts on Public), so its strip had no layout and
-    // the render-time scroll-to-end was a no-op against a 0-height element. Now that the strip is visible, jump it to
-    // the end — being at the end the moment the tab opens is exactly what the user expects.
+    // The active conversation was first rendered while this tab was hidden (boot starts on Public): its images
+    // decoded with no layout and their one-shot load handlers already fired into nothing, so just scrolling the
+    // stale strip now lands short. Re-render it now that the strip is visible — it rebuilds with eager images whose
+    // load handlers re-anchor to the true bottom as they decode, the exact path the chat-list selection uses (which
+    // lands correctly). So opening the Private tab puts the active chat at the end, same as selecting it.
     conversationStickToBottom = true;
-    requestAnimationFrame(() => { if (messageStrip) messageStrip.scrollTop = messageStrip.scrollHeight; });
+    renderConversation();
   }
   // Switching tabs no longer re-triggers a sync — the unified background loop (scheduleMessageAutoSync) keeps
   // BOTH private messages and the public feed fresh on every tab, so switch-in is instant. setView only renders.
