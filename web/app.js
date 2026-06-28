@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v565';
+const PLATHO_APP_RUNTIME_VERSION = 'v566';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19234,6 +19234,23 @@ function publishStateBroadcastIsFailing(publishState) {
   return pending.length > 0 && pending.every((part) => Boolean(part.error));
 }
 
+// The Vault GRAM hold actually signed into the in-flight external(s), read back from the persisted publishState.
+// Every part of a batch carries the SAME batch-total maxCharge (stamped at sign time), so sum the DISTINCT
+// per-batch totals (deduped by batchPublishId) over the parts still awaiting (re)broadcast. Returns 0n when no
+// signed hold is recorded — callers treat 0n as "unknown" and never terminate on it.
+function privatePublishStateSignedHoldNanotons(publishState) {
+  const seenBatches = new Set();
+  let total = 0n;
+  for (const part of publishState?.parts ?? []) {
+    if (!part || part.maxCharge == null || !publishPartNeedsBroadcastRetry(part)) continue;
+    const batchKey = part.batchPublishId ?? `part:${part.publishId ?? part.partIndex}`;
+    if (seenBatches.has(batchKey)) continue;
+    seenBatches.add(batchKey);
+    try { total += BigInt(part.maxCharge); } catch { /* skip a malformed charge */ }
+  }
+  return total;
+}
+
 // On an explicit user Retry of a broadcast-unacknowledged publish, clear the per-part re-broadcast budget
 // (count + cooldown) so the already-signed, fixed-nonce external is re-sent immediately. Idempotent and
 // double-spend-safe: a re-used nonce is contract-rejected, and retryUnconfirmedVaultPublishBroadcasts reads
@@ -19767,6 +19784,7 @@ function ensurePendingPrivateSendRetry(thread, message, error = { message: 'resu
 }
 
 function privatePublishConfirmStoppedStatusText(error = null) {
+  if (error?.code === 'INSUFFICIENT_VAULT_GRAM') return 'Insufficient Vault GRAM — top up in Vault, then retry';
   if (error?.code === 'STALE_PRIVATE_PUBLISH') return 'not confirmed: chain lookup expired';
   if (error?.code === 'BROADCAST_REJECTED') return 'not confirmed: RPC broadcast unavailable';
   if (error?.code === 'CONFIRM_RETRY_EXHAUSTED') return 'not confirmed: chain confirmation timed out';
@@ -19797,7 +19815,9 @@ function stopPrivatePublishConfirmationRetry(context, error = null) {
   // Local Cancel stays unavailable while a publish attempt exists (the nonce slot is committed; discarding
   // the message would orphan it) — privateMessageCanLocalCancel enforces that, so it resolves to false here.
   // Other stop reasons (stale chain lookup, etc.) keep the no-action durable terminal.
-  const broadcastRetryable = error?.code === 'BROADCAST_REJECTED' || error?.code === 'CONFIRM_RETRY_EXHAUSTED';
+  const broadcastRetryable = error?.code === 'BROADCAST_REJECTED'
+    || error?.code === 'CONFIRM_RETRY_EXHAUSTED'
+    || error?.code === 'INSUFFICIENT_VAULT_GRAM';
   message.privateManualRetryAvailable = broadcastRetryable;
   message.privateCancelAvailable = broadcastRetryable && privateMessageCanLocalCancel(message);
   message.privateSendLastError = shortUiErrorText(error, 'confirmation stopped');
@@ -19954,6 +19974,27 @@ async function runPrivatePublishConfirmationRetry(context) {
   if (isStalePrivatePendingPublishConfirmation(message)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
     return;
+  }
+  // Underfunded-Vault terminal: when NOTHING landed and every in-flight external is failing to broadcast, read the
+  // LIVE Vault GRAM balance BEFORE re-broadcasting. If it can't cover this message's signed hold (e.g. a batch where
+  // earlier sends drained the pool), the 5xx will never clear — so stop the auto-retry with a clear "top up GRAM"
+  // terminal instead of hammering /api/v3/message with 500s. Double-spend-safe: this only STOPS a re-broadcast (no
+  // re-sign, the nonce floor is untouched). A transient balance-read failure falls through to the normal retry.
+  if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && Number(message.publishState?.confirmedCount ?? 0) === 0
+    && Number(message.publishState?.submittedCount ?? 0) === 0
+    && publishStateBroadcastIsFailing(message.publishState)) {
+    try {
+      const balanceProvider = await resolveVaultChainProvider();
+      const freshUser = await readFreshConnectedVaultUserForOwnVaultAction(balanceProvider);
+      const signedHold = privatePublishStateSignedHoldNanotons(message.publishState);
+      if (signedHold > 0n && vaultTonBalanceNanotons(freshUser) < signedHold) {
+        stopPrivatePublishConfirmationRetry(context, { message: 'Vault GRAM balance is too low for this publish', code: 'INSUFFICIENT_VAULT_GRAM' });
+        return;
+      }
+    } catch (balanceError) {
+      // Could not re-read the Vault balance (transient RPC) — fall through to the normal bounded confirm retry.
+    }
   }
   if (privateChainSyncPromise) {
     const key = privatePublishConfirmRetryKey(message);

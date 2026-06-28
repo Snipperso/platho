@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v565<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v565'/);
+    expect(html).toMatch(/id="appVersionLabel">v566<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v566'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1361,7 +1361,7 @@ describe('PWA runtime config guard', () => {
     // landed external is detected by the confirm read), which unsticks the send once the RPC broadcaster
     // recovers. Local Cancel stays gated by privateMessageCanLocalCancel (false while a publish attempt
     // exists — the nonce slot is committed, so discarding would orphan it).
-    expect(stopSource).toMatch(/const broadcastRetryable = error\?\.code === 'BROADCAST_REJECTED' \|\| error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'/);
+    expect(stopSource).toMatch(/const broadcastRetryable = error\?\.code === 'BROADCAST_REJECTED'[\s\S]*?error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'[\s\S]*?error\?\.code === 'INSUFFICIENT_VAULT_GRAM'/);
     expect(stopSource).toMatch(/message\.privateManualRetryAvailable = broadcastRetryable/);
     expect(stopSource).toMatch(/message\.privateCancelAvailable = broadcastRetryable && privateMessageCanLocalCancel\(message\)/);
     // The Retry path clears the per-part re-broadcast budget so the same-nonce external re-sends at once.
@@ -1369,6 +1369,26 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/resetPublishBroadcastBudgetForManualRetry\(message\.publishState\)/);
     // 'not confirmed: ...' resolves to a 'failed' status key — the durable red terminal status.
     expect(app).toMatch(/text\.includes\('not confirmed'\)/);
+  });
+
+  it('PWA-INSUFFICIENT-GRAM-01: an underfunded Vault stops the confirm re-broadcast loop with a "top up GRAM" terminal', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The signed-hold helper reads the persisted per-batch maxCharge (deduped) for parts still needing rebroadcast.
+    expect(app).toMatch(/function privatePublishStateSignedHoldNanotons\(publishState\)/);
+    expect(app).toMatch(/seenBatches\.has\(batchKey\)/);
+    // Before re-broadcasting, the confirm executor reads the LIVE Vault GRAM balance when nothing landed and every
+    // in-flight external is failing; if it can't cover the signed hold, it terminal-stops with INSUFFICIENT_VAULT_GRAM
+    // instead of hammering /message with 500s.
+    const runSource = app.slice(
+      app.indexOf('async function runPrivatePublishConfirmationRetry'),
+      app.indexOf('const broadcastRetries = await retryUnconfirmedPrivatePublishBroadcasts'),
+    );
+    expect(runSource).toMatch(/publishStateBroadcastIsFailing\(message\.publishState\)/);
+    expect(runSource).toMatch(/readFreshConnectedVaultUserForOwnVaultAction\(balanceProvider\)/);
+    expect(runSource).toMatch(/vaultTonBalanceNanotons\(freshUser\) < signedHold/);
+    expect(runSource).toMatch(/code: 'INSUFFICIENT_VAULT_GRAM'/);
+    // The terminal status tells the user to top up; the gate is double-spend-safe (it only stops a re-broadcast).
+    expect(app).toMatch(/error\?\.code === 'INSUFFICIENT_VAULT_GRAM'\) return 'Insufficient Vault GRAM — top up in Vault, then retry'/);
   });
 
   it('PWA-SEND-01: publish preparation blocks over-cap network surcharge before send-time BOC signing', () => {
@@ -4810,11 +4830,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v636/);
+    expect(sw).toMatch(/platho-pwa-prototype-v637/);
     expect(sw).toMatch(/\.\/styles\.css\?v=185/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=565/);
+    expect(sw).toMatch(/\.\/app\.js\?v=566/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
