@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v551';
+const PLATHO_APP_RUNTIME_VERSION = 'v552';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11626,11 +11626,10 @@ function renderConversation() {
           image.className = 'message-image';
           image.src = block.url;
           image.alt = 'Open image';
-          // Eager, not lazy: a lazy image below the fold never loads, so its height stays 0 and the strip's
-          // scrollHeight — the conversation's true length — comes up short by the sum of every un-loaded image
-          // (thousands of px in an image-heavy chat). That short length is exactly why scroll-to-end stopped well
-          // above the bottom. Eager makes every image contribute its real height.
-          image.loading = 'eager';
+          // Lazy: only load images as they near the viewport (lighter for image-heavy chats). The conversation now
+          // renders only when its tab is visible (not into a hidden pane), and the load handler below re-anchors to
+          // the bottom as each image decodes — so scroll-to-end keeps up as the in-view images load.
+          image.loading = 'lazy';
           image.tabIndex = 0;
           image.role = 'button';
           image.title = 'Open full-size image';
@@ -11665,9 +11664,9 @@ function renderConversation() {
       image.className = 'message-image';
       image.src = message.attachment.url;
       image.alt = 'Open image';
-      // Eager (see the block-image note above): lazy images below the fold never load, so their 0 height shorts the
-      // strip's scrollHeight and scroll-to-end lands above the true bottom.
-      image.loading = 'eager';
+      // Lazy (see the block-image note above): load as images near the viewport; the load handler re-anchors to the
+      // bottom as each decodes.
+      image.loading = 'lazy';
       image.tabIndex = 0;
       image.role = 'button';
       image.title = 'Open full-size image';
