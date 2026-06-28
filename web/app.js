@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v545';
+const PLATHO_APP_RUNTIME_VERSION = 'v546';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11498,13 +11498,28 @@ function renderThreads() {
     });
 }
 
-// Conversation scroll behaviour. Jump to the END only when opening a chat (incl. right after an app reload — the
-// thread appears one render before its messages do, so we wait until the messages have actually rendered) or when
-// the user sends a new outbound message (smooth). Every other re-render — background sync, status change, a
-// received message — keeps the reader where they were instead of yanking the view to the bottom.
+// Conversation scroll behaviour. The view sticks to the bottom by default, so opening a chat (incl. right after a
+// reload, once its messages render) lands on the latest, and the user's own new message smooth-scrolls into view.
+// Once the reader scrolls up to read history it stops sticking, and a background re-render (sync / status / a
+// received message) keeps them where they are instead of yanking the view down. The "at bottom" flag + saved
+// position are read from a DEBOUNCED scroll handler, so the transient scroll-to-0 a re-render causes when it
+// rebuilds the strip cannot corrupt them — that race is what made the earlier attempts land back at the top.
 let lastConversationThreadId = null;
 let lastConversationMsgCount = 0;
-let conversationPendingScrollRestore = false;
+let conversationStickToBottom = true;
+let conversationSavedScrollTop = 0;
+let conversationScrollSaveTimer = null;
+
+function rememberConversationScroll() {
+  if (conversationScrollSaveTimer) clearTimeout(conversationScrollSaveTimer);
+  conversationScrollSaveTimer = setTimeout(() => {
+    conversationScrollSaveTimer = null;
+    if (!messageStrip) return;
+    conversationStickToBottom = (messageStrip.scrollHeight - messageStrip.scrollTop - messageStrip.clientHeight) < 24;
+    conversationSavedScrollTop = messageStrip.scrollTop;
+  }, 150);
+}
+messageStrip?.addEventListener('scroll', rememberConversationScroll, { passive: true });
 
 function renderConversation() {
   const thread = activeThread();
@@ -11532,7 +11547,7 @@ function renderConversation() {
     if (privateImageModeSelect) privateImageModeSelect.disabled = true;
     lastConversationThreadId = null;
     lastConversationMsgCount = 0;
-    conversationPendingScrollRestore = false;
+    conversationStickToBottom = true;
     return;
   }
   setAvatarNode(activeAvatar, thread.avatar, thread.avatarImageUrl);
@@ -11542,9 +11557,8 @@ function renderConversation() {
   renderConversationIdentity(thread);
   activeSubtitle.textContent = conversationSubtitleText(thread);
   // Capture the pre-render scroll state so a background re-render can restore it instead of jumping to the bottom.
-  const prevConversationScrollTop = messageStrip.scrollTop;
   const conversationThreadChanged = thread.id !== lastConversationThreadId;
-  if (conversationThreadChanged) conversationPendingScrollRestore = true;
+  if (conversationThreadChanged) conversationStickToBottom = true;
   messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
   const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
@@ -11746,21 +11760,18 @@ function renderConversation() {
   });
 
   requestAnimationFrame(() => {
-    if (conversationPendingScrollRestore) {
-      // Opening a chat (incl. right after an app reload): once the messages have actually rendered, jump to the end.
-      if (messageStrip.scrollHeight > messageStrip.clientHeight || conversationMsgCount > 0) {
-        conversationPendingScrollRestore = false;
-        messageStrip.scrollTop = messageStrip.scrollHeight;
-      }
-      return;
-    }
     if (conversationNewOutbound) {
-      // The user just sent — scroll their message into view, as a scroll rather than a sudden jump.
+      // The user just sent — scroll their message into view as a scroll, not a sudden jump.
+      conversationStickToBottom = true;
       messageStrip.scrollTo({ top: messageStrip.scrollHeight, behavior: 'smooth' });
-      return;
+    } else if (conversationStickToBottom) {
+      // Opening a chat, or already reading the latest — stay pinned to the end (instant). Robust to the multi-render
+      // burst on open: every render in the burst pins to the bottom, so there is no stale position to land on.
+      messageStrip.scrollTop = messageStrip.scrollHeight;
+    } else {
+      // The reader scrolled up to read history — a background re-render keeps them where they were.
+      messageStrip.scrollTop = conversationSavedScrollTop;
     }
-    // Background sync / status change / received message — keep the reader where they were.
-    messageStrip.scrollTop = prevConversationScrollTop;
   });
 }
 
