@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v547';
+const PLATHO_APP_RUNTIME_VERSION = 'v548';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11617,7 +11617,11 @@ function renderConversation() {
           image.className = 'message-image';
           image.src = block.url;
           image.alt = 'Open image';
-          image.loading = 'lazy';
+          // Eager, not lazy: a lazy image below the fold never loads, so its height stays 0 and the strip's
+          // scrollHeight — the conversation's true length — comes up short by the sum of every un-loaded image
+          // (thousands of px in an image-heavy chat). That short length is exactly why scroll-to-end stopped well
+          // above the bottom. Eager makes every image contribute its real height.
+          image.loading = 'eager';
           image.tabIndex = 0;
           image.role = 'button';
           image.title = 'Open full-size image';
@@ -11625,6 +11629,9 @@ function renderConversation() {
           image.dataset.fullImageMeta = messageImageLightboxMeta(block);
           image.addEventListener('load', () => {
             image.dataset.fullImageMeta = messageImageLightboxMeta(block, image);
+            // The real height is known only once the image decodes; if we're pinned to the end, re-anchor there so a
+            // late-decoding image can't leave us short of the true bottom.
+            if (conversationStickToBottom && messageStrip) messageStrip.scrollTop = messageStrip.scrollHeight;
           }, { once: true });
           bubble.append(image);
         } else if (block?.type === 'payment') {
@@ -11649,7 +11656,9 @@ function renderConversation() {
       image.className = 'message-image';
       image.src = message.attachment.url;
       image.alt = 'Open image';
-      image.loading = 'lazy';
+      // Eager (see the block-image note above): lazy images below the fold never load, so their 0 height shorts the
+      // strip's scrollHeight and scroll-to-end lands above the true bottom.
+      image.loading = 'eager';
       image.tabIndex = 0;
       image.role = 'button';
       image.title = 'Open full-size image';
@@ -11657,6 +11666,7 @@ function renderConversation() {
       image.dataset.fullImageMeta = messageImageLightboxMeta(message.attachment);
       image.addEventListener('load', () => {
         image.dataset.fullImageMeta = messageImageLightboxMeta(message.attachment, image);
+        if (conversationStickToBottom && messageStrip) messageStrip.scrollTop = messageStrip.scrollHeight;
       }, { once: true });
       bubble.append(image);
     }
