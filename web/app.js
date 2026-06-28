@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v546';
+const PLATHO_APP_RUNTIME_VERSION = 'v547';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11415,6 +11415,13 @@ function setView(view) {
   }
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
+  if (view === 'chats' && activeThreadId) {
+    // The conversation is rendered while this tab is hidden (boot starts on Public), so its strip had no layout and
+    // the render-time scroll-to-end was a no-op against a 0-height element. Now that the strip is visible, jump it to
+    // the end — being at the end the moment the tab opens is exactly what the user expects.
+    conversationStickToBottom = true;
+    requestAnimationFrame(() => { if (messageStrip) messageStrip.scrollTop = messageStrip.scrollHeight; });
+  }
   // Switching tabs no longer re-triggers a sync — the unified background loop (scheduleMessageAutoSync) keeps
   // BOTH private messages and the public feed fresh on every tab, so switch-in is instant. setView only renders.
   if (view === 'public') {
@@ -11490,6 +11497,9 @@ function renderThreads() {
       item.addEventListener('click', () => {
         activeThreadId = thread.id;
         appShell.dataset.chatOpen = 'true';
+        // Selecting a chat always lands at the end (even re-selecting the current one), regardless of where it was
+        // left — renderConversation() reads this and scrolls to the bottom.
+        conversationStickToBottom = true;
         markThreadRead(thread);
         renderThreads();
         renderConversation();
