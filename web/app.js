@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v555';
+const PLATHO_APP_RUNTIME_VERSION = 'v556';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4110,6 +4110,20 @@ function selectOrCreateRecipientThread(input, options = {}) {
       existing.avatar = result.thread.avatar;
       existing.subtitle = result.thread.subtitle;
       persistThreadDisplayPreference(existing);
+    } else {
+      // Addressed by a specific identity (e.g. "admin") that resolved to an existing contact's wallet. Record that
+      // username among the contact's known identities (the "Display as" list) even though we've never received from
+      // it — and, for a username (not a raw wallet address), switch the dialog's display to it, so addressing
+      // "admin" doesn't drop you into a dialog still labelled "plato".
+      const addressedVariants = threadIdentityVariants(result.thread);
+      if (addressedVariants.length > 0) refreshThreadIdentityFromVariants(existing, addressedVariants);
+      const addressedIdentity = primaryThreadIdentity(result.thread);
+      if (addressedIdentity && addressedIdentity.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) {
+        existing.displayIdentity = addressedIdentity;
+        applyThreadDisplayFields(existing);
+        syncThreadDisplayToContactStore(existing);
+        persistThreadDisplayPreference(existing);
+      }
     }
     activeThreadId = existing.id;
   } else {
@@ -7731,6 +7745,21 @@ function relocateExistingCapsuleMessage(existing, targetThread) {
   }
   refreshThreadAfterMessageChange(existing.thread);
   refreshThreadAfterMessageChange(targetThread);
+  // The source just had its message moved to the target (the same counterparty wallet, recognised after the fact).
+  // If that emptied it, it's a duplicate dialog (e.g. one opened for a username before we knew it's an existing
+  // contact) — drop it and move the user onto the surviving thread, so they aren't stranded in an empty merged
+  // dialog. (pruneEmptyAnonymousPeerThreads below only removes no-identity peers; this also handles named ones.)
+  if (existing.thread !== targetThread && (existing.thread.messages ?? []).length === 0) {
+    const sourceIndex = threads.indexOf(existing.thread);
+    if (sourceIndex >= 0) {
+      if (existing.thread.localLabel && !targetThread.localLabel) {
+        targetThread.localLabel = existing.thread.localLabel;
+        applyThreadDisplayFields(targetThread);
+      }
+      threads.splice(sourceIndex, 1);
+      if (activeThreadId === existing.thread.id) activeThreadId = targetThread.id;
+    }
+  }
   pruneEmptyAnonymousPeerThreads();
   return true;
 }
