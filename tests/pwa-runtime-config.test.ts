@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v563<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v563'/);
+    expect(html).toMatch(/id="appVersionLabel">v564<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v564'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2272,6 +2272,35 @@ describe('PWA runtime config guard', () => {
     expect(submitSource).toMatch(/await loadConnectedAthWalletAddress\(\)/);
     expect(app).not.toMatch(/async function submitUsernameRegistryMessage/);
     expect(app).not.toMatch(/async function submitUsernameRefundFlush/);
+  });
+
+  it('PWA-USERNAME-TRANSFER-01: a .ath is a movable alias — routing is wallet-first; addressing reconciles + relabels', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Routing is by the dialog's WALLET, not by re-resolving the username every send: in resolveRecipientWalletForThread
+    // the wallet_address variant is matched BEFORE the platho_nft resolve (reverts the v562 FM-1 band-aid).
+    const routeSource = app.slice(
+      app.indexOf('async function resolveRecipientWalletForThread'),
+      app.indexOf('async function resolveRecipientPeerEntry'),
+    );
+    expect(routeSource.indexOf("type === 'wallet_address'")).toBeLessThan(routeSource.indexOf("type === 'platho_nft'"));
+    // Transfer is handled at the identity/dialog layer: strip+relabel the old owner, resolve to the current owner.
+    expect(app).toMatch(/function dropThreadIdentityVariant\(thread, targetKey\)/);
+    expect(app).toMatch(/function reconcileUsernameOwnership\(usernameIdentity, ownerWallet\)/);
+    expect(app).toMatch(/async function revalidateThreadUsernameVariants\(thread\)/);
+    expect(app).toMatch(/class UsernameNotRegisteredError extends Error/);
+    // The new-chat handler async-resolves a username to its current owner wallet, validates existence, reconciles,
+    // then opens the dialog BY WALLET. Guarded against double-submit and self-addressing.
+    const newChatSource = app.slice(
+      app.indexOf("newChatForm?.addEventListener('submit'"),
+      app.indexOf("actionCancelButton?.addEventListener('click'"),
+    );
+    expect(newChatSource).toMatch(/async \(event\) =>/);
+    expect(newChatSource).toMatch(/await resolveRecipientWalletForThread\(parsed\.thread\)/);
+    expect(newChatSource).toMatch(/error instanceof UsernameNotRegisteredError/);
+    expect(newChatSource).toMatch(/reconcileUsernameOwnership\(identity, ownerWallet\)/);
+    expect(newChatSource).toMatch(/sameWalletAddress\(ownerWallet, ownAddress\)/);
+    // Old-owner dialog is revalidated on open (fire-and-forget).
+    expect(app).toMatch(/void revalidateThreadUsernameVariants\(thread\)/);
   });
 
   it('PWA-VAULT-ATH-DEPOSIT-PREFLIGHT-01: Vault ATH deposit preflights Vault ATHMaster and official wallet route', () => {
@@ -4762,11 +4791,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v634/);
+    expect(sw).toMatch(/platho-pwa-prototype-v635/);
     expect(sw).toMatch(/\.\/styles\.css\?v=185/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=563/);
+    expect(sw).toMatch(/\.\/app\.js\?v=564/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v563';
+const PLATHO_APP_RUNTIME_VERSION = 'v564';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -602,6 +602,8 @@ const verifiedPlathoUsernameOwnerCache = new Map();
 // attributed to its previous owner. Bounds the stale-label window without a chain read on every receive.
 const PLATHO_USERNAME_OWNER_CACHE_TTL_MS = 5 * 60_000;
 let plathoWallet = null;
+// Guards the async new-chat resolve against a double-submit race (the handler awaits a chain read before opening).
+let isResolvingNewChat = false;
 let activeRuntimeWalletAddress = null;
 let localReplayStore = createMemoryReplayStore();
 let encryptedMessageStore = null;
@@ -7310,6 +7312,84 @@ function refreshThreadIdentityFromVariants(thread, variants) {
   return thread;
 }
 
+// Remove an identity variant (matched by its key) from a thread and RE-LABEL it. Used when a .ath username is
+// transferred away from this thread's wallet: the username is just a movable display alias, so the dialog (keyed
+// by wallet) keeps existing but must stop wearing a name it no longer owns. Defeats the sticky-identity trap in
+// refreshThreadIdentityFromVariants (which never overwrites thread.identity once set) by clearing identity /
+// displayIdentity FIRST, then re-deriving the display from the kept variants (another username -> wallet address),
+// while preserving a user-set local label. Returns true if anything was dropped (callers skip persist/render on
+// a no-op, which also prevents repaint storms in the on-open revalidation).
+function dropThreadIdentityVariant(thread, targetKey) {
+  if (!thread) return false;
+  const variants = threadIdentityVariants(thread);
+  const kept = variants.filter((variant) => identityKey(variant) !== targetKey);
+  if (kept.length === variants.length) return false;
+  thread.identityVariants = normalizeIdentityVariants(kept);
+  if (thread.identity && identityKey(thread.identity) === targetKey) thread.identity = null;
+  if (thread.displayIdentity && identityKey(thread.displayIdentity) === targetKey && !thread.localLabel) {
+    thread.displayIdentity = null;
+  }
+  if (kept.length > 0) refreshThreadIdentityFromVariants(thread, kept);
+  applyThreadDisplayFields(thread);
+  return true;
+}
+
+// A username now belongs to ownerWallet. Strip it from every OTHER wallet's dialog (the previous owner) and
+// relabel them. Skips dialogs with no wallet variant (username-only, nothing to fall back to — the new-chat
+// addressing re-keys those by wallet) and the owner's own dialog. The wallet is canonical; the username moves.
+function reconcileUsernameOwnership(usernameIdentity, ownerWallet) {
+  if (!usernameIdentity || !ownerWallet) return;
+  const targetKey = identityKey(usernameIdentity);
+  let changed = false;
+  for (const thread of threads) {
+    const wallet = ownerWalletFromThread(thread);
+    if (!wallet || sameWalletAddress(wallet, ownerWallet)) continue;
+    if (dropThreadIdentityVariant(thread, targetKey)) {
+      syncThreadDisplayToContactStore(thread);
+      persistThreadDisplayPreference(thread);
+      changed = true;
+    }
+  }
+  if (changed) renderThreads();
+}
+
+// Lazily re-check, on dialog open, that each .ath variant a dialog wears still resolves to the dialog's wallet;
+// drop+relabel any that have been transferred away. Throttled per-dialog (once per TTL) so opening chats does not
+// hammer the chain, and fire-and-forget so it never blocks the open. Distinguishes "transferred/unregistered"
+// (strip) from a transient RPC failure (leave it) — unlike verifiedPlathoUsernameIdentityForWallet, which returns
+// null for both, so we resolve directly here.
+async function revalidateThreadUsernameVariants(thread) {
+  if (!thread) return;
+  const wallet = ownerWalletFromThread(thread);
+  if (!wallet) return;
+  const usernameVariants = threadIdentityVariants(thread)
+    .filter((variant) => variant.type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT);
+  if (usernameVariants.length === 0) return;
+  if (thread.usernameRevalidatedAt && (Date.now() - thread.usernameRevalidatedAt) < PLATHO_USERNAME_OWNER_CACHE_TTL_MS) return;
+  thread.usernameRevalidatedAt = Date.now();
+  let dropped = false;
+  for (const variant of usernameVariants) {
+    let ownerWallet = null;
+    try {
+      ownerWallet = (await resolvePlathoUsernameOwner(variant.value)).ownerWallet;
+    } catch (error) {
+      if (error instanceof UsernameNotRegisteredError) ownerWallet = '';
+      else continue; // transient RPC — do not strip
+    }
+    if (!ownerWallet || !sameWalletAddress(ownerWallet, wallet)) {
+      if (dropThreadIdentityVariant(thread, identityKey(variant))) {
+        syncThreadDisplayToContactStore(thread);
+        persistThreadDisplayPreference(thread);
+        dropped = true;
+      }
+    }
+  }
+  if (dropped) {
+    renderThreads();
+    if (thread.id === activeThreadId) renderConversation();
+  }
+}
+
 async function threadForChainCapsule(opened, entry) {
   if (opened?.openedAs === 'sender') {
     const target = await threadForOpenedSenderCapsule(opened);
@@ -11584,6 +11664,9 @@ function renderThreads() {
         markThreadRead(thread);
         renderThreads();
         renderConversation();
+        // Fire-and-forget: if a .ath this dialog wears has been transferred away from its wallet, drop+relabel it
+        // (throttled per-dialog; repaints only on an actual change).
+        void revalidateThreadUsernameVariants(thread);
       });
       threadList.append(item);
     });
@@ -11949,15 +12032,70 @@ identityMenuButton?.addEventListener('click', (event) => {
 newChatButton?.addEventListener('click', openNewChatDialog);
 closeNewChatButton?.addEventListener('click', closeNewChatDialog);
 closeOnBackdropClick(newChatDialog, closeNewChatDialog);
-newChatForm?.addEventListener('submit', (event) => {
+function showNewChatHint(text, tone = 'error') {
+  if (!recipientHint) return;
+  recipientHint.textContent = text;
+  recipientHint.dataset.tone = tone;
+  if (tone === 'error') recipientInput?.focus();
+}
+
+newChatForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const result = selectOrCreateRecipientThread(recipientInput?.value, {
-    localLabel: recipientLocalLabel?.value,
-  });
-  if (!result.ok && recipientHint) {
-    recipientHint.textContent = result.error;
-    recipientHint.dataset.tone = 'error';
-    recipientInput?.focus();
+  if (isResolvingNewChat) return; // an async resolve is already in flight — ignore the double-submit
+  const localLabel = recipientLocalLabel?.value;
+  const parsed = createRecipientThread(recipientInput?.value, { localLabel });
+  if (!parsed.ok) { showNewChatHint(parsed.error); return; }
+  const identity = parsed.thread.identity;
+  const isUsername = identity
+    && (identity.type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT || identity.type === RECIPIENT_IDENTITY_TYPES.TON_DNS);
+  if (!isUsername) {
+    // Raw wallet address: open/create the dialog directly (the dialog IS that wallet — no resolve needed).
+    const result = selectOrCreateRecipientThread(recipientInput?.value, { localLabel });
+    if (!result.ok) showNewChatHint(result.error);
+    return;
+  }
+  // Username / TON DNS: a username is a movable alias — resolve it to the CURRENT owner wallet (canonical) and
+  // key the dialog by that wallet, so addressing a transferred username opens the NEW owner's dialog and we can
+  // relabel any old-owner dialog still wearing it. The resolve also validates the name actually exists.
+  isResolvingNewChat = true;
+  showNewChatHint(`Resolving ${identity.label}…`, 'info');
+  try {
+    let ownerWallet = null;
+    try {
+      ownerWallet = await resolveRecipientWalletForThread(parsed.thread);
+    } catch (error) {
+      if (error instanceof UsernameNotRegisteredError) { showNewChatHint(`${identity.label} is not registered`); return; }
+      // Transient RPC/network failure — don't hard-block the user; fall back to the legacy path (the send-time
+      // resolve still routes to the current owner).
+      console.warn('Username resolve failed (transient); using legacy path', error);
+      const result = selectOrCreateRecipientThread(recipientInput?.value, { localLabel });
+      if (!result.ok) showNewChatHint(result.error);
+      return;
+    }
+    const ownAddress = activeWalletRuntimeAddress();
+    if (ownAddress && sameWalletAddress(ownerWallet, ownAddress)) {
+      showNewChatHint(`${identity.label} is your own username`);
+      return;
+    }
+    // The username belongs to ownerWallet NOW — strip it from any other wallet's dialog and relabel them.
+    reconcileUsernameOwnership(identity, ownerWallet);
+    // Open/create the dialog BY WALLET, then display it as the addressed username (unless a local name was given).
+    const result = selectOrCreateRecipientThread(ownerWallet, { localLabel });
+    if (!result.ok) { showNewChatHint(result.error); return; }
+    if (!localLabel) {
+      const thread = threads.find((item) => item.id === activeThreadId);
+      if (thread) {
+        refreshThreadIdentityFromVariants(thread, [identity]);
+        thread.displayIdentity = identity;
+        applyThreadDisplayFields(thread);
+        syncThreadDisplayToContactStore(thread);
+        persistThreadDisplayPreference(thread);
+        renderThreads();
+        renderConversation();
+      }
+    }
+  } finally {
+    isResolvingNewChat = false;
   }
 });
 actionCancelButton?.addEventListener('click', () => {
@@ -16358,6 +16496,11 @@ async function resolveUsernameNftItemProvider() {
   return provider;
 }
 
+// Thrown when a .ath name is DEFINITIVELY unregistered (as opposed to a transient RPC failure). Callers that
+// address a username can distinguish "no such username" (hard error — don't create a dialog) from "couldn't
+// reach the chain" (transient — fall back) via `instanceof`.
+class UsernameNotRegisteredError extends Error {}
+
 async function resolvePlathoUsernameOwner(label) {
   const username = normalizeUsernameInput(label);
   const displayLabel = `${username}.ath`;
@@ -16370,7 +16513,7 @@ async function resolvePlathoUsernameOwner(label) {
     address: registryAddress,
     ...criticalChainReadOptions(),
   });
-  if (record.exists !== true) throw new Error(`${displayLabel} is not registered`);
+  if (record.exists !== true) throw new UsernameNotRegisteredError(`${displayLabel} is not registered`);
 
   const itemProvider = await resolveUsernameNftItemProvider();
   const proof = await resolveAuthoritativeUsernameItemOwnership({
@@ -16466,20 +16609,21 @@ async function loadConnectedAthWalletAddress() {
 
 async function resolveRecipientWalletForThread(thread) {
   const variants = threadIdentityVariants(thread);
-  // A .ath username is AUTHORITATIVE over a thread's cached wallet variant: the username can be transferred to a
-  // new wallet, so route to whoever owns it NOW. We must resolve it BEFORE falling back to the stored
-  // wallet_address variant — otherwise a dialog that once received from the old owner (and so accumulated their
-  // wallet variant) would keep encrypting/sending to the OLD owner after a transfer (a misroute + privacy leak).
-  // resolvePlathoUsernameOwner already runs with cacheTtlMs:0 (fresh), and this resolve happens only for
-  // username-typed dialogs; pure wallet dialogs keep the zero-read fast path below.
+  // The dialog's WALLET is canonical for routing. A .ath username is a movable display alias whose ownership is
+  // reconciled at ADDRESSING time (new-chat resolves it to the current owner and keys the dialog by that wallet)
+  // and lazily on dialog OPEN — NOT re-resolved on the hot send path. So use the stored wallet variant first
+  // (zero chain read); resolve a username/DNS only as a FALLBACK for a username-only dialog that has no wallet
+  // variant yet (e.g. first contact before any send). [Reverts the v562 FM-1 band-aid, which made the username
+  // win over the wallet — wrong layer: it could route a wallet-A dialog to B just because it still carried the
+  // alias. Old-owner dialogs are now stripped+relabelled instead; see reconcileUsernameOwnership.]
+  const walletIdentity = variants.find((identity) => identity.type === 'wallet_address');
+  if (walletIdentity) return requireBasechainAddress(walletIdentity.value, 'Payment recipient');
+
   const plathoIdentity = variants.find((identity) => identity.type === 'platho_nft');
   if (plathoIdentity) {
     const resolved = await resolvePlathoUsernameOwner(plathoIdentity.value);
     return requireBasechainAddress(resolved.ownerWallet, 'Payment recipient');
   }
-
-  const walletIdentity = variants.find((identity) => identity.type === 'wallet_address');
-  if (walletIdentity) return requireBasechainAddress(walletIdentity.value, 'Payment recipient');
 
   const tonDnsIdentity = variants.find((identity) => identity.type === 'ton_dns');
   if (tonDnsIdentity) {
