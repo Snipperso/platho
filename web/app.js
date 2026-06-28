@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v554';
+const PLATHO_APP_RUNTIME_VERSION = 'v555';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3032,16 +3032,27 @@ function identityDisplayOptions(thread) {
       identity: null,
     });
   }
+  const variantOptions = [];
   for (const identity of uniqueDisplayIdentityVariants(thread)) {
     const key = identityDisplayKey(identity);
     if (!key) continue;
-    options.push({
+    variantOptions.push({
       key,
       label: displayIdentityLabel(identity),
       subtitle: identityTypeLabel(identity),
       identity,
     });
   }
+  // Order: name identities (Platho NFT / TON DNS) first, alphabetically, then the raw wallet address last — so the
+  // human-readable handles group together above the address. (The local name, if any, stays first; the "Set local
+  // name" action is placed at the top of the popover separately.)
+  variantOptions.sort((a, b) => {
+    const aWallet = a.identity?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS ? 1 : 0;
+    const bWallet = b.identity?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS ? 1 : 0;
+    if (aWallet !== bWallet) return aWallet - bWallet;
+    return String(a.label ?? '').localeCompare(String(b.label ?? ''));
+  });
+  options.push(...variantOptions);
   return options;
 }
 
@@ -3170,6 +3181,21 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
     hideIdentityPopover();
     onSetLocalName();
   };
+  // Local name at the very top: when none is set yet, the "Set local name" action sits above the identities. (When
+  // one IS set it's the first option in the loop below, carrying an edit pencil — already at the top.)
+  if (!localLabelExists) {
+    const localNameRow = document.createElement('button');
+    localNameRow.type = 'button';
+    localNameRow.className = 'identity-variant identity-variant-action';
+    localNameRow.setAttribute('role', 'menuitem');
+    const localNameLabel = document.createElement('strong');
+    localNameLabel.textContent = 'Set local name';
+    const localNameType = document.createElement('span');
+    localNameType.textContent = 'Only shown on this device';
+    localNameRow.append(localNameLabel, localNameType);
+    localNameRow.addEventListener('click', openEdit);
+    popover.append(localNameRow);
+  }
   for (const option of options ?? []) {
     if (option.key === 'local-label') {
       // The local name stays a selectable display option; its edit affordance is now a pencil button
@@ -3197,21 +3223,6 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       hideIdentityPopover();
       onSelect(selected);
     }));
-  }
-  // No local name yet — offer a plain action row to set one (there is nothing to edit before a name
-  // exists, so the pencil affordance only appears once one is present).
-  if (!localLabelExists) {
-    const localNameRow = document.createElement('button');
-    localNameRow.type = 'button';
-    localNameRow.className = 'identity-variant identity-variant-action';
-    localNameRow.setAttribute('role', 'menuitem');
-    const localNameLabel = document.createElement('strong');
-    localNameLabel.textContent = 'Set local name';
-    const localNameType = document.createElement('span');
-    localNameType.textContent = 'Only shown on this device';
-    localNameRow.append(localNameLabel, localNameType);
-    localNameRow.addEventListener('click', openEdit);
-    popover.append(localNameRow);
   }
   const rect = anchor.getBoundingClientRect();
   popover.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
