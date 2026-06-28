@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v552';
+const PLATHO_APP_RUNTIME_VERSION = 'v553';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11578,6 +11578,10 @@ function renderConversation() {
   // Capture the pre-render scroll state so a background re-render can restore it instead of jumping to the bottom.
   const conversationThreadChanged = thread.id !== lastConversationThreadId;
   if (conversationThreadChanged) conversationStickToBottom = true;
+  // Capture the pre-rebuild scroll position: innerHTML='' resets scrollTop to 0, so a smooth scroll-to-end on send
+  // would otherwise animate all the way from the top ("flies to the beginning and back"). Restoring this first lets
+  // the smooth scroll cover only the short distance to the new message.
+  const prevConversationScrollTop = messageStrip.scrollTop;
   messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
   const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
@@ -11789,8 +11793,11 @@ function renderConversation() {
 
   requestAnimationFrame(() => {
     if (conversationNewOutbound) {
-      // The user just sent — scroll their message into view as a scroll, not a sudden jump.
+      // The user just sent — scroll their message into view as a gentle scroll, not a sudden jump. Restore the
+      // pre-rebuild position first (instant) so the smooth scroll travels only from there to the new bottom, instead
+      // of animating up from the cleared scrollTop=0 (the "flies to the beginning and back" jerk).
       conversationStickToBottom = true;
+      messageStrip.scrollTop = prevConversationScrollTop;
       messageStrip.scrollTo({ top: messageStrip.scrollHeight, behavior: 'smooth' });
     } else if (conversationStickToBottom) {
       // Opening a chat, or already reading the latest — stay pinned to the end (instant). Robust to the multi-render
