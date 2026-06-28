@@ -3216,6 +3216,19 @@ button.feed-item:hover {
     --mobile-nav-bottom-reserve: 10px;
   }
 
+  /* Fit the three post-action buttons (e.g. Comments off / Private chat / Unfollow) on ONE row on phones:
+     at ~360px the card's action row is ~270px but the buttons need ~318px at the desktop sizing and wrap to two
+     lines. Tighten the gap, horizontal padding and font just enough to fit with ~8px to spare at 360px. Desktop
+     (>900px) keeps the roomier defaults. */
+  .feed-actions {
+    gap: 6px;
+  }
+
+  .feed-actions button {
+    padding: 0 7px;
+    font-size: 12px;
+  }
+
   body {
     overflow: hidden;
   }
