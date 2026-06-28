@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v556';
+const PLATHO_APP_RUNTIME_VERSION = 'v557';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -7750,14 +7750,28 @@ function relocateExistingCapsuleMessage(existing, targetThread) {
   // contact) — drop it and move the user onto the surviving thread, so they aren't stranded in an empty merged
   // dialog. (pruneEmptyAnonymousPeerThreads below only removes no-identity peers; this also handles named ones.)
   if (existing.thread !== targetThread && (existing.thread.messages ?? []).length === 0) {
-    const sourceIndex = threads.indexOf(existing.thread);
+    const sourceThread = existing.thread;
+    const sourceIndex = threads.indexOf(sourceThread);
     if (sourceIndex >= 0) {
-      if (existing.thread.localLabel && !targetThread.localLabel) {
-        targetThread.localLabel = existing.thread.localLabel;
-        applyThreadDisplayFields(targetThread);
+      // Carry the merged dialog's identity into the survivor: add its username(s) to the survivor's known identities
+      // (the "Display as" list), and — unless the survivor has a deliberate local name — adopt its display, so the
+      // user keeps seeing the username they were just talking to (e.g. a "support" dialog merging into "platho"
+      // leaves the dialog showing support AND lists support, not just platho).
+      const sourceVariants = threadIdentityVariants(sourceThread);
+      if (sourceVariants.length > 0) refreshThreadIdentityFromVariants(targetThread, sourceVariants);
+      if (sourceThread.localLabel && !targetThread.localLabel) {
+        targetThread.localLabel = sourceThread.localLabel;
+      } else if (!targetThread.localLabel) {
+        const sourceDisplay = sourceThread.displayIdentity ?? primaryThreadIdentity(sourceThread);
+        if (sourceDisplay && sourceDisplay.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) {
+          targetThread.displayIdentity = sourceDisplay;
+        }
       }
+      applyThreadDisplayFields(targetThread);
+      syncThreadDisplayToContactStore(targetThread);
+      persistThreadDisplayPreference(targetThread);
       threads.splice(sourceIndex, 1);
-      if (activeThreadId === existing.thread.id) activeThreadId = targetThread.id;
+      if (activeThreadId === sourceThread.id) activeThreadId = targetThread.id;
     }
   }
   pruneEmptyAnonymousPeerThreads();
