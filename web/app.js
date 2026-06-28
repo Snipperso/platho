@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v561';
+const PLATHO_APP_RUNTIME_VERSION = 'v562';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -598,6 +598,9 @@ let localVaultDraft = null;
 const knownVaultKeyOwnerBySignPubkey = new Map();
 const knownVaultKeyRecordByWallet = new Map();
 const verifiedPlathoUsernameOwnerCache = new Map();
+// A verified (username -> wallet) pairing expires after this window so a TRANSFERRED username stops being
+// attributed to its previous owner. Bounds the stale-label window without a chain read on every receive.
+const PLATHO_USERNAME_OWNER_CACHE_TTL_MS = 5 * 60_000;
 let plathoWallet = null;
 let activeRuntimeWalletAddress = null;
 let localReplayStore = createMemoryReplayStore();
@@ -6976,13 +6979,18 @@ async function verifiedPlathoUsernameIdentityForWallet(label, walletAddress) {
   const identity = plathoUsernameIdentity(label);
   if (!rawWallet || !identity) return null;
   const key = `${identity.value}:${rawWallet}`;
-  if (verifiedPlathoUsernameOwnerCache.has(key)) return verifiedPlathoUsernameOwnerCache.get(key);
+  // Short TTL, not forever: a username can be TRANSFERRED to another wallet, so a once-verified (username,wallet)
+  // pairing must expire. Without this the old owner keeps wearing the username's label for the whole session even
+  // after losing the NFT. (Routing is fixed authoritatively in resolveRecipientWalletForThread; this is label
+  // hygiene.) Key includes the wallet, so an old-owner entry never mislabels the new owner.
+  const cached = verifiedPlathoUsernameOwnerCache.get(key);
+  if (cached && (Date.now() - cached.at) < PLATHO_USERNAME_OWNER_CACHE_TTL_MS) return cached.value;
   try {
     const resolved = await resolvePlathoUsernameOwner(identity.value);
     const verified = sameWalletAddress(resolved.ownerWallet, rawWallet)
       ? plathoUsernameIdentity(resolved.label)
       : null;
-    verifiedPlathoUsernameOwnerCache.set(key, verified);
+    verifiedPlathoUsernameOwnerCache.set(key, { value: verified, at: Date.now() });
     return verified;
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) {
@@ -16457,14 +16465,20 @@ async function loadConnectedAthWalletAddress() {
 
 async function resolveRecipientWalletForThread(thread) {
   const variants = threadIdentityVariants(thread);
-  const walletIdentity = variants.find((identity) => identity.type === 'wallet_address');
-  if (walletIdentity) return requireBasechainAddress(walletIdentity.value, 'Payment recipient');
-
+  // A .ath username is AUTHORITATIVE over a thread's cached wallet variant: the username can be transferred to a
+  // new wallet, so route to whoever owns it NOW. We must resolve it BEFORE falling back to the stored
+  // wallet_address variant — otherwise a dialog that once received from the old owner (and so accumulated their
+  // wallet variant) would keep encrypting/sending to the OLD owner after a transfer (a misroute + privacy leak).
+  // resolvePlathoUsernameOwner already runs with cacheTtlMs:0 (fresh), and this resolve happens only for
+  // username-typed dialogs; pure wallet dialogs keep the zero-read fast path below.
   const plathoIdentity = variants.find((identity) => identity.type === 'platho_nft');
   if (plathoIdentity) {
     const resolved = await resolvePlathoUsernameOwner(plathoIdentity.value);
     return requireBasechainAddress(resolved.ownerWallet, 'Payment recipient');
   }
+
+  const walletIdentity = variants.find((identity) => identity.type === 'wallet_address');
+  if (walletIdentity) return requireBasechainAddress(walletIdentity.value, 'Payment recipient');
 
   const tonDnsIdentity = variants.find((identity) => identity.type === 'ton_dns');
   if (tonDnsIdentity) {
