@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v550';
+const PLATHO_APP_RUNTIME_VERSION = 'v551';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11415,12 +11415,13 @@ function setView(view) {
   }
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
-  if (view === 'chats' && activeThreadId) {
-    // The active conversation was first rendered while this tab was hidden (boot starts on Public): its images
-    // decoded with no layout and their one-shot load handlers already fired into nothing, so just scrolling the
-    // stale strip now lands short. Re-render it now that the strip is visible — it rebuilds with eager images whose
-    // load handlers re-anchor to the true bottom as they decode, the exact path the chat-list selection uses (which
-    // lands correctly). So opening the Private tab puts the active chat at the end, same as selecting it.
+  if (view === 'chats') {
+    // The conversation isn't rendered while this tab is hidden (boot opens on Public — see the guard in
+    // renderConversation), so render it now that the strip is visible. Unconditional: renderConversation resolves the
+    // active thread (or falls back to threads[0], or the empty state), so the pane is correct the instant the tab
+    // opens instead of sitting on a stale "No private chat" until the next sync. It rebuilds with eager images whose
+    // load handlers re-anchor to the true bottom as they decode — the same path the chat-list selection uses — so the
+    // chat lands at the end.
     conversationStickToBottom = true;
     renderConversation();
   }
