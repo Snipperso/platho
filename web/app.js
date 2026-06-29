@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v571';
+const PLATHO_APP_RUNTIME_VERSION = 'v572';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -538,6 +538,7 @@ const publicCommentContextText = document.querySelector('#publicCommentContextTe
 const publicCancelCommentButton = document.querySelector('#publicCancelCommentButton');
 const publicPostDetail = document.querySelector('#publicPostDetail');
 const publicPostDetailBody = document.querySelector('#publicPostDetailBody');
+const publicPostDetailAvatar = document.querySelector('#publicPostDetailAvatar');
 const publicPostDetailTitle = document.querySelector('#publicPostDetailTitle');
 const publicPostDetailSubtitle = document.querySelector('#publicPostDetailSubtitle');
 const publicPostBackButton = document.querySelector('#publicPostBackButton');
@@ -4864,29 +4865,23 @@ function publicDetailStatusNode(text, { retry = false } = {}) {
 function renderPublicPostDetail() {
   const item = publicPostDetailItem;
   if (!publicPostDetailBody || !item) return;
-  setText(publicPostDetailTitle, item.author || item.title || 'Post');
-  const dateLabel = typeof item.createdAt === 'string' ? item.createdAt.slice(0, 10) : '';
-  setText(publicPostDetailSubtitle, dateLabel ? `Public post - ${dateLabel}` : 'Public post');
+  // Feed items carry the author NAME in meta[0] (= the channel/thread name) and the date as the last meta entry —
+  // there is no item.author / item.createdAt. The header mirrors the private chat conversation header (avatar +
+  // name + a short subtitle), so the body below can show just the post content + comments without repeating the
+  // author on every row.
+  const flatMeta = (item.meta ?? []).flat().filter(Boolean);
+  const authorName = item.author || flatMeta[0] || item.title || 'Post';
+  const dateLabel = flatMeta.length > 1 ? String(flatMeta[flatMeta.length - 1]) : '';
+  setText(publicPostDetailTitle, authorName);
+  setText(publicPostDetailSubtitle, dateLabel || 'Public post');
+  if (publicPostDetailAvatar) {
+    setAvatarNode(publicPostDetailAvatar, String(authorName).slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
+  }
   publicPostDetailBody.replaceChildren();
 
-  // The post itself, pinned at the top.
+  // The post content, pinned at the top (no author row — the header already carries the author identity).
   const post = document.createElement('article');
   post.className = 'feed-item public-detail-post';
-  const authorRow = document.createElement('div');
-  authorRow.className = 'feed-author-row';
-  const avatar = document.createElement('div');
-  avatar.className = 'avatar feed-avatar';
-  avatar.setAttribute('aria-hidden', 'true');
-  setAvatarNode(avatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
-  const meta = document.createElement('div');
-  meta.className = 'feed-meta';
-  for (const label of (item.meta ?? [])) {
-    const span = document.createElement('span');
-    span.textContent = label;
-    meta.append(span);
-  }
-  authorRow.append(avatar, meta);
-  post.append(authorRow);
   if (item.title) {
     const title = document.createElement('h2');
     title.textContent = item.title;
@@ -4959,7 +4954,15 @@ async function loadPublicPostComments(item) {
     throw error;
   }
   // No comment index for this post yet -> genuinely zero comments (a clean, non-degraded result).
-  if (!parentIndex || parentIndex.exists !== true) return { comments: [], degraded: false };
+  if (!parentIndex || parentIndex.exists !== true) {
+    globalThis.plathoLastPublicCommentLoad = {
+      entryId: String(item.entryId), bodyHash: item.bodyHash ?? null,
+      parentExists: parentIndex?.exists ?? null,
+      latestLink: String(parentIndex?.latest_entry_link ?? ''), entryCount: String(parentIndex?.entry_count ?? ''),
+      walked: 0, resolved: 0, comments: 0, degraded: false,
+    };
+    return { comments: [], degraded: false };
+  }
 
   const ids = [];
   const walkedEntries = new Map();
@@ -5031,6 +5034,15 @@ async function loadPublicPostComments(item) {
     String(comment.parentEntryId) === String(item.entryId)
     && (!item.bodyHash || !comment.parentHash || String(item.bodyHash).toLowerCase() === String(comment.parentHash).toLowerCase())
   ));
+  // Diagnostic snapshot (read via globalThis.plathoLastPublicCommentLoad) so an empty result is debuggable: it
+  // pinpoints whether the parent index was missing, the walk returned nothing, bodies failed to resolve, or the
+  // parent-binding filter dropped them.
+  globalThis.plathoLastPublicCommentLoad = {
+    entryId: String(item.entryId), bodyHash: item.bodyHash ?? null,
+    parentExists: true, latestLink: String(parentIndex.latest_entry_link ?? ''), entryCount: String(parentIndex.entry_count ?? ''),
+    walked: ids.length, resolved: commentParts.length, assembled: assembled.length, comments: comments.length, degraded,
+    sampleParents: assembled.slice(0, 5).map((c) => ({ parentEntryId: String(c.parentEntryId ?? ''), parentHash: c.parentHash ?? null, type: c.type })),
+  };
   return { comments, degraded };
 }
 

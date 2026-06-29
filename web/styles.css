@@ -1716,12 +1716,24 @@ button.feed-item:hover {
 /* The conversation-header base supplies the grid/columns/min-height/border/background. Bleed it to the pane edges
    (the pane has 24px padding) so it matches the private chat header, and force the Back button visible (it is
    display:none on desktop for the private two-pane layout, but Public has no second pane to fall back to). */
-/* The header sits within the pane's 24px padding — symmetric, and at the same inset as the feed's own pane-header,
-   so it lands in the same place whether the feed or a post detail is showing. (Full edge-bleed isn't reliable here:
-   the header is a grid item inside an overflow:hidden detail, where negative side margins don't widen it.) The Back
-   button is display:none on desktop for the private two-pane layout; Public has no second pane, so force it on. */
+/* The header sits within the pane's 24px padding — symmetric, at the same inset as the feed's own pane-header, so it
+   lands in the same place whether the feed or a post detail is showing. (Full edge-bleed isn't reliable here: the
+   header is a grid item inside an overflow:hidden detail, where negative side margins don't widen it.) Give it its
+   OWN column track (back + avatar + title) so it renders the same at every width — the shared conversation-header
+   grid assumes the Back button is hidden on desktop (the private two-pane layout), which doesn't hold for Public. */
+.public-pane .public-post-detail-header {
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  gap: 12px;
+}
+
+/* Back is display:none on desktop for the private layout; Public has no second pane, so force it visible. */
 .public-post-detail-header .chat-back-button {
   display: grid;
+}
+
+.public-post-detail-header .avatar {
+  width: 44px;
+  height: 44px;
 }
 
 .public-post-detail-body {
