@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v568<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v568'/);
+    expect(html).toMatch(/id="appVersionLabel">v569<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v569'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -346,11 +346,7 @@ describe('PWA runtime config guard', () => {
     // Registry name overlay + per-wallet avatar resolution so feed, channels list and detail all show it.
     expect(app).toMatch(/\.map\(applyContactDisplayToRegistryChannel\)/);
     expect(app).toMatch(/function publicAvatarUrlForWallet\(walletAddress\)/);
-    expect(app).toMatch(/latestPost\?\.avatarImageUrl \?\? publicAvatarUrlForWallet\(channel\.authorWallet\)/);
-
-    // Channels list column width matches the Private dialog-list column (one shared variable).
-    expect(css).toMatch(/--public-list-col:\s*clamp\(280px, 32vw, 392px\)/);
-    expect(css).toMatch(/data-public-mode="channels"\]\s*\{[\s\S]*grid-template-columns:\s*minmax\(280px, var\(--public-list-col\)\)/);
+    expect(app).toMatch(/item\.avatarImageUrl \?\? publicAvatarUrlForWallet\(item\.authorWallet\)/);
   });
 
   it('PWA-CONFIG-01I: opening a private chat reuses the existing dialog, and the comments toggle reads its state', () => {
@@ -379,43 +375,12 @@ describe('PWA runtime config guard', () => {
     // fallback to the channel name (the live name comes from thread.name in the feed item).
     expect(mjs).toMatch(/meta: \[post\.publishStatus, shortTime\(post\.createdAt\)/);
     expect(mjs).toMatch(/title: message\.publicPostTitle \?\? null/);
-    // (2) Posts are marked read when actually viewed (Public tab active; channel detail visible).
+    // (2) Posts are marked read when actually viewed (Public tab active).
     expect(app).toMatch(/isPublicViewActive\(\) && markVisiblePublicFeedRead\(items\)/);
-    expect(app).toMatch(/getComputedStyle\(publicChannelDetail\)\.display !== 'none'[\s\S]*?markVisiblePublicFeedRead\(items\)/);
-    // (3) Mobile Channels mode: tapping a channel opens its detail full-width with a back button.
-    expect(app).toMatch(/let publicChannelDetailOpen = false/);
-    expect(app).toMatch(/public-channel-detail-back-button/);
-    expect(css).toMatch(/\[data-channel-detail-open="true"\][\s\S]*?\.public-channel-detail\s*{[\s\S]*?display: grid;/);
-    // (4) The open channel detail is FULL-SCREEN like a Private conversation: the list chrome — the
-    // .pane-header (Platho.app title + the Feed/Channels toggle) — is hidden so all space goes to the channel.
-    // The toggle is a list-level control; Back returns to the channel list where it lives.
-    expect(css).toMatch(/\[data-channel-detail-open="true"\] \.pane-header[\s\S]*?display: none;/);
-    // (5) The channel-detail header reuses the .conversation-header layout (pixel-identical to the Private
-    // conversation header, no "jump") but carries NO action buttons: the "Display as" chevron and Unfollow moved
-    // to the post cards (both modes), and the Documents "i" duplicated the pane header's "i" (the desktop
-    // duplicate menu) so it was removed. The header is back(mobile)+avatar+name+sync-status; the subtitle reads
-    // the live public sync phase, consistent with the Private conversation header.
-    expect(app).toMatch(/header\.className = 'conversation-header public-channel-detail-header'/);
-    const detailRender = app.slice(
-      app.indexOf('function renderPublicChannelDetail'),
-      app.indexOf('function renderPublicChannels'),
-    );
-    expect(detailRender).toMatch(/subtitle\.textContent = publicChannelSyncSubtitle\(\)/);
-    expect(detailRender).toMatch(/header\.append\(backButton, avatar, titleWrap\)/);
-    expect(detailRender).not.toMatch(/actions\.className = 'header-actions'/);
-    expect(detailRender).not.toMatch(/unfollowButton\.textContent = 'Unfollow'/);
-    expect(detailRender).not.toMatch(/openDocsDialog\(\)/);
-    // The chevron + Unfollow now live on the post cards: the Channels-mode card adds the chevron like the Feed
-    // card, and the shared post actions add Unfollow when the post's channel is subscribed (incl. official platho).
-    expect(app).toMatch(/const channelIdentityButton = publicItemIdentityButton\(item\)/);
+    // The "Display as" chevron + Unfollow live on the feed post cards: renderPublicFeed adds the chevron, and the
+    // shared post actions add Unfollow when the post's channel is subscribed (incl. the official platho channel).
+    expect(app).toMatch(/const feedIdentityButton = publicItemIdentityButton\(item\)/);
     expect(app).toMatch(/if \(!isOwnPost && isPublicChannelSubscribed\(item\.channelId\)\)/);
-    expect(app).toMatch(/function publicChannelSyncSubtitle\(\)/);
-    // (6) The Public pane has 24px padding (the chats pane has none); with the detail open full-screen the
-    // pane's padding is dropped ENTIRELY so the header/feed/composer self-inset with their own padding exactly
-    // like the Private chats pane — no extra gap, and no fragile negative-margin compensation that could clip
-    // the header buttons at the screen edge.
-    expect(css).toMatch(/\[data-channel-detail-open="true"\]\s*\{\s*padding: 0;/);
-    expect(css).not.toMatch(/\[data-channel-detail-open="true"\] \.public-channel-detail-header\s*\{\s*margin: 0 -24px/);
   });
 
   it('PWA-CONFIG-01C: profile keeps postquantum messaging fixed without an encryption selector', () => {
@@ -3740,8 +3705,6 @@ describe('PWA runtime config guard', () => {
     const html = readFileSync('web/index.html', 'utf8');
     const publicHeader = html.match(/<section class="content-pane public-pane[\s\S]*?<\/header>/)?.[0] ?? '';
 
-    expect(html).toMatch(/id="publicFeedModeButton"/);
-    expect(html).toMatch(/id="publicChannelsModeButton"/);
     expect(html).toMatch(/id="publicChannelSearch"/);
     expect(html).toMatch(/id="addPublicChannelButton"/);
     expect(html).toMatch(/class="search-row action-search-row"[\s\S]*id="threadSearch"[\s\S]*id="newChatButton"/);
@@ -4586,7 +4549,7 @@ describe('PWA runtime config guard', () => {
     );
     const syncButtonSource = app.slice(
       app.indexOf('syncMessagesButton?.addEventListener'),
-      app.indexOf('publicFeedModeButton?.addEventListener'),
+      app.indexOf('publicChannelSearch?.addEventListener'),
     );
 
     expect(app).toMatch(/const MESSAGE_AUTO_SYNC_MS = 60 \* 1000/);
@@ -4854,11 +4817,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v639/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=185/);
+    expect(sw).toMatch(/platho-pwa-prototype-v640/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=186/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=568/);
+    expect(sw).toMatch(/\.\/app\.js\?v=569/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
