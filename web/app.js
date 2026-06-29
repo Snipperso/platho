@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v568';
+const PLATHO_APP_RUNTIME_VERSION = 'v569';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -518,12 +518,9 @@ const chatCountLabel = document.querySelector('#chatCountLabel');
 const publicSubtitle = document.querySelector('#publicSubtitle');
 const publicPane = document.querySelector('.public-pane');
 const publicFeed = document.querySelector('#publicFeed');
-const publicChannelDetail = document.querySelector('#publicChannelDetail');
 const publicChannelSearchRow = document.querySelector('#publicChannelSearchRow');
 const publicChannelSearch = document.querySelector('#publicChannelSearch');
 const addPublicChannelButton = document.querySelector('#addPublicChannelButton');
-const publicFeedModeButton = document.querySelector('#publicFeedModeButton');
-const publicChannelsModeButton = document.querySelector('#publicChannelsModeButton');
 const publicJumpDownButton = document.querySelector('#publicJumpDownButton');
 const publicComposer = document.querySelector('#publicComposer');
 const publicMessageInput = document.querySelector('#publicMessageInput');
@@ -614,11 +611,6 @@ let identityPopover = null;
 // channel detail header), so its aria-expanded can be reset when the popover closes.
 let identityPopoverAnchor = null;
 let activeActionDialog = null;
-let publicDisplayMode = 'feed';
-// Mobile only: in Channels mode, whether the channel DETAIL (posts) is shown instead of the channel
-// LIST. Desktop always shows both side-by-side; on mobile the detail is hidden until a channel is
-// tapped, then a back button returns to the list.
-let publicChannelDetailOpen = false;
 let publicChannelSearchQuery = '';
 let publicCommentTarget = null;
 let privateImageAttachments = [];
@@ -1319,7 +1311,7 @@ function applyTelegramSafeArea() {
 // (PWA/browser): keep exactly ONE history sentinel while an overlay is open, so a popstate (Android Back)
 // closes the overlay instead of unloading the app.
 function navOverlayIsOpen() {
-  return appShell?.dataset?.chatOpen === 'true' || publicChannelDetailOpen === true;
+  return appShell?.dataset?.chatOpen === 'true';
 }
 
 let navHistorySentinel = false;
@@ -1336,13 +1328,6 @@ function syncNavBackAffordance() {
 }
 
 function closeNavOverlay() {
-  // Public channel branch (channels mode) -> back to the channel list.
-  if (publicChannelDetailOpen === true) {
-    publicChannelDetailOpen = false;
-    renderPublicSurface({ anchorUnread: false });
-    syncNavBackAffordance();
-    return true;
-  }
   // Private conversation -> back to the dialog list. Clear activeThreadId so a later tab-return restores the
   // LIST, not this dialog: setView restores chatOpen from activeThreadId, and leaving it set re-opened the
   // dialog even when the user had backed out to the list.
@@ -3378,17 +3363,9 @@ function conversationSubtitleText() {
   return messageAutoSyncCountdownText() ?? 'Syncing…';
 }
 
-// The public channel-detail header subtitle — same sync wording as a Private conversation (Syncing…/✓ Synced/
-// Sync delayed) instead of a static channel blurb.
-function publicChannelSyncSubtitle() {
-  if (publicSyncPhase === 'syncing') return 'Syncing…';
-  if (publicSyncPhase === 'delayed') return 'Sync delayed';
-  return '✓ Synced';
-}
-
-// Advance the public sync phase and, ONLY when it actually changes, repaint the public surface so the open
-// channel-detail subtitle updates. Gated to the active Public view + change-only so a quiet background sync does
-// not repaint every cycle.
+// Advance the public sync phase and, ONLY when it actually changes, repaint the public Feed so the live sync
+// status updates. Gated to the active Public view + change-only so a quiet background sync does not repaint
+// every cycle.
 function setPublicSyncPhase(phase) {
   if (publicSyncPhase === phase) return;
   publicSyncPhase = phase;
@@ -4330,7 +4307,6 @@ function addCustomPublicChannel(channel) {
   };
   writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
-  publicDisplayMode = 'channels';
   renderPublicSurface();
 }
 
@@ -4502,28 +4478,18 @@ function scrollPublicToOldestUnread() {
 
 function updatePublicJumpDownVisibility() {
   if (!publicJumpDownButton || !publicFeed) return;
-  if (publicDisplayMode !== 'feed') {
-    publicJumpDownButton.hidden = true;
-    return;
-  }
   const maxScroll = Math.max(0, publicFeed.scrollHeight - publicFeed.clientHeight);
   const awayFromNewest = publicFeed.scrollTop < maxScroll - 80;
   publicJumpDownButton.hidden = !(maxScroll > 24 && awayFromNewest);
 }
 
 function updatePublicModeButtons() {
-  if (publicDisplayMode !== 'channels') publicChannelDetailOpen = false;
-  if (publicPane) {
-    publicPane.dataset.publicMode = publicDisplayMode;
-    // Drives the mobile "list vs. detail" swap (no effect on desktop, which shows both columns).
-    publicPane.dataset.channelDetailOpen = publicDisplayMode === 'channels' && publicChannelDetailOpen ? 'true' : 'false';
-  }
-  publicFeedModeButton?.setAttribute('aria-pressed', publicDisplayMode === 'feed' ? 'true' : 'false');
-  publicChannelsModeButton?.setAttribute('aria-pressed', publicDisplayMode === 'channels' ? 'true' : 'false');
-  if (publicChannelSearch) publicChannelSearch.placeholder = publicDisplayMode === 'channels' ? 'Search channels' : 'Search public';
+  // Public has a single view now (the Feed). Keep the dataset.publicMode='feed' marker so the feed-only CSS
+  // ([data-public-mode="feed"]) keeps matching.
+  if (publicPane) publicPane.dataset.publicMode = 'feed';
+  if (publicChannelSearch) publicChannelSearch.placeholder = 'Search public';
   updatePublicJumpDownVisibility();
   if (publicComposer) publicComposer.hidden = false;
-  if (publicChannelDetail) publicChannelDetail.hidden = publicDisplayMode !== 'channels';
 }
 
 function publicFeedItemMatchesSearch(item, query) {
@@ -4736,7 +4702,6 @@ function appendPublicItemActions(article, item) {
 function renderPublicFeed(items, options = {}) {
   if (!publicFeed) return;
   publicFeed.dataset.publicMode = 'feed';
-  if (publicChannelDetail) publicChannelDetail.replaceChildren();
   publicFeed.replaceChildren();
   if ((items ?? []).length === 0) {
     renderPublicEmpty(publicChannelSearchQuery ? 'No public posts found' : 'No public posts', publicChannelSearchQuery ? 'Try another search.' : 'Follow a channel or publish the first post.');
@@ -4764,7 +4729,7 @@ function renderPublicFeed(items, options = {}) {
       meta.append(span);
     }
     authorRow.append(authorAvatar, meta);
-    // The "Display as" chevron lives top-right in the author row (same in Channels mode, via appendPublicChannelPost).
+    // The "Display as" chevron lives top-right in the author row.
     const feedIdentityButton = publicItemIdentityButton(item);
     if (feedIdentityButton) authorRow.append(feedIdentityButton);
     article.append(authorRow);
@@ -4787,197 +4752,9 @@ function renderPublicFeed(items, options = {}) {
   }
 }
 
-function appendPublicChannelPost(container, item) {
-  const article = document.createElement('article');
-  article.className = `feed-item compact${isUnreadPublicItem(item) ? ' is-unread' : ''}`;
-  const authorRow = document.createElement('div');
-  authorRow.className = 'feed-author-row';
-  const avatar = document.createElement('div');
-  avatar.className = 'avatar feed-avatar';
-  avatar.setAttribute('aria-hidden', 'true');
-  setAvatarNode(avatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
-  const meta = document.createElement('div');
-  meta.className = 'feed-meta';
-  for (const label of [...(item.meta ?? []), item.createdAt?.slice?.(0, 10)].filter(Boolean)) {
-    const span = document.createElement('span');
-    span.textContent = label;
-    meta.append(span);
-  }
-  authorRow.append(avatar, meta);
-  // Same "Display as" chevron as the Feed-mode post card (top-right of the author row) — now in Channels mode too,
-  // since the channel-detail header no longer carries it.
-  const channelIdentityButton = publicItemIdentityButton(item);
-  if (channelIdentityButton) authorRow.append(channelIdentityButton);
-  article.append(authorRow);
-  if (item.title) {
-    const title = document.createElement('h2');
-    title.textContent = item.title;
-    article.append(title);
-  }
-  appendPublicItemContent(article, item);
-  appendPublicItemComments(article, item);
-  appendPublicItemActions(article, item);
-  container.append(article);
-}
-
-function renderPublicChannelDetail(channel, items) {
-  if (!publicChannelDetail) return;
-  publicChannelDetail.replaceChildren();
-  if (!channel) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state public-channel-empty';
-    const title = document.createElement('h2');
-    title.textContent = 'No channel selected';
-    const body = document.createElement('p');
-    body.textContent = 'Choose a public channel from the list.';
-    empty.append(title, body);
-    publicChannelDetail.append(empty);
-    return;
-  }
-  const latestPost = items?.[items.length - 1] ?? null;
-  const display = channel.authorWallet ? resolveWalletChannelDisplay(channel.authorWallet) : null;
-  const header = document.createElement('header');
-  // Reuse the Private conversation header's layout class so the two headers are pixel-identical (no "jump"
-  // when switching tabs); public-channel-detail-header stays as a marker for the mobile back-button rules.
-  header.className = 'conversation-header public-channel-detail-header';
-  // Mobile-only back affordance: the detail replaces the channel list on narrow screens, so the user
-  // needs a way back. Hidden on desktop via CSS (where list + detail are side by side).
-  const backButton = document.createElement('button');
-  backButton.type = 'button';
-  backButton.className = 'icon-button public-channel-detail-back-button';
-  backButton.setAttribute('aria-label', 'Back to channels');
-  backButton.title = 'Back to channels';
-  const backIcon = document.createElement('span');
-  backIcon.className = 'icon icon-back';
-  backButton.append(backIcon);
-  backButton.addEventListener('click', () => {
-    requestNavBack();
-  });
-  const avatar = document.createElement('div');
-  avatar.className = 'avatar';
-  avatar.setAttribute('aria-hidden', 'true');
-  setAvatarNode(avatar, channel.avatar, latestPost?.avatarImageUrl ?? publicAvatarUrlForWallet(channel.authorWallet));
-  const titleWrap = document.createElement('div');
-  titleWrap.className = 'conversation-title';
-  const title = document.createElement('h2');
-  title.textContent = channel.name;
-  if (display?.tone) title.className = `identity-title-label identity-label-${display.tone}`;
-  const subtitle = document.createElement('p');
-  // Consistent with the Private conversation header: show the live sync status, not a static channel blurb.
-  subtitle.textContent = publicChannelSyncSubtitle();
-  titleWrap.append(title, subtitle);
-  // No action buttons in this header: the "Display as" chevron and Unfollow now live on the post cards (both Feed
-  // and Channels modes), and the only info/Documents button is the pane header's — carrying it here too made a
-  // duplicate menu on desktop. The detail header is just back (mobile) + avatar + name + sync status.
-  header.append(backButton, avatar, titleWrap);
-
-  const list = document.createElement('div');
-  list.className = 'public-channel-detail-feed';
-  if ((items ?? []).length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state public-channel-empty';
-    const emptyTitle = document.createElement('h2');
-    emptyTitle.textContent = 'No posts yet';
-    const emptyBody = document.createElement('p');
-    emptyBody.textContent = 'This channel has no visible posts in the current history window.';
-    empty.append(emptyTitle, emptyBody);
-    list.append(empty);
-  } else {
-    for (const item of items ?? []) appendPublicChannelPost(list, item);
-  }
-  publicChannelDetail.append(header, list);
-  // Opening a channel marks its posts read — but only when the detail is actually visible (on mobile it
-  // is hidden until the user taps in; on a background sync the Public tab is off screen).
-  if (isPublicViewActive()
-    && (items ?? []).length > 0
-    && getComputedStyle(publicChannelDetail).display !== 'none'
-    && markVisiblePublicFeedRead(items)) {
-    requestAnimationFrame(() => renderPublicSurface({ anchorUnread: false }));
-  }
-}
-
-function renderPublicChannels() {
-  if (!publicFeed) return;
-  publicFeed.dataset.publicMode = 'channels';
-  publicFeed.replaceChildren();
-  const query = publicChannelSearchQuery.trim().toLowerCase();
-  const channels = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
-    .filter((channel) => {
-      if (!query) return true;
-      return [
-        channel.name,
-        channel.id,
-        channel.subtitle,
-        channel.authorWallet,
-        channel.sourceUrl,
-      ].filter(Boolean).join(' ').toLowerCase().includes(query);
-    });
-  if (channels.length === 0) {
-    renderPublicEmpty(query ? 'No channels found' : 'No public channels', query ? 'Try another search.' : 'Add a channel to follow public posts.');
-    renderPublicChannelDetail(null, []);
-    return;
-  }
-  const activeChannelId = channels.some((channel) => channel.id === publicChannelSubscriptions?.activeChannelId)
-    ? publicChannelSubscriptions?.activeChannelId
-    : channels[0]?.id;
-  for (const channel of channels) {
-    const unread = publicUnreadCount(channel.id);
-    const cachedFeed = publicChannelFeedCache?.[channel.id]?.feed ?? publicChannelFeedCache?.[channel.id] ?? null;
-    const latestPost = cachedFeed?.posts?.[cachedFeed.posts.length - 1] ?? null;
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = `thread-item public-channel-item${unread > 0 ? ' is-unread' : ''}${channel.id === activeChannelId ? ' is-selected' : ''}`;
-    const channelAvatar = document.createElement('div');
-    channelAvatar.className = 'avatar';
-    channelAvatar.setAttribute('aria-hidden', 'true');
-    setAvatarNode(channelAvatar, channel.avatar, latestPost?.avatarImageUrl ?? publicAvatarUrlForWallet(channel.authorWallet));
-    const main = document.createElement('div');
-    main.className = 'thread-main';
-    const top = document.createElement('div');
-    top.className = 'thread-top';
-    const channelDisplay = channel.authorWallet ? resolveWalletChannelDisplay(channel.authorWallet) : null;
-    const name = document.createElement('div');
-    name.className = `thread-name identity-label${channelDisplay?.tone ? ` identity-label-${channelDisplay.tone}` : ''}`;
-    name.textContent = channel.name;
-    top.append(name);
-    const preview = document.createElement('div');
-    preview.className = 'thread-preview';
-    preview.textContent = unread > 0
-      ? `${unread} unread post${unread === 1 ? '' : 's'}`
-      : (latestPost?.text || 'No unread posts');
-    const state = document.createElement('div');
-    state.className = 'thread-state';
-    state.textContent = channel.authorWallet ? shortAddress(channel.authorWallet) : (channel.subtitle ?? 'public channel');
-    main.append(top, preview, state);
-    const time = document.createElement('div');
-    time.className = 'thread-time';
-    time.textContent = unread > 0 ? 'unread' : (latestPost?.createdAt?.slice?.(5, 10) ?? '');
-    card.append(channelAvatar, main, time);
-    card.addEventListener('click', () => {
-      publicChannelSubscriptions = {
-        ...publicChannelSubscriptions,
-        activeChannelId: channel.id,
-      };
-      writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
-      publicChannelDetailOpen = true; // mobile: reveal the detail (posts); desktop ignores this
-      renderPublicSurface({ anchorUnread: false });
-    });
-    publicFeed.append(card);
-  }
-  const activeChannel = channels.find((channel) => channel.id === activeChannelId) ?? channels[0] ?? null;
-  const activeItems = publicFeedItemsChronological().filter((item) => item.channelId === activeChannel?.id);
-  renderPublicChannelDetail(activeChannel, activeItems);
-}
-
 function renderPublicSurface(options = {}) {
   updatePublicModeButtons();
   if (publicChannelSearchRow) publicChannelSearchRow.hidden = false;
-  if (publicDisplayMode === 'channels') {
-    renderPublicChannels();
-    setPublicStatus('channels');
-    updatePublicJumpDownVisibility();
-    return;
-  }
   const allItems = publicFeedItemsChronological();
   const items = allItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
   renderPublicFeed(items, options);
@@ -12389,16 +12166,6 @@ syncMessagesButton?.addEventListener('click', async () => {
     syncMessagesButton.disabled = false;
     scheduleMessageAutoSync();
   }
-});
-
-publicFeedModeButton?.addEventListener('click', () => {
-  publicDisplayMode = 'feed';
-  renderPublicSurface({ anchorUnread: true });
-});
-
-publicChannelsModeButton?.addEventListener('click', () => {
-  publicDisplayMode = 'channels';
-  renderPublicSurface();
 });
 
 publicChannelSearch?.addEventListener('input', () => {
@@ -20583,7 +20350,7 @@ async function runPrivateSendRetry(context) {
 
 function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachment = null, options = {}) {
   const channelId = ensurePublicChannelForAuthorWallet(plathoWallet?.address, {
-    activate: publicDisplayMode === 'channels',
+    activate: false,
   });
   const profilePointer = currentProfilePointerFields();
   const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
