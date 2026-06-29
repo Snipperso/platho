@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v577';
+const PLATHO_APP_RUNTIME_VERSION = 'v578';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5918,12 +5918,24 @@ function publicChannelIdForAuthorWallet(authorWallet) {
     ?? ensurePublicChannelForAuthorWallet(wallet);
 }
 
-// The user's OWN wallet channel, if it already exists in the registry (created at publish time). FIND-only:
-// no side effects (does NOT create/subscribe) so it is safe to call on every render/sync.
+// The user's OWN wallet channel. FIND-only (no side effects: does NOT register/subscribe), so it is safe to call
+// on every render/sync. Smart default: if the channel is not yet in the registry — a fresh import or a local-data
+// wipe leaves the registry without it until the first publish re-registers it — SYNTHESIZE it from the wallet so
+// the own channel is ALWAYS a feed source and the user's own posts load + show even before they post this session.
+// The synthesized object uses the same id (`wallet:<addr>`) and shape as ensurePublicChannelForAuthorWallet, so the
+// first publish's registration is idempotent (same id) and nothing duplicates.
 function ownPublicChannel() {
   const wallet = rawWalletAddress(plathoWallet?.address);
   if (!wallet) return null;
-  return publicChannelRegistry.find((channel) => publicChannelMatchesAuthorWallet(channel, wallet)) ?? null;
+  const existing = publicChannelRegistry.find((channel) => publicChannelMatchesAuthorWallet(channel, wallet));
+  if (existing) return existing;
+  return {
+    id: `wallet:${wallet}`,
+    name: 'you',
+    avatar: publicChannelAvatar('you'),
+    subtitle: `your public channel - ${shortAddress(wallet)}`,
+    authorWallet: wallet,
+  };
 }
 
 // The set of channels that feed the Public FEED: everything the user is subscribed to, PLUS their own wallet
