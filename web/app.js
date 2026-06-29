@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v580';
+const PLATHO_APP_RUNTIME_VERSION = 'v581';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -629,6 +629,7 @@ let publicPostDetailItem = null;
 let publicPostDetailChainComments = [];
 let publicPostDetailLoadToken = 0;
 let publicPostDetailLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
+let publicPostDetailParentExists = null; // last clean read: true = post has a comment index, false = genuinely none
 let privateImageAttachments = [];
 let privatePaymentCheckDraft = null;
 let publicImageAttachments = [];
@@ -4941,12 +4942,15 @@ function renderPublicPostDetail() {
   if (publicPostDetailLoadState === 'loading') {
     section.append(publicDetailStatusNode(comments.length > 0 ? 'Loading more comments...' : 'Loading comments...'));
   } else if (publicPostDetailLoadState === 'error' && comments.length === 0) {
-    section.append(publicDetailStatusNode('Couldn’t load comments. Check your connection and try again.', { retry: true }));
+    // The read failed (rate-limited / unreachable) after retries — we do NOT know if there are comments.
+    section.append(publicDetailStatusNode('Comments not loaded — check your connection and retry.', { retry: true }));
   } else if (publicPostDetailLoadState === 'ready' && comments.length === 0) {
-    // We can't be SURE a post is comment-free: a lagging/contended RPC node can return an empty parent index even
-    // when a comment exists (it self-heals on a later read). So don't assert "no comments" — say they aren't loaded
-    // yet and offer a re-check, instead of a false-negative.
-    section.append(publicDetailStatusNode('Comments not loaded yet.', { retry: true }));
+    // A clean read distinguishes the two honestly: parentExists === false means the post's comment index was
+    // genuinely never created (no one has commented). parentExists === true with nothing shown is anomalous (index
+    // present but no comment resolved) — treat as not-yet-loaded with a retry, not as "no comments".
+    section.append(publicPostDetailParentExists === false
+      ? publicDetailStatusNode('No comments yet. Be the first to comment.')
+      : publicDetailStatusNode('Comments not loaded yet.', { retry: true }));
   }
   publicPostDetailBody.append(section);
 }
@@ -4956,6 +4960,7 @@ function openPublicPostDetail(item) {
   publicPostDetailItem = item;
   publicPostDetailOpen = true;
   publicPostDetailChainComments = [];
+  publicPostDetailParentExists = null;
   publicPostDetailLoadState = 'loading';
   if (publicPane) publicPane.dataset.postOpen = 'true';
   // Shared composer -> comment mode for this post; no auto-focus (the user opens to read first) and no inline
@@ -5003,7 +5008,8 @@ async function loadPublicPostComments(item) {
       latestLink: String(parentIndex?.latest_entry_link ?? ''), entryCount: String(parentIndex?.entry_count ?? ''),
       walked: 0, resolved: 0, comments: 0, degraded: false,
     };
-    return { comments: [], degraded: false };
+    // Clean read, no parent index → the post genuinely has no comments (the index is created on the first comment).
+    return { comments: [], degraded: false, parentExists: false };
   }
 
   const ids = [];
@@ -5085,7 +5091,7 @@ async function loadPublicPostComments(item) {
     walked: ids.length, resolved: commentParts.length, assembled: assembled.length, comments: comments.length, degraded,
     sampleParents: assembled.slice(0, 5).map((c) => ({ parentEntryId: String(c.parentEntryId ?? ''), parentHash: c.parentHash ?? null, type: c.type })),
   };
-  return { comments, degraded };
+  return { comments, degraded, parentExists: true };
 }
 
 // Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
@@ -5108,6 +5114,7 @@ async function refreshPublicPostDetailComments() {
     if (token !== publicPostDetailLoadToken) return; // closed or reopened — drop this result
     if (!result.degraded) {
       publicPostDetailChainComments = result.comments;
+      publicPostDetailParentExists = result.parentExists === true;
       publicPostDetailLoadState = 'ready';
       renderPublicPostDetail();
       return;
