@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v567<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v567'/);
+    expect(html).toMatch(/id="appVersionLabel">v568<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v568'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1384,8 +1384,11 @@ describe('PWA runtime config guard', () => {
       app.indexOf('const broadcastRetries = await retryUnconfirmedPrivatePublishBroadcasts'),
     );
     expect(runSource).toMatch(/publishStateBroadcastIsFailing\(message\.publishState\)/);
-    expect(runSource).toMatch(/readFreshConnectedVaultUserForOwnVaultAction\(balanceProvider\)/);
-    expect(runSource).toMatch(/vaultTonBalanceNanotons\(freshUser\) < signedHold/);
+    // Uses the CACHED vault balance (same source as the composer cost line), NOT a fresh chain read — a fresh read
+    // fails exactly when the RPC is unavailable (the moment broadcasts 5xx), which silently defeated the gate.
+    expect(runSource).toMatch(/const cachedVaultUser = currentVaultUserSource\(\)/);
+    expect(runSource).toMatch(/vaultTonBalanceNanotons\(cachedVaultUser\) < signedHold/);
+    expect(runSource).not.toMatch(/readFreshConnectedVaultUserForOwnVaultAction/);
     expect(runSource).toMatch(/code: 'INSUFFICIENT_VAULT_GRAM'/);
     // The terminal status tells the user to top up; the gate is double-spend-safe (it only stops a re-broadcast).
     expect(app).toMatch(/error\?\.code === 'INSUFFICIENT_VAULT_GRAM'\) return 'Insufficient Vault GRAM — top up in Vault, then retry'/);
@@ -4851,11 +4854,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v638/);
+    expect(sw).toMatch(/platho-pwa-prototype-v639/);
     expect(sw).toMatch(/\.\/styles\.css\?v=185/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=567/);
+    expect(sw).toMatch(/\.\/app\.js\?v=568/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
