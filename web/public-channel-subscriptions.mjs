@@ -384,6 +384,9 @@ export function publicChannelThreadsToFeedItems(threads) {
         text: thread.preview,
         comments: [],
         compact: true,
+        // A followed channel with no posts yet: there is nothing to comment on, so its card drops the disabled
+        // "Preview only" button and shows just the Unfollow (+ Private chat) — see appendPublicItemActions.
+        emptyChannel: true,
       });
       continue;
     }

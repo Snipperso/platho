@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v569<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v569'/);
+    expect(html).toMatch(/id="appVersionLabel">v570<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v570'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -3715,6 +3715,18 @@ describe('PWA runtime config guard', () => {
     expect(html).not.toMatch(/id="refreshVaultButton"/);
   });
 
+  it('PWA-EMPTY-CHANNEL-01: a followed channel with no posts shows a clean card with Unfollow (no Preview-only)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const mjs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
+    // The "no posts yet" placeholder for a followed channel is flagged so its card can drop the useless comment button.
+    expect(mjs).toMatch(/text: thread\.preview,[\s\S]*?compact: true,[\s\S]*?emptyChannel: true,/);
+    // appendPublicItemActions skips the comment button for an empty-channel card (nothing to comment on), leaving
+    // Private chat + Unfollow — so an empty channel stays unfollowable, with Unfollow the clear action.
+    expect(app).toMatch(/if \(!item\.emptyChannel\) \{[\s\S]*?const commentButton = document\.createElement\('button'\)/);
+    // Unfollow is the shared post action, so it also reaches the empty-channel placeholder card.
+    expect(app).toMatch(/if \(!isOwnPost && isPublicChannelSubscribed\(item\.channelId\)\)[\s\S]*?textContent = 'Unfollow'/);
+  });
+
   it('PWA-CONFIG-02: production config passes only with mainnet and provider module configured', () => {
     const report = validatePlathoAppConfig(productionConfig);
 
@@ -4817,11 +4829,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v640/);
+    expect(sw).toMatch(/platho-pwa-prototype-v641/);
     expect(sw).toMatch(/\.\/styles\.css\?v=186/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=569/);
+    expect(sw).toMatch(/\.\/app\.js\?v=570/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
@@ -4830,7 +4842,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=13/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);

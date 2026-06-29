@@ -62,7 +62,7 @@ import {
   writePublicChannelSubscriptions,
   publicEvictionFloor,
   prunePublicPostsBelowFloor,
-} from './public-channel-subscriptions.mjs?v=13';
+} from './public-channel-subscriptions.mjs?v=14';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v569';
+const PLATHO_APP_RUNTIME_VERSION = 'v570';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4635,33 +4635,37 @@ function publicItemIdentityButton(item) {
 function appendPublicItemActions(article, item) {
   const actions = document.createElement('div');
   actions.className = 'feed-actions';
-  const commentButton = document.createElement('button');
-  commentButton.type = 'button';
-  const commentsAllowed = item.commentsAllowed !== false;
-  const hasChainCommentTarget = item.entryId !== undefined
-    && item.entryId !== null
-    && /^0x[0-9a-fA-F]{64}$/.test(String(item.bodyHash ?? ''));
-  const canComment = Boolean(commentsAllowed && plathoWallet && hasChainCommentTarget);
-  if (!commentsAllowed) {
-    commentButton.textContent = 'Comments off';
-  } else if (!hasChainCommentTarget) {
-    commentButton.textContent = 'Preview only';
-  } else if (!plathoWallet) {
-    commentButton.textContent = 'Create wallet';
-  } else {
-    commentButton.textContent = 'Comment';
+  // A followed channel with no posts yet has nothing to comment on — skip the disabled "Preview only" button so
+  // its card shows just Private chat + Unfollow (the Unfollow being the clear action for an empty channel).
+  if (!item.emptyChannel) {
+    const commentButton = document.createElement('button');
+    commentButton.type = 'button';
+    const commentsAllowed = item.commentsAllowed !== false;
+    const hasChainCommentTarget = item.entryId !== undefined
+      && item.entryId !== null
+      && /^0x[0-9a-fA-F]{64}$/.test(String(item.bodyHash ?? ''));
+    const canComment = Boolean(commentsAllowed && plathoWallet && hasChainCommentTarget);
+    if (!commentsAllowed) {
+      commentButton.textContent = 'Comments off';
+    } else if (!hasChainCommentTarget) {
+      commentButton.textContent = 'Preview only';
+    } else if (!plathoWallet) {
+      commentButton.textContent = 'Create wallet';
+    } else {
+      commentButton.textContent = 'Comment';
+    }
+    commentButton.disabled = !canComment;
+    commentButton.title = !commentsAllowed
+      ? 'The author closed comments for this post'
+      : (!hasChainCommentTarget
+          ? 'This preview post is not an on-chain capsule yet'
+          : (canComment ? 'Write one immutable public comment' : 'Create or import a Platho wallet to comment'));
+    commentButton.addEventListener('click', async () => {
+      if (!canComment) return;
+      setPublicCommentTarget(item);
+    });
+    actions.append(commentButton);
   }
-  commentButton.disabled = !canComment;
-  commentButton.title = !commentsAllowed
-    ? 'The author closed comments for this post'
-    : (!hasChainCommentTarget
-        ? 'This preview post is not an on-chain capsule yet'
-        : (canComment ? 'Write one immutable public comment' : 'Create or import a Platho wallet to comment'));
-  commentButton.addEventListener('click', async () => {
-    if (!canComment) return;
-    setPublicCommentTarget(item);
-  });
-  actions.append(commentButton);
 
   const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
   const isOwnPost = isOwnPublicAuthor(authorWallet);
