@@ -1711,18 +1711,19 @@ button.feed-item:hover {
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
+  /* Bleed the whole detail to the pane edges (the pane has 24px padding) so the header lines up with the private
+     chat header. This is a DIRECT pane grid child (like the composer, which bleeds the same way), where negative
+     side margins reliably widen it — a negative margin on the nested header itself does not, on desktop. The header
+     then fills the bled detail; the body re-insets its own content with padding. */
+  margin: -24px -24px 0;
 }
 
-/* The conversation-header base supplies the grid/columns/min-height/border/background. Bleed it to the pane edges
-   (the pane has 24px padding) so it matches the private chat header, and force the Back button visible (it is
-   display:none on desktop for the private two-pane layout, but Public has no second pane to fall back to). */
-/* The header sits within the pane's 24px padding — symmetric, at the same inset as the feed's own pane-header, so it
-   lands in the same place whether the feed or a post detail is showing. (Full edge-bleed isn't reliable here: the
-   header is a grid item inside an overflow:hidden detail, where negative side margins don't widen it.) Give it its
-   OWN column track (back + avatar + title) so it renders the same at every width — the shared conversation-header
-   grid assumes the Back button is hidden on desktop (the private two-pane layout), which doesn't hold for Public. */
+/* The detail container bleeds to the pane edges, so this header (filling it) lines up with the private chat header.
+   Give it its own column track (back + avatar + title + actions) so it renders the same at every width — the shared
+   conversation-header grid assumes the Back button is hidden on desktop (the private two-pane layout), which doesn't
+   hold for the single-pane Public tab. */
 .public-pane .public-post-detail-header {
-  grid-template-columns: max-content max-content minmax(0, 1fr);
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
   gap: 12px;
 }
 
@@ -1742,7 +1743,8 @@ button.feed-item:hover {
   flex-direction: column;
   gap: 14px;
   min-height: 0;
-  padding-top: 16px;
+  /* The detail bled to the pane edges, so re-inset the content here (matches the pane's 24px gutter). */
+  padding: 16px 24px 0;
 }
 
 .public-post-detail-body .comment-list {
