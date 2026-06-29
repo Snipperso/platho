@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v567';
+const PLATHO_APP_RUNTIME_VERSION = 'v568';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19996,25 +19996,24 @@ async function runPrivatePublishConfirmationRetry(context) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
     return;
   }
-  // Underfunded-Vault terminal: when NOTHING landed and every in-flight external is failing to broadcast, read the
-  // LIVE Vault GRAM balance BEFORE re-broadcasting. If it can't cover this message's signed hold (e.g. a batch where
-  // earlier sends drained the pool), the 5xx will never clear — so stop the auto-retry with a clear "top up GRAM"
-  // terminal instead of hammering /api/v3/message with 500s. Double-spend-safe: this only STOPS a re-broadcast (no
-  // re-sign, the nonce floor is untouched). A transient balance-read failure falls through to the normal retry.
+  // Underfunded-Vault terminal: when NOTHING landed and every in-flight external is failing to broadcast, the 5xx
+  // will never clear if the Vault GRAM can't cover this message's signed hold (e.g. a batch where earlier sends
+  // drained the pool). Use the SAME cached balance the composer cost line uses (currentVaultUserSource), NOT a
+  // fresh chain read — the read fails exactly when the RPC is unavailable (the moment broadcasts 5xx), which
+  // silently defeated this gate before (the message then ran to the generic "RPC broadcast unavailable" terminal).
+  // The cached balance already reflects the drained pool (it's what "Vault N GRAM" shows). If it's short, stop the
+  // auto-retry with a clear "top up GRAM" terminal instead of hammering /api/v3/message with 500s. Double-spend-safe:
+  // only STOPS a re-broadcast (no re-sign, nonce floor untouched); a stale-high cached balance just defers to the
+  // next pass (re-checked each time), never a false terminal.
   if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
     && Number(message.publishState?.confirmedCount ?? 0) === 0
     && Number(message.publishState?.submittedCount ?? 0) === 0
     && publishStateBroadcastIsFailing(message.publishState)) {
-    try {
-      const balanceProvider = await resolveVaultChainProvider();
-      const freshUser = await readFreshConnectedVaultUserForOwnVaultAction(balanceProvider);
-      const signedHold = privatePublishStateSignedHoldNanotons(message.publishState);
-      if (signedHold > 0n && vaultTonBalanceNanotons(freshUser) < signedHold) {
-        stopPrivatePublishConfirmationRetry(context, { message: 'Vault GRAM balance is too low for this publish', code: 'INSUFFICIENT_VAULT_GRAM' });
-        return;
-      }
-    } catch (balanceError) {
-      // Could not re-read the Vault balance (transient RPC) — fall through to the normal bounded confirm retry.
+    const cachedVaultUser = currentVaultUserSource();
+    const signedHold = privatePublishStateSignedHoldNanotons(message.publishState);
+    if (cachedVaultUser?.exists === true && signedHold > 0n && vaultTonBalanceNanotons(cachedVaultUser) < signedHold) {
+      stopPrivatePublishConfirmationRetry(context, { message: 'Vault GRAM balance is too low for this publish', code: 'INSUFFICIENT_VAULT_GRAM' });
+      return;
     }
   }
   if (privateChainSyncPromise) {
