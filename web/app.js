@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v575';
+const PLATHO_APP_RUNTIME_VERSION = 'v576';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -8014,11 +8014,16 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
   await persistMessageToEncryptedHistory(targetThread, message);
-  hydrateThreadAvatarFromPointer(
-    targetThread,
-    ownerWalletFromThread(targetThread),
-    avatarPointerFromPrivateHeader(opened.capsule?.header0),
-  ).catch((error) => console.error(error));
+  // Only an INCOMING message's header carries the counterparty's avatar. An outgoing ('out') message carries the
+  // OWN avatar pointer, and the avatar media cache is content-addressed by avatarHash (not wallet), so feeding it
+  // here would briefly paint the dialog header with the user's own avatar until an inbound message corrects it.
+  if (message.type !== 'out') {
+    hydrateThreadAvatarFromPointer(
+      targetThread,
+      ownerWalletFromThread(targetThread),
+      avatarPointerFromPrivateHeader(opened.capsule?.header0),
+    ).catch((error) => console.error(error));
+  }
   return true;
 }
 
@@ -8032,11 +8037,14 @@ async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
   await persistMessageToEncryptedHistory(targetThread, message);
   const firstOpened = parts[0]?.opened;
-  hydrateThreadAvatarFromPointer(
-    targetThread,
-    ownerWalletFromThread(targetThread),
-    avatarPointerFromPrivateHeader(firstOpened?.capsule?.header0),
-  ).catch((error) => console.error(error));
+  // Incoming only — see appendOpenedCapsuleMessage: an outgoing message's header carries the OWN avatar.
+  if (message.type !== 'out') {
+    hydrateThreadAvatarFromPointer(
+      targetThread,
+      ownerWalletFromThread(targetThread),
+      avatarPointerFromPrivateHeader(firstOpened?.capsule?.header0),
+    ).catch((error) => console.error(error));
+  }
   return true;
 }
 
@@ -9177,11 +9185,15 @@ async function restoreEncryptedMessageHistory() {
       ensureMessageOrderFields(message, item.createdAt);
       insertThreadMessage(thread, message);
       refreshThreadAfterMessageChange(thread);
-      hydrateThreadAvatarFromPointer(
-        thread,
-        ownerWalletFromThread(thread),
-        avatarPointerFromFields(message.profileVersion, message.avatarHash),
-      ).catch((error) => console.error(error));
+      // Incoming only — an outgoing ('out') restored message carries the OWN avatar pointer, which the by-hash
+      // avatar cache would resolve to the user's own avatar on the counterparty's dialog header.
+      if (message.type !== 'out') {
+        hydrateThreadAvatarFromPointer(
+          thread,
+          ownerWalletFromThread(thread),
+          avatarPointerFromFields(message.profileVersion, message.avatarHash),
+        ).catch((error) => console.error(error));
+      }
         changed = true;
     }
     globalThis.plathoLastEncryptedHistoryRestore = {

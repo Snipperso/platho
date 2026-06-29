@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v575<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v575'/);
+    expect(html).toMatch(/id="appVersionLabel">v576<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v576'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4148,6 +4148,24 @@ describe('PWA runtime config guard', () => {
     expect(refreshSource).toMatch(/if \(!result\.degraded\)/);
   });
 
+  it('PWA-DIALOG-AVATAR-INCOMING-ONLY-01: the dialog header avatar hydrates only from INCOMING message headers', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // An outgoing ('out') message carries the OWN avatar pointer; the by-hash avatar cache would otherwise paint
+    // the counterparty's header with the user's own avatar. Each message-driven hydrate must be gated on incoming.
+    const appendSource = app.slice(
+      app.indexOf('async function appendOpenedCapsuleMessage'),
+      app.indexOf('async function appendOpenedPrivatePartsMessage'),
+    );
+    expect(appendSource).toMatch(/if \(message\.type !== 'out'\) \{[\s\S]*?hydrateThreadAvatarFromPointer\(/);
+    const partsSource = app.slice(
+      app.indexOf('async function appendOpenedPrivatePartsMessage'),
+      app.indexOf('function isBodyHistoryUnavailableError'),
+    );
+    expect(partsSource).toMatch(/if \(message\.type !== 'out'\) \{[\s\S]*?hydrateThreadAvatarFromPointer\(/);
+    // The encrypted-history restore loop is gated the same way.
+    expect(app).toMatch(/if \(message\.type !== 'out'\) \{\s*hydrateThreadAvatarFromPointer\(\s*thread,/);
+  });
+
   it('PWA-SYNC-MESSAGES-INFLIGHT-01: the manual Sync messages button stays disabled across re-renders while its run is in flight', () => {
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toMatch(/let messageSyncManualInFlight = false;/);
@@ -4912,11 +4930,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v646/);
+    expect(sw).toMatch(/platho-pwa-prototype-v647/);
     expect(sw).toMatch(/\.\/styles\.css\?v=190/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=575/);
+    expect(sw).toMatch(/\.\/app\.js\?v=576/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
