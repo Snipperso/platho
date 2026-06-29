@@ -1452,8 +1452,18 @@ html[data-platho-telegram="true"] .install-header-button {
   height: 44px;
 }
 
+/* Comment mode (post detail screen) hides the "allow comments" toggle (composer-post-option, column 1). Drop that
+   track so the input doesn't leave an empty 44px gap where the toggle used to be: just image + input + send. */
 .public-composer[data-mode="comment"] {
-  grid-template-columns: 44px 44px minmax(0, 1fr) 52px;
+  grid-template-columns: 44px minmax(0, 1fr) 52px;
+}
+
+.public-composer[data-mode="comment"] .composer-stack {
+  grid-column: 2;
+}
+
+.public-composer[data-mode="comment"] > .send-button {
+  grid-column: 3;
 }
 
 .public-composer > .composer-post-option {
