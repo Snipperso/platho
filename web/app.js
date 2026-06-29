@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v574';
+const PLATHO_APP_RUNTIME_VERSION = 'v575';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -675,6 +675,9 @@ let messageAutoSyncPhase = 'idle';
 let publicSyncPhase = 'syncing';
 let messageAutoSyncLastResult = null;
 let messageAutoSyncLastErrorLabel = null;
+// True while the MANUAL "Sync messages" run is in flight, so a profile re-render (refreshMessagingControls) does not
+// re-enable the button mid-sync — which left it clickable while the status still read "syncing".
+let messageSyncManualInFlight = false;
 let messageAutoSyncLoadingFrame = 0;
 let messageAutoSyncStallStreak = 0;
 const privateScanUnknownErrorCounts = new Map();
@@ -11648,7 +11651,7 @@ function refreshMessagingControls() {
       ? 'activating'
       : `${plathoAccountActivationFeeLabel()} GRAM`);
   if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !signedActionsReady;
-  if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady;
+  if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady || messageSyncManualInFlight;
   if (mintUsernameButton) mintUsernameButton.disabled = false;
   if (linkUsernameButton) linkUsernameButton.disabled = false;
   if (setAvatarButton) setAvatarButton.disabled = plathoProfileAvatarPending;
@@ -12453,6 +12456,7 @@ replaceVaultKeysButton?.addEventListener('click', async () => {
 
 syncMessagesButton?.addEventListener('click', async () => {
   try {
+    messageSyncManualInFlight = true;
     syncMessagesButton.disabled = true;
     clearMessageAutoSyncTimer();
     beginMessageSyncUi();
@@ -12470,6 +12474,7 @@ syncMessagesButton?.addEventListener('click', async () => {
     setText(messageSyncStatus, rateLimited ? 'sync delayed' : 'sync failed');
     if (!rateLimited) console.error(error);
   } finally {
+    messageSyncManualInFlight = false;
     syncMessagesButton.disabled = false;
     scheduleMessageAutoSync();
   }
