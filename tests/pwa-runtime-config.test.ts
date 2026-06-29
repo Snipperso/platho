@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v571<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v571'/);
+    expect(html).toMatch(/id="appVersionLabel">v572<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v572'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4133,7 +4133,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function refreshPublicPostDetailComments('),
     );
     // Empty / missing parent index -> genuinely zero comments (clean, not degraded).
-    expect(loaderSource).toMatch(/if \(!parentIndex \|\| parentIndex\.exists !== true\) return \{ comments: \[\], degraded: false \};/);
+    expect(loaderSource).toMatch(/if \(!parentIndex \|\| parentIndex\.exists !== true\) \{/);
+    expect(loaderSource).toMatch(/return \{ comments: \[\], degraded: false \};/);
     // A rate-limited read returns degraded:true (the caller keeps "Loading" and retries; never caches a partial).
     expect(loaderSource).toMatch(/if \(noteTonRpcRateLimit\(error\)\) return \{ comments: \[\], degraded: true \};/);
     // Parent binding identical to the feed sync: drop only when BOTH hashes present AND mismatch (lowercased).
@@ -4897,11 +4898,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v642/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=187/);
+    expect(sw).toMatch(/platho-pwa-prototype-v643/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=188/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=571/);
+    expect(sw).toMatch(/\.\/app\.js\?v=572/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
