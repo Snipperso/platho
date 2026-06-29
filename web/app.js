@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v579';
+const PLATHO_APP_RUNTIME_VERSION = 'v580';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4943,7 +4943,10 @@ function renderPublicPostDetail() {
   } else if (publicPostDetailLoadState === 'error' && comments.length === 0) {
     section.append(publicDetailStatusNode('Couldn’t load comments. Check your connection and try again.', { retry: true }));
   } else if (publicPostDetailLoadState === 'ready' && comments.length === 0) {
-    section.append(publicDetailStatusNode('No comments yet. Be the first to comment.'));
+    // We can't be SURE a post is comment-free: a lagging/contended RPC node can return an empty parent index even
+    // when a comment exists (it self-heals on a later read). So don't assert "no comments" — say they aren't loaded
+    // yet and offer a re-check, instead of a false-negative.
+    section.append(publicDetailStatusNode('Comments not loaded yet.', { retry: true }));
   }
   publicPostDetailBody.append(section);
 }
