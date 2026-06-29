@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v578<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v578'/);
+    expect(html).toMatch(/id="appVersionLabel">v579<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v579'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4161,6 +4161,77 @@ describe('PWA runtime config guard', () => {
     expect(ownSource).toMatch(/authorWallet: wallet,/);
   });
 
+  it('PWA-PREFS-CAPSULE-01: subscription snapshot is a PREFS document block sent as a single-part private capsule to self', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/PREFS: 4,/);
+    expect(app).toMatch(/} else if \(block\.type === 'prefs'\) \{/);
+    expect(app).toMatch(/type === PLATHO_DOCUMENT_BLOCK_TYPES\.PREFS\) \{/);
+    expect(app).toMatch(/async function createPrivatePrefsCapsules\(/);
+    expect(app).toMatch(/async function resolveSelfPeerEntry\(/);
+    expect(app).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'prefs', bytes: snapshotBytes \}\]\)/);
+    // Single-part guarantee is STRUCTURAL (in the builder), not only a late check before publish.
+    const builder = app.slice(app.indexOf('async function createPrivatePrefsCapsules('), app.indexOf('let prefsSyncInFlight'));
+    expect(builder).toMatch(/if \(totalParts > 1\) \{/);
+    expect(builder).toMatch(/code = 'PREFS_TOO_LARGE'/);
+    // Publish reuses the single-capsule path and clears dirty ONLY on a confirmed publish.
+    const pub = app.slice(app.indexOf('async function publishPrefsSnapshot('), app.indexOf('function prefsSyncedDateLabel('));
+    expect(pub).toMatch(/await publishCapsuleThroughVault\(capsules\[0\], publishOptions\)/);
+    expect(pub).not.toMatch(/publishCapsulesThroughVault/);
+    expect(pub).toMatch(/=== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\)/);
+    expect(pub).toMatch(/writePrefsDirty\(false\)/);
+  });
+
+  it('PWA-PREFS-CHAT-FILTER-01: a prefs capsule is diverted before thread routing and never becomes a chat message', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function prefsBytesFromOpenedCapsule\(opened\)/);
+    const detect = app.slice(app.indexOf('function prefsBytesFromOpenedCapsule(opened)'), app.indexOf('function messageFromOpenedCapsule('));
+    expect(detect).toMatch(/Number\(opened\.payload\.partCount \?\? 1\) > 1\) return null/);
+    // Scan diverts AFTER opening the capsule and BEFORE resolving a thread.
+    const scanIdx = app.indexOf('const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair');
+    const scanSlice = app.slice(scanIdx, scanIdx + 800);
+    expect(scanSlice).toMatch(/const prefsBytes = prefsBytesFromOpenedCapsule\(opened\);/);
+    expect(scanSlice).toMatch(/collectRestoredPrefsSnapshot\(prefsBytes\)/);
+    expect(scanSlice.indexOf('collectRestoredPrefsSnapshot')).toBeLessThan(scanSlice.indexOf('threadForChainCapsule'));
+    // Defensive divert at the top of the append path too.
+    const appendSrc = app.slice(app.indexOf('async function appendOpenedCapsuleMessage('), app.indexOf('async function appendOpenedPrivatePartsMessage('));
+    expect(appendSrc).toMatch(/const prefsBytes = prefsBytesFromOpenedCapsule\(opened\);\s*if \(prefsBytes\) \{ collectRestoredPrefsSnapshot\(prefsBytes\); return true; \}/);
+  });
+
+  it('PWA-PREFS-RESTORE-01: restore collects diverted snapshots and auto-applies the newest only on a fresh device', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function collectRestoredPrefsSnapshot\(/);
+    expect(app).toMatch(/function drainRestoredPrefsSnapshots\(/);
+    expect(app).toMatch(/function applyPrefsSnapshot\(snapshot\)/);
+    // Drain runs after each private sync pass.
+    const wrap = app.slice(app.indexOf('async function syncPrivateCapsulesFromChainOnce('), app.indexOf('function isChatsViewActive('));
+    expect(wrap).toMatch(/drainRestoredPrefsSnapshots\(\)/);
+    // Conservative auto-restore guard: only on a truly fresh device (never synced, not dirty, no local follows).
+    expect(app).toMatch(/prefsLastSyncedAt === null && !prefsDirty && !hasLocalFollows/);
+  });
+
+  it('PWA-PREFS-BUTTON-01: Save subscriptions button publishes the snapshot, shows last-synced, disabled when nothing to save', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    expect(html).toMatch(/id="savePrefsButton"/);
+    expect(html).toMatch(/id="savePrefsStatus"/);
+    expect(app).toMatch(/savePrefsButton\?\.addEventListener\('click'/);
+    expect(app).toMatch(/savePrefsButton\.disabled = !\(Boolean\(plathoWallet && hasActivePlathoAccount\(\)\) && prefsDirty && !prefsSyncInFlight\)/);
+    expect(app).toMatch(/saved \$\{prefsSyncedDateLabel\(prefsLastSyncedAt\)\}/);
+    expect(app).toMatch(/refreshPrefsSyncUi\(\);/);
+  });
+
+  it('PWA-PREFS-NO-SILENT-FLUSH-01: prefs write only via the explicit button; follow/unfollow only marks dirty', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // No timer-driven / background publish of the snapshot.
+    expect(app).not.toMatch(/setTimeout\([^)]*publishPrefsSnapshot/);
+    expect(app).not.toMatch(/setInterval\([^)]*publishPrefsSnapshot/);
+    // Following / unfollowing marks dirty (does not auto-publish).
+    const addSrc = app.slice(app.indexOf('function addCustomPublicChannel('), app.indexOf('function resyncPublicForNewSubscription'));
+    expect(addSrc).toMatch(/markPrefsDirty\(\)/);
+    const setSrc = app.slice(app.indexOf('function setPublicChannelSubscribed('), app.indexOf('function readPublicReadCursors('));
+    expect(setSrc).toMatch(/markPrefsDirty\(\)/);
+  });
+
   it('PWA-PUBLIC-SUBSCRIBE-RESYNC-01: following a channel invalidates the sync fast-path and resyncs so its posts load now', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The resync helper forces a full walk (clears the global fast-path cursor) and kicks a sync.
@@ -4969,11 +5040,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v649/);
+    expect(sw).toMatch(/platho-pwa-prototype-v650/);
     expect(sw).toMatch(/\.\/styles\.css\?v=190/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=578/);
+    expect(sw).toMatch(/\.\/app\.js\?v=579/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

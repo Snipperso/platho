@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v578';
+const PLATHO_APP_RUNTIME_VERSION = 'v579';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -356,6 +356,8 @@ const exportWalletKeyStatus = document.querySelector('#exportWalletKeyStatus');
 const importWalletKeyButton = document.querySelector('#importWalletKeyButton');
 const importWalletKeyStatus = document.querySelector('#importWalletKeyStatus');
 const walletKeyBackupInput = document.querySelector('#walletKeyBackupInput');
+const savePrefsButton = document.querySelector('#savePrefsButton');
+const savePrefsStatus = document.querySelector('#savePrefsStatus');
 const exportWalletSeedButton = document.querySelector('#exportWalletSeedButton');
 const clearLocalDataButton = document.querySelector('#clearLocalDataButton');
 const clearLocalDataStatus = document.querySelector('#clearLocalDataStatus');
@@ -4334,6 +4336,7 @@ function addCustomPublicChannel(channel) {
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface();
   resyncPublicForNewSubscription();
+  markPrefsDirty();
 }
 
 // A newly-followed channel does NOT change the GLOBAL public latest id, so the sync fast-path (latestId unchanged ->
@@ -4373,6 +4376,7 @@ function setPublicChannelSubscribed(channelId, subscribed) {
   setPublicStatus(subscribed ? 'channel followed' : 'channel hidden');
   // Following a channel must pull its posts NOW (the fast-path would otherwise skip the walk until a reload).
   if (subscribed) resyncPublicForNewSubscription();
+  markPrefsDirty();
   return true;
 }
 
@@ -5948,6 +5952,131 @@ function feedSourcePublicChannels() {
   const own = ownPublicChannel();
   if (!own || subscribed.some((channel) => channel.id === own.id)) return subscribed;
   return [...subscribed, own];
+}
+
+// ---- Subscription persistence (Phase 2 v1): full snapshot stored as a private capsule to SELF -----------------
+// Public-channel subscriptions live only in localStorage and are lost on a data wipe / new device. v1 persists them
+// on-chain (recoverable from the key like everything else): the user taps "Save subscriptions" to publish a FULL
+// snapshot as a private capsule addressed to themselves; a fresh device restores it from the recipient-index walk.
+// No silent/background write — only the explicit button (piggyback is Phase 2.1). Latest snapshot wins (per-channel
+// LWW is a 2.1 refinement). The own + official channels are implicit (never stored).
+const PREFS_SNAPSHOT_VERSION = 1;
+const PREFS_DIRTY_STORAGE_KEY = 'platho.prefs.dirty.v1';
+const PREFS_LAST_SYNCED_STORAGE_KEY = 'platho.prefs.lastSyncedAt.v1';
+let prefsDirty = false;
+let prefsLastSyncedAt = null; // unix sec of the last snapshot written or restored, or null if never
+let pendingRestoredPrefsSnapshots = [];
+
+function loadPrefsSyncMeta() {
+  const storage = publicChannelStorage();
+  try {
+    prefsDirty = storage?.getItem(PREFS_DIRTY_STORAGE_KEY) === '1';
+    const at = Number(storage?.getItem(PREFS_LAST_SYNCED_STORAGE_KEY) ?? '');
+    prefsLastSyncedAt = Number.isFinite(at) && at > 0 ? at : null;
+  } catch {
+    prefsDirty = false;
+    prefsLastSyncedAt = null;
+  }
+}
+
+function writePrefsDirty(value) {
+  prefsDirty = Boolean(value);
+  try { publicChannelStorage()?.setItem(PREFS_DIRTY_STORAGE_KEY, prefsDirty ? '1' : '0'); } catch { /* advisory */ }
+  refreshPrefsSyncUi();
+}
+
+function markPrefsDirty() {
+  if (!prefsDirty) writePrefsDirty(true);
+}
+
+function setPrefsLastSyncedAt(sec) {
+  prefsLastSyncedAt = Number.isFinite(sec) && sec > 0 ? Math.floor(sec) : null;
+  try {
+    if (prefsLastSyncedAt) publicChannelStorage()?.setItem(PREFS_LAST_SYNCED_STORAGE_KEY, String(prefsLastSyncedAt));
+  } catch { /* advisory */ }
+}
+
+// Full snapshot of the user's FOLLOWED wallet channels (+ explicit unfollows). Official + own channels are implicit.
+function buildPrefsSnapshot() {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const ownWallet = rawWalletAddress(plathoWallet?.address);
+  const subById = new Map((publicChannelSubscriptions?.channels ?? []).map((c) => [c.id, c.subscribed === true]));
+  const customById = new Map((customPublicChannels ?? []).map((c) => [c.id, c]));
+  const channels = [];
+  for (const id of new Set([...subById.keys(), ...customById.keys()])) {
+    if (id === DEFAULT_PUBLIC_CHANNEL_ID) continue;
+    const authorWallet = customById.get(id)?.authorWallet ?? null;
+    if (authorWallet && ownWallet && sameWalletAddress(authorWallet, ownWallet)) continue; // own channel is implicit
+    channels.push({ id, w: authorWallet, sub: subById.get(id) === true, name: customById.get(id)?.name ?? null, ts: nowSec });
+  }
+  return { v: PREFS_SNAPSHOT_VERSION, writtenAt: nowSec, channels };
+}
+
+function serializePrefsSnapshotBytes(snapshot) {
+  return new TextEncoder().encode(JSON.stringify(snapshot));
+}
+
+function parsePrefsSnapshotBytes(bytes) {
+  try {
+    const obj = JSON.parse(new TextDecoder().decode(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes ?? [])));
+    if (!obj || obj.v !== PREFS_SNAPSHOT_VERSION || !Array.isArray(obj.channels)) return null;
+    return obj;
+  } catch {
+    return null;
+  }
+}
+
+// Apply a restored snapshot to local subscriptions (v1: the snapshot wins). Registers its wallet channels, sets the
+// subscribed flags, pulls posts. NOT a user change → does not mark dirty; records the snapshot as last-synced.
+function applyPrefsSnapshot(snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.channels)) return false;
+  for (const ch of snapshot.channels) {
+    if (!ch?.id || ch.id === DEFAULT_PUBLIC_CHANNEL_ID || !ch.w) continue;
+    if (customPublicChannels.some((c) => c.id === ch.id)) continue;
+    const normalized = normalizePublicChannelRegistry([{ id: ch.id, authorWallet: ch.w, name: ch.name ?? undefined }]).find((c) => c.id === ch.id);
+    if (normalized) customPublicChannels = normalizePublicChannelRegistry([...customPublicChannels, normalized]);
+  }
+  writeCustomPublicChannels();
+  rebuildPublicChannelRegistry();
+  const subById = new Map((publicChannelSubscriptions?.channels ?? []).map((c) => [c.id, c.subscribed === true]));
+  for (const ch of snapshot.channels) {
+    if (ch?.id && ch.id !== DEFAULT_PUBLIC_CHANNEL_ID) subById.set(ch.id, ch.sub === true);
+  }
+  publicChannelSubscriptions = {
+    version: publicChannelSubscriptions?.version ?? 1,
+    activeChannelId: publicChannelSubscriptions?.activeChannelId ?? null,
+    channels: publicChannelRegistry.map((item) => ({ id: item.id, subscribed: subById.get(item.id) === true })),
+  };
+  writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
+  setPrefsLastSyncedAt(snapshot.writtenAt);
+  writePrefsDirty(false);
+  rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
+  resyncPublicForNewSubscription();
+  return true;
+}
+
+// A diverted prefs capsule (from the recipient-index walk) parks its snapshot here; drained after the sync pass.
+function collectRestoredPrefsSnapshot(bytes) {
+  const snapshot = parsePrefsSnapshotBytes(bytes);
+  if (snapshot) pendingRestoredPrefsSnapshots.push(snapshot);
+}
+
+// v1 restore: auto-apply the newest collected snapshot ONLY on a truly fresh device (never synced here, no local
+// follows, no unsaved changes) — so a restore never clobbers in-session local edits. Otherwise just note the time;
+// the user reconciles via the Save button. (Cross-device merge / per-channel LWW is Phase 2.1.)
+function drainRestoredPrefsSnapshots() {
+  if (pendingRestoredPrefsSnapshots.length === 0) return false;
+  const snapshots = pendingRestoredPrefsSnapshots;
+  pendingRestoredPrefsSnapshots = [];
+  const newest = snapshots.reduce((best, s) => (Number(s.writtenAt ?? 0) >= Number(best.writtenAt ?? 0) ? s : best));
+  const hasLocalFollows = (publicChannelSubscriptions?.channels ?? [])
+    .some((c) => c.subscribed && c.id !== DEFAULT_PUBLIC_CHANNEL_ID);
+  if (prefsLastSyncedAt === null && !prefsDirty && !hasLocalFollows) {
+    return applyPrefsSnapshot(newest);
+  }
+  const seen = Math.max(prefsLastSyncedAt ?? 0, Number(newest.writtenAt ?? 0));
+  if (seen > 0) setPrefsLastSyncedAt(seen);
+  return false;
 }
 
 function publicAuthorLabel(authorWallet) {
@@ -7763,6 +7892,20 @@ function insertThreadMessage(thread, message) {
   sortThreadMessages(thread);
 }
 
+// A self-addressed subscription snapshot (Phase 2) rides as a single PREFS document block. Detect it on an opened
+// capsule so the scan can divert it (collect for restore) BEFORE it is routed to a thread — it is never a chat
+// message. v1 prefs is single-part, so multipart documents are never prefs here.
+function prefsBytesFromOpenedCapsule(opened) {
+  if (opened?.payload?.type !== 'document') return null;
+  if (Number(opened.payload.partCount ?? 1) > 1) return null;
+  try {
+    const prefsBlock = decodeMessageDocumentBlocks(opened.payload.bytes).find((block) => block?.type === 'prefs');
+    return prefsBlock ? prefsBlock.bytes : null;
+  } catch {
+    return null;
+  }
+}
+
 function messageFromOpenedCapsule(opened, meta, entry) {
   const isOutgoing = opened?.openedAs === 'sender';
   const payment = paymentFromCompactPayload(opened.payload);
@@ -8029,6 +8172,9 @@ function relocateExistingCapsuleMessage(existing, targetThread) {
 }
 
 async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
+  // Defensive divert (the scan already diverts before thread resolution): a prefs snapshot is never a chat message.
+  const prefsBytes = prefsBytesFromOpenedCapsule(opened);
+  if (prefsBytes) { collectRestoredPrefsSnapshot(prefsBytes); return true; }
   if (!targetThread) throw new Error('Private chain message target thread could not be resolved');
   const message = messageFromOpenedCapsule(opened, meta, entry);
   const existing = findMessageByCapsuleId(opened.capsule?.id);
@@ -8386,6 +8532,15 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair, {
         now: Date.now(),
       });
+      // Divert a self-addressed subscription snapshot BEFORE thread resolution, so it never spawns a "chat with
+      // yourself" thread. Collected here; applied (restore) when the sync pass drains them.
+      const prefsBytes = prefsBytesFromOpenedCapsule(opened);
+      if (prefsBytes) {
+        collectRestoredPrefsSnapshot(prefsBytes);
+        rememberPrivateScanLog(entryId, 'prefs');
+        clearPrivateStuckEntry(address, entryId);
+        return { ok: true, entry };
+      }
       const targetThread = await threadForChainCapsule(opened, entry);
       const partCount = Number(opened.payload?.partCount ?? 1);
       if (partCount > 1) {
@@ -8797,7 +8952,10 @@ async function syncPrivateCapsulesFromChainOnce(options = {}) {
   if (privateChainSyncPromise) return privateChainSyncPromise;
   privateChainSyncPromise = syncPrivateCapsulesFromChain(options);
   try {
-    return await privateChainSyncPromise;
+    const result = await privateChainSyncPromise;
+    // Apply any subscription snapshot diverted from this pass (restore on a fresh device / cleared data).
+    try { drainRestoredPrefsSnapshots(); } catch (error) { console.error(error); }
+    return result;
   } finally {
     privateChainSyncPromise = null;
   }
@@ -11660,6 +11818,7 @@ function refreshMessagingControls() {
   // backup restores the key into storage, and this guarantees the Profile field reflects it (refreshMessagingControls
   // runs in the import's finally) even if the field was rendered empty before the import completed.
   refreshToncenterKeyUi();
+  refreshPrefsSyncUi();
   if (exportWalletSeedButton) exportWalletSeedButton.disabled = !plathoWallet;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = !(plathoWallet || storedWalletAddressForCopy());
   if (walletDisplayModeSelect) walletDisplayModeSelect.disabled = !plathoWallet;
@@ -13158,6 +13317,10 @@ importWalletKeyButton?.addEventListener('click', () => {
   walletKeyBackupInput?.click();
 });
 
+savePrefsButton?.addEventListener('click', () => {
+  publishPrefsSnapshot().catch((error) => console.error(error));
+});
+
 walletKeyBackupInput?.addEventListener('change', async () => {
   const file = walletKeyBackupInput.files?.[0] ?? null;
   walletKeyBackupInput.value = '';
@@ -14356,6 +14519,9 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   TEXT: 1,
   IMAGE: 2,
   PAYMENT: 3,
+  // A self-addressed subscription snapshot (Phase 2): the body of a private capsule the user sends to THEMSELVES to
+  // persist their public-channel subscriptions on-chain. Never rendered as chat — diverted in messageFromOpenedCapsule.
+  PREFS: 4,
 });
 const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
 const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\]/ig;
@@ -14454,6 +14620,9 @@ function encodeMessageDocumentBlocks(blocks, options = {}) {
     } else if (block.type === 'payment') {
       type = PLATHO_DOCUMENT_BLOCK_TYPES.PAYMENT;
       content = documentPaymentContent(block.payment ?? block, options);
+    } else if (block.type === 'prefs') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.PREFS;
+      content = block.bytes instanceof Uint8Array ? block.bytes : new Uint8Array(block.bytes ?? []);
     } else {
       throw new Error('Unsupported document block type');
     }
@@ -14510,6 +14679,8 @@ function decodeMessageDocumentBlocks(bytesLike, options = {}) {
       });
     } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.PAYMENT) {
       blocks.push({ type: 'payment', payment: paymentFromDocumentContent(content) });
+    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.PREFS) {
+      blocks.push({ type: 'prefs', bytes: content.slice() });
     } else if (tolerateUnknownBlocks) {
       // Skip an unrecognized block (offset already advanced past its content above) — forward-compat.
       continue;
@@ -20874,6 +21045,133 @@ async function createPrivateComposerCapsules(text, attachments, recipientEntry, 
   return capsules;
 }
 
+// Resolve a private "peer entry" for the user's OWN wallet (mirror of resolveRecipientPeerEntry) so a prefs
+// snapshot can be encrypted to SELF. Reads the own Vault user + key record + public bundle from chain.
+async function resolveSelfPeerEntry(options = {}) {
+  const walletAddress = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const requestedSuite = options.suite === undefined || options.suite === null ? null : normalizeCryptoSuite(options.suite);
+  const provider = await resolveVaultChainProvider();
+  if (!provider?.getUser || !provider?.getKeyRecord) throw new Error('Vault provider cannot resolve own key record');
+  const readOptions = { vaultAddress: requireVaultAddress(), ...criticalChainReadOptions() };
+  const user = await provider.getUser(walletAddress, readOptions);
+  const currentKeyId = BigInt(user.current_key_id ?? 0n);
+  if (user.exists !== true || currentKeyId === 0n) throw new Error('Activate Platho account before saving subscriptions');
+  const keyRecord = await provider.getKeyRecord(currentKeyId, { ownerWallet: walletAddress, ...readOptions });
+  await assertVaultKeyRecordMatchesOwner(walletAddress, keyRecord, currentKeyId);
+  const publicBundle = await publicKeyBundleFromVaultKeyRecord(keyRecord, { ownerWallet: walletAddress, suite: requestedSuite });
+  return { walletAddress, user, keyRecord, currentKeyId, publicBundle };
+}
+
+// Build the private capsule(s) that carry a prefs snapshot to SELF. Mirrors createPrivateComposerCapsules but the
+// body is a single PREFS document block (no chat text/attachments) — keeping the chat-composer builder untouched.
+async function createPrivatePrefsCapsules(snapshotBytes, selfEntry, options = currentPrivateSenderOptions()) {
+  const senderWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const recipientWallet = requireBasechainAddress(selfEntry?.walletAddress, 'Recipient wallet');
+  const documentBytes = encodeMessageDocumentBlocks([{ type: 'prefs', bytes: snapshotBytes }]);
+  const documentParts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
+    perPartOverheadBytes: privateCompactPayloadOverhead(options),
+  });
+  const totalParts = documentParts.length;
+  assertPrivateComposerPartLimit(totalParts);
+  // v1 GUARANTEE: a prefs snapshot is ONE capsule part. Enforce it structurally HERE (not just before publish) so a
+  // multipart prefs capsule can never be built/sent — the receive-side divert (prefsBytesFromOpenedCapsule) ignores
+  // partCount > 1, so a multipart one would never be diverted and would land as an empty multipart message.
+  if (totalParts > 1) {
+    const error = new Error('Subscription snapshot exceeds a single capsule part (v1)');
+    error.code = 'PREFS_TOO_LARGE';
+    throw error;
+  }
+  const streamId = randomBytes(16);
+  const capsules = [];
+  for (let index = 0; index < documentParts.length; index += 1) {
+    const part = documentParts[index];
+    const payloadBytes = encodeCompactPayload({
+      type: 'document',
+      bytes: part.bytes,
+      sizeClass: part.sizeClass,
+      streamId,
+      partIndex: index,
+      partCount: totalParts,
+      senderWallet,
+      senderVaultKeyId: currentVaultMessagingKeyId() ?? undefined,
+      recipientWallet,
+      reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
+    });
+    capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', selfEntry.publicBundle, localIdentity, {
+      payloadBytes,
+      sizeClass: part.sizeClass,
+      threadId: 'platho-prefs',
+      senderRecovery: true,
+      ...currentProfilePointerFields(),
+    }));
+  }
+  return capsules;
+}
+
+let prefsSyncInFlight = false;
+
+// Explicit "Save subscriptions" action: publish a full snapshot as a private capsule to self via the proven publish
+// path. Only clears dirty on a CONFIRMED publish (a non-confirmed/failed one stays dirty so the user can retry).
+async function publishPrefsSnapshot() {
+  if (prefsSyncInFlight) return;
+  if (!plathoWallet || !localIdentity || !localRecipientKeyPair || !hasActivePlathoAccount()) {
+    setText(savePrefsStatus, 'activate first');
+    return;
+  }
+  if (tonRpcLimited()) { setText(savePrefsStatus, 'RPC busy'); return; }
+  prefsSyncInFlight = true;
+  refreshPrefsSyncUi();
+  setText(savePrefsStatus, 'saving...');
+  try {
+    const snapshot = buildPrefsSnapshot();
+    const selfEntry = await resolveSelfPeerEntry({ suite: currentOutgoingPrivateSuite() });
+    // createPrivatePrefsCapsules enforces single-part (throws PREFS_TOO_LARGE otherwise), so there is always exactly
+    // one capsule here and the publish reuses the single-capsule path (with its nonce-floor / double-spend hardening).
+    const capsules = await createPrivatePrefsCapsules(serializePrefsSnapshotBytes(snapshot), selfEntry);
+    if (capsules.length === 0) throw new Error('Prefs snapshot produced no capsule');
+    const publishState = createCapsulePublishState(capsules);
+    const publishOptions = { publishState, allowOwnVaultActionReadFallback: true, confirmFinalNonce: true };
+    const result = await publishCapsuleThroughVault(capsules[0], publishOptions);
+    if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+      setPrefsLastSyncedAt(snapshot.writtenAt);
+      writePrefsDirty(false);
+      setText(savePrefsStatus, 'saved');
+    } else {
+      setText(savePrefsStatus, 'pending - retry');
+    }
+  } catch (error) {
+    const rateLimited = noteTonRpcRateLimit(error);
+    setText(savePrefsStatus, error?.code === 'PREFS_TOO_LARGE' ? 'too many channels' : (rateLimited ? 'RPC busy' : 'save failed'));
+    if (!rateLimited && error?.code !== 'PREFS_TOO_LARGE') console.error(error);
+  } finally {
+    prefsSyncInFlight = false;
+    refreshPrefsSyncButton();
+  }
+}
+
+function prefsSyncedDateLabel(sec) {
+  if (!sec) return '';
+  try { return new Date(sec * 1000).toISOString().slice(0, 16).replace('T', ' '); } catch { return ''; }
+}
+
+function refreshPrefsSyncButton() {
+  if (!savePrefsButton) return;
+  savePrefsButton.disabled = !(Boolean(plathoWallet && hasActivePlathoAccount()) && prefsDirty && !prefsSyncInFlight);
+}
+
+// Resting status for the Save-subscriptions row. A publish in flight owns the status text (saving/saved/failed);
+// otherwise show whether there are unsaved changes and the last-synced date.
+function refreshPrefsSyncUi() {
+  refreshPrefsSyncButton();
+  if (prefsSyncInFlight || !savePrefsStatus) return;
+  let label;
+  if (!plathoWallet) label = 'wallet required';
+  else if (prefsDirty) label = 'unsaved';
+  else if (prefsLastSyncedAt) label = `saved ${prefsSyncedDateLabel(prefsLastSyncedAt)}`;
+  else label = 'not saved';
+  setText(savePrefsStatus, label);
+}
+
 function publicPublishDraftFromPayload(payload) {
   return {
     publish_kind: VAULT_PUBLISH_KIND.PUBLIC,
@@ -21362,6 +21660,7 @@ customPublicChannels = readCustomPublicChannels();
 rebuildPublicChannelRegistry();
 publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
 writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
+loadPrefsSyncMeta();
 publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
 // Warm per-wallet avatars from the IndexedDB media store BEFORE the first render so reloaded public feeds show
 // faces immediately (no letter-tile placeholder + chain-refetch flash). Top-level await (app.js is a module),
