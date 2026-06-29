@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v582<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v582'/);
+    expect(html).toMatch(/id="appVersionLabel">v583<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v583'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -288,7 +288,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/icon\.classList\.toggle\('icon-eye', !anonymous\)/);
     expect(app).toMatch(/icon\.classList\.toggle\('icon-eye-off', anonymous\)/);
     expect(html).toMatch(/aria-label="Choose display name"/);
-    expect(app).toMatch(/identity\.type === RECIPIENT_IDENTITY_TYPES\.PLATHO_NFT[\s\S]*replace\(\/\\\.ath\$\/i, ''\)/);
+    // Usernames are shown canonically (no ".ath"): displayIdentityLabel routes the non-wallet branch
+    // through canonicalUsernameDisplay. Full coverage in PWA-CANONICAL-USERNAME-01.
+    expect(app).toMatch(/function displayIdentityLabel\(identity\)[\s\S]*canonicalUsernameDisplay\(identity\.label \?\? identity\.value \?\? ''\)/);
     expect(css).toMatch(/\.identity-label-ton\s*\{\s*color:\s*#9fd3f2;/);
     expect(css).toMatch(/\.identity-label-platho\s*\{\s*color:\s*#8fdcc8;/);
     expect(app).toMatch(/function identityDisplayOptions\(thread\)[\s\S]*subtitle: 'Local name'[\s\S]*uniqueDisplayIdentityVariants\(thread\)/);
@@ -4234,6 +4236,19 @@ describe('PWA runtime config guard', () => {
     expect(setSrc).toMatch(/markPrefsDirty\(\)/);
   });
 
+  it('PWA-CANONICAL-USERNAME-01: usernames display canonically (no .ath suffix) via displayIdentityLabel + threadDisplayLabel', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function canonicalUsernameDisplay\(label\)/);
+    const canon = app.slice(app.indexOf('function canonicalUsernameDisplay(label)'), app.indexOf('function displayIdentityLabel('));
+    expect(canon).toMatch(/\.ath/);
+    expect(canon).toMatch(/replace/);
+    // The shared identity + thread label functions route through the canonical strip.
+    const displayFn = app.slice(app.indexOf('function displayIdentityLabel(identity)'), app.indexOf('function verifyWalletDisplayIdentity'));
+    expect(displayFn).toMatch(/canonicalUsernameDisplay\(/);
+    const threadFn = app.slice(app.indexOf('function threadDisplayLabel(thread)'), app.indexOf('function threadDisplayTone'));
+    expect(threadFn).toMatch(/canonicalUsernameDisplay\(thread\?\.name/);
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -5057,11 +5072,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v653/);
+    expect(sw).toMatch(/platho-pwa-prototype-v654/);
     expect(sw).toMatch(/\.\/styles\.css\?v=191/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=582/);
+    expect(sw).toMatch(/\.\/app\.js\?v=583/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

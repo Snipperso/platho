@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v582';
+const PLATHO_APP_RUNTIME_VERSION = 'v583';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2331,15 +2331,19 @@ function displayWalletAddress(address) {
   }
 }
 
+// Canonical display name for a username: the bare name, WITHOUT the ".ath" suffix (the suffix lives in the stored
+// identity label for routing/matching, but is never shown).
+function canonicalUsernameDisplay(label) {
+  return String(label ?? '').replace(/\.ath$/i, '');
+}
+
 function displayIdentityLabel(identity) {
   if (!identity) return '';
   if (identity.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) {
     return shortAddress(identity.value ?? identity.label);
   }
-  if (identity.type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT) {
-    return String(identity.label ?? identity.value ?? '').replace(/\.ath$/i, '');
-  }
-  return identity.label ?? identity.value ?? '';
+  // PLATHO_NFT (and any future name type) is shown canonically — never with the ".ath" suffix.
+  return canonicalUsernameDisplay(identity.label ?? identity.value ?? '');
 }
 
 async function verifyWalletDisplayIdentity(mode, label, wallet = plathoWallet) {
@@ -2897,7 +2901,9 @@ function threadDisplayLabel(thread) {
   const identity = threadSelectedIdentity(thread);
   if (identity) return displayIdentityLabel(identity);
   if (thread?.localLabel) return thread.localLabel;
-  return thread?.name ?? '';
+  // Fallback to a stored name — strip a stray ".ath" so a thread.name that was persisted with the suffix still
+  // shows canonically.
+  return canonicalUsernameDisplay(thread?.name ?? '');
 }
 
 function threadDisplayTone(thread) {
