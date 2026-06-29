@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v576';
+const PLATHO_APP_RUNTIME_VERSION = 'v577';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4333,6 +4333,15 @@ function addCustomPublicChannel(channel) {
   writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface();
+  resyncPublicForNewSubscription();
+}
+
+// A newly-followed channel does NOT change the GLOBAL public latest id, so the sync fast-path (latestId unchanged ->
+// skip the whole walk) would leave the channel on "Waiting for public feed" until a page reload reset the in-memory
+// cursor. Invalidate the fast-path and kick a sync now so the new channel's posts load immediately.
+function resyncPublicForNewSubscription() {
+  lastSyncedPublicLatestId = null;
+  syncPublicChannels().catch((error) => { noteTonRpcRateLimit(error); });
 }
 
 function isPublicChannelSubscribed(channelId) {
@@ -4362,6 +4371,8 @@ function setPublicChannelSubscribed(channelId, subscribed) {
   rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
   renderPublicSurface({ anchorUnread: false });
   setPublicStatus(subscribed ? 'channel followed' : 'channel hidden');
+  // Following a channel must pull its posts NOW (the fast-path would otherwise skip the walk until a reload).
+  if (subscribed) resyncPublicForNewSubscription();
   return true;
 }
 
@@ -11633,6 +11644,10 @@ function refreshMessagingControls() {
   setText(exportWalletKeyStatus, readEncryptedPlathoWalletRecord() ? 'encrypted file' : 'not stored');
   if (importWalletKeyButton) importWalletKeyButton.disabled = false;
   setText(importWalletKeyStatus, hasKnownWallet ? 'replace' : 'file');
+  // Keep the toncenter key field in sync with stored state on every messaging refresh — importing a v2 wallet-key
+  // backup restores the key into storage, and this guarantees the Profile field reflects it (refreshMessagingControls
+  // runs in the import's finally) even if the field was rendered empty before the import completed.
+  refreshToncenterKeyUi();
   if (exportWalletSeedButton) exportWalletSeedButton.disabled = !plathoWallet;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = !(plathoWallet || storedWalletAddressForCopy());
   if (walletDisplayModeSelect) walletDisplayModeSelect.disabled = !plathoWallet;

@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v576<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v576'/);
+    expect(html).toMatch(/id="appVersionLabel">v577<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v577'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4148,6 +4148,32 @@ describe('PWA runtime config guard', () => {
     expect(refreshSource).toMatch(/if \(!result\.degraded\)/);
   });
 
+  it('PWA-PUBLIC-SUBSCRIBE-RESYNC-01: following a channel invalidates the sync fast-path and resyncs so its posts load now', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The resync helper forces a full walk (clears the global fast-path cursor) and kicks a sync.
+    expect(app).toMatch(/function resyncPublicForNewSubscription\(\)/);
+    const helper = app.slice(
+      app.indexOf('function resyncPublicForNewSubscription()'),
+      app.indexOf('function resyncPublicForNewSubscription()') + 260,
+    );
+    expect(helper).toMatch(/lastSyncedPublicLatestId = null;/);
+    expect(helper).toMatch(/syncPublicChannels\(\)/);
+    // Both follow paths call it (add custom channel + re-follow an existing one).
+    const addSource = app.slice(app.indexOf('function addCustomPublicChannel('), app.indexOf('function resyncPublicForNewSubscription'));
+    expect(addSource).toMatch(/resyncPublicForNewSubscription\(\)/);
+    const setSource = app.slice(app.indexOf('function setPublicChannelSubscribed('), app.indexOf('function readPublicReadCursors('));
+    expect(setSource).toMatch(/if \(subscribed\) resyncPublicForNewSubscription\(\)/);
+  });
+
+  it('PWA-TONCENTER-KEY-FIELD-REFRESH-01: refreshMessagingControls re-syncs the toncenter key field (so an imported v2 backup key shows)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const controls = app.slice(
+      app.indexOf('function refreshMessagingControls'),
+      app.indexOf('function refreshMessagingControls') + 3500,
+    );
+    expect(controls).toMatch(/refreshToncenterKeyUi\(\);/);
+  });
+
   it('PWA-DIALOG-AVATAR-INCOMING-ONLY-01: the dialog header avatar hydrates only from INCOMING message headers', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // An outgoing ('out') message carries the OWN avatar pointer; the by-hash avatar cache would otherwise paint
@@ -4930,11 +4956,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v647/);
+    expect(sw).toMatch(/platho-pwa-prototype-v648/);
     expect(sw).toMatch(/\.\/styles\.css\?v=190/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=576/);
+    expect(sw).toMatch(/\.\/app\.js\?v=577/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
