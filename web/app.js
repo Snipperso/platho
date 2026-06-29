@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v572';
+const PLATHO_APP_RUNTIME_VERSION = 'v573';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -542,6 +542,7 @@ const publicPostDetailAvatar = document.querySelector('#publicPostDetailAvatar')
 const publicPostDetailTitle = document.querySelector('#publicPostDetailTitle');
 const publicPostDetailSubtitle = document.querySelector('#publicPostDetailSubtitle');
 const publicPostBackButton = document.querySelector('#publicPostBackButton');
+const publicPostAuthorIdentityButton = document.querySelector('#publicPostAuthorIdentityButton');
 const vaultSubtitle = document.querySelector('#vaultSubtitle');
 const navVaultTonBalances = [...document.querySelectorAll('[data-nav-vault-ton]')];
 const navVaultAthBalances = [...document.querySelectorAll('[data-nav-vault-ath]')];
@@ -4822,9 +4823,12 @@ function setPublicCommentTarget(item = null, { focus = true, showContext = true 
 // private chatOpen pattern via publicPane.dataset.postOpen), shows the post at the top, loads ITS comments on demand
 // from chain, and puts the shared composer into comment mode for that post.
 
-// Local-pending (just-published, not yet on-chain) comments for a post, read from the feed cache where
-// rememberLocalPublicComment stores them. Merged with the chain-loaded comments so an own comment shows instantly.
-function localPendingCommentsForPost(item) {
+// Cached comments for a post (read from the feed cache where rememberLocalPublicComment stores them, and where a
+// prior version's comment-walk persisted confirmed ones). Includes BOTH confirmed (entryId) and local-pending
+// comments so the detail can fall back to local data when a fresh chain read returns fewer (or none), and so an
+// own just-published comment shows instantly. Note the cache is per-account, so a comment seen under another
+// account is not here.
+function cachedCommentsForPost(item) {
   if (!item) return [];
   const channelId = item.channelId ?? 'platho.app';
   const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
@@ -4832,19 +4836,22 @@ function localPendingCommentsForPost(item) {
     String(entry.entryId ?? entry.id) === String(item.entryId ?? item.id)
     && (!item.bodyHash || !entry.bodyHash || String(entry.bodyHash).toLowerCase() === String(item.bodyHash).toLowerCase())
   ));
-  return (post?.comments ?? []).filter(isPendingPublicFeedItem);
+  return post?.comments ?? [];
 }
 
 function publicPostDetailMergedComments() {
   const item = publicPostDetailItem;
   if (!item) return [];
   const chain = publicPostDetailChainComments;
-  // Drop any local-pending comment that has already landed on chain (matched by body hash) — mergePublicComments
-  // keys chain comments by entryId and pending ones by bodyHash, so without this filter a confirmed comment would
-  // show twice. Mirrors mergeLocalPendingPublicFeed's pending-vs-chain dedup.
-  const pending = localPendingCommentsForPost(item)
-    .filter((local) => !chain.some((chainComment) => samePublicBodyHash(local, chainComment)));
-  return mergePublicComments(chain, pending);
+  // Union the fresh chain read with cached comments (durable, like the feed's accumulate-never-wipe model): a
+  // degraded/empty fresh read keeps the previously-seen comments instead of dropping them. mergePublicComments
+  // dedups confirmed comments by entryId; a local-pending copy (no entryId) is dropped only when its body hash
+  // already appears on chain, so a confirmed comment never shows twice next to its old pending copy.
+  const cached = cachedCommentsForPost(item).filter((local) => {
+    if (local.entryId !== undefined && local.entryId !== null && local.entryId !== '') return true;
+    return !chain.some((chainComment) => samePublicBodyHash(local, chainComment));
+  });
+  return mergePublicComments(chain, cached);
 }
 
 function publicDetailStatusNode(text, { retry = false } = {}) {
@@ -4863,8 +4870,14 @@ function publicDetailStatusNode(text, { retry = false } = {}) {
 }
 
 function renderPublicPostDetail() {
-  const item = publicPostDetailItem;
-  if (!publicPostDetailBody || !item) return;
+  if (!publicPostDetailBody || !publicPostDetailItem) return;
+  // Re-find the current feed item by entryId so a display change (e.g. relabelling the author via the chevron)
+  // reflects here without re-opening; fall back to the captured item. Identity for comment loading stays the
+  // captured item.entryId (stable).
+  const fresh = publicFeedItemsChronological().find((it) => (
+    it.entryId !== undefined && String(it.entryId) === String(publicPostDetailItem.entryId)
+  ));
+  const item = fresh ?? publicPostDetailItem;
   // Feed items carry the author NAME in meta[0] (= the channel/thread name) and the date as the last meta entry —
   // there is no item.author / item.createdAt. The header mirrors the private chat conversation header (avatar +
   // name + a short subtitle), so the body below can show just the post content + comments without repeating the
@@ -4876,6 +4889,14 @@ function renderPublicPostDetail() {
   setText(publicPostDetailSubtitle, dateLabel || 'Public post');
   if (publicPostDetailAvatar) {
     setAvatarNode(publicPostDetailAvatar, String(authorName).slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
+  }
+  // The "Display as" chevron — relabel another author (same as the feed's per-post chevron). Hidden for your own
+  // post, the official channel, or an item with no author wallet (matches publicItemIdentityButton's gate).
+  if (publicPostAuthorIdentityButton) {
+    const authorWallet = item.authorWallet ?? null;
+    publicPostAuthorIdentityButton.hidden = !authorWallet
+      || isOwnPublicAuthor(authorWallet)
+      || item.channelId === DEFAULT_PUBLIC_CHANNEL_ID;
   }
   publicPostDetailBody.replaceChildren();
 
@@ -12531,6 +12552,17 @@ publicCancelCommentButton?.addEventListener('click', () => {
 
 publicPostBackButton?.addEventListener('click', () => {
   requestNavBack();
+});
+
+publicPostAuthorIdentityButton?.addEventListener('click', (event) => {
+  event.stopPropagation();
+  const authorWallet = publicPostDetailItem?.authorWallet ?? null;
+  if (!authorWallet) return;
+  if (identityPopover && !identityPopover.hidden) {
+    hideIdentityPopover();
+  } else {
+    showPublicChannelDisplayPopover({ authorWallet }, publicPostAuthorIdentityButton);
+  }
 });
 
 publicComposerCommentsCheckbox?.addEventListener('change', () => {
