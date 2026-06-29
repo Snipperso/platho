@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v581';
+const PLATHO_APP_RUNTIME_VERSION = 'v582';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -267,6 +267,7 @@ const railItems = [...document.querySelectorAll('.rail-item[data-tab]')];
 const panels = [...document.querySelectorAll('.view-panel')];
 const docsButtons = [...document.querySelectorAll('.docs-header-button')];
 const installButtons = [...document.querySelectorAll('.install-header-button')];
+const globalSyncIndicators = [...document.querySelectorAll('.global-sync-indicator')];
 const docsDialog = document.querySelector('#docsDialog');
 const docsCloseButton = document.querySelector('#docsCloseButton');
 const docsTitle = document.querySelector('#docsTitle');
@@ -3383,12 +3384,25 @@ function messageAutoSyncCountdownText() {
 }
 
 function conversationSubtitleText() {
-  // The conversation-header subtitle is the message-sync status ONLY (Syncing…/✓ Synced/Sync delayed), like the
-  // Public channel-detail header — never the thread's identity-type label ("Platho NFT", "wallet", TON DNS, …),
-  // which is redundant with the name above it. The status must be present at ALL times: in the brief gaps where it
-  // isn't known yet (the pre-first-sync 'idle'/'scheduled' frame; the post-reload wallet/key load) default to
-  // "Syncing…" instead of a blank that only pops in a beat later — the resting state resolves to ✓ Synced on its own.
-  return messageAutoSyncCountdownText() ?? 'Syncing…';
+  // The sync status moved to the GLOBAL header sync indicator (spinner/check, visible on every tab), so the dialog
+  // subtitle no longer carries it. Kept empty — the name above already identifies the conversation.
+  return '';
+}
+
+function isGlobalSyncActive() {
+  return messageAutoSyncPhase === 'syncing' || publicSyncPhase === 'syncing' || prefsSyncInFlight === true;
+}
+
+// Drive the green header sync indicator (spinner while any sync runs, check when synced) — shown in the corner on
+// every tab. Toggled at every sync phase transition: private via refreshConversationSubtitle (which all private
+// transitions call), public via setPublicSyncPhase, prefs via publishPrefsSnapshot.
+function refreshGlobalSyncIndicator() {
+  const active = isGlobalSyncActive();
+  for (const el of globalSyncIndicators) {
+    el.dataset.syncing = active ? 'true' : 'false';
+    el.setAttribute('aria-label', active ? 'Syncing' : 'Synced');
+    el.title = active ? 'Syncing…' : 'Synced';
+  }
 }
 
 // Advance the public sync phase and, ONLY when it actually changes, repaint the public Feed so the live sync
@@ -3397,6 +3411,7 @@ function conversationSubtitleText() {
 function setPublicSyncPhase(phase) {
   if (publicSyncPhase === phase) return;
   publicSyncPhase = phase;
+  refreshGlobalSyncIndicator();
   if (isPublicViewActive()) renderPublicSurface({ anchorUnread: false });
 }
 
@@ -3547,6 +3562,9 @@ function privateDebugLines(thread = activeThread()) {
 }
 
 function refreshConversationSubtitle() {
+  // The global sync indicator updates on every private-sync transition (all of which call this), regardless of
+  // whether a conversation is open — so refresh it first, before the no-active-thread early return.
+  refreshGlobalSyncIndicator();
   const thread = activeThread();
   if (!thread || !activeSubtitle) return;
   activeSubtitle.textContent = conversationSubtitleText(thread);
@@ -4991,6 +5009,9 @@ async function loadPublicPostComments(item) {
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return { comments: [], degraded: true };
   const { provider, address } = resolved;
+  // 'critical' priority (same as the public sync, ABOVE the private message sync at 'messages') — already the
+  // highest practical tier without a wide module-version cascade. The user-waited comment read thus jumps ahead of
+  // the private sync (the bulk of any burst); a dedicated above-critical tier wasn't worth re-versioning 8 modules.
   const readOptions = criticalCapsuleHubReadOptions(address);
   let degraded = false;
   let parentIndex;
@@ -21131,6 +21152,7 @@ async function publishPrefsSnapshot() {
   if (tonRpcLimited()) { setText(savePrefsStatus, 'RPC busy'); return; }
   prefsSyncInFlight = true;
   refreshPrefsSyncUi();
+  refreshGlobalSyncIndicator();
   setText(savePrefsStatus, 'saving...');
   try {
     const snapshot = buildPrefsSnapshot();
@@ -21156,6 +21178,7 @@ async function publishPrefsSnapshot() {
   } finally {
     prefsSyncInFlight = false;
     refreshPrefsSyncButton();
+    refreshGlobalSyncIndicator();
   }
 }
 
@@ -21671,6 +21694,7 @@ rebuildPublicChannelRegistry();
 publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
 writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
 loadPrefsSyncMeta();
+refreshGlobalSyncIndicator();
 publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
 // Warm per-wallet avatars from the IndexedDB media store BEFORE the first render so reloaded public feeds show
 // faces immediately (no letter-tile placeholder + chain-refetch flash). Top-level await (app.js is a module),

@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v581<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v581'/);
+    expect(html).toMatch(/id="appVersionLabel">v582<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v582'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4234,6 +4234,21 @@ describe('PWA runtime config guard', () => {
     expect(setSrc).toMatch(/markPrefsDirty\(\)/);
   });
 
+  it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    expect((html.match(/class="global-sync-indicator"/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect(css).toMatch(/\.global-sync-indicator\[data-syncing="true"\]::before/);
+    expect(css).toMatch(/\.global-sync-indicator\[data-syncing="false"\]::before/);
+    expect(app).toMatch(/function isGlobalSyncActive\(\)/);
+    expect(app).toMatch(/function refreshGlobalSyncIndicator\(\)/);
+    expect(app).toMatch(/const globalSyncIndicators = \[\.\.\.document\.querySelectorAll\('\.global-sync-indicator'\)\]/);
+    // The private dialog subtitle is emptied — sync status moved to the global indicator.
+    const subtitleSrc = app.slice(app.indexOf('function conversationSubtitleText()'), app.indexOf('function isGlobalSyncActive('));
+    expect(subtitleSrc).toMatch(/return '';/);
+  });
+
   it('PWA-PUBLIC-SUBSCRIBE-RESYNC-01: following a channel invalidates the sync fast-path and resyncs so its posts load now', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The resync helper forces a full walk (clears the global fast-path cursor) and kicks a sync.
@@ -5042,11 +5057,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v652/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=190/);
+    expect(sw).toMatch(/platho-pwa-prototype-v653/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=191/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=581/);
+    expect(sw).toMatch(/\.\/app\.js\?v=582/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
