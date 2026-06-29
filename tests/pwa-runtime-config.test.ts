@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v570<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v570'/);
+    expect(html).toMatch(/id="appVersionLabel">v571<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v571'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4044,26 +4044,24 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).not.toMatch(/readPublicPostPayload/);
   });
 
-  it('PWA-PUBLIC-INCREMENTAL-02: public sync uses per-author + per-post cursors, attaches new comments to cached posts, and withholds the cursor on an in-window gap', () => {
+  it('PWA-PUBLIC-INCREMENTAL-02: public sync uses a per-author cursor (comments load on demand, not in the feed) and withholds the cursor on an in-window gap', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const syncPublicSource = app.slice(
       app.indexOf('async function syncPublicChannelFromChain'),
       app.indexOf('async function syncPublicChannels'),
     );
-    // Per-index cursors (in-memory), skipping unchanged authors/posts so a busy feed re-reads only what changed.
+    // Per-author cursor (in-memory), skipping unchanged authors so a busy feed re-reads only what changed.
     expect(app).toMatch(/const publicAuthorIndexHeads = new Map\(\)/);
-    expect(app).toMatch(/const publicParentIndexHeads = new Map\(\)/);
     expect(syncPublicSource).toMatch(/publicAuthorIndexHeads\.get\(authorHeadKey\) === authorHead/);
-    expect(syncPublicSource).toMatch(/publicParentIndexHeads\.get\(parentHeadKey\) === parentHead/);
-    // A skipped author still checks its CACHED posts for new comments (the comment-on-old-post path).
+    // A skipped author still reuses its CACHED post ids (no re-read of unchanged post bodies).
     expect(app).toMatch(/function cachedChainPostEntryIds\(channelId\)/);
     expect(syncPublicSource).toMatch(/postIds = cachedPostIds/);
-    // New comments attach to a cached parent post that was not re-walked this cycle.
+    // attachNewPublicComments stays wired (a no-op with the now-empty comment set) so a future comment-in-feed path
+    // could reattach; the walk that fed it was moved to the on-demand loader (loadPublicPostComments).
     expect(app).toMatch(/function attachNewPublicComments\(posts, newCommentsByParent\)/);
     expect(syncPublicSource).toMatch(/attachNewPublicComments\(/);
-    // Commit-gate: per-index heads advance ONLY after a clean walk, alongside the global head.
+    // Commit-gate: the author cursor advances ONLY after a clean walk, alongside the global head.
     expect(syncPublicSource).toMatch(/for \(const \[key, head\] of pendingAuthorHeadWrites\) publicAuthorIndexHeads\.set\(key, head\)/);
-    expect(syncPublicSource).toMatch(/for \(const \[key, head\] of pendingParentHeadWrites\) publicParentIndexHeads\.set\(key, head\)/);
     // Strand guard: an in-window entry that fails to resolve marks the walk degraded, so the commit-gate does NOT
     // advance the cursor past it (Phase 2 would otherwise skip re-walking it next cycle and it could never
     // self-heal — in-window ids are excluded from the body-gap retry set). Both failure branches gate on it.
@@ -4077,6 +4075,76 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/prunePublicPostsBelowFloor,/);
     expect(syncPublicSource).toMatch(/publicOldestLiveId = publicEvictionFloor\(latestId, publicLiveCount\)/);
     expect(syncPublicSource).toMatch(/prunePublicPostsBelowFloor\(/);
+  });
+
+  it('PWA-PUBLIC-FEED-INLINE-COMMENTS-REMOVED: the feed render no longer shows inline comments (they load on the post detail), but the renderer stays for the detail', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const renderFeedSource = app.slice(
+      app.indexOf('function renderPublicFeed('),
+      app.indexOf('function renderPublicSurface('),
+    );
+    // The feed render must NOT call appendPublicItemComments (the inline-comment-loading the owner asked to remove).
+    expect(renderFeedSource).not.toMatch(/appendPublicItemComments\(/);
+    // The renderer itself still exists — the post detail screen reuses it for the comment list.
+    expect(app).toMatch(/function appendPublicItemComments\(article, item\)/);
+  });
+
+  it('PWA-PUBLIC-BUTTON-COMMENTS-TEXT: the per-post action button is "Comments", viewable without a wallet, and opens the post detail', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const actionsSource = app.slice(
+      app.indexOf('function appendPublicItemActions('),
+      app.indexOf('function renderPublicFeed('),
+    );
+    expect(actionsSource).toMatch(/commentButton\.textContent = 'Comments';/);
+    // Viewing comments needs no wallet — gated on the on-chain post only, not plathoWallet.
+    expect(actionsSource).toMatch(/const canViewComments = Boolean\(commentsAllowed && hasChainCommentTarget\);/);
+    expect(actionsSource).toMatch(/commentButton\.disabled = !canViewComments;/);
+    expect(actionsSource).toMatch(/openPublicPostDetail\(item\)/);
+  });
+
+  it('PWA-PUBLIC-POST-DETAIL: post detail screen state, open/close, on-demand loader, and HTML section exist', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    expect(app).toMatch(/let publicPostDetailOpen = false;/);
+    expect(app).toMatch(/function openPublicPostDetail\(item\)/);
+    expect(app).toMatch(/function closePublicPostDetail\(\)/);
+    expect(app).toMatch(/async function loadPublicPostComments\(item\)/);
+    // Open/close toggle the pane attribute the CSS keys on, mirroring the private chatOpen overlay.
+    expect(app).toMatch(/publicPane\.dataset\.postOpen = 'true';/);
+    expect(app).toMatch(/publicPane\.dataset\.postOpen = 'false';/);
+    // Back/overlay nav recognises the detail as an open overlay.
+    expect(app).toMatch(/publicPane\?\.dataset\?\.postOpen === 'true'/);
+    // HTML section lives inside the public pane with a back button and a body container.
+    expect(html).toMatch(/<div class="public-post-detail" id="publicPostDetail" hidden>/);
+    expect(html).toMatch(/id="publicPostBackButton"/);
+    expect(html).toMatch(/id="publicPostDetailBody"/);
+  });
+
+  it('PWA-PUBLIC-COMMENT-MODE-PERSISTENCE: publishing a comment from the detail screen keeps the composer in comment mode for that post', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The shared composer only resets the comment target when NOT on the post detail screen.
+    expect(app).toMatch(/if \(!publicPostDetailOpen\) setPublicCommentTarget\(null\);/);
+  });
+
+  it('PWA-PUBLIC-COMMENTS-ONDEMAND-DEGRADE: the on-demand comment loader fails closed (no partial list as complete) and binds comments to the parent', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const loaderSource = app.slice(
+      app.indexOf('async function loadPublicPostComments(item)'),
+      app.indexOf('async function refreshPublicPostDetailComments('),
+    );
+    // Empty / missing parent index -> genuinely zero comments (clean, not degraded).
+    expect(loaderSource).toMatch(/if \(!parentIndex \|\| parentIndex\.exists !== true\) return \{ comments: \[\], degraded: false \};/);
+    // A rate-limited read returns degraded:true (the caller keeps "Loading" and retries; never caches a partial).
+    expect(loaderSource).toMatch(/if \(noteTonRpcRateLimit\(error\)\) return \{ comments: \[\], degraded: true \};/);
+    // Parent binding identical to the feed sync: drop only when BOTH hashes present AND mismatch (lowercased).
+    expect(loaderSource).toMatch(/String\(item\.bodyHash\)\.toLowerCase\(\) === String\(comment\.parentHash\)\.toLowerCase\(\)/);
+    // The retry orchestrator keeps the partial OUT of the authoritative list on a degraded walk.
+    const refreshSource = app.slice(
+      app.indexOf('async function refreshPublicPostDetailComments('),
+      app.indexOf('async function confirmPublicCommentsRisk('),
+    );
+    expect(refreshSource).toMatch(/if \(token !== publicPostDetailLoadToken\) return;/);
+    expect(refreshSource).toMatch(/if \(!result\.degraded\)/);
   });
 
   it('PWA-CONFIG-06B: profile avatar registry update waits for CapsuleHub proof and registry finality', () => {
@@ -4829,11 +4897,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v641/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=186/);
+    expect(sw).toMatch(/platho-pwa-prototype-v642/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=187/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=570/);
+    expect(sw).toMatch(/\.\/app\.js\?v=571/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

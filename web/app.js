@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v570';
+const PLATHO_APP_RUNTIME_VERSION = 'v571';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -536,6 +536,11 @@ const publicPostCommentsToggle = document.querySelector('#publicPostCommentsTogg
 const publicCommentContext = document.querySelector('#publicCommentContext');
 const publicCommentContextText = document.querySelector('#publicCommentContextText');
 const publicCancelCommentButton = document.querySelector('#publicCancelCommentButton');
+const publicPostDetail = document.querySelector('#publicPostDetail');
+const publicPostDetailBody = document.querySelector('#publicPostDetailBody');
+const publicPostDetailTitle = document.querySelector('#publicPostDetailTitle');
+const publicPostDetailSubtitle = document.querySelector('#publicPostDetailSubtitle');
+const publicPostBackButton = document.querySelector('#publicPostBackButton');
 const vaultSubtitle = document.querySelector('#vaultSubtitle');
 const navVaultTonBalances = [...document.querySelectorAll('[data-nav-vault-ton]')];
 const navVaultAthBalances = [...document.querySelectorAll('[data-nav-vault-ath]')];
@@ -613,6 +618,13 @@ let identityPopoverAnchor = null;
 let activeActionDialog = null;
 let publicChannelSearchQuery = '';
 let publicCommentTarget = null;
+// Public post detail screen (per-post comments, opened from the "Comments" action). The composer is shared with
+// the feed; while the detail is open it is in comment mode (publicCommentTarget = the open post).
+let publicPostDetailOpen = false;
+let publicPostDetailItem = null;
+let publicPostDetailChainComments = [];
+let publicPostDetailLoadToken = 0;
+let publicPostDetailLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
 let privateImageAttachments = [];
 let privatePaymentCheckDraft = null;
 let publicImageAttachments = [];
@@ -1311,7 +1323,7 @@ function applyTelegramSafeArea() {
 // (PWA/browser): keep exactly ONE history sentinel while an overlay is open, so a popstate (Android Back)
 // closes the overlay instead of unloading the app.
 function navOverlayIsOpen() {
-  return appShell?.dataset?.chatOpen === 'true';
+  return appShell?.dataset?.chatOpen === 'true' || publicPane?.dataset?.postOpen === 'true';
 }
 
 let navHistorySentinel = false;
@@ -1328,6 +1340,14 @@ function syncNavBackAffordance() {
 }
 
 function closeNavOverlay() {
+  // Public post detail -> back to the feed. Checked before the chat branch so Back closes whichever overlay is on.
+  // closePublicPostDetail() also exits the composer's comment mode (setPublicCommentTarget(null)) — without it the
+  // shared composer would stay pinned to the closed post and a feed "post" would publish as a comment.
+  if (publicPane?.dataset?.postOpen === 'true') {
+    closePublicPostDetail();
+    syncNavBackAffordance();
+    return true;
+  }
   // Private conversation -> back to the dialog list. Clear activeThreadId so a later tab-return restores the
   // LIST, not this dialog: setView restores chatOpen from activeThreadId, and leaving it set re-opened the
   // dialog even when the user had backed out to the list.
@@ -1356,7 +1376,7 @@ function installNavBackHandling() {
   if (typeof MutationObserver === 'function') {
     const observer = new MutationObserver(syncNavBackAffordance);
     observer.observe(appShell, { attributes: true, attributeFilter: ['data-chat-open'] });
-    if (publicPane) observer.observe(publicPane, { attributes: true, attributeFilter: ['data-channel-detail-open'] });
+    if (publicPane) observer.observe(publicPane, { attributes: true, attributeFilter: ['data-post-open'] });
   }
   if (typeof window !== 'undefined' && !isTelegramEnv()) {
     window.addEventListener('popstate', () => {
@@ -4644,25 +4664,25 @@ function appendPublicItemActions(article, item) {
     const hasChainCommentTarget = item.entryId !== undefined
       && item.entryId !== null
       && /^0x[0-9a-fA-F]{64}$/.test(String(item.bodyHash ?? ''));
-    const canComment = Boolean(commentsAllowed && plathoWallet && hasChainCommentTarget);
+    // Viewing comments needs no wallet — only an on-chain post to load them from. Posting a comment still
+    // requires a wallet (enforced by the post detail composer). "Comments off" / "Preview only" stay disabled.
+    const canViewComments = Boolean(commentsAllowed && hasChainCommentTarget);
     if (!commentsAllowed) {
       commentButton.textContent = 'Comments off';
     } else if (!hasChainCommentTarget) {
       commentButton.textContent = 'Preview only';
-    } else if (!plathoWallet) {
-      commentButton.textContent = 'Create wallet';
     } else {
-      commentButton.textContent = 'Comment';
+      commentButton.textContent = 'Comments';
     }
-    commentButton.disabled = !canComment;
+    commentButton.disabled = !canViewComments;
     commentButton.title = !commentsAllowed
       ? 'The author closed comments for this post'
       : (!hasChainCommentTarget
           ? 'This preview post is not an on-chain capsule yet'
-          : (canComment ? 'Write one immutable public comment' : 'Create or import a Platho wallet to comment'));
-    commentButton.addEventListener('click', async () => {
-      if (!canComment) return;
-      setPublicCommentTarget(item);
+          : 'Open comments for this post');
+    commentButton.addEventListener('click', () => {
+      if (!canViewComments) return;
+      openPublicPostDetail(item);
     });
     actions.append(commentButton);
   }
@@ -4743,7 +4763,8 @@ function renderPublicFeed(items, options = {}) {
       article.append(title);
     }
     appendPublicItemContent(article, item);
-    appendPublicItemComments(article, item);
+    // Comments are no longer rendered inline in the feed — they load on demand on the post detail screen
+    // (openPublicPostDetail). appendPublicItemComments is reused there.
     appendPublicItemActions(article, item);
     publicFeed.append(article);
   }
@@ -4762,21 +4783,27 @@ function renderPublicSurface(options = {}) {
   const allItems = publicFeedItemsChronological();
   const items = allItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
   renderPublicFeed(items, options);
+  // Keep the open post detail (per-post comments) in sync with the cache too — a just-published local-pending
+  // comment lands in the cache and must show on the detail screen, which is rendered separately from the feed.
+  if (publicPostDetailOpen) renderPublicPostDetail();
   const unread = allItems.filter(isUnreadPublicItem).length;
   setPublicStatus(publicChannelSearchQuery ? `${items.length} found` : (unread > 0 ? `${unread} unread` : 'feed'));
 }
 
-function setPublicCommentTarget(item = null) {
+function setPublicCommentTarget(item = null, { focus = true, showContext = true } = {}) {
   publicCommentTarget = item;
   const active = Boolean(item);
   if (publicComposer) publicComposer.dataset.mode = active ? 'comment' : 'post';
-  if (publicCommentContext) publicCommentContext.hidden = !active;
+  // The post detail screen drives comment mode implicitly (the whole screen IS the post), so it suppresses the
+  // inline "Comment to X / Cancel" context bar — there a Cancel would silently drop the composer back to post mode
+  // while still on the post screen, so a "comment" would publish as a new public post.
+  if (publicCommentContext) publicCommentContext.hidden = !active || !showContext;
   if (publicPostCommentsToggle) publicPostCommentsToggle.hidden = active;
   if (active) {
     setText(publicCommentContextText, `Comment to ${item.title ?? item.id ?? 'post'}`);
     if (publicMessageInput) {
       publicMessageInput.placeholder = publicComposerPlaceholder();
-      publicMessageInput.focus();
+      if (focus) publicMessageInput.focus();
     }
   } else {
     if (publicMessageInput) {
@@ -4787,6 +4814,259 @@ function setPublicCommentTarget(item = null) {
   updatePublicCommentsToggleUi();
   refreshComposerPublishPolicy();
   refreshComposerCostStatus();
+}
+
+// ---- Public post detail screen (per-post comments, opened from the "Comments" action) -------------------------
+// The feed no longer loads comments (scalability). Opening a post slides a detail screen over the feed (mirrors the
+// private chatOpen pattern via publicPane.dataset.postOpen), shows the post at the top, loads ITS comments on demand
+// from chain, and puts the shared composer into comment mode for that post.
+
+// Local-pending (just-published, not yet on-chain) comments for a post, read from the feed cache where
+// rememberLocalPublicComment stores them. Merged with the chain-loaded comments so an own comment shows instantly.
+function localPendingCommentsForPost(item) {
+  if (!item) return [];
+  const channelId = item.channelId ?? 'platho.app';
+  const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
+  const post = (cached?.posts ?? []).find((entry) => (
+    String(entry.entryId ?? entry.id) === String(item.entryId ?? item.id)
+    && (!item.bodyHash || !entry.bodyHash || String(entry.bodyHash).toLowerCase() === String(item.bodyHash).toLowerCase())
+  ));
+  return (post?.comments ?? []).filter(isPendingPublicFeedItem);
+}
+
+function publicPostDetailMergedComments() {
+  const item = publicPostDetailItem;
+  if (!item) return [];
+  const chain = publicPostDetailChainComments;
+  // Drop any local-pending comment that has already landed on chain (matched by body hash) — mergePublicComments
+  // keys chain comments by entryId and pending ones by bodyHash, so without this filter a confirmed comment would
+  // show twice. Mirrors mergeLocalPendingPublicFeed's pending-vs-chain dedup.
+  const pending = localPendingCommentsForPost(item)
+    .filter((local) => !chain.some((chainComment) => samePublicBodyHash(local, chainComment)));
+  return mergePublicComments(chain, pending);
+}
+
+function publicDetailStatusNode(text, { retry = false } = {}) {
+  const node = document.createElement('p');
+  node.className = 'public-detail-status';
+  node.textContent = text;
+  if (retry) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'public-detail-retry';
+    button.textContent = 'Retry';
+    button.addEventListener('click', () => { refreshPublicPostDetailComments(); });
+    node.append(' ', button);
+  }
+  return node;
+}
+
+function renderPublicPostDetail() {
+  const item = publicPostDetailItem;
+  if (!publicPostDetailBody || !item) return;
+  setText(publicPostDetailTitle, item.author || item.title || 'Post');
+  const dateLabel = typeof item.createdAt === 'string' ? item.createdAt.slice(0, 10) : '';
+  setText(publicPostDetailSubtitle, dateLabel ? `Public post - ${dateLabel}` : 'Public post');
+  publicPostDetailBody.replaceChildren();
+
+  // The post itself, pinned at the top.
+  const post = document.createElement('article');
+  post.className = 'feed-item public-detail-post';
+  const authorRow = document.createElement('div');
+  authorRow.className = 'feed-author-row';
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar feed-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  setAvatarNode(avatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
+  const meta = document.createElement('div');
+  meta.className = 'feed-meta';
+  for (const label of (item.meta ?? [])) {
+    const span = document.createElement('span');
+    span.textContent = label;
+    meta.append(span);
+  }
+  authorRow.append(avatar, meta);
+  post.append(authorRow);
+  if (item.title) {
+    const title = document.createElement('h2');
+    title.textContent = item.title;
+    post.append(title);
+  }
+  appendPublicItemContent(post, item);
+  publicPostDetailBody.append(post);
+
+  // Comments section.
+  const section = document.createElement('section');
+  section.className = 'public-detail-comments';
+  const comments = publicPostDetailMergedComments();
+  const heading = document.createElement('h3');
+  heading.className = 'public-detail-comments-heading';
+  heading.textContent = comments.length > 0 ? `Comments (${comments.length})` : 'Comments';
+  section.append(heading);
+  if (comments.length > 0) appendPublicItemComments(section, { comments });
+  if (publicPostDetailLoadState === 'loading') {
+    section.append(publicDetailStatusNode(comments.length > 0 ? 'Loading more comments...' : 'Loading comments...'));
+  } else if (publicPostDetailLoadState === 'error' && comments.length === 0) {
+    section.append(publicDetailStatusNode('Couldn’t load comments. Check your connection and try again.', { retry: true }));
+  } else if (publicPostDetailLoadState === 'ready' && comments.length === 0) {
+    section.append(publicDetailStatusNode('No comments yet. Be the first to comment.'));
+  }
+  publicPostDetailBody.append(section);
+}
+
+function openPublicPostDetail(item) {
+  if (!item || item.entryId === undefined || item.entryId === null) return;
+  publicPostDetailItem = item;
+  publicPostDetailOpen = true;
+  publicPostDetailChainComments = [];
+  publicPostDetailLoadState = 'loading';
+  if (publicPane) publicPane.dataset.postOpen = 'true';
+  // Shared composer -> comment mode for this post; no auto-focus (the user opens to read first) and no inline
+  // context bar (the screen itself is the context).
+  setPublicCommentTarget(item, { focus: false, showContext: false });
+  renderPublicPostDetail();
+  if (publicPostDetailBody) publicPostDetailBody.scrollTop = 0;
+  refreshPublicPostDetailComments();
+}
+
+function closePublicPostDetail() {
+  if (!publicPostDetailOpen && publicPane?.dataset?.postOpen !== 'true') return;
+  publicPostDetailOpen = false;
+  publicPostDetailItem = null;
+  publicPostDetailChainComments = [];
+  publicPostDetailLoadState = 'idle';
+  publicPostDetailLoadToken += 1; // invalidate any in-flight comment load so a stale result can't render
+  if (publicPane) publicPane.dataset.postOpen = 'false';
+  setPublicCommentTarget(null);
+  renderPublicSurface({ anchorUnread: false });
+}
+
+// On-demand comment loader for ONE post: walk the post's parent (comment) index, resolve each comment body, and
+// reassemble multipart comments with the SAME assembler the feed sync uses. Returns { comments, degraded }: a
+// rate-limited / partial walk reports degraded:true so the caller keeps "Loading..." and retries instead of
+// showing a partial list as complete (the "comments disappear on flaky RPC" failure mode).
+async function loadPublicPostComments(item) {
+  const resolved = await resolveCapsuleHubProvider();
+  if (!resolved) return { comments: [], degraded: true };
+  const { provider, address } = resolved;
+  const readOptions = criticalCapsuleHubReadOptions(address);
+  let degraded = false;
+  let parentIndex;
+  try {
+    parentIndex = await provider.getPublicParentIndex(BigInt(item.entryId), readOptions);
+  } catch (error) {
+    if (noteTonRpcRateLimit(error)) return { comments: [], degraded: true };
+    throw error;
+  }
+  // No comment index for this post yet -> genuinely zero comments (a clean, non-degraded result).
+  if (!parentIndex || parentIndex.exists !== true) return { comments: [], degraded: false };
+
+  const ids = [];
+  const walkedEntries = new Map();
+  let link = BigInt(parentIndex.latest_entry_link ?? 0n);
+  try {
+    for (let n = 0; link > 0n; n += 1) {
+      if (n >= PUBLIC_CHAIN_LONG_READ_LIMIT) { degraded = true; break; }
+      const entryId = link - 1n;
+      const entry = await provider.getPublicEntry(entryId, readOptions);
+      walkedEntries.set(entryId.toString(), entry);
+      if (entry.exists !== true) break;
+      ids.push(entryId);
+      const prev = BigInt(entry.prev_link ?? 0n);
+      if (prev === link) break; // defensive: never spin on a self-referential link
+      link = prev;
+    }
+  } catch (error) {
+    if (noteTonRpcRateLimit(error)) return { comments: [], degraded: true };
+    throw error;
+  }
+
+  const commentParts = [];
+  for (const entryId of ids) {
+    const entry = walkedEntries.get(entryId.toString());
+    if (!entry || entry.exists !== true) continue;
+    let payload = null;
+    try {
+      payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
+    } catch (error) {
+      // An unreadable / history-unavailable comment must NOT be presented as "no such comment": mark degraded so
+      // the caller retries instead of caching a short list.
+      if (noteTonRpcRateLimit(error)) { degraded = true; continue; }
+      degraded = true;
+      continue;
+    }
+    if (!payload) { degraded = true; continue; }
+    if (payload.type !== 'comment' && payload.type !== 'image_comment' && payload.type !== 'document_comment') continue;
+    const createdAtSec = Number(payload.createdAtSec ?? payload.created_at_sec ?? 0);
+    const createdAt = createdAtSec > 0 ? new Date(createdAtSec * 1000).toISOString() : new Date().toISOString();
+    const authorWallet = rawWalletAddress(payload.authorWallet ?? entry.author_wallet) ?? String(payload.authorWallet ?? entry.author_wallet ?? '');
+    commentParts.push({
+      id: `chain-${entry.entry_id.toString()}`,
+      entryId: entry.entry_id.toString(),
+      channelId: item.channelId ?? publicChannelIdForAuthorWallet(authorWallet),
+      type: payload.type,
+      text: payload.text ?? '',
+      imageBytes: payload.imageBytes ?? payload.image_bytes,
+      documentBytes: payload.documentBytes ?? payload.document_bytes,
+      createdAt,
+      author: publicAuthorLabel(authorWallet),
+      authorWallet,
+      bodyHash: payload.bodyHash ?? uint256Hex(entry.body_hash),
+      entryUid: payload.entryUid ?? entry.entry_uid.toString(16),
+      streamId: payload.stream_id,
+      partIndex: payload.partIndex ?? 0,
+      partCount: payload.partCount ?? 1,
+      profileVersion: payload.profileVersion ?? payload.profile_version ?? 0,
+      avatarHash: payload.avatarHash ?? payload.avatar_hash ?? zeroAvatarHashHex(),
+      chainVerified: true,
+      parentEntryId: payload.parentEntryId.toString(),
+      parentHash: payload.parentHash,
+    });
+  }
+
+  const assembled = assemblePublicParts(commentParts)
+    .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+  // Bind exactly to THIS post: same filter the feed sync uses (drop only when both hashes present AND mismatch).
+  const comments = assembled.filter((comment) => (
+    String(comment.parentEntryId) === String(item.entryId)
+    && (!item.bodyHash || !comment.parentHash || String(item.bodyHash).toLowerCase() === String(comment.parentHash).toLowerCase())
+  ));
+  return { comments, degraded };
+}
+
+// Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
+// retries on a degraded (rate-limited) walk — keeping the partial result OUT of the authoritative list.
+async function refreshPublicPostDetailComments() {
+  const item = publicPostDetailItem;
+  if (!item) return;
+  const token = (publicPostDetailLoadToken += 1);
+  publicPostDetailLoadState = 'loading';
+  renderPublicPostDetail();
+  const maxAttempts = 6;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let result;
+    try {
+      result = await loadPublicPostComments(item);
+    } catch (error) {
+      console.error(error);
+      result = { comments: [], degraded: true };
+    }
+    if (token !== publicPostDetailLoadToken) return; // closed or reopened — drop this result
+    if (!result.degraded) {
+      publicPostDetailChainComments = result.comments;
+      publicPostDetailLoadState = 'ready';
+      renderPublicPostDetail();
+      return;
+    }
+    // Degraded: keep the previous authoritative list (don't overwrite with a partial), show "loading", retry.
+    publicPostDetailLoadState = 'loading';
+    renderPublicPostDetail();
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    if (token !== publicPostDetailLoadToken) return;
+  }
+  if (token !== publicPostDetailLoadToken) return;
+  publicPostDetailLoadState = 'error';
+  renderPublicPostDetail();
 }
 
 async function confirmPublicCommentsRisk() {
@@ -5669,6 +5949,81 @@ function ensurePublicChannelForAuthorWallet(authorWallet, options = {}) {
   return id;
 }
 
+// Assemble walked public entry parts (posts OR comments) into display items: groups multipart streams, joins
+// image/document bytes in part order, decodes document blocks (forward-compat tolerant), and drops incomplete
+// multipart groups. Hoisted to module scope so both the feed sync and the on-demand comment loader use the
+// exact same assembly (multipart comments must reassemble identically in both paths).
+function assemblePublicParts(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const count = Number(item.partCount ?? 1);
+    const index = Number(item.partIndex ?? 0);
+    const key = count <= 1
+      ? `single:${item.channelId}:${item.entryId}`
+      : `${item.channelId}:${item.streamId}:${item.parentEntryId ?? ''}:${item.parentHash ?? ''}`;
+    const group = groups.get(key) ?? { expected: count, parts: [] };
+    group.expected = Math.max(group.expected, count);
+    group.parts.push({ ...item, partIndex: index, partCount: count });
+    groups.set(key, group);
+  }
+  const out = [];
+  for (const group of groups.values()) {
+    const ordered = group.parts
+      .slice()
+      .sort((a, b) => Number(a.partIndex ?? 0) - Number(b.partIndex ?? 0));
+    const unique = new Set(ordered.map((item) => Number(item.partIndex ?? 0)));
+    if (group.expected > 1 && unique.size !== group.expected) continue;
+    const first = ordered[0];
+    const imageParts = ordered.filter((item) => item.imageBytes?.length);
+    const imageBytes = imageParts.length > 0
+      ? new Uint8Array(imageParts.reduce((sum, item) => sum + item.imageBytes.length, 0))
+      : null;
+    if (imageBytes) {
+      let offset = 0;
+      for (const item of imageParts) {
+        imageBytes.set(item.imageBytes, offset);
+        offset += item.imageBytes.length;
+      }
+    }
+    const documentParts = ordered.filter((item) => item.documentBytes?.length);
+    const documentBytes = documentParts.length > 0
+      ? new Uint8Array(documentParts.reduce((sum, item) => sum + item.documentBytes.length, 0))
+      : null;
+    if (documentBytes) {
+      let offset = 0;
+      for (const item of documentParts) {
+        documentBytes.set(item.documentBytes, offset);
+        offset += item.documentBytes.length;
+      }
+    }
+    const documentBlocks = documentBytes
+      // Public decode is forward-compat tolerant: a post carrying a new block type (e.g. the author-.ath
+      // tag added in a later phase) still decodes here instead of throwing. Private decode stays strict.
+      ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes, { tolerateUnknownBlocks: true }))
+      : [];
+    const readEntryId = ordered.reduce((max, item) => {
+      const value = publicEntryIdBigInt(item.entryId) ?? -1n;
+      return value > max ? value : max;
+    }, -1n);
+    const item = {
+      ...first,
+      text: documentBlocks.length > 0
+        ? messagePreviewFromBlocks(documentBlocks)
+        : ordered.filter((part) => !part.imageBytes?.length && !part.documentBytes?.length).map((part) => part.text ?? '').join(''),
+      blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
+      readEntryId: readEntryId >= 0n ? readEntryId.toString() : first.entryId,
+      partCount: group.expected,
+      avatarImageUrl: null,
+    };
+    if (imageBytes && documentBlocks.length === 0) {
+      item.imageUrl = bytesToImageDataUrl(imageBytes, 'image/webp');
+      item.imageBytes = undefined;
+    }
+    out.push(item);
+  }
+  return out;
+}
+
 async function syncPublicChannelFromChain() {
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return false;
@@ -5748,7 +6103,6 @@ async function syncPublicChannelFromChain() {
   // Walk the FEED source (subscribed + own) so the user's own confirmed posts are fetched from chain, not just
   // the subscribed authors. Adds at most one author index (the user's own).
   const pendingAuthorHeadWrites = [];
-  const pendingParentHeadWrites = [];
   for (const channel of feedSourcePublicChannels()) {
     const channelAuthor = channel.authorWallet;
     if (!channelAuthor) continue;
@@ -5767,9 +6121,8 @@ async function syncPublicChannelFromChain() {
     const authorHeadKey = authorKeyId.toString();
     const authorHead = String(authorIndex.latest_entry_link ?? 0n);
     const cachedPostIds = cachedChainPostEntryIds(channel.id);
-    // Per-author POST cursor: an unchanged author-index head means no new posts — reuse the cached post ids (so a
-    // new comment on an OLD post is still detected below) without re-reading every post body. A changed head
-    // re-walks the window and unions the result with the cached ids.
+    // Per-author POST cursor: an unchanged author-index head means no new posts — reuse the cached post ids
+    // without re-reading every post body. A changed head re-walks the window and unions with the cached ids.
     let postIds;
     let postsTruncated = false;
     if (publicAuthorIndexHeads.get(authorHeadKey) === authorHead) {
@@ -5783,27 +6136,12 @@ async function syncPublicChannelFromChain() {
       postIds = [...postIdSet.values()];
       pendingAuthorHeadWrites.push([authorHeadKey, authorHead]);
     }
-    let commentsTruncated = false;
-    for (const postId of postIds) {
-      let parentIndex;
-      try {
-        parentIndex = await provider.getPublicParentIndex(postId, readOptions);
-      } catch (error) {
-        if (noteTonRpcRateLimit(error)) walkDegraded = true;
-        continue;
-      }
-      if (parentIndex.exists !== true) continue;
-      const parentHeadKey = postId.toString();
-      const parentHead = String(parentIndex.latest_entry_link ?? 0n);
-      // Per-post COMMENT cursor: an unchanged parent-index head means no new comments on this post — skip its walk.
-      if (publicParentIndexHeads.get(parentHeadKey) === parentHead) continue;
-      const { truncated: ct } = await walkPublicChainIds(parentIndex.latest_entry_link, authorWalkMax);
-      if (ct) commentsTruncated = true;
-      pendingParentHeadWrites.push([parentHeadKey, parentHead]);
-    }
+    // Comments are no longer walked during the feed sync — they load on demand on the post detail screen
+    // (loadPublicPostComments). The feed resolves posts only now: no per-post parent-index reads and no comment
+    // body resolution for every subscribed channel on every cycle (the scalability fix the owner asked for).
     // Honest incomplete: more live posts on-chain than were surfaced (cap-truncated, or fewer ids than the
-    // contract's exact live count), or some post's comment chain was truncated.
-    if (postsTruncated || commentsTruncated || (liveCount > 0 && postIds.length < liveCount)) {
+    // contract's exact live count).
+    if (postsTruncated || (liveCount > 0 && postIds.length < liveCount)) {
       incompleteChannels.push(channel.id);
     }
   }
@@ -5896,76 +6234,7 @@ async function syncPublicChannelFromChain() {
       });
     }
   }
-  const assemblePublicParts = (items) => {
-    const groups = new Map();
-    for (const item of items) {
-      const count = Number(item.partCount ?? 1);
-      const index = Number(item.partIndex ?? 0);
-      const key = count <= 1
-        ? `single:${item.channelId}:${item.entryId}`
-        : `${item.channelId}:${item.streamId}:${item.parentEntryId ?? ''}:${item.parentHash ?? ''}`;
-      const group = groups.get(key) ?? { expected: count, parts: [] };
-      group.expected = Math.max(group.expected, count);
-      group.parts.push({ ...item, partIndex: index, partCount: count });
-      groups.set(key, group);
-    }
-    const out = [];
-    for (const group of groups.values()) {
-      const ordered = group.parts
-        .slice()
-        .sort((a, b) => Number(a.partIndex ?? 0) - Number(b.partIndex ?? 0));
-      const unique = new Set(ordered.map((item) => Number(item.partIndex ?? 0)));
-      if (group.expected > 1 && unique.size !== group.expected) continue;
-      const first = ordered[0];
-      const imageParts = ordered.filter((item) => item.imageBytes?.length);
-      const imageBytes = imageParts.length > 0
-        ? new Uint8Array(imageParts.reduce((sum, item) => sum + item.imageBytes.length, 0))
-        : null;
-      if (imageBytes) {
-        let offset = 0;
-        for (const item of imageParts) {
-          imageBytes.set(item.imageBytes, offset);
-          offset += item.imageBytes.length;
-        }
-      }
-      const documentParts = ordered.filter((item) => item.documentBytes?.length);
-      const documentBytes = documentParts.length > 0
-        ? new Uint8Array(documentParts.reduce((sum, item) => sum + item.documentBytes.length, 0))
-        : null;
-      if (documentBytes) {
-        let offset = 0;
-        for (const item of documentParts) {
-          documentBytes.set(item.documentBytes, offset);
-          offset += item.documentBytes.length;
-        }
-      }
-      const documentBlocks = documentBytes
-        // Public decode is forward-compat tolerant: a post carrying a new block type (e.g. the author-.ath
-        // tag added in a later phase) still decodes here instead of throwing. Private decode stays strict.
-        ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes, { tolerateUnknownBlocks: true }))
-        : [];
-      const readEntryId = ordered.reduce((max, item) => {
-        const value = publicEntryIdBigInt(item.entryId) ?? -1n;
-        return value > max ? value : max;
-      }, -1n);
-      const item = {
-        ...first,
-        text: documentBlocks.length > 0
-          ? messagePreviewFromBlocks(documentBlocks)
-          : ordered.filter((part) => !part.imageBytes?.length && !part.documentBytes?.length).map((part) => part.text ?? '').join(''),
-        blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
-        readEntryId: readEntryId >= 0n ? readEntryId.toString() : first.entryId,
-        partCount: group.expected,
-        avatarImageUrl: null,
-      };
-      if (imageBytes && documentBlocks.length === 0) {
-        item.imageUrl = bytesToImageDataUrl(imageBytes, 'image/webp');
-        item.imageBytes = undefined;
-      }
-      out.push(item);
-    }
-    return out;
-  };
+  // assemblePublicParts is hoisted to module scope (reused by the on-demand comment loader, loadPublicPostComments).
   const avatarGroups = new Map();
   for (const part of avatarParts) {
     const pointer = avatarPointerFromFields(part.profileVersion, part.avatarHash);
@@ -6056,7 +6325,6 @@ async function syncPublicChannelFromChain() {
     // Advance the per-index cursors only now — after the merge committed — so a head is never recorded as "seen"
     // before its (new) entries actually reached the cache. A degraded cycle skips this entirely and re-walks next.
     for (const [key, head] of pendingAuthorHeadWrites) publicAuthorIndexHeads.set(key, head);
-    for (const [key, head] of pendingParentHeadWrites) publicParentIndexHeads.set(key, head);
   }
   globalThis.plathoLastPublicSync = {
     capsuleHub: address,
@@ -11406,6 +11674,8 @@ function setView(view) {
   // Switching tabs no longer re-triggers a sync — the unified background loop (scheduleMessageAutoSync) keeps
   // BOTH private messages and the public feed fresh on every tab, so switch-in is instant. setView only renders.
   if (view === 'public') {
+    // Returning to the Public tab always lands on the feed, not a stale post detail left open from before.
+    if (publicPane?.dataset?.postOpen === 'true') closePublicPostDetail();
     renderPublicSurface({ anchorUnread: true });
   }
   if (view === 'vault') {
@@ -12247,6 +12517,10 @@ publicCancelCommentButton?.addEventListener('click', () => {
   refreshComposerCostStatus();
 });
 
+publicPostBackButton?.addEventListener('click', () => {
+  requestNavBack();
+});
+
 publicComposerCommentsCheckbox?.addEventListener('change', () => {
   updatePublicCommentsToggleUi();
   setPublicStatus(publicComposerCommentsCheckbox.checked
@@ -12477,7 +12751,9 @@ publicComposer?.addEventListener('submit', async (event) => {
     publicMessageInput.value = '';
     publicImageAttachments = [];
     updateImageAttachmentUi('public');
-    setPublicCommentTarget(null);
+    // On the post detail screen the composer stays in comment mode for the SAME post (so a follow-up message is
+    // another comment, not a public post). Only the inline/feed flow resets the target.
+    if (!publicPostDetailOpen) setPublicCommentTarget(null);
     autoResizeComposerTextarea(publicMessageInput);
     refreshComposerCostStatus();
   } catch (error) {

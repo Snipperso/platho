@@ -1686,6 +1686,85 @@ button.feed-item:hover {
   font-size: 14px;
 }
 
+/* Public post detail screen (per-post comments). The Public tab is a single pane (no second column like the chat
+   list), so the detail slides over the feed within the same pane, toggled by .public-pane[data-post-open]. The
+   shared composer stays pinned below. */
+.public-post-detail {
+  display: none;
+  min-height: 0;
+}
+
+.public-pane[data-post-open="true"] {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.public-pane[data-post-open="true"] > .pane-header,
+.public-pane[data-post-open="true"] > .public-header-actions,
+.public-pane[data-post-open="true"] > .public-channel-search-row,
+.public-pane[data-post-open="true"] > .public-feed,
+.public-pane[data-post-open="true"] > .public-jump-down-button {
+  display: none;
+}
+
+.public-pane[data-post-open="true"] > .public-post-detail {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The conversation-header base supplies the grid/columns/min-height/border/background. Bleed it to the pane edges
+   (the pane has 24px padding) so it matches the private chat header, and force the Back button visible (it is
+   display:none on desktop for the private two-pane layout, but Public has no second pane to fall back to). */
+/* The header sits within the pane's 24px padding — symmetric, and at the same inset as the feed's own pane-header,
+   so it lands in the same place whether the feed or a post detail is showing. (Full edge-bleed isn't reliable here:
+   the header is a grid item inside an overflow:hidden detail, where negative side margins don't widen it.) The Back
+   button is display:none on desktop for the private two-pane layout; Public has no second pane, so force it on. */
+.public-post-detail-header .chat-back-button {
+  display: grid;
+}
+
+.public-post-detail-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding-top: 16px;
+}
+
+.public-post-detail-body .comment-list {
+  margin-top: 0;
+}
+
+.public-detail-comments-heading {
+  margin: 4px 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.public-detail-status {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.public-detail-retry {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(10, 13, 15, 0.62);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .feed-actions {
   display: flex;
   flex-wrap: wrap;
