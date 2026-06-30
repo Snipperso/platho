@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v602<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v602'/);
+    expect(html).toMatch(/id="appVersionLabel">v603<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v603'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4321,6 +4321,22 @@ describe('PWA runtime config guard', () => {
     expect(refreshNow).not.toMatch(/withVaultReadLock/);
   });
 
+  it('PWA-IOS-PUMP-YIELD-01: the shared RPC pump yields a macrotask before rejecting a backoff-skipped read (no microtask-starvation freeze)', () => {
+    const rpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    // ROOT FIX for the iOS dead-freeze that moved between Vault/activation/send: drainToncenterRequestQueue is the one
+    // shared pump every read flows through. During a 429 backoff it rejects every skipIfRateLimited read with NO
+    // macrotask yield (the only `await delay(waitMs)` is skipped because waitMs<=0), so the microtask queue never
+    // empties and setInterval/render/setTimeout never run = the whole app dead on slow iOS JSC. The fix: the
+    // skip-rate-limited backoff branch MUST `await delay(0)` (a real setTimeout macrotask) before throwing.
+    const drain = rpc.slice(rpc.indexOf('async function drainToncenterRequestQueue'), rpc.indexOf('async function scheduleToncenterRequest'));
+    expect(drain).toMatch(/skipIfRateLimited === true && state\.backoffUntil > now/);
+    // The yield must come BEFORE the backoff throw, inside that branch.
+    const branch = drain.slice(drain.indexOf('skipIfRateLimited === true && state.backoffUntil > now'), drain.indexOf('throw toncenterBackoffError'));
+    expect(branch).toMatch(/await delay\(0\)/);
+    // delay() is a genuine macrotask (setTimeout), not a microtask.
+    expect(rpc).toMatch(/function delay\(ms\)\s*\{\s*return new Promise\(\(resolve\) => setTimeout\(resolve, ms\)\)/);
+  });
+
   it('PWA-IOS-ACT-FAST-KEYID-01: activation status verifies the binding from current_key_id locally, skipping the get_key_record read on the common path', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The localized permanent iOS freeze was the get_key_record read (crumb act:getkeyrecord) on the boot / Vault /
@@ -5217,11 +5233,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v673/);
+    expect(sw).toMatch(/platho-pwa-prototype-v674/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=602/);
+    expect(sw).toMatch(/\.\/app\.js\?v=603/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

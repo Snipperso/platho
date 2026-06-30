@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v602';
+const PLATHO_APP_RUNTIME_VERSION = 'v603';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2109,7 +2109,27 @@ function diagReadCryptoCrumb() {
 }
 // Let the crypto module (separate ES module, cannot import these) stamp ML-KEM ops.
 try { if (typeof globalThis !== 'undefined') globalThis.plathoDiagCryptoCrumb = diagCryptoCrumb; } catch { /* best effort */ }
+// Watch for LARGE synchronous localStorage writes — the iOS WebKit classic: setItem re-serializes the WHOLE store
+// synchronously, so writing a bloated store (image data / growing history) stalls the run loop for seconds = a
+// perceived permanent freeze. Wrap setItem ONCE to stamp the op lane with key+size BEFORE a big write, so if that
+// write is the block, the banner shows op=ls:<key>:<kb> with the tick frozen at it.
+function startDiagLsWatch() {
+  try {
+    const ls = localStorageOrNull();
+    if (!ls || ls.__plathoDiagWrapped) return;
+    const origSet = ls.setItem.bind(ls);
+    ls.setItem = function diagWrappedSetItem(key, value) {
+      try {
+        const len = typeof value === 'string' ? value.length : String(value ?? '').length;
+        if (len > 30000) diagCryptoCrumb(`ls:${String(key).slice(0, 28)}:${Math.round(len / 1024)}kb`);
+      } catch { /* best effort */ }
+      return origSet(key, value);
+    };
+    ls.__plathoDiagWrapped = true;
+  } catch { /* best effort */ }
+}
 startDiagTick();
+startDiagLsWatch();
 // IN-FLIGHT phase tracking: the crumb must show the op RUNNING, and 'idle' when nothing risky is in flight — else a
 // completed op's marker (e.g. nav:read-ok) persists and falsely looks like a freeze on a HEALTHY device too. Depth
 // counter handles overlapping ops: crumb settles to 'idle' only when ALL entered ops have exited. If the thread
