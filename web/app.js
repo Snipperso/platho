@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v601';
+const PLATHO_APP_RUNTIME_VERSION = 'v602';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2072,12 +2072,44 @@ function setText(node, value) {
 // 'boot:ok' (suppressed in the display). Remove this block + all diagCrumb()/diagReadCrumb() call sites once the
 // freeze is localized.
 const DIAG_CRUMB_KEY = 'platho.diag.crumb.v1';
+const DIAG_TICK_KEY = 'platho.diag.tick.v1';
+const DIAG_CRYPTO_KEY = 'platho.diag.crypto.v1';
+// FREE-RUNNING TICK — the decisive sync-vs-async detector. A setInterval that bumps a counter every 200ms. A blocked
+// main thread CANNOT run a timer, so if the run loop freezes synchronously the tick STOPS; an async network hang would
+// let the tick keep climbing. Every crumb stamps the tick count at write time (#N), so on reload we can see whether the
+// run loop kept ticking AFTER a given phase (freeze is elsewhere/async) or stopped dead at it (synchronous block here).
+let diagTickCount = 0;
+function startDiagTick() {
+  try {
+    if (typeof setInterval === 'undefined') return;
+    setInterval(() => {
+      diagTickCount += 1;
+      try { localStorageOrNull()?.setItem(DIAG_TICK_KEY, `${diagTickCount}@${Date.now()}`); } catch { /* best effort */ }
+    }, 200);
+  } catch { /* best effort */ }
+}
 function diagCrumb(step) {
-  try { localStorageOrNull()?.setItem(DIAG_CRUMB_KEY, `${step}@${Date.now()}`); } catch { /* best effort */ }
+  try { localStorageOrNull()?.setItem(DIAG_CRUMB_KEY, `${step}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
+}
+// Heavy synchronous crypto (ML-KEM keygen/encapsulate/decapsulate) is all on the main thread (no Web Worker). This
+// crumb is written from platho-crypto.mjs via globalThis around each ML-KEM op, on its OWN key so it does not clobber
+// the phase crumb. If the tick stops while this crumb's tick == the final tick, an ML-KEM op (or a loop around it) was
+// the blocking operation.
+function diagCryptoCrumb(op) {
+  try { localStorageOrNull()?.setItem(DIAG_CRYPTO_KEY, `${op}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
 }
 function diagReadCrumb() {
   try { return localStorageOrNull()?.getItem(DIAG_CRUMB_KEY) || null; } catch { return null; }
 }
+function diagReadTick() {
+  try { return localStorageOrNull()?.getItem(DIAG_TICK_KEY) || null; } catch { return null; }
+}
+function diagReadCryptoCrumb() {
+  try { return localStorageOrNull()?.getItem(DIAG_CRYPTO_KEY) || null; } catch { return null; }
+}
+// Let the crypto module (separate ES module, cannot import these) stamp ML-KEM ops.
+try { if (typeof globalThis !== 'undefined') globalThis.plathoDiagCryptoCrumb = diagCryptoCrumb; } catch { /* best effort */ }
+startDiagTick();
 // IN-FLIGHT phase tracking: the crumb must show the op RUNNING, and 'idle' when nothing risky is in flight — else a
 // completed op's marker (e.g. nav:read-ok) persists and falsely looks like a freeze on a HEALTHY device too. Depth
 // counter handles overlapping ops: crumb settles to 'idle' only when ALL entered ops have exited. If the thread
@@ -5322,14 +5354,27 @@ function renderConfiguredShell() {
   // phase next to the version so the owner can screenshot it after a force-reload. A clean boot wrote 'boot:ok'.
   const diagPrev = diagReadCrumb();
   const diagStep = diagPrev ? diagPrev.split('@')[0] : 'none';
+  // Tick stamps: each crumb carries the free-running tick count at write time (after '#'). Compare the phase crumb's
+  // tick to the FINAL tick to tell a SYNC block (ticks stopped at the phase) from an async hang (ticks kept climbing).
+  const phaseTick = diagPrev && diagPrev.includes('#') ? diagPrev.split('#')[1] : '?';
+  const tickRaw = diagReadTick();
+  const finalTick = tickRaw ? tickRaw.split('@')[0] : '?';
+  const cryptoRaw = diagReadCryptoCrumb();
+  // Last heavy/concurrent op (ML-KEM encaps/decaps/keygen OR the send replay/confirm path) on its own lane, so it does
+  // NOT clobber the phase crumb. Rendered as op=<label>#<tickAtWrite>. If the tick froze and this op's tick == final
+  // tick, THIS concurrent op (not the phase crumb's read) is the blocking operation.
+  const cryptoLabel = cryptoRaw ? cryptoRaw.replace('@', ' @').split(' @')[0] + (cryptoRaw.includes('#') ? `#${cryptoRaw.split('#')[1]}` : '') : 'none';
   // Show the banner ONLY when the previous session left a non-idle (in-flight) crumb = it FROZE mid-op at that
   // phase. A healthy session settles to 'idle' (all ops exited) → no banner. 'boot:ok'/'none' also = not frozen.
   const diagFrozen = diagStep !== 'none' && diagStep !== 'idle' && diagStep !== 'boot:ok';
-  if (diagFrozen) diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep}`);
+  if (diagFrozen) {
+    // ticks A→B: if A≈B the run loop STOPPED at this phase = synchronous block here; if B≫A it ran past it = async/elsewhere.
+    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · op ${cryptoLabel}`);
+  }
   if (appVersionLabel && diagFrozen) {
     const warn = document.createElement('span');
     warn.className = 'platho-diag-warn';
-    warn.textContent = ` ⚠ ${diagStep}`;
+    warn.textContent = ` ⚠ ${diagStep} t${phaseTick}/${finalTick}`;
     appVersionLabel.append(warn);
   }
   renderPaneHeaders();
@@ -8701,9 +8746,11 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       scannedPrivateEntryIds.add(entryIdKey);
       privateScanUnknownErrorCounts.delete(`${address}:${entryIdKey}`);
       clearPrivateBodyHistoryUnavailable(address, entryId);
+      diagCryptoCrumb('decaps:start');
       const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair, {
         now: Date.now(),
       });
+      diagCryptoCrumb('decaps:done');
       // Divert a self-addressed subscription snapshot BEFORE thread resolution, so it never spawns a "chat with
       // yourself" thread. Collected here; applied (restore) when the sync pass drains them.
       const prefsBytes = prefsBytesFromOpenedCapsule(opened);
@@ -20663,6 +20710,7 @@ function hasPendingPrivatePublishConfirmation(message) {
 
 function resumePendingPrivatePublishConfirmations() {
   if (document.hidden) return;
+  diagCryptoCrumb('replay-confirm');
   for (const thread of threads) {
     for (const message of thread.messages ?? []) {
       if (stopPartialPrivatePublishRecovery({ thread, message })) continue;
@@ -20717,6 +20765,7 @@ function hasPendingPrivateSendRetry(message) {
 
 function resumePendingPrivateSendRetries() {
   if (document.hidden) return;
+  diagCryptoCrumb('replay-retry');
   for (const thread of threads) {
     for (const message of thread.messages ?? []) {
       if (stopPartialPrivatePublishRecovery({ thread, message })) continue;
@@ -21256,6 +21305,7 @@ async function createPrivateComposerCapsules(text, attachments, recipientEntry, 
       ...recipientMetadata,
       reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
     });
+    diagCryptoCrumb('encaps:start');
     capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
       payloadBytes,
       sizeClass: part.sizeClass,
@@ -21263,6 +21313,7 @@ async function createPrivateComposerCapsules(text, attachments, recipientEntry, 
       senderRecovery: true,
       ...currentProfilePointerFields(),
     }));
+    diagCryptoCrumb('encaps:done');
   }
   return capsules;
 }
@@ -21319,6 +21370,7 @@ async function createPrivatePrefsCapsules(snapshotBytes, selfEntry, options = cu
       recipientWallet,
       reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
     });
+    diagCryptoCrumb('encaps-self:start');
     capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', selfEntry.publicBundle, localIdentity, {
       payloadBytes,
       sizeClass: part.sizeClass,
@@ -21326,6 +21378,7 @@ async function createPrivatePrefsCapsules(snapshotBytes, selfEntry, options = cu
       senderRecovery: true,
       ...currentProfilePointerFields(),
     }));
+    diagCryptoCrumb('encaps-self:done');
   }
   return capsules;
 }
