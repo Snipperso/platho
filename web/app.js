@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v603';
+const PLATHO_APP_RUNTIME_VERSION = 'v604';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -680,8 +680,22 @@ let navVaultBalanceRefreshPromise = null;
 // LEAF reads (a single provider.* call) — never a driver that awaits another wrapped read, or it self-deadlocks.
 // READS ONLY: never wrap sign/sendBoc/nonce/double-spend.
 let vaultReadMutexTail = Promise.resolve();
+let vaultReadLockCount = 0; // TEMP diag (slow-device-freeze): counts reads through the mutex; high count + frozen tick = read-chain starvation.
 function withVaultReadLock(fn) {
-  const run = vaultReadMutexTail.then(() => fn());
+  // iOS DEAD-FREEZE FIX (slow-device-freeze): this mutex chains EVERY app-level Vault read (get_user / get_global /
+  // getKeyRecord / GRAM / ATH / stats) via .then() = a MICROTASK. A network (cache-miss) read awaits fetch (a real
+  // macrotask, so the run loop breathes), but a cache-HIT or fast-REJECT read resolves through a microtask only — so a
+  // BURST of such reads chained here drains the whole microtask queue with NO macrotask turn = setInterval / rendering
+  // / setTimeout never run = the app dead. On fast V8 the burst clears in ~ms (invisible); on slow iOS JSC it pins the
+  // run loop = the iPhone-only permanent freeze. Fix: force a real macrotask (delay(0)) before each read, so the run
+  // loop ALWAYS gets a turn between reads regardless of how they resolve. Reads only — ordering preserved (still one
+  // at a time), no sign/nonce/double-spend impact; the per-read ~setTimeout-min latency is negligible (reads are paced
+  // far slower than that already).
+  const run = vaultReadMutexTail.then(() => delay(0)).then(() => {
+    vaultReadLockCount += 1;
+    if (vaultReadLockCount % 25 === 0) { try { diagCryptoCrumb(`vread:${vaultReadLockCount}`); } catch { /* diag best-effort */ } }
+    return fn();
+  });
   vaultReadMutexTail = run.then(() => {}, () => {});
   return run;
 }
