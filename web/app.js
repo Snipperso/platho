@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v598';
+const PLATHO_APP_RUNTIME_VERSION = 'v599';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2078,6 +2078,13 @@ function diagCrumb(step) {
 function diagReadCrumb() {
   try { return localStorageOrNull()?.getItem(DIAG_CRUMB_KEY) || null; } catch { return null; }
 }
+// IN-FLIGHT phase tracking: the crumb must show the op RUNNING, and 'idle' when nothing risky is in flight — else a
+// completed op's marker (e.g. nav:read-ok) persists and falsely looks like a freeze on a HEALTHY device too. Depth
+// counter handles overlapping ops: crumb settles to 'idle' only when ALL entered ops have exited. If the thread
+// FREEZES mid-op, the matching diagExit() never runs, so the crumb stays at the frozen op = the real freeze site.
+let diagDepth = 0;
+function diagEnter(step) { diagDepth += 1; diagCrumb(step); }
+function diagExit() { diagDepth = Math.max(0, diagDepth - 1); if (diagDepth === 0) diagCrumb('idle'); }
 // The version label is hidden on mobile, so surface a frozen-phase crumb as a full-width fixed RED banner that is
 // visible on the phone regardless of layout (painted before bootCrypto, so it shows even on a frozen boot). Tap to
 // dismiss. Removable with the rest of the diag scaffolding.
@@ -5315,11 +5322,11 @@ function renderConfiguredShell() {
   // phase next to the version so the owner can screenshot it after a force-reload. A clean boot wrote 'boot:ok'.
   const diagPrev = diagReadCrumb();
   const diagStep = diagPrev ? diagPrev.split('@')[0] : 'none';
-  // ALWAYS show the banner (debug build): it confirms WHICH version actually loaded on the phone AND names the last
-  // phase the previous session reached. If the previous session froze, that phase is the freeze site; a clean boot
-  // shows 'boot:ok'. No banner at all => this new version did not load (stale SW/cache).
-  diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · prev: ${diagStep}`);
-  if (appVersionLabel && diagStep !== 'none' && diagStep !== 'boot:ok') {
+  // Show the banner ONLY when the previous session left a non-idle (in-flight) crumb = it FROZE mid-op at that
+  // phase. A healthy session settles to 'idle' (all ops exited) → no banner. 'boot:ok'/'none' also = not frozen.
+  const diagFrozen = diagStep !== 'none' && diagStep !== 'idle' && diagStep !== 'boot:ok';
+  if (diagFrozen) diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep}`);
+  if (appVersionLabel && diagFrozen) {
     const warn = document.createElement('span');
     warn.className = 'platho-diag-warn';
     warn.textContent = ` ⚠ ${diagStep}`;
@@ -6781,7 +6788,10 @@ function chainBackedPublicFeedOnly(feed) {
 }
 
 async function syncPublicChannels() {
-  diagCrumb('public:sync');
+  diagEnter('public:sync');
+  try { return await syncPublicChannelsRun(); } finally { diagExit(); }
+}
+async function syncPublicChannelsRun() {
   let chainSyncError = null;
   try {
     // First cycle on a fresh load pays the verifier failure that parks a dead
@@ -7914,7 +7924,10 @@ async function restoreOwnAvatarFromCacheFast(owner = plathoWallet?.address) {
 }
 
 async function refreshOwnProfileAvatar() {
-  diagCrumb('avatar:read');
+  diagEnter('avatar:read');
+  try { return await refreshOwnProfileAvatarRun(); } finally { diagExit(); }
+}
+async function refreshOwnProfileAvatarRun() {
   const owner = plathoWallet?.address;
   if (!owner) {
     setAvatarNode(profileAvatar, 'P', null);
@@ -9109,6 +9122,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
 
 async function syncPrivateCapsulesFromChainOnce(options = {}) {
   if (privateChainSyncPromise) return privateChainSyncPromise;
+  diagEnter('priv:sync');
   privateChainSyncPromise = syncPrivateCapsulesFromChain(options);
   try {
     const result = await privateChainSyncPromise;
@@ -9117,6 +9131,7 @@ async function syncPrivateCapsulesFromChainOnce(options = {}) {
     return result;
   } finally {
     privateChainSyncPromise = null;
+    diagExit();
   }
 }
 
@@ -9243,7 +9258,6 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
   messageAutoSyncTimer = window.setTimeout(async () => {
     messageAutoSyncTimer = null;
     messageAutoSyncAt = 0;
-    diagCrumb('sync:auto');
     let nextSyncDelayMs = MESSAGE_AUTO_SYNC_MS;
     // Pause background sync while an outbound send OR its publish-confirmation is in flight. The broadcast
     // is covered by privateOutboundWorkActive(), but the CONFIRM phase (runPrivatePublishConfirmationRetry:
@@ -9273,7 +9287,6 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
       return;
     }
     beginMessageSyncUi();
-    diagCrumb('sync:auto-private');
     try {
       const result = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' });
       completeMessageSyncUi(result);
@@ -16499,15 +16512,16 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
   }
   markNavVaultBalancePending(options.fromRetry ? 'retrying' : 'refreshing');
   navVaultBalanceRefreshPromise = (async () => {
+    diagEnter('nav:read');
     try {
-      diagCrumb('nav:read');
       const user = await loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS });
       applyVaultUserPocketState(user);
-      diagCrumb('nav:read-ok');
       return user;
     } catch (error) {
       markNavVaultBalanceRetryNeeded('balance unavailable');
       throw error;
+    } finally {
+      diagExit();
     }
   })();
   try {
@@ -16724,7 +16738,7 @@ async function refreshVaultDeferredReadsInBackground(vaultUser) {
   if (vaultDeferredReadInFlight) return;
   if (!plathoWallet?.address || !isVaultViewActive()) return;
   vaultDeferredReadInFlight = true;
-  diagCrumb('vault:deferred');
+  diagEnter('vault:deferred');
   try {
     // 1) get_global (airdrop / registry display) — unverified display read, on its own connection. Never
     //    concurrent with get_user (that 2-read burst was the iOS freeze). assertVaultGlobalMatchesConfig
@@ -16771,6 +16785,7 @@ async function refreshVaultDeferredReadsInBackground(vaultUser) {
     renderVaultPocketCards({ ton_balance: ton, ath_balance: ath }, vaultUser);
   } finally {
     vaultDeferredReadInFlight = false;
+    diagExit();
   }
 }
 
@@ -16853,7 +16868,10 @@ async function refreshAthAirdropState() {
 }
 
 async function refreshAthProtocolStats() {
-  diagCrumb('vault:stats');
+  diagEnter('vault:stats');
+  try { return await refreshAthProtocolStatsRun(); } finally { diagExit(); }
+}
+async function refreshAthProtocolStatsRun() {
   renderAthProfileStats();
   // Serialize the ATH-stats reads (airdrop -> jetton -> flush), one at a time. The airdrop read was
   // fire-and-forget, overlapping the jetton read + the flush burst — the iOS run-loop-stall pattern (v509).
@@ -16932,28 +16950,32 @@ function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
 async function refreshVaultNow({ includeActivation = false, includeStats = false } = {}) {
   if (vaultRefreshPromise) return vaultRefreshPromise;
   const vaultWork = (async () => {
-    diagCrumb('vault:now');
-    const results = [];
-    const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
-    results.push(...dashboardResult);
-    const dashboardUser = dashboardResult[0]?.status === 'fulfilled'
-      ? dashboardResult[0].value
-      : null;
-    // Run the post-dashboard jobs SEQUENTIALLY (one at a time), not concurrently: on iOS WebKit, activation +
-    // ATH-stats firing together (and each fanning out) is the run-loop-stall pattern fixed for the Vault in
-    // v509. Build thunks so each job is INVOKED only when the previous has settled.
-    const jobThunks = [];
-    if (includeActivation) {
-      jobThunks.push(() => refreshVaultActivationStatus(
-        dashboardUser ? { user: dashboardUser, skipGlobal: true } : {},
-      ));
+    diagEnter('vault:now');
+    try {
+      const results = [];
+      const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
+      results.push(...dashboardResult);
+      const dashboardUser = dashboardResult[0]?.status === 'fulfilled'
+        ? dashboardResult[0].value
+        : null;
+      // Run the post-dashboard jobs SEQUENTIALLY (one at a time), not concurrently: on iOS WebKit, activation +
+      // ATH-stats firing together (and each fanning out) is the run-loop-stall pattern fixed for the Vault in
+      // v509. Build thunks so each job is INVOKED only when the previous has settled.
+      const jobThunks = [];
+      if (includeActivation) {
+        jobThunks.push(() => refreshVaultActivationStatus(
+          dashboardUser ? { user: dashboardUser, skipGlobal: true } : {},
+        ));
+      }
+      if (includeStats) jobThunks.push(() => refreshAthProtocolStats());
+      for (const job of jobThunks) {
+        results.push(...await Promise.allSettled([job()]));
+      }
+      const rejected = results.find((result) => result.status === 'rejected');
+      if (rejected) throw rejected.reason;
+    } finally {
+      diagExit();
     }
-    if (includeStats) jobThunks.push(() => refreshAthProtocolStats());
-    for (const job of jobThunks) {
-      results.push(...await Promise.allSettled([job()]));
-    }
-    const rejected = results.find((result) => result.status === 'rejected');
-    if (rejected) throw rejected.reason;
   })();
   vaultWork.catch(() => {});
   vaultRefreshPromise = vaultWork;
@@ -18374,7 +18396,7 @@ async function submitVaultRegisterMessagingKeys() {
   plathoAccountActivationPending = true;
   vaultDraftStatus.textContent = 'activation sent';
   queueVaultPostTransactionRefresh({ pollActivation: true });
-  diagCrumb('act:posttx-done');
+  diagCrumb('idle');
   return result;
 }
 
@@ -21571,6 +21593,7 @@ async function refreshVaultActivationStatus(options = {}) {
     refreshComposerPublishPolicy();
     return null;
   }
+  diagEnter('vault:act-status');
   try {
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
@@ -21649,6 +21672,8 @@ async function refreshVaultActivationStatus(options = {}) {
     refreshComposerPublishPolicy();
     if (!expectedUnavailable) console.error(error);
     return null;
+  } finally {
+    diagExit();
   }
 }
 
