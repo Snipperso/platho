@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v583<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v583'/);
+    expect(html).toMatch(/id="appVersionLabel">v584<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v584'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4247,6 +4247,13 @@ describe('PWA runtime config guard', () => {
     expect(displayFn).toMatch(/canonicalUsernameDisplay\(/);
     const threadFn = app.slice(app.indexOf('function threadDisplayLabel(thread)'), app.indexOf('function threadDisplayTone'));
     expect(threadFn).toMatch(/canonicalUsernameDisplay\(thread\?\.name/);
+    // Public feed/channel author also canonicalizes: the post/comment author string source (publicAuthorLabel)
+    // and the registry-name overlay (applyContactDisplayToRegistryChannel's fallback) both strip ".ath", so the
+    // feed card author, channels list, channel-detail header, post-detail title and comment rows are all bare.
+    const authorFn = app.slice(app.indexOf('function publicAuthorLabel(authorWallet)'), app.indexOf('function ensurePublicChannelForAuthorWallet'));
+    expect(authorFn).toMatch(/canonicalUsernameDisplay\(channelName\)/);
+    const overlayFn = app.slice(app.indexOf('function applyContactDisplayToRegistryChannel(channel)'), app.indexOf('function publicChannelAvatar'));
+    expect(overlayFn).toMatch(/canonicalUsernameDisplay\(channel\.name\)/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -5072,11 +5079,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v654/);
+    expect(sw).toMatch(/platho-pwa-prototype-v655/);
     expect(sw).toMatch(/\.\/styles\.css\?v=191/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=583/);
+    expect(sw).toMatch(/\.\/app\.js\?v=584/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
