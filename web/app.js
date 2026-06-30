@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v585';
+const PLATHO_APP_RUNTIME_VERSION = 'v586';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4932,8 +4932,19 @@ function renderPublicPostDetail() {
   const flatMeta = (item.meta ?? []).flat().filter(Boolean);
   const authorName = item.author || flatMeta[0] || item.title || 'Post';
   const dateLabel = flatMeta.length > 1 ? String(flatMeta[flatMeta.length - 1]) : '';
-  setText(publicPostDetailTitle, authorName);
-  setText(publicPostDetailSubtitle, dateLabel || 'Public post');
+  // Title carries the author's identity tone (e.g. the teal ".ath" colour) — parity with the private chat header
+  // (renderConversationIdentity). The date is NOT shown here; it moves into the post card below (like the feed),
+  // and the subtitle is left empty so this header matches the private one (just the name).
+  const authorTone = item.authorWallet ? resolveWalletChannelDisplay(item.authorWallet)?.tone : null;
+  if (authorTone) {
+    const toneLabel = document.createElement('span');
+    toneLabel.className = `identity-title-label identity-label-${authorTone}`;
+    toneLabel.textContent = authorName;
+    publicPostDetailTitle.replaceChildren(toneLabel);
+  } else {
+    setText(publicPostDetailTitle, authorName);
+  }
+  setText(publicPostDetailSubtitle, '');
   if (publicPostDetailAvatar) {
     setAvatarNode(publicPostDetailAvatar, String(authorName).slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
   }
@@ -4950,6 +4961,15 @@ function renderPublicPostDetail() {
   // The post content, pinned at the top (no author row — the header already carries the author identity).
   const post = document.createElement('article');
   post.className = 'feed-item public-detail-post';
+  // Post date lives on the card (mirrors the feed), not in the header — keeps the header to just the author.
+  if (dateLabel) {
+    const meta = document.createElement('div');
+    meta.className = 'feed-meta public-detail-post-meta';
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = dateLabel;
+    meta.append(dateSpan);
+    post.append(meta);
+  }
   if (item.title) {
     const title = document.createElement('h2');
     title.textContent = item.title;

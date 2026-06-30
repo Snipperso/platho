@@ -725,8 +725,8 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .conversation-header {
-  min-height: 90px;
-  padding: 24px 24px 16px;
+  min-height: 64px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--line-soft);
   background: rgba(15, 18, 20, 0.94);
 }
@@ -1762,10 +1762,11 @@ button.feed-item:hover {
 /* The detail container bleeds to the pane edges, so this header (filling it) lines up with the private chat header.
    Give it its own column track (back + avatar + title + actions) so it renders the same at every width — the shared
    conversation-header grid assumes the Back button is hidden on desktop (the private two-pane layout), which doesn't
-   hold for the single-pane Public tab. */
+   hold for the single-pane Public tab. The fixed 38px/44px back+avatar tracks + 10px gap MATCH the private mobile
+   header exactly so the avatar lines up identically in both. */
 .public-pane .public-post-detail-header {
-  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
-  gap: 12px;
+  grid-template-columns: 38px 44px minmax(0, 1fr) max-content;
+  gap: 10px;
 }
 
 /* Back is display:none on desktop for the private layout; Public has no second pane, so force it visible. */
@@ -1776,6 +1777,10 @@ button.feed-item:hover {
 .public-post-detail-header .avatar {
   width: 44px;
   height: 44px;
+}
+
+.public-detail-post-meta {
+  margin-bottom: 8px;
 }
 
 .public-post-detail-body {
@@ -3328,11 +3333,10 @@ button.feed-item:hover {
     display: grid;
     grid-template-columns: 38px 44px minmax(0, 1fr) max-content;
     align-items: center;
-    /* The header keeps its desktop min-height:90px on mobile too (the desktop rule isn't overridden here), so mirror
-       the desktop padding: vertical 24/16 (symmetric 12/12 centred the avatar/name/menu 4px higher → the buttons
-       "jumped" vertically) and RIGHT 24 (mobile's 14 sat the menu buttons closer to the edge than on desktop). Left
-       stays 14 — the mobile gutter for the back button + avatar, shared with the message area. */
-    padding: 24px 24px 16px 14px;
+    /* Compressed header (shared with desktop: same symmetric vertical padding so the buttons don't jump across the
+       900px breakpoint). RIGHT 24 matches desktop; LEFT 14 is the mobile gutter for the back button + avatar,
+       shared with the message area. */
+    padding: 12px 24px 12px 14px;
     gap: 10px;
     max-width: 100vw;
     overflow: hidden;
