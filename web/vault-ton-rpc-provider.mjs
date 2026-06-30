@@ -569,6 +569,11 @@ function takeNextToncenterTask(state) {
   return state.pending.splice(bestIndex, 1)[0];
 }
 
+// TEMP diag (removed with the rest of the slow-device-freeze scaffolding): counts skip-rate-limited reads rejected
+// during an active backoff, so the on-device banner can prove the microtask-starvation storm (a high count while the
+// free-running tick is frozen == the storm). Throttled crumb to avoid per-reject localStorage churn.
+let toncenterBackoffRejectCount = 0;
+
 async function drainToncenterRequestQueue(state) {
   try {
     while (state.pending.length > 0) {
@@ -584,6 +589,21 @@ async function drainToncenterRequestQueue(state) {
         const queueDeadlineAt = queueTimeoutMs > 0 ? task.enqueuedAt + queueTimeoutMs : 0;
         const now = Date.now();
         if (task.options.skipIfRateLimited === true && state.backoffUntil > now) {
+          // iOS DEAD-FREEZE ROOT FIX (slow-device-freeze-iphone-se2): this single shared RPC pump is the one
+          // construct every Vault / activation / send / confirm read flows through. Its only macrotask yield
+          // (`await delay(waitMs)` below) is SKIPPED for skipIfRateLimited reads (waitMs<=0 because backoff is
+          // excluded from waitUntil). So during a 429 backoff the drain loop rejected every queued read through
+          // MICROTASKS ONLY — the microtask queue never emptied, so setInterval / rendering / the setTimeout
+          // send-retry never ran = the whole app dead until the upstream confirm/broadcast budget stopped feeding
+          // it. On fast V8 the burst drains in ~ms (invisible); on slow iOS JSC the same burst pins the run loop
+          // for the whole budget = the iPhone-only permanent freeze. The fix: yield ONE real macrotask before
+          // rejecting, so the run loop breathes between rejects on every engine. Scheduling-only — the read still
+          // rejects (skip semantics preserved), just one macrotask later; no send/nonce/double-spend change.
+          await delay(0);
+          toncenterBackoffRejectCount += 1;
+          if (toncenterBackoffRejectCount % 25 === 0) {
+            try { globalThis.plathoDiagCryptoCrumb?.(`pump-reject:${toncenterBackoffRejectCount}`); } catch { /* diag best-effort */ }
+          }
           throw toncenterBackoffError(state.backoffUntil - now);
         }
         if (queueDeadlineAt > 0 && now >= queueDeadlineAt) {
