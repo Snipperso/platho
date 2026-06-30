@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v588<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v588'/);
+    expect(html).toMatch(/id="appVersionLabel">v589<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v589'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2320,8 +2320,9 @@ describe('PWA runtime config guard', () => {
     );
     expect(linkSource).toMatch(/readKnownPlathoUsernames\(plathoWallet\?\.address\)/);
     expect(linkSource).toMatch(/id: 'pick',\s*\n\s*type: 'select'/);
-    expect(linkSource).toMatch(/await verifyWalletDisplayIdentity\(normalizedMode, value, plathoWallet\)/);
-    expect(linkSource).toMatch(/addKnownPlathoUsername\(verified\.label, plathoWallet\?\.address\)/);
+    // Verification now runs in-place via validateSubmit (close only on success — no flicker), see PWA-LINK-NAME-NO-FLICKER-01.
+    expect(linkSource).toMatch(/await verifyWalletDisplayIdentity\(normalizedMode, chosen, plathoWallet\)/);
+    expect(linkSource).toMatch(/addKnownPlathoUsername\(result\.label, plathoWallet\?\.address\)/);
   });
 
   it('PWA-MINT-ATH-PREFLIGHT-01: Mint Platho name validates length and ATH affordability up front', () => {
@@ -4248,6 +4249,39 @@ describe('PWA runtime config guard', () => {
     expect(setSrc).toMatch(/markPrefsDirty\(\)/);
   });
 
+  it('PWA-PREFS-USERNAMES-01: the prefs snapshot also syncs the wallet .ath names so a cleared device restores its linked-names list', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const build = app.slice(app.indexOf('function buildPrefsSnapshot()'), app.indexOf('function serializePrefsSnapshotBytes'));
+    expect(build).toMatch(/readKnownPlathoUsernames\(plathoWallet\?\.address\)/);
+    expect(build).toMatch(/readLinkedPlathoUsername\(plathoWallet\?\.address\)\?\.label/);
+    expect(build).toMatch(/channels, usernames, linked \}/);
+    expect(app).toMatch(/function restoreKnownUsernamesFromSnapshot\(snapshot\)/);
+    const restore = app.slice(app.indexOf('function restoreKnownUsernamesFromSnapshot(snapshot)'), app.indexOf('function applyPrefsSnapshot(snapshot)'));
+    expect(restore).toMatch(/addKnownPlathoUsername\(label\.trim\(\)\)/);
+    const apply = app.slice(app.indexOf('function applyPrefsSnapshot(snapshot)'), app.indexOf('function collectRestoredPrefsSnapshot'));
+    expect(apply).toMatch(/restoreKnownUsernamesFromSnapshot\(snapshot\)/);
+    // Re-link the remembered display name only when this device has none yet (so a local choice is never clobbered).
+    expect(apply).toMatch(/!readLinkedPlathoUsername\(\)[\s\S]*?writeLinkedPlathoUsername\(identity\)/);
+    // Additive restore even on a non-fresh device (drain's non-auto-apply branch).
+    const drain = app.slice(app.indexOf('function drainRestoredPrefsSnapshots('), app.indexOf('function publicAuthorLabel'));
+    expect(drain).toMatch(/restoreKnownUsernamesFromSnapshot\(newest\)/);
+  });
+
+  it('PWA-LINK-NAME-NO-FLICKER-01: Link Platho name verifies in-place (no close+reopen flicker)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // openActionDialog supports an async validateSubmit gate; the submit handler keeps the dialog open on ok:false.
+    expect(app).toMatch(/validateSubmit: config\.validateSubmit \?\? null/);
+    const submit = app.slice(app.indexOf("actionForm?.addEventListener('submit'"), app.indexOf("document.addEventListener('click'"));
+    expect(submit).toMatch(/const validate = dialogAtStart\.validateSubmit/);
+    expect(submit).toMatch(/if \(outcome && outcome\.ok\) \{\s*closeActionDialog\(outcome\.result \?\? values\)/);
+    expect(submit).toMatch(/actionHint\.dataset\.tone = 'error'/);
+    // requestWalletDisplayIdentity verifies via validateSubmit in a single open — NOT a close+reopen while-loop.
+    const fn = app.slice(app.indexOf('async function requestWalletDisplayIdentity'), app.indexOf('async function requestUsernameMintName'));
+    expect(fn).toMatch(/validateSubmit: async \(values\) =>/);
+    expect(fn).toMatch(/verifyWalletDisplayIdentity\(normalizedMode, chosen, plathoWallet\)/);
+    expect(fn).not.toMatch(/while \(true\)/);
+  });
+
   it('PWA-CANONICAL-USERNAME-01: usernames display canonically (no .ath suffix) via displayIdentityLabel + threadDisplayLabel', () => {
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toMatch(/function canonicalUsernameDisplay\(label\)/);
@@ -5112,11 +5146,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v659/);
+    expect(sw).toMatch(/platho-pwa-prototype-v660/);
     expect(sw).toMatch(/\.\/styles\.css\?v=194/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=588/);
+    expect(sw).toMatch(/\.\/app\.js\?v=589/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
