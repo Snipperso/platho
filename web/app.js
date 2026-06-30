@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v588';
+const PLATHO_APP_RUNTIME_VERSION = 'v589';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3891,6 +3891,10 @@ async function openActionDialog(config = {}) {
       summary: config.summary,
       dismissOnBackdrop: dismissible,
       cancellable,
+      // Optional async gate: run on submit BEFORE the dialog closes. Resolves { ok, result?, error? }. When it
+      // returns ok:false the dialog STAYS OPEN and shows the error inline (no close+reopen flicker).
+      validateSubmit: config.validateSubmit ?? null,
+      checkingHint: config.checkingHint ?? 'Checking…',
     };
     actionTitle.textContent = config.title ?? 'Action';
     actionHint.textContent = config.hint ?? 'Review details before signing.';
@@ -6071,7 +6075,12 @@ function buildPrefsSnapshot() {
     if (authorWallet && ownWallet && sameWalletAddress(authorWallet, ownWallet)) continue; // own channel is implicit
     channels.push({ id, w: authorWallet, sub: subById.get(id) === true, name: customById.get(id)?.name ?? null, ts: nowSec });
   }
-  return { v: PREFS_SNAPSHOT_VERSION, writtenAt: nowSec, channels };
+  // Also remember this wallet's .ath names so a cleared/re-imported device gets its "linked names" back. The
+  // quick-pick list (readKnownPlathoUsernames unions the currently-linked name) + which one is the active display.
+  // These are this wallet's own NFTs and re-verified on use, so restoring them is safe.
+  const usernames = ownWallet ? readKnownPlathoUsernames(plathoWallet?.address) : [];
+  const linked = ownWallet ? (readLinkedPlathoUsername(plathoWallet?.address)?.label ?? null) : null;
+  return { v: PREFS_SNAPSHOT_VERSION, writtenAt: nowSec, channels, usernames, linked };
 }
 
 function serializePrefsSnapshotBytes(snapshot) {
@@ -6085,6 +6094,16 @@ function parsePrefsSnapshotBytes(bytes) {
     return obj;
   } catch {
     return null;
+  }
+}
+
+// Restore the wallet's known .ath names from a snapshot — additive (a union of quick-picks, re-verified on use), so
+// safe to run regardless of the subscription auto-apply gate. This is what makes the profile remember its linked
+// names after a local clear + re-import.
+function restoreKnownUsernamesFromSnapshot(snapshot) {
+  if (!Array.isArray(snapshot?.usernames)) return;
+  for (const label of snapshot.usernames) {
+    if (typeof label === 'string' && label.trim()) addKnownPlathoUsername(label.trim());
   }
 }
 
@@ -6112,6 +6131,17 @@ function applyPrefsSnapshot(snapshot) {
   writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
   setPrefsLastSyncedAt(snapshot.writtenAt);
   writePrefsDirty(false);
+  // Restore the wallet's .ath names (the "linked names" quick-picks) and, when this device has no display name yet,
+  // re-link the one the snapshot remembered so the profile shows it again (re-verified on next interaction).
+  restoreKnownUsernamesFromSnapshot(snapshot);
+  if (typeof snapshot.linked === 'string' && snapshot.linked.trim() && !readLinkedPlathoUsername()) {
+    const identity = normalizeLinkedPlathoUsername(snapshot.linked.trim());
+    if (identity) {
+      writeLinkedPlathoUsername(identity);
+      writeWalletDisplayIdentity(identity);
+      try { renderWalletIdentity(); } catch { /* profile UI not ready yet; next render picks it up */ }
+    }
+  }
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   resyncPublicForNewSubscription();
   return true;
@@ -6136,6 +6166,9 @@ function drainRestoredPrefsSnapshots() {
   if (prefsLastSyncedAt === null && !prefsDirty && !hasLocalFollows) {
     return applyPrefsSnapshot(newest);
   }
+  // Not a fresh device (so we don't auto-apply subscriptions), but the known .ath names are additive — restore them
+  // anyway so the profile's linked-names list stays complete across devices.
+  restoreKnownUsernamesFromSnapshot(newest);
   const seen = Math.max(prefsLastSyncedAt ?? 0, Number(newest.writtenAt ?? 0));
   if (seen > 0) setPrefsLastSyncedAt(seen);
   return false;
@@ -12521,9 +12554,35 @@ messageStrip?.addEventListener('keydown', (event) => {
 });
 actionFields?.addEventListener('input', updateActiveActionSummary);
 actionFields?.addEventListener('change', updateActiveActionSummary);
-actionForm?.addEventListener('submit', (event) => {
+actionForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (!activeActionDialog) return;
   const values = collectActionDialogValues();
+  const dialogAtStart = activeActionDialog;
+  const validate = dialogAtStart.validateSubmit;
+  if (typeof validate === 'function') {
+    // Validate IN-PLACE before closing: keep the dialog open and show the error inline on failure, so a bad input
+    // (e.g. an unregistered .ath name) no longer makes the modal close and immediately re-open (the flicker).
+    if (actionSubmitButton) actionSubmitButton.disabled = true;
+    if (actionHint) { actionHint.textContent = dialogAtStart.checkingHint ?? 'Checking…'; actionHint.dataset.tone = 'muted'; }
+    let outcome = null;
+    try {
+      outcome = await validate(values);
+    } catch (error) {
+      outcome = { ok: false, error: error?.message || 'Validation failed' };
+    }
+    if (activeActionDialog !== dialogAtStart) return; // dialog was cancelled/replaced while validating
+    if (outcome && outcome.ok) {
+      closeActionDialog(outcome.result ?? values);
+      return;
+    }
+    if (actionHint) {
+      actionHint.textContent = (outcome && outcome.error) || 'Invalid input';
+      actionHint.dataset.tone = 'error';
+    }
+    if (actionSubmitButton) actionSubmitButton.disabled = false;
+    return;
+  }
   if (actionSubmitButton) actionSubmitButton.disabled = true;
   window.setTimeout(() => closeActionDialog(values), 0);
 });
@@ -14109,61 +14168,64 @@ async function requestWalletDisplayIdentity(mode) {
   const knownNames = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
     ? readKnownPlathoUsernames(plathoWallet?.address)
     : [];
-  while (true) {
-    const fields = [];
-    if (knownNames.length > 0) {
-      fields.push({
-        id: 'pick',
-        type: 'select',
-        label: 'Your linked names',
-        required: false,
-        options: [{ value: '', label: 'Enter a name below…' }, ...knownNames.map((label) => ({ value: label, label }))],
-        value: knownNames.includes(value) ? value : '',
-      });
-      fields.push({
-        id: 'displayName',
-        label: `Or a different ${suffix} name`,
-        placeholder: 'name.ath',
-        autocomplete: 'off',
-        required: false,
-        value: '',
-      });
-    } else {
-      fields.push({
-        id: 'displayName',
-        label: WALLET_DISPLAY_MODE_LABELS[normalizedMode],
-        placeholder: 'name.ath',
-        autocomplete: 'off',
-        value,
-      });
-    }
-    const result = await openActionDialog({
-      title: 'Link Platho name',
-      hint: feedback,
-      tone,
-      submitLabel: 'Link name',
-      fields,
-      summary: (values) => {
-        const chosen = (values.displayName?.trim() || values.pick || '').trim();
-        return [{
-          label: 'Check',
-          value: chosen ? `verify ${chosen} is owned by this wallet` : 'permanent name, currently owned by this wallet',
-        }];
-      },
+  const fields = [];
+  if (knownNames.length > 0) {
+    fields.push({
+      id: 'pick',
+      type: 'select',
+      label: 'Your linked names',
+      required: false,
+      options: [{ value: '', label: 'Enter a name below…' }, ...knownNames.map((label) => ({ value: label, label }))],
+      value: knownNames.includes(value) ? value : '',
     });
-    if (!result) return null;
-    value = (result.displayName?.trim() || result.pick || '').trim();
-    try {
-      const verified = await verifyWalletDisplayIdentity(normalizedMode, value, plathoWallet);
-      if (verified?.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && verified.label) {
-        addKnownPlathoUsername(verified.label, plathoWallet?.address);
-      }
-      return verified;
-    } catch (error) {
-      feedback = error?.message || `Use a verified ${suffix} name for this wallet.`;
-      tone = 'error';
-    }
+    fields.push({
+      id: 'displayName',
+      label: `Or a different ${suffix} name`,
+      placeholder: 'name.ath',
+      autocomplete: 'off',
+      required: false,
+      value: '',
+    });
+  } else {
+    fields.push({
+      id: 'displayName',
+      label: WALLET_DISPLAY_MODE_LABELS[normalizedMode],
+      placeholder: 'name.ath',
+      autocomplete: 'off',
+      value,
+    });
   }
+  // The name is verified IN-PLACE on submit (validateSubmit): the dialog stays open and shows the error inline if
+  // the name is not registered / not owned, instead of closing and immediately re-opening (the flicker the owner
+  // reported). It only closes once the name passes verification.
+  const verified = await openActionDialog({
+    title: 'Link Platho name',
+    hint: feedback,
+    tone,
+    submitLabel: 'Link name',
+    fields,
+    checkingHint: 'Verifying name…',
+    summary: (values) => {
+      const chosen = (values.displayName?.trim() || values.pick || '').trim();
+      return [{
+        label: 'Check',
+        value: chosen ? `verify ${chosen} is owned by this wallet` : 'permanent name, currently owned by this wallet',
+      }];
+    },
+    validateSubmit: async (values) => {
+      const chosen = (values.displayName?.trim() || values.pick || '').trim();
+      try {
+        const result = await verifyWalletDisplayIdentity(normalizedMode, chosen, plathoWallet);
+        if (result?.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && result.label) {
+          addKnownPlathoUsername(result.label, plathoWallet?.address);
+        }
+        return { ok: true, result };
+      } catch (error) {
+        return { ok: false, error: error?.message || `Use a verified ${suffix} name for this wallet.` };
+      }
+    },
+  });
+  return verified ?? null;
 }
 
 async function requestUsernameMintName() {
