@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v594';
+const PLATHO_APP_RUNTIME_VERSION = 'v595';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2066,11 +2066,11 @@ function diagReadCrumb() {
 // The version label is hidden on mobile, so surface a frozen-phase crumb as a full-width fixed RED banner that is
 // visible on the phone regardless of layout (painted before bootCrypto, so it shows even on a frozen boot). Tap to
 // dismiss. Removable with the rest of the diag scaffolding.
-function diagShowBanner(step) {
+function diagShowBanner(text) {
   try {
     if (typeof document === 'undefined' || !document.body) return;
     const banner = document.createElement('div');
-    banner.textContent = `PLATHO DIAG · froze @ ${step} · tap to dismiss`;
+    banner.textContent = `${text} · tap to dismiss`;
     banner.setAttribute('style', 'position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#ff3b30;color:#fff;font:700 13px/1.45 system-ui,-apple-system,sans-serif;padding:12px 14px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.4);');
     banner.addEventListener('click', () => banner.remove());
     document.body.appendChild(banner);
@@ -5297,16 +5297,16 @@ function renderConfiguredShell() {
   // TEMP diag: if the previous session left an incomplete breadcrumb (it froze mid-boot/activation), surface that
   // phase next to the version so the owner can screenshot it after a force-reload. A clean boot wrote 'boot:ok'.
   const diagPrev = diagReadCrumb();
-  const diagStep = diagPrev && !diagPrev.startsWith('boot:ok') ? diagPrev.split('@')[0] : null;
-  if (diagStep) {
-    if (appVersionLabel) {
-      const warn = document.createElement('span');
-      warn.textContent = ` ⚠ ${diagStep}`;
-      warn.style.color = '#ff6b6b';
-      appVersionLabel.append(warn);
-    }
-    // The version label is hidden on mobile — show a full-width red banner the phone can actually display.
-    diagShowBanner(diagStep);
+  const diagStep = diagPrev ? diagPrev.split('@')[0] : 'none';
+  // ALWAYS show the banner (debug build): it confirms WHICH version actually loaded on the phone AND names the last
+  // phase the previous session reached. If the previous session froze, that phase is the freeze site; a clean boot
+  // shows 'boot:ok'. No banner at all => this new version did not load (stale SW/cache).
+  diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · prev: ${diagStep}`);
+  if (appVersionLabel && diagStep !== 'none' && diagStep !== 'boot:ok') {
+    const warn = document.createElement('span');
+    warn.textContent = ` ⚠ ${diagStep}`;
+    warn.style.color = '#ff6b6b';
+    appVersionLabel.append(warn);
   }
   renderPaneHeaders();
   setText(identityName, ui.identityName);
@@ -16475,8 +16475,10 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
   markNavVaultBalancePending(options.fromRetry ? 'retrying' : 'refreshing');
   navVaultBalanceRefreshPromise = (async () => {
     try {
+      diagCrumb('nav:read');
       const user = await loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS });
       applyVaultUserPocketState(user);
+      diagCrumb('nav:read-ok');
       return user;
     } catch (error) {
       markNavVaultBalanceRetryNeeded('balance unavailable');
