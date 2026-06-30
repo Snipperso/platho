@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v593';
+const PLATHO_APP_RUNTIME_VERSION = 'v594';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2062,6 +2062,19 @@ function diagCrumb(step) {
 }
 function diagReadCrumb() {
   try { return localStorageOrNull()?.getItem(DIAG_CRUMB_KEY) || null; } catch { return null; }
+}
+// The version label is hidden on mobile, so surface a frozen-phase crumb as a full-width fixed RED banner that is
+// visible on the phone regardless of layout (painted before bootCrypto, so it shows even on a frozen boot). Tap to
+// dismiss. Removable with the rest of the diag scaffolding.
+function diagShowBanner(step) {
+  try {
+    if (typeof document === 'undefined' || !document.body) return;
+    const banner = document.createElement('div');
+    banner.textContent = `PLATHO DIAG · froze @ ${step} · tap to dismiss`;
+    banner.setAttribute('style', 'position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#ff3b30;color:#fff;font:700 13px/1.45 system-ui,-apple-system,sans-serif;padding:12px 14px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.4);');
+    banner.addEventListener('click', () => banner.remove());
+    document.body.appendChild(banner);
+  } catch { /* best effort */ }
 }
 
 function walletAddressForCopy(wallet = plathoWallet) {
@@ -5285,11 +5298,15 @@ function renderConfiguredShell() {
   // phase next to the version so the owner can screenshot it after a force-reload. A clean boot wrote 'boot:ok'.
   const diagPrev = diagReadCrumb();
   const diagStep = diagPrev && !diagPrev.startsWith('boot:ok') ? diagPrev.split('@')[0] : null;
-  if (appVersionLabel && diagStep) {
-    const warn = document.createElement('span');
-    warn.textContent = ` ⚠ ${diagStep}`;
-    warn.style.color = '#ff6b6b';
-    appVersionLabel.append(warn);
+  if (diagStep) {
+    if (appVersionLabel) {
+      const warn = document.createElement('span');
+      warn.textContent = ` ⚠ ${diagStep}`;
+      warn.style.color = '#ff6b6b';
+      appVersionLabel.append(warn);
+    }
+    // The version label is hidden on mobile — show a full-width red banner the phone can actually display.
+    diagShowBanner(diagStep);
   }
   renderPaneHeaders();
   setText(identityName, ui.identityName);
