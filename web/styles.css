@@ -249,6 +249,12 @@ button:disabled,
   user-select: none;
 }
 
+/* The block's own `display: grid` would otherwise beat the UA `[hidden] { display: none }` (equal specificity,
+   author wins), so the hidden attribute set while the balance is unknown wouldn't actually hide it. Make it stick. */
+.rail-vault-balance[hidden] {
+  display: none;
+}
+
 .rail-vault-balance span {
   color: var(--accent);
   font-size: 9px;
@@ -274,28 +280,24 @@ button:disabled,
   word-break: normal;
 }
 
-.rail-vault-balance strong.is-loading {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 14px;
-  min-height: 14px;
+/* The rail balance shows NOTHING until it is known (no spinner — the global header sync indicator already signals
+   activity); when a real balance lands the whole block fades in. */
+.rail-vault-balance-reveal {
+  animation: rail-balance-fade-in 0.45s ease-out both;
 }
 
-.rail-vault-balance strong.is-placeholder {
-  visibility: hidden;
+@keyframes rail-balance-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.rail-vault-balance strong.is-loading::before {
-  content: "";
-  width: 11px;
-  height: 11px;
-  border: 2px solid rgba(48, 213, 176, 0.18);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: rail-balance-spin 0.8s linear infinite;
-}
-
+/* Kept for the global header sync indicator's spinner. */
 @keyframes rail-balance-spin {
   to {
     transform: rotate(360deg);
