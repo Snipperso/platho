@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v585<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v585'/);
+    expect(html).toMatch(/id="appVersionLabel">v586<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v586'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4256,6 +4256,22 @@ describe('PWA runtime config guard', () => {
     expect(overlayFn).toMatch(/canonicalUsernameDisplay\(channel\.name\)/);
   });
 
+  it('PWA-HEADER-CONSISTENCY-01: public post header matches the private chat header (tone, grid, compressed height, date on card)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const detailFn = app.slice(app.indexOf('function renderPublicPostDetail()'), app.indexOf('function openPublicPostDetail'));
+    // The public title carries the author's identity tone (teal ".ath" etc.), mirroring renderConversationIdentity.
+    expect(detailFn).toMatch(/resolveWalletChannelDisplay\(item\.authorWallet\)\?\.tone/);
+    expect(detailFn).toMatch(/identity-title-label identity-label-\$\{authorTone\}/);
+    // Date is no longer in the header subtitle (empty, like the private header) — it moves onto the post card.
+    expect(detailFn).toMatch(/setText\(publicPostDetailSubtitle, ''\)/);
+    expect(detailFn).toMatch(/className = 'feed-meta public-detail-post-meta'/);
+    // The public header grid + gap match the private mobile header exactly so the avatar lines up identically.
+    expect(css).toMatch(/\.public-pane \.public-post-detail-header \{\s*grid-template-columns: 38px 44px minmax\(0, 1fr\) max-content;\s*gap: 10px;/);
+    // Both conversation headers are compressed (was min-height 90 / padding 24px 24px 16px).
+    expect(css).toMatch(/\.conversation-header \{\s*min-height: 64px;\s*padding: 12px 24px;/);
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -5084,11 +5100,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v656/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=191/);
+    expect(sw).toMatch(/platho-pwa-prototype-v657/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=192/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=585/);
+    expect(sw).toMatch(/\.\/app\.js\?v=586/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
