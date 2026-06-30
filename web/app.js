@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v592';
+const PLATHO_APP_RUNTIME_VERSION = 'v593';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2048,6 +2048,20 @@ function setAvatarNode(node, fallback, imageUrl = null) {
 
 function setText(node, value) {
   if (node) node.textContent = value ?? '';
+}
+
+// --- TEMP iPhone-freeze diagnostics (removable) -------------------------------------------------------------
+// A synchronous localStorage breadcrumb written BEFORE each boot / activation phase. localStorage.setItem
+// completes before the next statement, so the crumb survives a JSC hard-freeze + force-reload — the next boot then
+// shows the exact phase the previous (frozen) session died in, next to the version label. A clean boot writes
+// 'boot:ok' (suppressed in the display). Remove this block + all diagCrumb()/diagReadCrumb() call sites once the
+// freeze is localized.
+const DIAG_CRUMB_KEY = 'platho.diag.crumb.v1';
+function diagCrumb(step) {
+  try { localStorageOrNull()?.setItem(DIAG_CRUMB_KEY, `${step}@${Date.now()}`); } catch { /* best effort */ }
+}
+function diagReadCrumb() {
+  try { return localStorageOrNull()?.getItem(DIAG_CRUMB_KEY) || null; } catch { return null; }
 }
 
 function walletAddressForCopy(wallet = plathoWallet) {
@@ -5267,6 +5281,16 @@ function renderConfiguredShell() {
   const ui = appConfig.ui ?? {};
   setText(brandNetworkLabel, ui.brandNetworkLabel ?? appConfig.network?.label ?? appConfig.mode);
   setText(appVersionLabel, PLATHO_APP_RUNTIME_VERSION);
+  // TEMP diag: if the previous session left an incomplete breadcrumb (it froze mid-boot/activation), surface that
+  // phase next to the version so the owner can screenshot it after a force-reload. A clean boot wrote 'boot:ok'.
+  const diagPrev = diagReadCrumb();
+  const diagStep = diagPrev && !diagPrev.startsWith('boot:ok') ? diagPrev.split('@')[0] : null;
+  if (appVersionLabel && diagStep) {
+    const warn = document.createElement('span');
+    warn.textContent = ` ⚠ ${diagStep}`;
+    warn.style.color = '#ff6b6b';
+    appVersionLabel.append(warn);
+  }
   renderPaneHeaders();
   setText(identityName, ui.identityName);
   setText(identitySubtitle, ui.identitySubtitle);
@@ -18286,17 +18310,21 @@ async function submitVaultRegisterMessagingKeys() {
   }
   const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
   if (!(await confirmPlathoAccountActivation(user, { needsKeyBackup }))) return null;
+  diagCrumb('act:confirmed');
   // Only force the key export when this wallet key has never been backed up (a freshly created wallet). An
   // imported or already-exported wallet is provably backed up (markWalletKeyBackupDone cleared the flag), so
   // don't make the user re-download it just to activate.
-  if (needsKeyBackup) await downloadEncryptedWalletKeyBackup();
+  if (needsKeyBackup) { diagCrumb('act:backup'); await downloadEncryptedWalletKeyBackup(); }
   vaultDraftStatus.textContent = 'signing';
+  diagCrumb('act:sign');
   const result = await submitVaultMessage('RegisterMessagingKeys', localVaultDraft.message, {
     userExists: user.exists === true,
   });
+  diagCrumb('act:sent');
   plathoAccountActivationPending = true;
   vaultDraftStatus.textContent = 'activation sent';
   queueVaultPostTransactionRefresh({ pollActivation: true });
+  diagCrumb('act:posttx-done');
   return result;
 }
 
@@ -21596,17 +21624,21 @@ async function bootCrypto() {
       setText(vaultRotateStatus, requiredStatus);
       localProfileAvatarPointer = null;
       refreshComposerPublishPolicy();
+      diagCrumb('boot:ok');
       return null;
     }
+    diagCrumb('boot:wallet');
     await bootWalletScopedLocalStores();
     renderWalletIdentity();
     localProfileAvatarPointer = readStoredProfileAvatarPointer(plathoWallet.address);
     // Restore the own avatar from the media cache right after unlock — before the sync and the first feed render —
     // so it does not flash the letter tile on reload; the tail refreshOwnProfileAvatar then confirms it on-chain.
     await restoreOwnAvatarFromCacheFast(plathoWallet.address).catch(() => {});
+    diagCrumb('boot:identity-start');
     localVaultAuthKeyPair = await deriveVaultAuthKeyPairFromWallet(plathoWallet);
     localIdentity = await loadMessagingIdentityFromWallet(VAULT_RECEIVE_CRYPTO_SUITE);
     localRecipientKeyPair = localIdentity?.encryptionKeyPair ?? null;
+    diagCrumb('boot:identity-done');
     localSignedPublicBundle = await exportSignedPublicKeyBundle(localIdentity, {
       purpose: appConfig.crypto?.signedBundlePurpose ?? 'pwa-runtime',
       ownerWallet: plathoWallet.address,
@@ -21619,6 +21651,7 @@ async function bootCrypto() {
     globalThis.plathoRefreshVaultActivation = async (provider) => refreshVaultActivationStatus({ provider });
     setText(vaultRecordStatus, 'checking');
     setText(vaultDraftStatus, 'checking');
+    diagCrumb('boot:act-status');
     await refreshVaultActivationStatus({ skipGlobal: true });
     // The crypto self-test is a DIAGNOSTIC-ONLY status indicator (~9 synchronous ML-KEM-768 ops:
     // keygen/encap/decap + tamper re-runs); it gates nothing functional. Running it inline here blocked
@@ -21642,6 +21675,7 @@ async function bootCrypto() {
       });
     // After unlock, sync private messages immediately + arm the unified background loop — regardless of the
     // active tab, so messages are there the moment you open chats (the loop keeps running on every tab).
+    diagCrumb('boot:sync-start');
     beginMessageSyncUi();
     const syncResult = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).catch((error) => {
       refreshMessagingControls();
@@ -21664,7 +21698,9 @@ async function bootCrypto() {
     // activation + private-sync reads above and BEFORE the background loop / vault auto-refresh timers are
     // armed below, so no avatar read overlaps another chain read on iOS (v509 class). Cached avatars resolve
     // instantly (IndexedDB) so this rarely blocks; an uncached avatar pays one serial read, never a freeze.
+    diagCrumb('boot:sync-done');
     await refreshOwnProfileAvatar().catch((error) => console.error(error));
+    diagCrumb('boot:ok');
     scheduleMessageAutoSync();
     if (isVaultViewActive()) {
       await refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
