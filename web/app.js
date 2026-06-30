@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v591';
+const PLATHO_APP_RUNTIME_VERSION = 'v592';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16419,6 +16419,18 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
     return null;
   }
   if (navVaultBalanceRefreshPromise) return navVaultBalanceRefreshPromise;
+  // iOS WebKit/JSC HARD-FREEZES the run loop on 2+ CONCURRENT app-level chain-read CALLS (the documented
+  // v509/v515/v516 class — force-reload required). A full vault refresh (refreshVaultNow -> refreshVaultDashboard)
+  // is already reading get_user under vaultRefreshPromise (lock A) and updates the nav balance itself via
+  // applyVaultUserPocketState -> markNavVaultBalanceReady. So while THAT read is in flight, do NOT fire a SECOND,
+  // concurrent get_user here. This cross-lock nav-vs-dashboard overlap on the activation POST-TRANSACTION path
+  // (queueVaultPostTransactionRefresh fires refreshVaultNow at T=0 AND arms a +2s nav read) was the permanent
+  // "Activate Platho account" iPhone freeze. Defer + re-arm so the nav balance still settles after the refresh
+  // frees the lock (and it is already kept current by the refresh's own read meanwhile).
+  if (vaultRefreshPromise) {
+    markNavVaultBalanceRetryNeeded('vault refresh in progress');
+    return vaultRefreshPromise.catch(() => null);
+  }
   markNavVaultBalancePending(options.fromRetry ? 'retrying' : 'refreshing');
   navVaultBalanceRefreshPromise = (async () => {
     try {

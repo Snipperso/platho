@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v591<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v591'/);
+    expect(html).toMatch(/id="appVersionLabel">v592<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v592'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4286,6 +4286,21 @@ describe('PWA runtime config guard', () => {
     expect(fn).not.toMatch(/while \(true\)/);
   });
 
+  it('PWA-IOS-VAULT-READ-SERIAL-01: nav-balance read defers to an in-flight vault refresh (no concurrent get_user / iOS activation freeze)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // refreshVaultNavBalanceInBackground must NOT issue a second get_user while a full vault refresh (lock A,
+    // vaultRefreshPromise) is already reading one — two concurrent app-level chain reads hard-freeze iOS WebKit
+    // (this was the permanent "Activate Platho account" freeze on the post-transaction read fan-out). It defers +
+    // re-arms instead, and the refresh updates the nav balance itself (applyVaultUserPocketState).
+    const navFn = app.slice(
+      app.indexOf('async function refreshVaultNavBalanceInBackground'),
+      app.indexOf('async function refreshVaultNavBalanceInBackground') + 1600,
+    );
+    expect(navFn).toMatch(/if \(vaultRefreshPromise\) \{/);
+    expect(navFn).toMatch(/markNavVaultBalanceRetryNeeded\('vault refresh in progress'\)/);
+    expect(navFn).toMatch(/return vaultRefreshPromise\.catch/);
+  });
+
   it('PWA-IOS-SHARED-TONCENTER-QUEUE-01: keyed + keyless toncenter share one limiter queue (no parallel connections / iOS freeze)', () => {
     const config = readFileSync('web/platho-config.mjs', 'utf8');
     const app = readFileSync('web/app.js', 'utf8');
@@ -5161,11 +5176,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v662/);
+    expect(sw).toMatch(/platho-pwa-prototype-v663/);
     expect(sw).toMatch(/\.\/styles\.css\?v=195/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=591/);
+    expect(sw).toMatch(/\.\/app\.js\?v=592/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
