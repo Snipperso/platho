@@ -188,6 +188,26 @@ button:disabled,
   color: rgba(48, 213, 176, 0.72);
 }
 
+/* TEMP freeze-diagnostics banner — styled via a CLASS, not an inline style, because the prod CSP is
+   `style-src 'self'` (inline styles are blocked). Removable with the rest of the diag scaffolding. */
+.platho-diag-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2147483647;
+  background: #ff3b30;
+  color: #fff;
+  font: 700 13px/1.45 system-ui, -apple-system, sans-serif;
+  padding: 12px 14px;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.platho-diag-warn {
+  color: #ff6b6b;
+}
+
 .status-dot {
   width: 7px;
   height: 7px;
