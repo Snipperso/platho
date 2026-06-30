@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v584<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v584'/);
+    expect(html).toMatch(/id="appVersionLabel">v585<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v585'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5029,6 +5029,11 @@ describe('PWA runtime config guard', () => {
     const pubMjs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
     // 1. Returning to the private tab restores the open conversation (data-chat-open) on mobile.
     expect(app).toMatch(/appShell\.dataset\.chatOpen = activeThreadId \? 'true' : 'false'/);
+    // 1b. Symmetric for Public: returning to the Public tab restores the open post detail instead of forcing the
+    // feed — setView must NOT close the detail on tab-return; renderPublicSurface re-renders it from the cache.
+    const publicViewBranch = app.slice(app.indexOf("if (view === 'public') {", app.indexOf('function setView(view)')), app.indexOf("if (view === 'vault') {", app.indexOf('function setView(view)')));
+    expect(publicViewBranch).not.toMatch(/closePublicPostDetail\(\)/);
+    expect(publicViewBranch).toMatch(/renderPublicSurface\(\{ anchorUnread: publicPane\?\.dataset\?\.postOpen !== 'true' \}\)/);
     // 2. The public header keeps its Feed/Channels toggle + info on ONE line with the title (no wrap to a
     // second line). The vestigial diagnostics-panel flex-wrap + the actions' forced min-width are gone, and
     // the install button is hidden on mobile so the toggle + info fit beside the title.
@@ -5079,11 +5084,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v655/);
+    expect(sw).toMatch(/platho-pwa-prototype-v656/);
     expect(sw).toMatch(/\.\/styles\.css\?v=191/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=584/);
+    expect(sw).toMatch(/\.\/app\.js\?v=585/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

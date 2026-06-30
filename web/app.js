@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v584';
+const PLATHO_APP_RUNTIME_VERSION = 'v585';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11950,9 +11950,13 @@ function setView(view) {
   // Switching tabs no longer re-triggers a sync — the unified background loop (scheduleMessageAutoSync) keeps
   // BOTH private messages and the public feed fresh on every tab, so switch-in is instant. setView only renders.
   if (view === 'public') {
-    // Returning to the Public tab always lands on the feed, not a stale post detail left open from before.
-    if (publicPane?.dataset?.postOpen === 'true') closePublicPostDetail();
-    renderPublicSurface({ anchorUnread: true });
+    // Restore the open post detail when returning to the Public tab — mirrors the private-tab restore above
+    // (data-chat-open from activeThreadId). Switching away leaves publicPane.dataset.postOpen +
+    // publicPostDetailItem intact, and renderPublicSurface re-renders the open detail from the cache, so the
+    // user lands back on the post they were reading instead of the feed. Back (closeNavOverlay ->
+    // closePublicPostDetail) clears that state, so a user who had backed out to the feed still lands on the feed.
+    // anchorUnread only applies to the feed scroll, so skip it while a detail is being restored.
+    renderPublicSurface({ anchorUnread: publicPane?.dataset?.postOpen !== 'true' });
   }
   if (view === 'vault') {
     refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
