@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v596';
+const PLATHO_APP_RUNTIME_VERSION = 'v597';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -670,6 +670,21 @@ let vaultAutoRefreshTimer = null;
 let vaultRefreshPromise = null;
 let navVaultBalanceRetryTimer = null;
 let navVaultBalanceRefreshPromise = null;
+// ONE app-level Vault read mutex: at most ONE app-level Vault chain read runs at a time, across ALL drivers
+// (dashboard get_user, nav get_user, deferred get_global/GRAM/ATH, activation getKeyRecord, ATH-stats getJettonData,
+// registry get_global). iOS WebKit/JSC HARD-FREEZES on CONCURRENT app-level read CALLS (incl. the synchronous
+// response decode), not the network fetch (already paced by the v590 limiter) — that is the permanent Activate /
+// Vault-tab freeze. The lock is held across fetch + json() + decode by chaining on a tail promise. The tail is
+// advanced to a rejection-swallowing continuation, so a read's failure (or a deadline-orphaned read) never poisons
+// the chain and the next read is released the instant this one settles (structural release-on-error). Wrap ONLY
+// LEAF reads (a single provider.* call) — never a driver that awaits another wrapped read, or it self-deadlocks.
+// READS ONLY: never wrap sign/sendBoc/nonce/double-spend.
+let vaultReadMutexTail = Promise.resolve();
+function withVaultReadLock(fn) {
+  const run = vaultReadMutexTail.then(() => fn());
+  vaultReadMutexTail = run.then(() => {}, () => {});
+  return run;
+}
 let privateChainSyncPromise = null;
 let messageAutoSyncTimer = null;
 let messageAutoSyncAt = 0;
@@ -15252,25 +15267,25 @@ function vaultProviderStatusForError(error) {
 async function loadConnectedVaultUser(options = {}) {
   const provider = options.provider ?? await resolveVaultChainProvider();
   if (!provider?.getUser) throw new VaultChainProviderUnavailableError('Vault chain provider is not configured');
-  return provider.getUser(requirePlathoWalletAddress(), {
+  return withVaultReadLock(() => provider.getUser(requirePlathoWalletAddress(), {
     vaultAddress: requireVaultAddress(),
     verify: options.verify === true,
     allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
     priority: options.priority,
     cacheTtlMs: options.cacheTtlMs,
-  });
+  }));
 }
 
 async function loadConnectedVaultGlobal(options = {}) {
   const provider = options.provider ?? await resolveVaultChainProvider();
   if (!provider?.getGlobal) throw new VaultChainProviderUnavailableError('Vault chain provider is not configured');
-  const global = await provider.getGlobal({
+  const global = await withVaultReadLock(() => provider.getGlobal({
     vaultAddress: requireVaultAddress(),
     verify: options.verify === true,
     allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
     priority: options.priority,
     cacheTtlMs: options.cacheTtlMs,
-  });
+  }));
   return assertVaultGlobalMatchesConfig(global);
 }
 
@@ -15439,43 +15454,47 @@ async function fetchTonWalletBalance(address) {
 
 async function loadConnectedTonWalletBalance() {
   const address = requirePlathoWalletAddress();
-  const candidates = [
-    globalThis.plathoWalletBalanceProvider,
-    globalThis.plathoTonWalletProvider,
-    globalThis.plathoTonRpcTransport,
-  ].filter(Boolean);
-  for (const provider of candidates) {
-    for (const method of ['getTonBalance', 'getWalletBalance', 'getAccountBalance', 'getBalance']) {
-      if (typeof provider?.[method] !== 'function') continue;
-      try {
-        const balance = extractTonWalletBalance(await provider[method](address));
-        if (balance !== null) return balance;
-      } catch {
-        // Try the next provider shape.
+  // One logical external-GRAM read (sequential provider/fetch fallbacks; calls no other wrapped Vault read), held
+  // under the shared read mutex so it never overlaps a get_user/get_global on iOS.
+  return withVaultReadLock(async () => {
+    const candidates = [
+      globalThis.plathoWalletBalanceProvider,
+      globalThis.plathoTonWalletProvider,
+      globalThis.plathoTonRpcTransport,
+    ].filter(Boolean);
+    for (const provider of candidates) {
+      for (const method of ['getTonBalance', 'getWalletBalance', 'getAccountBalance', 'getBalance']) {
+        if (typeof provider?.[method] !== 'function') continue;
+        try {
+          const balance = extractTonWalletBalance(await provider[method](address));
+          if (balance !== null) return balance;
+        } catch {
+          // Try the next provider shape.
+        }
+      }
+      if (typeof provider?.getAccount === 'function') {
+        try {
+          const balance = extractTonWalletBalance(await provider.getAccount(address));
+          if (balance !== null) return balance;
+        } catch {
+          // Try the next provider.
+        }
       }
     }
-    if (typeof provider?.getAccount === 'function') {
-      try {
-        const balance = extractTonWalletBalance(await provider.getAccount(address));
-        if (balance !== null) return balance;
-      } catch {
-        // Try the next provider.
-      }
+    try {
+      return await fetchTonWalletBalance(address);
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) console.error(error);
+      return null;
     }
-  }
-  try {
-    return await fetchTonWalletBalance(address);
-  } catch (error) {
-    if (!noteTonRpcRateLimit(error)) console.error(error);
-    return null;
-  }
+  });
 }
 
 async function loadConnectedAthWalletBalance() {
   const athWalletAddress = await loadConnectedAthWalletAddress();
   const provider = createAthWalletTonRpcProvider({ athWalletAddress });
   try {
-    const data = await provider.getWalletData({ address: athWalletAddress });
+    const data = await withVaultReadLock(() => provider.getWalletData({ address: athWalletAddress }));
     return nonNegativeBigInt(data.balance);
   } catch (error) {
     if (isAthWalletNotDeployedError(error)) return 0n;
@@ -16759,10 +16778,10 @@ async function readAthBurnFlushState() {
   // Read the two registry globals SEQUENTIALLY (not concurrently) — concurrent toncenter reads stall the iOS
   // run loop (the v509 pattern). Keep the {status,value/reason} settled shape the rest of the fn expects.
   const usernameResult = await resolveUsernameRegistryProvider()
-    .then((provider) => provider.getGlobal({ address: requireUsernameRegistryAddress(), ...readOptions }))
+    .then((provider) => withVaultReadLock(() => provider.getGlobal({ address: requireUsernameRegistryAddress(), ...readOptions })))
     .then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
   const profileResult = await resolveProfileRegistryProvider()
-    .then(({ provider, address }) => provider.getGlobal({ address, ...readOptions }))
+    .then(({ provider, address }) => withVaultReadLock(() => provider.getGlobal({ address, ...readOptions })))
     .then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
   const next = {
     username_burn_due_ath: null,
@@ -16836,7 +16855,7 @@ async function refreshAthProtocolStats() {
       await refreshAthFlushState();
       return athProtocolState;
     }
-    const data = await provider.getJettonData({ address: requireAthMasterAddress() });
+    const data = await withVaultReadLock(() => provider.getJettonData({ address: requireAthMasterAddress() }));
     athProtocolState = {
       total_supply: data?.total_supply === null || data?.total_supply === undefined
         ? null
@@ -17168,10 +17187,10 @@ async function loadConnectedAthWalletAddress() {
   requireBasechainAddress(owner, 'Connected wallet');
   requireBasechainAddress(requireAthMasterAddress(), 'ATHMaster');
   const provider = await resolveAthMasterProvider();
-  const walletAddress = await provider.getWalletAddress(owner, {
+  const walletAddress = await withVaultReadLock(() => provider.getWalletAddress(owner, {
     address: requireAthMasterAddress(),
     ...criticalChainReadOptions(),
-  });
+  }));
   return requireBasechainAddress(walletAddress, 'Connected ATH wallet');
 }
 
@@ -21545,12 +21564,12 @@ async function refreshVaultActivationStatus(options = {}) {
   try {
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
-    const user = options.user ?? await provider.getUser(plathoWallet.address, {
+    const user = options.user ?? await withVaultReadLock(() => provider.getUser(plathoWallet.address, {
       vaultAddress: requireVaultAddress(),
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
-    });
+    }));
     const global = options.skipGlobal === true
       ? null
       : provider.getGlobal
@@ -21579,12 +21598,12 @@ async function refreshVaultActivationStatus(options = {}) {
       refreshComposerPublishPolicy();
       return null;
     }
-    const record = await provider.getKeyRecord(user.current_key_id, {
+    const record = await withVaultReadLock(() => provider.getKeyRecord(user.current_key_id, {
       vaultAddress: requireVaultAddress(),
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
-    });
+    }));
     await assertVaultKeyRecordMatchesOwner(plathoWallet.address, record, user.current_key_id);
     // The synchronous ed25519.verify of the signed-bundle binding runs inside here (wallet-only, every
     // vault open).

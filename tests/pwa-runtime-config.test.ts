@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v596<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v596'/);
+    expect(html).toMatch(/id="appVersionLabel">v597<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v597'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4301,6 +4301,26 @@ describe('PWA runtime config guard', () => {
     expect(navFn).toMatch(/return vaultRefreshPromise\.catch/);
   });
 
+  it('PWA-IOS-VAULT-READ-MUTEX-01: ALL leaf Vault chain reads serialize through one withVaultReadLock mutex', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The single tail-chained mutex: at most one app-level Vault read in flight, across every driver. This is the
+    // structural fix for the iOS concurrent-read freeze (crumbs localized it to nav:read on the Vault tab and
+    // act:posttx-done -> refreshVaultNow on activation), superseding the ad-hoc per-driver single-flights.
+    expect(app).toMatch(/let vaultReadMutexTail = Promise\.resolve\(\);/);
+    expect(app).toMatch(/function withVaultReadLock\(fn\) \{[\s\S]*?vaultReadMutexTail\.then\(\(\) => fn\(\)\)[\s\S]*?vaultReadMutexTail = run\.then\(\(\) => \{\}, \(\) => \{\}\)/);
+    // Every leaf read primitive on the Vault-tab / activation paths is wrapped.
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getUser\(requirePlathoWalletAddress\(\)/); // loadConnectedVaultUser (nav + dashboard)
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getGlobal\(\{\s*vaultAddress: requireVaultAddress\(\)/); // loadConnectedVaultGlobal
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getKeyRecord\(user\.current_key_id/); // activation key record
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getJettonData\(/); // ATH stats
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getWalletData\(/); // external ATH balance
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getWalletAddress\(owner/); // ATH wallet address
+    // The mutex wraps LEAF reads only — refreshVaultNow / refreshVaultDashboard (drivers) are NEVER wrapped (would
+    // self-deadlock across their inner wrapped leaves).
+    const refreshNow = app.slice(app.indexOf('async function refreshVaultNow'), app.indexOf('async function refreshVaultNow') + 200);
+    expect(refreshNow).not.toMatch(/withVaultReadLock/);
+  });
+
   it('PWA-IOS-SHARED-TONCENTER-QUEUE-01: keyed + keyless toncenter share one limiter queue (no parallel connections / iOS freeze)', () => {
     const config = readFileSync('web/platho-config.mjs', 'utf8');
     const app = readFileSync('web/app.js', 'utf8');
@@ -5176,11 +5196,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v667/);
+    expect(sw).toMatch(/platho-pwa-prototype-v668/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=596/);
+    expect(sw).toMatch(/\.\/app\.js\?v=597/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
