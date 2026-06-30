@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v586<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v586'/);
+    expect(html).toMatch(/id="appVersionLabel">v587<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v587'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -820,8 +820,15 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.rail-vault-balance/);
     expect(css).toMatch(/\.rail-vault-balance\s*{[\s\S]*grid-template-rows:\s*auto auto auto/);
     expect(css).toMatch(/\.rail-vault-balance strong\s*{[\s\S]*white-space: normal;/);
-    expect(css).toMatch(/\.rail-vault-balance strong\.is-loading/);
-    expect(css).toMatch(/\.rail-vault-balance strong\.is-placeholder/);
+    // The rail balance shows nothing until known (no spinner — the global sync indicator covers activity), then
+    // fades in. The old is-loading/is-placeholder spinner rules are gone; rail-balance-spin keyframe is KEPT for
+    // the global header sync indicator.
+    expect(css).not.toMatch(/\.rail-vault-balance strong\.is-loading/);
+    expect(css).not.toMatch(/\.rail-vault-balance strong\.is-placeholder/);
+    expect(css).toMatch(/\.rail-vault-balance-reveal\s*{\s*animation: rail-balance-fade-in/);
+    // The hidden attribute must actually hide the block (its own display:grid would otherwise beat UA [hidden]).
+    expect(css).toMatch(/\.rail-vault-balance\[hidden\]\s*{\s*display: none;/);
+    expect(css).toMatch(/@keyframes rail-balance-fade-in/);
     expect(css).toMatch(/@keyframes rail-balance-spin/);
     expect(css).toMatch(/--message-media-width:\s*320px/);
     expect(css).toMatch(/--message-card-width:\s*calc\(var\(--message-media-width\) \+ 28px\)/);
@@ -838,11 +845,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function navVaultBalanceHasKnownValue/);
     expect(app).toMatch(/refreshNavVaultBalance\(\)/);
     expect(app).toMatch(/function refreshVaultNavBalanceInBackground/);
-    expect(app).toMatch(/navVaultTonBalances\.forEach\(\(node, index\)/);
-    expect(app).toMatch(/navVaultBalanceState\.status === 'pending' && !navVaultBalanceHasKnownValue\(\)/);
-    expect(app).toMatch(/node\.classList\.toggle\('is-loading', index === 0\)/);
-    expect(app).toMatch(/node\.classList\.toggle\('is-placeholder', index > 0\)/);
-    expect(app).toMatch(/node\.classList\.add\('is-placeholder'\)/);
+    expect(app).toMatch(/const navVaultBalanceContainers = \[\.\.\.document\.querySelectorAll\('\[data-nav-vault-balance\]'\)\]/);
+    // Hidden until known (no spinner), one-shot fade-in on first appearance.
+    const navBalanceFn = app.slice(app.indexOf('function refreshNavVaultBalance()'), app.indexOf('function refreshVaultMoveWidget'));
+    expect(navBalanceFn).toMatch(/if \(!navVaultBalanceHasKnownValue\(\)\) \{[\s\S]*container\.hidden = true;[\s\S]*container\.classList\.remove\('rail-vault-balance-reveal'\)/);
+    expect(navBalanceFn).toMatch(/if \(container\.hidden\) \{[\s\S]*?container\.hidden = false;[\s\S]*?container\.classList\.add\('rail-vault-balance-reveal'\)/);
+    expect(navBalanceFn).not.toMatch(/is-loading|is-placeholder/);
     expect(html).toMatch(/id="vaultMoveTonForm"/);
     expect(html).toMatch(/id="vaultMoveAthForm"/);
     expect(html).toMatch(/id="vaultMoveTonWalletBalance"[^>]*>0<\/strong>/);
@@ -5100,11 +5108,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v657/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=192/);
+    expect(sw).toMatch(/platho-pwa-prototype-v658/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=193/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=586/);
+    expect(sw).toMatch(/\.\/app\.js\?v=587/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v586';
+const PLATHO_APP_RUNTIME_VERSION = 'v587';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -549,6 +549,7 @@ const publicPostAuthorIdentityButton = document.querySelector('#publicPostAuthor
 const vaultSubtitle = document.querySelector('#vaultSubtitle');
 const navVaultTonBalances = [...document.querySelectorAll('[data-nav-vault-ton]')];
 const navVaultAthBalances = [...document.querySelectorAll('[data-nav-vault-ath]')];
+const navVaultBalanceContainers = [...document.querySelectorAll('[data-nav-vault-balance]')];
 const balanceGrid = document.querySelector('#balanceGrid');
 const vaultMoveCards = Array.from(document.querySelectorAll('[data-vault-move-asset]')).map((form) => ({
   asset: form.dataset.vaultMoveAsset === 'ATH' ? 'ATH' : 'TON',
@@ -10231,10 +10232,6 @@ function clearNavVaultBalanceRetryTimer() {
   navVaultBalanceRetryTimer = null;
 }
 
-function navVaultBalanceLoadingLabel() {
-  return 'Refreshing Vault balance';
-}
-
 function markNavVaultBalanceIdle() {
   clearNavVaultBalanceRetryTimer();
   navVaultBalanceState = { status: 'idle', retryAttempt: 0, reason: null };
@@ -16425,50 +16422,34 @@ function vaultMoveMaxAmount(asset) {
 }
 
 function refreshNavVaultBalance() {
-  const loading = plathoWallet?.address && navVaultBalanceState.status === 'pending' && !navVaultBalanceHasKnownValue();
-  if (loading) {
-    navVaultTonBalances.forEach((node, index) => {
-      node.hidden = false;
-      node.classList.toggle('is-loading', index === 0);
-      node.classList.toggle('is-placeholder', index > 0);
-      node.textContent = index > 0 ? '\u00a0' : '';
-      if (index === 0) {
-        node.title = navVaultBalanceLoadingLabel();
-        node.setAttribute('aria-label', navVaultBalanceLoadingLabel());
-      } else {
-        node.removeAttribute('aria-label');
-        node.removeAttribute('title');
-      }
-    });
-    for (const node of navVaultAthBalances) {
-      node.classList.remove('is-loading');
-      node.classList.add('is-placeholder');
-      node.hidden = false;
-      node.textContent = '\u00a0';
-      node.setAttribute('aria-hidden', 'true');
-      node.removeAttribute('aria-label');
-      node.removeAttribute('title');
+  // Until the Vault balance is actually known, show NOTHING in the rail corner \u2014 no spinner. The global header sync
+  // indicator already signals activity, so a second spinner here is just noise. The whole balance block is hidden,
+  // then revealed with a one-shot fade the moment a real balance lands (re-armed if it ever goes unknown again,
+  // e.g. on account switch / sign-out).
+  if (!navVaultBalanceHasKnownValue()) {
+    for (const container of navVaultBalanceContainers) {
+      container.hidden = true;
+      container.classList.remove('rail-vault-balance-reveal');
     }
     return;
+  }
+  for (const container of navVaultBalanceContainers) {
+    if (container.hidden) {
+      container.hidden = false;
+      // Fade-in only on first appearance, not on later background value refreshes (the gate is container.hidden).
+      container.classList.add('rail-vault-balance-reveal');
+    }
   }
   const tonBalance = `${vaultMoveFormattedBalance('vault', 'TON')} GRAM`;
   const athBalance = `${vaultMoveFormattedBalance('vault', 'ATH')} ATH`;
   for (const node of navVaultTonBalances) {
-    node.classList.remove('is-loading');
-    node.classList.remove('is-placeholder');
     node.hidden = false;
     node.removeAttribute('aria-hidden');
-    node.removeAttribute('aria-label');
-    node.removeAttribute('title');
     setText(node, tonBalance);
   }
   for (const node of navVaultAthBalances) {
-    node.classList.remove('is-loading');
-    node.classList.remove('is-placeholder');
     node.hidden = false;
     node.removeAttribute('aria-hidden');
-    node.removeAttribute('aria-label');
-    node.removeAttribute('title');
     setText(node, athBalance);
   }
 }
