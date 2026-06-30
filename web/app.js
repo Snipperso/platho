@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v599';
+const PLATHO_APP_RUNTIME_VERSION = 'v600';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -21597,12 +21597,14 @@ async function refreshVaultActivationStatus(options = {}) {
   try {
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
+    diagCrumb('act:getuser');
     const user = options.user ?? await withVaultReadLock(() => provider.getUser(plathoWallet.address, {
       vaultAddress: requireVaultAddress(),
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
     }));
+    diagCrumb('act:getglobal');
     const global = options.skipGlobal === true
       ? null
       : provider.getGlobal
@@ -21631,13 +21633,16 @@ async function refreshVaultActivationStatus(options = {}) {
       refreshComposerPublishPolicy();
       return null;
     }
+    diagCrumb('act:getkeyrecord');
     const record = await withVaultReadLock(() => provider.getKeyRecord(user.current_key_id, {
       vaultAddress: requireVaultAddress(),
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
     }));
+    diagCrumb('act:assert');
     await assertVaultKeyRecordMatchesOwner(plathoWallet.address, record, user.current_key_id);
+    diagCrumb('act:verify');
     // The synchronous ed25519.verify of the signed-bundle binding runs inside here (wallet-only, every
     // vault open).
     const binding = await verifyVaultKeyRecordBinding(localSignedPublicBundle, record, {
