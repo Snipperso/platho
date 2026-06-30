@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v600';
+const PLATHO_APP_RUNTIME_VERSION = 'v601';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -21632,6 +21632,34 @@ async function refreshVaultActivationStatus(options = {}) {
       refreshMessagingControls();
       refreshComposerPublishPolicy();
       return null;
+    }
+    // FAST PATH — avoid the get_key_record read that HARD-FREEZES iOS WebKit (the localized permanent freeze, crumb
+    // act:getkeyrecord; see slow-device-freeze-iphone-se2). current_key_id IS the contract's collision-resistant
+    // binding hash of (owner + our key fields + key_generation): if it equals the key id computed from OUR local
+    // draft at generation 0 (the keys we registered), the account is provably bound to OUR current keys — no need to
+    // read + verify the full key record from chain. auth_pubkey is checked from get_user (no extra read). Only fall
+    // back to the heavy on-chain key-record read on a MISMATCH (key rotation / generation > 0 / unexpected) — rare.
+    const fastLocalAuthPubkey = localVaultAuthKeyPair?.publicKey ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey) : 0n;
+    if (localVaultDraft?.message && fastLocalAuthPubkey !== 0n && BigInt(user.auth_pubkey ?? 0n) === fastLocalAuthPubkey) {
+      try {
+        const expectedKeyId = await computeVaultMessagingKeyId({
+          owner_wallet: plathoWallet.address,
+          key_generation: 0n,
+          enc_pubkey: localVaultDraft.message.enc_pubkey,
+          sign_pubkey: localVaultDraft.message.sign_pubkey,
+          pq_kem_pubkey_hash: localVaultDraft.message.pq_kem_pubkey_hash,
+          pq_kem_pubkey_len: localVaultDraft.message.pq_kem_pubkey_len,
+          crypto_suite_mask: localVaultDraft.message.crypto_suite_mask,
+        });
+        if (BigInt(user.current_key_id) === expectedKeyId) {
+          globalThis.plathoVaultBinding = { walletAddress: plathoWallet.address, user, keyRecord: null };
+          setText(vaultRecordStatus, 'activated');
+          refreshMessageActionStatuses();
+          refreshMessagingControls();
+          refreshComposerPublishPolicy();
+          return globalThis.plathoVaultBinding;
+        }
+      } catch { /* fall back to the on-chain key-record read below */ }
     }
     diagCrumb('act:getkeyrecord');
     const record = await withVaultReadLock(() => provider.getKeyRecord(user.current_key_id, {
