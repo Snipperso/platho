@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v595';
+const PLATHO_APP_RUNTIME_VERSION = 'v596';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2070,8 +2070,10 @@ function diagShowBanner(text) {
   try {
     if (typeof document === 'undefined' || !document.body) return;
     const banner = document.createElement('div');
+    // Class, NOT inline style — the prod CSP (style-src 'self') blocks inline styles, which silently left the
+    // banner unstyled/invisible (this is why no banner showed on the device in v593-v595).
+    banner.className = 'platho-diag-banner';
     banner.textContent = `${text} · tap to dismiss`;
-    banner.setAttribute('style', 'position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#ff3b30;color:#fff;font:700 13px/1.45 system-ui,-apple-system,sans-serif;padding:12px 14px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.4);');
     banner.addEventListener('click', () => banner.remove());
     document.body.appendChild(banner);
   } catch { /* best effort */ }
@@ -5304,8 +5306,8 @@ function renderConfiguredShell() {
   diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · prev: ${diagStep}`);
   if (appVersionLabel && diagStep !== 'none' && diagStep !== 'boot:ok') {
     const warn = document.createElement('span');
+    warn.className = 'platho-diag-warn';
     warn.textContent = ` ⚠ ${diagStep}`;
-    warn.style.color = '#ff6b6b';
     appVersionLabel.append(warn);
   }
   renderPaneHeaders();
