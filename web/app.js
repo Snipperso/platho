@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v597';
+const PLATHO_APP_RUNTIME_VERSION = 'v598';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6781,6 +6781,7 @@ function chainBackedPublicFeedOnly(feed) {
 }
 
 async function syncPublicChannels() {
+  diagCrumb('public:sync');
   let chainSyncError = null;
   try {
     // First cycle on a fresh load pays the verifier failure that parks a dead
@@ -7913,6 +7914,7 @@ async function restoreOwnAvatarFromCacheFast(owner = plathoWallet?.address) {
 }
 
 async function refreshOwnProfileAvatar() {
+  diagCrumb('avatar:read');
   const owner = plathoWallet?.address;
   if (!owner) {
     setAvatarNode(profileAvatar, 'P', null);
@@ -9241,6 +9243,7 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
   messageAutoSyncTimer = window.setTimeout(async () => {
     messageAutoSyncTimer = null;
     messageAutoSyncAt = 0;
+    diagCrumb('sync:auto');
     let nextSyncDelayMs = MESSAGE_AUTO_SYNC_MS;
     // Pause background sync while an outbound send OR its publish-confirmation is in flight. The broadcast
     // is covered by privateOutboundWorkActive(), but the CONFIRM phase (runPrivatePublishConfirmationRetry:
@@ -9270,6 +9273,7 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
       return;
     }
     beginMessageSyncUi();
+    diagCrumb('sync:auto-private');
     try {
       const result = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' });
       completeMessageSyncUi(result);
@@ -16641,6 +16645,7 @@ async function refreshVaultDashboard() {
     setVaultStatus('wallet required');
     return null;
   }
+  diagCrumb('vault:dash');
   let user = null;
   let userError = null;
   // v509 — the Apple-only Vault freeze is the CONCURRENT read burst itself, not any single read. v508 removed
@@ -16650,6 +16655,7 @@ async function refreshVaultDashboard() {
   // read is fine but 2+ concurrent reads stall the run loop. FIX: the critical path reads get_user ALONE
   // (== the proven nav read) and renders immediately; get_global (stats/registry) + the external GRAM/ATH
   // balances load deferred and STRICTLY SEQUENTIALLY (one read at a time), off the render path.
+  diagCrumb('vault:dash-read');
   const vaultUserTimedOut = Symbol('vault-open-user-timeout');
   const settledUser = await Promise.race([
     loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS })
@@ -16672,6 +16678,7 @@ async function refreshVaultDashboard() {
   }
   // Render the Vault from get_user ONLY. get_global (airdrop/registry display) is NOT awaited here — its
   // last-known value persists in vaultProtocolState and is refreshed by the deferred sequential reader.
+  diagCrumb('vault:dash-render');
   renderAthProfileStats();
   // Carry-forward external wallet balances (never wipe last-known to "-" — that would flicker every refresh).
   renderVaultPocketCards({
@@ -16717,6 +16724,7 @@ async function refreshVaultDeferredReadsInBackground(vaultUser) {
   if (vaultDeferredReadInFlight) return;
   if (!plathoWallet?.address || !isVaultViewActive()) return;
   vaultDeferredReadInFlight = true;
+  diagCrumb('vault:deferred');
   try {
     // 1) get_global (airdrop / registry display) — unverified display read, on its own connection. Never
     //    concurrent with get_user (that 2-read burst was the iOS freeze). assertVaultGlobalMatchesConfig
@@ -16845,6 +16853,7 @@ async function refreshAthAirdropState() {
 }
 
 async function refreshAthProtocolStats() {
+  diagCrumb('vault:stats');
   renderAthProfileStats();
   // Serialize the ATH-stats reads (airdrop -> jetton -> flush), one at a time. The airdrop read was
   // fire-and-forget, overlapping the jetton read + the flush burst — the iOS run-loop-stall pattern (v509).
@@ -16923,6 +16932,7 @@ function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
 async function refreshVaultNow({ includeActivation = false, includeStats = false } = {}) {
   if (vaultRefreshPromise) return vaultRefreshPromise;
   const vaultWork = (async () => {
+    diagCrumb('vault:now');
     const results = [];
     const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
     results.push(...dashboardResult);
