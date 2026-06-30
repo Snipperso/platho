@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v600<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v600'/);
+    expect(html).toMatch(/id="appVersionLabel">v601<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v601'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4321,6 +4321,27 @@ describe('PWA runtime config guard', () => {
     expect(refreshNow).not.toMatch(/withVaultReadLock/);
   });
 
+  it('PWA-IOS-ACT-FAST-KEYID-01: activation status verifies the binding from current_key_id locally, skipping the get_key_record read on the common path', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The localized permanent iOS freeze was the get_key_record read (crumb act:getkeyrecord) on the boot / Vault /
+    // activation critical path. current_key_id IS the contract's collision-resistant binding hash of (owner + our key
+    // fields + key_generation == 0 for the first, never-rotated key, see contracts/Vault.tact RegisterMessagingKeys).
+    // So the fast path recomputes that hash from the LOCAL draft and, on a match, marks the account activated WITHOUT
+    // the chain read -> no freeze. The heavy get_key_record read survives ONLY as the fallback (rotation / mismatch).
+    const fn = app.slice(app.indexOf('async function refreshVaultActivationStatus'), app.indexOf('async function bootCrypto'));
+    const fastIdx = fn.indexOf('computeVaultMessagingKeyId({');
+    const readIdx = fn.indexOf("diagCrumb('act:getkeyrecord')");
+    expect(fastIdx).toBeGreaterThan(-1);
+    expect(readIdx).toBeGreaterThan(-1);
+    // The local key-id recompute MUST come before the chain read (it short-circuits it).
+    expect(fastIdx).toBeLessThan(readIdx);
+    // Computed at generation 0 (the first, never-rotated key) from the local draft fields.
+    expect(fn).toMatch(/key_generation: 0n,[\s\S]{0,260}enc_pubkey: localVaultDraft\.message\.enc_pubkey/);
+    // Gated on the same auth_pubkey identity check as the slow path, and short-circuits with keyRecord: null.
+    expect(fn).toMatch(/BigInt\(user\.auth_pubkey \?\? 0n\) === fastLocalAuthPubkey/);
+    expect(fn).toMatch(/BigInt\(user\.current_key_id\) === expectedKeyId[\s\S]{0,200}keyRecord: null \};/);
+  });
+
   it('PWA-IOS-SHARED-TONCENTER-QUEUE-01: keyed + keyless toncenter share one limiter queue (no parallel connections / iOS freeze)', () => {
     const config = readFileSync('web/platho-config.mjs', 'utf8');
     const app = readFileSync('web/app.js', 'utf8');
@@ -5196,11 +5217,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v671/);
+    expect(sw).toMatch(/platho-pwa-prototype-v672/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=600/);
+    expect(sw).toMatch(/\.\/app\.js\?v=601/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
