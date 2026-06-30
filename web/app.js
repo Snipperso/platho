@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v604';
+const PLATHO_APP_RUNTIME_VERSION = 'v605';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2123,6 +2123,40 @@ function diagReadCryptoCrumb() {
 }
 // Let the crypto module (separate ES module, cannot import these) stamp ML-KEM ops.
 try { if (typeof globalThis !== 'undefined') globalThis.plathoDiagCryptoCrumb = diagCryptoCrumb; } catch { /* best effort */ }
+// NET-CONCURRENCY watcher — directly tests the owner's hypothesis that iOS dies on MULTIPLE simultaneous
+// connections. Wraps globalThis.fetch ONCE and counts EXTERNAL (cross-origin) requests in flight, across every
+// path/host/transport-instance (catches anything a code read could miss). Tracks the max ever seen + crumbs when
+// >= 2 concurrent. If the banner shows net>=2 there ARE parallel connections; net==1 means they are serialized.
+const DIAG_NETMAX_KEY = 'platho.diag.netmax.v1';
+function startDiagNetWatch() {
+  try {
+    if (typeof globalThis === 'undefined' || typeof globalThis.fetch !== 'function' || globalThis.__plathoNetWrapped) return;
+    const origFetch = globalThis.fetch.bind(globalThis);
+    let inFlight = 0;
+    let maxSeen = 0;
+    let selfHost = '';
+    try { selfHost = location.host; } catch { /* ignore */ }
+    globalThis.fetch = function diagFetch(input, init) {
+      let host = '';
+      try { host = new URL(typeof input === 'string' ? input : (input?.url ?? ''), location.href).host; } catch { /* ignore */ }
+      if (!host || host === selfHost) return origFetch(input, init); // only count EXTERNAL connections
+      inFlight += 1;
+      if (inFlight > maxSeen) {
+        maxSeen = inFlight;
+        try { localStorageOrNull()?.setItem(DIAG_NETMAX_KEY, `${maxSeen}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
+      }
+      if (inFlight >= 2) { try { diagCryptoCrumb(`netcc:${inFlight}`); } catch { /* best effort */ } }
+      const dec = () => { inFlight = Math.max(0, inFlight - 1); };
+      let promise;
+      try { promise = origFetch(input, init); } catch (error) { dec(); throw error; }
+      return promise.then((r) => { dec(); return r; }, (e) => { dec(); throw e; });
+    };
+    globalThis.__plathoNetWrapped = true;
+  } catch { /* best effort */ }
+}
+function diagReadNetMax() {
+  try { return localStorageOrNull()?.getItem(DIAG_NETMAX_KEY) || null; } catch { return null; }
+}
 // Watch for LARGE synchronous localStorage writes — the iOS WebKit classic: setItem re-serializes the WHOLE store
 // synchronously, so writing a bloated store (image data / growing history) stalls the run loop for seconds = a
 // perceived permanent freeze. Wrap setItem ONCE to stamp the op lane with key+size BEFORE a big write, so if that
@@ -2144,6 +2178,7 @@ function startDiagLsWatch() {
 }
 startDiagTick();
 startDiagLsWatch();
+startDiagNetWatch();
 // IN-FLIGHT phase tracking: the crumb must show the op RUNNING, and 'idle' when nothing risky is in flight — else a
 // completed op's marker (e.g. nav:read-ok) persists and falsely looks like a freeze on a HEALTHY device too. Depth
 // counter handles overlapping ops: crumb settles to 'idle' only when ALL entered ops have exited. If the thread
@@ -5398,12 +5433,16 @@ function renderConfiguredShell() {
   // NOT clobber the phase crumb. Rendered as op=<label>#<tickAtWrite>. If the tick froze and this op's tick == final
   // tick, THIS concurrent op (not the phase crumb's read) is the blocking operation.
   const cryptoLabel = cryptoRaw ? cryptoRaw.replace('@', ' @').split(' @')[0] + (cryptoRaw.includes('#') ? `#${cryptoRaw.split('#')[1]}` : '') : 'none';
+  // Max simultaneous EXTERNAL connections seen last session — the direct test of the "iOS dies on parallel
+  // connections" hypothesis. net>=2 = parallel connections happened; net<=1 = connections were serialized.
+  const netRaw = diagReadNetMax();
+  const netMax = netRaw ? netRaw.split('@')[0] : '?';
   // Show the banner ONLY when the previous session left a non-idle (in-flight) crumb = it FROZE mid-op at that
   // phase. A healthy session settles to 'idle' (all ops exited) → no banner. 'boot:ok'/'none' also = not frozen.
   const diagFrozen = diagStep !== 'none' && diagStep !== 'idle' && diagStep !== 'boot:ok';
   if (diagFrozen) {
     // ticks A→B: if A≈B the run loop STOPPED at this phase = synchronous block here; if B≫A it ran past it = async/elsewhere.
-    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · op ${cryptoLabel}`);
+    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · op ${cryptoLabel} · net ${netMax}`);
   }
   if (appVersionLabel && diagFrozen) {
     const warn = document.createElement('span');
