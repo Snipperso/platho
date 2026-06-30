@@ -2665,10 +2665,13 @@ button.feed-item:hover {
   padding-right: 44px;
   font: inherit;
   line-height: 1.25;
-  background-image: url("./assets/icons/chevron-down.svg");
+  cursor: pointer;
+  /* A clearly visible accent-coloured down-chevron so the field reads as an expandable dropdown. The shared
+     chevron-down.svg is fill=#000 (invisible on the dark field), so use an inline accent (#30d5b0) chevron. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
-  background-size: 18px 18px;
+  background-size: 22px 22px;
 }
 
 .action-dialog textarea {

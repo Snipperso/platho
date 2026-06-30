@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v590<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v590'/);
+    expect(html).toMatch(/id="appVersionLabel">v591<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v591'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4269,6 +4269,10 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-LINK-NAME-NO-FLICKER-01: Link Platho name verifies in-place (no close+reopen flicker)', () => {
     const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // The dialog's select shows a clearly visible accent down-chevron (the shared chevron-down.svg is fill=#000,
+    // invisible on the dark field) so users see it's an expandable dropdown.
+    expect(css).toMatch(/\.recipient-dialog select \{[\s\S]*?cursor: pointer;[\s\S]*?data:image\/svg\+xml,[\s\S]*?fill='%2330d5b0'/);
     // openActionDialog supports an async validateSubmit gate; the submit handler keeps the dialog open on ok:false.
     expect(app).toMatch(/validateSubmit: config\.validateSubmit \?\? null/);
     const submit = app.slice(app.indexOf("actionForm?.addEventListener('submit'"), app.indexOf("document.addEventListener('click'"));
@@ -5157,11 +5161,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v661/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=194/);
+    expect(sw).toMatch(/platho-pwa-prototype-v662/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=195/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=590/);
+    expect(sw).toMatch(/\.\/app\.js\?v=591/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
