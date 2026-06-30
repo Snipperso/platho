@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v583';
+const PLATHO_APP_RUNTIME_VERSION = 'v584';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2539,7 +2539,7 @@ function writeWalletDisplayIdentity(identity, owner = plathoWallet?.address) {
 function walletDisplayName(wallet = plathoWallet) {
   const identity = readWalletDisplayIdentity(wallet?.address);
   if (identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT) {
-    return readLinkedPlathoUsername(wallet?.address)?.label ?? shortAddress(walletAddressForCopy(wallet));
+    return canonicalUsernameDisplay(readLinkedPlathoUsername(wallet?.address)?.label) || shortAddress(walletAddressForCopy(wallet));
   }
   return shortAddress(walletAddressForCopy(wallet));
 }
@@ -2572,9 +2572,9 @@ function renderWalletIdentity(status = null) {
   setText(identitySubtitle, status ?? walletDisplaySubtitle(plathoWallet));
   setText(walletAddressStatus, shortAddress(walletAddressForCopy(plathoWallet)));
   setText(walletDisplayModeStatus, identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT
-    ? linkedUsername?.label ?? 'optional'
+    ? canonicalUsernameDisplay(linkedUsername?.label) || 'optional'
     : 'address');
-  setText(linkedUsernameStatus, linkedUsername?.label ?? 'optional');
+  setText(linkedUsernameStatus, canonicalUsernameDisplay(linkedUsername?.label) || 'optional');
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = identity.mode;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = false;
 }
@@ -4266,11 +4266,15 @@ function rebuildPublicChannelRegistry() {
 function applyContactDisplayToRegistryChannel(channel) {
   if (!channel?.authorWallet || channel.id === DEFAULT_PUBLIC_CHANNEL_ID) return channel;
   const display = resolveWalletChannelDisplay(channel.authorWallet);
-  if (!display?.name) return channel;
+  // An explicit display choice wins; otherwise fall back to the channel's own name made canonical (no ".ath"),
+  // so even a registry name persisted/added with the suffix is shown bare everywhere it propagates (feed author,
+  // channels list, channel-detail header, and the thread.name the public-feed module derives from it).
+  const name = display?.name || canonicalUsernameDisplay(channel.name);
+  if (!name || name === channel.name) return channel;
   return {
     ...channel,
-    name: display.name,
-    avatar: publicChannelAvatar(display.name),
+    name,
+    avatar: publicChannelAvatar(name),
   };
 }
 
@@ -4286,7 +4290,7 @@ function publicChannelSubtitleForIdentity(identity) {
 
 function publicChannelRouteLabel(identity, authorWallet) {
   if (identity?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) return shortAddress(authorWallet ?? identity.value);
-  return identity?.label ?? shortAddress(authorWallet);
+  return canonicalUsernameDisplay(identity?.label) || shortAddress(authorWallet);
 }
 
 async function resolvePublicChannelIdentity(input) {
@@ -6118,8 +6122,9 @@ function drainRestoredPrefsSnapshots() {
 
 function publicAuthorLabel(authorWallet) {
   const wallet = rawWalletAddress(authorWallet) ?? String(authorWallet ?? '').trim();
-  return publicChannelRegistry.find((channel) => publicChannelMatchesAuthorWallet(channel, wallet))?.name
-    ?? shortAddress(wallet);
+  const channelName = publicChannelRegistry.find((channel) => publicChannelMatchesAuthorWallet(channel, wallet))?.name;
+  // Author is shown canonically — never with the ".ath" suffix (the registry name may still carry it for matching).
+  return channelName ? canonicalUsernameDisplay(channelName) : shortAddress(wallet);
 }
 
 function ensurePublicChannelForAuthorWallet(authorWallet, options = {}) {
@@ -12419,13 +12424,13 @@ newChatForm?.addEventListener('submit', async (event) => {
   // key the dialog by that wallet, so addressing a transferred username opens the NEW owner's dialog and we can
   // relabel any old-owner dialog still wearing it. The resolve also validates the name actually exists.
   isResolvingNewChat = true;
-  showNewChatHint(`Resolving ${identity.label}…`, 'info');
+  showNewChatHint(`Resolving ${canonicalUsernameDisplay(identity.label)}…`, 'info');
   try {
     let ownerWallet = null;
     try {
       ownerWallet = await resolveRecipientWalletForThread(parsed.thread);
     } catch (error) {
-      if (error instanceof UsernameNotRegisteredError) { showNewChatHint(`${identity.label} is not registered`); return; }
+      if (error instanceof UsernameNotRegisteredError) { showNewChatHint(`${canonicalUsernameDisplay(identity.label)} is not registered`); return; }
       // Transient RPC/network failure — don't hard-block the user; fall back to the legacy path (the send-time
       // resolve still routes to the current owner).
       console.warn('Username resolve failed (transient); using legacy path', error);
@@ -12435,7 +12440,7 @@ newChatForm?.addEventListener('submit', async (event) => {
     }
     const ownAddress = activeWalletRuntimeAddress();
     if (ownAddress && sameWalletAddress(ownerWallet, ownAddress)) {
-      showNewChatHint(`${identity.label} is your own username`);
+      showNewChatHint(`${canonicalUsernameDisplay(identity.label)} is your own username`);
       return;
     }
     // The username belongs to ownerWallet NOW — strip it from any other wallet's dialog and relabel them.
@@ -12647,11 +12652,11 @@ linkUsernameButton?.addEventListener('click', async () => {
     if (!identity) return;
     writeLinkedPlathoUsername(identity, plathoWallet.address);
     writeWalletDisplayIdentity(identity, plathoWallet.address);
-    flashWalletIdentityStatus(`Linked ${identity.label}`);
+    flashWalletIdentityStatus(`Linked ${canonicalUsernameDisplay(identity.label)}`);
   } catch (error) {
     flashWalletIdentityStatus('name link blocked');
     if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-    setText(linkedUsernameStatus, previousLinked?.label ?? 'optional');
+    setText(linkedUsernameStatus, canonicalUsernameDisplay(previousLinked?.label) || 'optional');
     console.error(error);
   } finally {
     linkUsernameButton.disabled = false;
@@ -12749,7 +12754,7 @@ addPublicChannelButton?.addEventListener('click', async () => {
     const name = localLabel || (
       identity.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS
         ? shortAddress(authorWallet)
-        : identity.label
+        : displayIdentityLabel(identity)
     );
     const id = `wallet:${authorWallet}`;
     addCustomPublicChannel({
@@ -13456,10 +13461,10 @@ walletDisplayModeSelect?.addEventListener('change', async () => {
       return;
     }
     writeWalletDisplayIdentity(identity, plathoWallet.address);
-    flashWalletIdentityStatus(identity.mode === WALLET_DISPLAY_MODES.ADDRESS ? 'Showing wallet address' : `Showing ${identity.label}`);
+    flashWalletIdentityStatus(identity.mode === WALLET_DISPLAY_MODES.ADDRESS ? 'Showing wallet address' : `Showing ${canonicalUsernameDisplay(identity.label)}`);
   } catch (error) {
     if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-    setText(walletDisplayModeStatus, previous.mode === WALLET_DISPLAY_MODES.ADDRESS ? 'address' : previous.label);
+    setText(walletDisplayModeStatus, previous.mode === WALLET_DISPLAY_MODES.ADDRESS ? 'address' : canonicalUsernameDisplay(previous.label));
     flashWalletIdentityStatus('display blocked');
     console.error(error);
   }
@@ -14160,7 +14165,7 @@ async function requestUsernameMintName() {
       summary: (values) => {
         const raw = values.username?.trim() || 'not set';
         const lines = [
-          { label: 'Display', value: raw.endsWith('.ath') ? raw : `${raw}.ath` },
+          { label: 'Display', value: canonicalUsernameDisplay(raw) },
           { label: 'ATH price', value: usernameMintPricePreview(raw) },
         ];
         // Show the live ATH balance + an affordability flag — but only when the Vault user (hence the balance)
@@ -14188,7 +14193,7 @@ async function requestUsernameMintName() {
       if (priceAtomic !== null && currentVaultUserSource()) {
         const athBalance = currentAthBalanceAtomic();
         if (athBalance < priceAtomic) {
-          throw new Error(`Insufficient ATH: ${username}.ath costs ${formatAthAtomic(priceAtomic)} ATH, you have ${formatAthAtomic(athBalance)} — top up ATH in Vault`);
+          throw new Error(`Insufficient ATH: ${username} costs ${formatAthAtomic(priceAtomic)} ATH, you have ${formatAthAtomic(athBalance)} — top up ATH in Vault`);
         }
       }
       return username;
@@ -16992,7 +16997,7 @@ async function waitForPlathoUsernameOwnership(label, ownerWallet, options = {}) 
 
 async function autoLinkMintedUsername(username, ownerWallet, options = {}) {
   const owner = requireBasechainAddress(ownerWallet, 'Connected wallet');
-  setUsernameMintStatus(`${username}.ath finalizing`);
+  setUsernameMintStatus(`${username} finalizing`);
   const identity = await waitForPlathoUsernameOwnership(username, owner, options);
   if (!plathoWallet?.address || !sameWalletAddress(plathoWallet.address, owner)) return null;
   const linked = {
@@ -17005,7 +17010,7 @@ async function autoLinkMintedUsername(username, ownerWallet, options = {}) {
   writeWalletDisplayIdentity(linked, owner);
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.PLATHO_NFT;
   clearPendingUsernameMint(username, owner);
-  setUsernameMintStatus(`Linked ${identity.label}`, '');
+  setUsernameMintStatus(`Linked ${canonicalUsernameDisplay(identity.label)}`, '');
   renderWalletIdentity();
   return linked;
 }
