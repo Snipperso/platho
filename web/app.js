@@ -37,7 +37,7 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=97';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=98';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v589';
+const PLATHO_APP_RUNTIME_VERSION = 'v590';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2291,6 +2291,9 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   activeRuntimeWalletAddress = null;
   clearMessageAutoSyncTimer();
   clearMessageAutoSyncCountdownTimer();
+  // Also cancel any pending rail Vault-balance retry so a teardown (lock / account switch) doesn't leave a get_user
+  // firing later and racing the next boot's reads (one of the concurrent-connection sources on iOS WebKit).
+  clearNavVaultBalanceRetryTimer();
   privateChainSyncPromise = null;
   messageAutoSyncAt = 0;
   messageAutoSyncPhase = 'idle';

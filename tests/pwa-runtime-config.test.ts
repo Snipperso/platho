@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v589<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v589'/);
+    expect(html).toMatch(/id="appVersionLabel">v590<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v590'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4282,6 +4282,17 @@ describe('PWA runtime config guard', () => {
     expect(fn).not.toMatch(/while \(true\)/);
   });
 
+  it('PWA-IOS-SHARED-TONCENTER-QUEUE-01: keyed + keyless toncenter share one limiter queue (no parallel connections / iOS freeze)', () => {
+    const config = readFileSync('web/platho-config.mjs', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
+    // BOTH toncenter providers carry the SAME explicit rateLimitKey -> one single-worker request pump, so the
+    // keyed primary and the keyless emergency can never fire two simultaneous connections to toncenter.com.
+    const shared = config.match(/rateLimitKey: 'toncenter-shared'/g) ?? [];
+    expect(shared.length).toBe(2);
+    // Wallet teardown cancels the pending rail Vault-balance retry so it can't race the next boot's reads.
+    expect(app).toMatch(/function clearWalletScopedRuntimeState[\s\S]{0,900}clearNavVaultBalanceRetryTimer\(\)/);
+  });
+
   it('PWA-CANONICAL-USERNAME-01: usernames display canonically (no .ath suffix) via displayIdentityLabel + threadDisplayLabel', () => {
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toMatch(/function canonicalUsernameDisplay\(label\)/);
@@ -5146,16 +5157,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v660/);
+    expect(sw).toMatch(/platho-pwa-prototype-v661/);
     expect(sw).toMatch(/\.\/styles\.css\?v=194/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=589/);
+    expect(sw).toMatch(/\.\/app\.js\?v=590/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=4/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=97/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=98/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);

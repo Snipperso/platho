@@ -80,6 +80,11 @@ export const PLATHO_APP_CONFIG = deepFreeze({
           // 125ms = 8 rps, a 20% margin under the 10 rps free-key cap. toncenter rate-limits per-second with
           // NO burst grace, so a flat 100ms (=10 rps, zero margin) sporadically tips to 11/sec on jitter -> 429.
           requestSpacingMs: 125,
+          // Shared limiter key (see keyless-toncenter): forces the keyed primary and the keyless emergency into
+          // ONE single-worker request pump so they can NEVER fire two simultaneous connections to toncenter.com
+          // from one IP. iOS WebKit stalls its run loop on parallel connections (the iPhone freeze); the per-task
+          // spacing is preserved, so keyed reads keep their 125ms (8 rps) cadence inside the shared queue.
+          rateLimitKey: 'toncenter-shared',
         },
         {
           id: 'keyless-toncenter',
@@ -95,6 +100,11 @@ export const PLATHO_APP_CONFIG = deepFreeze({
           // 1100ms = ~0.91 rps, the "forsazh" anonymous pacing (shares the #F per-IP budget with a no-key
           // user-toncenter; see TONCENTER_KEYLESS_REQUEST_SPACING_MS). Was 1500ms/0.67 rps.
           requestSpacingMs: 1100,
+          // SAME key as user-toncenter -> one shared single-worker pump (no parallel keyed+keyless connections on
+          // iOS). This is STRICTER than toncenter's own buckets (keyed per-key, anonymous per-IP) need, but that is
+          // the point: serialize on the client so two fetches never race the WebKit run loop. Keyless keeps its own
+          // 1100ms per-task spacing. Do NOT split these back into separate keys without re-checking the iPhone freeze.
+          rateLimitKey: 'toncenter-shared',
         },
       ],
       requestSpacingMs: 250,
