@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v587';
+const PLATHO_APP_RUNTIME_VERSION = 'v588';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16422,34 +16422,32 @@ function vaultMoveMaxAmount(asset) {
 }
 
 function refreshNavVaultBalance() {
-  // Until the Vault balance is actually known, show NOTHING in the rail corner \u2014 no spinner. The global header sync
-  // indicator already signals activity, so a second spinner here is just noise. The whole balance block is hidden,
-  // then revealed with a one-shot fade the moment a real balance lands (re-armed if it ever goes unknown again,
-  // e.g. on account switch / sign-out).
+  // The rail corner ALWAYS reserves its space (its min-height), but stays visually EMPTY until the balance is known
+  // \u2014 no spinner (the global header sync indicator already signals activity) and, because the block is never
+  // removed from layout, no shift of the rail buttons when the balance arrives. The moment a real balance lands we
+  // fill it and fade it in (one-shot; re-armed if the value ever goes unknown again, e.g. on account switch).
   if (!navVaultBalanceHasKnownValue()) {
     for (const container of navVaultBalanceContainers) {
-      container.hidden = true;
+      container.classList.add('is-pending');
       container.classList.remove('rail-vault-balance-reveal');
+      container.setAttribute('aria-hidden', 'true');
     }
     return;
   }
   for (const container of navVaultBalanceContainers) {
-    if (container.hidden) {
-      container.hidden = false;
-      // Fade-in only on first appearance, not on later background value refreshes (the gate is container.hidden).
+    if (container.classList.contains('is-pending')) {
+      container.classList.remove('is-pending');
+      // Fade-in only on the first fill, not on later background value refreshes (the gate is the is-pending class).
       container.classList.add('rail-vault-balance-reveal');
     }
+    container.removeAttribute('aria-hidden');
   }
   const tonBalance = `${vaultMoveFormattedBalance('vault', 'TON')} GRAM`;
   const athBalance = `${vaultMoveFormattedBalance('vault', 'ATH')} ATH`;
   for (const node of navVaultTonBalances) {
-    node.hidden = false;
-    node.removeAttribute('aria-hidden');
     setText(node, tonBalance);
   }
   for (const node of navVaultAthBalances) {
-    node.hidden = false;
-    node.removeAttribute('aria-hidden');
     setText(node, athBalance);
   }
 }

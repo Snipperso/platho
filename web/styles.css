@@ -249,10 +249,10 @@ button:disabled,
   user-select: none;
 }
 
-/* The block's own `display: grid` would otherwise beat the UA `[hidden] { display: none }` (equal specificity,
-   author wins), so the hidden attribute set while the balance is unknown wouldn't actually hide it. Make it stick. */
-.rail-vault-balance[hidden] {
-  display: none;
+/* While the balance is unknown the block keeps its layout slot (min-height reserves the space, so the rail buttons
+   never shift when the balance arrives) but its content is invisible — empty space, no spinner. */
+.rail-vault-balance.is-pending {
+  opacity: 0;
 }
 
 .rail-vault-balance span {
