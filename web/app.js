@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v608';
+const PLATHO_APP_RUNTIME_VERSION = 'v609';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -12407,6 +12407,7 @@ function renderConversation() {
     && conversationLastMsg?.type === 'out';
   lastConversationThreadId = thread.id;
   lastConversationMsgCount = conversationMsgCount;
+  const __renderConvT0 = (globalThis.performance?.now?.() ?? Date.now());
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
     row.className = `message ${message.type}`;
@@ -12586,6 +12587,13 @@ function renderConversation() {
     if (manualActions) row.append(manualActions);
     messageStrip.append(row);
   });
+  // TEMP diag: measure the synchronous full-rebuild of the conversation strip (innerHTML='' + rebuild every message).
+  // This runs on EVERY onPartState / confirm-attempt / sync tick; if it is heavy on a large thread it is the ~0.5s
+  // foreground stall (gap Nms v) the owner sees during confirming. Crumb only when slow so the banner shows the cost.
+  try {
+    const __renderConvMs = Math.round((globalThis.performance?.now?.() ?? Date.now()) - __renderConvT0);
+    if (__renderConvMs > 80) diagCryptoCrumb(`render:conv:${__renderConvMs}ms/${thread.messages.length}n`);
+  } catch { /* diag best-effort */ }
 
   requestAnimationFrame(() => {
     if (conversationNewOutbound) {
