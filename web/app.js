@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v616';
+const PLATHO_APP_RUNTIME_VERSION = 'v617';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -842,6 +842,12 @@ const PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS = 15 * 60 * 1000;
 const PRIVATE_SEND_RPC_RETRY_MAX_ATTEMPTS = 90;
 const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [1_000, 2_000, 3_000, 5_000, 8_000, 13_000, 21_000, 30_000];
 const PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT = 24;
+// Poll FLOOR (~one basechain block) applied while a part has LANDED on the Vault (nonce consumed ->
+// VAULT_SUBMITTED) but its receipt has not yet flipped CAPSULEHUB_CONFIRMED. Such a part is only waiting on
+// the Vault->Hub->Vault ACK (~2 blocks); backing the confirm poll off to the 13/21/30s ladder tail here is
+// what leaves a healed 2nd capsule shown as "confirming" for tens of seconds after it is effectively
+// delivered. Caps only the tail (the fast 1/2/3s ramp stays), so it does not add reads to a quick send.
+const PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS = 4_000;
 const PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS = 10 * 60 * 1000;
 const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 // If NOTHING confirms within this window (measured from the message's STABLE creation time, which —
@@ -19749,6 +19755,13 @@ function publishPartAwaitingCapsuleHubConfirmation(part) {
     || part?.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED;
 }
 
+// A part in VAULT_SUBMITTED has had its nonce CONSUMED on-chain (the Vault processed its external), so it HAS
+// landed and is only awaiting the Vault->Hub->Vault ACK to flip CAPSULEHUB_CONFIRMED. That is the window where
+// the confirm poll should stay tight (see PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS) instead of backing off.
+function publishStateHasLandedUnconfirmedPart(publishState) {
+  return (publishState?.parts ?? []).some((part) => part?.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED);
+}
+
 function publishPartCanFreshSendRetry(part) {
   if (!part || publishPartAlreadyAttempted(part)) return false;
   if (part.clientNonce !== undefined && part.clientNonce !== null) return false;
@@ -20472,11 +20485,22 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
     return;
   }
   clearPrivateMessageManualRecovery(message);
-  const delayMs = isTonRpcRateLimitError(error)
+  let delayMs = isTonRpcRateLimitError(error)
     ? tonRpcLimitBackoffMs(error)
     : (attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT
       ? PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS
       : PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS[Math.min(attempt, PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS.length - 1)]);
+  // While the confirmation is still fresh and a part has already LANDED but not yet confirmed (VAULT_SUBMITTED
+  // -> awaiting the ~2-block CapsuleHub ACK), floor the poll at ~one block instead of the 13/21/30s ladder tail:
+  // this is exactly what strands a healed multi-capsule send "confirming" long after it is effectively
+  // delivered. Not rate-limit-driven and bounded to the landed-pending window, so it cannot storm the RPC;
+  // read-only cadence (never changes WHAT confirms) so there is no double-spend / false-confirm surface, and a
+  // keyless wallet only pays a few extra receipt reads while a part is genuinely mid-confirm.
+  if (!isTonRpcRateLimitError(error)
+    && isFreshPrivatePublishConfirmation(message)
+    && publishStateHasLandedUnconfirmedPart(message.publishState)) {
+    delayMs = Math.min(delayMs, PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS);
+  }
   context.confirmAttempt = attempt + 1;
   message.privatePublishConfirmAttempt = context.confirmAttempt;
   const scheduledAt = Date.now();
