@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v625';
+const PLATHO_APP_RUNTIME_VERSION = 'v626';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -10617,12 +10617,12 @@ function isAmbiguousTonRpcBroadcastError(error) {
 }
 
 // Vault exit code 16453 = the publish path's throwUnless(clientNonce == publish_nonce) (contracts/Vault.tact).
-// On a RE-broadcast — only sent after reading currentNonce === clientNonce, and publish_nonce only ever
-// increases — a 16453 can only mean the nonce advanced PAST this external, i.e. OUR external (nonce ==
-// clientNonce) already LANDED (only accepting our nonce advances it). On the sub-second TON chain the external
-// can land in the gap between the nonce read and the POST, so this races often. (In the INITIAL back-to-back
-// send a 16453 instead means "too early" — a later batch signed before an earlier one landed — so this is used
-// ONLY on the re-broadcast path, guarded by currentNonce !== null.)
+// AMBIGUOUS even on a re-broadcast sent right after reading currentNonce === clientNonce: toncenter is a
+// FLEET — POST /message is emulated against the SEND node's own state, which can lag the read pool by a
+// block, so its 16453 can mean "too early" (publish_nonce still below clientNonce there) just as well as
+// "the nonce advanced past this external". NEVER treat this error alone as proof the external landed; the
+// only sound landing evidence is a fresh nonce READ showing currentNonce > clientNonce (monotonic counter —
+// replicas lag, never run ahead). Callers use this match only to route to the quiet short-cooldown retry.
 function isVaultPublishNonceConsumedError(error) {
   return /\b16453\b/.test(String(error?.responseBody ?? error?.message ?? ''));
 }
@@ -18534,6 +18534,13 @@ const CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT = 32;
 const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 35_000;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6;
+// A re-broadcast POST that bounced 16453 while the READ pool says currentNonce === clientNonce is a
+// toncenter fleet race: the send node's emulation state lags the read pool by a block. The external was
+// NOT relayed (structural pre-accept reject, never mempooled), so retry QUICKLY — the send node catches
+// up within seconds — but paced (not the zero first-heal cooldown) so a lagging node is not hammered on
+// every ~1s confirm pass. After a few races fall back to the full 35s cooldown.
+const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 2_500;
+const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 * 1000;
 // 8s (was 4s): the pre-re-broadcast nonce read is get_user on the heavy Vault contract; toncenter answers it
 // in <1s when healthy but 4-8s during a load spike, and a 4s timeout made that read fail (observed console
@@ -19863,6 +19870,8 @@ function clearPublishPartSignedAttempt(part) {
   delete part.lastBroadcastRetryError;
   delete part.lastBroadcastRetryErrorAt;
   delete part.broadcastRetryCount;
+  delete part.broadcastNonceRaceCount;
+  delete part.broadcastDuplicateRelayCount;
 }
 
 function publishPartNeedsBroadcastRetry(part) {
@@ -19916,6 +19925,8 @@ function resetPublishBroadcastBudgetForManualRetry(publishState) {
   for (const part of publishState?.parts ?? []) {
     if (!publishPartNeedsBroadcastRetry(part)) continue;
     part.broadcastRetryCount = 0;
+    part.broadcastNonceRaceCount = 0;
+    part.broadcastDuplicateRelayCount = 0;
     part.lastBroadcastAt = null;
   }
 }
@@ -20007,16 +20018,23 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     const head = parts[0];
     const retryCount = publishPartBroadcastRetryCount(head);
     if (retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT) continue;
+    const nonceRaceCount = Number(head.broadcastNonceRaceCount ?? 0) || 0;
+    const duplicateRelayCount = Number(head.broadcastDuplicateRelayCount ?? 0) || 0;
     // FIRST heal of a proven-not-landed external re-broadcasts with NO cooldown. Reaching here with
     // currentNonce === clientNonce means the chain's next-expected nonce is EXACTLY this batch's nonce, so
     // its back-to-back external never landed (a landed one would have advanced the nonce past it — that is
     // the branch above). The 35s cooldown only guards against HAMMERING on repeat attempts; on the first
-    // heal it is pure added latency — the residual second-capsule delay after the barrier fix. Repeat
-    // attempts (retryCount >= 1) keep the full cooldown. Idempotent + double-spend-safe: a stale-replica
-    // false "not landed" costs at most one wasted (contract-rejected) re-broadcast of the fixed-nonce boc.
-    const rebroadcastCooldownMs = retryCount === 0 && currentNonce !== null && currentNonce === clientNonce
-      ? 0
-      : PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;
+    // heal it is pure added latency — the residual second-capsule delay after the barrier fix. A 16453
+    // fleet-race bounce (send node lagging the read pool) retries on the SHORT race cooldown while fresh,
+    // then falls back to 35s; a "duplicate message" answer (BoC already queued at toncenter) and repeat
+    // real relays (retryCount >= 1) keep the full cooldown. Idempotent + double-spend-safe throughout: a
+    // stale-replica false "not landed" costs at most one wasted (contract-rejected) re-broadcast of the
+    // fixed-nonce boc.
+    let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;
+    if (retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce) {
+      if (nonceRaceCount === 0) rebroadcastCooldownMs = 0;
+      else if (nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;
+    }
     if (publishPartLastBroadcastAgeMs(head) < rebroadcastCooldownMs) continue;
     let result = null;
     try {
@@ -20027,31 +20045,50 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
         priority: 'background',
       });
     } catch (error) {
-      // A re-broadcast that hits Vault exit code 16453 (throwUnless clientNonce == publish_nonce) AFTER we read
-      // currentNonce === clientNonce means the nonce advanced past this external between the read and the POST —
-      // i.e. OUR external LANDED (the sub-second chain makes this race common). Treat it exactly like the
-      // currentNonce > clientNonce branch above: mark VAULT_SUBMITTED, clear the error, stop re-broadcasting —
-      // it is NOT a failure, and it should not log a scary 500. Guarded by currentNonce !== null so it never
-      // applies to an unread-nonce blind resend.
+      // Vault exit code 16453 on a re-broadcast is AMBIGUOUS across the toncenter fleet: the READ pool said
+      // publish_nonce === clientNonce (not landed), but POST /message is emulated against the SEND node's
+      // OWN state, which can lag the read pool by a block — its 16453 then means "too early", NOT "landed".
+      // With the deferred first POST of the 2nd+ batch this is that batch's FIRST-ever POST, where "landed"
+      // is IMPOSSIBLE (only its own acceptance advances the nonce past it); trusting the bounce as landing
+      // proof permanently orphaned the 2nd capsule (the v621 regression). NEVER conclude "landed" from the
+      // error alone: keep the part SENT and let the NEXT pass's fresh nonce READ decide — a genuinely landed
+      // external flips VAULT_SUBMITTED via the currentNonce > clientNonce branch above within one ~1s pass.
+      // Pace repeats with the short race cooldown (the send node catches up within seconds), do NOT burn the
+      // relay budget (the reject is pre-accept — the BoC never entered the mempool, nothing was relayed),
+      // and no scary warn (an expected fleet-lag condition, not a failure).
       if (currentNonce !== null && isVaultPublishNonceConsumedError(error)) {
+        console.debug('[platho] vault re-broadcast 16453 nonce race (send node lagging read pool), retrying shortly', {
+          clientNonce: String(clientNonce),
+          nonceRaceCount: nonceRaceCount + 1,
+        });
+        const raceAt = new Date().toISOString();
         for (const part of parts) {
-          setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
-            confirmedBy: 'vault_nonce_consumed',
+          setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
+            broadcastNonceRaceCount: nonceRaceCount + 1,
+            lastBroadcastAt: raceAt,
             error: null,
           });
           changed += 1;
         }
         continue;
       }
-      // "duplicate message" = this exact BoC is ALREADY queued at toncenter — the external is in flight, so
-      // count this attempt as a successful relay: stamp lastBroadcastAt + the retry count exactly like the
-      // success path (which arms the repeat-attempt cooldown and stops the every-pass duplicate re-POST spam),
-      // keep the part SENT, and skip the scary failure warn. The nonce/receipt confirm flips it once it lands.
+      // "duplicate message" = this exact BoC is ALREADY queued at toncenter. Stop the every-pass duplicate
+      // re-POST spam by stamping lastBroadcastAt (arms the full 35s cooldown via broadcastDuplicateRelayCount),
+      // keep the part SENT, and skip the scary failure warn. But do NOT burn a broadcastRetryCount slot: a
+      // duplicate proves only "queued at toncenter", not "relayed to the network" — toncenter has been observed
+      // to ACK/queue without delivering, and burning the 6-slot budget on duplicates left such a send with NO
+      // further re-POSTs after ~3.5min (the multi-minute stall). Un-counted, the 35s-paced idempotent re-POST
+      // keeps healing until the nonce/receipt confirm flips the part or the 10-min no-progress terminal fires
+      // (bounded: ~17 POSTs max).
       if (isTonBroadcastDuplicateMessageError(error)) {
+        console.debug('[platho] vault re-broadcast: BoC already queued at toncenter (duplicate), waiting for it to land', {
+          clientNonce: String(clientNonce),
+          duplicateRelayCount: duplicateRelayCount + 1,
+        });
         const duplicateAt = new Date().toISOString();
         for (const part of parts) {
           setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
-            broadcastRetryCount: retryCount + 1,
+            broadcastDuplicateRelayCount: duplicateRelayCount + 1,
             lastBroadcastAt: duplicateAt,
             error: null,
           });

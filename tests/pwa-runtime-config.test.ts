@@ -256,12 +256,12 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v625<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v625'/);
+    expect(html).toMatch(/id="appVersionLabel">v626<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v626'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=625" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=626" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1610,19 +1610,29 @@ describe('PWA runtime config guard', () => {
     // surface the toncenter reason, so NO broadcast 500 can be a bare mystery on any path.
     expect(app).toMatch(/console\.warn\('\[platho\] vault auth external broadcast failed'/);
     expect(app).toMatch(/console\.warn\('\[platho\] vault receive-intent external broadcast failed'/);
-    // v625: toncenter "duplicate message" on a re-broadcast = the same BoC is ALREADY queued (in flight) -> count
-    // it as a successful relay (stamp lastBroadcastAt + retry count, arming the repeat cooldown) instead of
-    // re-POSTing the same BoC every ~1s pass and logging a scary 500 each time.
+    // v626: toncenter "duplicate message" on a re-broadcast = the same BoC is ALREADY queued (in flight) -> arm
+    // the 35s cooldown via broadcastDuplicateRelayCount, but do NOT burn a broadcastRetryCount slot: a duplicate
+    // proves "queued", not "relayed" — burning the 6-slot budget on duplicates left an ACKed-but-undelivered
+    // send with NO further re-POSTs after ~3.5min (the multi-minute stall).
     expect(app).toMatch(/function isTonBroadcastDuplicateMessageError\(error\)[\s\S]*duplicate message/);
-    expect(app).toMatch(/isTonBroadcastDuplicateMessageError\(error\)[\s\S]*broadcastRetryCount: retryCount \+ 1,\s*lastBroadcastAt: duplicateAt/);
+    expect(app).toMatch(/isTonBroadcastDuplicateMessageError\(error\)[\s\S]*broadcastDuplicateRelayCount: duplicateRelayCount \+ 1,\s*lastBroadcastAt: duplicateAt/);
+    const duplicateBranch = app.slice(app.indexOf('if (isTonBroadcastDuplicateMessageError(error))'), app.indexOf('const retryError = shortUiErrorText(error'));
+    expect(duplicateBranch).not.toMatch(/broadcastRetryCount/);
     // v625: the wallet transfer path (platho-wallet.mjs) also warns with the toncenter reason.
     const walletModule = readFileSync('web/platho-wallet.mjs', 'utf8');
     expect(walletModule).toMatch(/console\.warn\('\[platho\] wallet external broadcast failed'/);
-    // v621: a re-broadcast that hits Vault exit code 16453 (throwUnless clientNonce == publish_nonce) after a
-    // currentNonce === clientNonce read means the external already LANDED (sub-second race) -> mark VAULT_SUBMITTED,
-    // not a failure; no scary 500, no wasted resend.
+    // v626: 16453 on a re-broadcast is a toncenter FLEET RACE (the send node lags the read pool), NOT landing
+    // proof — the v621 "16453 => VAULT_SUBMITTED" branch permanently orphaned the 2nd capsule of a multi-capsule
+    // send. The part stays SENT with a short race cooldown; only a fresh nonce READ (currentNonce > clientNonce)
+    // may mark it VAULT_SUBMITTED.
     expect(app).toMatch(/function isVaultPublishNonceConsumedError\(error\)[\s\S]*\\b16453\\b/);
-    expect(app).toMatch(/currentNonce !== null && isVaultPublishNonceConsumedError\(error\)[\s\S]*PUBLISH_PART_STATUS_VAULT_SUBMITTED[\s\S]*confirmedBy: 'vault_nonce_consumed'/);
+    expect(app).toMatch(/currentNonce !== null && isVaultPublishNonceConsumedError\(error\)[\s\S]*PUBLISH_PART_STATUS_SENT[\s\S]*broadcastNonceRaceCount: nonceRaceCount \+ 1/);
+    expect(app).not.toMatch(/vault_nonce_consumed/);
+    expect(app).toMatch(/console\.debug\('\[platho\] vault re-broadcast 16453 nonce race/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 2_500/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6/);
+    expect(app).toMatch(/function clearPublishPartSignedAttempt\(part\)[\s\S]*delete part\.broadcastNonceRaceCount;\s*delete part\.broadcastDuplicateRelayCount;/);
+    expect(app).toMatch(/function resetPublishBroadcastBudgetForManualRetry\(publishState\)[\s\S]*broadcastNonceRaceCount = 0;\s*part\.broadcastDuplicateRelayCount = 0;/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 \* 60 \* 1000/);
     // Publish + CapsuleHub ACK spans 2-3 basechain blocks; the hot window
     // covers that so sends do not degrade into the recovery/retry path.
@@ -1670,7 +1680,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function readVaultPublishNonceForBroadcastRetry\(provider, owner, options = \{\}\)[\s\S]*ignoreNonceBarrier: true/);
     // Fix 3: the FIRST re-broadcast of a proven-not-landed external (chain nonce sits exactly at its nonce)
     // skips the 35s cooldown; repeat attempts keep it. Collapses the residual second-capsule delay.
-    expect(app).toMatch(/const rebroadcastCooldownMs = retryCount === 0 && currentNonce !== null && currentNonce === clientNonce\s*\?\s*0\s*:\s*PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS/);
+    // v626: the cooldown is race-aware — zero on the very first heal, the short race cooldown while 16453
+    // fleet-race bounces are fresh, and the full 35s otherwise (repeat relays / duplicates).
+    expect(app).toMatch(/let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;\s*if \(retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce\) \{\s*if \(nonceRaceCount === 0\) rebroadcastCooldownMs = 0;\s*else if \(nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT\) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;/);
     expect(app).toMatch(/if \(publishPartLastBroadcastAgeMs\(head\) < rebroadcastCooldownMs\) continue/);
     expect(app).not.toMatch(/function markPublishPartForFreshNonceRetry/);
     expect(app).not.toMatch(/fresh nonce retry required/);
@@ -5327,11 +5339,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v696/);
+    expect(sw).toMatch(/platho-pwa-prototype-v697/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=625/);
+    expect(sw).toMatch(/\.\/app\.js\?v=626/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
