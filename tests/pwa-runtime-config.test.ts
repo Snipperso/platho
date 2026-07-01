@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v614<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v614'/);
+    expect(html).toMatch(/id="appVersionLabel">v615<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v615'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -666,7 +666,7 @@ describe('PWA runtime config guard', () => {
     // wallet (markWalletKeyBackupDone cleared the pending flag) skips the download + the backup checkbox and
     // just confirms the on-chain activation.
     expect(app).toMatch(/const needsKeyBackup = walletKeyBackupPendingForStoredWallet\(\)/);
-    expect(app).toMatch(/if \(needsKeyBackup\) \{ diagCrumb\('act:backup'\); await downloadEncryptedWalletKeyBackup\(\); \}/);
+    expect(app).toMatch(/if \(needsKeyBackup\) \{ await downloadEncryptedWalletKeyBackup\(\); \}/);
     expect(app).toMatch(/submitLabel: needsKeyBackup \? 'Export key and activate' : 'Activate account'/);
     expect(app).toMatch(/VAULT_RECEIVE_CRYPTO_SUITE = CRYPTO_SUITES\.HYBRID_V1/);
     expect(app).toMatch(/loadMessagingIdentityFromWallet\(VAULT_RECEIVE_CRYPTO_SUITE\)/);
@@ -2129,15 +2129,21 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/fetch\('https:\/\/toncenter\.com\/api\/v3\/masterchainInfo', \{\s*headers: \{ 'X-API-Key': key \}/);
     expect(app).toMatch(/if \(response\.ok\) return \{ ok: true \}/);
     expect(app).toMatch(/response\.status === 401 \|\| response\.status === 403\) return \{ ok: false, reason: 'invalid' \}/);
-    // No Save button: the settings field validates + saves on change (blur / Enter). A definitively
-    // invalid key is rejected and NOT stored; an unverified one is kept (keyless Orbs fallback).
+    // No Save button: the settings field validates + saves on change (blur / Enter). A 401/403 is NOT a hard
+    // reject — a brand-new toncenter key needs up to ~1 min to activate — so the key is saved anyway, shown as
+    // 'activating', and re-verified in the background (flips to active, or reverts to keyless if still rejected).
     expect(app).toMatch(/async function commitToncenterKeyFromInput\(\)/);
     expect(app).toMatch(/toncenterApiKeyInput\?\.addEventListener\('change'/);
     // Validate on paste/input (debounced), not only on blur, so pasting a key shows feedback right away;
     // and keep "checking..." visible for a perceptible beat even when validation returns fast.
     expect(app).toMatch(/toncenterApiKeyInput\?\.addEventListener\('input', scheduleToncenterKeyCheck\)/);
     expect(app).toMatch(/const minCheckingVisible = new Promise[\s\S]*?setTimeout\(resolve, 450\)[\s\S]*?await validateToncenterApiKey\(trimmed\);\s*await minCheckingVisible;/);
-    expect(app).toMatch(/if \(result\.reason === 'invalid'\) \{[\s\S]*toncenterKeyStatus\.textContent = 'invalid key'[\s\S]*setAttribute\('data-state', 'error'\)[\s\S]*return;\s*\}\s*applyToncenterApiKey\(trimmed\);/);
+    // Optimistic save BEFORE the invalid-branch: a 401/403 shows 'activating' + schedules a background re-verify
+    // instead of hard-rejecting; a persistent reject after the grace window reverts to keyless with a clear status.
+    expect(app).toMatch(/await minCheckingVisible;\s*applyToncenterApiKey\(trimmed\);\s*if \(result\.reason === 'invalid'\) \{/);
+    expect(app).toMatch(/toncenterKeyStatus\.textContent = 'saved - activating \(up to ~1 min\)'/);
+    expect(app).toMatch(/scheduleToncenterKeyReverify\(trimmed\)/);
+    expect(app).toMatch(/toncenterKeyStatus\.textContent = 'key not accepted - re-check it'/);
     // "recommended" lives in the section heading, not the row, so it never crowds the key input on a narrow
     // phone; the in-row status is empty when there is no key (validation states like 'invalid key' still show).
     expect(app).toMatch(/toncenterKeyStatus\.textContent = key \? 'key active' : ''/);
@@ -4374,14 +4380,14 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-IOS-ACT-FAST-KEYID-01: activation status verifies the binding from current_key_id locally, skipping the get_key_record read on the common path', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // The localized permanent iOS freeze was the get_key_record read (crumb act:getkeyrecord) on the boot / Vault /
+    // The localized permanent iOS freeze was the get_key_record read on the boot / Vault /
     // activation critical path. current_key_id IS the contract's collision-resistant binding hash of (owner + our key
     // fields + key_generation == 0 for the first, never-rotated key, see contracts/Vault.tact RegisterMessagingKeys).
     // So the fast path recomputes that hash from the LOCAL draft and, on a match, marks the account activated WITHOUT
     // the chain read -> no freeze. The heavy get_key_record read survives ONLY as the fallback (rotation / mismatch).
     const fn = app.slice(app.indexOf('async function refreshVaultActivationStatus'), app.indexOf('async function bootCrypto'));
     const fastIdx = fn.indexOf('computeVaultMessagingKeyId({');
-    const readIdx = fn.indexOf("diagCrumb('act:getkeyrecord')");
+    const readIdx = fn.indexOf('provider.getKeyRecord(user.current_key_id');
     expect(fastIdx).toBeGreaterThan(-1);
     expect(readIdx).toBeGreaterThan(-1);
     // The local key-id recompute MUST come before the chain read (it short-circuits it).
@@ -5268,11 +5274,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v685/);
+    expect(sw).toMatch(/platho-pwa-prototype-v686/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=614/);
+    expect(sw).toMatch(/\.\/app\.js\?v=615/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v614';
+const PLATHO_APP_RUNTIME_VERSION = 'v615';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -443,12 +443,53 @@ async function validateToncenterApiKey(rawKey) {
   }
 }
 
-// No Save button: validate + save when the field loses focus after an edit (or on Enter). A
-// definitively invalid key (toncenter 401/403) is rejected and NOT stored; an unverifiable one
-// (offline / rate-limited) is kept so the user is never blocked — a wrong key just falls back to the
-// keyless toncenter path. On success refreshToncenterKeyUi() shows 'key active'.
+// A BRAND-NEW toncenter key returns 401 "API key does not exist" for up to ~1 min after the @toncenter bot
+// issues it (activation delay) — indistinguishable at the HTTP layer from a genuinely wrong key. So a 401 must
+// NOT hard-block: we save the key optimistically (keyless toncenter stays the fallback meanwhile) and re-verify
+// in the background across a grace window, flipping to 'key active' the moment toncenter accepts it. Only if it
+// is STILL rejected after the window do we revert to keyless with a clear message (a real typo/wrong key).
+let toncenterKeyReverifyTimers = [];
+function clearToncenterKeyReverify() {
+  for (const timer of toncenterKeyReverifyTimers) { try { clearTimeout(timer); } catch { /* best effort */ } }
+  toncenterKeyReverifyTimers = [];
+}
+function scheduleToncenterKeyReverify(key) {
+  clearToncenterKeyReverify();
+  const attempt = async (isFinal) => {
+    if ((globalThis.plathoToncenterApiKey ?? null) !== key) return; // superseded by a newer key / cleared
+    const result = await validateToncenterApiKey(key);
+    if ((globalThis.plathoToncenterApiKey ?? null) !== key) return;
+    if (result.ok) {
+      clearToncenterKeyReverify();
+      if (toncenterKeyStatus) {
+        toncenterKeyStatus.textContent = 'key active';
+        toncenterKeyStatus.removeAttribute('data-state');
+      }
+      return;
+    }
+    if (isFinal && result.reason === 'invalid') {
+      // Still rejected after the activation grace window → treat as a wrong key. Revert to keyless so a bad key
+      // does not 401 every read forever; the user sees a clear, actionable status.
+      applyToncenterApiKey('');
+      if (toncenterApiKeyInput && document.activeElement !== toncenterApiKeyInput) toncenterApiKeyInput.value = '';
+      if (toncenterKeyStatus) {
+        toncenterKeyStatus.textContent = 'key not accepted - re-check it';
+        toncenterKeyStatus.setAttribute('data-state', 'error');
+      }
+    }
+  };
+  // toncenter activation typically lands within a minute; re-check at 25s and (final) 60s.
+  toncenterKeyReverifyTimers.push(setTimeout(() => { attempt(false).catch(() => {}); }, 25000));
+  toncenterKeyReverifyTimers.push(setTimeout(() => { attempt(true).catch(() => {}); }, 60000));
+}
+
+// No Save button: validate + save when the field loses focus after an edit (or on Enter). On success shows
+// 'key active'. On a 401/403 we SAVE anyway and show 'activating' + background re-verify (see above), because a
+// fresh key is not active immediately. Offline/rate-limited (unverified) is also saved so the user is never
+// blocked — a wrong key just falls back to the keyless toncenter path.
 async function commitToncenterKeyFromInput() {
   if (!toncenterApiKeyInput) return;
+  clearToncenterKeyReverify();
   const trimmed = String(toncenterApiKeyInput.value ?? '').trim();
   if (!trimmed) {
     applyToncenterApiKey('');
@@ -463,18 +504,19 @@ async function commitToncenterKeyFromInput() {
     toncenterKeyStatus.removeAttribute('data-state');
   }
   // Keep "checking..." on screen for a perceptible beat even when the network validation returns fast,
-  // so the user actually sees the key being verified before it flips to "key active" / "invalid key".
+  // so the user actually sees the key being verified before it flips to its result.
   const minCheckingVisible = new Promise((resolve) => setTimeout(resolve, 450));
   const result = await validateToncenterApiKey(trimmed);
   await minCheckingVisible;
-  if (result.reason === 'invalid') {
-    if (toncenterKeyStatus) {
-      toncenterKeyStatus.textContent = 'invalid key';
-      toncenterKeyStatus.setAttribute('data-state', 'error');
-    }
-    return;
-  }
   applyToncenterApiKey(trimmed);
+  if (result.reason === 'invalid') {
+    // Not a hard reject: a just-issued key is not active yet. Keep it, show activating, and re-verify.
+    if (toncenterKeyStatus) {
+      toncenterKeyStatus.textContent = 'saved - activating (up to ~1 min)';
+      toncenterKeyStatus.removeAttribute('data-state');
+    }
+    scheduleToncenterKeyReverify(trimmed);
+  }
 }
 
 // Validate shortly after the key is pasted/edited (debounced), so the user sees "checking..." -> result
@@ -680,7 +722,6 @@ let navVaultBalanceRefreshPromise = null;
 // LEAF reads (a single provider.* call) — never a driver that awaits another wrapped read, or it self-deadlocks.
 // READS ONLY: never wrap sign/sendBoc/nonce/double-spend.
 let vaultReadMutexTail = Promise.resolve();
-let vaultReadLockCount = 0; // TEMP diag (slow-device-freeze): counts reads through the mutex; high count + frozen tick = read-chain starvation.
 function withVaultReadLock(fn) {
   // iOS DEAD-FREEZE FIX (slow-device-freeze): this mutex chains EVERY app-level Vault read (get_user / get_global /
   // getKeyRecord / GRAM / ATH / stats) via .then() = a MICROTASK. A network (cache-miss) read awaits fetch (a real
@@ -692,8 +733,6 @@ function withVaultReadLock(fn) {
   // at a time), no sign/nonce/double-spend impact; the per-read ~setTimeout-min latency is negligible (reads are paced
   // far slower than that already).
   const run = vaultReadMutexTail.then(() => delay(0)).then(() => {
-    vaultReadLockCount += 1;
-    if (vaultReadLockCount % 25 === 0) { try { diagCryptoCrumb(`vread:${vaultReadLockCount}`); } catch { /* diag best-effort */ } }
     return fn();
   });
   vaultReadMutexTail = run.then(() => {}, () => {});
@@ -2077,170 +2116,6 @@ function setAvatarNode(node, fallback, imageUrl = null) {
 
 function setText(node, value) {
   if (node) node.textContent = value ?? '';
-}
-
-// --- TEMP iPhone-freeze diagnostics (removable) -------------------------------------------------------------
-// A synchronous localStorage breadcrumb written BEFORE each boot / activation phase. localStorage.setItem
-// completes before the next statement, so the crumb survives a JSC hard-freeze + force-reload — the next boot then
-// shows the exact phase the previous (frozen) session died in, next to the version label. A clean boot writes
-// 'boot:ok' (suppressed in the display). Remove this block + all diagCrumb()/diagReadCrumb() call sites once the
-// freeze is localized.
-const DIAG_CRUMB_KEY = 'platho.diag.crumb.v1';
-const DIAG_TICK_KEY = 'platho.diag.tick.v1';
-const DIAG_CRYPTO_KEY = 'platho.diag.crypto.v1';
-// FREE-RUNNING TICK — the decisive sync-vs-async detector. A setInterval that bumps a counter every 200ms. A blocked
-// main thread CANNOT run a timer, so if the run loop freezes synchronously the tick STOPS; an async network hang would
-// let the tick keep climbing. Every crumb stamps the tick count at write time (#N), so on reload we can see whether the
-// run loop kept ticking AFTER a given phase (freeze is elsewhere/async) or stopped dead at it (synchronous block here).
-let diagTickCount = 0;
-let diagTickMaxGapMs = 0; // largest observed gap between 200ms ticks = how long the run loop was blocked/frozen at once
-function startDiagTick() {
-  try {
-    if (typeof setInterval === 'undefined') return;
-    let lastAt = Date.now();
-    setInterval(() => {
-      diagTickCount += 1;
-      const now = Date.now();
-      const gap = now - lastAt;
-      lastAt = now;
-      if (gap > diagTickMaxGapMs) diagTickMaxGapMs = gap;
-      // vis = visibility (b=background/hidden). A big maxGap with vis='v' (foreground) = the run loop was
-      // synchronously blocked that long WHILE VISIBLE (not a background suspend). tick@time#count maxGap vis.
-      let vis = '?';
-      try { vis = (document.visibilityState === 'visible') ? 'v' : 'h'; } catch { /* best effort */ }
-      try { localStorageOrNull()?.setItem(DIAG_TICK_KEY, `${diagTickCount}@${now} gap${diagTickMaxGapMs} ${vis}`); } catch { /* best effort */ }
-    }, 200);
-  } catch { /* best effort */ }
-}
-// RING BUFFER — the definitive interleave-proof tracer. Every crumb (phase/op/confirm) is ALSO appended, in real
-// execution order, to one capped ring. On reload after a freeze the ring shows the EXACT ordered sequence of the last
-// ~18 steps across ALL concurrent paths, so the LAST entry with nothing after it is the frozen frame — no more
-// guessing which of several interleaved lanes actually hung. Snapshot the PREVIOUS session's ring at boot (before any
-// new push overwrites it) so the banner can display the frozen run's tail. Removable with the rest of the diag.
-const DIAG_RING_KEY = 'platho.diag.ring.v1';
-let diagRingArr = [];
-let diagPrevRing = '';
-try { diagPrevRing = localStorageOrNull()?.getItem(DIAG_RING_KEY) || ''; } catch { /* best effort */ }
-function diagRingPush(step) {
-  try {
-    diagRingArr.push(`${step}#${diagTickCount}`);
-    if (diagRingArr.length > 18) diagRingArr.shift();
-    localStorageOrNull()?.setItem(DIAG_RING_KEY, diagRingArr.join('|'));
-  } catch { /* best effort */ }
-}
-function diagReadRing() { return diagPrevRing; }
-function diagCrumb(step) {
-  try { localStorageOrNull()?.setItem(DIAG_CRUMB_KEY, `${step}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
-  diagRingPush(step);
-}
-// Heavy synchronous crypto (ML-KEM keygen/encapsulate/decapsulate) is all on the main thread (no Web Worker). This
-// crumb is written from platho-crypto.mjs via globalThis around each ML-KEM op, on its OWN key so it does not clobber
-// the phase crumb. If the tick stops while this crumb's tick == the final tick, an ML-KEM op (or a loop around it) was
-// the blocking operation.
-function diagCryptoCrumb(op) {
-  try { localStorageOrNull()?.setItem(DIAG_CRYPTO_KEY, `${op}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
-  diagRingPush(op);
-}
-function diagReadCrumb() {
-  try { return localStorageOrNull()?.getItem(DIAG_CRUMB_KEY) || null; } catch { return null; }
-}
-function diagReadTick() {
-  try { return localStorageOrNull()?.getItem(DIAG_TICK_KEY) || null; } catch { return null; }
-}
-function diagReadCryptoCrumb() {
-  try { return localStorageOrNull()?.getItem(DIAG_CRYPTO_KEY) || null; } catch { return null; }
-}
-// DEDICATED confirm-path lane: a crumb before EVERY step of the message confirmation flow, on its OWN key so
-// concurrent nav:read / sync crumbs never clobber it. The freeze is a FULL hang (the app dies, tick stops), so the
-// LAST cfm step with no following step is the exact operation that never returns. Owner-directed: mark every step.
-const DIAG_CONFIRM_KEY = 'platho.diag.confirm.v1';
-function diagConfirmCrumb(step) {
-  try { localStorageOrNull()?.setItem(DIAG_CONFIRM_KEY, `${step}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
-  diagRingPush(step);
-}
-function diagReadConfirm() {
-  try { return localStorageOrNull()?.getItem(DIAG_CONFIRM_KEY) || null; } catch { return null; }
-}
-try { if (typeof globalThis !== 'undefined') globalThis.plathoDiagConfirmCrumb = diagConfirmCrumb; } catch { /* best effort */ }
-// Let the crypto module (separate ES module, cannot import these) stamp ML-KEM ops.
-try { if (typeof globalThis !== 'undefined') globalThis.plathoDiagCryptoCrumb = diagCryptoCrumb; } catch { /* best effort */ }
-// NET-CONCURRENCY watcher — directly tests the owner's hypothesis that iOS dies on MULTIPLE simultaneous
-// connections. Wraps globalThis.fetch ONCE and counts EXTERNAL (cross-origin) requests in flight, across every
-// path/host/transport-instance (catches anything a code read could miss). Tracks the max ever seen + crumbs when
-// >= 2 concurrent. If the banner shows net>=2 there ARE parallel connections; net==1 means they are serialized.
-const DIAG_NETMAX_KEY = 'platho.diag.netmax.v1';
-function startDiagNetWatch() {
-  try {
-    if (typeof globalThis === 'undefined' || typeof globalThis.fetch !== 'function' || globalThis.__plathoNetWrapped) return;
-    const origFetch = globalThis.fetch.bind(globalThis);
-    let selfHost = '';
-    try { selfHost = location.host; } catch { /* ignore */ }
-    globalThis.fetch = function diagFetch(input, init) {
-      let host = '';
-      try { host = new URL(typeof input === 'string' ? input : (input?.url ?? ''), location.href).host; } catch { /* ignore */ }
-      // Count EXTERNAL, NON-toncenter connections here (toncenter is counted authoritatively in the transport's
-      // fetchWithTonRpcTimeout). Share ONE global in-flight counter so the max reflects TRUE overall concurrency.
-      if (!host || host === selfHost || /toncenter|orbs\.network/i.test(host)) return origFetch(input, init);
-      const n = (globalThis.plathoNetInFlight = (globalThis.plathoNetInFlight || 0) + 1);
-      if (n > (globalThis.plathoNetMax || 0)) {
-        globalThis.plathoNetMax = n;
-        try { localStorageOrNull()?.setItem(DIAG_NETMAX_KEY, `${n}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
-      }
-      if (n >= 2) { try { diagCryptoCrumb(`netcc:${n}`); } catch { /* best effort */ } }
-      const dec = () => { globalThis.plathoNetInFlight = Math.max(0, (globalThis.plathoNetInFlight || 1) - 1); };
-      let promise;
-      try { promise = origFetch(input, init); } catch (error) { dec(); throw error; }
-      return promise.then((r) => { dec(); return r; }, (e) => { dec(); throw e; });
-    };
-    globalThis.__plathoNetWrapped = true;
-  } catch { /* best effort */ }
-}
-function diagReadNetMax() {
-  try { return localStorageOrNull()?.getItem(DIAG_NETMAX_KEY) || null; } catch { return null; }
-}
-// Watch for LARGE synchronous localStorage writes — the iOS WebKit classic: setItem re-serializes the WHOLE store
-// synchronously, so writing a bloated store (image data / growing history) stalls the run loop for seconds = a
-// perceived permanent freeze. Wrap setItem ONCE to stamp the op lane with key+size BEFORE a big write, so if that
-// write is the block, the banner shows op=ls:<key>:<kb> with the tick frozen at it.
-function startDiagLsWatch() {
-  try {
-    const ls = localStorageOrNull();
-    if (!ls || ls.__plathoDiagWrapped) return;
-    const origSet = ls.setItem.bind(ls);
-    ls.setItem = function diagWrappedSetItem(key, value) {
-      try {
-        const len = typeof value === 'string' ? value.length : String(value ?? '').length;
-        if (len > 30000) diagCryptoCrumb(`ls:${String(key).slice(0, 28)}:${Math.round(len / 1024)}kb`);
-      } catch { /* best effort */ }
-      return origSet(key, value);
-    };
-    ls.__plathoDiagWrapped = true;
-  } catch { /* best effort */ }
-}
-startDiagTick();
-startDiagLsWatch();
-startDiagNetWatch();
-// IN-FLIGHT phase tracking: the crumb must show the op RUNNING, and 'idle' when nothing risky is in flight — else a
-// completed op's marker (e.g. nav:read-ok) persists and falsely looks like a freeze on a HEALTHY device too. Depth
-// counter handles overlapping ops: crumb settles to 'idle' only when ALL entered ops have exited. If the thread
-// FREEZES mid-op, the matching diagExit() never runs, so the crumb stays at the frozen op = the real freeze site.
-let diagDepth = 0;
-function diagEnter(step) { diagDepth += 1; diagCrumb(step); }
-function diagExit() { diagDepth = Math.max(0, diagDepth - 1); if (diagDepth === 0) diagCrumb('idle'); }
-// The version label is hidden on mobile, so surface a frozen-phase crumb as a full-width fixed RED banner that is
-// visible on the phone regardless of layout (painted before bootCrypto, so it shows even on a frozen boot). Tap to
-// dismiss. Removable with the rest of the diag scaffolding.
-function diagShowBanner(text) {
-  try {
-    if (typeof document === 'undefined' || !document.body) return;
-    const banner = document.createElement('div');
-    // Class, NOT inline style — the prod CSP (style-src 'self') blocks inline styles, which silently left the
-    // banner unstyled/invisible (this is why no banner showed on the device in v593-v595).
-    banner.className = 'platho-diag-banner';
-    banner.textContent = `${text} · tap to dismiss`;
-    banner.addEventListener('click', () => banner.remove());
-    document.body.appendChild(banner);
-  } catch { /* best effort */ }
 }
 
 function walletAddressForCopy(wallet = plathoWallet) {
@@ -5460,50 +5335,6 @@ function renderConfiguredShell() {
   const ui = appConfig.ui ?? {};
   setText(brandNetworkLabel, ui.brandNetworkLabel ?? appConfig.network?.label ?? appConfig.mode);
   setText(appVersionLabel, PLATHO_APP_RUNTIME_VERSION);
-  // TEMP diag: if the previous session left an incomplete breadcrumb (it froze mid-boot/activation), surface that
-  // phase next to the version so the owner can screenshot it after a force-reload. A clean boot wrote 'boot:ok'.
-  const diagPrev = diagReadCrumb();
-  const diagStep = diagPrev ? diagPrev.split('@')[0] : 'none';
-  // Tick stamps: each crumb carries the free-running tick count at write time (after '#'). Compare the phase crumb's
-  // tick to the FINAL tick to tell a SYNC block (ticks stopped at the phase) from an async hang (ticks kept climbing).
-  const phaseTick = diagPrev && diagPrev.includes('#') ? diagPrev.split('#')[1] : '?';
-  const tickRaw = diagReadTick();
-  const finalTick = tickRaw ? tickRaw.split('@')[0] : '?';
-  // Largest gap between 200ms ticks + last visibility. A big gap with vis=v (foreground) means the run loop was
-  // synchronously BLOCKED that long while visible (not a background suspend). Format: 'count@time gapN v|h'.
-  const tickGapMatch = tickRaw ? tickRaw.match(/gap(\d+)/) : null;
-  const tickGap = tickGapMatch ? tickGapMatch[1] : '?';
-  const tickVis = tickRaw ? (tickRaw.trim().endsWith(' h') ? 'h' : (tickRaw.trim().endsWith(' v') ? 'v' : '?')) : '?';
-  const cryptoRaw = diagReadCryptoCrumb();
-  // Last heavy/concurrent op (ML-KEM encaps/decaps/keygen OR the send replay/confirm path) on its own lane, so it does
-  // NOT clobber the phase crumb. Rendered as op=<label>#<tickAtWrite>. If the tick froze and this op's tick == final
-  // tick, THIS concurrent op (not the phase crumb's read) is the blocking operation.
-  const cryptoLabel = cryptoRaw ? cryptoRaw.replace('@', ' @').split(' @')[0] + (cryptoRaw.includes('#') ? `#${cryptoRaw.split('#')[1]}` : '') : 'none';
-  // Max simultaneous EXTERNAL connections seen last session — the direct test of the "iOS dies on parallel
-  // connections" hypothesis. net>=2 = parallel connections happened; net<=1 = connections were serialized.
-  const netRaw = diagReadNetMax();
-  const netMax = netRaw ? netRaw.split('@')[0] : '?';
-  // Dedicated confirm-path lane: the LAST step of message confirmation before the hang. Its own key so concurrent
-  // nav/sync never clobbers it — so cfm:<step>#<tick> names the exact confirm step that never returned.
-  const confirmRaw = diagReadConfirm();
-  const confirmLabel = confirmRaw ? confirmRaw.split('@')[0] + (confirmRaw.includes('#') ? `#${confirmRaw.split('#')[1]}` : '') : 'none';
-  // Ring buffer of the frozen session: the EXACT ordered sequence of the last steps across all lanes. The final
-  // entry (rightmost) with nothing after it is the operation that never returned. Show the last 10 to fit the banner.
-  const ringRaw = diagReadRing();
-  const ringTail = ringRaw ? ringRaw.split('|').slice(-10).join(' > ') : 'none';
-  // Show the banner ONLY when the previous session left a non-idle (in-flight) crumb = it FROZE mid-op at that
-  // phase. A healthy session settles to 'idle' (all ops exited) → no banner. 'boot:ok'/'none' also = not frozen.
-  const diagFrozen = diagStep !== 'none' && diagStep !== 'idle' && diagStep !== 'boot:ok';
-  if (diagFrozen) {
-    // ticks A→B: if A≈B the run loop STOPPED at this phase = synchronous block here; if B≫A it ran past it = async/elsewhere.
-    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · gap ${tickGap}ms ${tickVis} · net ${netMax} · SEQ: ${ringTail}`);
-  }
-  if (appVersionLabel && diagFrozen) {
-    const warn = document.createElement('span');
-    warn.className = 'platho-diag-warn';
-    warn.textContent = ` ⚠ ${diagStep} t${phaseTick}/${finalTick}`;
-    appVersionLabel.append(warn);
-  }
   renderPaneHeaders();
   setText(identityName, ui.identityName);
   setText(identitySubtitle, ui.identitySubtitle);
@@ -6960,8 +6791,7 @@ function chainBackedPublicFeedOnly(feed) {
 }
 
 async function syncPublicChannels() {
-  diagEnter('public:sync');
-  try { return await syncPublicChannelsRun(); } finally { diagExit(); }
+  return await syncPublicChannelsRun();
 }
 async function syncPublicChannelsRun() {
   let chainSyncError = null;
@@ -8096,8 +7926,7 @@ async function restoreOwnAvatarFromCacheFast(owner = plathoWallet?.address) {
 }
 
 async function refreshOwnProfileAvatar() {
-  diagEnter('avatar:read');
-  try { return await refreshOwnProfileAvatarRun(); } finally { diagExit(); }
+  return await refreshOwnProfileAvatarRun();
 }
 async function refreshOwnProfileAvatarRun() {
   const owner = plathoWallet?.address;
@@ -8873,11 +8702,9 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       scannedPrivateEntryIds.add(entryIdKey);
       privateScanUnknownErrorCounts.delete(`${address}:${entryIdKey}`);
       clearPrivateBodyHistoryUnavailable(address, entryId);
-      diagCryptoCrumb('decaps:start');
       const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair, {
         now: Date.now(),
       });
-      diagCryptoCrumb('decaps:done');
       // Divert a self-addressed subscription snapshot BEFORE thread resolution, so it never spawns a "chat with
       // yourself" thread. Collected here; applied (restore) when the sync pass drains them.
       const prefsBytes = prefsBytesFromOpenedCapsule(opened);
@@ -9296,7 +9123,6 @@ async function syncPrivateCapsulesFromChain(options = {}) {
 
 async function syncPrivateCapsulesFromChainOnce(options = {}) {
   if (privateChainSyncPromise) return privateChainSyncPromise;
-  diagEnter('priv:sync');
   privateChainSyncPromise = syncPrivateCapsulesFromChain(options);
   try {
     const result = await privateChainSyncPromise;
@@ -9305,7 +9131,6 @@ async function syncPrivateCapsulesFromChainOnce(options = {}) {
     return result;
   } finally {
     privateChainSyncPromise = null;
-    diagExit();
   }
 }
 
@@ -9676,7 +9501,6 @@ async function writeMessageToEncryptedHistory(thread, message) {
   ensureMessageOrderFields(message);
   try {
     const createdAt = messageCreatedAtMs(message) ?? Date.now();
-    diagCryptoCrumb('idb:put');
     const stored = await encryptedMessageStore.putMessage({
       id: message.localHistoryId ?? undefined,
       threadId: thread.id,
@@ -9684,7 +9508,6 @@ async function writeMessageToEncryptedHistory(thread, message) {
       message: serializeMessageForHistory(message),
       createdAt: message.localHistoryCreatedAt ?? createdAt,
     });
-    diagCryptoCrumb('idb:put-ok');
     message.localHistoryId = stored.id;
     message.localHistoryCreatedAt = stored.createdAt;
     setText(localStateLabel, historyStatusLabel());
@@ -12446,7 +12269,6 @@ function renderConversation() {
     && conversationLastMsg?.type === 'out';
   lastConversationThreadId = thread.id;
   lastConversationMsgCount = conversationMsgCount;
-  const __renderConvT0 = (globalThis.performance?.now?.() ?? Date.now());
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
     row.className = `message ${message.type}`;
@@ -12626,13 +12448,6 @@ function renderConversation() {
     if (manualActions) row.append(manualActions);
     messageStrip.append(row);
   });
-  // TEMP diag: measure the synchronous full-rebuild of the conversation strip (innerHTML='' + rebuild every message).
-  // This runs on EVERY onPartState / confirm-attempt / sync tick; if it is heavy on a large thread it is the ~0.5s
-  // foreground stall (gap Nms v) the owner sees during confirming. Crumb only when slow so the banner shows the cost.
-  try {
-    const __renderConvMs = Math.round((globalThis.performance?.now?.() ?? Date.now()) - __renderConvT0);
-    if (__renderConvMs > 80) diagCryptoCrumb(`render:conv:${__renderConvMs}ms/${thread.messages.length}n`);
-  } catch { /* diag best-effort */ }
 
   requestAnimationFrame(() => {
     if (conversationNewOutbound) {
@@ -16667,27 +16482,12 @@ function applyVaultUserPocketState(user) {
       walletAddress: plathoWallet?.address ?? globalThis.plathoVaultBinding?.walletAddress ?? null,
     };
   }
-  // TEMP diag: time each synchronous tail step of the nav:read path; crumb the slow one (>80ms). The v610 banner
-  // froze at nav:read with a ~400ms foreground stall that is NOT the receipt decode (fixed) — so it is one of these
-  // synchronous refreshers. Names the exact one, e.g. tail:publishPolicy:400ms.
-  const __tailTime = (label, fn) => {
-    // PRE-crumb (into the ring) BEFORE fn: a permanently-frozen refresher never reaches the after-crumb, so the
-    // v611 "no tail crumb" was a FALSE exoneration of these refreshers. The ring now records tail:in:<label> up
-    // front → the last such entry with no matching tail:<label> after it is the exact refresher that hung.
-    diagCryptoCrumb(`tail:in:${label}`);
-    const s = globalThis.performance?.now?.() ?? Date.now();
-    fn();
-    try {
-      const d = Math.round((globalThis.performance?.now?.() ?? Date.now()) - s);
-      if (d > 80) diagCryptoCrumb(`tail:${label}:${d}ms`);
-    } catch { /* diag best-effort */ }
-  };
-  __tailTime('walletProfile', refreshWalletTonProfileStatus);
-  __tailTime('moveWidget', refreshVaultMoveWidget);
-  __tailTime('navReady', markNavVaultBalanceReady);
-  __tailTime('costStatus', refreshComposerCostStatus);
-  __tailTime('publishPolicy', refreshComposerPublishPolicy);
-  __tailTime('actionStatuses', () => refreshMessageActionStatuses({ keepSyncStatus: true }));
+  refreshWalletTonProfileStatus();
+  refreshVaultMoveWidget();
+  markNavVaultBalanceReady();
+  refreshComposerCostStatus();
+  refreshComposerPublishPolicy();
+  refreshMessageActionStatuses({ keepSyncStatus: true });
 }
 
 async function refreshVaultNavBalanceInBackground(options = {}) {
@@ -16711,7 +16511,6 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
   }
   markNavVaultBalancePending(options.fromRetry ? 'retrying' : 'refreshing');
   navVaultBalanceRefreshPromise = (async () => {
-    diagEnter('nav:read');
     try {
       const user = await loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS });
       applyVaultUserPocketState(user);
@@ -16719,8 +16518,6 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
     } catch (error) {
       markNavVaultBalanceRetryNeeded('balance unavailable');
       throw error;
-    } finally {
-      diagExit();
     }
   })();
   try {
@@ -16858,7 +16655,6 @@ async function refreshVaultDashboard() {
     setVaultStatus('wallet required');
     return null;
   }
-  diagCrumb('vault:dash');
   let user = null;
   let userError = null;
   // v509 — the Apple-only Vault freeze is the CONCURRENT read burst itself, not any single read. v508 removed
@@ -16868,7 +16664,6 @@ async function refreshVaultDashboard() {
   // read is fine but 2+ concurrent reads stall the run loop. FIX: the critical path reads get_user ALONE
   // (== the proven nav read) and renders immediately; get_global (stats/registry) + the external GRAM/ATH
   // balances load deferred and STRICTLY SEQUENTIALLY (one read at a time), off the render path.
-  diagCrumb('vault:dash-read');
   const vaultUserTimedOut = Symbol('vault-open-user-timeout');
   const settledUser = await Promise.race([
     loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS })
@@ -16891,7 +16686,6 @@ async function refreshVaultDashboard() {
   }
   // Render the Vault from get_user ONLY. get_global (airdrop/registry display) is NOT awaited here — its
   // last-known value persists in vaultProtocolState and is refreshed by the deferred sequential reader.
-  diagCrumb('vault:dash-render');
   renderAthProfileStats();
   // Carry-forward external wallet balances (never wipe last-known to "-" — that would flicker every refresh).
   renderVaultPocketCards({
@@ -16937,7 +16731,6 @@ async function refreshVaultDeferredReadsInBackground(vaultUser) {
   if (vaultDeferredReadInFlight) return;
   if (!plathoWallet?.address || !isVaultViewActive()) return;
   vaultDeferredReadInFlight = true;
-  diagEnter('vault:deferred');
   try {
     // 1) get_global (airdrop / registry display) — unverified display read, on its own connection. Never
     //    concurrent with get_user (that 2-read burst was the iOS freeze). assertVaultGlobalMatchesConfig
@@ -16984,7 +16777,6 @@ async function refreshVaultDeferredReadsInBackground(vaultUser) {
     renderVaultPocketCards({ ton_balance: ton, ath_balance: ath }, vaultUser);
   } finally {
     vaultDeferredReadInFlight = false;
-    diagExit();
   }
 }
 
@@ -17067,8 +16859,7 @@ async function refreshAthAirdropState() {
 }
 
 async function refreshAthProtocolStats() {
-  diagEnter('vault:stats');
-  try { return await refreshAthProtocolStatsRun(); } finally { diagExit(); }
+  return await refreshAthProtocolStatsRun();
 }
 async function refreshAthProtocolStatsRun() {
   renderAthProfileStats();
@@ -17149,32 +16940,27 @@ function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
 async function refreshVaultNow({ includeActivation = false, includeStats = false } = {}) {
   if (vaultRefreshPromise) return vaultRefreshPromise;
   const vaultWork = (async () => {
-    diagEnter('vault:now');
-    try {
-      const results = [];
-      const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
-      results.push(...dashboardResult);
-      const dashboardUser = dashboardResult[0]?.status === 'fulfilled'
-        ? dashboardResult[0].value
-        : null;
-      // Run the post-dashboard jobs SEQUENTIALLY (one at a time), not concurrently: on iOS WebKit, activation +
-      // ATH-stats firing together (and each fanning out) is the run-loop-stall pattern fixed for the Vault in
-      // v509. Build thunks so each job is INVOKED only when the previous has settled.
-      const jobThunks = [];
-      if (includeActivation) {
-        jobThunks.push(() => refreshVaultActivationStatus(
-          dashboardUser ? { user: dashboardUser, skipGlobal: true } : {},
-        ));
-      }
-      if (includeStats) jobThunks.push(() => refreshAthProtocolStats());
-      for (const job of jobThunks) {
-        results.push(...await Promise.allSettled([job()]));
-      }
-      const rejected = results.find((result) => result.status === 'rejected');
-      if (rejected) throw rejected.reason;
-    } finally {
-      diagExit();
+    const results = [];
+    const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
+    results.push(...dashboardResult);
+    const dashboardUser = dashboardResult[0]?.status === 'fulfilled'
+      ? dashboardResult[0].value
+      : null;
+    // Run the post-dashboard jobs SEQUENTIALLY (one at a time), not concurrently: on iOS WebKit, activation +
+    // ATH-stats firing together (and each fanning out) is the run-loop-stall pattern fixed for the Vault in
+    // v509. Build thunks so each job is INVOKED only when the previous has settled.
+    const jobThunks = [];
+    if (includeActivation) {
+      jobThunks.push(() => refreshVaultActivationStatus(
+        dashboardUser ? { user: dashboardUser, skipGlobal: true } : {},
+      ));
     }
+    if (includeStats) jobThunks.push(() => refreshAthProtocolStats());
+    for (const job of jobThunks) {
+      results.push(...await Promise.allSettled([job()]));
+    }
+    const rejected = results.find((result) => result.status === 'rejected');
+    if (rejected) throw rejected.reason;
   })();
   vaultWork.catch(() => {});
   vaultRefreshPromise = vaultWork;
@@ -18581,21 +18367,17 @@ async function submitVaultRegisterMessagingKeys() {
   }
   const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
   if (!(await confirmPlathoAccountActivation(user, { needsKeyBackup }))) return null;
-  diagCrumb('act:confirmed');
   // Only force the key export when this wallet key has never been backed up (a freshly created wallet). An
   // imported or already-exported wallet is provably backed up (markWalletKeyBackupDone cleared the flag), so
   // don't make the user re-download it just to activate.
-  if (needsKeyBackup) { diagCrumb('act:backup'); await downloadEncryptedWalletKeyBackup(); }
+  if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
   vaultDraftStatus.textContent = 'signing';
-  diagCrumb('act:sign');
   const result = await submitVaultMessage('RegisterMessagingKeys', localVaultDraft.message, {
     userExists: user.exists === true,
   });
-  diagCrumb('act:sent');
   plathoAccountActivationPending = true;
   vaultDraftStatus.textContent = 'activation sent';
   queueVaultPostTransactionRefresh({ pollActivation: true });
-  diagCrumb('idle');
   return result;
 }
 
@@ -19118,9 +18900,7 @@ async function confirmPrivatePublishEntriesFromSenderIndex(publishState, pending
     if (privateParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
     let senderIndex = null;
     try {
-      diagConfirmCrumb('cfm:idx-getindex');
       senderIndex = await candidateProvider.getPrivateSenderIndex(keyIdIndex, readOptions);
-      diagConfirmCrumb('cfm:idx-index-ok');
     } catch (error) {
       if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) continue;
       continue;
@@ -19133,9 +18913,7 @@ async function confirmPrivatePublishEntriesFromSenderIndex(publishState, pending
       if (entryId === null) break;
       let entry = null;
       try {
-        diagConfirmCrumb(`cfm:idx-read:${entryId}`);
         entry = await candidateProvider.getPrivateEntry(entryId, readOptions);
-        diagConfirmCrumb(`cfm:idx-read-ok:${entryId}`);
       } catch (error) {
         if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) break;
       }
@@ -19221,9 +18999,7 @@ async function confirmVaultBatchReceiptsFromPublishState(publishState, options =
     if (publishConfirmDeadlineExpired(deadlineAt)) break;
     let interp = null;
     try {
-      diagConfirmCrumb(`cfm:receipt-read:n${batch.nonce}`);
       interp = await readBatchPublishReceipt(provider, vaultAddress, owner, batch.nonce, readOptions);
-      diagConfirmCrumb('cfm:receipt-interp');
     } catch (error) {
       // Rate limits propagate so the caller can fall back to SUBMITTED; a soft verification miss (RPC
       // disagreement / verifier unavailable) just leaves this batch pending for the entry-scan recovery.
@@ -19293,7 +19069,6 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
   // receipt is still processing or has been evicted from the ring.
   if (options.skipBatchReceipt !== true) {
     try {
-      diagConfirmCrumb('cfm:receipts');
       await confirmVaultBatchReceiptsFromPublishState(publishState, {
         owner: options.owner,
         provider: options.vaultProvider,
@@ -19301,7 +19076,6 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
         requestTimeoutMs: options.requestTimeoutMs ?? options.timeoutMs,
         queueTimeoutMs: options.queueTimeoutMs,
       });
-      diagConfirmCrumb('cfm:receipts-ok');
     } catch (error) {
       if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
     }
@@ -19315,7 +19089,6 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
   // confirmation retry (schedulePrivatePublishConfirmationRetry) runs the FULL confirm later, once the entry IS on
   // chain, and flips the status to published without blocking the send. See slow-device-freeze-iphone-se2.
   if (options.receiptOnly === true) return publishState;
-  diagConfirmCrumb('cfm:resolve-hub');
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return publishState;
   const { provider, address } = resolved;
@@ -19325,17 +19098,14 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
   });
   const scanLimit = options.scanLimit ?? CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT;
   if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
-  diagConfirmCrumb('cfm:sender-index');
   await confirmPrivatePublishEntriesFromSenderIndex(publishState, pendingParts, providerCandidates, readOptions, {
     scanLimit,
     deadlineAt,
   });
-  diagConfirmCrumb('cfm:candidate-scan');
   for (const candidateProvider of providerCandidates) {
     if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
     if (pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
     try {
-      diagConfirmCrumb('cfm:getstate');
       const state = await candidateProvider.getState(readOptions);
       const groups = [
         {
@@ -19360,9 +19130,7 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
           if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
           let entry = null;
           try {
-            diagConfirmCrumb(`cfm:scan-read:${group.kind}:${entryId}`);
             entry = await group.read(entryId);
-            diagConfirmCrumb(`cfm:scan-match:${group.kind}:${entryId}`);
           } catch (error) {
             if (isTonRpcRecoverableReadError(error)) throw error;
             if (noteTonRpcRateLimit(error)) throw error;
@@ -19846,9 +19614,7 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
   // (schedulePrivatePublishConfirmationRetry, scheduled by the caller when status != confirmed) once the entry is on
   // chain, flipping to published without blocking the send. See slow-device-freeze-iphone-se2.
   try {
-    diagCrumb('confirm:inline-receipt');
     await confirmCapsuleHubPublishEntries(publishState, { hot: true, receiptOnly: true });
-    diagCrumb('idle');
   } catch (error) {
     const softVerification = isTonRpcRecoverableReadError(error);
     const rateLimited = noteTonRpcRateLimit(error);
@@ -20746,7 +20512,6 @@ function scheduleImmediatePrivatePublishConfirmation(context) {
 }
 
 async function runPrivatePublishConfirmationRetry(context) {
-  diagConfirmCrumb('cfm:retry-enter');
   const { thread, message } = context;
   if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
   if (stopPartialPrivatePublishRecovery(context)) return;
@@ -20801,7 +20566,6 @@ async function runPrivatePublishConfirmationRetry(context) {
     message.privatePublishConfirmRunCount = (Number(message.privatePublishConfirmRunCount ?? 0) || 0) + 1;
     message.privatePublishConfirmLastResult = 'checking';
     message.privatePublishConfirmNextAt = null;
-    diagConfirmCrumb('cfm:rebroadcast');
     const broadcastRetries = await retryUnconfirmedPrivatePublishBroadcasts(message.publishState, {
       deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
       readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
@@ -20832,16 +20596,12 @@ async function runPrivatePublishConfirmationRetry(context) {
         queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
       };
     const confirmStartedAt = Date.now();
-    diagConfirmCrumb('cfm:confirm-call');
     await confirmCapsuleHubPublishEntries(message.publishState, { ...confirmOptions, owner: resolvePublishOwner(message.publishState) });
-    diagConfirmCrumb('cfm:confirm-ok');
     const droppedRecovery = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
       ? { resigned: 0, confirmed: 0 }
-      : (diagConfirmCrumb('cfm:dropped-recovery'), await recoverDroppedSignedPublishParts(message));
-    diagConfirmCrumb('cfm:mark-stale');
+      : await recoverDroppedSignedPublishParts(message);
     const retryableMissingParts = markStaleUnconfirmedPublishPartsForRetry(message, 'missing CapsuleHub entry')
       + droppedRecovery.resigned;
-    diagConfirmCrumb('cfm:ensure-retry');
     const sendRetryScheduled = ensurePendingPrivateSendRetry(thread, message, {
       code: 'NETWORK_ERROR',
       message: retryableMissingParts > 0
@@ -20862,13 +20622,10 @@ async function runPrivatePublishConfirmationRetry(context) {
       : (sendRetryScheduled ? `${statusResult} send-retry` : statusResult);
     message.meta = publishStateMeta(message.publishState);
     thread.state = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
-    diagConfirmCrumb('cfm:persist');
     await updateMessageInEncryptedHistory(thread, message);
-    diagConfirmCrumb('cfm:render');
     refreshThreadAfterMessageChange(thread);
     renderThreads();
     renderConversation();
-    diagConfirmCrumb('cfm:done');
     if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
       schedulePrivatePublishConfirmationRetry(context);
     } else {
@@ -20901,7 +20658,6 @@ function hasPendingPrivatePublishConfirmation(message) {
 
 function resumePendingPrivatePublishConfirmations() {
   if (document.hidden) return;
-  diagCryptoCrumb('replay-confirm');
   for (const thread of threads) {
     for (const message of thread.messages ?? []) {
       if (stopPartialPrivatePublishRecovery({ thread, message })) continue;
@@ -20956,7 +20712,6 @@ function hasPendingPrivateSendRetry(message) {
 
 function resumePendingPrivateSendRetries() {
   if (document.hidden) return;
-  diagCryptoCrumb('replay-retry');
   for (const thread of threads) {
     for (const message of thread.messages ?? []) {
       if (stopPartialPrivatePublishRecovery({ thread, message })) continue;
@@ -21496,7 +21251,6 @@ async function createPrivateComposerCapsules(text, attachments, recipientEntry, 
       ...recipientMetadata,
       reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
     });
-    diagCryptoCrumb('encaps:start');
     capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
       payloadBytes,
       sizeClass: part.sizeClass,
@@ -21504,7 +21258,6 @@ async function createPrivateComposerCapsules(text, attachments, recipientEntry, 
       senderRecovery: true,
       ...currentProfilePointerFields(),
     }));
-    diagCryptoCrumb('encaps:done');
   }
   return capsules;
 }
@@ -21561,7 +21314,6 @@ async function createPrivatePrefsCapsules(snapshotBytes, selfEntry, options = cu
       recipientWallet,
       reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
     });
-    diagCryptoCrumb('encaps-self:start');
     capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', selfEntry.publicBundle, localIdentity, {
       payloadBytes,
       sizeClass: part.sizeClass,
@@ -21569,7 +21321,6 @@ async function createPrivatePrefsCapsules(snapshotBytes, selfEntry, options = cu
       senderRecovery: true,
       ...currentProfilePointerFields(),
     }));
-    diagCryptoCrumb('encaps-self:done');
   }
   return capsules;
 }
@@ -21837,18 +21588,15 @@ async function refreshVaultActivationStatus(options = {}) {
     refreshComposerPublishPolicy();
     return null;
   }
-  diagEnter('vault:act-status');
   try {
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
-    diagCrumb('act:getuser');
     const user = options.user ?? await withVaultReadLock(() => provider.getUser(plathoWallet.address, {
       vaultAddress: requireVaultAddress(),
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
     }));
-    diagCrumb('act:getglobal');
     const global = options.skipGlobal === true
       ? null
       : provider.getGlobal
@@ -21905,16 +21653,13 @@ async function refreshVaultActivationStatus(options = {}) {
         }
       } catch { /* fall back to the on-chain key-record read below */ }
     }
-    diagCrumb('act:getkeyrecord');
     const record = await withVaultReadLock(() => provider.getKeyRecord(user.current_key_id, {
       vaultAddress: requireVaultAddress(),
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
     }));
-    diagCrumb('act:assert');
     await assertVaultKeyRecordMatchesOwner(plathoWallet.address, record, user.current_key_id);
-    diagCrumb('act:verify');
     // The synchronous ed25519.verify of the signed-bundle binding runs inside here (wallet-only, every
     // vault open).
     const binding = await verifyVaultKeyRecordBinding(localSignedPublicBundle, record, {
@@ -21949,8 +21694,6 @@ async function refreshVaultActivationStatus(options = {}) {
     refreshComposerPublishPolicy();
     if (!expectedUnavailable) console.error(error);
     return null;
-  } finally {
-    diagExit();
   }
 }
 
@@ -21976,21 +21719,17 @@ async function bootCrypto() {
       setText(vaultRotateStatus, requiredStatus);
       localProfileAvatarPointer = null;
       refreshComposerPublishPolicy();
-      diagCrumb('boot:ok');
       return null;
     }
-    diagCrumb('boot:wallet');
     await bootWalletScopedLocalStores();
     renderWalletIdentity();
     localProfileAvatarPointer = readStoredProfileAvatarPointer(plathoWallet.address);
     // Restore the own avatar from the media cache right after unlock — before the sync and the first feed render —
     // so it does not flash the letter tile on reload; the tail refreshOwnProfileAvatar then confirms it on-chain.
     await restoreOwnAvatarFromCacheFast(plathoWallet.address).catch(() => {});
-    diagCrumb('boot:identity-start');
     localVaultAuthKeyPair = await deriveVaultAuthKeyPairFromWallet(plathoWallet);
     localIdentity = await loadMessagingIdentityFromWallet(VAULT_RECEIVE_CRYPTO_SUITE);
     localRecipientKeyPair = localIdentity?.encryptionKeyPair ?? null;
-    diagCrumb('boot:identity-done');
     localSignedPublicBundle = await exportSignedPublicKeyBundle(localIdentity, {
       purpose: appConfig.crypto?.signedBundlePurpose ?? 'pwa-runtime',
       ownerWallet: plathoWallet.address,
@@ -22003,7 +21742,6 @@ async function bootCrypto() {
     globalThis.plathoRefreshVaultActivation = async (provider) => refreshVaultActivationStatus({ provider });
     setText(vaultRecordStatus, 'checking');
     setText(vaultDraftStatus, 'checking');
-    diagCrumb('boot:act-status');
     await refreshVaultActivationStatus({ skipGlobal: true });
     // The crypto self-test is a DIAGNOSTIC-ONLY status indicator (~9 synchronous ML-KEM-768 ops:
     // keygen/encap/decap + tamper re-runs); it gates nothing functional. Running it inline here blocked
@@ -22027,7 +21765,6 @@ async function bootCrypto() {
       });
     // After unlock, sync private messages immediately + arm the unified background loop — regardless of the
     // active tab, so messages are there the moment you open chats (the loop keeps running on every tab).
-    diagCrumb('boot:sync-start');
     beginMessageSyncUi();
     const syncResult = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).catch((error) => {
       refreshMessagingControls();
@@ -22050,9 +21787,7 @@ async function bootCrypto() {
     // activation + private-sync reads above and BEFORE the background loop / vault auto-refresh timers are
     // armed below, so no avatar read overlaps another chain read on iOS (v509 class). Cached avatars resolve
     // instantly (IndexedDB) so this rarely blocks; an uncached avatar pays one serial read, never a freeze.
-    diagCrumb('boot:sync-done');
     await refreshOwnProfileAvatar().catch((error) => console.error(error));
-    diagCrumb('boot:ok');
     scheduleMessageAutoSync();
     if (isVaultViewActive()) {
       await refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
