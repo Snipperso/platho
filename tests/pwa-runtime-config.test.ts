@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v619<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v619'/);
+    expect(html).toMatch(/id="appVersionLabel">v620<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v620'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1300,20 +1300,19 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-PRIVATE-CONFIRM-RETRY-01: stuck multi-part private confirm is bounded and ends in a durable terminal red status', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // The private publish-confirm auto-retry is capped: after the active-attempt budget with nothing
-    // confirmed (or a hard backstop) it STOPS instead of spinning on "submitted N/N, confirming" via
-    // the endless 30s background retry. (The 24h age-stale never fires because each pass bumps
-    // publishState.updatedAt, so this attempt cap is the real terminal guard.)
-    expect(app).toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT/);
+    // The private publish-confirm auto-retry is bounded by AGE-based terminals (decoupled from the poll cadence,
+    // so tight ~1s polling never trips them early): past the no-progress deadline with nothing fully confirmed it
+    // STOPS and surfaces a durable Retry instead of spinning on "submitted N/N, confirming" forever.
+    expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
     expect(app).toMatch(/Number\(message\.publishState\?\.confirmedCount \?\? 0\) === 0/);
     expect(app).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
     expect(app).toMatch(/error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'\) return 'not confirmed: chain confirmation timed out'/);
     // Early actionable terminal when the broadcast is provably erroring (nothing landed): "RPC broadcast
-    // unavailable" surfaces in ~minutes (PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT) instead of spinning to
-    // the full ~9-min deadline, gated by publishStateBroadcastIsFailing so a fine-but-slow send is never killed.
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT = 10/);
+    // unavailable" surfaces after PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS (AGE-based) instead of spinning
+    // to the full deadline, gated by publishStateBroadcastIsFailing so a fine-but-slow send is never killed.
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS = 2 \* 60 \* 1000/);
     expect(app).toMatch(/function publishStateBroadcastIsFailing\(publishState\)/);
-    expect(app).toMatch(/attempt >= PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT[\s\S]*publishStateBroadcastIsFailing\(message\.publishState\)/);
+    expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS[\s\S]*publishStateBroadcastIsFailing\(message\.publishState\)/);
     expect(app).toMatch(/code: 'BROADCAST_REJECTED'/);
     expect(app).toMatch(/error\?\.code === 'BROADCAST_REJECTED'\) return 'not confirmed: RPC broadcast unavailable'/);
     // STABLE-age trigger: a long-stuck no-progress message surfaces Retry without restarting the
@@ -1577,16 +1576,20 @@ describe('PWA runtime config guard', () => {
     expect(partialIndex).toBeGreaterThan(submittedStatusIndex);
     expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{ hot: true, receiptOnly: true \}\)/);
     expect(sendSource).toMatch(/: VAULT_PUBLISH_STATUS_SUBMITTED/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = \[1_000, 2_000, 3_000, 5_000, 8_000, 13_000, 21_000, 30_000\]/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT = 24/);
-    // Landed-but-unconfirmed poll floor: a VAULT_SUBMITTED part (nonce consumed, awaiting the ~2-block Hub ACK)
-    // is polled at ~one block instead of the 13/21/30s ladder tail, so a healed multi-capsule send stops
-    // showing "confirming" long after it is delivered. Read-only cadence (no double-spend / false-confirm surface).
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS = 4_000/);
+    // v620 AGE-based confirm cadence (sub-second TON chain + toncenter queue pacing): settle 1.5s, active ~1s
+    // while a part is in-flight and young, stretch after the active window. A single delay auto-throttles keyless
+    // via the sequential confirm loop. Give-up is age-based (above) so tight polling never trips a terminal.
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_SETTLE_MS = 1_500/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS = 1_000/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS = 60 \* 1000/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS = 15 \* 1000/);
     expect(app).toMatch(/function publishStateHasLandedUnconfirmedPart\(publishState\)[\s\S]*PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
-    // v618: the poll floor also covers a still-broadcast-pending part (SENT/UNKNOWN) so a reordered/500ing 2nd
-    // capsule re-broadcasts every ~4s instead of the 13/21/30s ladder tail.
-    expect(app).toMatch(/isFreshPrivatePublishConfirmation\(message\)\s*&&\s*\(\s*publishStateHasLandedUnconfirmedPart\(message\.publishState\)\s*\|\|\s*publishStateBroadcastCount\(message\.publishState\) > 0\)[\s\S]*delayMs = Math\.min\(delayMs, PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS\)/);
+    expect(app).toMatch(/function privatePublishConfirmDelayMs\(message, error\)/);
+    // Settle: no knowingly-empty poll before ~one block + the toncenter index can reflect a landing.
+    expect(app).toMatch(/ageMs < PRIVATE_PUBLISH_CONFIRM_SETTLE_MS\) return Math\.max\(250, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS - ageMs\)/);
+    expect(app).toMatch(/ageMs < PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS\) return PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS/);
+    expect(app).toMatch(/return PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS/);
+    expect(app).toMatch(/const delayMs = privatePublishConfirmDelayMs\(message, error\)/);
     // v618: the toncenter reject reason (raw upstream error.responseBody) is surfaced on a (re-)broadcast failure
     // instead of the bare native 500 — makes an intermittent broadcast drag diagnosable.
     expect(app).toMatch(/console\.warn\('\[platho\] vault publish re-broadcast failed'/);
@@ -3053,14 +3056,11 @@ describe('PWA runtime config guard', () => {
     expect(confirmationRetry).toMatch(/confirmTimedOut/);
     expect(confirmationRetry).toMatch(/const sendRetryScheduled = ensurePendingPrivateSendRetry\(thread, message/);
     expect(confirmationRetry).toMatch(/Retrying unsent capsule parts/);
-    // Owner-directed (2026-06-18), SUPERSEDES the prior unbounded background window: a multi-part
-    // publish that confirms NOTHING after the active-attempt budget (or a hard backstop) STOPS and
-    // surfaces a manual Retry instead of spinning forever on "submitted N/N, confirming". The cap is
-    // GATED on confirmedCount===0 so a partially/fully-confirmed (progressing/delivered) publish still
-    // keeps the long background window; and the manual Retry for a fully-submitted message re-confirms
-    // (never re-publishes), so no double-send regression.
-    expect(confirmationRetry).toMatch(/confirmedCount \?\? 0\) === 0[\s\S]{0,200}attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT[\s\S]{0,200}stopPrivatePublishConfirmationRetry/);
-    expect(confirmationRetry).toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT[\s\S]{0,120}PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS/);
+    // A multi-part publish that never FULLY confirms STOPS at the AGE-based no-progress deadline (decoupled from
+    // the poll cadence) and surfaces a manual Retry instead of spinning forever on "submitted N/N, confirming".
+    // The manual Retry for a fully-submitted message re-confirms (never re-publishes), so no double-send regression.
+    expect(confirmationRetry).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS[\s\S]{0,200}stopPrivatePublishConfirmationRetry/);
+    expect(confirmationRetry).toMatch(/const delayMs = privatePublishConfirmDelayMs\(message, error\)/);
     expect(sendRetry).toMatch(/isStalePrivatePendingPublish\(message\) && !privateMessageHasPublishAttempt\(message\)/);
     expect(resumeSource).toMatch(/isStalePrivatePendingPublishConfirmation\(message\)/);
     expect(resumeSource).toMatch(/scheduleImmediatePrivatePublishConfirmation\(\{/);
@@ -5298,7 +5298,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v690/);
+    expect(sw).toMatch(/platho-pwa-prototype-v691/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);

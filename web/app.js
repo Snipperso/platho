@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v619';
+const PLATHO_APP_RUNTIME_VERSION = 'v620';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -840,27 +840,26 @@ const PRIVATE_SEND_RETRY_MAX_ATTEMPTS = 8;
 const PRIVATE_SEND_PARTIAL_RETRY_MAX_ATTEMPTS = 16;
 const PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS = 15 * 60 * 1000;
 const PRIVATE_SEND_RPC_RETRY_MAX_ATTEMPTS = 90;
-const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [1_000, 2_000, 3_000, 5_000, 8_000, 13_000, 21_000, 30_000];
-const PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT = 24;
-// Poll FLOOR (~one basechain block) applied while a part has LANDED on the Vault (nonce consumed ->
-// VAULT_SUBMITTED) but its receipt has not yet flipped CAPSULEHUB_CONFIRMED. Such a part is only waiting on
-// the Vault->Hub->Vault ACK (~2 blocks); backing the confirm poll off to the 13/21/30s ladder tail here is
-// what leaves a healed 2nd capsule shown as "confirming" for tens of seconds after it is effectively
-// delivered. Caps only the tail (the fast 1/2/3s ramp stays), so it does not add reads to a quick send.
-const PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS = 4_000;
+// Confirm-poll cadence, tuned to the post-2026-04 SUB-SECOND TON chain + the toncenter queue pacing (keyless
+// 1.1s/req, keyed ~10 req/1.1s). On-chain state now changes sub-second, so the limit is the toncenter read
+// round-trip, not the block time. The confirm loop is SEQUENTIAL (each pass awaits its reads before scheduling
+// the next), so ONE delay auto-throttles a keyless wallet — its ~2 reads take ~2.2s, so a 1s delay yields a
+// ~3.2s effective cadence — while a keyed wallet polls tight (~1.3s); no key-aware branch is needed.
+const PRIVATE_PUBLISH_CONFIRM_SETTLE_MS = 1_500;            // first check: don't poll before one block + the toncenter index can reflect a landing (no knowingly-empty poll)
+const PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS = 1_000;       // active poll while a part is in-flight and the send is young — catches a fast confirm / healed re-broadcast within ~1s
+const PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS = 60 * 1000; // active window; past it a still-unconfirmed send is anomalously slow -> stretch (below)
+const PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS = 15 * 1000;  // stretch cadence once the send is anomalously slow (toncenter slow / partial stuck)
 const PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS = 10 * 60 * 1000;
 const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
-// If NOTHING confirms within this window (measured from the message's STABLE creation time, which —
-// unlike publishState.updatedAt — the confirm loop never bumps), stop the auto-retry and surface a
-// manual Retry button. This makes a genuinely-undelivered message recoverable in minutes and, for an
-// already-old stuck message, surfaces Retry immediately on resume instead of after 24 fresh attempts.
+// If NOTHING fully confirms within this window (measured from the message's STABLE creation time, which —
+// unlike publishState.updatedAt — the confirm loop never bumps) STOP the auto-retry and surface a Retry
+// button instead of spinning forever. AGE-based (not attempt-based) so the tight poll cadence never trips it.
 const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 10 * 60 * 1000;
-// Surface the actionable "RPC broadcast unavailable, retry" terminal EARLY (long before the ~9-min
-// no-progress deadline) when the broadcast is provably erroring: nothing landed AND every in-flight
-// external is failing to relay (e.g. toncenter's keyless broadcaster is shedding/5xx-ing). A send whose
-// broadcast SUCCEEDED but is just slow to confirm keeps the patient full-deadline path — its parts carry
-// no error, so publishStateBroadcastIsFailing() returns false and this early stop never fires.
-const PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT = 10;
+// Surface the actionable "RPC broadcast unavailable, retry" terminal EARLY (long before the no-progress
+// deadline) when the broadcast is provably erroring: nothing landed AND every in-flight external is failing to
+// relay for this long. A send whose broadcast SUCCEEDED but is just slow to confirm keeps the patient path —
+// its parts carry no error, so publishStateBroadcastIsFailing() is false and this never fires. AGE-based.
+const PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS = 2 * 60 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 * 60 * 1000;
 // Publish + CapsuleHub ACK realistically spans 2-3 basechain blocks; the hot
@@ -19765,8 +19764,8 @@ function publishPartAwaitingCapsuleHubConfirmation(part) {
 }
 
 // A part in VAULT_SUBMITTED has had its nonce CONSUMED on-chain (the Vault processed its external), so it HAS
-// landed and is only awaiting the Vault->Hub->Vault ACK to flip CAPSULEHUB_CONFIRMED. That is the window where
-// the confirm poll should stay tight (see PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS) instead of backing off.
+// landed and is only awaiting the Vault->Hub->Vault ACK to flip CAPSULEHUB_CONFIRMED. Counts as "in-flight" for
+// privatePublishConfirmDelayMs so the confirm poll stays on the active cadence instead of the background one.
 function publishStateHasLandedUnconfirmedPart(publishState) {
   return (publishState?.parts ?? []).some((part) => part?.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED);
 }
@@ -20466,6 +20465,25 @@ function stopPartialPrivatePublishRecovery(context, error = { message: 'partial 
   return true;
 }
 
+// PURE cadence: how long to wait before the NEXT confirm poll, from the message age + what is still in flight.
+// Age-based (not attempt-based) so it composes with the age-based terminals. See the constants above for the
+// sub-second-chain / queue-pacing rationale (a single delay auto-throttles keyless via the sequential loop).
+function privatePublishConfirmDelayMs(message, error) {
+  if (isTonRpcRateLimitError(error)) return tonRpcLimitBackoffMs(error); // honor a 429 backoff (keyless self-throttle)
+  const inFlight = publishStateHasLandedUnconfirmedPart(message?.publishState)
+    || publishStateBroadcastCount(message?.publishState) > 0;
+  if (!inFlight) return PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS; // nothing pending -> gentle background cadence
+  const ageMs = privatePendingPublishConfirmAgeMs(message);
+  // Before one block + the toncenter index can reflect a landing, a poll is knowingly empty — hold the FIRST
+  // real check until the settle point instead of firing at 0/1s.
+  if (ageMs < PRIVATE_PUBLISH_CONFIRM_SETTLE_MS) return Math.max(250, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS - ageMs);
+  // Young + in-flight: poll actively so a fast on-chain confirm / a healed re-broadcast is caught within ~1s.
+  if (ageMs < PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS) return PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS;
+  // Anomalously slow (toncenter slow / a partial stuck): stretch to cut load; the age-based terminals below
+  // decide when to give up.
+  return PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS;
+}
+
 function schedulePrivatePublishConfirmationRetry(context, error = null) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
@@ -20476,58 +20494,30 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
     return;
   }
-  // Bounded auto-confirm. After the active-attempt budget with NOTHING confirmed (or a hard backstop
-  // even with partial progress), STOP the otherwise-endless 30s background retry and surface a Retry
-  // button instead of spinning on "submitted N/N, confirming" forever. The age-based 24h stale above
-  // never fires for a genuinely-stuck message because each confirm pass bumps publishState.updatedAt,
-  // resetting privatePendingPublishAgeMs — so this attempt cap is the real terminal guard.
-  // Terminal guard. The stable-age branch (privatePendingPublishConfirmAgeMs, anchored on messageCreatedAtMs
-  // — reset-proof, reload-surviving) fires for ANY not-fully-confirmed publish, NOT only confirmedCount===0:
-  // a multi-external publish that lands one part but not the other (confirmedCount in [1, partCount-1]) must
-  // still reach the durable red terminal instead of spinning on "submitted N/N, confirming" forever (the
-  // per-resume scheduleImmediate reset means the attempt-based >=ACTIVE_LIMIT*4 backstop is otherwise never
-  // reached for a partial). The fast attempt>=ACTIVE_LIMIT stop stays gated on confirmedCount===0 (nothing
-  // landed -> fail fast); the *4 backstop is the attempt-based catch-all.
-  // Early actionable terminal: nothing landed (confirmed AND vault-submitted both 0) and the broadcast is
-  // provably erroring on every in-flight external. Surface "RPC broadcast unavailable" + a safe Retry in
-  // ~minutes instead of spinning to the full ~9-min no-progress deadline. Gated on publishStateBroadcastIsFailing
-  // so a broadcasting-fine-but-slow send is never killed early.
+  // Give-up terminals are AGE-based (privatePendingPublishConfirmAgeMs, anchored on messageCreatedAtMs —
+  // reset-proof, reload-surviving), DECOUPLED from the poll cadence so tight (~1s) polling never trips them
+  // early the way the old attempt-count thresholds would.
+  // (a) NOTHING landed AND every in-flight external is provably failing to broadcast for BROADCAST_FAIL_AFTER
+  // -> actionable "RPC broadcast unavailable" + safe Retry, instead of spinning to the no-progress deadline. A
+  // broadcasting-fine-but-slow send carries no part.error, so publishStateBroadcastIsFailing() is false here.
   if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
     && Number(message.publishState?.confirmedCount ?? 0) === 0
     && Number(message.publishState?.submittedCount ?? 0) === 0
-    && attempt >= PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT
+    && privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS
     && publishStateBroadcastIsFailing(message.publishState)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'RPC broadcast unavailable', code: 'BROADCAST_REJECTED' });
     return;
   }
+  // (b) No FULL confirmation by the no-progress deadline (covers a PARTIAL: one part landed, another never
+  // confirmed) -> durable "chain lookup timed out" terminal + Retry instead of spinning forever.
   if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-    && ((Number(message.publishState?.confirmedCount ?? 0) === 0
-        && attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT)
-      || privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS
-      || attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT * 4)) {
+    && privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
     return;
   }
   clearPrivateMessageManualRecovery(message);
-  let delayMs = isTonRpcRateLimitError(error)
-    ? tonRpcLimitBackoffMs(error)
-    : (attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT
-      ? PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS
-      : PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS[Math.min(attempt, PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS.length - 1)]);
-  // While the confirmation is still fresh, floor the poll at ~one basechain block whenever a part is still
-  // in-flight — either LANDED but awaiting its ~2-block CapsuleHub ACK (VAULT_SUBMITTED, the v617 case) OR still
-  // broadcast-pending (SENT/UNKNOWN, not yet landed, publishStateBroadcastCount > 0). A part stuck broadcast-
-  // pending — e.g. a 2nd capsule whose back-to-back external reordered and whose re-broadcast intermittently
-  // 500s — otherwise rides the 13/21/30s ladder tail and strands the send "confirming" for minutes; polling
-  // every ~4s re-broadcasts/re-checks it fast so a transient reorder/flakiness clears in seconds. Bounded to the
-  // fresh window + skipped on 429 (isTonRpcRateLimitError) so keyless cannot storm; read-only cadence (never
-  // changes WHAT confirms) -> no double-spend / false-confirm surface.
-  if (!isTonRpcRateLimitError(error)
-    && isFreshPrivatePublishConfirmation(message)
-    && (publishStateHasLandedUnconfirmedPart(message.publishState)
-      || publishStateBroadcastCount(message.publishState) > 0)) {
-    delayMs = Math.min(delayMs, PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS);
-  }
+  const delayMs = privatePublishConfirmDelayMs(message, error);
+  // Retained ONLY for the "still checking" meta text + debug; the cadence and give-up terminals are age-based.
   context.confirmAttempt = attempt + 1;
   message.privatePublishConfirmAttempt = context.confirmAttempt;
   const scheduledAt = Date.now();
