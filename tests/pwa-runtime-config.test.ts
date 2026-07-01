@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v617<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v617'/);
+    expect(html).toMatch(/id="appVersionLabel">v618<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v618'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1584,7 +1584,13 @@ describe('PWA runtime config guard', () => {
     // showing "confirming" long after it is delivered. Read-only cadence (no double-spend / false-confirm surface).
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS = 4_000/);
     expect(app).toMatch(/function publishStateHasLandedUnconfirmedPart\(publishState\)[\s\S]*PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
-    expect(app).toMatch(/isFreshPrivatePublishConfirmation\(message\)\s*&&\s*publishStateHasLandedUnconfirmedPart\(message\.publishState\)[\s\S]*delayMs = Math\.min\(delayMs, PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS\)/);
+    // v618: the poll floor also covers a still-broadcast-pending part (SENT/UNKNOWN) so a reordered/500ing 2nd
+    // capsule re-broadcasts every ~4s instead of the 13/21/30s ladder tail.
+    expect(app).toMatch(/isFreshPrivatePublishConfirmation\(message\)\s*&&\s*\(\s*publishStateHasLandedUnconfirmedPart\(message\.publishState\)\s*\|\|\s*publishStateBroadcastCount\(message\.publishState\) > 0\)[\s\S]*delayMs = Math\.min\(delayMs, PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS\)/);
+    // v618: the toncenter reject reason (raw upstream error.responseBody) is surfaced on a (re-)broadcast failure
+    // instead of the bare native 500 — makes an intermittent broadcast drag diagnosable.
+    expect(app).toMatch(/console\.warn\('\[platho\] vault publish re-broadcast failed'/);
+    expect(app).toMatch(/detail: error\?\.responseBody/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 \* 60 \* 1000/);
     // Publish + CapsuleHub ACK spans 2-3 basechain blocks; the hot window
     // covers that so sends do not degrade into the recovery/retry path.
@@ -5292,7 +5298,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v688/);
+    expect(sw).toMatch(/platho-pwa-prototype-v689/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);

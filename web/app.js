@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v617';
+const PLATHO_APP_RUNTIME_VERSION = 'v618';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19880,6 +19880,11 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
   } catch (error) {
     publishState.lastBroadcastRetryError = shortUiErrorText(error, 'broadcast retry read failed');
     publishState.lastBroadcastRetryErrorAt = new Date().toISOString();
+    console.warn('[platho] vault publish broadcast-retry nonce read failed', {
+      status: error?.status ?? null,
+      code: error?.code ?? null,
+      detail: error?.responseBody ?? shortUiErrorText(error, 'broadcast retry read failed'),
+    });
     if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) return 0;
     throw error;
   }
@@ -19947,6 +19952,16 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
         part.lastBroadcastRetryError = retryError;
         part.lastBroadcastRetryErrorAt = retryErrorAt;
       }
+      // Surface WHY toncenter rejected the (re-)broadcast: the raw, un-truncated upstream detail the provider
+      // already parsed into error.responseBody (toncenterHttpErrorWithBody) — reorder / "cannot apply external" /
+      // insufficient balance / flakiness — instead of the bare native "500 (Internal Server Error)" the browser
+      // logs. Makes an intermittent broadcast drag diagnosable without a throwaway diagnostic build.
+      console.warn('[platho] vault publish re-broadcast failed', {
+        status: error?.status ?? null,
+        code: error?.code ?? null,
+        detail: error?.responseBody ?? retryError,
+        clientNonce: String(clientNonce),
+      });
       if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) continue;
       throw error;
     }
@@ -20490,15 +20505,18 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
     : (attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT
       ? PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS
       : PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS[Math.min(attempt, PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS.length - 1)]);
-  // While the confirmation is still fresh and a part has already LANDED but not yet confirmed (VAULT_SUBMITTED
-  // -> awaiting the ~2-block CapsuleHub ACK), floor the poll at ~one block instead of the 13/21/30s ladder tail:
-  // this is exactly what strands a healed multi-capsule send "confirming" long after it is effectively
-  // delivered. Not rate-limit-driven and bounded to the landed-pending window, so it cannot storm the RPC;
-  // read-only cadence (never changes WHAT confirms) so there is no double-spend / false-confirm surface, and a
-  // keyless wallet only pays a few extra receipt reads while a part is genuinely mid-confirm.
+  // While the confirmation is still fresh, floor the poll at ~one basechain block whenever a part is still
+  // in-flight — either LANDED but awaiting its ~2-block CapsuleHub ACK (VAULT_SUBMITTED, the v617 case) OR still
+  // broadcast-pending (SENT/UNKNOWN, not yet landed, publishStateBroadcastCount > 0). A part stuck broadcast-
+  // pending — e.g. a 2nd capsule whose back-to-back external reordered and whose re-broadcast intermittently
+  // 500s — otherwise rides the 13/21/30s ladder tail and strands the send "confirming" for minutes; polling
+  // every ~4s re-broadcasts/re-checks it fast so a transient reorder/flakiness clears in seconds. Bounded to the
+  // fresh window + skipped on 429 (isTonRpcRateLimitError) so keyless cannot storm; read-only cadence (never
+  // changes WHAT confirms) -> no double-spend / false-confirm surface.
   if (!isTonRpcRateLimitError(error)
     && isFreshPrivatePublishConfirmation(message)
-    && publishStateHasLandedUnconfirmedPart(message.publishState)) {
+    && (publishStateHasLandedUnconfirmedPart(message.publishState)
+      || publishStateBroadcastCount(message.publishState) > 0)) {
     delayMs = Math.min(delayMs, PRIVATE_PUBLISH_CONFIRM_LANDED_POLL_MS);
   }
   context.confirmAttempt = attempt + 1;
