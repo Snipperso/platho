@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-01T14:18:39.859Z",
+  "generatedAt": "2026-07-01T15:20:30.902Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 132,
-    "totalBytes": 3652993,
-    "bundleSha256": "cadb98948e2caad4640bac6df553f5d3e40ffd1de11935f9ba7f247e411de9e7",
+    "totalBytes": 3632605,
+    "bundleSha256": "9c96e52e1e0332717575a0f55ac77f3e9704a1f1893d1da95c2178e9dd38a782",
     "files": [
       {
         "path": "app.js",
-        "bytes": 993320,
-        "sha256": "ca2c4ee8dff33f2ebcc899f70703d68dfc249e7f9080f1c028ed871e2fd66e1a"
+        "bytes": 976946,
+        "sha256": "5a81b8760c3287ad02b9bffa01264a03f575f726cb7edfb2b0ab36b12cfac657"
       },
       {
         "path": "assets/icons/back.svg",
@@ -210,7 +210,7 @@
       {
         "path": "index.html",
         "bytes": 36767,
-        "sha256": "74af9da74a32588466257481153ae9ff8ddb2985aead31144b88bb4bbc1f9e62"
+        "sha256": "945248a53d0b6b71c369c43b331f87de6acd043f7317a2012bca79eaae921c99"
       },
       {
         "path": "manifest.webmanifest",
@@ -274,13 +274,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 72131,
-        "sha256": "272965d918a575929e2f32c32a7533d6e460b45d428356551091b0d40461c4ff"
+        "bytes": 71597,
+        "sha256": "6d291731fb2596fc1a54597d0fc6ebee58c716a1c71024d1a37f86e9680db6c8"
       },
       {
         "path": "sw.js",
         "bytes": 6598,
-        "sha256": "7aeb6b0aa5cbbe5def9fdc1342634130ccf2dddce167376ad232197e3a09e4d0"
+        "sha256": "46afe01ea18ba34b87da1aa3e684637ac14c3a7bdee286f0d767982858a70ee4"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -304,8 +304,8 @@
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
-        "bytes": 103338,
-        "sha256": "9ccd6aa276d4b1c1621e7e5567b3a372f425da78f2be2e81223f0a475f5ad2fe"
+        "bytes": 99858,
+        "sha256": "cc7feca0a1a0f02d7246fe1dd43c11f59e4cd8ea65059bf78e4f873f5d6b90b7"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",

@@ -295,29 +295,9 @@ function resolveTonRpcRequestTimeoutMs(requestOptions, transportOptions) {
 }
 
 async function fetchWithTonRpcTimeout(fetchImpl, url, init, timeoutMs) {
-  // TEMP diag (parallel-connection test, slow-device-freeze): count CONCURRENT toncenter fetches. This is the ONE
-  // chokepoint every toncenter read/send passes through (runGetMethod / sendBoc / getAccountState / getMessages),
-  // regardless of the captured fetchImpl or the transport instance. globalThis-shared so it aggregates across any
-  // module instances. net>=2 means real parallel connections happened (iOS can die on those); net<=1 means the
-  // limiter truly serializes. Writes the running max to the diag banner key ('platho.diag.netmax.v1').
-  let diagCounted = false;
-  const diagDec = () => {
-    if (!diagCounted) return;
-    diagCounted = false;
-    try { globalThis.plathoNetInFlight = Math.max(0, (globalThis.plathoNetInFlight || 1) - 1); } catch { /* best effort */ }
-  };
-  try {
-    const n = (globalThis.plathoNetInFlight = (globalThis.plathoNetInFlight || 0) + 1);
-    diagCounted = true;
-    if (n > (globalThis.plathoNetMax || 0)) {
-      globalThis.plathoNetMax = n;
-      try { globalThis.localStorage?.setItem('platho.diag.netmax.v1', `${n}@${Date.now()}`); } catch { /* best effort */ }
-    }
-    if (n >= 2) { try { globalThis.plathoDiagCryptoCrumb?.(`netcc:${n}`); } catch { /* best effort */ } }
-  } catch { /* best effort */ }
   const resolvedTimeoutMs = finiteNonNegativeMs(timeoutMs, TON_RPC_REQUEST_TIMEOUT_MS);
   if (resolvedTimeoutMs <= 0) {
-    try { return await fetchImpl(url, init); } finally { diagDec(); }
+    return await fetchImpl(url, init);
   }
 
   let timeoutId = null;
@@ -351,7 +331,6 @@ async function fetchWithTonRpcTimeout(fetchImpl, url, init, timeoutMs) {
     return await Promise.race([request, timeout]);
   } finally {
     if (timeoutId !== null) clearTimeout(timeoutId);
-    diagDec();
   }
 }
 
@@ -592,11 +571,6 @@ function takeNextToncenterTask(state) {
   return state.pending.splice(bestIndex, 1)[0];
 }
 
-// TEMP diag (removed with the rest of the slow-device-freeze scaffolding): counts skip-rate-limited reads rejected
-// during an active backoff, so the on-device banner can prove the microtask-starvation storm (a high count while the
-// free-running tick is frozen == the storm). Throttled crumb to avoid per-reject localStorage churn.
-let toncenterBackoffRejectCount = 0;
-
 async function drainToncenterRequestQueue(state) {
   try {
     while (state.pending.length > 0) {
@@ -623,10 +597,6 @@ async function drainToncenterRequestQueue(state) {
           // rejecting, so the run loop breathes between rejects on every engine. Scheduling-only — the read still
           // rejects (skip semantics preserved), just one macrotask later; no send/nonce/double-spend change.
           await delay(0);
-          toncenterBackoffRejectCount += 1;
-          if (toncenterBackoffRejectCount % 25 === 0) {
-            try { globalThis.plathoDiagCryptoCrumb?.(`pump-reject:${toncenterBackoffRejectCount}`); } catch { /* diag best-effort */ }
-          }
           throw toncenterBackoffError(state.backoffUntil - now);
         }
         if (queueDeadlineAt > 0 && now >= queueDeadlineAt) {
@@ -1166,32 +1136,22 @@ function decodeReceiptSlotCell(valueCell) {
 // receipts(cell|null)]. receipts is the dictionary root cell (`map<uint8, ReceiptSlot>`) or null.
 // receipts is keyed by slotKey = nonce % RECEIPT_RING_K (Number), values carry bigints.
 export function decodeVaultUserReceiptsViewStack(result) {
-  const __t0 = globalThis.performance?.now?.() ?? Date.now(); // TEMP diag: confirm the receipt decode is no longer the ~0.4s iOS stall
-  try { globalThis.plathoDiagCryptoCrumb?.('dec:enter'); } catch { /* diag */ }
   const stack = extractStack(result);
   const exists = readStackBool(stack, 0, 'Vault user receipts exists');
   const publishNonce = readStackInt(stack, 1, 'Vault user receipts publish_nonce');
   const receipts = new Map();
   const dictItem = stack[2];
   const dictValue = dictItem === undefined ? null : stackItemValue(dictItem);
-  try { globalThis.plathoDiagCryptoCrumb?.(`dec:shape:${stackItemType(dictItem)}:${typeof dictValue === 'string' ? dictValue.length : (Array.isArray(dictValue) ? `arr${dictValue.length}` : typeof dictValue)}`); } catch { /* diag */ }
   if (dictValue !== null && dictValue !== undefined) {
     const dictType = stackItemType(dictItem);
     if (typeof dictValue !== 'string' || !(dictType.includes('cell') || dictType.includes('slice'))) {
       throw new Error('Vault user receipts dictionary must be a TON cell stack item');
     }
-    try { globalThis.plathoDiagCryptoCrumb?.('dec:parse'); } catch { /* diag */ }
     const rootCell = parseBocBase64(dictValue);
-    try { globalThis.plathoDiagCryptoCrumb?.('dec:walk'); } catch { /* diag */ }
     for (const [key, valueCell] of loadTonHashmapDirect(rootCell, 8)) {
       receipts.set(Number(key), decodeReceiptSlotCell(valueCell));
     }
-    try { globalThis.plathoDiagCryptoCrumb?.('dec:walk-ok'); } catch { /* diag */ }
   }
-  try {
-    const __dt = Math.round((globalThis.performance?.now?.() ?? Date.now()) - __t0);
-    if (__dt > 50) globalThis.plathoDiagCryptoCrumb?.(`decode:receipts:${__dt}ms/${receipts.size}n`);
-  } catch { /* diag best-effort */ }
   return { exists, publishNonce, receipts };
 }
 
@@ -1368,7 +1328,6 @@ export async function readBatchPublishReceipt(provider, vaultAddress, owner, exp
     ...callOptions,
     ...(vaultAddress ? { vaultAddress } : {}),
   });
-  try { globalThis.plathoDiagCryptoCrumb?.('rbr:interp'); } catch { /* diag */ }
   const slotKey = Number(wantNonce % BigInt(RECEIPT_RING_K));
   const slot = view?.receipts instanceof Map
     ? view.receipts.get(slotKey)
@@ -1450,7 +1409,6 @@ export function createTonCenterV3VaultTransport(options = {}) {
       if (apiKey) headers['X-API-Key'] = apiKey;
       const promise = (async () => {
         try {
-          try { globalThis.plathoDiagCryptoCrumb?.(`rpc:${call.method}`); } catch { /* diag */ }
           const response = await scheduleToncenterHttpRequest(
             endpoint,
             apiKey,
@@ -1473,7 +1431,6 @@ export function createTonCenterV3VaultTransport(options = {}) {
             throw toncenterHttpError('TON RPC get-method', response, rateLimitBackoffMs);
           }
           const json = await response.json();
-          try { globalThis.plathoDiagCryptoCrumb?.(`rpc-ok:${call.method}`); } catch { /* diag */ }
           const exitCode = json.exit_code ?? json.exitCode ?? json.result?.exit_code ?? json.result?.exitCode ?? 0;
           if (Number(exitCode) !== 0) {
             throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`, { exitCode: Number(exitCode) });
@@ -1979,9 +1936,7 @@ export function createFallbackTonRpcTransport(options = {}) {
       || (verifyCriticalReads && criticalMethods.has(String(method)))
     );
     if (!mustVerify) return primaryResult;
-    try { globalThis.plathoDiagCryptoCrumb?.(`cmp:${method}`); } catch { /* diag */ }
     const primaryComparable = normalizeTonRpcResultForCompare(primaryResult, method);
-    try { globalThis.plathoDiagCryptoCrumb?.(`cmp-ok:${method}`); } catch { /* diag */ }
     let verified = false;
     let verifyError = null;
     let eligibleVerifierTried = false;
@@ -2198,14 +2153,7 @@ export function createVaultTonRpcProvider(options = {}) {
       const transport = resolveTransport(options);
       if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
       const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      const __receiptsRaw = await transport.runGetMethod({
-        address: vaultAddress,
-        method: 'get_user_receipts',
-        stack: [stackAddress(ownerWallet)],
-        ...runGetCallOptions(callOptions),
-      });
-      try { globalThis.plathoDiagCryptoCrumb?.('gur:dec'); } catch { /* diag */ }
-      return decodeVaultUserReceiptsViewStack(__receiptsRaw);
+      return decodeVaultUserReceiptsViewStack(await transport.runGetMethod({ address: vaultAddress, method: 'get_user_receipts', stack: [stackAddress(ownerWallet)], ...runGetCallOptions(callOptions) }));
     },
     async getKeyRecord(keyId, callOptions = {}) {
       const transport = resolveTransport(options);
