@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v622<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v622'/);
+    expect(html).toMatch(/id="appVersionLabel">v623<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v623'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1494,7 +1494,7 @@ describe('PWA runtime config guard', () => {
     const nonceReadIndex = sendSource.indexOf('clientNonce = options.allowOwnVaultActionReadFallback === true');
     const floorNonceIndex = sendSource.indexOf('clientNonce = nonceFloor;');
     const buildIndex = sendSource.indexOf('batchExternal = await buildBatchExternalFromPublishItems(batch');
-    const sendIndex = sendSource.indexOf('lastResult = await sendVaultExternalBoc(batchExternal)');
+    const sendIndex = sendSource.indexOf('lastResult = batchIndex === 0 ? await sendVaultExternalBoc(batchExternal)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
     const confirmNonceIndex = sendSource.indexOf('shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)');
     const barrierWaitIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, expectedNonce, nonceWaitOptions)');
@@ -1557,6 +1557,10 @@ describe('PWA runtime config guard', () => {
     expect(sendSource).toMatch(/partWithPublishId\.lastBroadcastAt = broadcastAt/);
     expect(sendSource).toMatch(/const epi1 = publishHashPlain\(batchExternal\.entryPublishIds\[entryIndex\]\)/);
     expect(sendSource).toMatch(/batchExternal = await buildBatchExternalFromPublishItems\(batch/);
+    // v623: only batch 0 (whose nonce is current) POSTs; a 2nd+ batch's back-to-back external is signed + stamped
+    // SENT but NOT broadcast (it would bounce pre-accept with exit code 16453 = "too early"), and the idempotent
+    // re-broadcast path sends it the moment batch 0 lands. Kills the guaranteed-doomed request + the alarming 500.
+    expect(sendSource).toMatch(/lastResult = batchIndex === 0 \? await sendVaultExternalBoc\(batchExternal\) : null/);
     // Post-broadcast nonce polling is unverified, cache-bypassing, and
     // tolerant of transient RPC trouble until the deadline decides.
     expect(nonceWaitSource).toMatch(/ignoreNonceBarrier: true/);
@@ -5307,7 +5311,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v693/);
+    expect(sw).toMatch(/platho-pwa-prototype-v694/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);

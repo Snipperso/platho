@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v622';
+const PLATHO_APP_RUNTIME_VERSION = 'v623';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19578,11 +19578,19 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
             notifyPublishState(options, publishState, partWithPublishId);
           }
         }
-        lastResult = await sendVaultExternalBoc(batchExternal);
+        // The 2nd+ batch's external is signed under a nonce (N+i) the chain has NOT reached yet — batch 0's
+        // nonce N is still in flight — so an immediate back-to-back POST is GUARANTEED to bounce pre-accept with
+        // Vault exit code 16453 (throwUnless clientNonce == publish_nonce): a wasted request + an alarming 500 on
+        // every multi-capsule send, since the sub-second chain never lands batch 0 in the ~150ms before this POST.
+        // Skip the POST for batchIndex > 0: the part is stamped SENT with its signed externalBoc + nonce below,
+        // and the idempotent re-broadcast path sends it the moment batch 0 lands (currentNonce === clientNonce) —
+        // the same ~1s it would have re-broadcast the bounced one anyway. Batch 0 always POSTs (its nonce IS
+        // current). No double-send: retryUnconfirmedVaultPublishBroadcasts reads the chain nonce FIRST.
+        lastResult = batchIndex === 0 ? await sendVaultExternalBoc(batchExternal) : null;
         batch.result = lastResult;
         for (const item of batch.items) item.result = lastResult;
-        // The signed external is now out: this nonce is consumed from the
-        // client's point of view even before the chain reflects it.
+        // The signed external is now out (or, for batchIndex > 0, will be re-broadcast the moment N is reached):
+        // this nonce is consumed from the client's point of view, so the next batch derives N+i+1 from the floor.
         raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
         for (const item of batch.items) {
           notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
