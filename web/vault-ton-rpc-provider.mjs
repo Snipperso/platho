@@ -1062,8 +1062,22 @@ function tonCellBitReader(cell) {
       return bit;
     },
     loadUint(bitLength) {
+      // iPhone-freeze ROOT FIX (slow-device-freeze): the old body did `out = (out << 1n) | BigInt(bit)` PER BIT —
+      // ~3 BigInt allocations for every single bit. Decoding the 20-slot receipt ring (get_user_receipts) is ~13k
+      // such per-bit BigInt ops; on iOS JavaScriptCore (BigInt is an order of magnitude slower + far more GC-heavy
+      // than V8) that took ~0.4s, and since the confirm reads the receipt on every attempt it stalled the sender
+      // repeatedly = the iPhone-only "freeze on confirming" (V8/Android decoded it instantly). Fold in 24-bit
+      // chunks accumulated in a plain Number: ONE BigInt op per chunk instead of per bit (~24x fewer), exact for
+      // any width. Value is identical.
       let out = 0n;
-      for (let index = 0; index < bitLength; index += 1) out = (out << 1n) | BigInt(this.loadBit());
+      let remaining = bitLength;
+      while (remaining > 0) {
+        const chunk = remaining < 24 ? remaining : 24;
+        let acc = 0;
+        for (let index = 0; index < chunk; index += 1) acc = (acc * 2) + this.loadBit();
+        out = (out << BigInt(chunk)) | BigInt(acc);
+        remaining -= chunk;
+      }
       return out;
     },
   };
@@ -1144,6 +1158,7 @@ function decodeReceiptSlotCell(valueCell) {
 // receipts(cell|null)]. receipts is the dictionary root cell (`map<uint8, ReceiptSlot>`) or null.
 // receipts is keyed by slotKey = nonce % RECEIPT_RING_K (Number), values carry bigints.
 export function decodeVaultUserReceiptsViewStack(result) {
+  const __t0 = globalThis.performance?.now?.() ?? Date.now(); // TEMP diag: confirm the receipt decode is no longer the ~0.4s iOS stall
   const stack = extractStack(result);
   const exists = readStackBool(stack, 0, 'Vault user receipts exists');
   const publishNonce = readStackInt(stack, 1, 'Vault user receipts publish_nonce');
@@ -1160,6 +1175,10 @@ export function decodeVaultUserReceiptsViewStack(result) {
       receipts.set(Number(key), decodeReceiptSlotCell(valueCell));
     }
   }
+  try {
+    const __dt = Math.round((globalThis.performance?.now?.() ?? Date.now()) - __t0);
+    if (__dt > 50) globalThis.plathoDiagCryptoCrumb?.(`decode:receipts:${__dt}ms/${receipts.size}n`);
+  } catch { /* diag best-effort */ }
   return { exists, publishNonce, receipts };
 }
 
