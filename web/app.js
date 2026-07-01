@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v606';
+const PLATHO_APP_RUNTIME_VERSION = 'v607';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19221,6 +19221,13 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
   }
   if (pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) return publishState;
   if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
+  // receiptOnly: do ONLY the fast, authoritative Vault-receipt confirm above and stop — skip the CapsuleHub
+  // entry-scan recovery (the sender-index walk + per-entry scan below). That scan searches the chain for the
+  // just-broadcast entry, which right after a send is NOT on chain yet, so it scans to the deadline and (on the
+  // INLINE send path) hangs the sender until it times out — while the message itself landed fine. The background
+  // confirmation retry (schedulePrivatePublishConfirmationRetry) runs the FULL confirm later, once the entry IS on
+  // chain, and flips the status to published without blocking the send. See slow-device-freeze-iphone-se2.
+  if (options.receiptOnly === true) return publishState;
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return publishState;
   const { provider, address } = resolved;
@@ -19738,8 +19745,17 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
   } finally {
     sendTurn.release();
   }
+  // INLINE confirm is RECEIPT-ONLY (fast + authoritative): never run the CapsuleHub entry-scan recovery on the
+  // send's critical path. Right after broadcast the entry is not on chain yet, so that scan searches to its deadline
+  // and hangs the SENDER (the message itself landed fine and shows up for the recipient) — the iPhone dead-freeze
+  // the owner localized as "the app hangs looking for the message in the blockchain, then times out; the next sync
+  // shows it published". The full confirm (receipt + entry-scan) runs in the BACKGROUND retry
+  // (schedulePrivatePublishConfirmationRetry, scheduled by the caller when status != confirmed) once the entry is on
+  // chain, flipping to published without blocking the send. See slow-device-freeze-iphone-se2.
   try {
-    await confirmCapsuleHubPublishEntries(publishState, { hot: true });
+    diagCrumb('confirm:inline-receipt');
+    await confirmCapsuleHubPublishEntries(publishState, { hot: true, receiptOnly: true });
+    diagCrumb('idle');
   } catch (error) {
     const softVerification = isTonRpcRecoverableReadError(error);
     const rateLimited = noteTonRpcRateLimit(error);

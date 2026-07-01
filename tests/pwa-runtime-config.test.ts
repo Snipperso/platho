@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v606<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v606'/);
+    expect(html).toMatch(/id="appVersionLabel">v607<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v607'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1574,7 +1574,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*Number\(error\?\.status \?\? error\?\.response\?\.status \?\? 0\) >= 500/);
     expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*rejected\|bad request\|invalid boc\|invalid message\|exit code\|not enough vault ton\|nonce/);
     expect(partialIndex).toBeGreaterThan(submittedStatusIndex);
-    expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{ hot: true \}\)/);
+    expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{ hot: true, receiptOnly: true \}\)/);
     expect(sendSource).toMatch(/: VAULT_PUBLISH_STATUS_SUBMITTED/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = \[1_000, 2_000, 3_000, 5_000, 8_000, 13_000, 21_000, 30_000\]/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT = 24/);
@@ -4323,6 +4323,25 @@ describe('PWA runtime config guard', () => {
     expect(refreshNow).not.toMatch(/withVaultReadLock/);
   });
 
+  it('PWA-IOS-CONFIRM-RECEIPT-ONLY-01: the inline post-send confirm is receipt-only (the chain entry-scan is deferred to the background retry)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The iPhone dead-freeze the owner localized as "the app hangs looking for the just-sent message in the
+    // blockchain, then times out; the next sync shows it published". The message lands fine; the SENDER hung on the
+    // INLINE post-broadcast entry-scan (searching for an entry that is not on chain yet, scanning to its deadline).
+    // Fix: the inline confirm on the send critical path runs receipt-only; the full receipt+entry-scan confirm runs
+    // only in the background retry (schedulePrivatePublishConfirmationRetry), once the entry IS on chain.
+    // The send-leg inline confirm passes receiptOnly:true.
+    expect(app).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{ hot: true, receiptOnly: true \}\)/);
+    // The confirm implementation honours receiptOnly by returning right after the fast Vault-receipt confirm, BEFORE
+    // resolving the CapsuleHub provider for the entry-scan.
+    const fn = app.slice(app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode'), app.indexOf('function isFreshPrivatePublishConfirmation'));
+    const guardIdx = fn.indexOf('if (options.receiptOnly === true) return publishState;');
+    const scanIdx = fn.indexOf('const resolved = await resolveCapsuleHubProvider();');
+    expect(guardIdx).toBeGreaterThan(-1);
+    expect(scanIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeLessThan(scanIdx); // the receiptOnly bail is BEFORE the entry-scan provider resolve
+  });
+
   it('PWA-IOS-PUMP-YIELD-01: the shared RPC pump yields a macrotask before rejecting a backoff-skipped read (no microtask-starvation freeze)', () => {
     const rpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
     // ROOT FIX for the iOS dead-freeze that moved between Vault/activation/send: drainToncenterRequestQueue is the one
@@ -5235,11 +5254,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v677/);
+    expect(sw).toMatch(/platho-pwa-prototype-v678/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=606/);
+    expect(sw).toMatch(/\.\/app\.js\?v=607/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
