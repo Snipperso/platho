@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v611';
+const PLATHO_APP_RUNTIME_VERSION = 'v612';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2112,8 +2112,26 @@ function startDiagTick() {
     }, 200);
   } catch { /* best effort */ }
 }
+// RING BUFFER — the definitive interleave-proof tracer. Every crumb (phase/op/confirm) is ALSO appended, in real
+// execution order, to one capped ring. On reload after a freeze the ring shows the EXACT ordered sequence of the last
+// ~18 steps across ALL concurrent paths, so the LAST entry with nothing after it is the frozen frame — no more
+// guessing which of several interleaved lanes actually hung. Snapshot the PREVIOUS session's ring at boot (before any
+// new push overwrites it) so the banner can display the frozen run's tail. Removable with the rest of the diag.
+const DIAG_RING_KEY = 'platho.diag.ring.v1';
+let diagRingArr = [];
+let diagPrevRing = '';
+try { diagPrevRing = localStorageOrNull()?.getItem(DIAG_RING_KEY) || ''; } catch { /* best effort */ }
+function diagRingPush(step) {
+  try {
+    diagRingArr.push(`${step}#${diagTickCount}`);
+    if (diagRingArr.length > 18) diagRingArr.shift();
+    localStorageOrNull()?.setItem(DIAG_RING_KEY, diagRingArr.join('|'));
+  } catch { /* best effort */ }
+}
+function diagReadRing() { return diagPrevRing; }
 function diagCrumb(step) {
   try { localStorageOrNull()?.setItem(DIAG_CRUMB_KEY, `${step}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
+  diagRingPush(step);
 }
 // Heavy synchronous crypto (ML-KEM keygen/encapsulate/decapsulate) is all on the main thread (no Web Worker). This
 // crumb is written from platho-crypto.mjs via globalThis around each ML-KEM op, on its OWN key so it does not clobber
@@ -2121,6 +2139,7 @@ function diagCrumb(step) {
 // the blocking operation.
 function diagCryptoCrumb(op) {
   try { localStorageOrNull()?.setItem(DIAG_CRYPTO_KEY, `${op}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
+  diagRingPush(op);
 }
 function diagReadCrumb() {
   try { return localStorageOrNull()?.getItem(DIAG_CRUMB_KEY) || null; } catch { return null; }
@@ -2137,6 +2156,7 @@ function diagReadCryptoCrumb() {
 const DIAG_CONFIRM_KEY = 'platho.diag.confirm.v1';
 function diagConfirmCrumb(step) {
   try { localStorageOrNull()?.setItem(DIAG_CONFIRM_KEY, `${step}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
+  diagRingPush(step);
 }
 function diagReadConfirm() {
   try { return localStorageOrNull()?.getItem(DIAG_CONFIRM_KEY) || null; } catch { return null; }
@@ -5467,12 +5487,16 @@ function renderConfiguredShell() {
   // nav/sync never clobbers it — so cfm:<step>#<tick> names the exact confirm step that never returned.
   const confirmRaw = diagReadConfirm();
   const confirmLabel = confirmRaw ? confirmRaw.split('@')[0] + (confirmRaw.includes('#') ? `#${confirmRaw.split('#')[1]}` : '') : 'none';
+  // Ring buffer of the frozen session: the EXACT ordered sequence of the last steps across all lanes. The final
+  // entry (rightmost) with nothing after it is the operation that never returned. Show the last 10 to fit the banner.
+  const ringRaw = diagReadRing();
+  const ringTail = ringRaw ? ringRaw.split('|').slice(-10).join(' > ') : 'none';
   // Show the banner ONLY when the previous session left a non-idle (in-flight) crumb = it FROZE mid-op at that
   // phase. A healthy session settles to 'idle' (all ops exited) → no banner. 'boot:ok'/'none' also = not frozen.
   const diagFrozen = diagStep !== 'none' && diagStep !== 'idle' && diagStep !== 'boot:ok';
   if (diagFrozen) {
     // ticks A→B: if A≈B the run loop STOPPED at this phase = synchronous block here; if B≫A it ran past it = async/elsewhere.
-    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · gap ${tickGap}ms ${tickVis} · cfm ${confirmLabel} · op ${cryptoLabel} · net ${netMax}`);
+    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · gap ${tickGap}ms ${tickVis} · net ${netMax} · SEQ: ${ringTail}`);
   }
   if (appVersionLabel && diagFrozen) {
     const warn = document.createElement('span');
@@ -16647,6 +16671,10 @@ function applyVaultUserPocketState(user) {
   // froze at nav:read with a ~400ms foreground stall that is NOT the receipt decode (fixed) — so it is one of these
   // synchronous refreshers. Names the exact one, e.g. tail:publishPolicy:400ms.
   const __tailTime = (label, fn) => {
+    // PRE-crumb (into the ring) BEFORE fn: a permanently-frozen refresher never reaches the after-crumb, so the
+    // v611 "no tail crumb" was a FALSE exoneration of these refreshers. The ring now records tail:in:<label> up
+    // front → the last such entry with no matching tail:<label> after it is the exact refresher that hung.
+    diagCryptoCrumb(`tail:in:${label}`);
     const s = globalThis.performance?.now?.() ?? Date.now();
     fn();
     try {
