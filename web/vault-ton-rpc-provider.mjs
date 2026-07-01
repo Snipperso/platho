@@ -945,7 +945,7 @@ function toStackNumber(value) {
   return bigint < 0n ? `-0x${(-bigint).toString(16)}` : `0x${bigint.toString(16)}`;
 }
 
-function parseStackBigIntValue(value, name) {
+export function parseStackBigIntValue(value, name) {
   if (typeof value === 'bigint') return value;
   if (typeof value === 'number' && Number.isSafeInteger(value)) return BigInt(value);
   if (typeof value === 'boolean') return value ? -1n : 0n;
@@ -955,8 +955,16 @@ function parseStackBigIntValue(value, name) {
       return text.startsWith('-') ? -BigInt(`0x${text.slice(3)}`) : BigInt(text);
     }
     if (/^-?[0-9]+$/.test(text)) return BigInt(text);
-  }
-  if (value && typeof value.toString === 'function') {
+    // A string that is not a decimal/hex integer is simply not an integer stack item: fall through to the
+    // throw below. It MUST NOT reach the value.toString() branch — String.prototype.toString returns the
+    // SAME string, so recursing on it re-enters with an identical argument = infinite self-recursion. On V8
+    // that overflows the stack fast and throws (caught by tryParseStackBigIntValue -> null, so reads work),
+    // but JavaScriptCore (Safari/iOS) implements proper tail calls for this strict-mode ES module: the
+    // self-recursive tail call never grows the stack and becomes an INFINITE LOOP that hard-freezes the run
+    // loop. That was the permanent iPhone-ONLY freeze on every verify:true compare (normalizeTonRpcResult-
+    // ForCompare) of a read whose stack carries a non-numeric string cell/slice — e.g. the get_user_receipts
+    // confirm read (receipts dict cell) and get_global (address slices). See slow-device-freeze-iphone-se2.
+  } else if (value && typeof value.toString === 'function') {
     return parseStackBigIntValue(value.toString(), name);
   }
   throw new Error(`${name} must be an integer stack item`);
