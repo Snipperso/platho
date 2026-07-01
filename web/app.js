@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v620';
+const PLATHO_APP_RUNTIME_VERSION = 'v621';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -10607,6 +10607,17 @@ function isAmbiguousTonRpcBroadcastError(error) {
     || /HTTP 5\d\d|timeout|network|failed to fetch|fetch failed|backoff|request aborted|bad gateway|service unavailable|gateway timeout|upstream request failed/i.test(message);
 }
 
+// Vault exit code 16453 = the publish path's throwUnless(clientNonce == publish_nonce) (contracts/Vault.tact).
+// On a RE-broadcast — only sent after reading currentNonce === clientNonce, and publish_nonce only ever
+// increases — a 16453 can only mean the nonce advanced PAST this external, i.e. OUR external (nonce ==
+// clientNonce) already LANDED (only accepting our nonce advances it). On the sub-second TON chain the external
+// can land in the gap between the nonce read and the POST, so this races often. (In the INITIAL back-to-back
+// send a 16453 instead means "too early" — a later batch signed before an earlier one landed — so this is used
+// ONLY on the re-broadcast path, guarded by currentNonce !== null.)
+function isVaultPublishNonceConsumedError(error) {
+  return /\b16453\b/.test(String(error?.responseBody ?? error?.message ?? ''));
+}
+
 function privateSendRetryDelayMs(error = null, attempt = 0) {
   if (isTonRpcRateLimitError(error)) return tonRpcLimitBackoffMs(error);
   const index = Math.min(Math.max(0, Number(attempt) || 0), PRIVATE_SEND_RETRY_DELAYS_MS.length - 1);
@@ -19954,6 +19965,22 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
         priority: 'background',
       });
     } catch (error) {
+      // A re-broadcast that hits Vault exit code 16453 (throwUnless clientNonce == publish_nonce) AFTER we read
+      // currentNonce === clientNonce means the nonce advanced past this external between the read and the POST —
+      // i.e. OUR external LANDED (the sub-second chain makes this race common). Treat it exactly like the
+      // currentNonce > clientNonce branch above: mark VAULT_SUBMITTED, clear the error, stop re-broadcasting —
+      // it is NOT a failure, and it should not log a scary 500. Guarded by currentNonce !== null so it never
+      // applies to an unread-nonce blind resend.
+      if (currentNonce !== null && isVaultPublishNonceConsumedError(error)) {
+        for (const part of parts) {
+          setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
+            confirmedBy: 'vault_nonce_consumed',
+            error: null,
+          });
+          changed += 1;
+        }
+        continue;
+      }
       const retryError = shortUiErrorText(error, 'broadcast retry failed');
       const retryErrorAt = new Date().toISOString();
       for (const part of parts) {

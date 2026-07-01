@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v620<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v620'/);
+    expect(html).toMatch(/id="appVersionLabel">v621<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v621'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1594,6 +1594,11 @@ describe('PWA runtime config guard', () => {
     // instead of the bare native 500 — makes an intermittent broadcast drag diagnosable.
     expect(app).toMatch(/console\.warn\('\[platho\] vault publish re-broadcast failed'/);
     expect(app).toMatch(/detail: error\?\.responseBody/);
+    // v621: a re-broadcast that hits Vault exit code 16453 (throwUnless clientNonce == publish_nonce) after a
+    // currentNonce === clientNonce read means the external already LANDED (sub-second race) -> mark VAULT_SUBMITTED,
+    // not a failure; no scary 500, no wasted resend.
+    expect(app).toMatch(/function isVaultPublishNonceConsumedError\(error\)[\s\S]*\\b16453\\b/);
+    expect(app).toMatch(/currentNonce !== null && isVaultPublishNonceConsumedError\(error\)[\s\S]*PUBLISH_PART_STATUS_VAULT_SUBMITTED[\s\S]*confirmedBy: 'vault_nonce_consumed'/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 \* 60 \* 1000/);
     // Publish + CapsuleHub ACK spans 2-3 basechain blocks; the hot window
     // covers that so sends do not degrade into the recovery/retry path.
@@ -5298,7 +5303,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v691/);
+    expect(sw).toMatch(/platho-pwa-prototype-v692/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
