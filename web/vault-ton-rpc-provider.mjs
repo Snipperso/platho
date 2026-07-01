@@ -1167,21 +1167,26 @@ function decodeReceiptSlotCell(valueCell) {
 // receipts is keyed by slotKey = nonce % RECEIPT_RING_K (Number), values carry bigints.
 export function decodeVaultUserReceiptsViewStack(result) {
   const __t0 = globalThis.performance?.now?.() ?? Date.now(); // TEMP diag: confirm the receipt decode is no longer the ~0.4s iOS stall
+  try { globalThis.plathoDiagCryptoCrumb?.('dec:enter'); } catch { /* diag */ }
   const stack = extractStack(result);
   const exists = readStackBool(stack, 0, 'Vault user receipts exists');
   const publishNonce = readStackInt(stack, 1, 'Vault user receipts publish_nonce');
   const receipts = new Map();
   const dictItem = stack[2];
   const dictValue = dictItem === undefined ? null : stackItemValue(dictItem);
+  try { globalThis.plathoDiagCryptoCrumb?.(`dec:shape:${stackItemType(dictItem)}:${typeof dictValue === 'string' ? dictValue.length : (Array.isArray(dictValue) ? `arr${dictValue.length}` : typeof dictValue)}`); } catch { /* diag */ }
   if (dictValue !== null && dictValue !== undefined) {
     const dictType = stackItemType(dictItem);
     if (typeof dictValue !== 'string' || !(dictType.includes('cell') || dictType.includes('slice'))) {
       throw new Error('Vault user receipts dictionary must be a TON cell stack item');
     }
+    try { globalThis.plathoDiagCryptoCrumb?.('dec:parse'); } catch { /* diag */ }
     const rootCell = parseBocBase64(dictValue);
+    try { globalThis.plathoDiagCryptoCrumb?.('dec:walk'); } catch { /* diag */ }
     for (const [key, valueCell] of loadTonHashmapDirect(rootCell, 8)) {
       receipts.set(Number(key), decodeReceiptSlotCell(valueCell));
     }
+    try { globalThis.plathoDiagCryptoCrumb?.('dec:walk-ok'); } catch { /* diag */ }
   }
   try {
     const __dt = Math.round((globalThis.performance?.now?.() ?? Date.now()) - __t0);
@@ -1363,6 +1368,7 @@ export async function readBatchPublishReceipt(provider, vaultAddress, owner, exp
     ...callOptions,
     ...(vaultAddress ? { vaultAddress } : {}),
   });
+  try { globalThis.plathoDiagCryptoCrumb?.('rbr:interp'); } catch { /* diag */ }
   const slotKey = Number(wantNonce % BigInt(RECEIPT_RING_K));
   const slot = view?.receipts instanceof Map
     ? view.receipts.get(slotKey)
@@ -1973,7 +1979,9 @@ export function createFallbackTonRpcTransport(options = {}) {
       || (verifyCriticalReads && criticalMethods.has(String(method)))
     );
     if (!mustVerify) return primaryResult;
+    try { globalThis.plathoDiagCryptoCrumb?.(`cmp:${method}`); } catch { /* diag */ }
     const primaryComparable = normalizeTonRpcResultForCompare(primaryResult, method);
+    try { globalThis.plathoDiagCryptoCrumb?.(`cmp-ok:${method}`); } catch { /* diag */ }
     let verified = false;
     let verifyError = null;
     let eligibleVerifierTried = false;
@@ -2190,12 +2198,14 @@ export function createVaultTonRpcProvider(options = {}) {
       const transport = resolveTransport(options);
       if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
       const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      return decodeVaultUserReceiptsViewStack(await transport.runGetMethod({
+      const __receiptsRaw = await transport.runGetMethod({
         address: vaultAddress,
         method: 'get_user_receipts',
         stack: [stackAddress(ownerWallet)],
         ...runGetCallOptions(callOptions),
-      }));
+      });
+      try { globalThis.plathoDiagCryptoCrumb?.('gur:dec'); } catch { /* diag */ }
+      return decodeVaultUserReceiptsViewStack(__receiptsRaw);
     },
     async getKeyRecord(keyId, callOptions = {}) {
       const transport = resolveTransport(options);
