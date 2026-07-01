@@ -1417,6 +1417,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
       if (apiKey) headers['X-API-Key'] = apiKey;
       const promise = (async () => {
         try {
+          try { globalThis.plathoDiagCryptoCrumb?.(`rpc:${call.method}`); } catch { /* diag */ }
           const response = await scheduleToncenterHttpRequest(
             endpoint,
             apiKey,
@@ -1439,6 +1440,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
             throw toncenterHttpError('TON RPC get-method', response, rateLimitBackoffMs);
           }
           const json = await response.json();
+          try { globalThis.plathoDiagCryptoCrumb?.(`rpc-ok:${call.method}`); } catch { /* diag */ }
           const exitCode = json.exit_code ?? json.exitCode ?? json.result?.exit_code ?? json.result?.exitCode ?? 0;
           if (Number(exitCode) !== 0) {
             throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`, { exitCode: Number(exitCode) });

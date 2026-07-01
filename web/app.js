@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v607';
+const PLATHO_APP_RUNTIME_VERSION = 'v608';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2093,12 +2093,22 @@ const DIAG_CRYPTO_KEY = 'platho.diag.crypto.v1';
 // let the tick keep climbing. Every crumb stamps the tick count at write time (#N), so on reload we can see whether the
 // run loop kept ticking AFTER a given phase (freeze is elsewhere/async) or stopped dead at it (synchronous block here).
 let diagTickCount = 0;
+let diagTickMaxGapMs = 0; // largest observed gap between 200ms ticks = how long the run loop was blocked/frozen at once
 function startDiagTick() {
   try {
     if (typeof setInterval === 'undefined') return;
+    let lastAt = Date.now();
     setInterval(() => {
       diagTickCount += 1;
-      try { localStorageOrNull()?.setItem(DIAG_TICK_KEY, `${diagTickCount}@${Date.now()}`); } catch { /* best effort */ }
+      const now = Date.now();
+      const gap = now - lastAt;
+      lastAt = now;
+      if (gap > diagTickMaxGapMs) diagTickMaxGapMs = gap;
+      // vis = visibility (b=background/hidden). A big maxGap with vis='v' (foreground) = the run loop was
+      // synchronously blocked that long WHILE VISIBLE (not a background suspend). tick@time#count maxGap vis.
+      let vis = '?';
+      try { vis = (document.visibilityState === 'visible') ? 'v' : 'h'; } catch { /* best effort */ }
+      try { localStorageOrNull()?.setItem(DIAG_TICK_KEY, `${diagTickCount}@${now} gap${diagTickMaxGapMs} ${vis}`); } catch { /* best effort */ }
     }, 200);
   } catch { /* best effort */ }
 }
@@ -5428,6 +5438,11 @@ function renderConfiguredShell() {
   const phaseTick = diagPrev && diagPrev.includes('#') ? diagPrev.split('#')[1] : '?';
   const tickRaw = diagReadTick();
   const finalTick = tickRaw ? tickRaw.split('@')[0] : '?';
+  // Largest gap between 200ms ticks + last visibility. A big gap with vis=v (foreground) means the run loop was
+  // synchronously BLOCKED that long while visible (not a background suspend). Format: 'count@time gapN v|h'.
+  const tickGapMatch = tickRaw ? tickRaw.match(/gap(\d+)/) : null;
+  const tickGap = tickGapMatch ? tickGapMatch[1] : '?';
+  const tickVis = tickRaw ? (tickRaw.trim().endsWith(' h') ? 'h' : (tickRaw.trim().endsWith(' v') ? 'v' : '?')) : '?';
   const cryptoRaw = diagReadCryptoCrumb();
   // Last heavy/concurrent op (ML-KEM encaps/decaps/keygen OR the send replay/confirm path) on its own lane, so it does
   // NOT clobber the phase crumb. Rendered as op=<label>#<tickAtWrite>. If the tick froze and this op's tick == final
@@ -5442,7 +5457,7 @@ function renderConfiguredShell() {
   const diagFrozen = diagStep !== 'none' && diagStep !== 'idle' && diagStep !== 'boot:ok';
   if (diagFrozen) {
     // ticks A→B: if A≈B the run loop STOPPED at this phase = synchronous block here; if B≫A it ran past it = async/elsewhere.
-    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · op ${cryptoLabel} · net ${netMax}`);
+    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · gap ${tickGap}ms ${tickVis} · op ${cryptoLabel} · net ${netMax}`);
   }
   if (appVersionLabel && diagFrozen) {
     const warn = document.createElement('span');
@@ -9622,6 +9637,7 @@ async function writeMessageToEncryptedHistory(thread, message) {
   ensureMessageOrderFields(message);
   try {
     const createdAt = messageCreatedAtMs(message) ?? Date.now();
+    diagCryptoCrumb('idb:put');
     const stored = await encryptedMessageStore.putMessage({
       id: message.localHistoryId ?? undefined,
       threadId: thread.id,
@@ -9629,6 +9645,7 @@ async function writeMessageToEncryptedHistory(thread, message) {
       message: serializeMessageForHistory(message),
       createdAt: message.localHistoryCreatedAt ?? createdAt,
     });
+    diagCryptoCrumb('idb:put-ok');
     message.localHistoryId = stored.id;
     message.localHistoryCreatedAt = stored.createdAt;
     setText(localStateLabel, historyStatusLabel());
