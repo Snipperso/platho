@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v623';
+const PLATHO_APP_RUNTIME_VERSION = 'v624';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -17325,6 +17325,14 @@ async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, u
     result = await sendVaultExternalBoc(external);
     raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
   } catch (error) {
+    // Surface WHY toncenter rejected the Vault AUTH external (activation/key/profile/username ops) — the last
+    // broadcast path without a [platho] warn, so a bare "500" here (e.g. exit 16453 nonce race) is diagnosable.
+    console.warn('[platho] vault auth external broadcast failed', {
+      status: error?.status ?? null,
+      code: error?.code ?? null,
+      detail: error?.responseBody ?? shortUiErrorText(error, 'auth broadcast failed'),
+      clientNonce: String(clientNonce),
+    });
     if (!isAmbiguousTonRpcBroadcastError(error)) throw error;
     ambiguousBroadcast = true;
     broadcastError = error;
@@ -17434,6 +17442,14 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
     result = await sendVaultExternalBoc(external);
     raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
   } catch (error) {
+    // Surface WHY toncenter rejected the Vault RECEIVE-INTENT external (payment intents) — the other broadcast
+    // path that lacked a [platho] warn, so a bare "500" here is diagnosable instead of a mystery.
+    console.warn('[platho] vault receive-intent external broadcast failed', {
+      status: error?.status ?? null,
+      code: error?.code ?? null,
+      detail: error?.responseBody ?? shortUiErrorText(error, 'receive-intent broadcast failed'),
+      clientNonce: String(clientNonce),
+    });
     if (!isAmbiguousTonRpcBroadcastError(error)) throw error;
     ambiguousBroadcast = true;
     broadcastError = error;
