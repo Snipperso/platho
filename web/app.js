@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v610';
+const PLATHO_APP_RUNTIME_VERSION = 'v611';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2131,6 +2131,17 @@ function diagReadTick() {
 function diagReadCryptoCrumb() {
   try { return localStorageOrNull()?.getItem(DIAG_CRYPTO_KEY) || null; } catch { return null; }
 }
+// DEDICATED confirm-path lane: a crumb before EVERY step of the message confirmation flow, on its OWN key so
+// concurrent nav:read / sync crumbs never clobber it. The freeze is a FULL hang (the app dies, tick stops), so the
+// LAST cfm step with no following step is the exact operation that never returns. Owner-directed: mark every step.
+const DIAG_CONFIRM_KEY = 'platho.diag.confirm.v1';
+function diagConfirmCrumb(step) {
+  try { localStorageOrNull()?.setItem(DIAG_CONFIRM_KEY, `${step}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
+}
+function diagReadConfirm() {
+  try { return localStorageOrNull()?.getItem(DIAG_CONFIRM_KEY) || null; } catch { return null; }
+}
+try { if (typeof globalThis !== 'undefined') globalThis.plathoDiagConfirmCrumb = diagConfirmCrumb; } catch { /* best effort */ }
 // Let the crypto module (separate ES module, cannot import these) stamp ML-KEM ops.
 try { if (typeof globalThis !== 'undefined') globalThis.plathoDiagCryptoCrumb = diagCryptoCrumb; } catch { /* best effort */ }
 // NET-CONCURRENCY watcher — directly tests the owner's hypothesis that iOS dies on MULTIPLE simultaneous
@@ -5452,12 +5463,16 @@ function renderConfiguredShell() {
   // connections" hypothesis. net>=2 = parallel connections happened; net<=1 = connections were serialized.
   const netRaw = diagReadNetMax();
   const netMax = netRaw ? netRaw.split('@')[0] : '?';
+  // Dedicated confirm-path lane: the LAST step of message confirmation before the hang. Its own key so concurrent
+  // nav/sync never clobbers it — so cfm:<step>#<tick> names the exact confirm step that never returned.
+  const confirmRaw = diagReadConfirm();
+  const confirmLabel = confirmRaw ? confirmRaw.split('@')[0] + (confirmRaw.includes('#') ? `#${confirmRaw.split('#')[1]}` : '') : 'none';
   // Show the banner ONLY when the previous session left a non-idle (in-flight) crumb = it FROZE mid-op at that
   // phase. A healthy session settles to 'idle' (all ops exited) → no banner. 'boot:ok'/'none' also = not frozen.
   const diagFrozen = diagStep !== 'none' && diagStep !== 'idle' && diagStep !== 'boot:ok';
   if (diagFrozen) {
     // ticks A→B: if A≈B the run loop STOPPED at this phase = synchronous block here; if B≫A it ran past it = async/elsewhere.
-    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · gap ${tickGap}ms ${tickVis} · op ${cryptoLabel} · net ${netMax}`);
+    diagShowBanner(`PLATHO DIAG ${PLATHO_APP_RUNTIME_VERSION} · FROZE @ ${diagStep} · ticks ${phaseTick}→${finalTick} · gap ${tickGap}ms ${tickVis} · cfm ${confirmLabel} · op ${cryptoLabel} · net ${netMax}`);
   }
   if (appVersionLabel && diagFrozen) {
     const warn = document.createElement('span');
@@ -16628,12 +16643,23 @@ function applyVaultUserPocketState(user) {
       walletAddress: plathoWallet?.address ?? globalThis.plathoVaultBinding?.walletAddress ?? null,
     };
   }
-  refreshWalletTonProfileStatus();
-  refreshVaultMoveWidget();
-  markNavVaultBalanceReady();
-  refreshComposerCostStatus();
-  refreshComposerPublishPolicy();
-  refreshMessageActionStatuses({ keepSyncStatus: true });
+  // TEMP diag: time each synchronous tail step of the nav:read path; crumb the slow one (>80ms). The v610 banner
+  // froze at nav:read with a ~400ms foreground stall that is NOT the receipt decode (fixed) — so it is one of these
+  // synchronous refreshers. Names the exact one, e.g. tail:publishPolicy:400ms.
+  const __tailTime = (label, fn) => {
+    const s = globalThis.performance?.now?.() ?? Date.now();
+    fn();
+    try {
+      const d = Math.round((globalThis.performance?.now?.() ?? Date.now()) - s);
+      if (d > 80) diagCryptoCrumb(`tail:${label}:${d}ms`);
+    } catch { /* diag best-effort */ }
+  };
+  __tailTime('walletProfile', refreshWalletTonProfileStatus);
+  __tailTime('moveWidget', refreshVaultMoveWidget);
+  __tailTime('navReady', markNavVaultBalanceReady);
+  __tailTime('costStatus', refreshComposerCostStatus);
+  __tailTime('publishPolicy', refreshComposerPublishPolicy);
+  __tailTime('actionStatuses', () => refreshMessageActionStatuses({ keepSyncStatus: true }));
 }
 
 async function refreshVaultNavBalanceInBackground(options = {}) {
@@ -19064,7 +19090,9 @@ async function confirmPrivatePublishEntriesFromSenderIndex(publishState, pending
     if (privateParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
     let senderIndex = null;
     try {
+      diagConfirmCrumb('cfm:idx-getindex');
       senderIndex = await candidateProvider.getPrivateSenderIndex(keyIdIndex, readOptions);
+      diagConfirmCrumb('cfm:idx-index-ok');
     } catch (error) {
       if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) continue;
       continue;
@@ -19077,7 +19105,9 @@ async function confirmPrivatePublishEntriesFromSenderIndex(publishState, pending
       if (entryId === null) break;
       let entry = null;
       try {
+        diagConfirmCrumb(`cfm:idx-read:${entryId}`);
         entry = await candidateProvider.getPrivateEntry(entryId, readOptions);
+        diagConfirmCrumb(`cfm:idx-read-ok:${entryId}`);
       } catch (error) {
         if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) break;
       }
@@ -19163,7 +19193,9 @@ async function confirmVaultBatchReceiptsFromPublishState(publishState, options =
     if (publishConfirmDeadlineExpired(deadlineAt)) break;
     let interp = null;
     try {
+      diagConfirmCrumb(`cfm:receipt-read:n${batch.nonce}`);
       interp = await readBatchPublishReceipt(provider, vaultAddress, owner, batch.nonce, readOptions);
+      diagConfirmCrumb('cfm:receipt-interp');
     } catch (error) {
       // Rate limits propagate so the caller can fall back to SUBMITTED; a soft verification miss (RPC
       // disagreement / verifier unavailable) just leaves this batch pending for the entry-scan recovery.
@@ -19233,6 +19265,7 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
   // receipt is still processing or has been evicted from the ring.
   if (options.skipBatchReceipt !== true) {
     try {
+      diagConfirmCrumb('cfm:receipts');
       await confirmVaultBatchReceiptsFromPublishState(publishState, {
         owner: options.owner,
         provider: options.vaultProvider,
@@ -19240,6 +19273,7 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
         requestTimeoutMs: options.requestTimeoutMs ?? options.timeoutMs,
         queueTimeoutMs: options.queueTimeoutMs,
       });
+      diagConfirmCrumb('cfm:receipts-ok');
     } catch (error) {
       if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
     }
@@ -19253,6 +19287,7 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
   // confirmation retry (schedulePrivatePublishConfirmationRetry) runs the FULL confirm later, once the entry IS on
   // chain, and flips the status to published without blocking the send. See slow-device-freeze-iphone-se2.
   if (options.receiptOnly === true) return publishState;
+  diagConfirmCrumb('cfm:resolve-hub');
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return publishState;
   const { provider, address } = resolved;
@@ -19262,14 +19297,17 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
   });
   const scanLimit = options.scanLimit ?? CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT;
   if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
+  diagConfirmCrumb('cfm:sender-index');
   await confirmPrivatePublishEntriesFromSenderIndex(publishState, pendingParts, providerCandidates, readOptions, {
     scanLimit,
     deadlineAt,
   });
+  diagConfirmCrumb('cfm:candidate-scan');
   for (const candidateProvider of providerCandidates) {
     if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
     if (pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
     try {
+      diagConfirmCrumb('cfm:getstate');
       const state = await candidateProvider.getState(readOptions);
       const groups = [
         {
@@ -19294,7 +19332,9 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
           if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
           let entry = null;
           try {
+            diagConfirmCrumb(`cfm:scan-read:${group.kind}:${entryId}`);
             entry = await group.read(entryId);
+            diagConfirmCrumb(`cfm:scan-match:${group.kind}:${entryId}`);
           } catch (error) {
             if (isTonRpcRecoverableReadError(error)) throw error;
             if (noteTonRpcRateLimit(error)) throw error;
@@ -20678,6 +20718,7 @@ function scheduleImmediatePrivatePublishConfirmation(context) {
 }
 
 async function runPrivatePublishConfirmationRetry(context) {
+  diagConfirmCrumb('cfm:retry-enter');
   const { thread, message } = context;
   if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
   if (stopPartialPrivatePublishRecovery(context)) return;
@@ -20732,6 +20773,7 @@ async function runPrivatePublishConfirmationRetry(context) {
     message.privatePublishConfirmRunCount = (Number(message.privatePublishConfirmRunCount ?? 0) || 0) + 1;
     message.privatePublishConfirmLastResult = 'checking';
     message.privatePublishConfirmNextAt = null;
+    diagConfirmCrumb('cfm:rebroadcast');
     const broadcastRetries = await retryUnconfirmedPrivatePublishBroadcasts(message.publishState, {
       deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
       readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
@@ -20762,12 +20804,16 @@ async function runPrivatePublishConfirmationRetry(context) {
         queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
       };
     const confirmStartedAt = Date.now();
+    diagConfirmCrumb('cfm:confirm-call');
     await confirmCapsuleHubPublishEntries(message.publishState, { ...confirmOptions, owner: resolvePublishOwner(message.publishState) });
+    diagConfirmCrumb('cfm:confirm-ok');
     const droppedRecovery = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
       ? { resigned: 0, confirmed: 0 }
-      : await recoverDroppedSignedPublishParts(message);
+      : (diagConfirmCrumb('cfm:dropped-recovery'), await recoverDroppedSignedPublishParts(message));
+    diagConfirmCrumb('cfm:mark-stale');
     const retryableMissingParts = markStaleUnconfirmedPublishPartsForRetry(message, 'missing CapsuleHub entry')
       + droppedRecovery.resigned;
+    diagConfirmCrumb('cfm:ensure-retry');
     const sendRetryScheduled = ensurePendingPrivateSendRetry(thread, message, {
       code: 'NETWORK_ERROR',
       message: retryableMissingParts > 0
@@ -20788,10 +20834,13 @@ async function runPrivatePublishConfirmationRetry(context) {
       : (sendRetryScheduled ? `${statusResult} send-retry` : statusResult);
     message.meta = publishStateMeta(message.publishState);
     thread.state = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
+    diagConfirmCrumb('cfm:persist');
     await updateMessageInEncryptedHistory(thread, message);
+    diagConfirmCrumb('cfm:render');
     refreshThreadAfterMessageChange(thread);
     renderThreads();
     renderConversation();
+    diagConfirmCrumb('cfm:done');
     if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
       schedulePrivatePublishConfirmationRetry(context);
     } else {
