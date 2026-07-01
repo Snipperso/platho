@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v615<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v615'/);
+    expect(html).toMatch(/id="appVersionLabel">v616<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v616'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1525,8 +1525,9 @@ describe('PWA runtime config guard', () => {
     expect(sendIndex).toBeGreaterThan(buildIndex);
     expect(sentStatusIndex).toBeGreaterThan(sendIndex);
     expect(confirmNonceIndex).toBeGreaterThan(sentStatusIndex);
-    // NON-BLOCKING: EVERY batch installs the background nonce barrier; there is NO blocking inter-batch
-    // wait. The barrier's nonce poll (on expectedNonce) runs inside the installed task, after the install.
+    // NON-BLOCKING: every NON-FINAL batch installs the background nonce barrier (the final batch does not,
+    // to avoid a self-blocking post-burst wait); there is NO blocking inter-batch wait. The barrier's nonce
+    // poll (on expectedNonce) runs inside the installed task, after the install.
     expect(finalBarrierIndex).toBeGreaterThan(confirmNonceIndex);
     expect(barrierWaitIndex).toBeGreaterThan(finalBarrierIndex);
     expect(submittedStatusIndex).toBeGreaterThan(finalBarrierIndex);
@@ -1587,7 +1588,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 \* 1000/);
     expect(app).toMatch(/const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8/);
     expect(app).toMatch(/async function enterVaultPublishSendLock\(\)/);
-    expect(app).toMatch(/function shouldConfirmVaultPublishNonceAfterSend\(index, total, options = \{\}\)[\s\S]*index < total - 1 \|\| options\.confirmFinalNonce === true/);
+    // Only NON-final batches install a nonce barrier: the final batch's barrier (waiting for the post-burst
+    // nonce, reachable only after the racy last external lands) could hang to its 90s timeout and park the
+    // next signed action. confirmFinalNonce is intentionally no longer honored.
+    expect(app).toMatch(/function shouldConfirmVaultPublishNonceAfterSend\(index, total, options = \{\}\)[\s\S]*return index < total - 1;/);
+    expect(app).not.toMatch(/index < total - 1 \|\| options\.confirmFinalNonce === true/);
     expect(sendSource).toMatch(/if \(shouldConfirmVaultPublishNonceAfterSend\(batchIndex, batches\.length, options\)\) \{/);
     expect(app).toMatch(/const publishCallbacks = \{[\s\S]*allowOwnVaultActionReadFallback: true,\s*confirmFinalNonce: true,/);
     expect(app).toMatch(/sendPreparedCapsulesThroughVault\(preparedPublish, \{[\s\S]*publishState,\s*confirmFinalNonce: true,/);
@@ -1616,6 +1621,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/setPublishPartStatus\(publishState, part\.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
     expect(app).toMatch(/clearPublishPartSignedAttempt\(part\)/);
     expect(app).toMatch(/currentNonce !== null && currentNonce > clientNonce[\s\S]*PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
+    // Fix 1: the keyless broadcast-retry nonce read ignores the publish-nonce barrier, so the healing
+    // re-broadcast is never dead-locked behind the very barrier it exists to clear.
+    expect(app).toMatch(/async function readVaultPublishNonceForBroadcastRetry\(provider, owner, options = \{\}\)[\s\S]*ignoreNonceBarrier: true/);
+    // Fix 3: the FIRST re-broadcast of a proven-not-landed external (chain nonce sits exactly at its nonce)
+    // skips the 35s cooldown; repeat attempts keep it. Collapses the residual second-capsule delay.
+    expect(app).toMatch(/const rebroadcastCooldownMs = retryCount === 0 && currentNonce !== null && currentNonce === clientNonce\s*\?\s*0\s*:\s*PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS/);
+    expect(app).toMatch(/if \(publishPartLastBroadcastAgeMs\(head\) < rebroadcastCooldownMs\) continue/);
     expect(app).not.toMatch(/function markPublishPartForFreshNonceRetry/);
     expect(app).not.toMatch(/fresh nonce retry required/);
     expect(app).toMatch(/await retryUnconfirmedPrivatePublishBroadcasts\(message\.publishState, \{/);
@@ -5274,7 +5286,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v686/);
+    expect(sw).toMatch(/platho-pwa-prototype-v687/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);

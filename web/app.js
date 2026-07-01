@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v615';
+const PLATHO_APP_RUNTIME_VERSION = 'v616';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19212,7 +19212,17 @@ async function sendVaultExternalBoc(built, options = {}) {
 }
 
 function shouldConfirmVaultPublishNonceAfterSend(index, total, options = {}) {
-  return index < total - 1 || options.confirmFinalNonce === true;
+  // Only NON-FINAL batches install a background nonce barrier. The FINAL batch's barrier would wait for
+  // clientNonce+1 == the nonce AFTER the whole burst — a value the chain only reaches once the racy last
+  // back-to-back external has landed; if that external bounces (out-of-order pre-accept) the barrier hangs
+  // to its 90s timeout and parks the next signed vault action (and, before the broadcast-retry stopped
+  // awaiting it, the healing itself). A non-final batch's barrier waits for a nonce a cleanly-landing
+  // EARLIER external produces, so it resolves promptly. Dropping the final barrier is double-spend-safe:
+  // the monotonic per-owner nonce floor + the contract's nonce-equality check already stop a following
+  // action from re-using a consumed nonce. `options.confirmFinalNonce` (still passed by some callers) is
+  // intentionally no longer honored — kept in the signature only to avoid churn at the call sites.
+  void options;
+  return index < total - 1;
 }
 
 async function readVaultPublishNonce(provider, owner, options = {}) {
@@ -19295,9 +19305,18 @@ async function waitForVaultPublishNonceForOwnVaultAction(provider, owner, expect
 }
 
 async function readVaultPublishNonceForBroadcastRetry(provider, owner, options = {}) {
+  // OBSERVATIONAL-only read on the keyless re-broadcast path: it decides whether an already-signed,
+  // fixed-nonce external must be re-sent or has already landed. It MUST NOT await the publish-nonce
+  // barrier. The barrier a prior batch of THIS same burst installed waits for the nonce AFTER the last
+  // back-to-back external — the very external this retry exists to re-broadcast. Awaiting it here
+  // dead-locked the healing behind the barrier's own 90s timeout (the healer blocked on the wait it was
+  // supposed to end), which is the dominant multi-minute latency of a 2-capsule / 64KB image send.
+  // Ignoring it is double-spend-safe: nothing is freshly signed here, and re-broadcasting a fixed-nonce
+  // external is idempotent (the contract rejects a replayed nonce; a landed one is detected as nonce-moved).
+  const readOptions = { ...options, ignoreNonceBarrier: true };
   return callWithOwnVaultActionReadFallback(
-    () => readVaultPublishNonceForOwnVaultAction(provider, owner, options),
-    () => readVaultPublishNonce(provider, owner, { ...options, verify: false, allowUnverifiedCriticalRead: true }),
+    () => readVaultPublishNonceForOwnVaultAction(provider, owner, readOptions),
+    () => readVaultPublishNonce(provider, owner, { ...readOptions, verify: false, allowUnverifiedCriticalRead: true }),
   );
 }
 
@@ -19889,7 +19908,17 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     const head = parts[0];
     const retryCount = publishPartBroadcastRetryCount(head);
     if (retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT) continue;
-    if (publishPartLastBroadcastAgeMs(head) < PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS) continue;
+    // FIRST heal of a proven-not-landed external re-broadcasts with NO cooldown. Reaching here with
+    // currentNonce === clientNonce means the chain's next-expected nonce is EXACTLY this batch's nonce, so
+    // its back-to-back external never landed (a landed one would have advanced the nonce past it — that is
+    // the branch above). The 35s cooldown only guards against HAMMERING on repeat attempts; on the first
+    // heal it is pure added latency — the residual second-capsule delay after the barrier fix. Repeat
+    // attempts (retryCount >= 1) keep the full cooldown. Idempotent + double-spend-safe: a stale-replica
+    // false "not landed" costs at most one wasted (contract-rejected) re-broadcast of the fixed-nonce boc.
+    const rebroadcastCooldownMs = retryCount === 0 && currentNonce !== null && currentNonce === clientNonce
+      ? 0
+      : PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;
+    if (publishPartLastBroadcastAgeMs(head) < rebroadcastCooldownMs) continue;
     let result = null;
     try {
       result = await sendVaultExternalBoc({ boc: head.externalBoc }, {

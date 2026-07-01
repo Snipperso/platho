@@ -1,4 +1,4 @@
-const CACHE_NAME = 'platho-pwa-prototype-v686';
+const CACHE_NAME = 'platho-pwa-prototype-v687';
 const ASSETS = [
   './',
   './index.html',
