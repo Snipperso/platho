@@ -2956,12 +2956,21 @@ function renderPaneHeaders() {
   setText(profileHandle, 'Profile');
 }
 
+// Pane status lines are logged only when they CHANGE: renderPublicSurface re-runs several times per background
+// tick (feed sync + post-avatar + channel-avatar hydration each trigger a re-render), so logging every call
+// spammed the console with identical '[public] feed' packs and buried the [platho] diagnostics that matter.
+let lastLoggedPublicStatus = null;
 function setPublicStatus(value) {
-  if (value) console.debug('[public]', value);
+  if (!value || value === lastLoggedPublicStatus) return;
+  lastLoggedPublicStatus = value;
+  console.debug('[public]', value);
 }
 
+let lastLoggedVaultStatus = null;
 function setVaultStatus(value) {
-  if (value) console.debug('[vault]', value);
+  if (!value || value === lastLoggedVaultStatus) return;
+  lastLoggedVaultStatus = value;
+  console.debug('[vault]', value);
 }
 
 function appendIcon(parent, icon) {

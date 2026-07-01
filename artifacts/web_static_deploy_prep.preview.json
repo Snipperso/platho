@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-01T21:54:01.050Z",
+  "generatedAt": "2026-07-01T22:09:01.834Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 132,
-    "totalBytes": 3646304,
-    "bundleSha256": "cfbdc9fb0275384074acc86d569140a71f3b4f28c1456b22c85df3e56d1f5f97",
+    "totalBytes": 3646863,
+    "bundleSha256": "82f28eb7ffed210836d2ee4dbffc8450ae61f86053215aebdfd6023f248affa3",
     "files": [
       {
         "path": "app.js",
-        "bytes": 990121,
-        "sha256": "9c971a7d47a2eac4316f753412371c52217df00e2a76f0738c230f0b711f4560"
+        "bytes": 990680,
+        "sha256": "bc7184897a439c372b9c2d813e33a48274d0c7790f5be86414a8de789989381c"
       },
       {
         "path": "assets/icons/back.svg",
