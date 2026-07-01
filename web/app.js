@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v626';
+const PLATHO_APP_RUNTIME_VERSION = 'v627';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -18541,6 +18541,13 @@ const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6;
 // every ~1s confirm pass. After a few races fall back to the full 35s cooldown.
 const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 2_500;
 const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6;
+// "duplicate message" = the BoC is queued at toncenter. On the sub-second chain a LIVE queued copy lands in
+// ~1-3s, so if ~4 block-times pass with the nonce unmoved the copy is likely stalled/dropped and a re-poke is
+// productive. Poke every ~4s for the first few duplicates (heals the ACK-no-deliver mode in seconds), then
+// fall back to the conservative 35s tail so a genuinely wedged toncenter is not poked (and does not log a
+// native red 500) every 4s all the way to the 10-min terminal. Idempotent + skipIfRateLimited throughout.
+const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS = 4_000;
+const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT = 6;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 * 1000;
 // 8s (was 4s): the pre-re-broadcast nonce read is get_user on the heavy Vault contract; toncenter answers it
 // in <1s when healthy but 4-8s during a load spike, and a 4s timeout made that read fail (observed console
@@ -20034,6 +20041,14 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     if (retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce) {
       if (nonceRaceCount === 0) rebroadcastCooldownMs = 0;
       else if (nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;
+    } else if (duplicateRelayCount > 0
+      && duplicateRelayCount < PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT
+      && currentNonce !== null && currentNonce === clientNonce) {
+      // Early duplicates re-poke at ~4 block-times (see the constant): the queued copy either lands within
+      // ~1-3s or is stalled, and the fresh-nonce gate (currentNonce === clientNonce) guarantees it has NOT
+      // landed yet, so a quick idempotent re-poke is the fastest safe heal for toncenter's queued-not-delivered
+      // mode. Past the fast limit the conservative 35s tail takes over.
+      rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS;
     }
     if (publishPartLastBroadcastAgeMs(head) < rebroadcastCooldownMs) continue;
     let result = null;
