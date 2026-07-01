@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v609<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v609'/);
+    expect(html).toMatch(/id="appVersionLabel">v610<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v610'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4342,6 +4342,20 @@ describe('PWA runtime config guard', () => {
     expect(guardIdx).toBeLessThan(scanIdx); // the receiptOnly bail is BEFORE the entry-scan provider resolve
   });
 
+  it('PWA-IOS-LOADUINT-CHUNKED-01: cell bit reader builds ints in chunks, not one BigInt op per bit (iOS JSC receipt-decode freeze)', () => {
+    const rpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    // ROOT FIX for the iPhone-only "freeze on confirming": tonCellBitReader.loadUint used to fold ONE BigInt op per
+    // bit (out = (out << 1n) | BigInt(bit)); decoding the 20-slot get_user_receipts ring is ~13k such ops, which on
+    // iOS JavaScriptCore (BigInt ~10-50x slower + GC-heavy vs V8) took ~0.4s and stalled the sender on every confirm.
+    // The fix accumulates 24-bit chunks in a plain Number and folds ONE BigInt op per chunk.
+    const fn = rpc.slice(rpc.indexOf('function tonCellBitReader'), rpc.indexOf('function loadTonHashmapDirect'));
+    // No per-bit BigInt fold left.
+    expect(fn).not.toMatch(/out = \(out << 1n\) \| BigInt\(this\.loadBit\(\)\)/);
+    // Chunked accumulation in a plain Number, folded per chunk.
+    expect(fn).toMatch(/acc = \(acc \* 2\) \+ this\.loadBit\(\)/);
+    expect(fn).toMatch(/out = \(out << BigInt\(chunk\)\) \| BigInt\(acc\)/);
+  });
+
   it('PWA-IOS-PUMP-YIELD-01: the shared RPC pump yields a macrotask before rejecting a backoff-skipped read (no microtask-starvation freeze)', () => {
     const rpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
     // ROOT FIX for the iOS dead-freeze that moved between Vault/activation/send: drainToncenterRequestQueue is the one
@@ -5254,11 +5268,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v680/);
+    expect(sw).toMatch(/platho-pwa-prototype-v681/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=609/);
+    expect(sw).toMatch(/\.\/app\.js\?v=610/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
