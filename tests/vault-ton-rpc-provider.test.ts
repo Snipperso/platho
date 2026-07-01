@@ -16,6 +16,7 @@ import {
   decodeTonAddressSliceBoc,
   decodeVaultGlobalViewStack,
   encodeTonAddressSliceBoc,
+  parseStackBigIntValue,
 } from '../web/vault-ton-rpc-provider.mjs';
 import { computeVaultMessagingKeyId, tonCell } from '../web/pwa-contract-transactions.mjs';
 
@@ -2116,5 +2117,40 @@ describe('Vault TON RPC provider', () => {
     expect(view.pending_profile_avatar_payment_count).toBe(6n);
     expect(view.pending_username_mint_payment_count).toBe(7n);
     expect(view.airdrop_total_allocation_ath).toBe(12n);
+  });
+});
+
+describe('parseStackBigIntValue non-numeric string does not self-recurse (PWA-IOS-BIGINT-NO-TOSTRING-RECURSION-01)', () => {
+  // ROOT of the permanent iPhone-ONLY confirm freeze: a non-numeric string stack value (e.g. the
+  // get_user_receipts receipts-dict cell base64, or a get_global address slice) reached the value.toString()
+  // recursion branch, and String.prototype.toString returns the SAME string -> infinite self-recursion. On V8
+  // that overflows the stack and throws RangeError fast (caught upstream). On JavaScriptCore (Safari/iOS) proper
+  // tail calls keep the stack flat, so it becomes an INFINITE LOOP = hard freeze. The compare path (verify:true)
+  // is the only caller, which is why it hit the confirm read only. Guard: a non-numeric string must throw the
+  // plain "integer stack item" error QUICKLY, never RangeError (proof there is no deep self-recursion).
+  it('throws a plain error (not RangeError) on a base64 cell string', () => {
+    const cell = 'te6cckECOwEAAvMAAgHHAQICASADBAIBYjEyAgEgBQYCASAbHA';
+    let caught: unknown = null;
+    try {
+      parseStackBigIntValue(cell, 'TON RPC compare value');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).constructor.name).toBe('Error'); // NOT 'RangeError' (would mean stack overflow)
+    expect((caught as Error).message).toMatch(/must be an integer stack item/);
+    expect((caught as RangeError).message).not.toMatch(/call stack/i);
+  });
+
+  it('still parses decimal and hex integer strings', () => {
+    expect(parseStackBigIntValue('133', 't')).toBe(133n);
+    expect(parseStackBigIntValue('0x85', 't')).toBe(133n);
+    expect(parseStackBigIntValue('-0x10', 't')).toBe(-16n);
+    expect(parseStackBigIntValue(42n, 't')).toBe(42n);
+  });
+
+  it('does not hang on an address slice string (get_global compare value)', () => {
+    // "0:<64 hex>" is not decimal/hex-0x, so it previously fell into the toString self-recursion too.
+    expect(() => parseStackBigIntValue(`0:${'ab'.repeat(32)}`, 't')).toThrow(/must be an integer stack item/);
   });
 });
