@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v605';
+const PLATHO_APP_RUNTIME_VERSION = 'v606';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2132,21 +2132,21 @@ function startDiagNetWatch() {
   try {
     if (typeof globalThis === 'undefined' || typeof globalThis.fetch !== 'function' || globalThis.__plathoNetWrapped) return;
     const origFetch = globalThis.fetch.bind(globalThis);
-    let inFlight = 0;
-    let maxSeen = 0;
     let selfHost = '';
     try { selfHost = location.host; } catch { /* ignore */ }
     globalThis.fetch = function diagFetch(input, init) {
       let host = '';
       try { host = new URL(typeof input === 'string' ? input : (input?.url ?? ''), location.href).host; } catch { /* ignore */ }
-      if (!host || host === selfHost) return origFetch(input, init); // only count EXTERNAL connections
-      inFlight += 1;
-      if (inFlight > maxSeen) {
-        maxSeen = inFlight;
-        try { localStorageOrNull()?.setItem(DIAG_NETMAX_KEY, `${maxSeen}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
+      // Count EXTERNAL, NON-toncenter connections here (toncenter is counted authoritatively in the transport's
+      // fetchWithTonRpcTimeout). Share ONE global in-flight counter so the max reflects TRUE overall concurrency.
+      if (!host || host === selfHost || /toncenter|orbs\.network/i.test(host)) return origFetch(input, init);
+      const n = (globalThis.plathoNetInFlight = (globalThis.plathoNetInFlight || 0) + 1);
+      if (n > (globalThis.plathoNetMax || 0)) {
+        globalThis.plathoNetMax = n;
+        try { localStorageOrNull()?.setItem(DIAG_NETMAX_KEY, `${n}@${Date.now()}#${diagTickCount}`); } catch { /* best effort */ }
       }
-      if (inFlight >= 2) { try { diagCryptoCrumb(`netcc:${inFlight}`); } catch { /* best effort */ } }
-      const dec = () => { inFlight = Math.max(0, inFlight - 1); };
+      if (n >= 2) { try { diagCryptoCrumb(`netcc:${n}`); } catch { /* best effort */ } }
+      const dec = () => { globalThis.plathoNetInFlight = Math.max(0, (globalThis.plathoNetInFlight || 1) - 1); };
       let promise;
       try { promise = origFetch(input, init); } catch (error) { dec(); throw error; }
       return promise.then((r) => { dec(); return r; }, (e) => { dec(); throw e; });

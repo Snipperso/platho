@@ -295,8 +295,30 @@ function resolveTonRpcRequestTimeoutMs(requestOptions, transportOptions) {
 }
 
 async function fetchWithTonRpcTimeout(fetchImpl, url, init, timeoutMs) {
+  // TEMP diag (parallel-connection test, slow-device-freeze): count CONCURRENT toncenter fetches. This is the ONE
+  // chokepoint every toncenter read/send passes through (runGetMethod / sendBoc / getAccountState / getMessages),
+  // regardless of the captured fetchImpl or the transport instance. globalThis-shared so it aggregates across any
+  // module instances. net>=2 means real parallel connections happened (iOS can die on those); net<=1 means the
+  // limiter truly serializes. Writes the running max to the diag banner key ('platho.diag.netmax.v1').
+  let diagCounted = false;
+  const diagDec = () => {
+    if (!diagCounted) return;
+    diagCounted = false;
+    try { globalThis.plathoNetInFlight = Math.max(0, (globalThis.plathoNetInFlight || 1) - 1); } catch { /* best effort */ }
+  };
+  try {
+    const n = (globalThis.plathoNetInFlight = (globalThis.plathoNetInFlight || 0) + 1);
+    diagCounted = true;
+    if (n > (globalThis.plathoNetMax || 0)) {
+      globalThis.plathoNetMax = n;
+      try { globalThis.localStorage?.setItem('platho.diag.netmax.v1', `${n}@${Date.now()}`); } catch { /* best effort */ }
+    }
+    if (n >= 2) { try { globalThis.plathoDiagCryptoCrumb?.(`netcc:${n}`); } catch { /* best effort */ } }
+  } catch { /* best effort */ }
   const resolvedTimeoutMs = finiteNonNegativeMs(timeoutMs, TON_RPC_REQUEST_TIMEOUT_MS);
-  if (resolvedTimeoutMs <= 0) return fetchImpl(url, init);
+  if (resolvedTimeoutMs <= 0) {
+    try { return await fetchImpl(url, init); } finally { diagDec(); }
+  }
 
   let timeoutId = null;
   let timedOut = false;
@@ -329,6 +351,7 @@ async function fetchWithTonRpcTimeout(fetchImpl, url, init, timeoutMs) {
     return await Promise.race([request, timeout]);
   } finally {
     if (timeoutId !== null) clearTimeout(timeoutId);
+    diagDec();
   }
 }
 
