@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v618';
+const PLATHO_APP_RUNTIME_VERSION = 'v619';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -867,7 +867,10 @@ const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 * 60 * 1000;
 // window must cover that plus the read round-trips or every send degrades
 // into the slow recovery/retry path.
 const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 25 * 1000;
-const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 4 * 1000;
+// 8s (was 4s): the hot receipt read is get_user_receipts, HEAVIER than get_user, so it hits the same toncenter
+// load-spike latency that timed out the 4s nonce read. Matching the recovery tier lets a slow-but-alive receipt
+// read confirm instead of timing out and churning; a healthy read still returns in <1s.
+const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 8 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 * 1000;
 const PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS = 2 * 60 * 1000;
@@ -18488,7 +18491,13 @@ const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 35_000;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 * 1000;
-const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 4 * 1000;
+// 8s (was 4s): the pre-re-broadcast nonce read is get_user on the heavy Vault contract; toncenter answers it
+// in <1s when healthy but 4-8s during a load spike, and a 4s timeout made that read fail (observed console
+// TIMEOUT 'TON RPC request timed out after 4000 ms') -> retryUnconfirmedVaultPublishBroadcasts returns 0 -> a
+// bounced 2nd capsule is never re-broadcast until toncenter reads recover (the intermittent multi-minute drag).
+// 8s (the recovery tier) lets a slow-but-alive read through so the re-broadcast proceeds; a healthy read is
+// unaffected (it returns in <1s regardless of the ceiling).
+const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 * 1000;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 * 1000;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS = 30 * 1000;

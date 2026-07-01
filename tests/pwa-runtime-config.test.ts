@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v618<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v618'/);
+    expect(html).toMatch(/id="appVersionLabel">v619<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v619'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1595,7 +1595,7 @@ describe('PWA runtime config guard', () => {
     // Publish + CapsuleHub ACK spans 2-3 basechain blocks; the hot window
     // covers that so sends do not degrade into the recovery/retry path.
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 25 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 4 \* 1000/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 8 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS = 30 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 \* 1000/);
     expect(app).toMatch(/const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8/);
@@ -1614,7 +1614,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 35_000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 4 \* 1000/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = 30 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS = 30 \* 1000/);
@@ -5298,7 +5298,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v689/);
+    expect(sw).toMatch(/platho-pwa-prototype-v690/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
