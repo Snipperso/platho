@@ -256,12 +256,12 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v624<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v624'/);
+    expect(html).toMatch(/id="appVersionLabel">v625<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v625'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=624" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=625" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1610,6 +1610,14 @@ describe('PWA runtime config guard', () => {
     // surface the toncenter reason, so NO broadcast 500 can be a bare mystery on any path.
     expect(app).toMatch(/console\.warn\('\[platho\] vault auth external broadcast failed'/);
     expect(app).toMatch(/console\.warn\('\[platho\] vault receive-intent external broadcast failed'/);
+    // v625: toncenter "duplicate message" on a re-broadcast = the same BoC is ALREADY queued (in flight) -> count
+    // it as a successful relay (stamp lastBroadcastAt + retry count, arming the repeat cooldown) instead of
+    // re-POSTing the same BoC every ~1s pass and logging a scary 500 each time.
+    expect(app).toMatch(/function isTonBroadcastDuplicateMessageError\(error\)[\s\S]*duplicate message/);
+    expect(app).toMatch(/isTonBroadcastDuplicateMessageError\(error\)[\s\S]*broadcastRetryCount: retryCount \+ 1,\s*lastBroadcastAt: duplicateAt/);
+    // v625: the wallet transfer path (platho-wallet.mjs) also warns with the toncenter reason.
+    const walletModule = readFileSync('web/platho-wallet.mjs', 'utf8');
+    expect(walletModule).toMatch(/console\.warn\('\[platho\] wallet external broadcast failed'/);
     // v621: a re-broadcast that hits Vault exit code 16453 (throwUnless clientNonce == publish_nonce) after a
     // currentNonce === clientNonce read means the external already LANDED (sub-second race) -> mark VAULT_SUBMITTED,
     // not a failure; no scary 500, no wasted resend.
@@ -5319,11 +5327,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v695/);
+    expect(sw).toMatch(/platho-pwa-prototype-v696/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=624/);
+    expect(sw).toMatch(/\.\/app\.js\?v=625/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
@@ -5334,7 +5342,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
-    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=17/);
+    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=58/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=40/);

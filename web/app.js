@@ -27,7 +27,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=17';
+} from './platho-wallet.mjs?v=18';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v624';
+const PLATHO_APP_RUNTIME_VERSION = 'v625';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -10618,6 +10618,15 @@ function isVaultPublishNonceConsumedError(error) {
   return /\b16453\b/.test(String(error?.responseBody ?? error?.message ?? ''));
 }
 
+// toncenter "cannot send external message : duplicate message" = the SAME BoC is already queued in its
+// mempool (an earlier broadcast of this exact external is still being processed). The external IS in flight,
+// so a re-broadcast attempt that hits this is effectively a SUCCESSFUL relay, not a failure: without treating
+// it as such, the tight (~1s) confirm cadence + the zero first-heal cooldown re-POST the same BoC every pass
+// and toncenter answers 500 "duplicate" each time — the red-500-spam loop the owner saw.
+function isTonBroadcastDuplicateMessageError(error) {
+  return /duplicate message/i.test(String(error?.responseBody ?? error?.message ?? ''));
+}
+
 function privateSendRetryDelayMs(error = null, attempt = 0) {
   if (isTonRpcRateLimitError(error)) return tonRpcLimitBackoffMs(error);
   const index = Math.min(Math.max(0, Number(attempt) || 0), PRIVATE_SEND_RETRY_DELAYS_MS.length - 1);
@@ -20019,6 +20028,22 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
         for (const part of parts) {
           setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
             confirmedBy: 'vault_nonce_consumed',
+            error: null,
+          });
+          changed += 1;
+        }
+        continue;
+      }
+      // "duplicate message" = this exact BoC is ALREADY queued at toncenter — the external is in flight, so
+      // count this attempt as a successful relay: stamp lastBroadcastAt + the retry count exactly like the
+      // success path (which arms the repeat-attempt cooldown and stops the every-pass duplicate re-POST spam),
+      // keep the part SENT, and skip the scary failure warn. The nonce/receipt confirm flips it once it lands.
+      if (isTonBroadcastDuplicateMessageError(error)) {
+        const duplicateAt = new Date().toISOString();
+        for (const part of parts) {
+          setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
+            broadcastRetryCount: retryCount + 1,
+            lastBroadcastAt: duplicateAt,
             error: null,
           });
           changed += 1;

@@ -584,7 +584,20 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
       timeout: options.timeout ?? transaction?.validUntil,
       includeStateInit: options.includeStateInit ?? seqno === 0,
     });
-    const result = await transport.sendBoc({ boc: built.boc, walletAddress: wallet.address });
+    let result = null;
+    try {
+      result = await transport.sendBoc({ boc: built.boc, walletAddress: wallet.address });
+    } catch (error) {
+      // Surface WHY toncenter rejected the WALLET external (transfers/top-ups/deploy) — this was the last
+      // broadcast path without a [platho] warn, so its 500s showed as bare mysteries in the console.
+      console.warn('[platho] wallet external broadcast failed', {
+        status: error?.status ?? null,
+        code: error?.code ?? null,
+        detail: error?.responseBody ?? String(error?.message ?? error),
+        seqno,
+      });
+      throw error;
+    }
     batches.push({ ...built, result, messageCount: chunk.length });
     if (index < chunks.length - 1) {
       seqno = await waitForWalletSeqnoAtLeast(wallet, transport, seqno + 1, options);
