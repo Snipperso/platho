@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v621';
+const PLATHO_APP_RUNTIME_VERSION = 'v622';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19026,6 +19026,15 @@ async function confirmVaultBatchReceiptsFromPublishState(publishState, options =
     try {
       interp = await readBatchPublishReceipt(provider, vaultAddress, owner, batch.nonce, readOptions);
     } catch (error) {
+      // Surface a FAILING receipt read (e.g. a slow/timed-out get_user_receipts during a toncenter spike). This
+      // path is otherwise SILENT, so a send that LANDED but whose receipt won't confirm (the "submitted N/N,
+      // confirming ... still checking" drag) looked like a mystery — now the toncenter reason is visible.
+      console.warn('[platho] vault publish receipt read failed', {
+        status: error?.status ?? null,
+        code: error?.code ?? null,
+        detail: error?.responseBody ?? shortUiErrorText(error, 'receipt read failed'),
+        nonce: String(batch.nonce),
+      });
       // Rate limits propagate so the caller can fall back to SUBMITTED; a soft verification miss (RPC
       // disagreement / verifier unavailable) just leaves this batch pending for the entry-scan recovery.
       if (noteTonRpcRateLimit(error)) throw error;
@@ -19611,6 +19620,17 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
           })());
         }
       } catch (error) {
+        // Surface WHY toncenter rejected the INITIAL broadcast (raw upstream error.responseBody) — symmetric with
+        // the re-broadcast warn — so a bare "500" on the FIRST send is diagnosable instead of a mystery: exit code
+        // 16453 = a later batch (nonce N+1) signed before an earlier one (N) landed ("too early", expected for
+        // back-to-back) vs a genuine toncenter reject/flakiness.
+        console.warn('[platho] vault publish broadcast failed', {
+          status: error?.status ?? null,
+          code: error?.code ?? null,
+          detail: error?.responseBody ?? shortUiErrorText(error, 'broadcast failed'),
+          clientNonce: batch.clientNonce === undefined || batch.clientNonce === null ? null : String(batch.clientNonce),
+          batchIndex,
+        });
         const sentBeforeFailure = Boolean(batch.result);
         const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError(error);
         // If the external may have landed (sent-before-failure, or an ambiguous
