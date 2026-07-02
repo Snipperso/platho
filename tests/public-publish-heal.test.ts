@@ -65,4 +65,24 @@ describe('public publish heal driver guard', () => {
     const publicParts = app.slice(app.indexOf('async function publishPublicPayloadParts'), app.indexOf('async function createPublicPayloadParts'));
     expect(publicParts).not.toMatch(/confirmFinalNonce\s*:/);
   });
+
+  it('PWA-PUBLIC-HEAL-06: composer parity with private — instant clear, optimistic insert, live private-style status', () => {
+    // The composer empties the moment send is pressed (BEFORE the await), and a user-cancel restores the draft.
+    const handlerStart = app.indexOf("publicComposer?.addEventListener('submit'");
+    const handler = app.slice(handlerStart, handlerStart + 4000);
+    const clearIndex = handler.indexOf("publicMessageInput.value = '';");
+    const awaitIndex = handler.indexOf('await submitPublic');
+    expect(clearIndex).toBeGreaterThan(-1);
+    expect(clearIndex).toBeLessThan(awaitIndex);
+    expect(handler).toMatch(/publicMessageInput\.value = text;/);
+    // Both submit paths insert the optimistic record with a streaming private-style status and patch the SAME
+    // record on result (never a second insert).
+    expect(app.match(/publishStatus: 'sending',\s*publishState: null,/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(app.match(/persistPublicPublishProgress\(\{ \.\.\.ref, publishState \}, \{ publishStatus: publishStateMeta\(publishState\) \|\| 'sending' \}\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(app.match(/removeLocalPublicPendingRecord\(ref\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // The feed badge shows the SAME status strings as private messages (publishStateMeta off the live state).
+    expect(app).toMatch(/\(item\.publishState \? publishStateMeta\(item\.publishState\) : null\) \|\| item\.publishStatus/);
+    // Persisted publishState is variant-stripped (the ~16×47KB BoCs stay in-memory only).
+    expect(app).toMatch(/const persistedState = publishStateForHistory\(job\.publishState\)/);
+  });
 });

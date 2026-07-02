@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v633';
+const PLATHO_APP_RUNTIME_VERSION = 'v634';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4921,7 +4921,9 @@ function renderPublicFeed(items, options = {}) {
     if (isPendingPublicFeedItem(item) && item.publishStatus) {
       const statusBadge = document.createElement('span');
       statusBadge.className = `public-publish-status${String(item.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
-      statusBadge.textContent = item.publishStatus;
+      // Private-style live status ('sending 2 parts' / 'submitted 1/2, confirming' / …) when a publishState is
+      // streaming; the machine-readable publishStatus marker is the fallback.
+      statusBadge.textContent = (item.publishState ? publishStateMeta(item.publishState) : null) || item.publishStatus;
       meta.append(statusBadge);
     }
     // The "Display as" chevron lives top-right in the author row.
@@ -13332,9 +13334,18 @@ publicComposer?.addEventListener('submit', async (event) => {
   }
   const send = publicComposer.querySelector('.send-button');
   send?.toggleAttribute('disabled', true);
+  // Private-composer parity (owner UX directive): the draft leaves the composer THE MOMENT send is pressed —
+  // the optimistic local record (inserted by the submit path with a live 'sending…' status) carries it from
+  // here. Capture the comment target BEFORE clearing so a cancel can restore the exact draft.
+  const draftCommentTarget = publicCommentTarget;
+  publicMessageInput.value = '';
+  publicImageAttachments = [];
+  updateImageAttachmentUi('public');
+  autoResizeComposerTextarea(publicMessageInput);
+  refreshComposerCostStatus();
   try {
-    if (publicCommentTarget) {
-      await submitPublicCommentThroughVault(publicCommentTarget, text, attachments);
+    if (draftCommentTarget) {
+      await submitPublicCommentThroughVault(draftCommentTarget, text, attachments);
     } else {
       await submitPublicPostThroughVault({
         text,
@@ -13342,18 +13353,21 @@ publicComposer?.addEventListener('submit', async (event) => {
         commentsAllowed,
       });
     }
-    publicMessageInput.value = '';
-    publicImageAttachments = [];
-    updateImageAttachmentUi('public');
     // On the post detail screen the composer stays in comment mode for the SAME post (so a follow-up message is
     // another comment, not a public post). Only the inline/feed flow resets the target.
     if (!publicPostDetailOpen) setPublicCommentTarget(null);
-    autoResizeComposerTextarea(publicMessageInput);
-    refreshComposerCostStatus();
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
     const cancelled = isPublishPriceChangeCancelled(error);
-    setPublicStatus(cancelled ? 'publish cancelled' : (rateLimited ? 'sync delayed' : (publicCommentTarget ? 'comment blocked' : 'publish blocked')));
+    if (cancelled) {
+      // User-cancelled (price dialog): give the draft back instead of losing it.
+      publicMessageInput.value = text;
+      publicImageAttachments = attachments;
+      updateImageAttachmentUi('public');
+      autoResizeComposerTextarea(publicMessageInput);
+      refreshComposerCostStatus();
+    }
+    setPublicStatus(cancelled ? 'publish cancelled' : (rateLimited ? 'sync delayed' : (draftCommentTarget ? 'comment blocked' : 'publish blocked')));
     if (!rateLimited && !cancelled) console.error(error);
   } finally {
     refreshPublicSendButtonState();
@@ -21585,11 +21599,15 @@ function persistPublicPublishProgress(job, patch = {}) {
   const cached = publicChannelFeedCache?.[job.channelId]?.feed ?? publicChannelFeedCache?.[job.channelId] ?? null;
   if (!cached) return null;
   const feed = { ...cached, posts: [...(cached.posts ?? [])] };
+  // Strip the ~16×47KB pre-signed variant BoCs before persisting (same rule as publishStateForHistory for
+  // private messages): the driver keeps them in ITS live publishState for rotation; a cross-reload resume
+  // falls back to the single externalBoc. Persisting them would write ~1.5MB per status notify.
+  const persistedState = publishStateForHistory(job.publishState);
   if (located.kind === 'post') {
-    feed.posts[located.postIndex] = { ...located.item, publishState: job.publishState, ...patch };
+    feed.posts[located.postIndex] = { ...located.item, publishState: persistedState, ...patch };
   } else {
     const post = { ...feed.posts[located.postIndex], comments: [...(feed.posts[located.postIndex].comments ?? [])] };
-    post.comments[located.commentIndex] = { ...located.item, publishState: job.publishState, ...patch };
+    post.comments[located.commentIndex] = { ...located.item, publishState: persistedState, ...patch };
     feed.posts[located.postIndex] = post;
   }
   feed.updatedAt = new Date().toISOString();
@@ -21597,6 +21615,26 @@ function persistPublicPublishProgress(job, patch = {}) {
   writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
   renderPublicSurface({ anchorUnread: false });
   return located;
+}
+
+// Remove an optimistic local record (user-cancelled publish: the composer restores the draft instead).
+function removeLocalPublicPendingRecord(ref) {
+  const located = findLocalPublicPendingRecord(ref.channelId, ref.localId);
+  if (!located) return;
+  const cached = publicChannelFeedCache?.[ref.channelId]?.feed ?? publicChannelFeedCache?.[ref.channelId] ?? null;
+  if (!cached) return;
+  const feed = { ...cached, posts: [...(cached.posts ?? [])] };
+  if (located.kind === 'post') {
+    feed.posts.splice(located.postIndex, 1);
+  } else {
+    const post = { ...feed.posts[located.postIndex], comments: [...(feed.posts[located.postIndex].comments ?? [])] };
+    post.comments.splice(located.commentIndex, 1);
+    feed.posts[located.postIndex] = post;
+  }
+  feed.updatedAt = new Date().toISOString();
+  publicChannelFeedCache = { ...publicChannelFeedCache, [ref.channelId]: { feed, syncedAt: feed.updatedAt } };
+  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  renderPublicSurface({ anchorUnread: false });
 }
 
 function stopPublicPublishConfirmation(job, patch = null) {
@@ -21705,10 +21743,18 @@ function resumePendingPublicPublishConfirmations() {
     for (const post of posts) {
       const candidates = [{ item: post, kind: 'post' }, ...(post?.comments ?? []).map((comment) => ({ item: comment, kind: 'comment' }))];
       for (const { item, kind } of candidates) {
-        if (!isPendingPublicFeedItem(item) || !item?.publishState) continue;
+        if (!isPendingPublicFeedItem(item)) continue;
+        const createdAt = Date.parse(item.createdAt ?? '') || Date.now();
+        // A record stuck at the optimistic pre-publishState stage (reload mid-signing) has nothing to heal —
+        // terminal it once past the no-progress deadline instead of showing 'sending' forever.
+        if (!item?.publishState) {
+          if (Date.now() - createdAt >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
+            persistPublicPublishProgress({ channelId, localId: item.id, publishState: null }, { publishStatus: 'public publish failed' });
+          }
+          continue;
+        }
         const key = `${channelId}:${item.id}`;
         if (publicPublishConfirmJobs.has(key)) continue;
-        const createdAt = Date.parse(item.createdAt ?? '') || Date.now();
         startPublicPublishConfirmation({ channelId, localId: item.id, kind, createdAt, publishState: item.publishState });
       }
     }
@@ -22079,34 +22125,49 @@ async function submitPublicPostThroughVault(draft = null) {
     attachments,
     commentsAllowed: resolvedDraft.commentsAllowed,
   });
+  // Private-composer parity: the post appears in the feed IMMEDIATELY (optimistic local record with a live
+  // private-style status), inserted as soon as the payloads exist so bodyHash-based merging with the on-chain
+  // twin keeps working. The publish pipeline streams part-state updates into the record via onPartState.
+  const ref = rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
+    blocks,
+    publishStatus: 'sending',
+    publishState: null,
+  });
+  const liveState = { publishState: null };
+  const onPartState = (part, publishState) => {
+    liveState.publishState = publishState;
+    if (ref) persistPublicPublishProgress({ ...ref, publishState }, { publishStatus: publishStateMeta(publishState) || 'sending' });
+  };
   let result;
   try {
-    result = await publishPublicPayloadParts(payloads, `public-${Date.now()}`);
+    result = await publishPublicPayloadParts(payloads, `public-${Date.now()}`, { onPartState });
   } catch (error) {
-    if (!isVaultPublishPartialError(error)) throw error;
+    if (isPublishPriceChangeCancelled(error)) {
+      // User-cancelled: drop the optimistic record; the composer handler restores the draft.
+      if (ref) removeLocalPublicPendingRecord(ref);
+      throw error;
+    }
+    if (!isVaultPublishPartialError(error)) {
+      if (ref) persistPublicPublishProgress({ ...ref, publishState: liveState.publishState }, { publishStatus: 'public publish failed' });
+      throw error;
+    }
     result = error.publishResult;
   }
+  // Patch the SAME optimistic record (never insert a second one). The badge renders private-style
+  // publishStateMeta text off the live publishState; publishStatus stays the machine-readable marker.
   if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, { blocks });
+    if (ref) persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: null });
     setPublicStatus('public published');
   } else if (result?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    const ref = rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
-      blocks,
-      publishStatus: 'partial public publish',
-      publishState: result.publishState ?? null,
-    });
-    if (ref && result.publishState) {
-      startPublicPublishConfirmation({ ...ref, kind: 'post', createdAt: Date.now(), publishState: result.publishState });
+    if (ref) {
+      persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: 'partial public publish' });
+      if (result.publishState) startPublicPublishConfirmation({ ...ref, kind: 'post', createdAt: Date.now(), publishState: result.publishState });
     }
     setPublicStatus('partial public publish');
   } else if (result?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    const ref = rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
-      blocks,
-      publishStatus: 'public publish submitted',
-      publishState: result.publishState ?? null,
-    });
-    if (ref && result.publishState) {
-      startPublicPublishConfirmation({ ...ref, kind: 'post', createdAt: Date.now(), publishState: result.publishState });
+    if (ref) {
+      persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: 'public publish submitted' });
+      if (result.publishState) startPublicPublishConfirmation({ ...ref, kind: 'post', createdAt: Date.now(), publishState: result.publishState });
     }
     setPublicStatus('public publish submitted');
   } else {
@@ -22131,34 +22192,45 @@ async function submitPublicCommentThroughVault(parent, bodyText = null, draftAtt
     attachments,
     parent,
   });
+  // Private-composer parity: insert the optimistic local comment immediately (live private-style status), then
+  // stream part-state updates into it; patch the SAME record on result — never insert a second one.
+  const ref = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
+    blocks,
+    publishStatus: 'sending',
+    publishState: null,
+  });
+  const liveState = { publishState: null };
+  const onPartState = (part, publishState) => {
+    liveState.publishState = publishState;
+    if (ref) persistPublicPublishProgress({ ...ref, publishState }, { publishStatus: publishStateMeta(publishState) || 'sending' });
+  };
   let result;
   try {
-    result = await publishPublicPayloadParts(payloads, `public-comment-${Date.now()}`);
+    result = await publishPublicPayloadParts(payloads, `public-comment-${Date.now()}`, { onPartState });
   } catch (error) {
-    if (!isVaultPublishPartialError(error)) throw error;
+    if (isPublishPriceChangeCancelled(error)) {
+      if (ref) removeLocalPublicPendingRecord(ref);
+      throw error;
+    }
+    if (!isVaultPublishPartialError(error)) {
+      if (ref) persistPublicPublishProgress({ ...ref, publishState: liveState.publishState }, { publishStatus: 'public publish failed' });
+      throw error;
+    }
     result = error.publishResult;
   }
   if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, { blocks });
+    if (ref) persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: null });
     setPublicStatus('comment published');
   } else if (result?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    const partialRef = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
-      blocks,
-      publishStatus: 'partial comment publish',
-      publishState: result.publishState ?? null,
-    });
-    if (partialRef && result.publishState) {
-      startPublicPublishConfirmation({ ...partialRef, kind: 'comment', createdAt: Date.now(), publishState: result.publishState });
+    if (ref) {
+      persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: 'partial comment publish' });
+      if (result.publishState) startPublicPublishConfirmation({ ...ref, kind: 'comment', createdAt: Date.now(), publishState: result.publishState });
     }
     setPublicStatus('partial comment publish');
   } else if (result?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    const submittedRef = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
-      blocks,
-      publishStatus: 'comment submitted',
-      publishState: result.publishState ?? null,
-    });
-    if (submittedRef && result.publishState) {
-      startPublicPublishConfirmation({ ...submittedRef, kind: 'comment', createdAt: Date.now(), publishState: result.publishState });
+    if (ref) {
+      persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: 'comment submitted' });
+      if (result.publishState) startPublicPublishConfirmation({ ...ref, kind: 'comment', createdAt: Date.now(), publishState: result.publishState });
     }
     setPublicStatus('comment submitted');
   } else {
