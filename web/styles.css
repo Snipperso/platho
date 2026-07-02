@@ -3514,3 +3514,17 @@ button.feed-item:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Public publish status badge (own pending posts/comments): the background confirm driver's visible state.
+   CSS classes only — the production CSP (style-src 'self') silently kills inline styles. */
+.public-publish-status {
+  color: var(--text-muted, #8b949e);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.public-publish-status--failed {
+  color: var(--danger, #f85149);
+  font-style: normal;
+  font-weight: 600;
+}

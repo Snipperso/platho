@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v632';
+const PLATHO_APP_RUNTIME_VERSION = 'v633';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -783,6 +783,10 @@ let privateSendRetrySeq = 0;
 const privateSendRetryJobs = new Map();
 let privatePublishConfirmSeq = 0;
 const privatePublishConfirmJobs = new Map();
+// PUBLIC posts/comments get the SAME background heal/confirm guarantees as private messages (owner symmetric-
+// case audit 2026-07-02): keyed `${channelId}:${localId}` of the local pending feed record. Without a driver a
+// deferred 2nd batch was never POSTed and its orphaned nonce POISONED the floor for every later send.
+const publicPublishConfirmJobs = new Map();
 const tonWalletBalanceCache = new Map();
 const tonWalletBalanceInFlight = new Map();
 const VAULT_RECEIVE_CRYPTO_SUITE = CRYPTO_SUITES.HYBRID_V1;
@@ -2377,6 +2381,10 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   }
   privatePublishConfirmJobs.clear();
   privatePublishConfirmSeq = 0;
+  for (const job of publicPublishConfirmJobs.values()) {
+    if (job?.timer) window.clearTimeout(job.timer);
+  }
+  publicPublishConfirmJobs.clear();
   activeRuntimeWalletAddress = null;
   clearMessageAutoSyncTimer();
   clearMessageAutoSyncCountdownTimer();
@@ -4908,6 +4916,14 @@ function renderPublicFeed(items, options = {}) {
       meta.append(span);
     }
     authorRow.append(authorAvatar, meta);
+    // Own pending publishes carry a status badge ('public publish submitted…' / 'public publish failed') —
+    // CSS classes only (prod CSP style-src 'self' silently kills inline styles).
+    if (isPendingPublicFeedItem(item) && item.publishStatus) {
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `public-publish-status${String(item.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
+      statusBadge.textContent = item.publishStatus;
+      meta.append(statusBadge);
+    }
     // The "Display as" chevron lives top-right in the author row.
     const feedIdentityButton = publicItemIdentityButton(item);
     if (feedIdentityButton) authorRow.append(feedIdentityButton);
@@ -9136,6 +9152,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     renderThreads();
     renderConversation();
     resumePendingPrivatePublishConfirmations();
+  resumePendingPublicPublishConfirmations();
     resumePendingPrivateSendRetries();
     return result;
   }
@@ -9147,6 +9164,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   }
   refreshMessagingControls();
   resumePendingPrivatePublishConfirmations();
+  resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
   return result;
 }
@@ -9613,6 +9631,7 @@ async function restoreEncryptedMessageHistory() {
       renderThreads();
       renderConversation();
       resumePendingPrivatePublishConfirmations();
+  resumePendingPublicPublishConfirmations();
       resumePendingPrivateSendRetries();
     }
   } catch (error) {
@@ -21538,6 +21557,164 @@ async function runPrivateSendRetry(context) {
   }
 }
 
+// ===== PUBLIC publish confirm driver (symmetric to the private one, owner audit 2026-07-02) =====
+// A lightweight background job per not-yet-confirmed PUBLIC post/comment that reuses the SAME idempotent core
+// as private sends: retryUnconfirmedVaultPublishBroadcasts (fresh-variant heal ladder, <=1 sendBoc per pass —
+// the v630 lesson reused as code, not copied) + confirmCapsuleHubPublishEntries + the same cadence/terminal
+// constants. Without it a deferred 2nd batch was NEVER POSTed (no healer) and its orphaned nonce poisoned the
+// floor for every later send. Resume-on-reload works off the publishState already persisted in
+// publicChannelFeedCache. NO re-sign surface here (phase 1): only fixed-nonce re-broadcasts -> no double-spend.
+function findLocalPublicPendingRecord(channelId, localId) {
+  const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
+  const posts = cached?.posts ?? [];
+  for (let i = 0; i < posts.length; i += 1) {
+    if (posts[i]?.id === localId) return { kind: 'post', item: posts[i], postIndex: i };
+    const comments = posts[i]?.comments ?? [];
+    for (let j = 0; j < comments.length; j += 1) {
+      if (comments[j]?.id === localId) return { kind: 'comment', item: comments[j], postIndex: i, commentIndex: j };
+    }
+  }
+  return null;
+}
+
+// Write the driver's LIVE publishState (each feed sync rebuilds the cache via safeClone, detaching references)
+// plus any patch back into the cached record, persist, repaint.
+function persistPublicPublishProgress(job, patch = {}) {
+  const located = findLocalPublicPendingRecord(job.channelId, job.localId);
+  if (!located) return null;
+  const cached = publicChannelFeedCache?.[job.channelId]?.feed ?? publicChannelFeedCache?.[job.channelId] ?? null;
+  if (!cached) return null;
+  const feed = { ...cached, posts: [...(cached.posts ?? [])] };
+  if (located.kind === 'post') {
+    feed.posts[located.postIndex] = { ...located.item, publishState: job.publishState, ...patch };
+  } else {
+    const post = { ...feed.posts[located.postIndex], comments: [...(feed.posts[located.postIndex].comments ?? [])] };
+    post.comments[located.commentIndex] = { ...located.item, publishState: job.publishState, ...patch };
+    feed.posts[located.postIndex] = post;
+  }
+  feed.updatedAt = new Date().toISOString();
+  publicChannelFeedCache = { ...publicChannelFeedCache, [job.channelId]: { feed, syncedAt: feed.updatedAt } };
+  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  renderPublicSurface({ anchorUnread: false });
+  return located;
+}
+
+function stopPublicPublishConfirmation(job, patch = null) {
+  const key = `${job.channelId}:${job.localId}`;
+  const existing = publicPublishConfirmJobs.get(key);
+  if (existing?.timer) window.clearTimeout(existing.timer);
+  publicPublishConfirmJobs.delete(key);
+  if (patch) persistPublicPublishProgress(job, patch);
+}
+
+function schedulePublicPublishConfirmationPass(job, delayMs) {
+  const key = `${job.channelId}:${job.localId}`;
+  const existing = publicPublishConfirmJobs.get(key);
+  if (existing?.timer) window.clearTimeout(existing.timer);
+  job.timer = window.setTimeout(() => {
+    runPublicPublishConfirmationPass(job).catch((error) => console.error(error));
+  }, Math.max(250, delayMs));
+  publicPublishConfirmJobs.set(key, job);
+}
+
+function startPublicPublishConfirmation(record) {
+  if (!record?.channelId || !record?.localId || !record?.publishState) return;
+  const job = {
+    channelId: record.channelId,
+    localId: record.localId,
+    kind: record.kind ?? 'post',
+    createdAt: Number(record.createdAt) || Date.now(),
+    publishState: record.publishState,
+    timer: null,
+  };
+  console.info('[platho] send timeline', { event: 'public publish confirm driver started', key: `${job.channelId}:${job.localId}` });
+  schedulePublicPublishConfirmationPass(job, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS);
+}
+
+async function runPublicPublishConfirmationPass(job) {
+  // Re-locate first: record gone, or already merged with its on-chain twin (entryId set / bodyHash merge in
+  // mergeLocalPendingPublicFeed) -> quiet success stop.
+  const located = findLocalPublicPendingRecord(job.channelId, job.localId);
+  if (!located || !isPendingPublicFeedItem(located.item)) {
+    stopPublicPublishConfirmation(job);
+    return;
+  }
+  // Don't fight the serial pump while a chain sync pass is in flight (same rule as the private driver).
+  if (privateChainSyncPromise) {
+    schedulePublicPublishConfirmationPass(job, 2_500);
+    return;
+  }
+  const ageMs = Date.now() - job.createdAt;
+  const publishState = job.publishState;
+  // Age terminals BEFORE any RPC — also protects resume-after-long-offline from an RPC storm: stale records
+  // terminal out without a single request.
+  if (publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && ageMs >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
+    console.warn('[platho] public publish: no-progress terminal', { key: `${job.channelId}:${job.localId}` });
+    stopPublicPublishConfirmation(job, { publishStatus: 'public publish failed' });
+    setPublicStatus('publish failed');
+    return;
+  }
+  if (Number(publishState?.confirmedCount ?? 0) === 0
+    && Number(publishState?.submittedCount ?? 0) === 0
+    && ageMs >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS
+    && publishStateBroadcastIsFailing(publishState)) {
+    console.warn('[platho] public publish: broadcast-unavailable terminal', { key: `${job.channelId}:${job.localId}` });
+    stopPublicPublishConfirmation(job, { publishStatus: 'public publish failed' });
+    setPublicStatus('publish failed');
+    return;
+  }
+  let passError = null;
+  try {
+    await retryUnconfirmedVaultPublishBroadcasts(publishState, {
+      deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
+      readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
+      sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
+      queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
+    });
+    await confirmCapsuleHubPublishEntries(publishState, {
+      deadlineMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS,
+      requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
+      queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
+      owner: resolvePublishOwner(publishState),
+    });
+  } catch (error) {
+    passError = error;
+    noteTonRpcRateLimit(error);
+  }
+  if (publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+    const entryId = publishState.parts?.find((part) => part?.entryId !== undefined && part?.entryId !== null)?.entryId ?? null;
+    stopPublicPublishConfirmation(job, {
+      publishStatus: null,
+      ...(entryId === null ? {} : { entryId: String(entryId) }),
+    });
+    setPublicStatus(job.kind === 'comment' ? 'comment published' : 'public published');
+    return;
+  }
+  persistPublicPublishProgress(job);
+  // Same cadence engine as private: the shim exposes exactly what privatePublishConfirmDelayMs reads
+  // (publishState + createdAtMs), honoring 429 backoffs, settle/active/unlanded/stretch windows.
+  const delayMs = privatePublishConfirmDelayMs({ publishState, createdAtMs: job.createdAt }, passError);
+  schedulePublicPublishConfirmationPass(job, delayMs);
+}
+
+function resumePendingPublicPublishConfirmations() {
+  const channels = publicChannelFeedCache ?? {};
+  for (const [channelId, entry] of Object.entries(channels)) {
+    const posts = entry?.feed?.posts ?? entry?.posts ?? [];
+    for (const post of posts) {
+      const candidates = [{ item: post, kind: 'post' }, ...(post?.comments ?? []).map((comment) => ({ item: comment, kind: 'comment' }))];
+      for (const { item, kind } of candidates) {
+        if (!isPendingPublicFeedItem(item) || !item?.publishState) continue;
+        const key = `${channelId}:${item.id}`;
+        if (publicPublishConfirmJobs.has(key)) continue;
+        const createdAt = Date.parse(item.createdAt ?? '') || Date.now();
+        startPublicPublishConfirmation({ channelId, localId: item.id, kind, createdAt, publishState: item.publishState });
+      }
+    }
+  }
+}
+
 function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachment = null, options = {}) {
   const channelId = ensurePublicChannelForAuthorWallet(plathoWallet?.address, {
     activate: false,
@@ -21549,8 +21726,9 @@ function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachm
     : { version: 1, channelId, updatedAt: null, posts: [] };
   const attachments = normalizePublicImageAttachments(attachment);
   const blocks = options.blocks ?? displayBlocksFromDocumentBlocks(publicDocumentBlocksFromDraft(text, attachments));
+  const localId = `local-${Date.now()}`;
   feed.posts.push({
-    id: `local-${Date.now()}`,
+    id: localId,
     text: messagePreviewFromBlocks(blocks) || text,
     blocks,
     imageUrl: blocks.length > 0 ? undefined : attachments[0]?.dataUrl,
@@ -21575,6 +21753,8 @@ function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachm
   renderPublicSurface({ anchorUnread: false });
   renderThreads();
   renderConversation();
+  // Reference for the public publish confirm driver (heal/confirm of a not-yet-confirmed publish).
+  return { channelId, localId };
 }
 
 function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, options = {}) {
@@ -21588,12 +21768,13 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, o
     String(post.entryId ?? post.id) === String(parent.entryId ?? parent.id)
     && (!parent.bodyHash || !post.bodyHash || String(post.bodyHash).toLowerCase() === String(parent.bodyHash).toLowerCase())
   ));
+  const commentLocalId = `local-comment-${Date.now()}`;
   if (index >= 0) {
     const post = { ...feed.posts[index], comments: [...(feed.posts[index].comments ?? [])] };
     const attachments = normalizePublicImageAttachments(attachment);
     const blocks = options.blocks ?? displayBlocksFromDocumentBlocks(publicDocumentBlocksFromDraft(text, attachments));
     post.comments.push({
-      id: `local-comment-${Date.now()}`,
+      id: commentLocalId,
       entryId: null,
       parentEntryId: String(parent.entryId),
       parentHash: parent.bodyHash,
@@ -21620,6 +21801,8 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, o
   writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: false });
+  // Reference for the public publish confirm driver (heal/confirm of a not-yet-confirmed publish).
+  return { channelId, localId: commentLocalId };
 }
 
 function imagePartsForSend(attachment, label = 'image') {
@@ -21844,7 +22027,9 @@ async function publishPublicPayloadParts(payloads, idPrefix, options = {}) {
   return publishCapsulesThroughVault(payloads.map((payload, index) => ({
     id: `${idPrefix}-${index}`,
     publish: publicPublishDraftFromPayload(payload),
-  })), { ...options, allowOwnVaultActionReadFallback: true, confirmFinalNonce: options.confirmFinalNonce ?? true });
+  // NOTE: the old confirmFinalNonce option is DEAD since v616 (shouldConfirmVaultPublishNonceAfterSend ignores
+  // options) — the final batch is confirmed/healed by the public publish confirm driver instead.
+  })), { ...options, allowOwnVaultActionReadFallback: true });
 }
 
 async function createPublicPayloadParts({ type, text, attachments = publicImageAttachments, commentsAllowed = true, parent = null }) {
@@ -21905,18 +22090,24 @@ async function submitPublicPostThroughVault(draft = null) {
     rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, { blocks });
     setPublicStatus('public published');
   } else if (result?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
+    const ref = rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
       blocks,
       publishStatus: 'partial public publish',
       publishState: result.publishState ?? null,
     });
+    if (ref && result.publishState) {
+      startPublicPublishConfirmation({ ...ref, kind: 'post', createdAt: Date.now(), publishState: result.publishState });
+    }
     setPublicStatus('partial public publish');
   } else if (result?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
+    const ref = rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
       blocks,
       publishStatus: 'public publish submitted',
       publishState: result.publishState ?? null,
     });
+    if (ref && result.publishState) {
+      startPublicPublishConfirmation({ ...ref, kind: 'post', createdAt: Date.now(), publishState: result.publishState });
+    }
     setPublicStatus('public publish submitted');
   } else {
     setPublicStatus('publish ready');
@@ -21951,18 +22142,24 @@ async function submitPublicCommentThroughVault(parent, bodyText = null, draftAtt
     rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, { blocks });
     setPublicStatus('comment published');
   } else if (result?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
+    const partialRef = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
       blocks,
       publishStatus: 'partial comment publish',
       publishState: result.publishState ?? null,
     });
+    if (partialRef && result.publishState) {
+      startPublicPublishConfirmation({ ...partialRef, kind: 'comment', createdAt: Date.now(), publishState: result.publishState });
+    }
     setPublicStatus('partial comment publish');
   } else if (result?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
+    const submittedRef = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
       blocks,
       publishStatus: 'comment submitted',
       publishState: result.publishState ?? null,
     });
+    if (submittedRef && result.publishState) {
+      startPublicPublishConfirmation({ ...submittedRef, kind: 'comment', createdAt: Date.now(), publishState: result.publishState });
+    }
     setPublicStatus('comment submitted');
   } else {
     setPublicStatus('publish ready');
@@ -22306,6 +22503,7 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', () => {
   clearTelegramBackgroundLockTimer();
   resumePendingPrivatePublishConfirmations();
+  resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
   scheduleWalletUnlockPrompt();
   scheduleMessageAutoSync(2_000);
@@ -22321,6 +22519,7 @@ window.addEventListener('pageshow', () => {
 window.addEventListener('focus', () => {
   clearTelegramBackgroundLockTimer();
   resumePendingPrivatePublishConfirmations();
+  resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
   scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
