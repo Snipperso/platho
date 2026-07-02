@@ -4212,6 +4212,28 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).toMatch(/prunePublicPostsBelowFloor\(/);
   });
 
+  it('PWA-PUBLIC-COMMENTS-BACKGROUND-FREE: comments load ONLY on thread open — no background walker exists (owner scalability requirement 2026-07-02)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const syncPublicSource = app.slice(
+      app.indexOf('async function syncPublicChannelFromChain'),
+      app.indexOf('async function syncPublicChannels'),
+    );
+    // The background feed sync must never touch the parent (comment) index or the on-demand loader. (The name
+    // appears in an explanatory comment inside the sync — forbid the CALL form, not the mention.)
+    expect(syncPublicSource).not.toMatch(/getPublicParentIndex\(/);
+    expect(syncPublicSource).not.toMatch(/loadPublicPostComments\(/);
+    // The parent-index walk has exactly ONE entry point (the on-demand loader)...
+    expect(app.match(/\.getPublicParentIndex\(/g)?.length ?? 0).toBe(1);
+    // ...and the loader itself is invoked from exactly ONE place: refreshPublicPostDetailComments.
+    expect(app.match(/await loadPublicPostComments\(/g)?.length ?? 0).toBe(1);
+    // refreshPublicPostDetailComments fires only on user actions: opening the post detail + the retry button.
+    expect(app.match(/refreshPublicPostDetailComments\(\);/g)?.length ?? 0).toBe(2);
+    // The pre-warm on the "Comments" button render is LOCAL-ONLY (IndexedDB) — zero chain reads.
+    const warm = app.slice(app.indexOf('async function warmPublicPostCommentsCache'), app.indexOf('function openPublicPostDetail'));
+    expect(warm.length).toBeGreaterThan(0);
+    expect(warm).not.toMatch(/provider\.|getPublic|resolvePublic|runGetMethod/);
+  });
+
   it('PWA-PUBLIC-FEED-INLINE-COMMENTS-REMOVED: the feed render no longer shows inline comments (they load on the post detail), but the renderer stays for the detail', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const renderFeedSource = app.slice(
