@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v634';
+const PLATHO_APP_RUNTIME_VERSION = 'v635';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4768,6 +4768,14 @@ function appendPublicItemComments(article, item) {
     const commentMeta = document.createElement('div');
     commentMeta.className = 'feed-meta';
     commentMeta.textContent = [comment.author, comment.createdAt?.slice?.(0, 10)].filter(Boolean).join(' - ');
+    // Own pending comments show the SAME live private-style status badge as feed posts (publishStateMeta off
+    // the streaming publishState; durable red on a failed terminal). CSS classes only (prod CSP).
+    if (isPendingPublicFeedItem(comment) && comment.publishStatus) {
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `public-publish-status${String(comment.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
+      statusBadge.textContent = (comment.publishState ? publishStateMeta(comment.publishState) : null) || comment.publishStatus;
+      commentMeta.append(statusBadge);
+    }
     commentAuthorRow.append(commentAvatar, commentMeta);
     row.append(commentAuthorRow);
     appendPublicItemContent(row, comment);
@@ -21779,7 +21787,9 @@ function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachm
     blocks,
     imageUrl: blocks.length > 0 ? undefined : attachments[0]?.dataUrl,
     createdAt: new Date().toISOString(),
-    author: 'you',
+    // Same author label the chain sync will assign (username or short wallet) — never a placeholder 'you',
+    // so the optimistic record looks identical to its merged on-chain twin (owner-flagged).
+    author: publicAuthorLabel(plathoWallet?.address),
     authorWallet: plathoWallet?.address ?? null,
     profileVersion: profilePointer.profileVersion,
     avatarHash: profilePointer.avatarHash,
@@ -21828,7 +21838,8 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, o
       blocks,
       imageUrl: blocks.length > 0 ? undefined : attachments[0]?.dataUrl,
       createdAt: new Date().toISOString(),
-      author: 'you',
+      // Same author label the chain sync will assign (username or short wallet), identical to the merged twin.
+      author: publicAuthorLabel(plathoWallet?.address),
       authorWallet: plathoWallet?.address ?? null,
       profileVersion: profilePointer.profileVersion,
       avatarHash: profilePointer.avatarHash,
