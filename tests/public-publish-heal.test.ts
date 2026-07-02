@@ -111,33 +111,81 @@ describe('public publish heal driver guard', () => {
     expect(app).toMatch(/publicPostCommentsCache\.clear\(\);/);
   });
 
-  it('PWA-PUBLIC-HEAL-09: comment PART bodies persist per-entry + unconditionally (the private-message model — no image re-download on reload)', () => {
-    // A separate per-ENTRY durable store (like private per-message history), keyed channelId:entryId.
-    expect(app).toMatch(/const publicCommentPartStorePromise = \(\(\) => \{/);
-    expect(app).toMatch(/scopedIndexedDbName\('platho-public-comment-parts-v1'\)/);
-    expect(app).toMatch(/async function readCachedCommentPart\(cacheKey\)/);
-    expect(app).toMatch(/async function writeCachedCommentPart\(cacheKey, part\)/);
-    // Bytes are base64'd for JSON (a raw Uint8Array serializes to a corrupt object) — imageUrl-style data URLs
-    // don't exist at the PART level yet, so we store the raw image/document bytes as base64 and rehydrate.
-    expect(app).toMatch(/imageBytes: part\.imageBytes\?\.length \? bytesToBase64\(part\.imageBytes\) : undefined/);
-    expect(app).toMatch(/part\.imageBytes = typeof raw\.imageBytes === 'string' \? base64ToBytes\(raw\.imageBytes\) : undefined/);
-    expect(app).toMatch(/function base64ToBytes\(base64\)/);
-    // resolveEntryToCommentPart reads the per-entry cache BEFORE the chain, and writes the resolved part
-    // UNCONDITIONALLY (fire-and-forget) — NOT gated on a clean walk, so one flaky sibling never blocks the rest.
-    const resolver = app.slice(app.indexOf('const resolveEntryToCommentPart = async'), app.indexOf('for (const entryId of ids) {'));
-    const readIdx = resolver.indexOf('const cachedPart = await readCachedCommentPart(partKey);');
-    const chainIdx = resolver.indexOf('payload = await resolvePublicEntryPayload(');
-    const writeIdx = resolver.indexOf('writeCachedCommentPart(partKey, part);');
+  it('PWA-PUBLIC-HEAL-09: public entry BODIES persist per-entry + unconditionally (the private-message model — no body re-download on reload)', () => {
+    // A per-ENTRY durable BoC store hooked into resolvePublicEntryPayload — the single funnel every public body
+    // reader (feed sync, post detail, avatar payloads) goes through. Hash-pinned: a hit is accepted only when the
+    // stored body_hash matches the entry's on-chain hash (bodies are immutable, so a match is authoritative).
+    expect(app).toMatch(/const publicEntryBodyStorePromise = \(\(\) => \{/);
+    expect(app).toMatch(/scopedIndexedDbName\('platho-public-entry-bodies-v1'\)/);
+    expect(app).toMatch(/async function readCachedPublicEntryBody\(entryId\)/);
+    expect(app).toMatch(/async function writeCachedPublicEntryBody\(entryId, bodyBoc, bodyHashHex\)/);
+    const funnel = app.slice(app.indexOf('async function resolvePublicEntryPayload'), app.indexOf('async function resolvePrivateEntryBody'));
+    const readIdx = funnel.indexOf('const cachedBody = await readCachedPublicEntryBody(entry?.entry_id);');
+    const chainIdx = funnel.indexOf('await provider.resolvePublicEntryBody(entry, {');
+    const writeIdx = funnel.indexOf('writeCachedPublicEntryBody(entry.entry_id, hydrated.body_boc, entryBodyHashHex);');
     expect(readIdx).toBeGreaterThan(-1);
     expect(chainIdx).toBeGreaterThan(-1);
-    expect(readIdx).toBeLessThan(chainIdx); // cache read precedes the chain body read
-    expect(resolver).toMatch(/if \(cachedPart\) \{ commentParts\.push\(cachedPart\); return; \}/);
-    expect(writeIdx).toBeGreaterThan(chainIdx); // resolved part persisted after assembly
-    // The write is NOT behind the degraded gate: `!result.degraded` never appears inside the resolver.
-    expect(resolver).not.toMatch(/!result\.degraded/);
-    // A degraded post load STILL persists the assembled snapshot (accumulate-never-wipe) with latestLink=null so
-    // resolved images paint on the next open while the unchanged-shortcut stays disarmed on an incomplete feed.
+    expect(readIdx).toBeLessThan(chainIdx); // durable read precedes the ~32KB live body read
+    expect(writeIdx).toBeGreaterThan(chainIdx); // live resolve persists unconditionally (fire-and-forget)
+    expect(funnel).toMatch(/cachedBody\.body_hash === entryBodyHashHex/); // hash-pinned hit
+    // The cached path re-parses through the SAME pipeline as a live read (zero decode drift).
+    expect(funnel).toMatch(/hydrated = \{ \.\.\.entry, body_boc: cachedBody\.body_boc \};/);
+    // A degraded detail load still persists the assembled snapshot (accumulate-never-wipe) with latestLink=null.
     const refresh = app.slice(app.indexOf('async function refreshPublicPostDetailComments'), app.indexOf('async function refreshPublicPostDetailComments') + 3600);
     expect(refresh).toMatch(/writeCachedPublicComments\(cacheKey, durablePartial, publicPostDetailParentExists === true, null\)/);
+    // The detail unions BOTH real comment sources: feed-sync (author-indexed legacy comments — chain forensics
+    // 2026-07-02: every pre-fix comment has parent_link=0, invisible to get_public_parent_index forever) and the
+    // parent-index walk (post-fix comments). Chain/durable copies win collisions (they carry the image data URL).
+    const merged = app.slice(app.indexOf('function publicPostDetailMergedComments'), app.indexOf('function publicPostDetailMergedComments') + 1800);
+    expect(merged).toMatch(/return mergePublicComments\(cached, chain\);/);
+  });
+});
+
+describe('public comment parent_link publish wiring', () => {
+  // Chain forensics (2026-07-02, mainnet probe): EVERY public entry since genesis had parent_link=0 and
+  // get_public_parent_index(entryId) returned exists=false for all posts — comments were silently published as
+  // top-level posts because publishItemToBatchPart DROPPED parent_entry_id from the public part mapping. These
+  // tests pin the full client pipeline: draft -> batch part -> part cell bits the contract actually reads.
+  it('PWA-PUBLIC-PARENT-01: publishItemToBatchPart carries the comment parent and the part cell encodes parent_link=parentEntryId+1', async () => {
+    const [{ buildBatchPublishPartCell, tonCell }, { publishItemToBatchPart }, { Cell }] = await Promise.all([
+      import('../web/pwa-contract-transactions.mjs'),
+      import('../web/publish-batch-orchestration.mjs'),
+      import('@ton/core'),
+    ]);
+    const headerCell = tonCell.snakeCellFromBytes(new Uint8Array([1, 2, 3]), 'header');
+    const bodyCell = tonCell.snakeCellFromBytes(new Uint8Array([4, 5, 6]), 'body');
+    const asPayload = (cell) => ({ boc: tonCell.bytesToBase64(tonCell.serializeBoc(cell)) });
+    const draft = (parentEntryId) => ({
+      publish: {
+        publish_kind: 1n,
+        size_class: 1n,
+        header_hash: '0x' + '11'.repeat(32),
+        body_hash: '0x' + '22'.repeat(32),
+        header_cell: asPayload(headerCell),
+        body_cell: asPayload(bodyCell),
+        ...(parentEntryId === undefined ? {} : { parent_entry_id: parentEntryId }),
+      },
+    });
+    const parentLinkOf = (item) => {
+      const part = publishItemToBatchPart(item, 'public');
+      const cell = Cell.fromBoc(Buffer.from(tonCell.serializeBoc(buildBatchPublishPartCell(part))))[0];
+      const s = cell.beginParse();
+      s.loadUint(8); s.loadUint(8); // size_class, reserved
+      return s.loadUintBig(64); // parent_link — the exact field CapsuleHub loads at part.loadUint(64)
+    };
+    // A comment on entry 3 -> parent_link 4 (entryLink convention, parent indexed on-chain).
+    expect(parentLinkOf(draft(3n))).toBe(4n);
+    // Entry 0 stays unambiguous: a comment on entry 0 -> parent_link 1.
+    expect(parentLinkOf(draft(0n))).toBe(1n);
+    // A post (no parent) -> parent_link 0 (author-indexed).
+    expect(parentLinkOf(draft(undefined))).toBe(0n);
+  });
+
+  it('PWA-PUBLIC-PARENT-02: the mapping survives the field-name variants the app draft uses', async () => {
+    const { publishItemToBatchPart } = await import('../web/publish-batch-orchestration.mjs');
+    const base = { size_class: 1n, header_hash: '0x11', body_hash: '0x22', header_cell: { boc: 'x' }, body_cell: { boc: 'x' } };
+    expect(publishItemToBatchPart({ publish: { ...base, parent_entry_id: 7n } }, 'public').parent_entry_id).toBe(7n);
+    expect(publishItemToBatchPart({ publish: { ...base, parentEntryId: 7n } }, 'public').parent_entry_id).toBe(7n);
+    expect(publishItemToBatchPart({ publish: { ...base } }, 'public').parent_entry_id).toBeUndefined();
   });
 });

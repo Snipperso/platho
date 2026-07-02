@@ -115,6 +115,11 @@ export function publishItemToBatchPart(item, kindLabel = publishItemKindLabel(it
       body_hash: publish.body_hash ?? publish.bodyHash,
       header_cell: publish.header_cell ?? publish.headerCell ?? publish.header_0_cell ?? publish.header0Cell,
       body_cell: publish.body_cell ?? publish.bodyCell,
+      // Comment parent (undefined for posts). This mapping DROPPING the field was the root of "comments never
+      // land in the contract's public_parent_index": buildBatchPublishPartCell derives parent_link from it
+      // (publishPublicParentLink -> parentEntryId+1, 0 when absent), so without it EVERY comment published as a
+      // top-level post (author-indexed) and get_public_parent_index stayed empty for every post since genesis.
+      parent_entry_id: publish.parent_entry_id ?? publish.parentEntryId,
     };
   }
   return {

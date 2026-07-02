@@ -139,7 +139,7 @@ import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
-} from './publish-batch-orchestration.mjs?v=5';
+} from './publish-batch-orchestration.mjs?v=6';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=38';
 import {
   createCapsuleHubTonRpcProvider,
@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v643';
+const PLATHO_APP_RUNTIME_VERSION = 'v644';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1169,69 +1169,45 @@ async function writeCachedPublicComments(cacheKey, comments, parentExists, lates
   }
 }
 
-// PER-ENTRY durable cache of resolved comment PART bodies — the faithful private-message model. Private message
-// bodies persist UNCONDITIONALLY + INDIVIDUALLY the moment they resolve (writeMessageToEncryptedHistory) and are
-// restored at boot, so a private image NEVER re-downloads. Public comments previously had ONLY a per-POST snapshot
-// written all-or-nothing behind `if (!result.degraded)` — and an image comment is 1+ SEPARATE ~32KB entry bodies
-// (getPublicEntry returns body_boc:null so every part is a live getMessages read, cache-bypassed by
-// messageCacheTtlMs:0), so ONE flaky/rate-limited sibling part poisoned the whole post's write → the snapshot was
-// NEVER stored → every reload re-walked + re-downloaded the image (the owner-flagged bug). This store fixes the
-// ROOT: each resolved part is written here immediately + individually, and read BEFORE the chain. Comment bodies
-// are immutable + content-addressed (entryId), so a hit is authoritative and never stale — deployment-scoped
-// (shared across accounts, readable before unlock), never wallet-scoped. Large cap; LRU eviction just re-downloads.
-const publicCommentPartStorePromise = (() => {
+// PER-ENTRY durable cache of resolved PUBLIC ENTRY BODIES (raw base64 BoC + hash) — the faithful private-message
+// model applied at the RIGHT level. Private message bodies persist UNCONDITIONALLY + INDIVIDUALLY the moment they
+// resolve and are restored from IndexedDB, so a private image NEVER re-downloads. Public bodies (posts, comments,
+// every multipart image part) previously lived only in the provider's in-memory publishBodyCache: getPublicEntry
+// returns body_boc:null, so after a reload EVERY body was a live ~32KB getMessages read again (cache-bypassed by
+// messageCacheTtlMs:0) — the owner-flagged "images re-download from the blockchain on every reload", for the FEED
+// SYNC as much as the post detail. This store sits inside resolvePublicEntryPayload — the single funnel all 7
+// public body readers go through — keyed by entry_id with the entry's body_hash pinned: bodies are immutable +
+// content-addressed, so a hash-matched hit is authoritative and never stale. Caching the raw BoC (a base64
+// string, JSON-safe by construction) means the cached path re-parses through the EXACT same
+// tryReadPublicEntryPayload pipeline as a live read — zero decode drift. Deployment-scoped (public content,
+// readable before unlock), never wallet-scoped. LRU-capped; eviction just re-downloads.
+const publicEntryBodyStorePromise = (() => {
   try {
-    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-public-comment-parts-v1'), cap: 400 }).catch(() => null);
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-public-entry-bodies-v1'), cap: 500 }).catch(() => null);
   } catch {
     return Promise.resolve(null);
   }
 })();
 
-function commentPartCacheKey(channelId, entryId) {
+async function readCachedPublicEntryBody(entryId) {
   if (entryId === undefined || entryId === null) return null;
-  return `${channelId ?? ''}:${entryId}`;
-}
-
-// A resolved comment PART carries Uint8Array image/document bytes (imageUrl data URLs only exist AFTER
-// assemblePublicParts concatenates parts) — base64 them so the record is JSON-safe (a raw Uint8Array serializes
-// to a corrupt {"0":..} object). Everything else on the part is already a string/number.
-function serializeCommentPartForCache(part) {
-  return JSON.stringify({
-    ...part,
-    imageBytes: part.imageBytes?.length ? bytesToBase64(part.imageBytes) : undefined,
-    documentBytes: part.documentBytes?.length ? bytesToBase64(part.documentBytes) : undefined,
-    _bytesB64: true,
-  });
-}
-
-function deserializeCommentPartFromCache(json) {
-  let raw;
-  try { raw = JSON.parse(json); } catch { return null; }
-  if (!raw || typeof raw !== 'object' || raw._bytesB64 !== true) return null;
-  const part = { ...raw };
-  delete part._bytesB64;
-  part.imageBytes = typeof raw.imageBytes === 'string' ? base64ToBytes(raw.imageBytes) : undefined;
-  part.documentBytes = typeof raw.documentBytes === 'string' ? base64ToBytes(raw.documentBytes) : undefined;
-  return part;
-}
-
-async function readCachedCommentPart(cacheKey) {
-  if (!cacheKey) return null;
   try {
-    const store = await publicCommentPartStorePromise;
-    const record = await store?.get(cacheKey);
+    const store = await publicEntryBodyStorePromise;
+    const record = await store?.get(`entry:${entryId}`);
     if (typeof record?.url !== 'string' || record.url.length === 0) return null;
-    return deserializeCommentPartFromCache(record.url);
+    const parsed = JSON.parse(record.url);
+    if (typeof parsed?.body_boc !== 'string' || parsed.body_boc.length === 0) return null;
+    return parsed; // { body_boc, body_hash }
   } catch {
     return null;
   }
 }
 
-async function writeCachedCommentPart(cacheKey, part) {
-  if (!cacheKey || !part) return;
+async function writeCachedPublicEntryBody(entryId, bodyBoc, bodyHashHex) {
+  if (entryId === undefined || entryId === null || typeof bodyBoc !== 'string' || bodyBoc.length === 0) return;
   try {
-    const store = await publicCommentPartStorePromise;
-    await store?.put(cacheKey, serializeCommentPartForCache(part));
+    const store = await publicEntryBodyStorePromise;
+    await store?.put(`entry:${entryId}`, JSON.stringify({ body_boc: bodyBoc, body_hash: bodyHashHex ?? null }));
   } catch {
     /* ignore (quota / unavailable) */
   }
@@ -5145,19 +5121,18 @@ function publicPostDetailMergedComments() {
   const item = publicPostDetailItem;
   if (!item) return [];
   const chain = publicPostDetailChainComments;
-  // ONE image-bearing source of truth (exactly like private messages, which render inline from the encrypted
-  // history — never from a lossy overlay): CONFIRMED comments come ONLY from `chain` (the durable IndexedDB cache
-  // + the chain walk, both of which carry the image data URLs). The localStorage feed cache STRIPS every image on
-  // persist (omitHeavyFeedMediaForPersist), so a confirmed feed-cache comment would paint TEXT-WITHOUT-IMAGE and,
-  // on the empty-Map first frame after a reload, FLASH before the durable comments load — the owner-flagged
-  // "images reload from the blockchain". So from the feed cache we take ONLY local-PENDING comments (no confirmed
-  // entryId): a just-posted comment still confirming, whose image is still in memory this session.
+  // UNION of both real comment sources. Chain-forensics fact (probe 2026-07-02): every comment published before
+  // the publishItemToBatchPart parent_entry_id fix went on-chain with parent_link=0 — AUTHOR-indexed, invisible
+  // to get_public_parent_index forever. For those, the FEED SYNC (author-index walk) is the ONLY source, surfaced
+  // here via cachedCommentsForPost; the parent-index walk (`chain`) covers comments published after the fix.
+  // mergePublicComments favors its SECOND argument on entryId collision, so the chain/durable copy (which carries
+  // the image data URL) wins over a feed-cache copy (images stripped on persist). A local-pending copy (no
+  // entryId) is dropped once its body hash appears in the chain list.
   const cached = cachedCommentsForPost(item).filter((local) => {
-    const confirmed = local.entryId !== undefined && local.entryId !== null && local.entryId !== '';
-    if (confirmed) return false;
+    if (local.entryId !== undefined && local.entryId !== null && local.entryId !== '') return true;
     return !chain.some((chainComment) => samePublicBodyHash(local, chainComment));
   });
-  return mergePublicComments(chain, cached);
+  return mergePublicComments(cached, chain);
 }
 
 function publicDetailStatusNode(text, { retry = false } = {}) {
@@ -5423,13 +5398,8 @@ async function loadPublicPostComments(item, options = {}) {
 
   const commentParts = [];
   const resolveEntryToCommentPart = async (entry) => {
-    // PER-ENTRY durable cache FIRST (the private model: read the local body before the chain). Public comment
-    // bodies are immutable + content-addressed by entryId, so a hit is authoritative — zero ~32KB chain body
-    // reads, and an already-resolved image NEVER re-downloads on reload (even if a sibling part is flaky and the
-    // whole load degrades). Keyed by the POST's channelId (stable at read+write) + this entry id.
-    const partKey = commentPartCacheKey(item.channelId, entry.entry_id.toString());
-    const cachedPart = await readCachedCommentPart(partKey);
-    if (cachedPart) { commentParts.push(cachedPart); return; }
+    // Body durability lives INSIDE resolvePublicEntryPayload (the per-entry BoC cache): a comment body that
+    // resolved once is served locally on every later walk, so this resolver stays a thin assembler.
     let payload = null;
     try {
       payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
@@ -5468,11 +5438,6 @@ async function loadPublicPostComments(item, options = {}) {
       parentHash: payload.parentHash,
     };
     commentParts.push(part);
-    // Persist this resolved part UNCONDITIONALLY (fire-and-forget), regardless of whether the OVERALL post load
-    // ends up degraded — this is the fix: a body that resolved ONCE is durable forever, exactly like a private
-    // message. Next reload reads it above (zero chain reads); only genuinely-new parts still hit the chain, and
-    // they persist here in turn.
-    writeCachedCommentPart(partKey, part);
   };
   for (const entryId of ids) {
     const entry = walkedEntries.get(entryId.toString());
@@ -5789,14 +5754,30 @@ function tryReadPublicEntryPayload(entry, options = {}) {
 }
 
 async function resolvePublicEntryPayload(provider, entry, address, options = {}) {
-  const hydrated = entry?.body_boc || !provider?.resolvePublicEntryBody
-    ? entry
-    : await provider.resolvePublicEntryBody(entry, {
-      capsuleHubAddress: address,
-      vaultAddress: appConfig.vault?.address ?? null,
-      messageCacheTtlMs: 0,
-      priority: 'critical',
-    });
+  let hydrated = entry;
+  if (!entry?.body_boc && provider?.resolvePublicEntryBody) {
+    // Durable per-entry body cache FIRST (the private model: local body before the chain). The hit is accepted
+    // ONLY when the stored hash matches the entry's on-chain body_hash — bodies are immutable, so a match is
+    // authoritative; a mismatch/corrupt record silently falls through to the live read (which then re-writes it).
+    const entryBodyHashHex = entry?.body_hash !== undefined && entry?.body_hash !== null ? uint256Hex(entry.body_hash) : null;
+    const cachedBody = await readCachedPublicEntryBody(entry?.entry_id);
+    if (cachedBody && entryBodyHashHex && cachedBody.body_hash === entryBodyHashHex) {
+      hydrated = { ...entry, body_boc: cachedBody.body_boc };
+    } else {
+      hydrated = await provider.resolvePublicEntryBody(entry, {
+        capsuleHubAddress: address,
+        vaultAddress: appConfig.vault?.address ?? null,
+        messageCacheTtlMs: 0,
+        priority: 'critical',
+      });
+      // Persist the resolved body UNCONDITIONALLY (fire-and-forget) — per-entry, never gated on the caller's
+      // overall walk succeeding. A body that resolved once never re-downloads; every reader (feed sync, post
+      // detail, avatars-via-payload) shares the hit.
+      if (typeof hydrated?.body_boc === 'string' && hydrated.body_boc.length > 0 && entryBodyHashHex) {
+        writeCachedPublicEntryBody(entry.entry_id, hydrated.body_boc, entryBodyHashHex);
+      }
+    }
+  }
   const payload = tryReadPublicEntryPayload(hydrated, options);
   if (!payload) return null;
   const authorWallet = hydrated?.author_wallet ?? hydrated?.authorWallet;
@@ -14974,13 +14955,6 @@ function bytesToBase64(bytes) {
   let binary = '';
   for (const byte of input) binary += String.fromCharCode(byte);
   return btoa(binary);
-}
-
-function base64ToBytes(base64) {
-  const binary = atob(String(base64 ?? ''));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
 }
 
 function bytesToImageDataUrl(bytes, mime = 'image/webp') {
