@@ -256,12 +256,18 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v635<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v635'/);
+    // v637: Public is the primary tab — first in the rail (before Private) and the default view (matches the
+    // boot, which sets view=public when there are public channels; activeThreadId is null at boot).
+    expect(html).toMatch(/data-tab="public"[\s\S]*data-tab="chats"/);
+    expect(html).toMatch(/class="app-shell" data-view="public"/);
+    expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
+    expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
+    expect(html).toMatch(/id="appVersionLabel">v637<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v637'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=635" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=637" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4515,7 +4521,9 @@ describe('PWA runtime config guard', () => {
     const shared = config.match(/rateLimitKey: 'toncenter-shared'/g) ?? [];
     expect(shared.length).toBe(2);
     // Wallet teardown cancels the pending rail Vault-balance retry so it can't race the next boot's reads.
-    expect(app).toMatch(/function clearWalletScopedRuntimeState[\s\S]{0,900}clearNavVaultBalanceRetryTimer\(\)/);
+    // Window is 1200 (was 900): the reset function legitimately grew (public confirm-job timers + the public
+    // post-comments SWR cache are cleared here too). The guard still pins that the nav-balance timer is cleared.
+    expect(app).toMatch(/function clearWalletScopedRuntimeState[\s\S]{0,1200}clearNavVaultBalanceRetryTimer\(\)/);
   });
 
   it('PWA-CANONICAL-USERNAME-01: usernames display canonically (no .ath suffix) via displayIdentityLabel + threadDisplayLabel', () => {
@@ -5382,11 +5390,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v706/);
+    expect(sw).toMatch(/platho-pwa-prototype-v708/);
     expect(sw).toMatch(/\.\/styles\.css\?v=197/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=635/);
+    expect(sw).toMatch(/\.\/app\.js\?v=637/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

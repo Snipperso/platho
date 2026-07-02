@@ -97,4 +97,17 @@ describe('public publish heal driver guard', () => {
     // The open post-detail screen refreshes on every progress write-back.
     expect(app).toMatch(/if \(publicPostDetailOpen\) renderPublicPostDetail\(\);/);
   });
+
+  it('PWA-PUBLIC-HEAL-08: post-detail comments are cached stale-while-revalidate (no re-download flash)', () => {
+    // A per-post SWR cache keyed by channel+entryId; reopening paints cached comments before the background load.
+    expect(app).toMatch(/const publicPostCommentsCache = new Map\(\)/);
+    expect(app).toMatch(/const cached = publicPostCommentsCache\.get\(publicPostCommentsCacheKey\(item\)\);/);
+    expect(app).toMatch(/publicPostDetailLoadState = publicPostDetailChainComments\.length > 0 \? 'ready' : 'loading';/);
+    // A fresh authoritative (non-degraded) load populates the cache (bounded LRU) — a degraded read must NOT.
+    const refresh = app.slice(app.indexOf('async function refreshPublicPostDetailComments'), app.indexOf('async function refreshPublicPostDetailComments') + 1400);
+    expect(refresh).toMatch(/if \(cacheKey\) \{[\s\S]*publicPostCommentsCache\.set\(cacheKey, \{ comments: result\.comments/);
+    expect(refresh).toMatch(/while \(publicPostCommentsCache\.size > 24\)/);
+    // Cleared on account switch alongside the other public state.
+    expect(app).toMatch(/publicPostCommentsCache\.clear\(\);/);
+  });
 });

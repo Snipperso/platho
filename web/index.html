@@ -17,7 +17,7 @@
     <script src="./boot-guard.js?v=3"></script>
   </head>
   <body>
-    <div class="app-shell" data-view="chats">
+    <div class="app-shell" data-view="public">
       <aside class="sidebar" aria-label="Navigation">
         <div class="brand">
           <img class="brand-mark" src="./assets/platho-icon-192.png?v=3" alt="" width="34" height="34">
@@ -26,7 +26,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel">network</span>
-              <span class="app-version-label" id="appVersionLabel">v635</span>
+              <span class="app-version-label" id="appVersionLabel">v637</span>
             </div>
           </div>
         </div>
@@ -37,13 +37,13 @@
             <strong data-nav-vault-ton>0 GRAM</strong>
             <strong data-nav-vault-ath>0 ATH</strong>
           </div>
-          <button class="rail-item is-active" type="button" data-tab="chats" aria-label="Private" title="Private">
-            <span class="icon icon-chat"></span>
-            <span>Private</span>
-          </button>
-          <button class="rail-item" type="button" data-tab="public" aria-label="Public" title="Public">
+          <button class="rail-item is-active" type="button" data-tab="public" aria-label="Public" title="Public">
             <span class="icon icon-broadcast"></span>
             <span>Public</span>
+          </button>
+          <button class="rail-item" type="button" data-tab="chats" aria-label="Private" title="Private">
+            <span class="icon icon-chat"></span>
+            <span>Private</span>
           </button>
           <button class="rail-item" type="button" data-tab="vault" aria-label="Vault" title="Vault">
             <span class="icon icon-vault"></span>
@@ -57,7 +57,7 @@
       </aside>
 
       <main class="workspace">
-        <section class="list-pane view-panel is-active" data-panel="chats" aria-label="Private">
+        <section class="list-pane view-panel" data-panel="chats" aria-label="Private">
           <header class="pane-header">
             <div class="pane-title-block">
               <h1>Platho.app</h1>
@@ -85,7 +85,7 @@
           <div class="thread-list" id="threadList"></div>
         </section>
 
-        <section class="content-pane chat-pane view-panel is-active" data-panel="chats" aria-label="Conversation">
+        <section class="content-pane chat-pane view-panel" data-panel="chats" aria-label="Conversation">
           <header class="conversation-header">
             <button class="icon-button chat-back-button" id="backToChatsButton" type="button" aria-label="Back to private" title="Back to private">
               <span class="icon icon-back"></span>
@@ -150,7 +150,7 @@
           </form>
         </section>
 
-        <section class="content-pane public-pane view-panel" data-panel="public" aria-label="Public feed">
+        <section class="content-pane public-pane view-panel is-active" data-panel="public" aria-label="Public feed">
           <header class="pane-header inline">
             <div class="pane-title-block">
               <h1>Platho.app</h1>
@@ -618,6 +618,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=635" type="module"></script>
+    <script src="./app.js?v=637" type="module"></script>
   </body>
 </html>

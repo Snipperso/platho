@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v635';
+const PLATHO_APP_RUNTIME_VERSION = 'v637';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -672,6 +672,15 @@ let publicPostDetailOpen = false;
 let publicPostDetailItem = null;
 let publicPostDetailChainComments = [];
 let publicPostDetailLoadToken = 0;
+// Stale-while-revalidate cache of a post's loaded comments (assembled bodies + image data URLs), keyed by
+// `${channelId}:${entryId}`. Reopening a post shows the cached comments INSTANTLY (no re-download flash — the
+// owner saw ~32KB comment images re-fetch from chain on every open) while a background load silently refreshes.
+const publicPostCommentsCache = new Map();
+function publicPostCommentsCacheKey(item) {
+  return item && item.entryId !== undefined && item.entryId !== null
+    ? `${item.channelId ?? ''}:${item.entryId}`
+    : null;
+}
 let publicPostDetailLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
 let publicPostDetailParentExists = null; // last clean read: true = post has a comment index, false = genuinely none
 let privateImageAttachments = [];
@@ -2385,6 +2394,7 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
     if (job?.timer) window.clearTimeout(job.timer);
   }
   publicPublishConfirmJobs.clear();
+  publicPostCommentsCache.clear();
   activeRuntimeWalletAddress = null;
   clearMessageAutoSyncTimer();
   clearMessageAutoSyncCountdownTimer();
@@ -5139,9 +5149,12 @@ function openPublicPostDetail(item) {
   if (!item || item.entryId === undefined || item.entryId === null) return;
   publicPostDetailItem = item;
   publicPostDetailOpen = true;
-  publicPostDetailChainComments = [];
-  publicPostDetailParentExists = null;
-  publicPostDetailLoadState = 'loading';
+  // Stale-while-revalidate: paint the cached comments immediately (no re-download flash) if we have them, then
+  // let refreshPublicPostDetailComments silently reload in the background.
+  const cached = publicPostCommentsCache.get(publicPostCommentsCacheKey(item));
+  publicPostDetailChainComments = Array.isArray(cached?.comments) ? cached.comments : [];
+  publicPostDetailParentExists = cached ? cached.parentExists === true : null;
+  publicPostDetailLoadState = publicPostDetailChainComments.length > 0 ? 'ready' : 'loading';
   if (publicPane) publicPane.dataset.postOpen = 'true';
   // Shared composer -> comment mode for this post; no auto-focus (the user opens to read first) and no inline
   // context bar (the screen itself is the context).
@@ -5299,6 +5312,16 @@ async function refreshPublicPostDetailComments() {
       publicPostDetailChainComments = result.comments;
       publicPostDetailParentExists = result.parentExists === true;
       publicPostDetailLoadState = 'ready';
+      // Cache the fresh authoritative result so the next open of this post is instant (SWR). Bounded LRU (data
+      // URLs can be large): drop the oldest once past the cap.
+      const cacheKey = publicPostCommentsCacheKey(item);
+      if (cacheKey) {
+        publicPostCommentsCache.delete(cacheKey);
+        publicPostCommentsCache.set(cacheKey, { comments: result.comments, parentExists: result.parentExists === true });
+        while (publicPostCommentsCache.size > 24) {
+          publicPostCommentsCache.delete(publicPostCommentsCache.keys().next().value);
+        }
+      }
       renderPublicPostDetail();
       return;
     }
