@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v630';
+const PLATHO_APP_RUNTIME_VERSION = 'v631';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -18645,16 +18645,6 @@ const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS = 35_000;
 // NOT relayed (structural pre-accept reject, never mempooled), so retry QUICKLY — the send node catches
 // up within seconds — but paced (not the zero first-heal cooldown) so a lagging node is not hammered on
 // every ~1s confirm pass. After a few races fall back to the full 35s cooldown.
-// Broadcast BURST: fire this many DISTINCT pre-signed variants per productive re-broadcast pass. A large
-// (~35KB) external's overlay FEC propagation is a per-attempt coin flip, so N fresh lottery tickets at once
-// (each a different root hash past the ~60s dedup windows, all sharing ONE nonce so at most one can land)
-// multiplies per-pass inclusion odds and cuts the deferred second-capsule wait. Keyed (10 req/1.1s) fires all;
-// keyless (1 req/1.1s) naturally lands ~1: the extras serialize on the unified per-IP request pump (~1100ms
-// spacing) and drop via queueTimeoutMs rather than flooding — skipIfRateLimited only sheds them under an ACTIVE
-// 429 backoff. Double-spend-safe by construction (the 16453 nonce gate lets exactly one apply; the rest bounce
-// pre-accept, uncharged — verified in Vault.tact: throwUnless runs before acceptMessage, excess max_charge is
-// refunded on the ACK/bounce).
-const PRIVATE_PUBLISH_BROADCAST_BURST_COUNT = 3;
 const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 3_500;
 const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6;
 // "duplicate message" = the BoC is queued at toncenter. On the sub-second chain a LIVE queued copy lands in
@@ -20245,26 +20235,16 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
         skipIfRateLimited: true,
         priority: 'background',
       };
-      // Advance the variant window by the FULL burst per pass (not by 1) so consecutive passes never reuse a
-      // variant still inside its ~60s dedup window (variant 0 was the initial send). Key the window on the SUM
-      // of ALL per-pass counters, because the 16453-race and "duplicate" branches do NOT increment retryCount —
-      // keying on retryCount alone would re-fire the SAME variants every race/duplicate pass (3 dedup no-op
-      // POSTs, tripling RPC load exactly where the burst is useless). Fire (burst-1) EXTRA distinct variants
-      // fire-and-forget alongside the main one: bonus real lottery tickets for this large external's inclusion,
-      // all sharing ONE nonce so at most one lands (rest bounce pre-accept, free). The main send below still
-      // drives all bookkeeping (retryCount / race / duplicate); the extras are swallowed. The extras do NOT
-      // storm the RPC: they queue on the unified per-IP request pump (spacing ~1100ms keyless / ~110ms keyed)
-      // and time out via queueTimeoutMs — skipIfRateLimited only sheds them under an ACTIVE 429 backoff.
+      // ONE send per pass. (v630 tried a 3-variant burst per pass; measured on-device it REGRESSED ~50s→~100s:
+      // the unified per-IP request pump is SERIAL, so two extra ~47KB uploads per pass queued AHEAD of the next
+      // pass's main send and nonce/receipt reads — main sends hit the 8s timeout, and post-landing stragglers
+      // bounced 16453 as unexplained red 500s. Parallel lottery tickets need parallel channels, which the
+      // single-pump transport intentionally does not have.) The variant window still advances on the SUM of ALL
+      // per-pass counters, because the 16453-race and "duplicate" branches do NOT increment retryCount — keying
+      // on retryCount alone would re-fire the SAME variant (a dedup no-op) every race/duplicate pass.
       const broadcastPassIndex = retryCount + duplicateRelayCount + nonceRaceCount;
-      const primaryIndex = variantBocs ? (1 + broadcastPassIndex * PRIVATE_PUBLISH_BROADCAST_BURST_COUNT) % variantBocs.length : 0;
+      const primaryIndex = variantBocs ? (1 + broadcastPassIndex) % variantBocs.length : 0;
       const retryBoc = variantBocs ? variantBocs[primaryIndex] : head.externalBoc;
-      if (variantBocs) {
-        const extras = Math.min(PRIVATE_PUBLISH_BROADCAST_BURST_COUNT - 1, variantBocs.length - 1);
-        for (let i = 1; i <= extras; i += 1) {
-          const boc = variantBocs[(primaryIndex + i) % variantBocs.length];
-          sendVaultExternalBoc({ boc }, sendOptions).catch(() => {});
-        }
-      }
       result = await sendVaultExternalBoc({ boc: retryBoc }, sendOptions);
     } catch (error) {
       // Vault exit code 16453 on a re-broadcast is AMBIGUOUS across the toncenter fleet: the READ pool said

@@ -256,12 +256,12 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v630<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v630'/);
+    expect(html).toMatch(/id="appVersionLabel">v631<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v631'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=630" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=631" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1677,13 +1677,13 @@ describe('PWA runtime config guard', () => {
     expect(pwaContractTx).toMatch(/export async function buildBatchPublishExternalVariants/);
     expect(app).toMatch(/partWithPublishId\.externalBocVariants = batchExternal\.variants/);
     expect(app).toMatch(/variantBocs \? variantBocs\[primaryIndex\] : head\.externalBoc/);
-    // v630 broadcast BURST: fire (BURST-1) EXTRA distinct variants fire-and-forget per pass; index advances by
-    // the full burst per pass so no variant is reused inside its ~60s dedup window.
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_BURST_COUNT = 3/);
-    // window keyed on the SUM of per-pass counters (retryCount doesn't advance on race/duplicate branches).
+    // v631: ONE send per pass (the v630 3-variant burst REGRESSED ~50s→~100s on-device: the serial per-IP pump
+    // queued the extra ~47KB uploads ahead of the next pass's main send/reads → 8s timeouts + unexplained red
+    // 500s from post-landing stragglers). The variant window advances on the SUM of per-pass counters
+    // (retryCount doesn't advance on race/duplicate branches) so every pass still fires a FRESH variant.
+    expect(app).not.toMatch(/PRIVATE_PUBLISH_BROADCAST_BURST_COUNT/);
     expect(app).toMatch(/const broadcastPassIndex = retryCount \+ duplicateRelayCount \+ nonceRaceCount/);
-    expect(app).toMatch(/const primaryIndex = variantBocs \? \(1 \+ broadcastPassIndex \* PRIVATE_PUBLISH_BROADCAST_BURST_COUNT\) % variantBocs\.length : 0/);
-    expect(app).toMatch(/sendVaultExternalBoc\(\{ boc \}, sendOptions\)\.catch\(\(\) => \{\}\)/);
+    expect(app).toMatch(/const primaryIndex = variantBocs \? \(1 \+ broadcastPassIndex\) % variantBocs\.length : 0/);
     // v629: the ~16×47KB variant BoCs are STRIPPED before persisting to encrypted history (else every status
     // notify would re-encrypt+write ~1.5MB — a latency regression). In-memory rotation keeps them.
     expect(app).toMatch(/function publishStateForHistory\(publishState\)/);
@@ -5378,11 +5378,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v701/);
+    expect(sw).toMatch(/platho-pwa-prototype-v702/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=630/);
+    expect(sw).toMatch(/\.\/app\.js\?v=631/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
