@@ -256,12 +256,12 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v631<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v631'/);
+    expect(html).toMatch(/id="appVersionLabel">v632<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v632'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=631" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=632" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1321,7 +1321,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/error\?\.code === 'BROADCAST_REJECTED'\) return 'not confirmed: RPC broadcast unavailable'/);
     // STABLE-age trigger: a long-stuck no-progress message surfaces Retry without restarting the
     // per-session attempt budget (the age is anchored on message creation, not publishState.updatedAt).
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 10 \* 60 \* 1000/);
+    // v632 (owner-directed): the no-progress terminal = the computed factual maximum (~5.5min worst keyless
+    // 2-cap ladder: 2 × 20 fresh-variant tickets + pre-send + confirms) + margin, instead of the legacy 10min.
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 6 \* 60 \* 1000/);
     expect(app).toMatch(/function privatePendingPublishConfirmAgeMs\(message\)/);
     expect(app).toMatch(/const createdAtMs = messageCreatedAtMs\(message\)/);
     expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
@@ -5378,11 +5380,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v702/);
+    expect(sw).toMatch(/platho-pwa-prototype-v703/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=631/);
+    expect(sw).toMatch(/\.\/app\.js\?v=632/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

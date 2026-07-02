@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v631';
+const PLATHO_APP_RUNTIME_VERSION = 'v632';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -858,7 +858,14 @@ const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 // If NOTHING fully confirms within this window (measured from the message's STABLE creation time, which —
 // unlike publishState.updatedAt — the confirm loop never bumps) STOP the auto-retry and surface a Retry
 // button instead of spinning forever. AGE-based (not attempt-based) so the tight poll cadence never trips it.
-const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 10 * 60 * 1000;
+// Derived from the WORST realistic 2-capsule ladder on the KEYLESS (first-class) path: ~15s pre-send
+// (sync-yield + paced verified reads + capsule build) + 2 × ~150s (each capsule exhausting the full
+// 20-fresh-variant fast ladder at ~4-6s/ticket incl. keyless pacing and occasional 429 backoffs, landing
+// strictly serial by nonce) + ~10s receipt confirms ≈ ~5.5min. If ~40 REAL fresh-hash broadcasts have not
+// landed by then, toncenter/the network is pathological and waiting longer is pointless — terminal + manual
+// Retry (safe: the retry's first nonce READ flips a late-landed send straight to confirmed, same-nonce
+// re-broadcast is contract-idempotent, no double-spend).
+const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 6 * 60 * 1000;
 // Surface the actionable "RPC broadcast unavailable, retry" terminal EARLY (long before the no-progress
 // deadline) when the broadcast is provably erroring: nothing landed AND every in-flight external is failing to
 // relay for this long. A send whose broadcast SUCCEEDED but is just slow to confirm keeps the patient path —
@@ -18651,7 +18658,7 @@ const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6;
 // ~1-3s, so if ~4 block-times pass with the nonce unmoved the copy is likely stalled/dropped and a re-poke is
 // productive. Poke every ~4s for the first few duplicates (heals the ACK-no-deliver mode in seconds), then
 // fall back to the conservative 35s tail so a genuinely wedged toncenter is not poked (and does not log a
-// native red 500) every 4s all the way to the 10-min terminal. Idempotent + skipIfRateLimited throughout.
+// native red 500) every 4s all the way to the age terminal. Idempotent + skipIfRateLimited throughout.
 const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS = 4_000;
 const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT = 6;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 * 1000;
@@ -20280,7 +20287,7 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
       // duplicate proves only "queued at toncenter", not "relayed to the network" — toncenter has been observed
       // to ACK/queue without delivering, and burning the 6-slot budget on duplicates left such a send with NO
       // further re-POSTs after ~3.5min (the multi-minute stall). Un-counted, the 35s-paced idempotent re-POST
-      // keeps healing until the nonce/receipt confirm flips the part or the 10-min no-progress terminal fires
+      // keeps healing until the nonce/receipt confirm flips the part or the no-progress age terminal fires
       // (bounded: ~17 POSTs max).
       if (isTonBroadcastDuplicateMessageError(error)) {
         console.debug('[platho] vault re-broadcast: BoC already queued at toncenter (duplicate), waiting for it to land', {
