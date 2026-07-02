@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v639';
+const PLATHO_APP_RUNTIME_VERSION = 'v640';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5292,6 +5292,33 @@ async function loadPublicPostComments(item) {
 
 // Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
 // retries on a degraded (rate-limited) walk — keeping the partial result OUT of the authoritative list.
+// Persist freshly-loaded chain comments (with their assembled image data URLs) INTO the feed cache post, so a
+// full app RELOAD shows them instantly from localStorage instead of re-walking the chain + re-downloading every
+// ~32KB comment image (owner-flagged: the in-memory SWR cache was wiped by reload). Local-pending comments (no
+// entryId, not yet on chain) are preserved.
+function persistLoadedPublicPostComments(item, chainComments) {
+  if (!item || !Array.isArray(chainComments)) return;
+  const channelId = item.channelId ?? 'platho.app';
+  const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
+  const posts = cached?.posts ?? [];
+  const idx = posts.findIndex((entry) => (
+    String(entry.entryId ?? entry.id) === String(item.entryId ?? item.id)
+    && (!item.bodyHash || !entry.bodyHash || String(entry.bodyHash).toLowerCase() === String(item.bodyHash).toLowerCase())
+  ));
+  if (idx < 0) return;
+  const existing = posts[idx].comments ?? [];
+  const localPending = existing.filter((c) => {
+    if (c.entryId !== undefined && c.entryId !== null && c.entryId !== '') return false;
+    return !chainComments.some((cc) => samePublicBodyHash(c, cc));
+  });
+  const merged = mergePublicComments(chainComments, localPending);
+  const feed = { ...cached, posts: [...posts] };
+  feed.posts[idx] = { ...posts[idx], comments: merged };
+  feed.updatedAt = new Date().toISOString();
+  publicChannelFeedCache = { ...publicChannelFeedCache, [channelId]: { feed, syncedAt: feed.updatedAt } };
+  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+}
+
 async function refreshPublicPostDetailComments() {
   const item = publicPostDetailItem;
   if (!item) return;
@@ -5322,6 +5349,8 @@ async function refreshPublicPostDetailComments() {
           publicPostCommentsCache.delete(publicPostCommentsCache.keys().next().value);
         }
       }
+      // Durable layer: also write into the persisted feed cache so a RELOAD shows them without re-downloading.
+      persistLoadedPublicPostComments(item, result.comments);
       renderPublicPostDetail();
       return;
     }
@@ -12132,6 +12161,24 @@ async function clearPlathoLocalData() {
   }
 }
 
+// The Vault tab is INERT until the account is activated: moving GRAM into the Vault before activation would
+// strand it (withdrawing needs the on-chain-registered auth key), and there is no reason to fund it first.
+// Shown dark-grey (.is-locked) + disabled with an explanatory title. Activation lives in the PROFILE tab, so
+// nothing needed to activate is behind this gate. Re-runs on every refreshMessagingControls (incl. right after
+// activation), so it unlocks the moment the account goes active.
+function refreshVaultTabLock() {
+  const locked = !hasActivePlathoAccount();
+  for (const item of railItems) {
+    if (item.dataset.tab !== 'vault') continue;
+    item.classList.toggle('is-locked', locked);
+    item.disabled = locked;
+    item.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    item.title = locked ? 'Activate your Platho account first (Profile tab)' : 'Vault';
+  }
+  // Never sit on a locked Vault view (a stale deep-link / a just-de-activated edge): fall back to Public.
+  if (locked && appShell?.dataset.view === 'vault') setView('public');
+}
+
 function refreshMessagingControls() {
   const accountActive = hasActivePlathoAccount();
   const appShellReloadPending = pendingServiceWorkerAppShellReload === true;
@@ -12225,6 +12272,9 @@ function refreshMessagingControls() {
     item.disabled = false;
     item.title = item.getAttribute('aria-label') ?? '';
   });
+  // AFTER the blanket rail re-enable above (which would otherwise undo the gate): lock the Vault tab until the
+  // account is activated.
+  refreshVaultTabLock();
   refreshVaultMoveWidget();
   updatePrivateSenderModeUi();
   refreshComposerCostStatus();
@@ -12233,6 +12283,9 @@ function refreshMessagingControls() {
 }
 
 function setView(view) {
+  // The Vault tab is gated until activation (see refreshVaultTabLock) — a programmatic/deep-link attempt to
+  // open it un-activated falls back to Public.
+  if (view === 'vault' && !hasActivePlathoAccount()) view = 'public';
   appShell.dataset.view = view;
   if (view !== 'chats') {
     appShell.dataset.chatOpen = 'false';
