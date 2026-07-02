@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v644<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v644'/);
+    expect(html).toMatch(/id="appVersionLabel">v645<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v645'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=644" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=645" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -740,7 +740,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/Full-size preview/);
     expect(html).toMatch(/id="imageLightboxDownloadButton"/);
     expect(html).toMatch(/class="icon icon-download"/);
-    expect(html).toMatch(/<div class="image-lightbox-viewport">\s*<img id="imageLightboxImage" alt="Full-size final image preview">\s*<\/div>\s*<\/section>\s*<\/div>/);
+    expect(html).toMatch(/<div class="image-lightbox-viewport">\s*<img id="imageLightboxImage" alt="Full-size final image preview" draggable="false">\s*<\/div>\s*<\/section>\s*<\/div>/);
     expect(app).toMatch(/openImageLightbox/);
     expect(app).toMatch(/downloadImageLightboxImage/);
     expect(app).toMatch(/imageLightboxDownloadFilename/);
@@ -749,7 +749,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/messageStrip\?\.addEventListener\('click'/);
     expect(app).toMatch(/messageStrip\?\.addEventListener\('keydown'/);
     expect(css).toMatch(/data-full-image-src/);
-    expect(css).toMatch(/\.message-image\s*{\s*cursor: zoom-in;/);
+    expect(css).toMatch(/\.message-image,\s*\.feed-image\[data-full-image-src\]\s*{\s*cursor: zoom-in;/);
     expect(css).toMatch(/image-lightbox-viewport/);
     expect(css).toMatch(/max-height: calc\(var\(--app-viewport-height, 100dvh\)/);
     expect(css).toMatch(/\.image-lightbox-backdrop/);
@@ -4234,6 +4234,43 @@ describe('PWA runtime config guard', () => {
     expect(warm).not.toMatch(/provider\.|getPublic|resolvePublic|runGetMethod/);
   });
 
+  it('PWA-PUBLIC-IMAGE-LIGHTBOX: public post/comment images are clickable like private ones and the lightbox zooms (pinch/double-tap/wheel)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // Every public image (feed post, detail card, comment) is wired for the SAME lightbox as private images:
+    // focusable, role button, dataset.fullImageSrc — via one helper used by BOTH appendPublicItemContent branches.
+    expect(app).toMatch(/function wirePublicImageLightbox\(image, src\)/);
+    expect(app.match(/wirePublicImageLightbox\(image, (block\.url|item\.imageUrl)\);/g)?.length ?? 0).toBe(2);
+    const wire = app.slice(app.indexOf('function wirePublicImageLightbox'), app.indexOf('function appendPublicItemContent'));
+    expect(wire).toMatch(/image\.tabIndex = 0;/);
+    expect(wire).toMatch(/image\.dataset\.fullImageSrc = src;/);
+    // Delegated open on the public pane mirrors the private messageStrip wiring (click + keyboard).
+    expect(app).toMatch(/publicPane\?\.addEventListener\('click'/);
+    expect(app).toMatch(/publicPane\?\.addEventListener\('keydown'/);
+    expect(app).toMatch(/target\?\.closest\?\.\('\.feed-image'\)/);
+    // The zoom engine: pinch (two-pointer), drag-pan when zoomed, double-tap toggle, wheel — pointer events on
+    // the viewport, transform via CSSOM (style.transform assignment; setAttribute('style') is what prod CSP blocks).
+    expect(app).toMatch(/const imageLightboxViewport = document\.querySelector\('\.image-lightbox-viewport'\)/);
+    expect(app).toMatch(/function zoomImageLightboxAt\(clientX, clientY, nextScale/);
+    expect(app).toMatch(/function clampImageLightboxPan\(\)/);
+    expect(app).toMatch(/imageLightboxImage\.style\.transform = /);
+    expect(app).not.toMatch(/imageLightboxImage\.setAttribute\('style'/);
+    expect(app).toMatch(/imageLightboxViewport\?\.addEventListener\('pointerdown'/);
+    expect(app).toMatch(/imageLightboxViewport\?\.addEventListener\('pointermove'/);
+    expect(app).toMatch(/imageLightboxViewport\?\.addEventListener\('wheel'/);
+    expect(app).toMatch(/imageLightboxViewport\?\.addEventListener\('dblclick'/);
+    // Zoom state resets on BOTH open and close (a stale transform must never greet the next image).
+    const openFn = app.slice(app.indexOf('function openImageLightbox'), app.indexOf('function closeImageLightbox'));
+    const closeFn = app.slice(app.indexOf('function closeImageLightbox'), app.indexOf('function imageDownloadExtension'));
+    expect(openFn).toMatch(/resetImageLightboxZoom\(\);/);
+    expect(closeFn).toMatch(/resetImageLightboxZoom\(\);/);
+    // CSS: the viewport owns gestures (touch-action none, no native scroll), the image fits at rest and
+    // transforms from origin 0 0 (the zoom math depends on it).
+    expect(css).toMatch(/\.image-lightbox-viewport\s*{[\s\S]*?overflow: hidden;[\s\S]*?touch-action: none;/);
+    expect(css).toMatch(/\.image-lightbox-viewport img\s*{[\s\S]*?max-width: 100%;[\s\S]*?max-height: 100%;[\s\S]*?transform-origin: 0 0;/);
+    expect(css).toMatch(/\.image-lightbox-viewport img\.is-zoom-animated\s*{\s*transition: transform/);
+  });
+
   it('PWA-PUBLIC-FEED-INLINE-COMMENTS-REMOVED: the feed render no longer shows inline comments (they load on the post detail), but the renderer stays for the detail', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const renderFeedSource = app.slice(
@@ -5412,11 +5449,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v715/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=201/);
+    expect(sw).toMatch(/platho-pwa-prototype-v716/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=202/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=644/);
+    expect(sw).toMatch(/\.\/app\.js\?v=645/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

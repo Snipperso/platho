@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v644';
+const PLATHO_APP_RUNTIME_VERSION = 'v645';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -307,6 +307,7 @@ const actionSummary = document.querySelector('#actionSummary');
 const actionCancelButton = document.querySelector('#actionCancelButton');
 const actionSubmitButton = document.querySelector('#actionSubmitButton');
 const imageLightboxDialog = document.querySelector('#imageLightboxDialog');
+const imageLightboxViewport = document.querySelector('.image-lightbox-viewport');
 const imageLightboxImage = document.querySelector('#imageLightboxImage');
 const imageLightboxMeta = document.querySelector('#imageLightboxMeta');
 const imageLightboxCloseButton = document.querySelector('#imageLightboxCloseButton');
@@ -4022,6 +4023,7 @@ function openImageLightbox(src, meta = '') {
   if (!imageLightboxDialog || !imageLightboxImage) return;
   if (!src) return;
   imageLightboxPreviousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  resetImageLightboxZoom();
   imageLightboxImage.src = src;
   if (imageLightboxMeta) imageLightboxMeta.textContent = meta || 'Final compressed image';
   if (imageLightboxDownloadButton) imageLightboxDownloadButton.disabled = false;
@@ -4033,11 +4035,159 @@ function closeImageLightbox() {
   if (!imageLightboxDialog || imageLightboxDialog.hidden) return;
   imageLightboxDialog.hidden = true;
   imageLightboxImage?.removeAttribute('src');
+  resetImageLightboxZoom();
   if (imageLightboxDownloadButton) imageLightboxDownloadButton.disabled = true;
   const focusTarget = imageLightboxPreviousFocus;
   imageLightboxPreviousFocus = null;
   focusTarget?.focus?.();
 }
+
+// --- Lightbox zoom/pan engine: pinch (touch), drag-pan when zoomed, double-tap / double-click toggle, wheel ---
+// Transforms are applied via CSSOM property assignment (allowed under the prod CSP style-src 'self' — what CSP
+// blocks is setAttribute('style'); the avatar backgroundImage path proves CSSOM works live). Geometry: the img's
+// untransformed layout box is grid-centered in the viewport; with transform-origin 0 0 and
+// transform = translate(tx,ty) scale(s), keeping a screen point fixed across a scale change is
+//   t' = t + (point - imgRect.topLeft) * (1 - s'/s)
+const IMAGE_LIGHTBOX_MAX_SCALE = 8;
+const imageLightboxZoom = { scale: 1, tx: 0, ty: 0 };
+const imageLightboxPointers = new Map();
+let imageLightboxPinchDistance = 0;
+let imageLightboxLastTap = { time: 0, x: 0, y: 0 };
+
+function applyImageLightboxZoom(animated = false) {
+  if (!imageLightboxImage) return;
+  const zoomed = imageLightboxZoom.scale > 1.001;
+  imageLightboxImage.classList.toggle('is-zoom-animated', animated === true);
+  imageLightboxImage.classList.toggle('is-zoomed', zoomed);
+  // Explicit identity at rest (not '') so an animated zoom-OUT interpolates instead of snapping to `none`.
+  imageLightboxImage.style.transform = zoomed || animated === true
+    ? `translate(${imageLightboxZoom.tx}px, ${imageLightboxZoom.ty}px) scale(${imageLightboxZoom.scale})`
+    : '';
+}
+
+function resetImageLightboxZoom() {
+  imageLightboxZoom.scale = 1;
+  imageLightboxZoom.tx = 0;
+  imageLightboxZoom.ty = 0;
+  imageLightboxPointers.clear();
+  imageLightboxPinchDistance = 0;
+  applyImageLightboxZoom(false);
+}
+
+// Keep the image anchored: centered on an axis it fits, covering the viewport on an axis it overflows (a pan can
+// never fling it away and leave an empty box). Derivation: rest top-left is centered, scaling grows from 0 0, so
+// the centered translation is (base - scaled)/2 and the cover band is that ± (scaled - viewport)/2.
+function clampImageLightboxPan() {
+  if (!imageLightboxViewport || !imageLightboxImage) return;
+  const scale = imageLightboxZoom.scale;
+  const viewportW = imageLightboxViewport.clientWidth;
+  const viewportH = imageLightboxViewport.clientHeight;
+  const baseW = imageLightboxImage.offsetWidth;
+  const baseH = imageLightboxImage.offsetHeight;
+  const scaledW = baseW * scale;
+  const scaledH = baseH * scale;
+  const centerX = (baseW - scaledW) / 2;
+  if (scaledW <= viewportW) {
+    imageLightboxZoom.tx = centerX;
+  } else {
+    const band = (scaledW - viewportW) / 2;
+    imageLightboxZoom.tx = Math.min(centerX + band, Math.max(centerX - band, imageLightboxZoom.tx));
+  }
+  const centerY = (baseH - scaledH) / 2;
+  if (scaledH <= viewportH) {
+    imageLightboxZoom.ty = centerY;
+  } else {
+    const band = (scaledH - viewportH) / 2;
+    imageLightboxZoom.ty = Math.min(centerY + band, Math.max(centerY - band, imageLightboxZoom.ty));
+  }
+}
+
+function zoomImageLightboxAt(clientX, clientY, nextScale, animated = false) {
+  if (!imageLightboxImage) return;
+  const target = Math.min(IMAGE_LIGHTBOX_MAX_SCALE, Math.max(1, nextScale));
+  const rect = imageLightboxImage.getBoundingClientRect();
+  const factor = target / imageLightboxZoom.scale;
+  imageLightboxZoom.tx += (clientX - rect.left) * (1 - factor);
+  imageLightboxZoom.ty += (clientY - rect.top) * (1 - factor);
+  imageLightboxZoom.scale = target;
+  clampImageLightboxPan();
+  applyImageLightboxZoom(animated);
+}
+
+function imageLightboxPointerSpread() {
+  const [a, b] = [...imageLightboxPointers.values()];
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function toggleImageLightboxZoomAt(clientX, clientY) {
+  zoomImageLightboxAt(clientX, clientY, imageLightboxZoom.scale > 1.001 ? 1 : 2.5, true);
+}
+
+imageLightboxViewport?.addEventListener('pointerdown', (event) => {
+  if (!imageLightboxImage?.src) return;
+  try { imageLightboxViewport.setPointerCapture(event.pointerId); } catch { /* unsupported */ }
+  imageLightboxPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (imageLightboxPointers.size === 2) imageLightboxPinchDistance = imageLightboxPointerSpread();
+  // Double-tap (touch): dblclick does not fire for touch in all engines, so detect it from pointerdown pairs.
+  if (event.pointerType === 'touch' && imageLightboxPointers.size === 1) {
+    const now = Date.now();
+    const isDoubleTap = now - imageLightboxLastTap.time < 350
+      && Math.hypot(event.clientX - imageLightboxLastTap.x, event.clientY - imageLightboxLastTap.y) < 40;
+    imageLightboxLastTap = { time: now, x: event.clientX, y: event.clientY };
+    if (isDoubleTap) {
+      toggleImageLightboxZoomAt(event.clientX, event.clientY);
+      imageLightboxLastTap = { time: 0, x: 0, y: 0 };
+    }
+  }
+});
+
+imageLightboxViewport?.addEventListener('pointermove', (event) => {
+  const pointer = imageLightboxPointers.get(event.pointerId);
+  if (!pointer) return;
+  const previousX = pointer.x;
+  const previousY = pointer.y;
+  pointer.x = event.clientX;
+  pointer.y = event.clientY;
+  if (imageLightboxPointers.size === 2) {
+    // Pinch: each finger contributes half the midpoint drift (pan), and the spread ratio scales toward the
+    // midpoint. touch-action: none on the viewport keeps the browser's own gestures out of the way.
+    imageLightboxZoom.tx += (pointer.x - previousX) / 2;
+    imageLightboxZoom.ty += (pointer.y - previousY) / 2;
+    const spread = imageLightboxPointerSpread();
+    if (imageLightboxPinchDistance > 0 && spread > 0) {
+      const [a, b] = [...imageLightboxPointers.values()];
+      zoomImageLightboxAt((a.x + b.x) / 2, (a.y + b.y) / 2, imageLightboxZoom.scale * (spread / imageLightboxPinchDistance));
+    }
+    imageLightboxPinchDistance = spread;
+    event.preventDefault();
+  } else if (imageLightboxPointers.size === 1 && imageLightboxZoom.scale > 1.001) {
+    imageLightboxZoom.tx += pointer.x - previousX;
+    imageLightboxZoom.ty += pointer.y - previousY;
+    clampImageLightboxPan();
+    applyImageLightboxZoom(false);
+    event.preventDefault();
+  }
+});
+
+function releaseImageLightboxPointer(event) {
+  imageLightboxPointers.delete(event.pointerId);
+  if (imageLightboxPointers.size < 2) imageLightboxPinchDistance = 0;
+}
+imageLightboxViewport?.addEventListener('pointerup', releaseImageLightboxPointer);
+imageLightboxViewport?.addEventListener('pointercancel', releaseImageLightboxPointer);
+
+imageLightboxViewport?.addEventListener('wheel', (event) => {
+  if (!imageLightboxImage?.src) return;
+  event.preventDefault();
+  const factor = Math.exp(-event.deltaY * 0.0022);
+  zoomImageLightboxAt(event.clientX, event.clientY, imageLightboxZoom.scale * factor, false);
+}, { passive: false });
+
+imageLightboxViewport?.addEventListener('dblclick', (event) => {
+  if (!imageLightboxImage?.src) return;
+  event.preventDefault();
+  toggleImageLightboxZoomAt(event.clientX, event.clientY);
+});
 
 function imageDownloadExtension(src) {
   const match = String(src ?? '').match(/^data:image\/([a-z0-9.+-]+)[;,]/i);
@@ -4812,6 +4962,25 @@ function renderPublicEmpty(titleText, bodyText) {
   publicFeed.append(empty);
 }
 
+// Parity with the private .message-image affordance: a public feed/comment image is keyboard-focusable and opens
+// the SAME full-size lightbox (delegated click/keydown on publicPane). Meta (dimensions + approx on-chain byte
+// size, derivable from the data URL's base64 length) fills in once the image decodes.
+function wirePublicImageLightbox(image, src) {
+  image.alt = 'Open image';
+  image.tabIndex = 0;
+  image.role = 'button';
+  image.title = 'Open full-size image';
+  image.dataset.fullImageSrc = src;
+  image.dataset.fullImageMeta = 'Public image';
+  image.addEventListener('load', () => {
+    const base64 = String(src).split(',')[1] ?? '';
+    const bytes = Math.floor(base64.length * 3 / 4);
+    const dimensions = image.naturalWidth > 0 ? `${image.naturalWidth}x${image.naturalHeight}` : '';
+    image.dataset.fullImageMeta = [dimensions, bytes > 0 ? imageByteCountLabel(bytes) : '']
+      .filter(Boolean).join(' - ') || 'Public image';
+  }, { once: true });
+}
+
 function appendPublicItemContent(container, item) {
   const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
   if (blocks.length > 0) {
@@ -4825,8 +4994,8 @@ function appendPublicItemContent(container, item) {
         const image = document.createElement('img');
         image.className = 'feed-image feed-block-image';
         image.src = block.url;
-        image.alt = '';
         image.loading = 'lazy';
+        wirePublicImageLightbox(image, block.url);
         container.append(image);
       }
     }
@@ -4841,8 +5010,8 @@ function appendPublicItemContent(container, item) {
     const image = document.createElement('img');
     image.className = 'feed-image';
     image.src = item.imageUrl;
-    image.alt = '';
     image.loading = 'lazy';
+    wirePublicImageLightbox(image, item.imageUrl);
     container.append(image);
   }
 }
@@ -13098,6 +13267,22 @@ messageStrip?.addEventListener('keydown', (event) => {
   if (!(target instanceof HTMLImageElement) || !target.classList.contains('message-image')) return;
   event.preventDefault();
   openImageLightbox(target.dataset.fullImageSrc ?? target.currentSrc ?? target.src, target.dataset.fullImageMeta);
+});
+// PUBLIC surface parity: feed posts, the post-detail card, and comments all render .feed-image via
+// appendPublicItemContent (dataset.fullImageSrc set there) — one delegation on the pane covers every occurrence,
+// exactly mirroring the private messageStrip wiring above. Avatars never carry .feed-image, so they can't match.
+publicPane?.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+  const image = target?.closest?.('.feed-image');
+  if (!(image instanceof HTMLImageElement) || !image.dataset.fullImageSrc) return;
+  openImageLightbox(image.dataset.fullImageSrc, image.dataset.fullImageMeta);
+});
+publicPane?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const target = event.target instanceof Element ? event.target : null;
+  if (!(target instanceof HTMLImageElement) || !target.classList.contains('feed-image') || !target.dataset.fullImageSrc) return;
+  event.preventDefault();
+  openImageLightbox(target.dataset.fullImageSrc, target.dataset.fullImageMeta);
 });
 actionFields?.addEventListener('input', updateActiveActionSummary);
 actionFields?.addEventListener('change', updateActiveActionSummary);

@@ -1432,12 +1432,15 @@ html[data-platho-telegram="true"] .install-header-button {
   overflow-wrap: anywhere;
 }
 
-.message-image {
+.message-image,
+.feed-image[data-full-image-src] {
   cursor: zoom-in;
 }
 
 .message-image:hover,
-.message-image:focus-visible {
+.message-image:focus-visible,
+.feed-image[data-full-image-src]:hover,
+.feed-image[data-full-image-src]:focus-visible {
   border-color: var(--accent);
   outline: none;
 }
@@ -2894,7 +2897,11 @@ button.feed-item:hover {
   align-items: center;
   justify-items: center;
   min-height: 0;
-  overflow: auto;
+  /* The zoom engine owns all motion: the image FITS at rest and scales via transform (no native scroll);
+     touch-action none hands pinch/pan to the app instead of the browser. */
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
   padding: 12px;
   border: 1px solid var(--line-soft);
   border-radius: 8px;
@@ -2905,9 +2912,19 @@ button.feed-item:hover {
   display: block;
   width: auto;
   height: auto;
-  max-width: none;
-  max-height: none;
+  max-width: 100%;
+  max-height: 100%;
   border-radius: 6px;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.image-lightbox-viewport img.is-zoom-animated {
+  transition: transform 0.18s ease-out;
+}
+
+.image-lightbox-viewport img.is-zoomed {
+  cursor: grab;
 }
 
 .action-summary {
