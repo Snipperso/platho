@@ -1658,7 +1658,19 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]*confirmFinalNonce: options\.confirmFinalNonce \?\? true/);
     expect(sendSource).toMatch(/const nonceWaitOptions = \{\s*timeoutMs: options\.timeoutMs \?\? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,\s*requestTimeoutMs: options\.requestTimeoutMs,\s*queueTimeoutMs: options\.queueTimeoutMs,\s*\}/);
     expect(sendSource).not.toMatch(/needsQueuedNonce|VAULT_PUBLISH_QUEUE_NONCE_CONFIRM_TIMEOUT_MS/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 35_000/);
+    // v628 mobilization (owner-directed, chain-forensics-derived): 10s real-relay re-poke tail; past the fast
+    // budget healing NEVER silently stops — it degrades to a 30s slow poke bounded by the age terminals; the
+    // duplicate/nonce-race tails stay sparse (35s: each answer is a native red 500).
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 10_000/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS = 30_000/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS = 35_000/);
+    expect(app).not.toMatch(/if \(retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT\) continue;/);
+    expect(app).toMatch(/broadcastBudgetExhaustedWarned/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_UNLANDED_POLL_MS = 5 \* 1000/);
+    expect(app).toMatch(/publishPartNeedsBroadcastRetry\(part\)[\s\S]{0,80}\)\) \{\s*return PRIVATE_PUBLISH_CONFIRM_UNLANDED_POLL_MS/);
+    expect(app).toMatch(/publishState\.lastBroadcastRetryNonceReadOkAt = Date\.now\(\)/);
+    expect(app).toMatch(/nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000/);
+    expect(app).toMatch(/console\.info\('\[platho\] send timeline'/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 \* 1000/);
@@ -1687,7 +1699,8 @@ describe('PWA runtime config guard', () => {
     // skips the 35s cooldown; repeat attempts keep it. Collapses the residual second-capsule delay.
     // v626: the cooldown is race-aware — zero on the very first heal, the short race cooldown while 16453
     // fleet-race bounces are fresh, and the full 35s otherwise (repeat relays / duplicates).
-    expect(app).toMatch(/let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;\s*if \(retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce\) \{\s*if \(nonceRaceCount === 0\) rebroadcastCooldownMs = 0;\s*else if \(nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT\) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;/);
+    expect(app).toMatch(/let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;\s*if \(pastFastBudget\) \{\s*rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS;\s*\} else if \(retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce\) \{\s*if \(nonceRaceCount === 0\) rebroadcastCooldownMs = 0;\s*else if \(nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT\) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;/);
+    expect(app).toMatch(/duplicateRelayCount >= PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT \|\| nonceRaceCount >= PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT[\s\S]{0,400}rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS/);
     expect(app).toMatch(/if \(publishPartLastBroadcastAgeMs\(head\) < rebroadcastCooldownMs\) continue/);
     expect(app).not.toMatch(/function markPublishPartForFreshNonceRetry/);
     expect(app).not.toMatch(/fresh nonce retry required/);
@@ -3177,7 +3190,7 @@ describe('PWA runtime config guard', () => {
     // A send also YIELDS to an in-flight sync pass (privateChainSyncPromise), capped, so the two never fight
     // the keyless ~1 rps budget. No-op when no sync is running; bounded so a stuck sync can't block sends.
     expect(publishSource).toMatch(/if \(privateChainSyncPromise\) \{[\s\S]*Promise\.race\(\[[\s\S]*privateChainSyncPromise[\s\S]*PRIVATE_SEND_SYNC_WAIT_CAP_MS/);
-    expect(app).toMatch(/const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 6 \* 1000/);
+    expect(app).toMatch(/const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 2_500/);
   });
 
   it('PWA-MSG-01: default public sync window covers the maximum public multipart image', () => {

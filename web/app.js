@@ -849,6 +849,10 @@ const PRIVATE_PUBLISH_CONFIRM_SETTLE_MS = 1_500;            // first check: don'
 const PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS = 1_000;       // active poll while a part is in-flight and the send is young — catches a fast confirm / healed re-broadcast within ~1s
 const PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS = 60 * 1000; // active window; past it a still-unconfirmed send is anomalously slow -> stretch (below)
 const PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS = 15 * 1000;  // stretch cadence once the send is anomalously slow (toncenter slow / partial stuck)
+// A part still awaiting its LANDING (status SENT, nonce unmoved) past the active window is the dropped-external
+// heal case, not the landed-but-slow-index case: the confirm pass is its ONLY re-poke opportunity, and a 15s
+// stretch quantized the re-poke cooldown to ~45s effective spacing. Keep a middle cadence while un-landed.
+const PRIVATE_PUBLISH_CONFIRM_UNLANDED_POLL_MS = 5 * 1000;
 const PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS = 10 * 60 * 1000;
 const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 // If NOTHING fully confirms within this window (measured from the message's STABLE creation time, which —
@@ -884,7 +888,9 @@ const PRIVATE_PUBLISH_DROPPED_RECOVERY_BROADCAST_MARGIN_S = 180;
 const PRIVATE_OUTBOUND_SYNC_PAUSE_MS = 5 * 1000;
 // A send yields to an in-flight sync pass for at most this long (so the two never fight the keyless ~1 rps
 // budget) — capped so a long/stuck sync can never block a send.
-const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 6 * 1000;
+// 2.5s (was 6s): with client-direct keyed toncenter the send/sync interleave is cheap; 6s was a flat
+// pre-send tax on every send that raced a background sync pass.
+const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 2_500;
 const PRIVATE_CHAIN_INDEX_STORAGE_PREFIX = 'platho.private.chain.index.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.history.unavailable.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 200;
@@ -18598,8 +18604,20 @@ const PUBLISH_PART_STATUS_UNKNOWN = 'unknown';
 const VAULT_PUBLISH_PARTIAL_ERROR_CODE = 'PLATHO_VAULT_PUBLISH_PARTIAL';
 const CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT = 32;
 const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8;
-const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 35_000;
+// Real-relay (HTTP 200) re-poke tail. Chain forensics 2026-07-02: a 35KB external CAN include in <=20s, and
+// every 200 answer to a re-POST proves toncenter DROPPED the previous queued copy — so a proven-not-landed
+// external (fresh nonce read said currentNonce === clientNonce) is re-poked every 10s, not 35s. Idempotent:
+// the contract pre-accept-rejects a replayed nonce, so an extra POST can never double-spend.
+const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 10_000;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6;
+// Past the fast budget healing must NOT stop (the old silent stop left a dropped external with ZERO re-POSTs
+// from ~3min to the 10-min terminal — the owner's 4/6.5-min image sends): fall back to an indefinite slow
+// poke, bounded by the age terminals (<= ~18 more idempotent POSTs worst case).
+const PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS = 30_000;
+// Duplicate answers ("BoC still queued") and persistent 16453 fleet-races past their fast windows keep the OLD
+// conservative tail: each such answer is a native red 500 in the console, so a wedged toncenter is poked (and
+// logged) sparsely, not every 10s.
+const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS = 35_000;
 // A re-broadcast POST that bounced 16453 while the READ pool says currentNonce === clientNonce is a
 // toncenter fleet race: the send node's emulation state lags the read pool by a block. The external was
 // NOT relayed (structural pre-accept reject, never mempooled), so retry QUICKLY — the send node catches
@@ -18710,7 +18728,24 @@ function createCapsulePublishState(capsules) {
 function setPublishPartStatus(publishState, index, status, extra = {}) {
   const part = publishState?.parts?.[index];
   if (!part) return null;
+  const previousStatus = part.status;
   Object.assign(part, extra, { status });
+  // Visible send timeline (console.info, NOT verbose debug): one line per REAL transition so a slow send
+  // self-localizes (landed on-chain / confirmed / failed) without a diagnostic build.
+  if (status !== previousStatus && (
+    status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
+    || status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
+    || status === PUBLISH_PART_STATUS_FAILED
+  )) {
+    console.info('[platho] send timeline', {
+      part: index,
+      from: previousStatus ?? null,
+      to: status,
+      nonce: part.clientNonce ?? null,
+      by: extra.confirmedBy ?? null,
+      at: new Date().toISOString(),
+    });
+  }
   if (
     status === PUBLISH_PART_STATUS_SENT
     || status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
@@ -19237,6 +19272,18 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
   // confirmation retry (schedulePrivatePublishConfirmationRetry) runs the FULL confirm later, once the entry IS on
   // chain, and flips the status to published without blocking the send. See slow-device-freeze-iphone-se2.
   if (options.receiptOnly === true) return publishState;
+  // A part that is merely SENT (signed external in flight, nonce not yet consumed) CANNOT have a CapsuleHub
+  // entry — but ONLY a fresh SUCCESSFUL heal nonce read proves that (a failed get_user read leaves landed parts
+  // stuck at SENT; suppressing the scan then would starve the ONLY working confirm path until the 10-min
+  // terminal). Skip the heavy scan (sender-index walk + up to 8 possibly-32KB entry reads) only under that
+  // fresh proof; the authoritative receipt read above still runs every pass.
+  const nonceProofAgeMs = Date.now() - (Number(publishState.lastBroadcastRetryNonceReadOkAt) || 0);
+  if (
+    nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000
+    && pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_SENT && !publishPartHadPriorChainAttempt(part))
+  ) {
+    return publishState;
+  }
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return publishState;
   const { provider, address } = resolved;
@@ -19701,6 +19748,9 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
         // the same ~1s it would have re-broadcast the bounced one anyway. Batch 0 always POSTs (its nonce IS
         // current). No double-send: retryUnconfirmedVaultPublishBroadcasts reads the chain nonce FIRST.
         lastResult = batchIndex === 0 ? await sendVaultExternalBoc(batchExternal) : null;
+        console.info('[platho] send timeline', batchIndex === 0
+          ? { event: 'external POSTed (200)', nonce: String(clientNonce), batchIndex }
+          : { event: 'signed, POST deferred until prior nonce lands', nonce: String(clientNonce), batchIndex });
         batch.result = lastResult;
         for (const item of batch.items) item.result = lastResult;
         // The signed external is now out (or, for batchIndex > 0, will be re-broadcast the moment N is reached):
@@ -19945,6 +19995,7 @@ function clearPublishPartSignedAttempt(part) {
   delete part.broadcastRetryCount;
   delete part.broadcastNonceRaceCount;
   delete part.broadcastDuplicateRelayCount;
+  delete part.broadcastBudgetExhaustedWarned;
 }
 
 function publishPartNeedsBroadcastRetry(part) {
@@ -20000,6 +20051,7 @@ function resetPublishBroadcastBudgetForManualRetry(publishState) {
     part.broadcastRetryCount = 0;
     part.broadcastNonceRaceCount = 0;
     part.broadcastDuplicateRelayCount = 0;
+    part.broadcastBudgetExhaustedWarned = false;
     part.lastBroadcastAt = null;
   }
 }
@@ -20053,6 +20105,10 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) return 0;
     throw error;
   }
+  // Fresh SUCCESSFUL nonce read: any landed batch is flipped VAULT_SUBMITTED in the loop below, so parts still
+  // SENT after this pass are PROVEN not-landed. The confirm entry-scan skip keys off this timestamp — a FAILED
+  // read (the catch above returns 0 without setting it) must never suppress the scan (degraded-reads mode).
+  publishState.lastBroadcastRetryNonceReadOkAt = Date.now();
   // VPB2: every part of a batch shares ONE externalBoc + nonce. Group the retryable parts by that shared nonce
   // so each distinct in-flight external is re-broadcast at most ONCE per pass; all parts of the batch then move
   // together (the contract accepts or rejects the single external atomically).
@@ -20090,7 +20146,17 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     // Per-part retry budget/cooldown is identical across a batch (shared lastBroadcastAt/count); read it off the head.
     const head = parts[0];
     const retryCount = publishPartBroadcastRetryCount(head);
-    if (retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT) continue;
+    // Past the fast budget healing does NOT stop (the old silent `continue` here left a dropped external with
+    // zero re-POSTs from ~3min to the 10-min terminal): it degrades to the 30s slow poke below, with a
+    // one-time visible warn so the owner sees the transition.
+    const pastFastBudget = retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT;
+    if (pastFastBudget && head.broadcastBudgetExhaustedWarned !== true) {
+      head.broadcastBudgetExhaustedWarned = true;
+      console.warn('[platho] send timeline: fast re-broadcast budget exhausted, continuing slow 30s re-pokes to the age terminal', {
+        clientNonce: String(clientNonce),
+        retryCount,
+      });
+    }
     const nonceRaceCount = Number(head.broadcastNonceRaceCount ?? 0) || 0;
     const duplicateRelayCount = Number(head.broadcastDuplicateRelayCount ?? 0) || 0;
     // FIRST heal of a proven-not-landed external re-broadcasts with NO cooldown. Reaching here with
@@ -20104,7 +20170,9 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     // stale-replica false "not landed" costs at most one wasted (contract-rejected) re-broadcast of the
     // fixed-nonce boc.
     let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;
-    if (retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce) {
+    if (pastFastBudget) {
+      rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS;
+    } else if (retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce) {
       if (nonceRaceCount === 0) rebroadcastCooldownMs = 0;
       else if (nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;
     } else if (duplicateRelayCount > 0
@@ -20115,6 +20183,10 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
       // landed yet, so a quick idempotent re-poke is the fastest safe heal for toncenter's queued-not-delivered
       // mode. Past the fast limit the conservative 35s tail takes over.
       rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS;
+    } else if (duplicateRelayCount >= PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT || nonceRaceCount >= PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT) {
+      // Past the duplicate/nonce-race fast windows each answer is a native red 500 — keep the sparse 35s tail
+      // so the console is not painted every 10s by a wedged queue or a persistently lagging send node.
+      rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS;
     }
     if (publishPartLastBroadcastAgeMs(head) < rebroadcastCooldownMs) continue;
     let result = null;
@@ -20197,6 +20269,13 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
       throw error;
     }
     const broadcastAt = new Date().toISOString();
+    // retryCount === 0 here also covers a deferred batch's FIRST-ever POST (the send loop does not POST it) —
+    // the nonce field disambiguates which batch this is.
+    console.info('[platho] send timeline', {
+      event: retryCount === 0 ? 'first heal POST (200)' : 'external re-POSTed (200)',
+      nonce: String(clientNonce),
+      retryCount: retryCount + 1,
+    });
     for (const part of parts) {
       part.lastBroadcastResult = result?.result ?? null;
       setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
@@ -20702,6 +20781,12 @@ function privatePublishConfirmDelayMs(message, error) {
   if (ageMs < PRIVATE_PUBLISH_CONFIRM_SETTLE_MS) return Math.max(250, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS - ageMs);
   // Young + in-flight: poll actively so a fast on-chain confirm / a healed re-broadcast is caught within ~1s.
   if (ageMs < PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS) return PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS;
+  // Still awaiting a LANDING (signed external in flight, nonce unmoved): each pass is a heal/re-poke
+  // opportunity — keep a middle cadence so the 10s re-poke tail is actually honored instead of being
+  // quantized to ~20-45s by the 15s stretch.
+  if ((message?.publishState?.parts ?? []).some((part) => publishPartNeedsBroadcastRetry(part))) {
+    return PRIVATE_PUBLISH_CONFIRM_UNLANDED_POLL_MS;
+  }
   // Anomalously slow (toncenter slow / a partial stuck): stretch to cut load; the age-based terminals below
   // decide when to give up.
   return PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS;
