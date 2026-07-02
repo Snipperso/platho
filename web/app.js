@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v637';
+const PLATHO_APP_RUNTIME_VERSION = 'v638';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -13609,6 +13609,9 @@ unlockWalletButton?.addEventListener('click', async () => {
     await bootCrypto();
     await enforceTelegramSeedBackupGate(wallet);
     flashWalletIdentityStatus('Wallet unlocked');
+    // Return-from-background flow: a user who hopped to another wallet app to top up came back to a locked
+    // Platho; on unlock, resume the quick-start at the step they were on (e.g. Top up / Activate).
+    maybeResumeQuickStartAfterUnlock();
   } catch (error) {
     setText(unlockWalletStatus, 'blocked');
     console.error(error);
@@ -22591,6 +22594,8 @@ document.addEventListener('visibilitychange', () => {
     clearTelegramBackgroundLockTimer();
     scheduleWalletUnlockPrompt();
     scheduleMessageAutoSync(2_000);
+    // Return-from-wallet-app: refresh a quick-start balance step so topped-up funds show right away.
+    quickStartRefreshCurrentBalanceStep();
     if (isVaultViewActive()) {
       refreshVaultNow({ includeActivation: true }).catch((error) => {
         if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
@@ -22683,9 +22688,37 @@ const quickStartStepBody = document.querySelector('#quickStartStepBody');
 const quickStartStepStatus = document.querySelector('#quickStartStepStatus');
 const QUICK_START_DISMISSED_KEY = 'platho.quickstart.dismissed.v1';
 const QUICK_START_DISMISSED_CLOUD_KEY = 'platho_quickstart_dismissed_v1';
+// Persisted so an in-progress quick start SURVIVES a reload or a background auto-lock (going to another wallet
+// app to top up then returning locks Platho — without this the stepper is gone and, since a wallet now exists,
+// never re-surfaces). Stores the active step index; cleared on finish / dismiss-forever.
+const QUICK_START_PROGRESS_KEY = 'platho.quickstart.step.v1';
 
 function quickStartDismissedForever() {
   try { return globalThis.localStorage?.getItem(QUICK_START_DISMISSED_KEY) === '1'; } catch { return false; }
+}
+
+function saveQuickStartProgress(stepIndex) {
+  try { globalThis.localStorage?.setItem(QUICK_START_PROGRESS_KEY, String(stepIndex)); } catch { /* ignore */ }
+}
+
+function readQuickStartProgress() {
+  try {
+    const raw = globalThis.localStorage?.getItem(QUICK_START_PROGRESS_KEY);
+    if (raw === null || raw === undefined || raw === '') return null;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  } catch { return null; }
+}
+
+function clearQuickStartProgress() {
+  try { globalThis.localStorage?.removeItem(QUICK_START_PROGRESS_KEY); } catch { /* ignore */ }
+}
+
+// Last-read external wallet GRAM balance in nanotons (from the shared vaultPocketState), or null if unknown.
+function quickStartWalletTonNanotons() {
+  const raw = vaultPocketState?.wallet?.ton_balance;
+  if (raw === null || raw === undefined) return null;
+  try { return BigInt(raw); } catch { return null; }
 }
 
 // iOS Telegram can evict localStorage between sessions, so a wallet-less user who
@@ -22715,6 +22748,89 @@ async function runQuickStartCreateWallet() {
   flashWalletIdentityStatus('Wallet ready');
   refreshMessagingControls();
   return true;
+}
+
+// Refresh the external wallet GRAM balance into vaultPocketState (no step re-render — callers update in place).
+async function quickStartRefreshWalletBalanceRaw() {
+  try { await refreshWalletTonBalanceForProfile(); } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
+}
+
+// Jump the stepper to a named step (used by "Back to Top up" on the activation step).
+function quickStartGoToStepByKey(key) {
+  quickStartStepIndex = quickStartStepIndexByKey(key);
+  renderQuickStartStep();
+}
+
+// Top-up step body: receive address + a LIVE balance line so a user who just sent GRAM from another wallet app
+// sees it arrive (auto-checked on entry + a manual "Check balance"). In-place text updates, never a re-render.
+function buildQuickStartTopUpBody() {
+  const wrap = document.createElement('div');
+  const addr = document.createElement('div');
+  addr.className = 'quick-start-step-address';
+  addr.textContent = currentWalletReceiveAddress() || storedWalletAddressForCopy() || 'Create a wallet first';
+  const balanceLine = document.createElement('div');
+  balanceLine.className = 'quick-start-balance-line';
+  const check = document.createElement('button');
+  check.type = 'button';
+  check.className = 'secondary-button';
+  check.textContent = 'Check balance';
+  const renderBalance = () => {
+    const bal = quickStartWalletTonNanotons();
+    balanceLine.textContent = bal === null ? 'Balance: checking…' : `Wallet balance: ${formatTonNanotons(bal)} GRAM`;
+  };
+  const refresh = async () => {
+    balanceLine.textContent = 'Balance: checking…';
+    await quickStartRefreshWalletBalanceRaw();
+    renderBalance();
+  };
+  check.addEventListener('click', () => { refresh(); });
+  renderBalance();
+  refresh();
+  wrap.append(addr, balanceLine, check);
+  return wrap;
+}
+
+// Activation step body: shows balance vs the activation fee and GATES on funds — an underfunded wallet cannot
+// activate, so instead of letting the on-chain send fail, disable the action and offer "Back to Top up".
+function buildQuickStartActivateBody() {
+  const wrap = document.createElement('div');
+  const summary = document.createElement('div');
+  summary.className = 'quick-start-balance-line';
+  const hint = document.createElement('div');
+  hint.className = 'quick-start-step-hint';
+  const check = document.createElement('button');
+  check.type = 'button';
+  check.className = 'secondary-button';
+  check.textContent = 'Check balance';
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.className = 'secondary-button';
+  backBtn.textContent = 'Back to Top up';
+  backBtn.addEventListener('click', () => { quickStartGoToStepByKey('topup'); });
+  const applyGate = () => {
+    const bal = quickStartWalletTonNanotons();
+    const fee = plathoAccountActivationFeeNanotons();
+    summary.textContent = bal === null
+      ? `Activation needs ${formatTonNanotons(fee)} GRAM · balance checking…`
+      : `Wallet balance: ${formatTonNanotons(bal)} GRAM · activation needs ${formatTonNanotons(fee)} GRAM`;
+    const underfunded = bal !== null && bal < fee;
+    backBtn.hidden = !underfunded;
+    hint.textContent = underfunded ? 'Not enough GRAM to activate — top up first, then check again.' : '';
+    hint.classList.toggle('is-error', underfunded);
+    // Block the on-chain send when we KNOW the wallet is short; leave it enabled while the balance is unknown
+    // (run() double-checks and returns guidance instead of a doomed activation). renderQuickStartStep runs
+    // body() BEFORE it sets the action label, and setting textContent does not touch .disabled, so this sticks.
+    if (quickStartActionButton) quickStartActionButton.disabled = underfunded;
+  };
+  const refresh = async () => {
+    await quickStartRefreshWalletBalanceRaw();
+    applyGate();
+  };
+  check.addEventListener('click', () => { refresh(); });
+  applyGate();
+  refresh();
+  wrap.append(summary, hint, check, backBtn);
+  return wrap;
 }
 
 const QUICK_START_STEPS = [
@@ -22771,17 +22887,13 @@ const QUICK_START_STEPS = [
     run: () => exportEncryptedWalletKeyFile(),
   },
   {
+    key: 'topup',
     title: 'Top up your wallet',
     action: 'Copy address',
     optional: true,
-    why: 'A small amount of GRAM covers network fees and account activation. Send GRAM to the address below from any TON wallet or exchange - you can do this later.',
+    why: 'A small amount of GRAM covers network fees and account activation. Send GRAM to the address below from any TON wallet or exchange - you can do this later. The balance below updates so you can see it arrive.',
     autoDone: () => false,
-    body: () => {
-      const div = document.createElement('div');
-      div.className = 'quick-start-step-address';
-      div.textContent = currentWalletReceiveAddress() || storedWalletAddressForCopy() || 'Create a wallet first';
-      return div;
-    },
+    body: () => buildQuickStartTopUpBody(),
     run: async () => {
       const address = currentWalletReceiveAddress() || storedWalletAddressForCopy() || '';
       if (!address) return false;
@@ -22790,13 +22902,23 @@ const QUICK_START_STEPS = [
     },
   },
   {
+    key: 'activate',
     title: 'Activate your Platho account',
     action: 'Activate account',
     optional: true,
     why: 'Activation registers your messaging keys on-chain (a one-time fee from your wallet). After it you can send and receive private messages. It needs a funded wallet - do it now, or later from the Profile tab.',
     autoDone: () => hasActivePlathoAccount(),
-    body: () => null,
-    run: async () => { await submitVaultRegisterMessagingKeys(); return true; },
+    body: () => buildQuickStartActivateBody(),
+    run: async () => {
+      // Gate on funds so activation never fails on an empty wallet — send the user back to Top up instead.
+      const bal = quickStartWalletTonNanotons();
+      const fee = plathoAccountActivationFeeNanotons();
+      if (bal !== null && bal < fee) {
+        return `Not enough GRAM (${formatTonNanotons(bal)}) — activation needs ${formatTonNanotons(fee)}. Use “Back to Top up”, fund the wallet, then check again.`;
+      }
+      await submitVaultRegisterMessagingKeys();
+      return true;
+    },
   },
 ];
 
@@ -22832,6 +22954,9 @@ function renderQuickStartStep() {
   if (quickStartActionButton) quickStartActionButton.textContent = step.action;
   if (quickStartBackButton) quickStartBackButton.hidden = quickStartStepIndex === 0;
   if (quickStartSkipButton) quickStartSkipButton.hidden = !step.optional;
+  // Persist the active step so a reload / background auto-lock resumes here (NOT in backup-only mode, which
+  // re-surfaces on its own via the pending-backup nudge).
+  if (!quickStartBackupMode) saveQuickStartProgress(quickStartStepIndex);
 }
 
 function quickStartAdvance() {
@@ -22848,15 +22973,53 @@ let quickStartBackupMode = false;
 function closeQuickStart() {
   if (quickStartDialog) quickStartDialog.hidden = true;
   if (!quickStartBackupMode) {
+    // Explicit dismissal (X / Skip-out): stop onboarding for good AND drop the in-progress resume marker.
     try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }
     try { telegramCloudSet(QUICK_START_DISMISSED_CLOUD_KEY, '1').catch(() => {}); } catch { /* ignore */ }
+    clearQuickStartProgress();
   }
   quickStartBackupMode = false;
 }
 
 function finishQuickStart() {
+  clearQuickStartProgress();
   closeQuickStart();
   flashWalletIdentityStatus('Setup complete');
+}
+
+// Resume the stepper at a specific step (reload / after a background auto-lock + unlock). Unlike openQuickStart,
+// it skips the welcome view and jumps straight to where the user left off.
+function openQuickStartAtStep(index) {
+  if (!quickStartDialog) return;
+  quickStartBackupMode = false;
+  quickStartStepIndex = Math.max(0, Math.min(Number(index) || 0, QUICK_START_STEPS.length - 1));
+  if (quickStartWelcomeView) quickStartWelcomeView.hidden = true;
+  if (quickStartStepsView) quickStartStepsView.hidden = false;
+  quickStartDialog.hidden = false;
+  renderQuickStartStep();
+}
+
+// After a background auto-lock + unlock, bring the user straight back to the quick-start step they were on
+// (e.g. they hopped to another wallet app to top up). No-op if it was dismissed.
+function maybeResumeQuickStartAfterUnlock() {
+  if (!quickStartDialog) return;
+  if (quickStartDismissedForever()) return;
+  if (quickStartDialog.hidden === false) {
+    // Still open (it sat behind the lock screen): just re-check a balance step now that reads work again.
+    quickStartRefreshCurrentBalanceStep();
+    return;
+  }
+  const savedStep = readQuickStartProgress();
+  if (savedStep !== null) openQuickStartAtStep(savedStep);
+}
+
+// Re-render the stepper IF it is showing a balance step (Top up / Activate) so it re-reads the wallet balance —
+// used on return-to-foreground and after unlock so arrived funds show without a manual "Check balance".
+function quickStartRefreshCurrentBalanceStep() {
+  if (!quickStartDialog || quickStartDialog.hidden !== false) return;
+  if (!quickStartStepsView || quickStartStepsView.hidden) return;
+  const key = QUICK_START_STEPS[quickStartStepIndex]?.key;
+  if (key === 'topup' || key === 'activate') renderQuickStartStep();
 }
 
 function openQuickStart() {
@@ -22888,6 +23051,13 @@ function openQuickStartAtBackup() {
 
 function maybeShowQuickStartOnFirstRun() {
   if (!quickStartDialog) return false;
+  // Resume an in-progress quick start FIRST (user began, then reloaded / backgrounded-and-locked): jump straight
+  // to the saved step even though a wallet now exists — otherwise onboarding silently vanishes after step 1.
+  const savedStep = readQuickStartProgress();
+  if (savedStep !== null && !quickStartDismissedForever()) {
+    openQuickStartAtStep(savedStep);
+    return true;
+  }
   if (!hasStoredPlathoWalletRecord()) {
     if (quickStartDismissedForever()) return false;
     openQuickStart();

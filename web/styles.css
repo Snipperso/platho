@@ -2586,6 +2586,24 @@ button.feed-item:hover {
   color: var(--text);
 }
 
+/* Live wallet balance line on the Top-up / Activate quick-start steps + the underfunded hint. */
+.quick-start-balance-line {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.quick-start-step-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #8b949e);
+}
+
+.quick-start-step-hint.is-error {
+  color: var(--danger, #f85149);
+  font-weight: 600;
+}
+
 .quick-start-status {
   margin: 0;
   min-height: 16px;
