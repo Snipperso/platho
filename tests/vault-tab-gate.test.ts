@@ -30,11 +30,29 @@ describe('vault tab gate + durable comment cache guard', () => {
     // cache can't hold comment images).
     expect(app).toMatch(/const publicCommentCacheStorePromise = \(\(\) => \{[\s\S]*platho-public-comments-v1/);
     expect(app).toMatch(/function readCachedPublicComments\(cacheKey\)/);
-    expect(app).toMatch(/function writeCachedPublicComments\(cacheKey, comments, parentExists\)/);
-    // Written on a fresh load, and read to seed the detail view instantly on a reload (guarded, no clobber).
-    expect(app).toMatch(/writeCachedPublicComments\(cacheKey, result\.comments, result\.parentExists\);/);
+    expect(app).toMatch(/function writeCachedPublicComments\(cacheKey, comments, parentExists, latestLink\)/);
+    // Written on a fresh load (WITH the incremental cursor), read to seed the detail view instantly on reload.
+    expect(app).toMatch(/writeCachedPublicComments\(cacheKey, result\.comments, result\.parentExists, result\.latestLink\);/);
     expect(app).toMatch(/readCachedPublicComments\(cacheKey\)\.then\(\(durable\) => \{\s*if \(!durable \|\| publicPostDetailItem !== item \|\| publicPostDetailChainComments\.length > 0\) return;/);
     // The ineffective localStorage persist (stripped images) is gone.
     expect(app).not.toMatch(/function persistLoadedPublicPostComments/);
+  });
+
+  it('VAULT-GATE-03: the comment loader is INCREMENTAL like the private sync — no body re-downloads', () => {
+    // Unchanged latest_entry_link => the snapshot is returned with ZERO body reads.
+    expect(app).toMatch(/if \(snapshot && snapshotBoundary > 0n && String\(snapshotBoundary\) === latestLink\) \{/);
+    // The walk stops at the snapshot boundary — only NEW entries above it are fetched.
+    expect(app).toMatch(/if \(snapshotBoundary > 0n && link <= snapshotBoundary\) break;/);
+    // A multipart group straddling the boundary extends the walk until complete (bounded).
+    expect(app).toMatch(/function publicCommentPartsHaveIncompleteGroup\(parts\)/);
+    expect(app).toMatch(/publicCommentPartsHaveIncompleteGroup\(commentParts\)\) \{/);
+    // Fresh entries merge OVER the snapshot (mergePublicComments favors its SECOND argument on an entryId
+    // collision), preserving everything below the boundary.
+    expect(app).toMatch(/\? mergePublicComments\(snapshot\.comments, fresh\)/);
+    // A LIMIT exit of the straddle extension with a still-incomplete group DEGRADES the result (never cache a
+    // cursor that jumped over a half-fetched comment); evicted/chain-start exits stay clean.
+    expect(app).toMatch(/if \(walked >= PUBLIC_CHAIN_LONG_READ_LIMIT && publicCommentPartsHaveIncompleteGroup\(commentParts\)\) \{\s*degraded = true;/);
+    // The refresh passes the cursor snapshot (memory first, IndexedDB after a reload).
+    expect(app).toMatch(/result = await loadPublicPostComments\(item, \{ snapshot: snapshot\?\.latestLink \? snapshot : null \}\);/);
   });
 });

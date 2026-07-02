@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v641';
+const PLATHO_APP_RUNTIME_VERSION = 'v642';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1153,11 +1153,17 @@ async function readCachedPublicComments(cacheKey) {
   }
 }
 
-async function writeCachedPublicComments(cacheKey, comments, parentExists) {
+async function writeCachedPublicComments(cacheKey, comments, parentExists, latestLink) {
   if (!cacheKey || !Array.isArray(comments)) return;
   try {
     const store = await publicCommentCacheStorePromise;
-    await store?.put(cacheKey, JSON.stringify({ comments, parentExists: parentExists === true }));
+    await store?.put(cacheKey, JSON.stringify({
+      comments,
+      parentExists: parentExists === true,
+      // The parent index's latest_entry_link at load time — the incremental cursor (append-only chain): an
+      // unchanged link on the next open means ZERO body re-reads.
+      latestLink: latestLink === undefined || latestLink === null ? null : String(latestLink),
+    }));
   } catch {
     /* ignore (quota / unavailable) */
   }
@@ -5207,7 +5213,7 @@ function openPublicPostDetail(item) {
       publicPostDetailChainComments = durable.comments;
       publicPostDetailParentExists = durable.parentExists === true;
       publicPostDetailLoadState = 'ready';
-      publicPostCommentsCache.set(cacheKey, { comments: durable.comments, parentExists: durable.parentExists === true });
+      publicPostCommentsCache.set(cacheKey, { comments: durable.comments, parentExists: durable.parentExists === true, latestLink: durable.latestLink ?? null });
       renderPublicPostDetail();
     }).catch(() => {});
   }
@@ -5230,7 +5236,17 @@ function closePublicPostDetail() {
 // reassemble multipart comments with the SAME assembler the feed sync uses. Returns { comments, degraded }: a
 // rate-limited / partial walk reports degraded:true so the caller keeps "Loading..." and retries instead of
 // showing a partial list as complete (the "comments disappear on flaky RPC" failure mode).
-async function loadPublicPostComments(item) {
+// INCREMENTAL comment loader (modelled on the private message sync: persisted bodies + fetch only what's NEW).
+// options.snapshot = { comments, latestLink } from the last CLEAN load: if the parent index's latest_entry_link
+// is unchanged, NOTHING is re-downloaded (1 cheap index read, zero ~32KB body reads — the owner-flagged
+// re-download); otherwise the walk STOPS at the snapshot boundary and only the new entries' bodies are fetched
+// (comment entries are immutable on-chain). A multipart group straddling the boundary (half-landed at snapshot
+// time) extends the walk until the group completes.
+async function loadPublicPostComments(item, options = {}) {
+  const snapshot = options.snapshot && Array.isArray(options.snapshot.comments) ? options.snapshot : null;
+  const snapshotBoundary = (() => {
+    try { return BigInt(snapshot?.latestLink ?? 0n); } catch { return 0n; }
+  })();
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return { comments: [], degraded: true };
   const { provider, address } = resolved;
@@ -5255,7 +5271,18 @@ async function loadPublicPostComments(item) {
       walked: 0, resolved: 0, comments: 0, degraded: false,
     };
     // Clean read, no parent index → the post genuinely has no comments (the index is created on the first comment).
-    return { comments: [], degraded: false, parentExists: false };
+    return { comments: [], degraded: false, parentExists: false, latestLink: '0' };
+  }
+  const latestLink = String(parentIndex.latest_entry_link ?? '0');
+  // UNCHANGED shortcut: the comment chain grows append-only, so an identical latest_entry_link means the
+  // snapshot already holds everything — return it with ZERO body reads (this is the whole point).
+  if (snapshot && snapshotBoundary > 0n && String(snapshotBoundary) === latestLink) {
+    globalThis.plathoLastPublicCommentLoad = {
+      entryId: String(item.entryId), bodyHash: item.bodyHash ?? null,
+      parentExists: true, latestLink, entryCount: String(parentIndex.entry_count ?? ''),
+      walked: 0, resolved: 0, comments: snapshot.comments.length, degraded: false, incremental: 'unchanged',
+    };
+    return { comments: snapshot.comments, degraded: false, parentExists: true, latestLink };
   }
 
   const ids = [];
@@ -5264,6 +5291,9 @@ async function loadPublicPostComments(item) {
   try {
     for (let n = 0; link > 0n; n += 1) {
       if (n >= PUBLIC_CHAIN_LONG_READ_LIMIT) { degraded = true; break; }
+      // Snapshot boundary: everything at/below the last clean load's latest_entry_link is already assembled in
+      // the snapshot — stop fetching (only NEW entries above it are read).
+      if (snapshotBoundary > 0n && link <= snapshotBoundary) break;
       const entryId = link - 1n;
       const entry = await provider.getPublicEntry(entryId, readOptions);
       walkedEntries.set(entryId.toString(), entry);
@@ -5279,21 +5309,19 @@ async function loadPublicPostComments(item) {
   }
 
   const commentParts = [];
-  for (const entryId of ids) {
-    const entry = walkedEntries.get(entryId.toString());
-    if (!entry || entry.exists !== true) continue;
+  const resolveEntryToCommentPart = async (entry) => {
     let payload = null;
     try {
       payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
     } catch (error) {
       // An unreadable / history-unavailable comment must NOT be presented as "no such comment": mark degraded so
       // the caller retries instead of caching a short list.
-      if (noteTonRpcRateLimit(error)) { degraded = true; continue; }
+      if (noteTonRpcRateLimit(error)) { degraded = true; return; }
       degraded = true;
-      continue;
+      return;
     }
-    if (!payload) { degraded = true; continue; }
-    if (payload.type !== 'comment' && payload.type !== 'image_comment' && payload.type !== 'document_comment') continue;
+    if (!payload) { degraded = true; return; }
+    if (payload.type !== 'comment' && payload.type !== 'image_comment' && payload.type !== 'document_comment') return;
     const createdAtSec = Number(payload.createdAtSec ?? payload.created_at_sec ?? 0);
     const createdAt = createdAtSec > 0 ? new Date(createdAtSec * 1000).toISOString() : new Date().toISOString();
     const authorWallet = rawWalletAddress(payload.authorWallet ?? entry.author_wallet) ?? String(payload.authorWallet ?? entry.author_wallet ?? '');
@@ -5319,15 +5347,54 @@ async function loadPublicPostComments(item) {
       parentEntryId: payload.parentEntryId.toString(),
       parentHash: payload.parentHash,
     });
+  };
+  for (const entryId of ids) {
+    const entry = walkedEntries.get(entryId.toString());
+    if (!entry || entry.exists !== true) continue;
+    await resolveEntryToCommentPart(entry);
+  }
+
+  // Boundary-straddle extension: a multipart comment half-landed at snapshot time has parts BELOW the boundary
+  // that were never assembled (incomplete groups are dropped) — walk deeper until every multipart group among
+  // the fresh parts is complete (bounded by the same read limit).
+  try {
+    let walked = ids.length;
+    while (snapshotBoundary > 0n && link > 0n && walked < PUBLIC_CHAIN_LONG_READ_LIMIT
+      && publicCommentPartsHaveIncompleteGroup(commentParts)) {
+      const entryId = link - 1n;
+      const entry = await provider.getPublicEntry(entryId, readOptions);
+      walked += 1;
+      if (entry.exists !== true) break;
+      await resolveEntryToCommentPart(entry);
+      const prev = BigInt(entry.prev_link ?? 0n);
+      if (prev === link) break;
+      link = prev;
+    }
+    // LIMIT exit with a still-incomplete group MUST degrade (symmetric with the main walk): otherwise the
+    // result caches with the NEW cursor and the half-fetched comment falls below the boundary FOREVER. The
+    // evicted (exists!==true) and chain-start (link=0) exits stay clean — an evicted half-group would loop
+    // a retry forever if degraded here.
+    if (walked >= PUBLIC_CHAIN_LONG_READ_LIMIT && publicCommentPartsHaveIncompleteGroup(commentParts)) {
+      degraded = true;
+    }
+  } catch (error) {
+    noteTonRpcRateLimit(error);
+    degraded = true;
   }
 
   const assembled = assemblePublicParts(commentParts)
     .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
   // Bind exactly to THIS post: same filter the feed sync uses (drop only when both hashes present AND mismatch).
-  const comments = assembled.filter((comment) => (
+  const fresh = assembled.filter((comment) => (
     String(comment.parentEntryId) === String(item.entryId)
     && (!item.bodyHash || !comment.parentHash || String(item.bodyHash).toLowerCase() === String(comment.parentHash).toLowerCase())
   ));
+  // Incremental merge: fresh (new) entries win by entryId (mergePublicComments favors its SECOND argument);
+  // the snapshot supplies everything below the boundary.
+  const comments = snapshot
+    ? mergePublicComments(snapshot.comments, fresh)
+      .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime())
+    : fresh;
   // Diagnostic snapshot (read via globalThis.plathoLastPublicCommentLoad) so an empty result is debuggable: it
   // pinpoints whether the parent index was missing, the walk returned nothing, bodies failed to resolve, or the
   // parent-binding filter dropped them.
@@ -5335,9 +5402,29 @@ async function loadPublicPostComments(item) {
     entryId: String(item.entryId), bodyHash: item.bodyHash ?? null,
     parentExists: true, latestLink: String(parentIndex.latest_entry_link ?? ''), entryCount: String(parentIndex.entry_count ?? ''),
     walked: ids.length, resolved: commentParts.length, assembled: assembled.length, comments: comments.length, degraded,
+    incremental: snapshot ? `boundary=${String(snapshotBoundary)}` : 'full',
     sampleParents: assembled.slice(0, 5).map((c) => ({ parentEntryId: String(c.parentEntryId ?? ''), parentHash: c.parentHash ?? null, type: c.type })),
   };
-  return { comments, degraded, parentExists: true };
+  return { comments, degraded, parentExists: true, latestLink };
+}
+
+// TRUE when a multipart comment group among the freshly-fetched parts is still missing parts (used to extend
+// the incremental walk past the snapshot boundary for a group that straddles it).
+function publicCommentPartsHaveIncompleteGroup(parts) {
+  const groups = new Map();
+  for (const part of parts) {
+    const expected = Number(part.partCount ?? 1);
+    if (expected <= 1) continue;
+    const key = `${part.channelId}:${part.streamId}:${part.parentEntryId ?? ''}:${part.parentHash ?? ''}`;
+    const group = groups.get(key) ?? { expected, seen: new Set() };
+    group.expected = Math.max(group.expected, expected);
+    group.seen.add(Number(part.partIndex ?? 0));
+    groups.set(key, group);
+  }
+  for (const group of groups.values()) {
+    if (group.seen.size < group.expected) return true;
+  }
+  return false;
 }
 
 // Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
@@ -5346,13 +5433,22 @@ async function refreshPublicPostDetailComments() {
   const item = publicPostDetailItem;
   if (!item) return;
   const token = (publicPostDetailLoadToken += 1);
-  publicPostDetailLoadState = 'loading';
+  publicPostDetailLoadState = publicPostDetailChainComments.length > 0 ? 'ready' : 'loading';
   renderPublicPostDetail();
+  // INCREMENTAL cursor: the last clean load's snapshot ({comments, latestLink}) — from the in-memory Map, or
+  // (after a reload) from IndexedDB. With it the loader re-reads NOTHING unless new comments actually landed.
+  const cacheKey = publicPostCommentsCacheKey(item);
+  let snapshot = publicPostCommentsCache.get(cacheKey) ?? null;
+  if (!snapshot?.latestLink) {
+    const durable = await readCachedPublicComments(cacheKey);
+    if (durable?.latestLink) snapshot = durable;
+  }
+  if (token !== publicPostDetailLoadToken) return;
   const maxAttempts = 6;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     let result;
     try {
-      result = await loadPublicPostComments(item);
+      result = await loadPublicPostComments(item, { snapshot: snapshot?.latestLink ? snapshot : null });
     } catch (error) {
       console.error(error);
       result = { comments: [], degraded: true };
@@ -5364,15 +5460,14 @@ async function refreshPublicPostDetailComments() {
       publicPostDetailLoadState = 'ready';
       // Cache the fresh authoritative result so the next open of this post is instant (SWR). Bounded LRU (data
       // URLs can be large): drop the oldest once past the cap.
-      const cacheKey = publicPostCommentsCacheKey(item);
       if (cacheKey) {
         publicPostCommentsCache.delete(cacheKey);
-        publicPostCommentsCache.set(cacheKey, { comments: result.comments, parentExists: result.parentExists === true });
+        publicPostCommentsCache.set(cacheKey, { comments: result.comments, parentExists: result.parentExists === true, latestLink: result.latestLink ?? null });
         while (publicPostCommentsCache.size > 24) {
           publicPostCommentsCache.delete(publicPostCommentsCache.keys().next().value);
         }
         // Durable layer (survives a full reload; localStorage can't hold the image data URLs): IndexedDB.
-        writeCachedPublicComments(cacheKey, result.comments, result.parentExists);
+        writeCachedPublicComments(cacheKey, result.comments, result.parentExists, result.latestLink);
       }
       renderPublicPostDetail();
       return;

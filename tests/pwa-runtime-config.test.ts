@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v641<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v641'/);
+    expect(html).toMatch(/id="appVersionLabel">v642<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v642'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=641" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=642" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4243,7 +4243,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/let publicPostDetailOpen = false;/);
     expect(app).toMatch(/function openPublicPostDetail\(item\)/);
     expect(app).toMatch(/function closePublicPostDetail\(\)/);
-    expect(app).toMatch(/async function loadPublicPostComments\(item\)/);
+    expect(app).toMatch(/async function loadPublicPostComments\(item, options = \{\}\)/);
     // Open/close toggle the pane attribute the CSS keys on, mirroring the private chatOpen overlay.
     expect(app).toMatch(/publicPane\.dataset\.postOpen = 'true';/);
     expect(app).toMatch(/publicPane\.dataset\.postOpen = 'false';/);
@@ -4264,12 +4264,12 @@ describe('PWA runtime config guard', () => {
   it('PWA-PUBLIC-COMMENTS-ONDEMAND-DEGRADE: the on-demand comment loader fails closed (no partial list as complete) and binds comments to the parent', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const loaderSource = app.slice(
-      app.indexOf('async function loadPublicPostComments(item)'),
+      app.indexOf('async function loadPublicPostComments(item, options = {})'),
       app.indexOf('async function refreshPublicPostDetailComments('),
     );
     // Empty / missing parent index -> genuinely zero comments (clean, not degraded).
     expect(loaderSource).toMatch(/if \(!parentIndex \|\| parentIndex\.exists !== true\) \{/);
-    expect(loaderSource).toMatch(/return \{ comments: \[\], degraded: false, parentExists: false \};/);
+    expect(loaderSource).toMatch(/return \{ comments: \[\], degraded: false, parentExists: false, latestLink: '0' \};/);
     // The post-detail empties honestly: genuinely-empty (clean read, no index) vs not-loaded (failed read).
     expect(app).toMatch(/publicPostDetailParentExists === false/);
     // A rate-limited read returns degraded:true (the caller keeps "Loading" and retries; never caches a partial).
@@ -5390,11 +5390,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v712/);
+    expect(sw).toMatch(/platho-pwa-prototype-v713/);
     expect(sw).toMatch(/\.\/styles\.css\?v=201/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=641/);
+    expect(sw).toMatch(/\.\/app\.js\?v=642/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
