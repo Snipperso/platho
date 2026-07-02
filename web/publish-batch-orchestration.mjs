@@ -11,9 +11,9 @@ import {
   MAX_BATCH_PARTS,
   VAULT_PUBLISH_KIND,
   batchChargeFloor,
-  buildBatchPublishExternalBoc,
+  buildBatchPublishExternalVariants,
   buildBatchPublishPartsRoot,
-} from './pwa-contract-transactions.mjs?v=30';
+} from './pwa-contract-transactions.mjs?v=31';
 import { batchHoldNanotons } from './message-pricing-policy.mjs?v=13';
 
 export { MAX_BATCH_PARTS };
@@ -167,7 +167,9 @@ export async function buildBatchExternalFromPublishItems(batch, ctx = {}) {
   const partsRoot = buildBatchPublishPartsRoot(parts);
   const partCount = BigInt(parts.length);
   const maxCharge = batchMaxChargeForItems(batch.items);
-  const built = await buildBatchPublishExternalBoc({
+  // Pre-signed max_charge VARIANTS (see buildBatchPublishExternalVariants): the keyless retry loop rotates
+  // them so every re-broadcast is a REAL broadcast past the network's ~60s same-bytes dedup windows.
+  const built = await buildBatchPublishExternalVariants({
     owner_wallet: ctx.owner,
     vaultAddress: ctx.vaultAddress,
     deploymentManifestHash: ctx.manifestHash,
@@ -177,7 +179,7 @@ export async function buildBatchExternalFromPublishItems(batch, ctx = {}) {
     part_count: partCount,
     partsRoot,
     authSecretKey: ctx.authSecretKey,
-  }, { vaultAddress: ctx.vaultAddress });
+  }, { vaultAddress: ctx.vaultAddress }, { variantCount: 16 });
   return {
     ...built,
     kind,

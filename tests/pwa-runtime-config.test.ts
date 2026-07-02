@@ -256,12 +256,12 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v628<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v628'/);
+    expect(html).toMatch(/id="appVersionLabel">v629<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v629'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=628" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=629" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1629,7 +1629,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/currentNonce !== null && isVaultPublishNonceConsumedError\(error\)[\s\S]*PUBLISH_PART_STATUS_SENT[\s\S]*broadcastNonceRaceCount: nonceRaceCount \+ 1/);
     expect(app).not.toMatch(/vault_nonce_consumed/);
     expect(app).toMatch(/console\.debug\('\[platho\] vault re-broadcast 16453 nonce race/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 2_500/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 3_500/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6/);
     // v627: early duplicates re-poke at ~4 block-times (sub-second chain) instead of the 35s tail, gated on a
     // fresh currentNonce === clientNonce read; past the fast limit the conservative 35s tail takes over.
@@ -1658,10 +1658,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]*confirmFinalNonce: options\.confirmFinalNonce \?\? true/);
     expect(sendSource).toMatch(/const nonceWaitOptions = \{\s*timeoutMs: options\.timeoutMs \?\? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,\s*requestTimeoutMs: options\.requestTimeoutMs,\s*queueTimeoutMs: options\.queueTimeoutMs,\s*\}/);
     expect(sendSource).not.toMatch(/needsQueuedNonce|VAULT_PUBLISH_QUEUE_NONCE_CONFIRM_TIMEOUT_MS/);
-    // v628 mobilization (owner-directed, chain-forensics-derived): 10s real-relay re-poke tail; past the fast
-    // budget healing NEVER silently stops — it degrades to a 30s slow poke bounded by the age terminals; the
-    // duplicate/nonce-race tails stay sparse (35s: each answer is a native red 500).
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 10_000/);
+    // v629 mobilization: with max_charge-variant rotation EVERY retry is a REAL broadcast (new root hash beats
+    // all ~60s dedup layers), so the tail is 3.5s and the fast budget is 20 (a ~70s fast window); past it,
+    // healing NEVER silently stops — it degrades to a 30s slow poke bounded by the age terminals.
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 3_500/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS = 30_000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS = 35_000/);
     expect(app).not.toMatch(/if \(retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT\) continue;/);
@@ -1671,7 +1671,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/publishState\.lastBroadcastRetryNonceReadOkAt = Date\.now\(\)/);
     expect(app).toMatch(/nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000/);
     expect(app).toMatch(/console\.info\('\[platho\] send timeline'/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 20/);
+    // v629 max_charge-variant rotation: every retry rotates a pre-signed variant so it is a REAL broadcast.
+    const pwaContractTx = readFileSync('web/pwa-contract-transactions.mjs', 'utf8');
+    expect(pwaContractTx).toMatch(/export async function buildBatchPublishExternalVariants/);
+    expect(app).toMatch(/partWithPublishId\.externalBocVariants = batchExternal\.variants/);
+    expect(app).toMatch(/variantBocs \? variantBocs\[\(retryCount \+ 1\) % variantBocs\.length\] : head\.externalBoc/);
+    // v629: the ~16×47KB variant BoCs are STRIPPED before persisting to encrypted history (else every status
+    // notify would re-encrypt+write ~1.5MB — a latency regression). In-memory rotation keeps them.
+    expect(app).toMatch(/function publishStateForHistory\(publishState\)/);
+    expect(app).toMatch(/publishState: publishStateForHistory\(message\.publishState\)/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 \* 1000/);
@@ -1683,8 +1692,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/queueTimeoutMs: options\.queueTimeoutMs \?\? PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS/);
     expect(app).toMatch(/queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS/);
     expect(app).toMatch(/readVaultPublishNonceForBroadcastRetry\(provider, owner, \{/);
-    // VPB2: broadcast-retry re-sends each batch's SHARED external once (keyed off the head part of the batch group).
-    expect(app).toMatch(/sendVaultExternalBoc\(\{ boc: head\.externalBoc \}, \{/);
+    // VPB2: broadcast-retry re-sends each batch's SHARED external once (keyed off the head part of the batch
+    // group); v629 rotates a pre-signed max_charge variant so each retry is a REAL broadcast.
+    expect(app).toMatch(/sendVaultExternalBoc\(\{ boc: retryBoc \}, \{/);
     expect(app).toMatch(/queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS/);
     expect(app).toMatch(/skipIfRateLimited:\s*true/);
     expect(app).toMatch(/priority:\s*'background'/);
@@ -5361,15 +5371,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v699/);
+    expect(sw).toMatch(/platho-pwa-prototype-v700/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=628/);
+    expect(sw).toMatch(/\.\/app\.js\?v=629/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
-    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=4/);
+    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=98/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
@@ -5377,7 +5387,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=58/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=40/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);

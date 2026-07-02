@@ -134,12 +134,12 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=30';
+} from './pwa-contract-transactions.mjs?v=31';
 import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
-} from './publish-batch-orchestration.mjs?v=4';
+} from './publish-batch-orchestration.mjs?v=5';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=38';
 import {
   createCapsuleHubTonRpcProvider,
@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v628';
+const PLATHO_APP_RUNTIME_VERSION = 'v629';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -9380,6 +9380,26 @@ function historyStatusLabel() {
     : `device-encrypted local cache (${limit})`;
 }
 
+// Drop the pre-signed variant BoCs (~16 × ~47KB per part) before persisting: they are in-memory retry material
+// for THIS session's re-broadcast rotation, not needed to restore a message (a cross-reload resume falls back
+// to the single externalBoc). Persisting them would re-encrypt+write ~1.5MB on EVERY status notify during a
+// send — a latency regression that would defeat the whole point of the variants.
+function publishStateForHistory(publishState) {
+  if (!publishState || typeof publishState !== 'object' || !Array.isArray(publishState.parts)) {
+    return publishState ?? null;
+  }
+  return {
+    ...publishState,
+    parts: publishState.parts.map((part) => {
+      if (part && part.externalBocVariants) {
+        const { externalBocVariants, ...rest } = part;
+        return rest;
+      }
+      return part;
+    }),
+  };
+}
+
 function serializeMessageForHistory(message) {
   return {
     type: message.type,
@@ -9397,7 +9417,7 @@ function serializeMessageForHistory(message) {
     blocks: messageBlocksForHistory(message),
     capsule: message.capsule ?? null,
     capsules: message.capsules ?? null,
-    publishState: message.publishState ?? null,
+    publishState: publishStateForHistory(message.publishState),
     recipientWallet: message.recipientWallet ?? null,
     vaultCreateIntent: safeJsonClone(message.vaultCreateIntent) ?? null,
     vaultPublish: safeJsonClone(message.vaultPublish) ?? null,
@@ -18608,8 +18628,10 @@ const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8;
 // every 200 answer to a re-POST proves toncenter DROPPED the previous queued copy — so a proven-not-landed
 // external (fresh nonce read said currentNonce === clientNonce) is re-poked every 10s, not 35s. Idempotent:
 // the contract pre-accept-rejects a replayed nonce, so an extra POST can never double-spend.
-const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 10_000;
-const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6;
+// 3.5s: with max_charge-variant rotation EVERY retry is a REAL broadcast (a new root hash beats all ~60s
+// dedup layers), so the productive floor is just a few block-times — no reason to wait 10s+.
+const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 3_500;
+const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 20;
 // Past the fast budget healing must NOT stop (the old silent stop left a dropped external with ZERO re-POSTs
 // from ~3min to the 10-min terminal — the owner's 4/6.5-min image sends): fall back to an indefinite slow
 // poke, bounded by the age terminals (<= ~18 more idempotent POSTs worst case).
@@ -18623,7 +18645,7 @@ const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS = 35_000;
 // NOT relayed (structural pre-accept reject, never mempooled), so retry QUICKLY — the send node catches
 // up within seconds — but paced (not the zero first-heal cooldown) so a lagging node is not hammered on
 // every ~1s confirm pass. After a few races fall back to the full 35s cooldown.
-const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 2_500;
+const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 3_500;
 const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6;
 // "duplicate message" = the BoC is queued at toncenter. On the sub-second chain a LIVE queued copy lands in
 // ~1-3s, so if ~4 block-times pass with the nonce unmoved the copy is likely stalled/dropped and a re-poke is
@@ -18756,6 +18778,12 @@ function setPublishPartStatus(publishState, index, status, extra = {}) {
     if (status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) {
       part.lastBroadcastRetryError = null;
       part.lastBroadcastRetryErrorAt = null;
+    }
+    // A landed part is never re-broadcast (publishPartNeedsBroadcastRetry excludes these statuses) — drop the
+    // pre-signed variant BoCs (~16 x 47KB) so the persisted encrypted history is not bloated past the in-flight
+    // window. The single externalBoc stays for the existing recovery/debug paths.
+    if (status !== PUBLISH_PART_STATUS_SENT && part.externalBocVariants) {
+      delete part.externalBocVariants;
     }
   }
   publishState.submittedCount = publishState.parts.filter((item) => (
@@ -19734,6 +19762,9 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
             partWithPublishId.batchPartIndex = entryIndex;
             if (publishPartKind(partWithPublishId) === 'public') partWithPublishId.authorWallet = owner;
             partWithPublishId.externalBoc = batchExternal.boc;
+            // Pre-signed max_charge variants (same nonce/ids): the keyless retry loop rotates them so every
+            // re-broadcast is a REAL broadcast past the network's ~60s same-bytes dedup windows.
+            partWithPublishId.externalBocVariants = batchExternal.variants ?? null;
             partWithPublishId.maxCharge = (batchExternal.maxCharge ?? batch.items.reduce((sum, it) => sum + BigInt(it.maxCharge ?? 0n), 0n)).toString();
             partWithPublishId.lastBroadcastAt = broadcastAt;
             notifyPublishState(options, publishState, partWithPublishId);
@@ -19996,6 +20027,7 @@ function clearPublishPartSignedAttempt(part) {
   delete part.broadcastNonceRaceCount;
   delete part.broadcastDuplicateRelayCount;
   delete part.broadcastBudgetExhaustedWarned;
+  delete part.externalBocVariants;
 }
 
 function publishPartNeedsBroadcastRetry(part) {
@@ -20191,7 +20223,14 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     if (publishPartLastBroadcastAgeMs(head) < rebroadcastCooldownMs) continue;
     let result = null;
     try {
-      result = await sendVaultExternalBoc({ boc: head.externalBoc }, {
+      // Rotate the pre-signed variants (same nonce, differing max_charge => different root hash) so this
+      // retry is a REAL broadcast, not a ~60s-dedup no-op. Falls back to the single boc for pre-variant
+      // publish states persisted by older builds. Keyless-compatible: only ready bytes are rotated.
+      const variantBocs = Array.isArray(head.externalBocVariants) && head.externalBocVariants.length > 0
+        ? head.externalBocVariants
+        : null;
+      const retryBoc = variantBocs ? variantBocs[(retryCount + 1) % variantBocs.length] : head.externalBoc;
+      result = await sendVaultExternalBoc({ boc: retryBoc }, {
         requestTimeoutMs: sendTimeoutMs,
         queueTimeoutMs,
         skipIfRateLimited: true,

@@ -1337,6 +1337,32 @@ export async function buildBatchPublishExternalBoc(params = {}, options = {}) {
   };
 }
 
+// K pre-signed VARIANTS of the SAME batch external (same nonce/parts/ids), differing only in max_charge
+// (+k nanotons, k = variant index). Every TON dedup layer keys on either the serialized bytes or the root
+// repr hash — both change with the signature — so rotating variants makes EVERY retry a REAL broadcast
+// (a same-BoC re-POST within the network's ~60s dedup windows is a silent no-op, which is what made large
+// externals take minutes: the retry ladder was almost entirely fake). Correctness: max_charge is NOT part of
+// computeBatchPublishId, so batchPublishId/entryPublishIds are byte-identical across variants and every
+// confirm/receipt path matches unchanged; all variants share ONE nonce, so the contract's pre-accept
+// throwUnless(16453) lets exactly ONE land (over-reserve refunded by the mode-128 ACK) and bounces the rest
+// uncharged — no double-spend by construction. Cost: <= K-1 nanotons on the winning variant, refunded.
+export async function buildBatchPublishExternalVariants(params = {}, options = {}, variantOptions = {}) {
+  const variantCount = Math.max(1, Math.min(64, Number(variantOptions.variantCount ?? 16)));
+  const baseMaxCharge = BigInt(params.max_charge ?? params.maxCharge);
+  const variants = [];
+  let first = null;
+  for (let k = 0; k < variantCount; k += 1) {
+    const built = await buildBatchPublishExternalBoc({
+      ...params,
+      max_charge: baseMaxCharge + BigInt(k),
+      maxCharge: baseMaxCharge + BigInt(k),
+    }, options);
+    if (k === 0) first = built;
+    variants.push(built.boc);
+  }
+  return { ...first, maxCharge: baseMaxCharge, variants };
+}
+
 export async function buildVaultProfileAvatarBodyCell(params = {}) {
   assertObject(params, 'params');
   const signedData = vaultProfileAvatarSignedDataCell(params);
