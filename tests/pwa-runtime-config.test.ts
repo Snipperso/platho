@@ -256,12 +256,12 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v627<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v627'/);
+    expect(html).toMatch(/id="appVersionLabel">v628<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v628'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=627" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=628" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2098,11 +2098,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-QUICKSTART-01: first-run quick-start onboarding + wallet-key carries the toncenter key', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
-    // Wallet-key backup now bundles the user's own toncenter key (v2) so restoring the key on a new device
-    // brings the RPC key too; the importer restores it, backward-compatible with v1 (no-key) backups.
-    expect(app).toMatch(/kind: PLATHO_WALLET_KEY_BACKUP_KIND,\s*version: 2/);
-    expect(app).toMatch(/\.\.\.\(toncenterApiKey \? \{ toncenterApiKey \} : \{\}\)/);
-    expect(app).toMatch(/parsed\?\.kind === PLATHO_WALLET_KEY_BACKUP_KIND[\s\S]*applyToncenterApiKey\(parsed\.toncenterApiKey\)/);
+    // Wallet-key backup bundles the user's own toncenter key so restoring on a new device brings the RPC key
+    // too. v3 ENCRYPTS it under the wallet seed (no plaintext secret in the file); the importer decrypts it,
+    // backward-compatible with v2 (legacy plaintext) and v1 (no-key) backups.
+    expect(app).toMatch(/kind: PLATHO_WALLET_KEY_BACKUP_KIND,\s*version: 3/);
+    expect(app).toMatch(/\.\.\.\(toncenterApiKeyEnc \? \{ toncenterApiKeyEnc \} : \{\}\)/);
+    // No plaintext toncenter key is ever written into the backup file.
+    expect(app).not.toMatch(/\.\.\.\(toncenterApiKey \? \{ toncenterApiKey \} : \{\}\)/);
+    expect(app).toMatch(/decryptToncenterApiKeyFromBackup\(parsed\.toncenterApiKeyEnc, wallet\)/);
     // Quick-start overlay markup (welcome + import buttons + the close affordance).
     expect(html).toMatch(/id="quickStartDialog"/);
     expect(html).toMatch(/id="quickStartBeginButton"/);
@@ -2133,7 +2136,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function showTelegramManualExportDialog\(filename, content\) \{\s*return openActionDialog\(/);
     expect(app).toMatch(/async function downloadJsonFile\(filename, value\)[\s\S]*await showTelegramManualExportDialog\(filename, json\)/);
     expect(app).toMatch(/async function downloadEncryptedWalletKeyBackup\([\s\S]*await downloadJsonFile\(/);
-    expect(app).toMatch(/if \(!unlocked\) return false;\s*await downloadEncryptedWalletKeyBackup\(record\);/);
+    expect(app).toMatch(/if \(!unlocked\) return false;\s*await downloadEncryptedWalletKeyBackup\(record, unlocked\);/);
     // MEDIUM fix: a bare window.open of a t.me/ link is a no-op in the TG WebView; route the @toncenter bot
     // link through the SDK (openTelegramLink) first, fall back to a new tab only outside Telegram.
     expect(app).toMatch(/function openTelegramDeepLink\(href\)[\s\S]*tg\.openTelegramLink\(href\)/);
@@ -2609,7 +2612,8 @@ describe('PWA runtime config guard', () => {
     // v472: the call is captured (const restored = await ...) so the bundled toncenter key can be restored
     // AFTER the wallet activates; the wallet-switch still goes through activateImportedEncryptedWalletRecord.
     expect(importSource).toMatch(/const restored = await activateImportedEncryptedWalletRecord\(wallet, record\)/);
-    expect(importSource).toMatch(/applyToncenterApiKey\(parsed\.toncenterApiKey\)/);
+    expect(importSource).toMatch(/decryptToncenterApiKeyFromBackup\(parsed\.toncenterApiKeyEnc, wallet\)/);
+    expect(importSource).toMatch(/applyToncenterApiKey\(restoredApiKey\.trim\(\)\)/);
     expect(importSource).not.toMatch(/plathoWallet = wallet/);
   });
 
@@ -5344,11 +5348,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v698/);
+    expect(sw).toMatch(/platho-pwa-prototype-v699/);
     expect(sw).toMatch(/\.\/styles\.css\?v=196/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=627/);
+    expect(sw).toMatch(/\.\/app\.js\?v=628/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

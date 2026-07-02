@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v627';
+const PLATHO_APP_RUNTIME_VERSION = 'v628';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11849,32 +11849,81 @@ function safeWalletKeyFilename(record) {
   return `platho-wallet-key-${safeAddress}.json`;
 }
 
-function walletKeyBackupFromRecord(record) {
-  if (!record || record.kind !== PLATHO_WALLET_STORAGE_KIND) {
-    throw new Error('Encrypted wallet key is missing');
+function readStoredToncenterApiKey() {
+  let key = globalThis.plathoToncenterApiKey ?? null;
+  if (key == null) {
+    try { key = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { key = null; }
   }
-  // Client-direct RPC: each user has their OWN free toncenter API key. Bundle it into the wallet-key
-  // backup so restoring the key on another device brings the RPC key too — not just the wallet. It is
-  // low-sensitivity (free, rate-limited, regenerable), so it travels in plaintext alongside the
-  // (password-encrypted) wallet rather than under the wallet password. Backward-compat: v1 backups had no
-  // key, and the importer reads it conditionally, so old/new files interoperate.
-  let toncenterApiKey = globalThis.plathoToncenterApiKey ?? null;
-  if (toncenterApiKey == null) {
-    try { toncenterApiKey = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { toncenterApiKey = null; }
-  }
+  return key || null;
+}
+
+// The per-user toncenter API key is bundled into the wallet-key backup so restoring the key on another
+// device brings the RPC key too. It is ENCRYPTED under the wallet's own recovery phrase (the same secret
+// that already protects the wallet), so the backup file carries ZERO plaintext secret material — only the
+// holder of the wallet password (→ seed) can recover it. Reuses the wallet PBKDF2/AES-GCM primitives.
+async function encryptToncenterApiKeyForBackup(apiKey, unlockedWallet) {
+  const phrase = exportPlathoWalletRecoveryPhrase(unlockedWallet);
+  if (!phrase) throw new Error('Cannot protect the RPC key without the unlocked wallet');
+  const salt = randomStorageBytes(16);
+  const iv = randomStorageBytes(12);
+  const key = await deriveWalletStorageKey(phrase, salt);
+  const ciphertext = new Uint8Array(await walletStorageCrypto().subtle.encrypt(
+    { name: 'AES-GCM', iv }, key, new TextEncoder().encode(String(apiKey)),
+  ));
   return {
-    kind: PLATHO_WALLET_KEY_BACKUP_KIND,
-    version: 2,
-    exportedAt: new Date().toISOString(),
-    walletAddress: storedWalletAddressForCopy(record),
-    encryptedWallet: record,
-    ...(toncenterApiKey ? { toncenterApiKey } : {}),
+    kdf: PLATHO_WALLET_KDF_NAME,
+    iterations: PLATHO_WALLET_KDF_ITERATIONS,
+    salt: walletBytesToBase64(salt),
+    cipher: PLATHO_WALLET_CIPHER_NAME,
+    iv: walletBytesToBase64(iv),
+    ciphertext: walletBytesToBase64(ciphertext),
   };
 }
 
-async function downloadEncryptedWalletKeyBackup(record = readEncryptedPlathoWalletRecord()) {
+async function decryptToncenterApiKeyFromBackup(enc, unlockedWallet) {
+  if (!enc || typeof enc.salt !== 'string' || typeof enc.iv !== 'string' || typeof enc.ciphertext !== 'string') {
+    return null;
+  }
+  const phrase = exportPlathoWalletRecoveryPhrase(unlockedWallet);
+  if (!phrase) return null;
+  const salt = walletBase64ToBytes(enc.salt);
+  const iv = walletBase64ToBytes(enc.iv);
+  const ciphertext = walletBase64ToBytes(enc.ciphertext);
+  const key = await deriveWalletStorageKey(phrase, salt, Number(enc.iterations ?? PLATHO_WALLET_KDF_ITERATIONS));
+  const plaintext = await walletStorageCrypto().subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new TextDecoder().decode(new Uint8Array(plaintext));
+}
+
+async function walletKeyBackupFromRecord(record, unlockedWallet = plathoWallet) {
+  if (!record || record.kind !== PLATHO_WALLET_STORAGE_KIND) {
+    throw new Error('Encrypted wallet key is missing');
+  }
+  // v3: the toncenter key is encrypted under the wallet seed (see encryptToncenterApiKeyForBackup) so the
+  // file holds no plaintext secret. If it can't be encrypted (no unlocked wallet) the key is OMITTED — never
+  // written in the clear. Backward-compat: v1 had no key, v2 carried it in plaintext; the importer reads all.
+  const toncenterApiKey = readStoredToncenterApiKey();
+  let toncenterApiKeyEnc = null;
+  if (toncenterApiKey && unlockedWallet) {
+    try {
+      toncenterApiKeyEnc = await encryptToncenterApiKeyForBackup(toncenterApiKey, unlockedWallet);
+    } catch (error) {
+      console.error(error);
+      toncenterApiKeyEnc = null;
+    }
+  }
+  return {
+    kind: PLATHO_WALLET_KEY_BACKUP_KIND,
+    version: 3,
+    exportedAt: new Date().toISOString(),
+    walletAddress: storedWalletAddressForCopy(record),
+    encryptedWallet: record,
+    ...(toncenterApiKeyEnc ? { toncenterApiKeyEnc } : {}),
+  };
+}
+
+async function downloadEncryptedWalletKeyBackup(record = readEncryptedPlathoWalletRecord(), unlockedWallet = plathoWallet) {
   if (!record) throw new Error('No encrypted wallet key is stored on this device');
-  await downloadJsonFile(safeWalletKeyFilename(record), walletKeyBackupFromRecord(record));
+  await downloadJsonFile(safeWalletKeyFilename(record), await walletKeyBackupFromRecord(record, unlockedWallet));
   // The key file (or the Telegram manual-copy dialog) is now saved/acknowledged — clear the backup nudge.
   markWalletKeyBackupDone(storedWalletAddressForCopy(record) || record?.address || null);
 }
@@ -11896,7 +11945,17 @@ async function offerEncryptedWalletKeyBackup(reason = 'Save this encrypted walle
     ],
   });
   if (!result) return false;
-  await downloadEncryptedWalletKeyBackup(record);
+  // If a toncenter key is set but the wallet is locked, unlock so it can be encrypted into the backup
+  // (never written in the clear). If the user cancels, the file still saves — just without the RPC key.
+  let unlockedWallet = plathoWallet;
+  if (!unlockedWallet && readStoredToncenterApiKey()) {
+    unlockedWallet = await requestAndDecryptEncryptedWallet(record, {
+      title: 'Protect RPC key',
+      hint: 'Enter your wallet password so your RPC key is encrypted inside the backup.',
+      submitLabel: 'Save encrypted key',
+    });
+  }
+  await downloadEncryptedWalletKeyBackup(record, unlockedWallet);
   return true;
 }
 
@@ -14222,7 +14281,7 @@ async function exportEncryptedWalletKeyFile() {
     submitLabel: 'Export wallet key',
   });
   if (!unlocked) return false;
-  await downloadEncryptedWalletKeyBackup(record);
+  await downloadEncryptedWalletKeyBackup(record, unlocked);
   return true;
 }
 
@@ -14260,9 +14319,16 @@ async function importEncryptedWalletKeyFile(file) {
   const restored = await activateImportedEncryptedWalletRecord(wallet, record);
   // v2+ backups also carry the user's own toncenter API key — restore it so importing the wallet key on a
   // new device brings the RPC key too. v1 backups (no key) skip this. Keyless toncenter works either way.
-  if (restored && parsed?.kind === PLATHO_WALLET_KEY_BACKUP_KIND
-    && typeof parsed.toncenterApiKey === 'string' && parsed.toncenterApiKey.trim()) {
-    applyToncenterApiKey(parsed.toncenterApiKey);
+  if (restored && parsed?.kind === PLATHO_WALLET_KEY_BACKUP_KIND) {
+    let restoredApiKey = null;
+    if (parsed.toncenterApiKeyEnc) {
+      // v3: encrypted under the wallet seed — decrypt with the just-unlocked wallet.
+      try { restoredApiKey = await decryptToncenterApiKeyFromBackup(parsed.toncenterApiKeyEnc, wallet); }
+      catch (error) { console.error(error); restoredApiKey = null; }
+    } else if (typeof parsed.toncenterApiKey === 'string' && parsed.toncenterApiKey.trim()) {
+      restoredApiKey = parsed.toncenterApiKey.trim(); // v2 legacy plaintext backups
+    }
+    if (restoredApiKey && restoredApiKey.trim()) applyToncenterApiKey(restoredApiKey.trim());
   }
   return restored;
 }

@@ -25,7 +25,7 @@ Production hosting must keep the security headers from `deploy/Caddyfile` or `de
 
 - `Content-Security-Policy` with `default-src 'self'`, `object-src 'none'`, `base-uri 'none'`, and `frame-ancestors https://web.telegram.org` (relaxed from `'none'` so the app can run as a Telegram Mini App, which embeds it in an iframe on `web.telegram.org`);
 - `script-src 'self' 'wasm-unsafe-eval'` for the bundled WebP encoder; the bundle has no inline scripts and no inline import map (vendor modules use relative imports), so `script-src` carries no content hashes;
-- `connect-src` limited to same-origin plus the approved production TON RPC hosts (`https://toncenter.com`, `https://*.toncenter.com`, `https://ton.access.orbs.network`, and `https://*.orbs.network`);
+- `connect-src` limited to same-origin plus the approved production TON RPC hosts (`https://toncenter.com` and `https://*.toncenter.com`);
 - `X-Content-Type-Options: nosniff`;
 - `Referrer-Policy: no-referrer`;
 - `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
@@ -72,7 +72,7 @@ Point DNS `A` and `AAAA` records for `platho.app` at the server before expecting
 
 ## Platho RPC gateway (RETIRED)
 
-`rpc.platho.app` has been decommissioned. The PWA is **client-direct**: each client talks to TON itself via the keyless Orbs (TON Access) network plus the user's own optional free TonCenter API key, so there is no central gateway to block or DoS. The former gateway code (`deploy/platho-rpc-gateway.*`) and its tests have been removed, and `validatePlathoAppConfig` now actively forbids any provider routing through `rpc.platho.app`.
+`rpc.platho.app` has been decommissioned. The PWA is **client-direct**: each client talks to TON itself via the user's own optional free TonCenter API key (with keyless TonCenter as a last-resort fallback), so there is no central gateway to block or DoS. Transport is TonCenter-only — the former Orbs (TON Access) path has been removed. The former gateway code (`deploy/platho-rpc-gateway.*`) and its tests have been removed, and `validatePlathoAppConfig` now actively forbids any provider routing through `rpc.platho.app`.
 
 ## Nginx fallback
 
