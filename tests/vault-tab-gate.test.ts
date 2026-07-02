@@ -25,12 +25,16 @@ describe('vault tab gate + durable comment cache guard', () => {
     expect(app).not.toMatch(/style\s*=\s*["'`][^"'`]*is-locked/);
   });
 
-  it('VAULT-GATE-02: post-detail comments persist into the feed cache so a reload does not re-download images', () => {
-    expect(app).toMatch(/function persistLoadedPublicPostComments\(item, chainComments\)/);
-    // Writes the merged comments into the cached post and persists.
-    expect(app).toMatch(/feed\.posts\[idx\] = \{ \.\.\.posts\[idx\], comments: merged \};/);
-    expect(app).toMatch(/persistLoadedPublicPostComments\(item, result\.comments\);/);
-    // Local-pending comments (no entryId, not on chain) are preserved through the merge.
-    expect(app).toMatch(/const localPending = existing\.filter\(\(c\) => \{[\s\S]*!chainComments\.some/);
+  it('VAULT-GATE-02: post-detail comments cache durably in IndexedDB (localStorage strips the image data URLs)', () => {
+    // A dedicated IndexedDB store (localStorage's omitHeavyFeedMediaForPersist strips imageUrl, so the feed
+    // cache can't hold comment images).
+    expect(app).toMatch(/const publicCommentCacheStorePromise = \(\(\) => \{[\s\S]*platho-public-comments-v1/);
+    expect(app).toMatch(/function readCachedPublicComments\(cacheKey\)/);
+    expect(app).toMatch(/function writeCachedPublicComments\(cacheKey, comments, parentExists\)/);
+    // Written on a fresh load, and read to seed the detail view instantly on a reload (guarded, no clobber).
+    expect(app).toMatch(/writeCachedPublicComments\(cacheKey, result\.comments, result\.parentExists\);/);
+    expect(app).toMatch(/readCachedPublicComments\(cacheKey\)\.then\(\(durable\) => \{\s*if \(!durable \|\| publicPostDetailItem !== item \|\| publicPostDetailChainComments\.length > 0\) return;/);
+    // The ineffective localStorage persist (stripped images) is gone.
+    expect(app).not.toMatch(/function persistLoadedPublicPostComments/);
   });
 });

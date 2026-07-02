@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v640';
+const PLATHO_APP_RUNTIME_VERSION = 'v641';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1125,6 +1125,42 @@ const profileAvatarMediaStorePromise = (() => {
 })();
 function profileAvatarMediaStore() {
   return profileAvatarMediaStorePromise;
+}
+
+// DURABLE cache of a post's loaded comments (assembled bodies + image data URLs), keyed `${channelId}:${entryId}`
+// in IndexedDB. localStorage strips image data URLs (omitHeavyFeedMediaForPersist), so the feed cache cannot hold
+// them; IndexedDB can. Survives a full reload, so re-opening a post shows its comments (WITH images) instantly
+// instead of re-walking the chain + re-downloading every ~32KB comment image (owner-flagged). Reuses the media
+// store shape as a generic key->JSON string KV (its LRU cap bounds growth).
+const publicCommentCacheStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-public-comments-v1'), cap: 50 }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+
+async function readCachedPublicComments(cacheKey) {
+  if (!cacheKey) return null;
+  try {
+    const store = await publicCommentCacheStorePromise;
+    const record = await store?.get(cacheKey);
+    if (typeof record?.url !== 'string' || record.url.length === 0) return null;
+    const parsed = JSON.parse(record.url);
+    return Array.isArray(parsed?.comments) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedPublicComments(cacheKey, comments, parentExists) {
+  if (!cacheKey || !Array.isArray(comments)) return;
+  try {
+    const store = await publicCommentCacheStorePromise;
+    await store?.put(cacheKey, JSON.stringify({ comments, parentExists: parentExists === true }));
+  } catch {
+    /* ignore (quota / unavailable) */
+  }
 }
 
 function walletIndexedDbSuffix(walletAddress = plathoWallet?.address) {
@@ -5151,7 +5187,8 @@ function openPublicPostDetail(item) {
   publicPostDetailOpen = true;
   // Stale-while-revalidate: paint the cached comments immediately (no re-download flash) if we have them, then
   // let refreshPublicPostDetailComments silently reload in the background.
-  const cached = publicPostCommentsCache.get(publicPostCommentsCacheKey(item));
+  const cacheKey = publicPostCommentsCacheKey(item);
+  const cached = publicPostCommentsCache.get(cacheKey);
   publicPostDetailChainComments = Array.isArray(cached?.comments) ? cached.comments : [];
   publicPostDetailParentExists = cached ? cached.parentExists === true : null;
   publicPostDetailLoadState = publicPostDetailChainComments.length > 0 ? 'ready' : 'loading';
@@ -5161,6 +5198,19 @@ function openPublicPostDetail(item) {
   setPublicCommentTarget(item, { focus: false, showContext: false });
   renderPublicPostDetail();
   if (publicPostDetailBody) publicPostDetailBody.scrollTop = 0;
+  // DURABLE seed: after a full reload the in-memory Map is empty — pull the last-loaded comments (with images)
+  // from IndexedDB and paint them instantly, before the background chain re-walk. Guarded so a fast chain result
+  // or a post close/reopen is never clobbered.
+  if (publicPostDetailChainComments.length === 0) {
+    readCachedPublicComments(cacheKey).then((durable) => {
+      if (!durable || publicPostDetailItem !== item || publicPostDetailChainComments.length > 0) return;
+      publicPostDetailChainComments = durable.comments;
+      publicPostDetailParentExists = durable.parentExists === true;
+      publicPostDetailLoadState = 'ready';
+      publicPostCommentsCache.set(cacheKey, { comments: durable.comments, parentExists: durable.parentExists === true });
+      renderPublicPostDetail();
+    }).catch(() => {});
+  }
   refreshPublicPostDetailComments();
 }
 
@@ -5292,33 +5342,6 @@ async function loadPublicPostComments(item) {
 
 // Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
 // retries on a degraded (rate-limited) walk — keeping the partial result OUT of the authoritative list.
-// Persist freshly-loaded chain comments (with their assembled image data URLs) INTO the feed cache post, so a
-// full app RELOAD shows them instantly from localStorage instead of re-walking the chain + re-downloading every
-// ~32KB comment image (owner-flagged: the in-memory SWR cache was wiped by reload). Local-pending comments (no
-// entryId, not yet on chain) are preserved.
-function persistLoadedPublicPostComments(item, chainComments) {
-  if (!item || !Array.isArray(chainComments)) return;
-  const channelId = item.channelId ?? 'platho.app';
-  const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
-  const posts = cached?.posts ?? [];
-  const idx = posts.findIndex((entry) => (
-    String(entry.entryId ?? entry.id) === String(item.entryId ?? item.id)
-    && (!item.bodyHash || !entry.bodyHash || String(entry.bodyHash).toLowerCase() === String(item.bodyHash).toLowerCase())
-  ));
-  if (idx < 0) return;
-  const existing = posts[idx].comments ?? [];
-  const localPending = existing.filter((c) => {
-    if (c.entryId !== undefined && c.entryId !== null && c.entryId !== '') return false;
-    return !chainComments.some((cc) => samePublicBodyHash(c, cc));
-  });
-  const merged = mergePublicComments(chainComments, localPending);
-  const feed = { ...cached, posts: [...posts] };
-  feed.posts[idx] = { ...posts[idx], comments: merged };
-  feed.updatedAt = new Date().toISOString();
-  publicChannelFeedCache = { ...publicChannelFeedCache, [channelId]: { feed, syncedAt: feed.updatedAt } };
-  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
-}
-
 async function refreshPublicPostDetailComments() {
   const item = publicPostDetailItem;
   if (!item) return;
@@ -5348,9 +5371,9 @@ async function refreshPublicPostDetailComments() {
         while (publicPostCommentsCache.size > 24) {
           publicPostCommentsCache.delete(publicPostCommentsCache.keys().next().value);
         }
+        // Durable layer (survives a full reload; localStorage can't hold the image data URLs): IndexedDB.
+        writeCachedPublicComments(cacheKey, result.comments, result.parentExists);
       }
-      // Durable layer: also write into the persisted feed cache so a RELOAD shows them without re-downloading.
-      persistLoadedPublicPostComments(item, result.comments);
       renderPublicPostDetail();
       return;
     }

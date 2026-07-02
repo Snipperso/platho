@@ -233,14 +233,14 @@ button:disabled,
   color: var(--text);
 }
 
-/* A tab gated until account activation (e.g. Vault): dark-grey on black, inert. */
+/* A tab gated until account activation (e.g. Vault): dimmed but still clearly readable, inert. */
 .rail-item.is-locked {
-  color: #3f454d;
+  color: #6b7480;
   cursor: not-allowed;
 }
 
 .rail-item.is-locked .icon {
-  opacity: 0.35;
+  opacity: 0.5;
 }
 
 .rail-vault-balance {
