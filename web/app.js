@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v638';
+const PLATHO_APP_RUNTIME_VERSION = 'v639';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -12913,7 +12913,7 @@ for (const card of vaultMoveCards) {
       if (card.submitButton) card.submitButton.disabled = true;
       const amount = card.asset === 'ATH' ? parseAthAmountAtomic(raw) : parseTonAmountNanotons(raw);
       if (card.asset === 'TON' && direction === 'to-vault') {
-        await submitVaultDepositTonAmount(amount);
+        await submitVaultDepositTonAmount(amount); // trap-guard confirm now lives inside submitVaultDepositTonAmount
       } else if (card.asset === 'TON') {
         await submitVaultWithdrawTonAmount(amount);
       } else if (direction === 'to-vault') {
@@ -16762,14 +16762,30 @@ function navVaultBalanceHasKnownValue() {
     && vaultPocketState.vault?.ath_balance !== undefined;
 }
 
+// GRAM to KEEP in the external wallet on a wallet->Vault move: always the transfer gas, PLUS — while the account
+// is not yet activated — the activation cost. Depositing needs no activation but WITHDRAWING does (the withdraw
+// external is signed by the on-chain-registered auth key), and activation itself is a wallet transaction. So a
+// user who moved everything in would be stranded: can't activate (no wallet GRAM) and can't withdraw (not
+// activated). Reserving the activation cost here keeps MAX from ever creating that trap.
+// Buffer on top of gas + activation fee: the DepositTon message itself attaches ~0.012 GRAM of overhead
+// (depositTonExec + first-time userStateStorage) that comes OUT of the kept reserve, plus a margin for
+// wallet-tx gas and forward-fee fluctuation. Sized so the wallet REALLY keeps enough to activate afterward.
+const VAULT_MOVE_ACTIVATION_RESERVE_BUFFER_NANOTONS = 25_000_000n;
+
+function vaultMoveWalletTonReserveNanotons() {
+  if (hasActivePlathoAccount()) return VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS;
+  return VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS
+    + plathoAccountActivationFeeNanotons()
+    + VAULT_MOVE_ACTIVATION_RESERVE_BUFFER_NANOTONS;
+}
+
 function vaultMoveMaxAmount(asset) {
   const source = vaultMoveSourcePocket(asset);
   const balance = vaultMoveBalance(source, asset);
   if (balance === null || balance === undefined) return null;
   if (asset === 'TON' && source === 'wallet') {
-    return balance > VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS
-      ? balance - VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS
-      : 0n;
+    const reserve = vaultMoveWalletTonReserveNanotons();
+    return balance > reserve ? balance - reserve : 0n;
   }
   if (asset === 'TON' && source === 'vault') {
     return balance > VAULT_RESERVES_NANOTONS.withdrawTonExec
@@ -16838,6 +16854,20 @@ function refreshVaultMoveWidget() {
     if (card.input) card.input.disabled = !plathoWallet;
     if (card.maxButton) card.maxButton.disabled = !plathoWallet;
     if (card.directionButton) card.directionButton.disabled = !plathoWallet;
+    // Explain the wallet reserve while un-activated (answers "why does some GRAM stay after MAX?"): created
+    // lazily, class-styled (prod CSP bans inline styles).
+    if (card.asset === 'TON') {
+      if (!card.note) {
+        card.note = document.createElement('p');
+        card.note.className = 'vault-move-note';
+        card.form?.appendChild(card.note);
+      }
+      const showReserveNote = Boolean(plathoWallet) && !hasActivePlathoAccount() && direction === 'to-vault';
+      card.note.hidden = !showReserveNote;
+      if (showReserveNote) {
+        card.note.textContent = `Keeping GRAM in your wallet to activate your account (activation costs about ${formatTonNanotons(plathoAccountActivationFeeNanotons())} GRAM) — you'll need it, because GRAM can't move back OUT of the Vault until you activate.`;
+      }
+    }
   }
 }
 
@@ -17693,7 +17723,41 @@ async function submitVaultDepositTon() {
   return submitVaultDepositTonAmount(amount);
 }
 
+// Warn before a wallet->Vault GRAM move that would leave too little to ACTIVATE (and thus too little to ever
+// withdraw — the withdraw external needs the registered auth key). Only fires for an un-activated account; a
+// known-sufficient or unknown balance passes silently. Returns true to proceed.
+async function confirmVaultDepositKeepsActivationReserve(amount) {
+  if (hasActivePlathoAccount()) return true;
+  const raw = vaultPocketState?.wallet?.ton_balance;
+  if (raw === null || raw === undefined) return true;
+  let walletBal;
+  let amt;
+  try { walletBal = BigInt(raw); amt = BigInt(amount); } catch { return true; }
+  const reserve = vaultMoveWalletTonReserveNanotons();
+  if (walletBal - amt >= reserve) return true;
+  const fee = plathoAccountActivationFeeNanotons();
+  const result = await openActionDialog({
+    title: 'Keep GRAM to activate?',
+    tone: 'error',
+    submitLabel: 'Move anyway',
+    hint: `Your account is not activated yet. This leaves too little GRAM in your wallet to activate (activation costs about ${formatTonNanotons(fee)} GRAM), and GRAM cannot be moved back OUT of the Vault until you activate. Move a smaller amount, or continue if you'll fund activation from another wallet.`,
+    fields: [],
+    summary: [
+      { label: 'Wallet GRAM', value: `${formatTonNanotons(walletBal)} GRAM` },
+      { label: 'Moving to Vault', value: `${formatTonNanotons(amt)} GRAM` },
+      { label: 'Activation costs', value: `${formatTonNanotons(fee)} GRAM` },
+    ],
+  });
+  return result !== null;
+}
+
 async function submitVaultDepositTonAmount(amount) {
+  // Trap guard lives HERE so EVERY deposit entry point is covered (the vault-move card, the submitVaultDepositTon
+  // wrapper, and the plathoVaultTransactions global export) — not just the card submit handler.
+  if (!(await confirmVaultDepositKeepsActivationReserve(amount))) {
+    setVaultStatus('move cancelled');
+    return null;
+  }
   const provider = await resolveVaultChainProvider();
   const user = await readFreshConnectedVaultUser(provider);
   setVaultStatus('moving GRAM to Vault');

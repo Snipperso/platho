@@ -2080,6 +2080,14 @@ button.feed-item:hover {
   font-weight: 900;
 }
 
+/* Note under the wallet->Vault card explaining the activation reserve kept in the wallet (un-activated only). */
+.vault-move-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted, #8b949e);
+}
+
 .action-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
