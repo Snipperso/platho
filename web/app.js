@@ -62,7 +62,7 @@ import {
   writePublicChannelSubscriptions,
   publicEvictionFloor,
   prunePublicPostsBelowFloor,
-} from './public-channel-subscriptions.mjs?v=14';
+} from './public-channel-subscriptions.mjs?v=15';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -85,7 +85,9 @@ import {
   splitBytesToCapsuleParts,
   messagePartCount,
   splitUtf8ToCapsuleParts,
-} from './capsule-part-policy.mjs?v=3';
+  encodeReplyBlockContent,
+  decodeReplyBlockContent,
+} from './capsule-part-policy.mjs?v=4';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -160,7 +162,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v645';
+const PLATHO_APP_RUNTIME_VERSION = 'v646';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -582,6 +584,9 @@ const publicPostCommentsToggle = document.querySelector('#publicPostCommentsTogg
 const publicCommentContext = document.querySelector('#publicCommentContext');
 const publicCommentContextText = document.querySelector('#publicCommentContextText');
 const publicCancelCommentButton = document.querySelector('#publicCancelCommentButton');
+const privateReplyContext = document.querySelector('#privateReplyContext');
+const privateReplyContextText = document.querySelector('#privateReplyContextText');
+const privateReplyCancelButton = document.querySelector('#privateReplyCancelButton');
 const publicPostDetail = document.querySelector('#publicPostDetail');
 const publicPostDetailBody = document.querySelector('#publicPostDetailBody');
 const publicPostDetailAvatar = document.querySelector('#publicPostDetailAvatar');
@@ -686,6 +691,10 @@ let publicPostDetailLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'error
 let publicPostDetailParentExists = null; // last clean read: true = post has a comment index, false = genuinely none
 let privateImageAttachments = [];
 let privatePaymentCheckDraft = null;
+// Swipe-to-reply drafts (v646): {refEntryId, author, snippet} | null — the quoted target for the NEXT send.
+// Composer block builders read these (default params) so the size plan, the optimistic echo and the wire agree.
+let privateReplyDraft = null;
+let publicCommentReplyTo = null;
 let publicImageAttachments = [];
 let pendingProfileAvatarModeId = 'good';
 let localProfileAvatarPointer = null;
@@ -2507,6 +2516,8 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   knownVaultKeyRecordByWallet.clear();
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
+  setPrivateReplyDraft(null);
+  setPublicCommentReplyTo(null);
   localProfileAvatarPointer = null;
   profileAvatarLoadPromises.clear();
   delete globalThis.plathoVaultBinding;
@@ -4985,7 +4996,10 @@ function appendPublicItemContent(container, item) {
   const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
   if (blocks.length > 0) {
     for (const block of blocks) {
-      if (block?.type === 'text' && block.text) {
+      if (block?.type === 'reply') {
+        // Reply quote strip (tappable — scrolls to the quoted comment within the open post detail).
+        container.append(buildReplyQuoteNode(block, publicPostDetailBody));
+      } else if (block?.type === 'text' && block.text) {
         const text = document.createElement('p');
         text.className = 'feed-block-text';
         text.textContent = block.text;
@@ -5024,6 +5038,9 @@ function appendPublicItemComments(article, item) {
   for (const comment of comments) {
     const row = document.createElement('article');
     row.className = 'comment-item';
+    // Chain anchor (parity with private .message rows): the swipe-to-reply gesture reads it as the reply ref and
+    // reply quotes scroll to it. A local-pending comment has none — replying to it waits for the entry id.
+    if (comment.entryId !== undefined && comment.entryId !== null && comment.entryId !== '') row.dataset.entryId = String(comment.entryId);
     const commentAuthorRow = document.createElement('div');
     commentAuthorRow.className = 'feed-author-row';
     const commentAvatar = document.createElement('div');
@@ -5242,11 +5259,16 @@ function renderPublicSurface(options = {}) {
 function setPublicCommentTarget(item = null, { focus = true, showContext = true } = {}) {
   publicCommentTarget = item;
   const active = Boolean(item);
+  // A comment target change (or clear) always drops any pending reply-to-comment quote — it referenced a comment
+  // of the PREVIOUS target post.
+  publicCommentReplyTo = null;
   if (publicComposer) publicComposer.dataset.mode = active ? 'comment' : 'post';
   // The post detail screen drives comment mode implicitly (the whole screen IS the post), so it suppresses the
   // inline "Comment to X / Cancel" context bar — there a Cancel would silently drop the composer back to post mode
-  // while still on the post screen, so a "comment" would publish as a new public post.
-  if (publicCommentContext) publicCommentContext.hidden = !active || !showContext;
+  // while still on the post screen, so a "comment" would publish as a new public post. (Reply mode re-shows the
+  // bar on the detail screen — see refreshPublicCommentReplyUi — with a Cancel that clears ONLY the reply.)
+  publicCommentContextSuppressed = !active || !showContext;
+  if (publicCommentContext) publicCommentContext.hidden = publicCommentContextSuppressed;
   if (publicPostCommentsToggle) publicPostCommentsToggle.hidden = active;
   if (active) {
     setText(publicCommentContextText, `Comment to ${item.title ?? item.id ?? 'post'}`);
@@ -5263,6 +5285,94 @@ function setPublicCommentTarget(item = null, { focus = true, showContext = true 
   updatePublicCommentsToggleUi();
   refreshComposerPublishPolicy();
   refreshComposerCostStatus();
+}
+
+// ---- Swipe-to-reply (v646): composer quote strips ---------------------------------------------------------------
+// Both strips show "author: snippet" with a Cancel that clears ONLY the reply draft. The reply becomes a REPLY
+// document block at send time (composerBlocksFromDraft / publicDocumentBlocksFromDraft read the drafts directly).
+
+function replyStripContent(node, reply, cancelLabelNode) {
+  if (!node) return;
+  const author = document.createElement('span');
+  author.className = 'composer-reply-author';
+  author.textContent = reply.author || 'Reply';
+  const snippet = document.createElement('span');
+  snippet.textContent = reply.snippet || '';
+  const wrap = document.createElement('span');
+  wrap.className = 'composer-reply-text';
+  wrap.append(author, snippet);
+  node.replaceChildren(wrap);
+  if (cancelLabelNode) node.append(cancelLabelNode);
+}
+
+function setPrivateReplyDraft(reply) {
+  privateReplyDraft = reply ?? null;
+  if (privateReplyContext) privateReplyContext.hidden = !privateReplyDraft;
+  if (privateReplyDraft && privateReplyContextText) {
+    replyStripContent(privateReplyContextText, privateReplyDraft);
+  }
+  if (privateReplyDraft && messageInput && !messageInput.disabled) messageInput.focus();
+  refreshComposerCostStatus();
+}
+
+// Suppression state mirrors setPublicCommentTarget's showContext decision so reply mode can temporarily re-show
+// the context bar on the post-detail screen and hide it back when the reply is cancelled/sent.
+let publicCommentContextSuppressed = true;
+
+function refreshPublicCommentReplyUi() {
+  if (!publicCommentContext) return;
+  if (publicCommentReplyTo) {
+    replyStripContent(publicCommentContextText, publicCommentReplyTo);
+    publicCommentContext.hidden = false;
+  } else {
+    if (publicCommentTarget) setText(publicCommentContextText, `Comment to ${publicCommentTarget.title ?? publicCommentTarget.id ?? 'post'}`);
+    publicCommentContext.hidden = publicCommentContextSuppressed;
+  }
+}
+
+function setPublicCommentReplyTo(reply) {
+  publicCommentReplyTo = reply ?? null;
+  refreshPublicCommentReplyUi();
+  if (publicCommentReplyTo && publicMessageInput && !publicMessageInput.disabled) publicMessageInput.focus();
+  refreshComposerCostStatus();
+}
+
+// Rendered quote strip inside a bubble/comment (the received REPLY block). Tapping it scrolls to the original
+// row (matched by data-entry-id inside `scroller`) with a brief highlight; a missing original (evicted/unloaded)
+// keeps the strip inert — the denormalized author+snippet already tell the story, Telegram-style.
+function buildReplyQuoteNode(reply, scroller) {
+  const quote = document.createElement('div');
+  quote.className = 'message-reply-quote';
+  const author = document.createElement('span');
+  author.className = 'message-reply-quote-author';
+  author.textContent = reply.author || 'Reply';
+  const snippet = document.createElement('span');
+  snippet.className = 'message-reply-quote-snippet';
+  snippet.textContent = reply.snippet || '';
+  quote.append(author, snippet);
+  const refEntryId = reply.refEntryId === undefined || reply.refEntryId === null ? '' : String(reply.refEntryId);
+  if (refEntryId && scroller) {
+    quote.dataset.refEntryId = refEntryId;
+    quote.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const target = scroller.querySelector(`[data-entry-id="${refEntryId}"]`);
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.remove('reply-target-flash');
+      requestAnimationFrame(() => target.classList.add('reply-target-flash'));
+    });
+  }
+  return quote;
+}
+
+// Snippet for a quote strip + the wire block: first text, else a media word (denormalized, like Telegram).
+function replySnippetFromContent(item) {
+  const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
+  const text = String(item?.text ?? '').trim() || String(blocks.find((block) => block?.type === 'text' && String(block.text ?? '').trim())?.text ?? '').trim();
+  if (text) return text;
+  if (blocks.some((block) => block?.type === 'image') || item?.imageUrl || item?.attachment?.type === 'image') return 'Image';
+  if (blocks.some((block) => block?.type === 'payment') || item?.payment) return 'Payment check';
+  return 'Message';
 }
 
 // ---- Public post detail screen (per-post comments, opened from the "Comments" action) -------------------------
@@ -8597,7 +8707,10 @@ function messageFromOpenedCapsule(opened, meta, entry) {
   const payment = paymentFromCompactPayload(opened.payload);
   const isImage = opened.payload?.type === 'image';
   const isDocument = opened.payload?.type === 'document';
-  const documentBlocks = isDocument ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(opened.payload.bytes)) : [];
+  // tolerateUnknownBlocks (v646): forward-compat for the private DISPLAY path — a future block kind degrades to
+  // "block skipped" instead of throwing the WHOLE message into the sync's unknown-error strike machine (stuck
+  // entry -> cross-session retries -> terminal undelivered). Funds/prefs parsing paths keep their own strictness.
+  const documentBlocks = isDocument ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(opened.payload.bytes, { tolerateUnknownBlocks: true })) : [];
   const documentPayment = paymentFromDocumentBlocks(documentBlocks);
   const effectivePayment = payment ?? documentPayment;
   const text = isDocument
@@ -8667,7 +8780,8 @@ function messageFromOpenedPrivateParts(parts, meta) {
       offset += part.opened.payload.bytes.length;
     }
   }
-  const documentBlocks = documentBytes ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes)) : [];
+  // Same forward-compat tolerance as the single-part path above (multipart private display decode).
+  const documentBlocks = documentBytes ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes, { tolerateUnknownBlocks: true })) : [];
   const documentPayment = paymentFromDocumentBlocks(documentBlocks);
   const text = ordered
     .filter((part) => part.opened?.payload?.type === 'text')
@@ -9914,6 +10028,12 @@ function serializeMessageForHistory(message) {
     vaultCreateIntent: safeJsonClone(message.vaultCreateIntent) ?? null,
     vaultPublish: safeJsonClone(message.vaultPublish) ?? null,
     vaultCancelIntent: safeJsonClone(message.vaultCancelIntent) ?? null,
+    // Minimal privateDraft persistence (v646): ONLY the reply quote. A post-reload capsule REBUILD (the rare
+    // capsule-less failure path) must reproduce the same reply block; text/attachments intentionally stay
+    // unpersisted (bytes) — the rebuild falls back to message.text as before.
+    privateDraft: message.privateDraft?.replyDraft
+      ? { replyDraft: safeJsonClone(message.privateDraft.replyDraft) }
+      : null,
     privateSendRetryAttempt: Number(message.privateSendRetryAttempt ?? 0) || 0,
     privateSendRetryStopped: message.privateSendRetryStopped === true,
     privateSendRetryStoppedAt: message.privateSendRetryStoppedAt ?? null,
@@ -11367,9 +11487,11 @@ function privateSenderUsernameMetadataBytes(options = {}) {
 
 function privateComposerSendPlan(text, attachments = privateImageAttachments, options = currentPrivateSenderOptions(), extras = {}) {
   const plan = [];
+  // extras.replyDraft: undefined -> the LIVE composer draft (typing-time cost estimates); an explicit null/value
+  // -> that exact state (retry contexts replay the CAPTURED draft — the live one is long cleared by then).
   const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.paymentCheck ?? privatePaymentCheckDraft, {
     allowMissingPaymentSecret: true,
-  });
+  }, extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft);
   if (!documentBytes) return plan;
   for (const part of splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
     perPartOverheadBytes: privateCompactPayloadOverhead(options),
@@ -12217,7 +12339,7 @@ function togglePrivateComposerAddMenu() {
   else showPrivateComposerAddMenu();
 }
 
-function composerBlocksFromDraft(text, attachments = [], paymentDraft = null) {
+function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, replyDraft = privateReplyDraft) {
   const source = String(text ?? '');
   const images = normalizePrivateImageAttachments(attachments);
   const usedImages = new Set();
@@ -12262,6 +12384,11 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null) {
     if (!usedImages.has(index)) pushImage(index + 1);
   });
   if (paymentDraft && !usedPayment) pushPayment();
+  // Swipe-to-reply (v646): the quote rides as the FIRST document block, so the size plan, the optimistic echo,
+  // and the wire all carry it from the same draft state (default-param style matches privateImageAttachments).
+  if (blocks.length > 0 && replyDraft?.refEntryId !== undefined && replyDraft?.refEntryId !== null) {
+    blocks.unshift({ type: 'reply', refEntryId: String(replyDraft.refEntryId), author: replyDraft.author ?? '', snippet: replyDraft.snippet ?? '' });
+  }
   return blocks;
 }
 
@@ -12284,12 +12411,16 @@ function displayBlocksFromDocumentBlocks(blocks) {
       const payment = block.payment ?? block.paymentDraft;
       return { type: 'payment', payment, text: payment ? paymentMessageText(payment) : 'Payment check' };
     }
+    // The quote strip data passes through verbatim (denormalized author+snippet; refEntryId for scroll-to-original).
+    if (block.type === 'reply') {
+      return { type: 'reply', refEntryId: block.refEntryId, author: block.author ?? '', snippet: block.snippet ?? '' };
+    }
     return null;
   }).filter(Boolean);
 }
 
-function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = null, options = {}) {
-  const blocks = composerBlocksFromDraft(text, attachments, paymentDraft);
+function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = null, options = {}, replyDraft = privateReplyDraft) {
+  const blocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft);
   if (blocks.length <= 0) return null;
   return encodeMessageDocumentBlocks(blocks, options);
 }
@@ -12792,6 +12923,8 @@ function renderThreads() {
       main.append(top, preview, state);
       item.append(avatar, main, side);
       item.addEventListener('click', () => {
+        // A reply quote references a message of the PREVIOUS dialog — drop it on any switch.
+        if (activeThreadId !== thread.id) setPrivateReplyDraft(null);
         activeThreadId = thread.id;
         appShell.dataset.chatOpen = 'true';
         // Selecting a chat always lands at the end (even re-selecting the current one), regardless of where it was
@@ -12911,9 +13044,16 @@ function renderConversation() {
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
     row.className = `message ${message.type}`;
+    // Chain anchor: the swipe-to-reply gesture reads it as the reply ref, and reply quotes scroll to it. A
+    // not-yet-confirmed optimistic message has none — replying to it is gated until the entry id lands.
+    if (message.chainEntryId !== undefined && message.chainEntryId !== null) row.dataset.entryId = String(message.chainEntryId);
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     const blocks = Array.isArray(message.blocks) ? message.blocks : [];
+    // The REPLY block renders as a tappable quote strip at the TOP of the bubble (the block loop below ignores
+    // its type); scroll target = the same messageStrip.
+    const replyBlock = blocks.find((block) => block?.type === 'reply');
+    if (replyBlock) bubble.append(buildReplyQuoteNode(replyBlock, messageStrip));
     let paymentBlockElement = null;
     if (blocks.length > 0) {
       for (const block of blocks) {
@@ -13284,6 +13424,114 @@ publicPane?.addEventListener('keydown', (event) => {
   event.preventDefault();
   openImageLightbox(target.dataset.fullImageSrc, target.dataset.fullImageMeta);
 });
+
+// ---- Swipe-to-reply gesture (v646) ------------------------------------------------------------------------------
+// Telegram-style: drag a row LEFT past the threshold to quote it in the composer. Touch pointers only (desktop
+// gets double-click below). Rows keep native vertical scroll via CSS touch-action: pan-y; the handler locks onto
+// a gesture only when it is clearly horizontal, gives live translateX feedback (CSSOM — CSP-safe), and springs
+// back via the row's transform transition. Only rows with a chain anchor (data-entry-id) are swipeable — a
+// pending message/comment has no stable ref yet.
+const SWIPE_REPLY_TRIGGER_PX = 56;
+const SWIPE_REPLY_MAX_PX = 96;
+
+function attachSwipeToReply(container, rowSelector, onReply) {
+  if (!container) return;
+  let swipe = null; // { pointerId, row, startX, startY, axis: null|'h'|'v', dx }
+  let suppressClickUntil = 0;
+  // A horizontal swipe's release must not ALSO deliver a click (a swipe starting on a .feed-image would open the
+  // lightbox). Capture-phase, one short window after any locked-horizontal gesture.
+  container.addEventListener('click', (event) => {
+    if (Date.now() >= suppressClickUntil) return;
+    suppressClickUntil = 0;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+  container.addEventListener('pointerdown', (event) => {
+    if (event.pointerType !== 'touch') return;
+    const row = event.target instanceof Element ? event.target.closest(rowSelector) : null;
+    if (!row || !row.dataset.entryId) return;
+    swipe = { pointerId: event.pointerId, row, startX: event.clientX, startY: event.clientY, axis: null, dx: 0 };
+  });
+  container.addEventListener('pointermove', (event) => {
+    if (!swipe || event.pointerId !== swipe.pointerId) return;
+    const dx = event.clientX - swipe.startX;
+    const dy = event.clientY - swipe.startY;
+    if (!swipe.axis) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      swipe.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'h' : 'v';
+      if (swipe.axis === 'h') {
+        swipe.row.classList.add('is-swiping');
+        try { container.setPointerCapture(event.pointerId); } catch { /* unsupported */ }
+      }
+    }
+    if (swipe.axis !== 'h') return;
+    const clamped = Math.max(-SWIPE_REPLY_MAX_PX, Math.min(0, dx));
+    swipe.dx = clamped;
+    swipe.row.style.transform = `translateX(${clamped}px)`;
+    swipe.row.classList.toggle('swipe-armed', clamped <= -SWIPE_REPLY_TRIGGER_PX);
+    event.preventDefault();
+  });
+  const endSwipe = (event) => {
+    if (!swipe || event.pointerId !== swipe.pointerId) return;
+    const { row, dx, axis } = swipe;
+    swipe = null;
+    row.classList.remove('is-swiping', 'swipe-armed');
+    row.style.transform = '';
+    if (axis === 'h') suppressClickUntil = Date.now() + 350;
+    if (axis === 'h' && dx <= -SWIPE_REPLY_TRIGGER_PX) onReply(row);
+  };
+  container.addEventListener('pointerup', endSwipe);
+  container.addEventListener('pointercancel', endSwipe);
+}
+
+function beginPrivateReplyForRow(row) {
+  const entryId = row?.dataset?.entryId;
+  const thread = threads.find((candidate) => candidate.id === activeThreadId);
+  if (!entryId || !thread) return;
+  const message = thread.messages.find((candidate) => String(candidate.chainEntryId ?? '') === entryId);
+  if (!message) return;
+  setPrivateReplyDraft({
+    refEntryId: entryId,
+    // Denormalized author label, resolved neutrally so it reads correctly on BOTH sides of the dialog.
+    author: message.type === 'out' ? (publicAuthorLabel(plathoWallet?.address) || 'You') : (thread.name || 'Message'),
+    snippet: replySnippetFromContent(message),
+  });
+}
+
+function beginPublicCommentReplyForRow(row) {
+  const entryId = row?.dataset?.entryId;
+  if (!entryId || !publicPostDetailOpen) return;
+  const comment = publicPostDetailMergedComments().find((candidate) => String(candidate.entryId ?? '') === entryId);
+  if (!comment) return;
+  setPublicCommentReplyTo({
+    refEntryId: entryId,
+    author: comment.author || 'Comment',
+    snippet: replySnippetFromContent(comment),
+  });
+}
+
+attachSwipeToReply(messageStrip, '.message', beginPrivateReplyForRow);
+attachSwipeToReply(publicPane, '.comment-item', beginPublicCommentReplyForRow);
+
+// Desktop parity (Telegram desktop convention): double-click a message/comment to reply. Images keep their
+// lightbox (a dblclick on an image is ignored here), buttons keep their own actions.
+function replyDblclickTarget(event, rowSelector) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target || target.closest('img, button, a, textarea, input')) return null;
+  return target.closest(rowSelector);
+}
+messageStrip?.addEventListener('dblclick', (event) => {
+  const row = replyDblclickTarget(event, '.message');
+  if (!row?.dataset?.entryId) return;
+  event.preventDefault();
+  beginPrivateReplyForRow(row);
+});
+publicPane?.addEventListener('dblclick', (event) => {
+  const row = replyDblclickTarget(event, '.comment-item');
+  if (!row?.dataset?.entryId) return;
+  event.preventDefault();
+  beginPublicCommentReplyForRow(row);
+});
 actionFields?.addEventListener('input', updateActiveActionSummary);
 actionFields?.addEventListener('change', updateActiveActionSummary);
 actionForm?.addEventListener('submit', async (event) => {
@@ -13602,9 +13850,19 @@ publicJumpDownButton?.addEventListener('click', () => {
 publicFeed?.addEventListener('scroll', updatePublicJumpDownVisibility, { passive: true });
 
 publicCancelCommentButton?.addEventListener('click', () => {
+  // In reply mode Cancel clears ONLY the reply quote (comment mode must survive on the post-detail screen —
+  // dropping the whole target there would silently turn the next "comment" into a new public post).
+  if (publicCommentReplyTo) {
+    setPublicCommentReplyTo(null);
+    return;
+  }
   setPublicCommentTarget(null);
   autoResizeComposerTextarea(publicMessageInput);
   refreshComposerCostStatus();
+});
+
+privateReplyCancelButton?.addEventListener('click', () => {
+  setPrivateReplyDraft(null);
 });
 
 publicPostBackButton?.addEventListener('click', () => {
@@ -13841,8 +14099,9 @@ publicComposer?.addEventListener('submit', async (event) => {
   send?.toggleAttribute('disabled', true);
   // Private-composer parity (owner UX directive): the draft leaves the composer THE MOMENT send is pressed —
   // the optimistic local record (inserted by the submit path with a live 'sending…' status) carries it from
-  // here. Capture the comment target BEFORE clearing so a cancel can restore the exact draft.
+  // here. Capture the comment target + reply quote BEFORE clearing so a cancel can restore the exact draft.
   const draftCommentTarget = publicCommentTarget;
+  const draftReplyTo = publicCommentReplyTo;
   publicMessageInput.value = '';
   publicImageAttachments = [];
   updateImageAttachmentUi('public');
@@ -13865,9 +14124,10 @@ publicComposer?.addEventListener('submit', async (event) => {
     const rateLimited = noteTonRpcRateLimit(error);
     const cancelled = isPublishPriceChangeCancelled(error);
     if (cancelled) {
-      // User-cancelled (price dialog): give the draft back instead of losing it.
+      // User-cancelled (price dialog): give the draft back instead of losing it (incl. the reply quote).
       publicMessageInput.value = text;
       publicImageAttachments = attachments;
+      if (draftReplyTo) setPublicCommentReplyTo(draftReplyTo);
       updateImageAttachmentUi('public');
       autoResizeComposerTextarea(publicMessageInput);
       refreshComposerCostStatus();
@@ -13949,7 +14209,10 @@ composer?.addEventListener('submit', async (event) => {
     refreshPrivateSendButtonState();
     return;
   }
-  const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft);
+  // Capture the reply quote NOW: the composer state clears below, but the capsule build (and any later manual
+  // retry) runs long after — the captured value keeps the echo, the wire, and every retry byte-identical.
+  const replyDraft = privateReplyDraft ? { ...privateReplyDraft } : null;
+  const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft);
   const displayBlocks = displayBlocksFromDocumentBlocks(draftBlocks);
   const message = {
     type: 'out',
@@ -13962,6 +14225,7 @@ composer?.addEventListener('submit', async (event) => {
       paymentDraft,
       selectedSuite,
       senderOptions,
+      replyDraft,
     },
     privateManualRetryAvailable: false,
     privateCancelAvailable: false,
@@ -13979,6 +14243,7 @@ composer?.addEventListener('submit', async (event) => {
     paymentDraft,
     selectedSuite,
     senderOptions,
+    replyDraft,
     retryAttempt: 0,
     confirmAttempt: 0,
   };
@@ -13986,6 +14251,7 @@ composer?.addEventListener('submit', async (event) => {
   messageInput.value = '';
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
+  setPrivateReplyDraft(null);
   updateImageAttachmentUi('private');
   autoResizeComposerTextarea(messageInput);
   // Return focus to the composer so the user can keep typing without re-tapping the field. Clicking the
@@ -15401,6 +15667,10 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   // A self-addressed subscription snapshot (Phase 2): the body of a private capsule the user sends to THEMSELVES to
   // persist their public-channel subscriptions on-chain. Never rendered as chat — diverted in messageFromOpenedCapsule.
   PREFS: 4,
+  // Telegram-style reply reference (v646): a denormalized quote of the replied-to message/comment — refEntryId
+  // (chain-global CapsuleHub entry id) + author label + snippet, codec in capsule-part-policy.mjs. Rides as the
+  // FIRST block. Symmetric across surfaces (private documents + public document posts/comments share PDC1).
+  REPLY: 5,
 });
 const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
 const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\]/ig;
@@ -15502,6 +15772,9 @@ function encodeMessageDocumentBlocks(blocks, options = {}) {
     } else if (block.type === 'prefs') {
       type = PLATHO_DOCUMENT_BLOCK_TYPES.PREFS;
       content = block.bytes instanceof Uint8Array ? block.bytes : new Uint8Array(block.bytes ?? []);
+    } else if (block.type === 'reply') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.REPLY;
+      content = encodeReplyBlockContent(block);
     } else {
       throw new Error('Unsupported document block type');
     }
@@ -15560,6 +15833,11 @@ function decodeMessageDocumentBlocks(bytesLike, options = {}) {
       blocks.push({ type: 'payment', payment: paymentFromDocumentContent(content) });
     } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.PREFS) {
       blocks.push({ type: 'prefs', bytes: content.slice() });
+    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.REPLY) {
+      // A malformed/future-version reply frame decodes to null and is simply dropped — the quote is cosmetic
+      // and must never make the carrying message undecodable.
+      const reply = decodeReplyBlockContent(content);
+      if (reply) blocks.push({ type: 'reply', ...reply });
     } else if (tolerateUnknownBlocks) {
       // Skip an unrecognized block (offset already advanced past its content above) — forward-compat.
       continue;
@@ -18811,9 +19089,10 @@ async function attemptPrivatePaymentCheckPublish(context) {
     recipientWallet,
     clientNonce,
   });
-  const capsules = await createPrivateComposerCapsules(context.text ?? '', context.attachments ?? [], recipientEntry, thread.id, senderOptions, { payment });
+  const contextReplyDraft = context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null;
+  const capsules = await createPrivateComposerCapsules(context.text ?? '', context.attachments ?? [], recipientEntry, thread.id, senderOptions, { payment, replyDraft: contextReplyDraft });
   const publishState = createCapsulePublishState(capsules);
-  const displayBlocks = displayBlocksFromDocumentBlocks(composerBlocksFromDraft(context.text ?? '', context.attachments ?? [], payment));
+  const displayBlocks = displayBlocksFromDocumentBlocks(composerBlocksFromDraft(context.text ?? '', context.attachments ?? [], payment, contextReplyDraft));
   message.text = messagePreviewFromBlocks(displayBlocks) || paymentMessageText(payment);
   message.blocks = displayBlocks;
   message.payment = payment;
@@ -21326,6 +21605,7 @@ function privateSendRetryContextForMessage(thread, message) {
     paymentDraft: hasPaymentIntent ? null : (draft.paymentDraft ?? message?.paymentDraft ?? null),
     selectedSuite: draft.selectedSuite ?? VAULT_RECEIVE_CRYPTO_SUITE,
     senderOptions: draft.senderOptions ?? message?.senderOptions ?? null,
+    replyDraft: draft.replyDraft ?? null,
     payment,
     paymentIntentCreated: hasPaymentIntent,
     retryAttempt: Number(message?.privateSendRetryAttempt ?? 0) || 0,
@@ -21876,6 +22156,7 @@ async function retryPrivateMessageFromUi(thread, message) {
     if (!privateMessageHasPublishAttempt(message) && !context.paymentIntentCreated) {
       const plan = privateComposerSendPlan(context.text, context.attachments, context.senderOptions, {
         paymentCheck: context.paymentDraft,
+        replyDraft: context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null,
       });
       await assertVaultHasPrivatePublishHold(context.selectedSuite, plan, {
         allowOwnVaultActionReadFallback: Boolean(context.paymentDraft),
@@ -21952,7 +22233,11 @@ async function attemptPrivateComposerMessagePublish(context) {
   if (!capsules) {
     const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
     refreshThreadIdentityFromVariants(thread, privateWalletIdentityVariants(recipientEntry.walletAddress));
-    capsules = await createPrivateComposerCapsules(text, attachments ?? (attachment ? [attachment] : []), recipientEntry, thread.id, senderOptions, { payment });
+    // replyDraft: the CAPTURED quote (context/history), never the live composer state — a retry runs after clear.
+    capsules = await createPrivateComposerCapsules(text, attachments ?? (attachment ? [attachment] : []), recipientEntry, thread.id, senderOptions, {
+      payment,
+      replyDraft: context.replyDraft ?? message?.privateDraft?.replyDraft ?? null,
+    });
     message.recipientWallet = recipientEntry.walletAddress;
   }
   const capsule = capsules[0];
@@ -22432,7 +22717,9 @@ function imagePartsForSend(attachment, label = 'image') {
 }
 
 function publicDocumentBlocksFromDraft(text, attachments = publicImageAttachments) {
-  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null)
+  // Explicit replyDraft: the PUBLIC surface quotes publicCommentReplyTo (non-null only in comment-reply mode) —
+  // never the private composer's draft (composerBlocksFromDraft defaults to privateReplyDraft).
+  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null, publicCommentReplyTo)
     .filter((block) => block.type !== 'payment');
 }
 
@@ -22467,7 +22754,9 @@ async function createPrivateComposerCapsules(text, attachments, recipientEntry, 
   const recipientMetadata = {
     recipientWallet,
   };
-  const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.payment ?? extras.paymentDraft ?? null);
+  // extras.replyDraft: undefined -> live composer draft; explicit null/value -> that captured state (retries).
+  const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.payment ?? extras.paymentDraft ?? null, {},
+    extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft);
   if (!documentBytes) return [];
   const documentParts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
     perPartOverheadBytes: privateCompactPayloadOverhead(options),
@@ -22767,6 +23056,10 @@ async function submitPublicCommentThroughVault(parent, bodyText = null, draftAtt
     attachments,
     parent,
   });
+  // Both consumers of publicCommentReplyTo (the display blocks above + the send plan inside
+  // createPublicPayloadParts, read synchronously on entry) are done — drop the quote strip now, exactly like the
+  // text input clears on send. The composer handler restores it on a user-cancelled price change.
+  setPublicCommentReplyTo(null);
   // Private-composer parity: insert the optimistic local comment immediately (live private-style status), then
   // stream part-state updates into it; patch the SAME record on result — never insert a second one.
   const ref = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {

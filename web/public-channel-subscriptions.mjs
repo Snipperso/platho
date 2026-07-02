@@ -241,6 +241,14 @@ function normalizeFeedBlocks(blocks) {
       const url = nonEmptyString(block.url);
       return url ? { type: 'image', url } : null;
     }
+    // Reply quote (v646): small strings, safe for localStorage — keep it so a quoted comment's strip survives a
+    // reload (and a comment whose only surviving block is the quote isn't dropped as empty).
+    if (block.type === 'reply') {
+      const refEntryId = nonEmptyString(String(block.refEntryId ?? ''));
+      return refEntryId
+        ? { type: 'reply', refEntryId, author: String(block.author ?? ''), snippet: String(block.snippet ?? '') }
+        : null;
+    }
     return null;
   }).filter(Boolean);
 }

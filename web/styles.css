@@ -891,6 +891,61 @@ html[data-platho-telegram="true"] .install-header-button {
   overflow-wrap: anywhere;
 }
 
+/* Swipe-to-reply (v646): rows keep native VERTICAL scroll (touch-action pan-y) while horizontal drags feed the
+   gesture; transform gives live feedback and springs back through the transition (killed mid-drag). */
+.message,
+.comment-item {
+  touch-action: pan-y;
+  transition: transform 0.15s ease-out;
+}
+
+.message.is-swiping,
+.comment-item.is-swiping {
+  transition: none;
+}
+
+.message.swipe-armed .bubble,
+.comment-item.swipe-armed {
+  border-color: var(--accent);
+}
+
+/* Reply quote strip inside a bubble / comment: tappable, accent-edged, one-line snippet. */
+.message-reply-quote {
+  display: grid;
+  gap: 2px;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  border-left: 2px solid var(--accent);
+  border-radius: 4px;
+  background: rgba(48, 213, 176, 0.08);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.message-reply-quote-author {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.message-reply-quote-snippet {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Scroll-to-original highlight (quote tap). */
+@keyframes reply-target-flash {
+  0% { background-color: rgba(48, 213, 176, 0.22); }
+  100% { background-color: transparent; }
+}
+
+.reply-target-flash {
+  animation: reply-target-flash 1.2s ease-out 1;
+}
+
 .message.in {
   align-self: flex-start;
   justify-self: start;
@@ -1202,6 +1257,25 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .composer-context[hidden] {
   display: none;
+}
+
+/* Swipe-to-reply quote strip: in the PRIVATE composer grid it spans the full row ABOVE the input (the public
+   composer's strip lives inside .composer-stack and needs no placement). The text ellipsizes on one line. */
+.composer > .composer-reply-context {
+  grid-column: 1 / -1;
+}
+
+.composer-context .composer-reply-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.composer-context .composer-reply-author {
+  color: var(--accent);
+  font-weight: 700;
+  margin-right: 6px;
 }
 
 .composer-context button {

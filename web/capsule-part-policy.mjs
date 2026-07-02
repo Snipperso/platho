@@ -185,3 +185,46 @@ export function splitBytesToCapsuleParts(value, maxPartBytes = MAX_CAPSULE_USEFU
 export function singleCapsuleMessageFits(text, walletFunded = false) {
   return walletFunded || utf8ByteLength(text) <= SINGLE_CAPSULE_USEFUL_BYTES;
 }
+
+// --- Reply-block content codec (document block type REPLY) ---
+// A reply reference rides INSIDE the shared PDC1 document container as its own block, so it is symmetric across
+// private messages and public posts/comments (both surfaces already ship PDC1 documents). The quote is
+// DENORMALIZED (author label + snippet baked in at compose time, Telegram-style) so it renders standalone even
+// when the referenced entry is evicted or not yet loaded; refEntryId (the chain-global CapsuleHub entry id, the
+// same value on both sides of a private dialog) only powers scroll-to-original.
+// Content layout: [version u8=1][refEntryId u64 BE][authorLen u8][author utf8<=64B][snippet utf8, rest<=160B]
+export const REPLY_BLOCK_CONTENT_VERSION = 1;
+export const REPLY_AUTHOR_MAX_BYTES = 64;
+export const REPLY_SNIPPET_MAX_BYTES = 160;
+
+export function encodeReplyBlockContent(reply) {
+  const refEntryId = BigInt(reply?.refEntryId ?? -1n);
+  if (refEntryId < 0n || refEntryId > 0xffffffffffffffffn) throw new Error('reply refEntryId must fit uint64');
+  const author = textEncoder.encode(truncateUtf8ToBytes(reply?.author ?? '', REPLY_AUTHOR_MAX_BYTES));
+  const snippet = textEncoder.encode(truncateUtf8ToBytes(reply?.snippet ?? '', REPLY_SNIPPET_MAX_BYTES));
+  const out = new Uint8Array(1 + 8 + 1 + author.length + snippet.length);
+  out[0] = REPLY_BLOCK_CONTENT_VERSION;
+  let id = refEntryId;
+  for (let i = 8; i >= 1; i -= 1) { out[i] = Number(id & 0xffn); id >>= 8n; }
+  out[9] = author.length;
+  out.set(author, 10);
+  out.set(snippet, 10 + author.length);
+  return out;
+}
+
+export function decodeReplyBlockContent(content) {
+  const bytes = content instanceof Uint8Array ? content : new Uint8Array(content ?? []);
+  // Unknown future versions and truncated frames return null (the renderer just drops the quote) — a reply
+  // block must NEVER make the whole message undecodable.
+  if (bytes.length < 10 || bytes[0] !== REPLY_BLOCK_CONTENT_VERSION) return null;
+  let refEntryId = 0n;
+  for (let i = 1; i <= 8; i += 1) refEntryId = (refEntryId << 8n) | BigInt(bytes[i]);
+  const authorLength = bytes[9];
+  if (10 + authorLength > bytes.length) return null;
+  const decoder = new TextDecoder();
+  return {
+    refEntryId: refEntryId.toString(),
+    author: decoder.decode(bytes.subarray(10, 10 + authorLength)),
+    snippet: decoder.decode(bytes.subarray(10 + authorLength)),
+  };
+}

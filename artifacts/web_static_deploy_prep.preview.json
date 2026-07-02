@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-02T19:55:34.487Z",
+  "generatedAt": "2026-07-02T20:45:32.294Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 132,
-    "totalBytes": 3725655,
-    "bundleSha256": "706d1d8834cda466193623e370ce1e24d3312b5bdebc71eec24705956f6d2b68",
+    "totalBytes": 3747483,
+    "bundleSha256": "992beda36c4dde52d6b7778999b46f0531d452820d4f631b8022cff9b8b6e00e",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1065280,
-        "sha256": "b013339bd5de1128d199bd5eb615979981325104fb304c5965d6e9ec26cc173f"
+        "bytes": 1082162,
+        "sha256": "c71c134028d620c95794788f01a1d2dd39a3b634d6914f69e1e3cf51666e218d"
       },
       {
         "path": "assets/icons/back.svg",
@@ -169,8 +169,8 @@
       },
       {
         "path": "capsule-part-policy.mjs",
-        "bytes": 7262,
-        "sha256": "8d13d937c5956557d91ae1404a956a40c9a5e7ec29d0d7f4823fcd047359dd7f"
+        "bytes": 9651,
+        "sha256": "6e072d97932d506ddc14f08ab593f06dc4382710dd0c1cf4416cfdb75435ac0a"
       },
       {
         "path": "capsulehub-ton-rpc-provider.mjs",
@@ -209,8 +209,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 36776,
-        "sha256": "b1afb5f53dd33a4100606901fbe8ae60bddc53e8d972dc791ecf71f25dbd65ad"
+        "bytes": 37040,
+        "sha256": "557843a6ed8d0481c99c3d3efe71817bf88589d24ad859af8107f804c4d81c01"
       },
       {
         "path": "manifest.webmanifest",
@@ -244,8 +244,8 @@
       },
       {
         "path": "public-channel-subscriptions.mjs",
-        "bytes": 18717,
-        "sha256": "c285cd58439a0d6f510c5fe423c01e43cc4350eab429e9da0bb43fe18c510daf"
+        "bytes": 19193,
+        "sha256": "8f9b0399ac55db4bb7067c1e55524e8524d3cead432fc7158d337593f20fcb21"
       },
       {
         "path": "publish-batch-orchestration.mjs",
@@ -274,13 +274,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 73397,
-        "sha256": "471a04fd3f2b1c0f694d21b99c15281c2e47c753c5a5fd0428fd0f5e95083947"
+        "bytes": 75214,
+        "sha256": "251cdada46828d23e4acf571e69d00cfdeef08f35019d2cb14c08ba5698a3bdf"
       },
       {
         "path": "sw.js",
         "bytes": 6598,
-        "sha256": "39db483a7443b588e7bae15d122f91ae6f66cdaa2e04681025faeb6c64065cd0"
+        "sha256": "078f37213a7dc38a7b7f3e2c114477422d54a9ca3718acaa2a497a2866a4b78a"
       },
       {
         "path": "ton-dns-provider.mjs",

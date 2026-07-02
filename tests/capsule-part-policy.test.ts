@@ -13,6 +13,10 @@ import {
   splitUtf8ToParts,
   truncateUtf8ToBytes,
   utf8ByteLength,
+  encodeReplyBlockContent,
+  decodeReplyBlockContent,
+  REPLY_AUTHOR_MAX_BYTES,
+  REPLY_SNIPPET_MAX_BYTES,
 } from '../web/capsule-part-policy.mjs';
 
 describe('PWA capsule part policy', () => {
@@ -96,5 +100,46 @@ describe('PWA capsule part policy', () => {
     expect(appSource).toMatch(/function createPrivateComposerCapsules[\s\S]*splitBytesToCapsuleParts\(documentBytes, MAX_CAPSULE_USEFUL_BYTES,\s*\{/);
     expect(appSource).toMatch(/function createPrivateComposerCapsules[\s\S]*perPartOverheadBytes: privateCompactPayloadOverhead\(options\)/);
     expect(appSource).not.toMatch(/function createPrivateComposerCapsules[\s\S]*splitUtf8ToParts\(text, SINGLE_CAPSULE_USEFUL_BYTES/);
+  });
+
+  // Swipe-to-reply (v646): the REPLY document block content codec — the wire bytes a reply quote rides in, on
+  // BOTH surfaces (private messages + public document posts/comments share the PDC1 container).
+  it('PWA-REPLY-CODEC-01: reply content round-trips exactly (incl. non-ASCII author/snippet)', () => {
+    const decoded = decodeReplyBlockContent(encodeReplyBlockContent({
+      refEntryId: '42',
+      author: 'Лариса.ath',
+      snippet: 'Привет, мир! 🌍',
+    }));
+    expect(decoded).toEqual({ refEntryId: '42', author: 'Лариса.ath', snippet: 'Привет, мир! 🌍' });
+  });
+
+  it('PWA-REPLY-CODEC-02: uint64 bounds — entry id 0 and max round-trip, negatives/overflow throw', () => {
+    expect(decodeReplyBlockContent(encodeReplyBlockContent({ refEntryId: '0', author: '', snippet: '' }))?.refEntryId).toBe('0');
+    expect(decodeReplyBlockContent(encodeReplyBlockContent({ refEntryId: '18446744073709551615', author: 'a', snippet: 'b' }))?.refEntryId)
+      .toBe('18446744073709551615');
+    expect(() => encodeReplyBlockContent({ refEntryId: '-1', author: '', snippet: '' })).toThrow();
+    expect(() => encodeReplyBlockContent({ refEntryId: '18446744073709551616', author: '', snippet: '' })).toThrow();
+  });
+
+  it('PWA-REPLY-CODEC-03: author/snippet are BYTE-capped on encode (unicode-safe truncation, never mid-codepoint)', () => {
+    const decoded = decodeReplyBlockContent(encodeReplyBlockContent({
+      refEntryId: '7',
+      author: 'ю'.repeat(200), // 2 bytes each -> capped to 64 bytes = 32 chars
+      snippet: 'щ'.repeat(500), // capped to 160 bytes = 80 chars
+    }));
+    expect(utf8ByteLength(decoded!.author)).toBeLessThanOrEqual(REPLY_AUTHOR_MAX_BYTES);
+    expect(utf8ByteLength(decoded!.snippet)).toBeLessThanOrEqual(REPLY_SNIPPET_MAX_BYTES);
+    expect(decoded!.author).toBe('ю'.repeat(32));
+    expect(decoded!.snippet).toBe('щ'.repeat(80));
+  });
+
+  it('PWA-REPLY-CODEC-04: malformed/future content decodes to null — a bad quote must never poison the message', () => {
+    expect(decodeReplyBlockContent(new Uint8Array())).toBe(null);
+    expect(decodeReplyBlockContent(new Uint8Array([1, 0, 0, 0]))).toBe(null); // truncated
+    expect(decodeReplyBlockContent(new Uint8Array([9, 0, 0, 0, 0, 0, 0, 0, 42, 0]))).toBe(null); // future version
+    // authorLen pointing past the buffer -> null, not a throw
+    const bad = encodeReplyBlockContent({ refEntryId: '1', author: 'ab', snippet: '' });
+    bad[9] = 200;
+    expect(decodeReplyBlockContent(bad)).toBe(null);
   });
 });

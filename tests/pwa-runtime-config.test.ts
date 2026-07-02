@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v645<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v645'/);
+    expect(html).toMatch(/id="appVersionLabel">v646<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v646'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=645" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=646" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -3375,7 +3375,7 @@ describe('PWA runtime config guard', () => {
     expect(paymentButtonSource).not.toMatch(/submitCreatePaymentCheck\(/);
     expect(submitSource).toMatch(/const attachments = normalizePrivateImageAttachments\(privateImageAttachments\)/);
     expect(submitSource).toMatch(/const paymentDraft = privatePaymentCheckDraft/);
-    expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*paymentDraft\)/);
+    expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*paymentDraft,\s*replyDraft\)/);
     expect(submitSource).toMatch(/blocks:\s*displayBlocks/);
     expect(submitSource).toMatch(/await attemptPrivatePaymentCheckPublish\(sendContext\)/);
     expect(submitSource).not.toMatch(/submitCreatePaymentCheck\(\{ thread, paymentDetails: paymentDraft \}\)/);
@@ -3448,7 +3448,7 @@ describe('PWA runtime config guard', () => {
     expect(source).not.toMatch(/getReceiveIntentId/);
     expect(source).not.toMatch(/allowUnverifiedCriticalRead:\s*true[\s\S]*getReceiveIntentId/);
     expect(source).toMatch(/const commitment = secret32/);
-    expect(source).toMatch(/createPrivateComposerCapsules\(context\.text \?\? '', context\.attachments \?\? \[\], recipientEntry, thread\.id, senderOptions, \{ payment \}\)/);
+    expect(source).toMatch(/createPrivateComposerCapsules\(context\.text \?\? '', context\.attachments \?\? \[\], recipientEntry, thread\.id, senderOptions, \{ payment, replyDraft: contextReplyDraft \}\)/);
     expect(app).toMatch(/function paymentSecret32Bytes\(payment\)/);
     expect(app).toMatch(/function normalizePaymentForMessage\(payment\)[\s\S]*secret32Hex:\s*bytesToHex\(paymentSecret32Bytes\(payment\)\)/);
     expect(app).toMatch(/function documentPaymentContent\(payment, options = \{\}\)[\s\S]*paymentSecret32Bytes\(payment\)[\s\S]*options\.allowMissingPaymentSecret === true[\s\S]*new Uint8Array\(32\)/);
@@ -4269,6 +4269,53 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.image-lightbox-viewport\s*{[\s\S]*?overflow: hidden;[\s\S]*?touch-action: none;/);
     expect(css).toMatch(/\.image-lightbox-viewport img\s*{[\s\S]*?max-width: 100%;[\s\S]*?max-height: 100%;[\s\S]*?transform-origin: 0 0;/);
     expect(css).toMatch(/\.image-lightbox-viewport img\.is-zoom-animated\s*{\s*transition: transform/);
+  });
+
+  it('PWA-REPLY-01: swipe-to-reply — REPLY wire block, composer quote strips, gesture engine, quote render on both surfaces', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    // Wire: REPLY=5 in the shared PDC1 registry, codec branches delegate to the unit-tested module functions.
+    expect(app).toMatch(/REPLY: 5,/);
+    expect(app).toMatch(/content = encodeReplyBlockContent\(block\);/);
+    expect(app).toMatch(/const reply = decodeReplyBlockContent\(content\);\s*if \(reply\) blocks\.push\(\{ type: 'reply', \.\.\.reply \}\);/);
+    // Display blocks pass the quote through; previews ignore it (messagePreviewFromBlocks matches text/payment/image only).
+    expect(app).toMatch(/if \(block\.type === 'reply'\) \{\s*return \{ type: 'reply', refEntryId: block\.refEntryId/);
+    // Composer threading: the PRIVATE builder defaults to the live draft; retry paths replay the CAPTURED one;
+    // the PUBLIC builder pins its OWN draft (never the private one).
+    expect(app).toMatch(/function composerBlocksFromDraft\(text, attachments = \[\], paymentDraft = null, replyDraft = privateReplyDraft\)/);
+    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo\)/);
+    expect(app.match(/context\.replyDraft \?\? (context\.)?message\?\.privateDraft\?\.replyDraft \?\? null/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(app).toMatch(/const replyDraft = privateReplyDraft \? \{ \.\.\.privateReplyDraft \} : null;/);
+    // The reply rides FIRST in the block list, only when the draft has a real chain ref.
+    expect(app).toMatch(/blocks\.unshift\(\{ type: 'reply', refEntryId: String\(replyDraft\.refEntryId\)/);
+    // Gesture: touch-only leftward swipe with a horizontal-intent lock; rows without a chain anchor are inert.
+    expect(app).toMatch(/function attachSwipeToReply\(container, rowSelector, onReply\)/);
+    expect(app).toMatch(/if \(event\.pointerType !== 'touch'\) return;/);
+    expect(app).toMatch(/if \(!row \|\| !row\.dataset\.entryId\) return;/);
+    expect(app).toMatch(/attachSwipeToReply\(messageStrip, '\.message', beginPrivateReplyForRow\);/);
+    expect(app).toMatch(/attachSwipeToReply\(publicPane, '\.comment-item', beginPublicCommentReplyForRow\);/);
+    // Desktop parity: double-click (images/buttons excluded so the lightbox keeps dblclick zoom).
+    expect(app).toMatch(/target\.closest\('img, button, a, textarea, input'\)/);
+    // Rows carry the chain anchor; quotes render + scroll within their own surface.
+    expect(app).toMatch(/row\.dataset\.entryId = String\(message\.chainEntryId\);/);
+    expect(app).toMatch(/row\.dataset\.entryId = String\(comment\.entryId\);/);
+    expect(app).toMatch(/function buildReplyQuoteNode\(reply, scroller\)/);
+    expect(app).toMatch(/buildReplyQuoteNode\(replyBlock, messageStrip\)/);
+    expect(app).toMatch(/buildReplyQuoteNode\(block, publicPostDetailBody\)/);
+    // Cancel semantics: public Cancel clears ONLY the reply while in reply mode (comment mode survives on the
+    // detail screen); the private strip has its own cancel.
+    expect(app).toMatch(/if \(publicCommentReplyTo\) \{\s*setPublicCommentReplyTo\(null\);\s*return;\s*\}/);
+    expect(app).toMatch(/privateReplyCancelButton\?\.addEventListener\('click'/);
+    // Drafts clear on send, thread switch, and account switch.
+    expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*updateImageAttachmentUi\('private'\);/);
+    expect(app).toMatch(/if \(activeThreadId !== thread\.id\) setPrivateReplyDraft\(null\);/);
+    expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*setPublicCommentReplyTo\(null\);/);
+    // UI shells + gesture CSS (touch-action pan-y keeps vertical scroll native).
+    expect(html).toMatch(/id="privateReplyContext"/);
+    expect(css).toMatch(/\.message,\s*\.comment-item \{\s*touch-action: pan-y;/);
+    expect(css).toMatch(/\.message-reply-quote \{/);
+    expect(css).toMatch(/\.reply-target-flash \{/);
   });
 
   it('PWA-PUBLIC-FEED-INLINE-COMMENTS-REMOVED: the feed render no longer shows inline comments (they load on the post detail), but the renderer stays for the detail', () => {
@@ -5437,23 +5484,25 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const ownAddress = plathoWallet\?\.address \?\? storedPlathoWalletRecord\(\)\?\.address \?\? null/);
     expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, ownAddress\)\)[\s\S]*?readLinkedPlathoUsername\(ownAddress\)\?\.label/);
     // 6B phase-1: PUBLIC document decode is forward-compat tolerant (skips unknown blocks) so a later phase can
-    // embed an author-.ath block without breaking already-updated clients; PRIVATE decode stays STRICT.
+    // embed an author-.ath block without breaking already-updated clients.
     expect(app).toMatch(/function decodeMessageDocumentBlocks\(bytesLike, options = \{\}\)/);
     expect(app).toMatch(/const tolerateUnknownBlocks = options\.tolerateUnknownBlocks === true/);
     expect(app).toMatch(/\} else if \(tolerateUnknownBlocks\) \{[\s\S]*?continue;/);
     expect(app).toMatch(/decodeMessageDocumentBlocks\(documentBytes, \{ tolerateUnknownBlocks: true \}\)/);
-    // Private capsule decode stays strict (no tolerate option) — funds-/correctness-sensitive path unchanged.
-    expect(app).toMatch(/decodeMessageDocumentBlocks\(opened\.payload\.bytes\)\)/);
+    // v646: the private DISPLAY decode is tolerant too — a future block kind must degrade to "block skipped",
+    // never throw the whole message into the sync's unknown-error strike machine (stuck entry -> undelivered).
+    // The prefs divert keeps its own strict decode (self-sent snapshot, single known block).
+    expect(app).toMatch(/decodeMessageDocumentBlocks\(opened\.payload\.bytes, \{ tolerateUnknownBlocks: true \}\)/);
   });
 
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v716/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=202/);
+    expect(sw).toMatch(/platho-pwa-prototype-v717/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=203/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=645/);
+    expect(sw).toMatch(/\.\/app\.js\?v=646/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
@@ -5462,7 +5511,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=14/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=15/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=31/);
