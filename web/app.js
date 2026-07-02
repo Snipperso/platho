@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v642';
+const PLATHO_APP_RUNTIME_VERSION = 'v643';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1164,6 +1164,74 @@ async function writeCachedPublicComments(cacheKey, comments, parentExists, lates
       // unchanged link on the next open means ZERO body re-reads.
       latestLink: latestLink === undefined || latestLink === null ? null : String(latestLink),
     }));
+  } catch {
+    /* ignore (quota / unavailable) */
+  }
+}
+
+// PER-ENTRY durable cache of resolved comment PART bodies — the faithful private-message model. Private message
+// bodies persist UNCONDITIONALLY + INDIVIDUALLY the moment they resolve (writeMessageToEncryptedHistory) and are
+// restored at boot, so a private image NEVER re-downloads. Public comments previously had ONLY a per-POST snapshot
+// written all-or-nothing behind `if (!result.degraded)` — and an image comment is 1+ SEPARATE ~32KB entry bodies
+// (getPublicEntry returns body_boc:null so every part is a live getMessages read, cache-bypassed by
+// messageCacheTtlMs:0), so ONE flaky/rate-limited sibling part poisoned the whole post's write → the snapshot was
+// NEVER stored → every reload re-walked + re-downloaded the image (the owner-flagged bug). This store fixes the
+// ROOT: each resolved part is written here immediately + individually, and read BEFORE the chain. Comment bodies
+// are immutable + content-addressed (entryId), so a hit is authoritative and never stale — deployment-scoped
+// (shared across accounts, readable before unlock), never wallet-scoped. Large cap; LRU eviction just re-downloads.
+const publicCommentPartStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-public-comment-parts-v1'), cap: 400 }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+
+function commentPartCacheKey(channelId, entryId) {
+  if (entryId === undefined || entryId === null) return null;
+  return `${channelId ?? ''}:${entryId}`;
+}
+
+// A resolved comment PART carries Uint8Array image/document bytes (imageUrl data URLs only exist AFTER
+// assemblePublicParts concatenates parts) — base64 them so the record is JSON-safe (a raw Uint8Array serializes
+// to a corrupt {"0":..} object). Everything else on the part is already a string/number.
+function serializeCommentPartForCache(part) {
+  return JSON.stringify({
+    ...part,
+    imageBytes: part.imageBytes?.length ? bytesToBase64(part.imageBytes) : undefined,
+    documentBytes: part.documentBytes?.length ? bytesToBase64(part.documentBytes) : undefined,
+    _bytesB64: true,
+  });
+}
+
+function deserializeCommentPartFromCache(json) {
+  let raw;
+  try { raw = JSON.parse(json); } catch { return null; }
+  if (!raw || typeof raw !== 'object' || raw._bytesB64 !== true) return null;
+  const part = { ...raw };
+  delete part._bytesB64;
+  part.imageBytes = typeof raw.imageBytes === 'string' ? base64ToBytes(raw.imageBytes) : undefined;
+  part.documentBytes = typeof raw.documentBytes === 'string' ? base64ToBytes(raw.documentBytes) : undefined;
+  return part;
+}
+
+async function readCachedCommentPart(cacheKey) {
+  if (!cacheKey) return null;
+  try {
+    const store = await publicCommentPartStorePromise;
+    const record = await store?.get(cacheKey);
+    if (typeof record?.url !== 'string' || record.url.length === 0) return null;
+    return deserializeCommentPartFromCache(record.url);
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedCommentPart(cacheKey, part) {
+  if (!cacheKey || !part) return;
+  try {
+    const store = await publicCommentPartStorePromise;
+    await store?.put(cacheKey, serializeCommentPartForCache(part));
   } catch {
     /* ignore (quota / unavailable) */
   }
@@ -4907,6 +4975,9 @@ function appendPublicItemActions(article, item) {
       if (!canViewComments) return;
       openPublicPostDetail(item);
     });
+    // Pre-warm this post's durable comments (with images) into memory so opening it is instant + flash-free —
+    // the private-message model (messages restored to memory before a thread opens). Only for openable posts.
+    if (canViewComments) warmPublicPostCommentsCache(item);
     actions.append(commentButton);
   }
 
@@ -5074,12 +5145,16 @@ function publicPostDetailMergedComments() {
   const item = publicPostDetailItem;
   if (!item) return [];
   const chain = publicPostDetailChainComments;
-  // Union the fresh chain read with cached comments (durable, like the feed's accumulate-never-wipe model): a
-  // degraded/empty fresh read keeps the previously-seen comments instead of dropping them. mergePublicComments
-  // dedups confirmed comments by entryId; a local-pending copy (no entryId) is dropped only when its body hash
-  // already appears on chain, so a confirmed comment never shows twice next to its old pending copy.
+  // ONE image-bearing source of truth (exactly like private messages, which render inline from the encrypted
+  // history — never from a lossy overlay): CONFIRMED comments come ONLY from `chain` (the durable IndexedDB cache
+  // + the chain walk, both of which carry the image data URLs). The localStorage feed cache STRIPS every image on
+  // persist (omitHeavyFeedMediaForPersist), so a confirmed feed-cache comment would paint TEXT-WITHOUT-IMAGE and,
+  // on the empty-Map first frame after a reload, FLASH before the durable comments load — the owner-flagged
+  // "images reload from the blockchain". So from the feed cache we take ONLY local-PENDING comments (no confirmed
+  // entryId): a just-posted comment still confirming, whose image is still in memory this session.
   const cached = cachedCommentsForPost(item).filter((local) => {
-    if (local.entryId !== undefined && local.entryId !== null && local.entryId !== '') return true;
+    const confirmed = local.entryId !== undefined && local.entryId !== null && local.entryId !== '';
+    if (confirmed) return false;
     return !chain.some((chainComment) => samePublicBodyHash(local, chainComment));
   });
   return mergePublicComments(chain, cached);
@@ -5185,6 +5260,44 @@ function renderPublicPostDetail() {
       : publicDetailStatusNode('Comments not loaded yet.', { retry: true }));
   }
   publicPostDetailBody.append(section);
+}
+
+// Warm the durable comment cache (IndexedDB — WITH image data URLs) into the in-memory Map BEFORE the user opens
+// the post: the public analogue of restoreEncryptedMessageHistory pre-loading private messages into memory at
+// boot, so openPublicPostDetail paints comments-with-images on its FIRST synchronous frame (no text-first flash,
+// no chain read). Called when a post's "Comments" button is rendered (the exact set of posts that can be opened).
+// Idempotent + cheap-guarded: skips a post already in the Map or already warming; a single IndexedDB get per post.
+const warmingPublicPostComments = new Set();
+async function warmPublicPostCommentsCache(item) {
+  const cacheKey = publicPostCommentsCacheKey(item);
+  if (!cacheKey || publicPostCommentsCache.has(cacheKey) || warmingPublicPostComments.has(cacheKey)) return;
+  warmingPublicPostComments.add(cacheKey);
+  try {
+    const durable = await readCachedPublicComments(cacheKey);
+    if (!durable || !Array.isArray(durable.comments) || durable.comments.length === 0) return;
+    if (publicPostCommentsCache.has(cacheKey)) return; // an authoritative load beat us to it
+    publicPostCommentsCache.set(cacheKey, {
+      comments: durable.comments,
+      parentExists: durable.parentExists === true,
+      latestLink: durable.latestLink ?? null,
+    });
+    while (publicPostCommentsCache.size > 24) {
+      publicPostCommentsCache.delete(publicPostCommentsCache.keys().next().value);
+    }
+    // If the user already has THIS post open and still empty (opened before the warm resolved), paint now.
+    if (publicPostDetailOpen && publicPostDetailItem
+      && String(publicPostDetailItem.entryId) === String(item.entryId)
+      && publicPostDetailChainComments.length === 0) {
+      publicPostDetailChainComments = durable.comments;
+      publicPostDetailParentExists = durable.parentExists === true;
+      publicPostDetailLoadState = 'ready';
+      renderPublicPostDetail();
+    }
+  } catch {
+    /* ignore (unavailable / quota) */
+  } finally {
+    warmingPublicPostComments.delete(cacheKey);
+  }
 }
 
 function openPublicPostDetail(item) {
@@ -5310,6 +5423,13 @@ async function loadPublicPostComments(item, options = {}) {
 
   const commentParts = [];
   const resolveEntryToCommentPart = async (entry) => {
+    // PER-ENTRY durable cache FIRST (the private model: read the local body before the chain). Public comment
+    // bodies are immutable + content-addressed by entryId, so a hit is authoritative — zero ~32KB chain body
+    // reads, and an already-resolved image NEVER re-downloads on reload (even if a sibling part is flaky and the
+    // whole load degrades). Keyed by the POST's channelId (stable at read+write) + this entry id.
+    const partKey = commentPartCacheKey(item.channelId, entry.entry_id.toString());
+    const cachedPart = await readCachedCommentPart(partKey);
+    if (cachedPart) { commentParts.push(cachedPart); return; }
     let payload = null;
     try {
       payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
@@ -5325,7 +5445,7 @@ async function loadPublicPostComments(item, options = {}) {
     const createdAtSec = Number(payload.createdAtSec ?? payload.created_at_sec ?? 0);
     const createdAt = createdAtSec > 0 ? new Date(createdAtSec * 1000).toISOString() : new Date().toISOString();
     const authorWallet = rawWalletAddress(payload.authorWallet ?? entry.author_wallet) ?? String(payload.authorWallet ?? entry.author_wallet ?? '');
-    commentParts.push({
+    const part = {
       id: `chain-${entry.entry_id.toString()}`,
       entryId: entry.entry_id.toString(),
       channelId: item.channelId ?? publicChannelIdForAuthorWallet(authorWallet),
@@ -5346,7 +5466,13 @@ async function loadPublicPostComments(item, options = {}) {
       chainVerified: true,
       parentEntryId: payload.parentEntryId.toString(),
       parentHash: payload.parentHash,
-    });
+    };
+    commentParts.push(part);
+    // Persist this resolved part UNCONDITIONALLY (fire-and-forget), regardless of whether the OVERALL post load
+    // ends up degraded — this is the fix: a body that resolved ONCE is durable forever, exactly like a private
+    // message. Next reload reads it above (zero chain reads); only genuinely-new parts still hit the chain, and
+    // they persist here in turn.
+    writeCachedCommentPart(partKey, part);
   };
   for (const entryId of ids) {
     const entry = walkedEntries.get(entryId.toString());
@@ -5472,8 +5598,19 @@ async function refreshPublicPostDetailComments() {
       renderPublicPostDetail();
       return;
     }
-    // Degraded: keep the previous authoritative list (don't overwrite with a partial), show "loading", retry.
-    publicPostDetailLoadState = 'loading';
+    // Degraded: keep the previous authoritative list on screen (don't overwrite with a partial), show "loading",
+    // retry. BUT still persist whatever assembled so far into the durable snapshot (accumulate-never-wipe, like
+    // the private per-message history) with latestLink=null — so the images that DID resolve paint instantly on
+    // the next open, while the null cursor keeps the unchanged-shortcut disarmed (an incomplete feed must be
+    // re-walked, not trusted as complete). The per-entry part cache already made those bodies durable; this makes
+    // the post snapshot durable too, so a post whose walk never lands fully clean still restores its images.
+    if (cacheKey && Array.isArray(result.comments) && result.comments.length > 0) {
+      const durablePartial = mergePublicComments(snapshot?.comments ?? [], result.comments);
+      if (durablePartial.length > 0) {
+        writeCachedPublicComments(cacheKey, durablePartial, publicPostDetailParentExists === true, null);
+      }
+    }
+    publicPostDetailLoadState = publicPostDetailChainComments.length > 0 ? 'ready' : 'loading';
     renderPublicPostDetail();
     await new Promise((resolve) => setTimeout(resolve, 2500));
     if (token !== publicPostDetailLoadToken) return;
@@ -14837,6 +14974,13 @@ function bytesToBase64(bytes) {
   let binary = '';
   for (const byte of input) binary += String.fromCharCode(byte);
   return btoa(binary);
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(String(base64 ?? ''));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 function bytesToImageDataUrl(bytes, mime = 'image/webp') {

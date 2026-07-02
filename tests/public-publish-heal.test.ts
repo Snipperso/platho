@@ -110,4 +110,34 @@ describe('public publish heal driver guard', () => {
     // Cleared on account switch alongside the other public state.
     expect(app).toMatch(/publicPostCommentsCache\.clear\(\);/);
   });
+
+  it('PWA-PUBLIC-HEAL-09: comment PART bodies persist per-entry + unconditionally (the private-message model — no image re-download on reload)', () => {
+    // A separate per-ENTRY durable store (like private per-message history), keyed channelId:entryId.
+    expect(app).toMatch(/const publicCommentPartStorePromise = \(\(\) => \{/);
+    expect(app).toMatch(/scopedIndexedDbName\('platho-public-comment-parts-v1'\)/);
+    expect(app).toMatch(/async function readCachedCommentPart\(cacheKey\)/);
+    expect(app).toMatch(/async function writeCachedCommentPart\(cacheKey, part\)/);
+    // Bytes are base64'd for JSON (a raw Uint8Array serializes to a corrupt object) — imageUrl-style data URLs
+    // don't exist at the PART level yet, so we store the raw image/document bytes as base64 and rehydrate.
+    expect(app).toMatch(/imageBytes: part\.imageBytes\?\.length \? bytesToBase64\(part\.imageBytes\) : undefined/);
+    expect(app).toMatch(/part\.imageBytes = typeof raw\.imageBytes === 'string' \? base64ToBytes\(raw\.imageBytes\) : undefined/);
+    expect(app).toMatch(/function base64ToBytes\(base64\)/);
+    // resolveEntryToCommentPart reads the per-entry cache BEFORE the chain, and writes the resolved part
+    // UNCONDITIONALLY (fire-and-forget) — NOT gated on a clean walk, so one flaky sibling never blocks the rest.
+    const resolver = app.slice(app.indexOf('const resolveEntryToCommentPart = async'), app.indexOf('for (const entryId of ids) {'));
+    const readIdx = resolver.indexOf('const cachedPart = await readCachedCommentPart(partKey);');
+    const chainIdx = resolver.indexOf('payload = await resolvePublicEntryPayload(');
+    const writeIdx = resolver.indexOf('writeCachedCommentPart(partKey, part);');
+    expect(readIdx).toBeGreaterThan(-1);
+    expect(chainIdx).toBeGreaterThan(-1);
+    expect(readIdx).toBeLessThan(chainIdx); // cache read precedes the chain body read
+    expect(resolver).toMatch(/if \(cachedPart\) \{ commentParts\.push\(cachedPart\); return; \}/);
+    expect(writeIdx).toBeGreaterThan(chainIdx); // resolved part persisted after assembly
+    // The write is NOT behind the degraded gate: `!result.degraded` never appears inside the resolver.
+    expect(resolver).not.toMatch(/!result\.degraded/);
+    // A degraded post load STILL persists the assembled snapshot (accumulate-never-wipe) with latestLink=null so
+    // resolved images paint on the next open while the unchanged-shortcut stays disarmed on an incomplete feed.
+    const refresh = app.slice(app.indexOf('async function refreshPublicPostDetailComments'), app.indexOf('async function refreshPublicPostDetailComments') + 3600);
+    expect(refresh).toMatch(/writeCachedPublicComments\(cacheKey, durablePartial, publicPostDetailParentExists === true, null\)/);
+  });
 });
