@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v646<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v646'/);
+    expect(html).toMatch(/id="appVersionLabel">v647<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v647'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=646" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=647" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4311,11 +4311,27 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*updateImageAttachmentUi\('private'\);/);
     expect(app).toMatch(/if \(activeThreadId !== thread\.id\) setPrivateReplyDraft\(null\);/);
     expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*setPublicCommentReplyTo\(null\);/);
-    // UI shells + gesture CSS (touch-action pan-y keeps vertical scroll native).
+    // UI shells + gesture CSS (touch-action pan-y keeps vertical scroll native; position:relative anchors the
+    // desktop hover Reply button).
     expect(html).toMatch(/id="privateReplyContext"/);
-    expect(css).toMatch(/\.message,\s*\.comment-item \{\s*touch-action: pan-y;/);
+    expect(css).toMatch(/\.message,\s*\.comment-item \{\s*position: relative;\s*touch-action: pan-y;/);
     expect(css).toMatch(/\.message-reply-quote \{/);
     expect(css).toMatch(/\.reply-target-flash \{/);
+    // v647 UX pass (owner feedback): EITHER direction triggers (a one-letter incoming bubble at the screen edge
+    // has no room for a leftward drag), the swipe grabs the whole row LINE (band hit-test — no reaching for a
+    // narrow bubble), and hover-capable devices get a VISIBLE Reply button (touch keeps the clean swipe).
+    expect(app).toMatch(/function swipeRowAtPoint\(container, rowSelector, target, clientY\)/);
+    expect(app).toMatch(/const row = swipeRowAtPoint\(container, rowSelector, event\.target, event\.clientY\);/);
+    expect(app).toMatch(/Math\.max\(-SWIPE_REPLY_MAX_PX, Math\.min\(SWIPE_REPLY_MAX_PX, dx\)\)/);
+    expect(app).toMatch(/Math\.abs\(clamped\) >= SWIPE_REPLY_TRIGGER_PX/);
+    expect(app).toMatch(/if \(axis === 'h' && Math\.abs\(dx\) >= SWIPE_REPLY_TRIGGER_PX\) onReply\(row\);/);
+    expect(app).toMatch(/function appendRowReplyButton\(row, onReply\)/);
+    expect(app).toMatch(/appendRowReplyButton\(row, beginPrivateReplyForRow\);/);
+    expect(app).toMatch(/appendRowReplyButton\(row, beginPublicCommentReplyForRow\);/);
+    expect(css).toMatch(/@media \(hover: hover\) \{[\s\S]*?\.message:hover > \.row-reply-button/);
+    // Fullscreen lightbox (v647): the dialog fills the viewport — zooming needs the room, not a content card.
+    expect(css).toMatch(/\.image-lightbox-dialog \{[\s\S]*?width: 100%;\s*height: 100%;\s*max-height: none;/);
+    expect(css).toMatch(/\.image-lightbox-backdrop\.image-lightbox-backdrop \{\s*padding: 0;\s*\}/);
   });
 
   it('PWA-PUBLIC-FEED-INLINE-COMMENTS-REMOVED: the feed render no longer shows inline comments (they load on the post detail), but the renderer stays for the detail', () => {
@@ -5498,11 +5514,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v717/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=203/);
+    expect(sw).toMatch(/platho-pwa-prototype-v718/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=204/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=646/);
+    expect(sw).toMatch(/\.\/app\.js\?v=647/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

@@ -162,7 +162,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v646';
+const PLATHO_APP_RUNTIME_VERSION = 'v647';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5061,6 +5061,7 @@ function appendPublicItemComments(article, item) {
     commentAuthorRow.append(commentAvatar, commentMeta);
     row.append(commentAuthorRow);
     appendPublicItemContent(row, comment);
+    appendRowReplyButton(row, beginPublicCommentReplyForRow);
     commentList.append(row);
   }
   article.append(commentList);
@@ -13225,6 +13226,7 @@ function renderConversation() {
       row.append(bubble);
     }
     if (manualActions) row.append(manualActions);
+    appendRowReplyButton(row, beginPrivateReplyForRow);
     messageStrip.append(row);
   });
 
@@ -13425,14 +13427,28 @@ publicPane?.addEventListener('keydown', (event) => {
   openImageLightbox(target.dataset.fullImageSrc, target.dataset.fullImageMeta);
 });
 
-// ---- Swipe-to-reply gesture (v646) ------------------------------------------------------------------------------
-// Telegram-style: drag a row LEFT past the threshold to quote it in the composer. Touch pointers only (desktop
-// gets double-click below). Rows keep native vertical scroll via CSS touch-action: pan-y; the handler locks onto
-// a gesture only when it is clearly horizontal, gives live translateX feedback (CSSOM — CSP-safe), and springs
-// back via the row's transform transition. Only rows with a chain anchor (data-entry-id) are swipeable — a
-// pending message/comment has no stable ref yet.
+// ---- Swipe-to-reply gesture (v646, v647 UX pass) ------------------------------------------------------------------
+// Telegram-style: drag a row PAST the threshold — EITHER direction (v647: a one-letter incoming bubble sits at
+// the screen edge, leaving no room to drag left; rightward works everywhere) — to quote it in the composer.
+// Touch pointers only (desktop gets a hover Reply button + double-click below). Rows keep native vertical scroll
+// via CSS touch-action: pan-y; the handler locks onto a gesture only when it is clearly horizontal, gives live
+// translateX feedback (CSSOM — CSP-safe), and springs back via the row's transform transition. Only rows with a
+// chain anchor (data-entry-id) are swipeable — a pending message/comment has no stable ref yet.
 const SWIPE_REPLY_TRIGGER_PX = 56;
 const SWIPE_REPLY_MAX_PX = 96;
+
+// v647: the swipe target is the whole horizontal LINE of the row, not the bubble itself — a swipe starting on the
+// empty strip beside a narrow bubble still grabs the row whose vertical band contains the touch. Fast path first
+// (started on the row); the band scan runs once per touch start only.
+function swipeRowAtPoint(container, rowSelector, target, clientY) {
+  const direct = target instanceof Element ? target.closest(rowSelector) : null;
+  if (direct && container.contains(direct)) return direct;
+  for (const row of container.querySelectorAll(rowSelector)) {
+    const rect = row.getBoundingClientRect();
+    if (rect.height > 0 && clientY >= rect.top && clientY <= rect.bottom) return row;
+  }
+  return null;
+}
 
 function attachSwipeToReply(container, rowSelector, onReply) {
   if (!container) return;
@@ -13448,7 +13464,7 @@ function attachSwipeToReply(container, rowSelector, onReply) {
   }, true);
   container.addEventListener('pointerdown', (event) => {
     if (event.pointerType !== 'touch') return;
-    const row = event.target instanceof Element ? event.target.closest(rowSelector) : null;
+    const row = swipeRowAtPoint(container, rowSelector, event.target, event.clientY);
     if (!row || !row.dataset.entryId) return;
     swipe = { pointerId: event.pointerId, row, startX: event.clientX, startY: event.clientY, axis: null, dx: 0 };
   });
@@ -13465,10 +13481,11 @@ function attachSwipeToReply(container, rowSelector, onReply) {
       }
     }
     if (swipe.axis !== 'h') return;
-    const clamped = Math.max(-SWIPE_REPLY_MAX_PX, Math.min(0, dx));
+    // Either direction (v647): the drag follows the finger both ways, clamped symmetrically.
+    const clamped = Math.max(-SWIPE_REPLY_MAX_PX, Math.min(SWIPE_REPLY_MAX_PX, dx));
     swipe.dx = clamped;
     swipe.row.style.transform = `translateX(${clamped}px)`;
-    swipe.row.classList.toggle('swipe-armed', clamped <= -SWIPE_REPLY_TRIGGER_PX);
+    swipe.row.classList.toggle('swipe-armed', Math.abs(clamped) >= SWIPE_REPLY_TRIGGER_PX);
     event.preventDefault();
   });
   const endSwipe = (event) => {
@@ -13478,10 +13495,27 @@ function attachSwipeToReply(container, rowSelector, onReply) {
     row.classList.remove('is-swiping', 'swipe-armed');
     row.style.transform = '';
     if (axis === 'h') suppressClickUntil = Date.now() + 350;
-    if (axis === 'h' && dx <= -SWIPE_REPLY_TRIGGER_PX) onReply(row);
+    if (axis === 'h' && Math.abs(dx) >= SWIPE_REPLY_TRIGGER_PX) onReply(row);
   };
   container.addEventListener('pointerup', endSwipe);
   container.addEventListener('pointercancel', endSwipe);
+}
+
+// Desktop-visible reply affordance (v647): a small hover button on the row (CSS shows it only on hover-capable
+// devices — @media (hover: hover) — so touch keeps the clean swipe UX). Shared by private rows and comment rows.
+function appendRowReplyButton(row, onReply) {
+  if (!row?.dataset?.entryId) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'row-reply-button';
+  button.title = 'Reply';
+  button.setAttribute('aria-label', 'Reply');
+  button.textContent = '↩';
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    onReply(row);
+  });
+  row.append(button);
 }
 
 function beginPrivateReplyForRow(row) {

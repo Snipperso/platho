@@ -892,11 +892,51 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 /* Swipe-to-reply (v646): rows keep native VERTICAL scroll (touch-action pan-y) while horizontal drags feed the
-   gesture; transform gives live feedback and springs back through the transition (killed mid-drag). */
+   gesture; transform gives live feedback and springs back through the transition (killed mid-drag).
+   position: relative anchors the desktop hover Reply button (v647). */
 .message,
 .comment-item {
+  position: relative;
   touch-action: pan-y;
   transition: transform 0.15s ease-out;
+}
+
+/* Desktop reply affordance (v647): visible ONLY on hover-capable devices — touch keeps the clean swipe UX. */
+.row-reply-button {
+  display: none;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: rgba(15, 18, 20, 0.92);
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* An outgoing bubble hugs the right screen edge — its button flips to the left corner. */
+.message.out .row-reply-button {
+  right: auto;
+  left: 2px;
+}
+
+@media (hover: hover) {
+  .message:hover > .row-reply-button,
+  .comment-item:hover > .row-reply-button,
+  .row-reply-button:focus-visible {
+    display: inline-flex;
+  }
+}
+
+.row-reply-button:hover {
+  border-color: var(--accent);
 }
 
 .message.is-swiping,
@@ -2922,18 +2962,28 @@ button.feed-item:hover {
   background: rgba(0, 0, 0, 0.78);
 }
 
+/* Fullscreen (v647, owner ask): the lightbox takes the WHOLE viewport — zooming needs the room, not a
+   content-sized card. Safe areas are padded INSIDE the dialog; the backdrop override below removes its inset. */
 .image-lightbox-dialog {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
-  width: min(100%, calc(100dvw - 24px));
-  max-height: calc(var(--app-viewport-height, 100dvh) - max(24px, var(--app-safe-area-top, env(safe-area-inset-top))) - max(24px, var(--app-safe-area-bottom, env(safe-area-inset-bottom))));
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  padding:
+    max(10px, var(--app-safe-area-top, env(safe-area-inset-top)))
+    max(10px, var(--app-safe-area-right, env(safe-area-inset-right)))
+    max(10px, var(--app-safe-area-bottom, env(safe-area-inset-bottom)))
+    max(10px, var(--app-safe-area-left, env(safe-area-inset-left)));
+  border: 0;
+  border-radius: 0;
   background: var(--panel);
-  box-shadow: 0 18px 50px var(--shadow);
   overflow: hidden;
+}
+
+.image-lightbox-backdrop.image-lightbox-backdrop {
+  padding: 0;
 }
 
 .image-lightbox-dialog header {
@@ -3609,9 +3659,11 @@ button.feed-item:hover {
     overflow: hidden;
   }
 
+  /* Fullscreen everywhere (v647): the base rule already sizes the dialog to the viewport; mobile keeps only the
+     tighter viewport padding. --app-viewport-height pins the height where 100% of the backdrop is unreliable
+     (iOS dynamic toolbars). */
   .image-lightbox-dialog {
-    width: min(100%, calc(100dvw - 24px));
-    max-height: calc(var(--app-viewport-height, 100dvh) - max(24px, var(--app-safe-area-top, env(safe-area-inset-top))) - max(24px, var(--app-safe-area-bottom, env(safe-area-inset-bottom))));
+    height: var(--app-viewport-height, 100%);
   }
 
   .image-lightbox-viewport {
