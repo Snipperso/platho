@@ -180,7 +180,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v661';
+const PLATHO_APP_RUNTIME_VERSION = 'v662';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3143,6 +3143,10 @@ function shouldOpenWalletUnlockPrompt() {
 function scheduleWalletUnlockPrompt(delayMs = 180) {
   clearWalletUnlockPromptTimer();
   if (!shouldOpenWalletUnlockPrompt()) return;
+  // Re-unlock on resume (after a background auto-lock): re-show the branded overlay NOW (synchronously, before
+  // paint) so the unlock dialog opens on it — not on the bare, locked-but-visible app. No-op on cold boot
+  // (overlay already up) — see showBootScreenForRelock. The core-ready lift hides it after unlock.
+  showBootScreenForRelock();
   walletUnlockPromptTimer = setTimeout(async () => {
     walletUnlockPromptTimer = null;
     if (!shouldOpenWalletUnlockPrompt()) return;
@@ -3163,6 +3167,8 @@ function scheduleWalletUnlockPrompt(delayMs = 180) {
       await enforceTelegramSeedBackupGate(wallet);
       flashWalletIdentityStatus(t('wallet.unlocked'));
     } catch (error) {
+      // Never strand the re-unlock behind the overlay on an error.
+      markBootAppReady();
       console.error(error);
       renderWalletIdentity();
       refreshMessagingControls();
@@ -24001,7 +24007,7 @@ async function refreshVaultActivationStatus(options = {}) {
 // first paint (markup in index.html); the unlock password dialog opens on top (z-index), then it
 // swaps to the spinner and lifts once the wallet+vault core is ready (messages keep loading behind).
 const bootScreen = document.querySelector('#bootScreen');
-const bootSignalCanvas = document.querySelector('#bootSignal');
+let bootSignalCanvas = document.querySelector('#bootSignal');
 let bootScreenActive = Boolean(bootScreen) && bootScreen.hidden !== true;
 let stopBootSignalField = null;
 let bootScreenSafetyTimer = null;
@@ -24060,6 +24066,20 @@ function startBootSignalField(canvas) {
   };
 }
 
+// Hard idle failsafe: the overlay must NEVER be eternal. If it is still up after 12s WITHOUT the unlock dialog
+// open (i.e. we never reached the unlock, not that the user is slow to type), reveal the app anyway. Re-checks
+// while the dialog is open so a user taking their time to unlock is never yanked out.
+function armBootScreenIdleFailsafe() {
+  if (bootScreenIdleFailsafe) clearTimeout(bootScreenIdleFailsafe);
+  const tick = () => {
+    if (!bootScreenActive) return;
+    if (activeActionDialog) { bootScreenIdleFailsafe = setTimeout(tick, 5_000); return; }
+    setBootDebug('idle-failsafe:reveal');
+    hideBootScreen();
+  };
+  bootScreenIdleFailsafe = setTimeout(tick, 12_000);
+}
+
 function initBootScreen() {
   if (!bootScreenActive) return;
   setBootDebug('init');
@@ -24070,16 +24090,35 @@ function initBootScreen() {
     setBootDebug(`init:field-err ${error?.message ?? error}`);
     console.error(error);
   }
-  // Hard idle failsafe: the overlay must NEVER be eternal. If it is still up after 12s WITHOUT the unlock dialog
-  // open (i.e. we never reached the unlock, not that the user is slow to type), reveal the app anyway. Re-checks
-  // while the dialog is open so a user taking their time to unlock is never yanked out.
-  const tickIdleFailsafe = () => {
-    if (!bootScreenActive) return;
-    if (activeActionDialog) { bootScreenIdleFailsafe = setTimeout(tickIdleFailsafe, 5_000); return; }
-    setBootDebug('idle-failsafe:reveal');
-    hideBootScreen();
-  };
-  bootScreenIdleFailsafe = setTimeout(tickIdleFailsafe, 12_000);
+  armBootScreenIdleFailsafe();
+}
+
+// Re-show the overlay for a RE-UNLOCK (resume after a background auto-lock): mask the app — the wallet is
+// locked but the chat list was still showing behind the unlock dialog (privacy) — and host the dialog on the
+// branded screen exactly like a cold boot. No-op during the initial boot (already active) or when there is
+// nothing to unlock. bootCrypto's core-ready lift (markBootAppReady) hides it again after the re-unlock.
+function showBootScreenForRelock() {
+  if (!bootScreen || bootScreenActive) return;
+  if (plathoWallet || !hasStoredPlathoWalletRecord()) return;
+  setBootDebug('relock:show');
+  bootScreen.dataset.phase = 'idle';
+  bootScreen.classList.remove('is-hiding');
+  bootScreen.hidden = false;
+  bootScreenActive = true;
+  // The OffscreenCanvas was transferred to the (now-terminated) cold-boot worker and cannot be reused — swap in
+  // a fresh <canvas> before restarting the field.
+  try {
+    const fresh = document.createElement('canvas');
+    fresh.className = 'boot-signal';
+    fresh.id = 'bootSignal';
+    fresh.setAttribute('aria-hidden', 'true');
+    bootSignalCanvas.replaceWith(fresh);
+    bootSignalCanvas = fresh;
+    stopBootSignalField = startBootSignalField(bootSignalCanvas);
+  } catch (error) {
+    console.error(error);
+  }
+  armBootScreenIdleFailsafe();
 }
 
 // Idle (unlock dialog on top) -> loading (spinner). No-op once the screen is gone or was never up. The failsafe

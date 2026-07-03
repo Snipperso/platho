@@ -271,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v661<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v661'/);
+    expect(html).toMatch(/id="appVersionLabel">v662<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v662'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=661" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=662" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5786,11 +5786,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v732/);
+    expect(sw).toMatch(/platho-pwa-prototype-v733/);
     expect(sw).toMatch(/\.\/styles\.css\?v=215/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=661/);
+    expect(sw).toMatch(/\.\/app\.js\?v=662/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=3/);
@@ -5963,10 +5963,22 @@ describe('PWA runtime config guard', () => {
     // ALL Telegram-cloud restores (incl. the wallet-record read) are bounded by a single race so a slow/hung
     // CloudStorage can't stall the chain before the unlock decision — the mobile eternal-boot root.
     expect(app).toMatch(/walletRestore\.then\(\(\) => dismissalRestore\)\.then\(\(\) => backupRestore\),\s*\n\s*delay\(2500\),/);
-    // Hard idle failsafe: the overlay is never eternal — reveal the app if still idle (no dialog open) after 12s.
-    expect(app).toMatch(/bootScreenIdleFailsafe = setTimeout\(tickIdleFailsafe, 12_000\)/);
-    expect(app).toMatch(/if \(activeActionDialog\) \{ bootScreenIdleFailsafe = setTimeout\(tickIdleFailsafe, 5_000\)/);
-    // A visible boot trace (temporary) surfaces which step a stuck mobile boot stopped on.
+    // Hard idle failsafe (shared by cold boot + re-unlock): the overlay is never eternal — reveal the app if
+    // still idle (no dialog open) after 12s.
+    expect(app).toMatch(/function armBootScreenIdleFailsafe\(\)/);
+    expect(app).toMatch(/bootScreenIdleFailsafe = setTimeout\(tick, 12_000\)/);
+    expect(app).toMatch(/if \(activeActionDialog\) \{ bootScreenIdleFailsafe = setTimeout\(tick, 5_000\)/);
+    // Re-unlock on resume (after a background auto-lock) re-shows the branded overlay so the unlock dialog opens
+    // ON it, not on the bare locked-but-visible app (privacy). It swaps in a FRESH canvas because the cold-boot
+    // OffscreenCanvas was transferred to a now-dead worker and cannot be reused.
+    expect(app).toMatch(/function showBootScreenForRelock\(\)/);
+    expect(app).toMatch(/bootSignalCanvas\.replaceWith\(fresh\);\s*\n\s*bootSignalCanvas = fresh;/);
+    // Wired synchronously into the resume unlock path (before the modal opens → no flash of the bare app):
+    // showBootScreenForRelock() runs before the setTimeout that opens the dialog.
+    const schedSrc = app.slice(app.indexOf('function scheduleWalletUnlockPrompt('), app.indexOf('function armWalletUnlockPrompt('));
+    expect(schedSrc).toMatch(/showBootScreenForRelock\(\);/);
+    expect(schedSrc.indexOf('showBootScreenForRelock();')).toBeLessThan(schedSrc.indexOf('walletUnlockPromptTimer = setTimeout('));
+    // A boot trace (console-only) surfaces which step a stuck boot stopped on.
     expect(app).toMatch(/function setBootDebug\(step\)/);
 
     // Controller + failsafe.
