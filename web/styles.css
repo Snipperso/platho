@@ -995,6 +995,41 @@ html[data-platho-telegram="true"] .install-header-button {
   cursor: zoom-in;
 }
 
+/* File attachment chip (v652): name + size, tap to download. Shared by private bubbles and public surfaces. */
+.message-file-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(48, 213, 176, 0.08);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.message-file-chip:hover {
+  border-color: var(--accent);
+}
+
+.message-file-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}
+
+.message-file-size {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .message.is-swiping,
 .comment-item.is-swiping {
   transition: none;

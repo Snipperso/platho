@@ -228,3 +228,48 @@ export function decodeReplyBlockContent(content) {
     snippet: decoder.decode(bytes.subarray(10 + authorLength)),
   };
 }
+
+// --- File-block content codec (document block type FILE) ---
+// An arbitrary attachment (name + mime + bytes) riding inside the shared PDC1 document container — symmetric
+// across surfaces like REPLY above. Content layout:
+//   [version u8=1][nameLen u16 BE][name utf8][mimeLen u8][mime utf8][bytes...]
+// nameLen is u16 (a cyrillic filename hits 255 BYTES at ~127 chars); mime fits u8. The byte payload length is
+// derived from the block frame length, exactly like the IMAGE block derives its pixels.
+export const FILE_BLOCK_CONTENT_VERSION = 1;
+export const FILE_NAME_MAX_BYTES = 512;
+export const FILE_MIME_MAX_BYTES = 128;
+
+export function encodeFileBlockContent(file) {
+  const name = textEncoder.encode(truncateUtf8ToBytes(file?.name ?? 'file', FILE_NAME_MAX_BYTES));
+  const mime = textEncoder.encode(truncateUtf8ToBytes(file?.mime ?? 'application/octet-stream', FILE_MIME_MAX_BYTES));
+  const bytes = file?.bytes instanceof Uint8Array ? file.bytes : new Uint8Array(file?.bytes ?? []);
+  if (name.length === 0) throw new Error('file block needs a name');
+  if (bytes.length === 0) throw new Error('file block needs bytes');
+  const out = new Uint8Array(1 + 2 + name.length + 1 + mime.length + bytes.length);
+  out[0] = FILE_BLOCK_CONTENT_VERSION;
+  out[1] = (name.length >> 8) & 0xff;
+  out[2] = name.length & 0xff;
+  out.set(name, 3);
+  out[3 + name.length] = mime.length;
+  out.set(mime, 4 + name.length);
+  out.set(bytes, 4 + name.length + mime.length);
+  return out;
+}
+
+export function decodeFileBlockContent(content) {
+  const bytes = content instanceof Uint8Array ? content : new Uint8Array(content ?? []);
+  // Unknown future versions / truncated frames return null — a bad file block must never make the carrying
+  // message undecodable (the REPLY rule).
+  if (bytes.length < 5 || bytes[0] !== FILE_BLOCK_CONTENT_VERSION) return null;
+  const nameLength = (bytes[1] << 8) | bytes[2];
+  if (nameLength === 0 || 3 + nameLength + 1 > bytes.length) return null;
+  const mimeLength = bytes[3 + nameLength];
+  const payloadStart = 4 + nameLength + mimeLength;
+  if (payloadStart > bytes.length) return null;
+  const decoder = new TextDecoder();
+  return {
+    name: decoder.decode(bytes.subarray(3, 3 + nameLength)),
+    mime: decoder.decode(bytes.subarray(4 + nameLength, 4 + nameLength + mimeLength)) || 'application/octet-stream',
+    bytes: bytes.slice(payloadStart),
+  };
+}

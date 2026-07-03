@@ -143,3 +143,34 @@ describe('PWA capsule part policy', () => {
     expect(decodeReplyBlockContent(bad)).toBe(null);
   });
 });
+
+// File-block content codec (v652): the wire bytes an arbitrary attachment rides in.
+describe('file block content codec', () => {
+  it('PWA-FILE-CODEC-01: round-trips name/mime/bytes (incl. cyrillic filenames)', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    const bytes = new Uint8Array(1024).map((_, i) => (i * 13 + 7) & 0xff);
+    const decoded = m.decodeFileBlockContent(m.encodeFileBlockContent({
+      name: 'отчёт за июнь.pdf', mime: 'application/pdf', bytes,
+    }));
+    expect(decoded!.name).toBe('отчёт за июнь.pdf');
+    expect(decoded!.mime).toBe('application/pdf');
+    expect(Buffer.from(decoded!.bytes)).toEqual(Buffer.from(bytes));
+  });
+
+  it('PWA-FILE-CODEC-02: caps + defaults + null-on-malformed (a bad frame never poisons the message)', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    // Name is byte-capped unicode-safe; empty mime decodes to the octet-stream default.
+    const decoded = m.decodeFileBlockContent(m.encodeFileBlockContent({
+      name: 'ю'.repeat(600), mime: '', bytes: new Uint8Array([1]),
+    }));
+    expect(m.utf8ByteLength(decoded!.name)).toBeLessThanOrEqual(m.FILE_NAME_MAX_BYTES);
+    expect(decoded!.mime).toBe('application/octet-stream');
+    // Encode rejects empties; decode nulls on junk.
+    expect(() => m.encodeFileBlockContent({ name: 'a', mime: 'x', bytes: new Uint8Array() })).toThrow();
+    expect(m.decodeFileBlockContent(new Uint8Array())).toBe(null);
+    expect(m.decodeFileBlockContent(new Uint8Array([9, 0, 1, 65, 0, 1]))).toBe(null); // future version
+    const truncated = m.encodeFileBlockContent({ name: 'ab', mime: 'x', bytes: new Uint8Array([1, 2]) });
+    truncated[1] = 0xff; truncated[2] = 0xff; // nameLen points past the buffer
+    expect(m.decodeFileBlockContent(truncated)).toBe(null);
+  });
+});

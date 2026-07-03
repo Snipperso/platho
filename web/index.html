@@ -9,7 +9,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=207">
+    <link rel="stylesheet" href="./styles.css?v=208">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
@@ -26,7 +26,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel">network</span>
-              <span class="app-version-label" id="appVersionLabel">v651</span>
+              <span class="app-version-label" id="appVersionLabel">v652</span>
             </div>
           </div>
         </div>
@@ -129,12 +129,17 @@
                   <span class="icon icon-vault"></span>
                   <span>Payment check</span>
                 </button>
+                <button class="composer-menu-button private-file-button" id="privateFileButton" type="button" role="menuitem" aria-label="Attach file" title="Attach file (up to ~250 KB)">
+                  <span class="icon icon-download"></span>
+                  <span>File</span>
+                </button>
               </div>
             </div>
             <button class="icon-button private-anonymous-button" id="privateAnonymousButton" type="button" aria-label="Send pseudonymously without wallet address" title="Pseudonymous: wallet address hidden, sender key may still link messages" aria-pressed="false">
               <span class="icon icon-eye-off"></span>
             </button>
             <input id="privateImageInput" type="file" accept="image/*" hidden>
+            <input id="privateFileInput" type="file" hidden>
             <label class="sr-only" for="messageInput">Message</label>
             <textarea id="messageInput" placeholder="Wallet required" rows="1" autocomplete="off"></textarea>
             <button class="send-button" type="submit" aria-label="Send" title="Send">
@@ -149,6 +154,10 @@
                 <option value="maximum">Maximum 64 KiB</option>
               </select>
               <button id="privateClearImageButton" type="button">Remove</button>
+            </div>
+            <div class="composer-attachment composer-file-panel" id="privateFilePanel" hidden>
+              <span id="privateFileLabel">No files</span>
+              <button id="privateClearFilesButton" type="button">Remove</button>
             </div>
             <div class="composer-cost-status" id="privateComposerCostStatus">Wallet required</div>
           </form>
@@ -622,6 +631,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=651" type="module"></script>
+    <script src="./app.js?v=652" type="module"></script>
   </body>
 </html>

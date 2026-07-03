@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v651<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v651'/);
+    expect(html).toMatch(/id="appVersionLabel">v652<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v652'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=651" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=652" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2430,7 +2430,8 @@ describe('PWA runtime config guard', () => {
     expect(newChatSource).toMatch(/await resolveRecipientWalletForThread\(parsed\.thread\)/);
     expect(newChatSource).toMatch(/error instanceof UsernameNotRegisteredError/);
     expect(newChatSource).toMatch(/reconcileUsernameOwnership\(identity, ownerWallet\)/);
-    expect(newChatSource).toMatch(/sameWalletAddress\(ownerWallet, ownAddress\)/);
+    // v652: addressing your OWN username no longer errors — it falls through to the standard self dialog (Saved).
+    expect(newChatSource).toMatch(/addressing your OWN username opens the Saved thread/);
     // Old-owner dialog is revalidated on open (fire-and-forget).
     expect(app).toMatch(/void revalidateThreadUsernameVariants\(thread\)/);
   });
@@ -3383,7 +3384,7 @@ describe('PWA runtime config guard', () => {
     expect(paymentButtonSource).not.toMatch(/submitCreatePaymentCheck\(/);
     expect(submitSource).toMatch(/const attachments = normalizePrivateImageAttachments\(privateImageAttachments\)/);
     expect(submitSource).toMatch(/const paymentDraft = privatePaymentCheckDraft/);
-    expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*paymentDraft,\s*replyDraft\)/);
+    expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*paymentDraft,\s*replyDraft,\s*fileAttachments\)/);
     expect(submitSource).toMatch(/blocks:\s*displayBlocks/);
     expect(submitSource).toMatch(/await attemptPrivatePaymentCheckPublish\(sendContext\)/);
     expect(submitSource).not.toMatch(/submitCreatePaymentCheck\(\{ thread, paymentDetails: paymentDraft \}\)/);
@@ -3456,7 +3457,7 @@ describe('PWA runtime config guard', () => {
     expect(source).not.toMatch(/getReceiveIntentId/);
     expect(source).not.toMatch(/allowUnverifiedCriticalRead:\s*true[\s\S]*getReceiveIntentId/);
     expect(source).toMatch(/const commitment = secret32/);
-    expect(source).toMatch(/createPrivateComposerCapsules\(context\.text \?\? '', context\.attachments \?\? \[\], recipientEntry, thread\.id, senderOptions, \{ payment, replyDraft: contextReplyDraft \}\)/);
+    expect(source).toMatch(/createPrivateComposerCapsules\(context\.text \?\? '', context\.attachments \?\? \[\], recipientEntry, thread\.id, senderOptions, \{ payment, replyDraft: contextReplyDraft, fileAttachments: contextFileAttachments \}\)/);
     expect(app).toMatch(/function paymentSecret32Bytes\(payment\)/);
     expect(app).toMatch(/function normalizePaymentForMessage\(payment\)[\s\S]*secret32Hex:\s*bytesToHex\(paymentSecret32Bytes\(payment\)\)/);
     expect(app).toMatch(/function documentPaymentContent\(payment, options = \{\}\)[\s\S]*paymentSecret32Bytes\(payment\)[\s\S]*options\.allowMissingPaymentSecret === true[\s\S]*new Uint8Array\(32\)/);
@@ -4265,7 +4266,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;/);
     // Role-scoped incompleteness check: only THIS role's groups (key starts with openedAs) with an indexed part.
     expect(app).toMatch(/const rolePartGroupsIncomplete = \(role\) => \{/);
-    expect(app).toMatch(/if \(!key\.startsWith\(`\$\{role\}:`\)\) continue;/);
+    // v652: self (Saved) groups live in BOTH index chains — either role's walk may close them.
+    expect(app).toMatch(/if \(!key\.startsWith\(`\$\{role\}:`\) && !selfGroup\) continue;/);
     expect(app).toMatch(/if \(group\.hasIndexedPart !== true\) continue;/);
     // The extension runs INSIDE walkIndexedRole after the window loop and BEFORE the cursor-exit branches, so a
     // closed group flows into normal assembly and the catch-up cursor resumes BELOW the group.
@@ -4293,6 +4295,59 @@ describe('PWA runtime config guard', () => {
     expect(walk).toMatch(/if \(truncated && hasSplitPartStream\(\)\) \{/);
     expect(walk).toMatch(/extendedScans < PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT && hasSplitPartStream\(\)/);
     expect(walk).toMatch(/if \(!\(await walkOne\(\)\)\) return \{ ids, truncated \};/);
+  });
+
+  it('PWA-FILE-01: file attachments — FILE block wire, compose capture, download chip, TG fallback, no public leak', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // Wire: FILE=6 delegates to the unit-tested module codec; decode is null-tolerant (never poisons a message).
+    expect(app).toMatch(/FILE: 6,/);
+    expect(app).toMatch(/content = encodeFileBlockContent\(block\);/);
+    expect(app).toMatch(/const file = decodeFileBlockContent\(content\);\s*if \(file\) blocks\.push\(\{ type: 'file', \.\.\.file \}\);/);
+    // Display block stores a data: URL STRING (blocks persist through JSON history/caches), never a Uint8Array.
+    expect(app).toMatch(/url: block\.url \?\? `data:\$\{block\.mime \?\? 'application\/octet-stream'\};base64,\$\{bytesToBase64\(bytes\)\}`/);
+    // Compose: '+' menu item + hidden input + pick-time size gate + capture-at-submit (the v646 rule).
+    expect(html).toMatch(/id="privateFileButton"/);
+    expect(html).toMatch(/id="privateFileInput"/);
+    expect(app).toMatch(/const PRIVATE_FILE_ATTACHMENT_MAX_BYTES = 245 \* 1024;/);
+    expect(app).toMatch(/const fileAttachments = normalizePrivateFileAttachments\(privateFileAttachments\);/);
+    expect(app.match(/fileAttachments: context\.fileAttachments \?\? (context\.)?message\?\.privateDraft\?\.fileAttachments \?\? \[\]/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // Render: download chip on BOTH surfaces; Telegram in-app view gets an explanation instead of a silent fail.
+    expect(app).toMatch(/function buildFileBlockChip\(block\)/);
+    expect(app.match(/buildFileBlockChip\(block\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(app).toMatch(/async function downloadFileBlock\(block\)/);
+    const download = app.slice(app.indexOf('async function downloadFileBlock'), app.indexOf('function buildFileBlockChip'));
+    expect(download).toMatch(/isTelegramEnv\(\)/);
+    expect(download).toMatch(/URL\.revokeObjectURL/);
+    // Previews: thread list + reply snippet know about files; copy ignores them (text-only filter).
+    expect(app).toMatch(/if \(fileBlocks\.length === 1\) return String\(fileBlocks\[0\]\.name \?\? 'File'\);/);
+    expect(app).toMatch(/if \(blocks\.some\(\(block\) => block\?\.type === 'file'\)\) return 'File';/);
+    expect(css).toMatch(/\.message-file-chip \{/);
+  });
+
+  it('PWA-SAVED-01: Saved messages — self dialog exists, renders one-sided, never self-badges, name is render-only', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The self thread is keyed by the STANDARD own-wallet dm identity (chain scans route with zero changes) and
+    // is ensured at boot.
+    expect(app).toMatch(/function ensureSavedMessagesThread\(\)/);
+    expect(app).toMatch(/if \(ensureSavedMessagesThread\(\)\) renderThreads\(\);/);
+    expect(app).toMatch(/function isSelfOpenedCapsule\(opened\)/);
+    expect(app).toMatch(/function isSavedMessagesThread\(thread\)/);
+    // Self messages render own-sided on BOTH open paths (device echo and cross-device restore agree)...
+    expect(app).toMatch(/opened\?\.openedAs === 'sender' \|\| isSelfOpenedCapsule\(opened\)/);
+    expect(app).toMatch(/first\?\.openedAs === 'sender' \|\| isSelfOpenedCapsule\(first\)/);
+    // ...with 'saved' meta wording and no self-unread.
+    expect(app).toMatch(/if \(entry\?\.openedAs === 'self'\) return parts > 1 \? `saved \(\$\{parts\} parts\)` : 'saved';/);
+    expect(app).toMatch(/if \(!thread \|\| isSavedMessagesThread\(thread\) \|\| isThreadConversationVisible\(thread\)\) return;/);
+    // 'Saved' is a RENDER-ONLY display name (threadDisplayLabel feeds the contact store + the own public
+    // channel name — storing it would rename the channel everywhere).
+    expect(app.match(/isSavedMessagesThread\(thread\) \? 'Saved' : threadDisplayLabel\(thread\)/g)?.length ?? 0).toBe(2);
+    expect(app).not.toMatch(/localLabel: 'Saved'/);
+    // Anonymity to yourself is meaningless AND breaks the self detection (payload.senderWallet stripped -> the
+    // note renders as incoming): self sends always carry the sender wallet, and the toggle explains why.
+    expect(app).toMatch(/const includeSenderWalletMetadata = savedThread \|\| currentPrivateSenderMode\(\) !== PRIVATE_SENDER_MODES\.ANONYMOUS;/);
+    expect(app).toMatch(/if \(isSavedMessagesThread\(activeThread\(\)\)\) return 'Notes to yourself are never anonymous';/);
   });
 
   it('PWA-COPY-01: long-press copies message/comment text with a flash (touch); desktop gets a hover Copy button; avatars open the lightbox', () => {
@@ -4402,8 +4457,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(block\.type === 'reply'\) \{\s*return \{ type: 'reply', refEntryId: block\.refEntryId/);
     // Composer threading: the PRIVATE builder defaults to the live draft; retry paths replay the CAPTURED one;
     // the PUBLIC builder pins its OWN draft (never the private one).
-    expect(app).toMatch(/function composerBlocksFromDraft\(text, attachments = \[\], paymentDraft = null, replyDraft = privateReplyDraft\)/);
-    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo\)/);
+    expect(app).toMatch(/function composerBlocksFromDraft\(text, attachments = \[\], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments\)/);
+    // The public builder pins its OWN reply draft AND an explicit EMPTY file list — private file drafts must
+    // never leak into a public post (v652).
+    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, \[\]\)/);
     expect(app.match(/context\.replyDraft \?\? (context\.)?message\?\.privateDraft\?\.replyDraft \?\? null/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(app).toMatch(/const replyDraft = privateReplyDraft \? \{ \.\.\.privateReplyDraft \} : null;/);
     // The reply rides FIRST in the block list, only when the draft has a real chain ref.
@@ -4427,7 +4484,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(publicCommentReplyTo\) \{\s*setPublicCommentReplyTo\(null\);\s*return;\s*\}/);
     expect(app).toMatch(/privateReplyCancelButton\?\.addEventListener\('click'/);
     // Drafts clear on send, thread switch, and account switch.
-    expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*updateImageAttachmentUi\('private'\);/);
+    expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*privateFileAttachments = \[\];\s*updatePrivateFileAttachmentUi\(\);\s*updateImageAttachmentUi\('private'\);/);
     expect(app).toMatch(/if \(activeThreadId !== thread\.id\) setPrivateReplyDraft\(null\);/);
     expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*setPublicCommentReplyTo\(null\);/);
     // UI shells + gesture CSS (touch-action pan-y keeps vertical scroll native; position:relative anchors the
@@ -5515,7 +5572,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function privateChainMessageOrderFields/);
     expect(app).toMatch(/createdAtMs/);
     expect(app).toMatch(/chainEntryId/);
-    expect(syncSource).toMatch(/privateChainMessageMeta\(\{\s*\.\.\.entry,\s*openedAs:\s*opened\.openedAs\s*\}\),\s*entry/);
+    expect(syncSource).toMatch(/privateChainMessageMeta\(\{\s*\.\.\.entry,\s*openedAs:\s*isSelfOpenedCapsule\(opened\) \? 'self' : opened\.openedAs\s*\}\),\s*entry/);
     expect(syncSource).toMatch(/appendOpenedPrivatePartsMessage/);
     expect(syncSource).toMatch(/incompletePrivateStreamCount \+= 1/);
     expect(syncSource).toMatch(/skipped \+= uniqueParts\.size/);
@@ -5638,11 +5695,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v722/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=207/);
+    expect(sw).toMatch(/platho-pwa-prototype-v723/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=208/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=651/);
+    expect(sw).toMatch(/\.\/app\.js\?v=652/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

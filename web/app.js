@@ -87,7 +87,9 @@ import {
   splitUtf8ToCapsuleParts,
   encodeReplyBlockContent,
   decodeReplyBlockContent,
-} from './capsule-part-policy.mjs?v=4';
+  encodeFileBlockContent,
+  decodeFileBlockContent,
+} from './capsule-part-policy.mjs?v=5';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -164,7 +166,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v651';
+const PLATHO_APP_RUNTIME_VERSION = 'v652';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -330,6 +332,11 @@ const privateImageModeSelect = document.querySelector('#privateImageModeSelect')
 const privateAttachmentPanel = document.querySelector('#privateAttachmentPanel');
 const privateAttachmentLabel = document.querySelector('#privateAttachmentLabel');
 const privateClearImageButton = document.querySelector('#privateClearImageButton');
+const privateFileButton = document.querySelector('#privateFileButton');
+const privateFileInput = document.querySelector('#privateFileInput');
+const privateFilePanel = document.querySelector('#privateFilePanel');
+const privateFileLabel = document.querySelector('#privateFileLabel');
+const privateClearFilesButton = document.querySelector('#privateClearFilesButton');
 const attachmentControls = [
   ...document.querySelectorAll('[data-requires-wallet="true"], #attachButton, .attachment-button'),
 ];
@@ -705,6 +712,9 @@ let privatePaymentCheckDraft = null;
 // Composer block builders read these (default params) so the size plan, the optimistic echo and the wire agree.
 let privateReplyDraft = null;
 let publicCommentReplyTo = null;
+// File attachments (v652): [{name, mime, bytes: Uint8Array}] for the NEXT private send — same default-param
+// pattern as images/reply so plan, echo and wire agree; captured-at-submit for retries.
+let privateFileAttachments = [];
 let publicImageAttachments = [];
 let pendingProfileAvatarModeId = 'good';
 let localProfileAvatarPointer = null;
@@ -2555,6 +2565,7 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   knownVaultKeyRecordByWallet.clear();
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
+  privateFileAttachments = [];
   setPrivateReplyDraft(null);
   setPublicCommentReplyTo(null);
   localProfileAvatarPointer = null;
@@ -2649,7 +2660,10 @@ function currentPrivateSenderMode() {
 }
 
 function currentPrivateSenderOptions() {
-  const includeSenderWalletMetadata = currentPrivateSenderMode() !== PRIVATE_SENDER_MODES.ANONYMOUS;
+  // Saved (v652): anonymity to YOURSELF is meaningless and would make a self note render as INCOMING — the
+  // self detection reads payload.senderWallet, which the anonymous mode strips. Self sends always carry it.
+  const savedThread = isSavedMessagesThread(activeThread());
+  const includeSenderWalletMetadata = savedThread || currentPrivateSenderMode() !== PRIVATE_SENDER_MODES.ANONYMOUS;
   const linkedUsername = includeSenderWalletMetadata ? readLinkedPlathoUsername(plathoWallet?.address) : null;
   return {
     includeSenderWalletMetadata,
@@ -2661,6 +2675,7 @@ function privateSenderModeToggleBlockReason() {
   if (!plathoWallet) return 'Wallet required';
   if (pendingServiceWorkerAppShellReload === true) return 'Update ready - reload app';
   if (composer?.dataset.readOnly === 'true') return 'Read-only channel';
+  if (isSavedMessagesThread(activeThread())) return 'Notes to yourself are never anonymous';
   return null;
 }
 
@@ -3306,7 +3321,8 @@ function hydrateThreadDisplayFromContactStore(thread) {
 
 function setIdentityLabel(node, thread, baseClass = 'identity-label') {
   const tone = threadDisplayTone(thread);
-  node.textContent = threadDisplayLabel(thread);
+  // Saved display name is RENDER-ONLY (threadDisplayLabel feeds the contact store + the own public channel name).
+  node.textContent = isSavedMessagesThread(thread) ? 'Saved' : threadDisplayLabel(thread);
   node.className = `${baseClass}${tone ? ` identity-label-${tone}` : ''}`;
 }
 
@@ -3612,7 +3628,7 @@ function showPublicChannelDisplayPopover(channel, anchor) {
 
 function renderConversationIdentity(thread) {
   const identity = threadSelectedIdentity(thread);
-  const labelText = threadDisplayLabel(thread);
+  const labelText = isSavedMessagesThread(thread) ? 'Saved' : threadDisplayLabel(thread);
   if (!identity) {
     activeTitle.textContent = labelText;
     if (identityMenuButton) {
@@ -5050,6 +5066,10 @@ function appendPublicItemContent(container, item) {
         image.loading = 'lazy';
         wirePublicImageLightbox(image, block.url);
         container.append(image);
+      } else if (block?.type === 'file' && block.url) {
+        // Receive-side forward-compat (v652): the public composer has no file attach UI yet, but a FILE block
+        // arriving on the public surface renders the same download chip as private bubbles.
+        container.append(buildFileBlockChip(block));
       }
     }
     return;
@@ -5415,6 +5435,7 @@ function replySnippetFromContent(item) {
   if (text) return text;
   if (blocks.some((block) => block?.type === 'image') || item?.imageUrl || item?.attachment?.type === 'image') return 'Image';
   if (blocks.some((block) => block?.type === 'payment') || item?.payment) return 'Payment check';
+  if (blocks.some((block) => block?.type === 'file')) return 'File';
   return 'Message';
 }
 
@@ -8536,6 +8557,59 @@ async function revalidateThreadUsernameVariants(thread) {
   }
 }
 
+// ---- Saved messages (v652): a private dialog with your OWN wallet, like Telegram's Saved -----------------------
+function ownRuntimeWalletRaw() {
+  try {
+    const address = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+    return address ? rawWalletAddress(address) : null;
+  } catch {
+    return null;
+  }
+}
+
+// TRUE when a capsule is a message to SELF (sender == recipient == own wallet). Prefs snapshots are ALSO
+// self-addressed but never reach display (the kind-based divert runs earlier) — this only shapes chat messages.
+function isSelfOpenedCapsule(opened) {
+  const own = ownRuntimeWalletRaw();
+  if (!own) return false;
+  if (opened?.openedAs === 'recipient') {
+    const sender = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
+    return sender === own;
+  }
+  if (opened?.openedAs === 'sender') {
+    const recipient = rawWalletAddress(opened?.payload?.recipientWallet ?? opened?.payload?.recipient_wallet);
+    return recipient === own;
+  }
+  return false;
+}
+
+function isSavedMessagesThread(thread) {
+  const own = ownRuntimeWalletRaw();
+  if (!own || !thread) return false;
+  const variants = Array.isArray(thread.identityVariants) && thread.identityVariants.length > 0
+    ? thread.identityVariants
+    : (thread.identity ? [thread.identity] : []);
+  return variants.some((variant) => {
+    try { return variant?.value && rawWalletAddress(variant.value) === own; } catch { return false; }
+  });
+}
+
+// Ensure the Saved thread exists (top of the list) once a wallet is available. Keyed by the STANDARD own-wallet
+// dm identity so chain scans (threadForChainCapsule / threadForOpenedSenderCapsule) route self messages here
+// with zero routing changes.
+function ensureSavedMessagesThread() {
+  const own = plathoWallet?.address;
+  if (!own) return null;
+  const variants = privateWalletIdentityVariants(own);
+  const existing = findThreadByIdentityVariants(threads, variants);
+  if (existing) return existing;
+  const created = createRecipientThread(own);
+  if (!created?.ok || !created.thread) return null;
+  created.thread.preview = 'Notes to yourself';
+  threads.unshift(created.thread);
+  return created.thread;
+}
+
 async function threadForChainCapsule(opened, entry) {
   if (opened?.openedAs === 'sender') {
     const target = await threadForOpenedSenderCapsule(opened);
@@ -8780,7 +8854,8 @@ function prefsBytesFromOpenedCapsule(opened) {
 }
 
 function messageFromOpenedCapsule(opened, meta, entry) {
-  const isOutgoing = opened?.openedAs === 'sender';
+  // A self message (Saved) always renders own-side — device A's echo and device B's chain restore agree.
+  const isOutgoing = opened?.openedAs === 'sender' || isSelfOpenedCapsule(opened);
   const payment = paymentFromCompactPayload(opened.payload);
   const isImage = opened.payload?.type === 'image';
   const isDocument = opened.payload?.type === 'document';
@@ -8815,6 +8890,7 @@ function messageFromOpenedCapsule(opened, meta, entry) {
 }
 
 function privateChainMessageMeta(entry, parts = 1) {
+  if (entry?.openedAs === 'self') return parts > 1 ? `saved (${parts} parts)` : 'saved';
   if (entry?.openedAs === 'sender') return parts > 1 ? `published (${parts} parts)` : 'published';
   return parts > 1 ? `received (${parts} parts)` : 'received';
 }
@@ -8842,7 +8918,7 @@ function messageFromOpenedPrivateParts(parts, meta) {
     return entryA < entryB ? -1 : 1;
   });
   const first = ordered[0]?.opened;
-  const isOutgoing = first?.openedAs === 'sender';
+  const isOutgoing = first?.openedAs === 'sender' || isSelfOpenedCapsule(first);
   const firstEntry = orderedByChain[0]?.entry;
   const lastEntry = orderedByChain[orderedByChain.length - 1]?.entry;
   const chainLastEntryId = privateEntryIdText(lastEntry);
@@ -8940,7 +9016,8 @@ function markThreadRead(thread) {
 }
 
 function markIncomingThreadMessage(thread) {
-  if (!thread || isThreadConversationVisible(thread)) return;
+  // Saved never self-badges unread: every message there is the user's own.
+  if (!thread || isSavedMessagesThread(thread) || isThreadConversationVisible(thread)) return;
   thread.unreadCount = threadUnreadCount(thread) + 1;
 }
 
@@ -9441,7 +9518,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         const added = await appendOpenedCapsuleMessage(
           opened,
           targetThread,
-          privateChainMessageMeta({ ...entry, openedAs: opened.openedAs }),
+          privateChainMessageMeta({ ...entry, openedAs: isSelfOpenedCapsule(opened) ? 'self' : opened.openedAs }),
           entry,
         );
         if (added) imported += 1;
@@ -9556,8 +9633,13 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   // index: the recipient index only yields recipient-opened parts and vice versa — so extending THIS role's walk
   // is exactly what can close them. history-retry-only groups (hasIndexedPart false) never trigger an extension.
   const rolePartGroupsIncomplete = (role) => {
+    const ownRaw = ownRuntimeWalletRaw();
     for (const [key, group] of privatePartGroups) {
-      if (!key.startsWith(`${role}:`)) continue;
+      // Self (Saved) groups live in BOTH index chains — either role's walk can close them, so the role filter
+      // admits any group whose peer identity is the own wallet (v652; without this a straddled multipart self
+      // message only closed on the recipient walk's later pass).
+      const selfGroup = ownRaw ? key.includes(`:${ownRaw}:`) : false;
+      if (!key.startsWith(`${role}:`) && !selfGroup) continue;
       if (group.hasIndexedPart !== true) continue;
       const unique = new Set();
       for (const part of group.parts) unique.add(Number(part.opened?.payload?.partIndex ?? 0));
@@ -9750,7 +9832,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       const added = await appendOpenedPrivatePartsMessage(
         ordered,
         group.targetThread,
-        privateChainMessageMeta({ ...firstEntry, openedAs: firstOpened?.openedAs }, ordered.length),
+        privateChainMessageMeta({ ...firstEntry, openedAs: isSelfOpenedCapsule(firstOpened) ? 'self' : firstOpened?.openedAs }, ordered.length),
       );
       pruneEmptyAnonymousPeerThreads();
       if (added) imported += 1;
@@ -10573,6 +10655,8 @@ async function bootWalletScopedLocalStores() {
   await bootReplayStore();
   await bootEncryptedMessageHistory();
   if (plathoWallet?.address) activeRuntimeWalletAddress = plathoWallet.address;
+  // Saved messages (v652): the self-dialog exists from the first unlock (top of the list until real dialogs push it).
+  if (ensureSavedMessagesThread()) renderThreads();
 }
 
 function shortKeyId(keyId) {
@@ -11566,6 +11650,11 @@ function normalizePublicImageAttachments(attachments = publicImageAttachments) {
   return normalizePrivateImageAttachments(attachments);
 }
 
+function normalizePrivateFileAttachments(attachments = privateFileAttachments) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments.filter((file) => file?.bytes?.length);
+}
+
 function privateCompactPayloadOverhead(options = {}) {
   return PLATHO_COMPACT_SENDER_RECOVERY_BYTES
     + PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES
@@ -11642,7 +11731,8 @@ function privateComposerSendPlan(text, attachments = privateImageAttachments, op
   // -> that exact state (retry contexts replay the CAPTURED draft — the live one is long cleared by then).
   const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.paymentCheck ?? privatePaymentCheckDraft, {
     allowMissingPaymentSecret: true,
-  }, extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft);
+  }, extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft,
+  extras.fileAttachments === undefined ? privateFileAttachments : extras.fileAttachments);
   if (!documentBytes) return plan;
   for (const part of splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
     perPartOverheadBytes: privateCompactPayloadOverhead(options),
@@ -12498,7 +12588,7 @@ function togglePrivateComposerAddMenu() {
   else showPrivateComposerAddMenu();
 }
 
-function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, replyDraft = privateReplyDraft) {
+function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments) {
   const source = String(text ?? '');
   const images = normalizePrivateImageAttachments(attachments);
   const usedImages = new Set();
@@ -12543,6 +12633,11 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
     if (!usedImages.has(index)) pushImage(index + 1);
   });
   if (paymentDraft && !usedPayment) pushPayment();
+  // File attachments (v652) append after the visible content — no text markers, order = attach order.
+  for (const file of Array.isArray(fileAttachments) ? fileAttachments : []) {
+    if (!file?.bytes?.length) continue;
+    blocks.push({ type: 'file', name: file.name, mime: file.mime, bytes: file.bytes });
+  }
   // Swipe-to-reply (v646): the quote rides as the FIRST document block, so the size plan, the optimistic echo,
   // and the wire all carry it from the same draft state (default-param style matches privateImageAttachments).
   if (blocks.length > 0 && replyDraft?.refEntryId !== undefined && replyDraft?.refEntryId !== null) {
@@ -12574,12 +12669,25 @@ function displayBlocksFromDocumentBlocks(blocks) {
     if (block.type === 'reply') {
       return { type: 'reply', refEntryId: block.refEntryId, author: block.author ?? '', snippet: block.snippet ?? '' };
     }
+    // File attachment (v652): the display block carries a data: URL STRING (never a Uint8Array — display blocks
+    // persist through JSON history/caches; the wire bytes only exist here at decode time). The chip renders
+    // name + size; the click builds a Blob from the url.
+    if (block.type === 'file') {
+      const bytes = block.bytes instanceof Uint8Array ? block.bytes : new Uint8Array(block.bytes ?? []);
+      return {
+        type: 'file',
+        name: String(block.name ?? 'file'),
+        mime: String(block.mime ?? 'application/octet-stream'),
+        size: block.url ? Number(block.size ?? 0) : bytes.length,
+        url: block.url ?? `data:${block.mime ?? 'application/octet-stream'};base64,${bytesToBase64(bytes)}`,
+      };
+    }
     return null;
   }).filter(Boolean);
 }
 
-function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = null, options = {}, replyDraft = privateReplyDraft) {
-  const blocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft);
+function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = null, options = {}, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments) {
+  const blocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments);
   if (blocks.length <= 0) return null;
   return encodeMessageDocumentBlocks(blocks, options);
 }
@@ -12591,6 +12699,9 @@ function messagePreviewFromBlocks(blocks = []) {
   if (payment) return paymentMessageText(payment);
   const imageCount = blocks.filter((block) => block?.type === 'image').length;
   if (imageCount > 0) return imageCount === 1 ? 'Image' : `${imageCount} images`;
+  const fileBlocks = blocks.filter((block) => block?.type === 'file');
+  if (fileBlocks.length === 1) return String(fileBlocks[0].name ?? 'File');
+  if (fileBlocks.length > 1) return `${fileBlocks.length} files`;
   return '';
 }
 
@@ -12630,6 +12741,59 @@ function enforceComposerByteLimit() {
 
 function enforcePublicComposerByteLimit() {
   return;
+}
+
+// Download a received FILE block (v652). The display block carries a data: URL string; the Blob is built at
+// click time (no persistent objectURLs). Telegram's in-app WebView silently swallows <a download>.click() —
+// there we explain instead of silent-failing (a binary can't be "copied manually" like the JSON export).
+async function downloadFileBlock(block) {
+  const url = String(block?.url ?? '');
+  const name = String(block?.name ?? 'file');
+  if (!url.startsWith('data:')) return;
+  if (isTelegramEnv()) {
+    await openActionDialog({
+      title: 'Download in a browser',
+      hint: `Telegram's in-app view cannot save files. Open platho.app in your browser to download "${name}".`,
+      submitLabel: 'OK',
+      fields: [],
+    });
+    return;
+  }
+  const comma = url.indexOf(',');
+  const binary = atob(url.slice(comma + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: block?.mime || 'application/octet-stream' });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+}
+
+// A tappable chip for a FILE block (bubble + public surfaces): name + size, click downloads.
+function buildFileBlockChip(block) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'message-file-chip';
+  const icon = document.createElement('span');
+  icon.className = 'icon icon-download';
+  const name = document.createElement('span');
+  name.className = 'message-file-name';
+  name.textContent = String(block.name ?? 'file');
+  const size = document.createElement('span');
+  size.className = 'message-file-size';
+  size.textContent = imageByteCountLabel(block.size);
+  chip.append(icon, name, size);
+  chip.title = `Download ${block.name ?? 'file'}`;
+  chip.addEventListener('click', (event) => {
+    event.stopPropagation();
+    downloadFileBlock(block).catch((error) => console.error(error));
+  });
+  return chip;
 }
 
 async function downloadJsonFile(filename, value) {
@@ -13252,6 +13416,8 @@ function renderConversation() {
           paymentBlock.append(paymentLabel);
           paymentBlockElement = paymentBlock;
           bubble.append(paymentBlock);
+        } else if (block?.type === 'file' && block.url) {
+          bubble.append(buildFileBlockChip(block));
         }
       }
     } else if (message.text) {
@@ -13509,11 +13675,8 @@ newChatForm?.addEventListener('submit', async (event) => {
       if (!result.ok) showNewChatHint(result.error);
       return;
     }
-    const ownAddress = activeWalletRuntimeAddress();
-    if (ownAddress && sameWalletAddress(ownerWallet, ownAddress)) {
-      showNewChatHint(`${canonicalUsernameDisplay(identity.label)} is your own username`);
-      return;
-    }
+    // v652: addressing your OWN username opens the Saved thread (fall through — selectOrCreateRecipientThread
+    // with ownerWallet == own address resolves to the standard self dialog).
     // The username belongs to ownerWallet NOW — strip it from any other wallet's dialog and relabel them.
     reconcileUsernameOwnership(identity, ownerWallet);
     // Open/create the dialog BY WALLET, then display it as the addressed username (unless a local name was given).
@@ -14327,6 +14490,63 @@ privateImageInput?.addEventListener('change', async () => {
   await setImageAttachment('private', file, DEFAULT_IMAGE_COMPRESSION_MODE_ID);
 });
 
+// ---- File attachments (v652) --------------------------------------------------------------------------------------
+// An arbitrary file rides as a FILE document block. Hard per-file gate at PICK time (a 5MB selection must fail
+// with a clear message, not at the send button): the whole MESSAGE tops out at 8 capsules x 32KB useful minus
+// overheads, so a single file can never exceed ~245KB — the part-limit gate still owns the combined-draft math.
+const PRIVATE_FILE_ATTACHMENT_MAX_BYTES = 245 * 1024;
+
+function updatePrivateFileAttachmentUi() {
+  if (!privateFilePanel || !privateFileLabel) return;
+  const files = normalizePrivateFileAttachments(privateFileAttachments);
+  privateFilePanel.hidden = files.length === 0;
+  if (files.length === 0) {
+    setText(privateFileLabel, 'No files');
+    return;
+  }
+  const total = files.reduce((sum, file) => sum + file.bytes.length, 0);
+  setText(privateFileLabel, files.length === 1
+    ? `${files[0].name} - ${imageByteCountLabel(total)}`
+    : `${files.length} files - ${imageByteCountLabel(total)}`);
+}
+
+privateFileButton?.addEventListener('click', () => {
+  hidePrivateComposerAddMenu();
+  if (!canEditPrivateComposerDraft()) {
+    refreshComposerPublishPolicy();
+    return;
+  }
+  privateFileInput?.click();
+});
+
+privateFileInput?.addEventListener('change', async () => {
+  const file = privateFileInput.files?.[0];
+  privateFileInput.value = '';
+  if (!file) return;
+  if (file.size > PRIVATE_FILE_ATTACHMENT_MAX_BYTES) {
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = `File is ${imageByteCountLabel(file.size)}; the limit is ${imageByteCountLabel(PRIVATE_FILE_ATTACHMENT_MAX_BYTES)} per message`;
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+    return;
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!bytes.length) return;
+  privateFileAttachments = [...normalizePrivateFileAttachments(privateFileAttachments), {
+    name: file.name || 'file',
+    mime: file.type || 'application/octet-stream',
+    bytes,
+  }];
+  updatePrivateFileAttachmentUi();
+  refreshComposerCostStatus();
+});
+
+privateClearFilesButton?.addEventListener('click', () => {
+  privateFileAttachments = [];
+  updatePrivateFileAttachmentUi();
+  refreshComposerCostStatus();
+});
+
 publicImageInput?.addEventListener('change', async () => {
   const file = publicImageInput.files?.[0];
   if (!file) return;
@@ -14544,7 +14764,8 @@ composer?.addEventListener('submit', async (event) => {
   // Capture the reply quote NOW: the composer state clears below, but the capsule build (and any later manual
   // retry) runs long after — the captured value keeps the echo, the wire, and every retry byte-identical.
   const replyDraft = privateReplyDraft ? { ...privateReplyDraft } : null;
-  const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft);
+  const fileAttachments = normalizePrivateFileAttachments(privateFileAttachments);
+  const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments);
   const displayBlocks = displayBlocksFromDocumentBlocks(draftBlocks);
   const message = {
     type: 'out',
@@ -14558,6 +14779,7 @@ composer?.addEventListener('submit', async (event) => {
       selectedSuite,
       senderOptions,
       replyDraft,
+      fileAttachments,
     },
     privateManualRetryAvailable: false,
     privateCancelAvailable: false,
@@ -14576,6 +14798,7 @@ composer?.addEventListener('submit', async (event) => {
     selectedSuite,
     senderOptions,
     replyDraft,
+    fileAttachments,
     retryAttempt: 0,
     confirmAttempt: 0,
   };
@@ -14584,6 +14807,8 @@ composer?.addEventListener('submit', async (event) => {
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   setPrivateReplyDraft(null);
+  privateFileAttachments = [];
+  updatePrivateFileAttachmentUi();
   updateImageAttachmentUi('private');
   autoResizeComposerTextarea(messageInput);
   // Return focus to the composer so the user can keep typing without re-tapping the field. Clicking the
@@ -16003,6 +16228,9 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   // (chain-global CapsuleHub entry id) + author label + snippet, codec in capsule-part-policy.mjs. Rides as the
   // FIRST block. Symmetric across surfaces (private documents + public document posts/comments share PDC1).
   REPLY: 5,
+  // Arbitrary file attachment (v652): name + mime + bytes — codec in capsule-part-policy.mjs. Old clients
+  // skip it via the tolerant decode (the REPLY precedent).
+  FILE: 6,
 });
 const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
 const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\]/ig;
@@ -16107,6 +16335,9 @@ function encodeMessageDocumentBlocks(blocks, options = {}) {
     } else if (block.type === 'reply') {
       type = PLATHO_DOCUMENT_BLOCK_TYPES.REPLY;
       content = encodeReplyBlockContent(block);
+    } else if (block.type === 'file') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.FILE;
+      content = encodeFileBlockContent(block);
     } else {
       throw new Error('Unsupported document block type');
     }
@@ -16170,6 +16401,10 @@ function decodeMessageDocumentBlocks(bytesLike, options = {}) {
       // and must never make the carrying message undecodable.
       const reply = decodeReplyBlockContent(content);
       if (reply) blocks.push({ type: 'reply', ...reply });
+    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.FILE) {
+      // Same null-on-malformed rule as REPLY: a bad file frame is dropped, never poisons the message.
+      const file = decodeFileBlockContent(content);
+      if (file) blocks.push({ type: 'file', ...file });
     } else if (tolerateUnknownBlocks) {
       // Skip an unrecognized block (offset already advanced past its content above) — forward-compat.
       continue;
@@ -19422,9 +19657,10 @@ async function attemptPrivatePaymentCheckPublish(context) {
     clientNonce,
   });
   const contextReplyDraft = context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null;
-  const capsules = await createPrivateComposerCapsules(context.text ?? '', context.attachments ?? [], recipientEntry, thread.id, senderOptions, { payment, replyDraft: contextReplyDraft });
+  const contextFileAttachments = context.fileAttachments ?? context.message?.privateDraft?.fileAttachments ?? [];
+  const capsules = await createPrivateComposerCapsules(context.text ?? '', context.attachments ?? [], recipientEntry, thread.id, senderOptions, { payment, replyDraft: contextReplyDraft, fileAttachments: contextFileAttachments });
   const publishState = createCapsulePublishState(capsules);
-  const displayBlocks = displayBlocksFromDocumentBlocks(composerBlocksFromDraft(context.text ?? '', context.attachments ?? [], payment, contextReplyDraft));
+  const displayBlocks = displayBlocksFromDocumentBlocks(composerBlocksFromDraft(context.text ?? '', context.attachments ?? [], payment, contextReplyDraft, contextFileAttachments));
   message.text = messagePreviewFromBlocks(displayBlocks) || paymentMessageText(payment);
   message.blocks = displayBlocks;
   message.payment = payment;
@@ -21962,6 +22198,7 @@ function privateSendRetryContextForMessage(thread, message) {
     selectedSuite: draft.selectedSuite ?? VAULT_RECEIVE_CRYPTO_SUITE,
     senderOptions: draft.senderOptions ?? message?.senderOptions ?? null,
     replyDraft: draft.replyDraft ?? null,
+    fileAttachments: normalizePrivateFileAttachments(draft.fileAttachments ?? []),
     payment,
     paymentIntentCreated: hasPaymentIntent,
     retryAttempt: Number(message?.privateSendRetryAttempt ?? 0) || 0,
@@ -22514,6 +22751,7 @@ async function retryPrivateMessageFromUi(thread, message) {
       const plan = privateComposerSendPlan(context.text, context.attachments, context.senderOptions, {
         paymentCheck: context.paymentDraft,
         replyDraft: context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null,
+        fileAttachments: context.fileAttachments ?? context.message?.privateDraft?.fileAttachments ?? [],
       });
       await assertVaultHasPrivatePublishHold(context.selectedSuite, plan, {
         allowOwnVaultActionReadFallback: Boolean(context.paymentDraft),
@@ -22594,6 +22832,7 @@ async function attemptPrivateComposerMessagePublish(context) {
     capsules = await createPrivateComposerCapsules(text, attachments ?? (attachment ? [attachment] : []), recipientEntry, thread.id, senderOptions, {
       payment,
       replyDraft: context.replyDraft ?? message?.privateDraft?.replyDraft ?? null,
+      fileAttachments: context.fileAttachments ?? message?.privateDraft?.fileAttachments ?? [],
     });
     message.recipientWallet = recipientEntry.walletAddress;
   }
@@ -23114,7 +23353,7 @@ function imagePartsForSend(attachment, label = 'image') {
 function publicDocumentBlocksFromDraft(text, attachments = publicImageAttachments) {
   // Explicit replyDraft: the PUBLIC surface quotes publicCommentReplyTo (non-null only in comment-reply mode) —
   // never the private composer's draft (composerBlocksFromDraft defaults to privateReplyDraft).
-  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null, publicCommentReplyTo)
+  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null, publicCommentReplyTo, [])
     .filter((block) => block.type !== 'payment');
 }
 
@@ -23151,7 +23390,8 @@ async function createPrivateComposerCapsules(text, attachments, recipientEntry, 
   };
   // extras.replyDraft: undefined -> live composer draft; explicit null/value -> that captured state (retries).
   const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.payment ?? extras.paymentDraft ?? null, {},
-    extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft);
+    extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft,
+    extras.fileAttachments === undefined ? privateFileAttachments : extras.fileAttachments);
   if (!documentBytes) return [];
   const documentParts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
     perPartOverheadBytes: privateCompactPayloadOverhead(options),
