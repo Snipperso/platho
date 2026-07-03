@@ -271,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v658<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v658'/);
+    expect(html).toMatch(/id="appVersionLabel">v659<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v659'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=658" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=659" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5786,11 +5786,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v729/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=213/);
+    expect(sw).toMatch(/platho-pwa-prototype-v730/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=214/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=658/);
+    expect(sw).toMatch(/\.\/app\.js\?v=659/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=3/);
@@ -5950,9 +5950,14 @@ describe('PWA runtime config guard', () => {
     expect(worker).toMatch(/setTimeout\(loop, 30\)/);
     const field = readFileSync('web/boot-signal-field.mjs', 'utf8');
     expect(field).toMatch(/export function createBootSignalField\(ctx/);
-    // The Telegram-cloud dismissal/backup restores are bounded (raced against a ~1.5s cap) so a slow cloud can't
-    // gate the unlock modal — the mobile "~20s blank boot screen" root.
-    expect(app).toMatch(/Promise\.race\(\[dismissalRestore\.then\(\(\) => backupRestore\), delay\(1500\)\]\)/);
+    // ALL Telegram-cloud restores (incl. the wallet-record read) are bounded by a single race so a slow/hung
+    // CloudStorage can't stall the chain before the unlock decision — the mobile eternal-boot root.
+    expect(app).toMatch(/walletRestore\.then\(\(\) => dismissalRestore\)\.then\(\(\) => backupRestore\),\s*\n\s*delay\(2500\),/);
+    // Hard idle failsafe: the overlay is never eternal — reveal the app if still idle (no dialog open) after 12s.
+    expect(app).toMatch(/bootScreenIdleFailsafe = setTimeout\(tickIdleFailsafe, 12_000\)/);
+    expect(app).toMatch(/if \(activeActionDialog\) \{ bootScreenIdleFailsafe = setTimeout\(tickIdleFailsafe, 5_000\)/);
+    // A visible boot trace (temporary) surfaces which step a stuck mobile boot stopped on.
+    expect(app).toMatch(/function setBootDebug\(step\)/);
 
     // Controller + failsafe.
     expect(app).toMatch(/function startBootSignalField\(canvas\)/);
@@ -5967,7 +5972,7 @@ describe('PWA runtime config guard', () => {
     // Startup unlock is driven directly on the overlay (no visibility-gated deferral that races the overlay
     // on a slow mobile cold-start).
     expect(app).toMatch(/async function runBootScreenUnlock\(\)/);
-    expect(app).toMatch(/if \(hasStoredPlathoWalletRecord\(\) && !plathoWallet\) \{\s*\n\s*\/\/[\s\S]{0,120}?void runBootScreenUnlock\(\);/);
+    expect(app).toMatch(/if \(hasWallet && !plathoWallet\) \{\s*\n\s*\/\/[\s\S]{0,120}?void runBootScreenUnlock\(\);/);
 
     // Hooks: swap to the spinner on unlock, lift at the vault-core-ready milestone (BEFORE the message sync),
     // lift immediately when there is nothing to unlock, and never strand on a boot error.

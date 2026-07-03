@@ -180,7 +180,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v658';
+const PLATHO_APP_RUNTIME_VERSION = 'v659';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -24002,9 +24002,18 @@ async function refreshVaultActivationStatus(options = {}) {
 // swaps to the spinner and lifts once the wallet+vault core is ready (messages keep loading behind).
 const bootScreen = document.querySelector('#bootScreen');
 const bootSignalCanvas = document.querySelector('#bootSignal');
+const bootDebugLabel = document.querySelector('#bootDebug');
 let bootScreenActive = Boolean(bootScreen) && bootScreen.hidden !== true;
 let stopBootSignalField = null;
 let bootScreenSafetyTimer = null;
+let bootScreenIdleFailsafe = null;
+
+// Boot trace: a console line + a tiny on-screen label, so a stuck mobile boot can be diagnosed from a
+// screenshot (which step it stopped on). English-only (OPSEC).
+function setBootDebug(step) {
+  try { console.log('[platho boot]', step); } catch { /* ignore */ }
+  if (bootDebugLabel) { try { bootDebugLabel.textContent = step; } catch { /* ignore */ } }
+}
 
 // The signal-field backdrop (ported from about.platho.app): a living teal lattice. Runs OFF the main thread
 // on an OffscreenCanvas worker when supported (so it never freezes under the crypto-heavy boot — owner's ask),
@@ -24055,7 +24064,24 @@ function startBootSignalField(canvas) {
 
 function initBootScreen() {
   if (!bootScreenActive) return;
-  try { stopBootSignalField = startBootSignalField(bootSignalCanvas); } catch (error) { console.error(error); }
+  setBootDebug('init');
+  try {
+    stopBootSignalField = startBootSignalField(bootSignalCanvas);
+    setBootDebug('init:field-ok');
+  } catch (error) {
+    setBootDebug(`init:field-err ${error?.message ?? error}`);
+    console.error(error);
+  }
+  // Hard idle failsafe: the overlay must NEVER be eternal. If it is still up after 12s WITHOUT the unlock dialog
+  // open (i.e. we never reached the unlock, not that the user is slow to type), reveal the app anyway. Re-checks
+  // while the dialog is open so a user taking their time to unlock is never yanked out.
+  const tickIdleFailsafe = () => {
+    if (!bootScreenActive) return;
+    if (activeActionDialog) { bootScreenIdleFailsafe = setTimeout(tickIdleFailsafe, 5_000); return; }
+    setBootDebug('idle-failsafe:reveal');
+    hideBootScreen();
+  };
+  bootScreenIdleFailsafe = setTimeout(tickIdleFailsafe, 12_000);
 }
 
 // Idle (unlock dialog on top) -> loading (spinner). No-op once the screen is gone or was never up. The failsafe
@@ -24074,13 +24100,16 @@ function setBootScreenPhase(phase) {
 // core is ready (bootCrypto lifts it) or the user cancels.
 async function runBootScreenUnlock() {
   try {
+    setBootDebug('unlock:open');
     const wallet = await loadPlathoWallet();
-    if (!wallet) { markBootAppReady(); return; }
+    if (!wallet) { setBootDebug('unlock:cancel'); markBootAppReady(); return; }
     // loadPlathoWallet already switched the overlay to the spinner phase on success.
+    setBootDebug('unlock:ok');
     await bootCrypto();
     await enforceTelegramSeedBackupGate(wallet);
     flashWalletIdentityStatus(t('wallet.unlocked'));
   } catch (error) {
+    setBootDebug(`unlock:err ${error?.message ?? error}`);
     markBootAppReady();
     console.error(error);
   }
@@ -24088,8 +24117,10 @@ async function runBootScreenUnlock() {
 
 function hideBootScreen() {
   if (!bootScreenActive || !bootScreen) return;
+  setBootDebug('ready');
   bootScreenActive = false;
   if (bootScreenSafetyTimer) { clearTimeout(bootScreenSafetyTimer); bootScreenSafetyTimer = null; }
+  if (bootScreenIdleFailsafe) { clearTimeout(bootScreenIdleFailsafe); bootScreenIdleFailsafe = null; }
   bootScreen.classList.add('is-hiding');
   const finalize = () => {
     bootScreen.hidden = true;
@@ -24850,18 +24881,21 @@ refreshMessagingControls();
 scheduleMessageAutoSync(2_000);
 document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
-  // A device WITHOUT a local wallet may hold one in Telegram CloudStorage — wait for that (it returns instantly
-  // when a local copy already exists, which is the common returning-user case).
-  .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))
-  // The dismissal + backup-flag cloud reads are NON-critical for showing the unlock modal, and Telegram
-  // CloudStorage can be slow (this was the mobile "~20s blank boot screen"): bound them so the unlock decision
-  // below is never gated more than ~1.5s. They finish in the background and their effects apply late. (These are
-  // CloudStorage reads, not toncenter reads, so outside the PWA-FUNDS-SERIAL-01 concurrent-read concern; still
-  // no Promise.all array literal — the two run concurrently, are chained, then raced against a cap.)
+  .then(() => { setBootDebug('crypto-locked'); })
+  // ALL Telegram-CloudStorage restores are bounded by a single race: telegramCloudGet has no timeout, so a slow
+  // or hung CloudStorage (mobile / Telegram WebView) could otherwise stall the whole chain BEFORE the unlock
+  // decision — an eternal boot screen with no modal. They keep running in the background; the decision below
+  // uses whatever local state is ready by the cap. (CloudStorage reads, not toncenter — outside the
+  // PWA-FUNDS-SERIAL-01 concern; and no Promise.all array literal: the reads are chained, then raced.)
   .then(() => {
+    setBootDebug('restore');
+    const walletRestore = restoreWalletRecordFromTelegramCloud().catch(() => false);
     const dismissalRestore = restoreQuickStartDismissalFromTelegramCloud().catch(() => {});
     const backupRestore = restoreWalletKeyBackupPendingFromTelegramCloud().catch(() => {});
-    return Promise.race([dismissalRestore.then(() => backupRestore), delay(1500)]).catch(() => {});
+    return Promise.race([
+      walletRestore.then(() => dismissalRestore).then(() => backupRestore),
+      delay(2500),
+    ]).catch(() => {});
   })
   .then(() => {
     try { refreshWalletBackupWarning(); } catch (error) { console.error(error); }
@@ -24871,6 +24905,8 @@ bootCrypto()
     const drivingBackup = walletKeyBackupPendingForStoredWallet();
     let quickStartShown = false;
     try { quickStartShown = maybeShowQuickStartOnFirstRun(); } catch (error) { console.error(error); }
+    const hasWallet = hasStoredPlathoWalletRecord();
+    setBootDebug(`decide wallet=${hasWallet ? 1 : 0} locked=${plathoWallet ? 0 : 1} backup=${drivingBackup ? 1 : 0} qs=${quickStartShown ? 1 : 0}`);
     // Quick-start / backup dialogs are modal-backdrops (z-index 40) that the overlay (55) would bury — reveal
     // the app before they show. The overlay stays up ONLY for the pure password-unlock path.
     if (quickStartShown || drivingBackup) {
@@ -24878,7 +24914,7 @@ bootCrypto()
       if (!drivingBackup) promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
       return;
     }
-    if (hasStoredPlathoWalletRecord() && !plathoWallet) {
+    if (hasWallet && !plathoWallet) {
       // Stored + locked: drive the unlock ON the overlay and keep it up until the core is ready / cancelled.
       void runBootScreenUnlock();
     } else {
@@ -24886,4 +24922,4 @@ bootCrypto()
       markBootAppReady();
     }
   })
-  .catch((error) => console.error(error));
+  .catch((error) => { setBootDebug(`boot-chain-err ${error?.message ?? error}`); console.error(error); });
