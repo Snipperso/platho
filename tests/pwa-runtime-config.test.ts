@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v653<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v653'/);
+    expect(html).toMatch(/id="appVersionLabel">v654<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v654'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=653" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=654" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4350,6 +4350,27 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(isSavedMessagesThread\(activeThread\(\)\)\) return 'Notes to yourself are never anonymous';/);
   });
 
+  it('PWA-SAVED-02: My notes pinned first + pencil avatar; thread-time shows the real last-message time', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const render = app.slice(app.indexOf('function renderThreads()'), app.indexOf('function renderConversation()'));
+    // Pinned by a render-time partition — `threads` array order stays owned by sync/restore code.
+    expect(render).toMatch(/\.\.\.visibleThreads\.filter\(\(thread\) => isSavedMessagesThread\(thread\)\),\s*\.\.\.visibleThreads\.filter\(\(thread\) => !isSavedMessagesThread\(thread\)\),/);
+    // Both thread-avatar sites route through the saved-aware setter; the icon branch undoes image state and the
+    // shared setter undoes the icon class (nodes are REUSED across threads).
+    expect(app).toMatch(/function setThreadAvatarNode\(node, thread\)/);
+    expect(render).toMatch(/setThreadAvatarNode\(avatar, thread\);/);
+    expect(app).toMatch(/setThreadAvatarNode\(activeAvatar, thread\);/);
+    expect(app).toMatch(/node\.classList\.remove\('avatar-saved'\);\s*if \(imageUrl\) \{/);
+    expect(app).toMatch(/node\.innerHTML = SAVED_MESSAGES_AVATAR_SVG;/);
+    expect(css).toMatch(/\.avatar\.avatar-saved svg \{/);
+    // Side label = last message's real timestamp (today -> time, week -> weekday, else date); computed at render,
+    // never the constant 'now'/'new' words.
+    expect(app).toMatch(/function formatThreadListTimestamp\(ms\)/);
+    expect(render).toMatch(/time\.textContent = lastMs !== null \? formatThreadListTimestamp\(lastMs\) : '';/);
+    expect(render).not.toMatch(/time\.textContent = thread\.time;/);
+  });
+
   it('PWA-COPY-01: long-press copies message/comment text with a flash (touch); desktop gets a hover Copy button; avatars open the lightbox', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
@@ -5695,11 +5716,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v724/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=209/);
+    expect(sw).toMatch(/platho-pwa-prototype-v725/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=210/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=653/);
+    expect(sw).toMatch(/\.\/app\.js\?v=654/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

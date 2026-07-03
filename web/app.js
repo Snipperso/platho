@@ -166,7 +166,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v653';
+const PLATHO_APP_RUNTIME_VERSION = 'v654';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2277,6 +2277,8 @@ function streamIdHexFromBigInt(value) {
 
 function setAvatarNode(node, fallback, imageUrl = null) {
   if (!node) return;
+  // Reused nodes may have been the Saved-thread icon on the previous render.
+  node.classList.remove('avatar-saved');
   if (imageUrl) {
     node.textContent = '';
     node.classList.add('has-image');
@@ -2291,6 +2293,41 @@ function setAvatarNode(node, fallback, imageUrl = null) {
   node.style.backgroundImage = '';
   delete node.dataset.avatarUrl;
   node.textContent = String(fallback ?? 'P').slice(0, 2).toUpperCase();
+}
+
+// Static markup only — never interpolate user data into this.
+const SAVED_MESSAGES_AVATAR_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+
+// Thread avatars route through here so the Saved (My notes) thread gets its pencil icon instead of the
+// wallet-letter fallback. The nodes are REUSED across threads (activeAvatar in the conversation header), so both
+// branches fully undo the other's state.
+function setThreadAvatarNode(node, thread) {
+  if (!node) return;
+  if (isSavedMessagesThread(thread)) {
+    node.classList.remove('has-image');
+    node.classList.add('avatar-saved');
+    node.style.backgroundImage = '';
+    delete node.dataset.avatarUrl;
+    node.innerHTML = SAVED_MESSAGES_AVATAR_SVG;
+    return;
+  }
+  node.classList.remove('avatar-saved');
+  setAvatarNode(node, thread?.avatar, thread?.avatarImageUrl);
+}
+
+// Thread-list side label: today -> clock time, this week -> weekday, else a date (year only when it differs).
+function formatThreadListTimestamp(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return '';
+  const date = new Date(ms);
+  const now = new Date();
+  const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.round((dayStart(now) - dayStart(date)) / 86_400_000);
+  if (dayDiff <= 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (dayDiff < 7) return date.toLocaleDateString([], { weekday: 'short' });
+  if (date.getFullYear() === now.getFullYear()) return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function setText(node, value) {
@@ -8984,7 +9021,8 @@ function refreshThreadAfterMessageChange(thread) {
   thread.preview = last
     ? (messagePreviewFromBlocks(last.blocks) || last.text || (last.attachment ? 'Image' : ''))
     : 'No messages yet';
-  thread.time = last ? (status === 'sending' ? 'sending' : 'now') : 'new';
+  // No thread.time write: the list's side label is computed at render from the last message's real timestamp
+  // (formatThreadListTimestamp) — the old constant 'now'/'new' words carried no information.
   thread.state = status === 'failed'
     ? 'blocked'
     : status === 'sending'
@@ -13203,11 +13241,17 @@ function renderThreads() {
   const q = search.value.trim().toLowerCase();
   threadList.innerHTML = '';
   threads.forEach(hydrateThreadDisplayFromContactStore);
-  threads
+  const visibleThreads = threads
     .filter((thread) => {
       if (privateChainSyncPromise && isPendingIdentityResolutionThread(thread)) return false;
       return `${thread.name} ${thread.preview} ${thread.state} ${threadIdentitySearchText(thread)}`.toLowerCase().includes(q);
-    })
+    });
+  // My notes is PINNED first regardless of activity order — a partition at render time, so no array mutation
+  // (chain sync / history restore reorder `threads` freely and must not have to know about the pin).
+  [
+    ...visibleThreads.filter((thread) => isSavedMessagesThread(thread)),
+    ...visibleThreads.filter((thread) => !isSavedMessagesThread(thread)),
+  ]
     .forEach((thread) => {
       const unread = threadUnreadCount(thread);
       const item = document.createElement('button');
@@ -13217,7 +13261,7 @@ function renderThreads() {
       const avatar = document.createElement('div');
       avatar.className = 'avatar';
       avatar.setAttribute('aria-hidden', 'true');
-      setAvatarNode(avatar, thread.avatar, thread.avatarImageUrl);
+      setThreadAvatarNode(avatar, thread);
       const main = document.createElement('div');
       main.className = 'thread-main';
       const top = document.createElement('div');
@@ -13232,7 +13276,11 @@ function renderThreads() {
       state.textContent = thread.state;
       const time = document.createElement('div');
       time.className = 'thread-time';
-      time.textContent = thread.time;
+      // Real last-message time, not the old constant 'now' word (v654). Computed at render (not cached on the
+      // thread) so the today/weekday/date bucket stays correct as days roll over between re-renders.
+      const lastMessage = thread.messages?.[thread.messages.length - 1] ?? null;
+      const lastMs = lastMessage ? messageCreatedAtMs(lastMessage) : null;
+      time.textContent = lastMs !== null ? formatThreadListTimestamp(lastMs) : '';
       const side = document.createElement('div');
       side.className = 'thread-side';
       side.append(time);
@@ -13322,7 +13370,7 @@ function renderConversation() {
     conversationStickToBottom = true;
     return;
   }
-  setAvatarNode(activeAvatar, thread.avatar, thread.avatarImageUrl);
+  setThreadAvatarNode(activeAvatar, thread);
   if (isThreadConversationVisible(thread) && markThreadRead(thread)) {
     renderThreads();
   }

@@ -721,6 +721,16 @@ html[data-platho-telegram="true"] .install-header-button {
   font-size: 24px;
 }
 
+/* Saved (My notes) thread: pencil icon instead of the wallet-letter fallback. */
+.avatar.avatar-saved {
+  background: rgba(48, 213, 176, 0.12);
+}
+
+.avatar.avatar-saved svg {
+  width: 20px;
+  height: 20px;
+}
+
 .feed-author-row {
   display: flex;
   align-items: center;
