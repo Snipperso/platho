@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-03T13:27:41.613Z",
+  "generatedAt": "2026-07-03T14:59:50.170Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 134,
-    "totalBytes": 4414450,
-    "bundleSha256": "5db05e482157bb6e496d24a76fc9d0414117f0b95d6f6ec51ce32f8f6708a216",
+    "totalBytes": 4432334,
+    "bundleSha256": "ab748496c71168f649f385e7242eecb7ed3be59b4924eabe085edb2641222e13",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1123482,
-        "sha256": "c88ed207cae9e435e0b34520baf0959e2f8a77563d5304a6a8aa210a49a35e89"
+        "bytes": 1134693,
+        "sha256": "6047e48a7b0a6344692909caddfcd14da8b715f3037c546e6437bbeb1b6fa2c1"
       },
       {
         "path": "assets/icons/back.svg",
@@ -209,18 +209,18 @@
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 600422,
-        "sha256": "7edc9102baaa0e6e592cadc9e034a4ace3c592bb4795d4cfde2018e6c7296d06"
+        "bytes": 601786,
+        "sha256": "90a6beb13676bc3eb2fa5957ea85a6e67453579d2abffd235d00c97d71819d4b"
       },
       {
         "path": "i18n.mjs",
         "bytes": 4607,
-        "sha256": "4c76946a046fc3a01c9dd1cf3d28d3d88684cdd34c8ca7ab5c500eff92b9b121"
+        "sha256": "8db29f3e50ddd856e298f26ad3e3a924defad9e4385bd9a9347772ea4d202890"
       },
       {
         "path": "index.html",
-        "bytes": 48052,
-        "sha256": "823ad31e0a7b7ba60e44a143bfcbe2091b16c5d08e20b4618390ba93716b77e4"
+        "bytes": 49602,
+        "sha256": "ae68c3a360644894824d1d7a0b40a0c8602f39313ea76a92f7c2721a67b17f7c"
       },
       {
         "path": "manifest.webmanifest",
@@ -284,13 +284,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 80979,
-        "sha256": "b416930824070838b25cf3cad52c74576f320bea9a4de6ae55f182ca889604c4"
+        "bytes": 84738,
+        "sha256": "073c7dba77415b68d1ceea9814dc49081854ba89061ef761a181579b60e17ed8"
       },
       {
         "path": "sw.js",
         "bytes": 6646,
-        "sha256": "0a2b60a88000f292014d40cebc414254c4c1ce7c491392d35e754b4a07940738"
+        "sha256": "6128800d9052d36a02e6bd44caf20009b737cee1fd14966749f117f7a917077d"
       },
       {
         "path": "ton-dns-provider.mjs",

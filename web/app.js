@@ -172,14 +172,14 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=1';
+} from './i18n.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
 // Locale resolves BEFORE any rendering (stored choice -> Telegram profile -> browser); static HTML gets its
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v655';
+const PLATHO_APP_RUNTIME_VERSION = 'v656';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3149,6 +3149,8 @@ function scheduleWalletUnlockPrompt(delayMs = 180) {
     try {
       const wallet = await loadPlathoWallet();
       if (!wallet) {
+        // Unlock declined/cancelled — reveal the app in its locked state (public feed still works).
+        markBootAppReady();
         renderWalletIdentity();
         refreshMessagingControls();
         return;
@@ -11159,6 +11161,9 @@ async function loadPlathoWallet() {
     plathoWallet = wallet;
     localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet?.address);
     if (wallet) {
+      // Password accepted: swap the boot screen from the unlock dialog to the spinner (no-op if it is not up,
+      // e.g. a mid-session unlock). bootCrypto lifts it once the core is ready.
+      setBootScreenPhase('loading');
       markWalletUnlocked();
       scheduleWalletAutoLock();
       markNavVaultBalancePending('wallet loaded', {
@@ -23990,6 +23995,257 @@ async function refreshVaultActivationStatus(options = {}) {
   }
 }
 
+// ── Boot screen ──────────────────────────────────────────────────────────────────────────────
+// A branded loading overlay that masks the several-second post-unlock initial sync. Visible from
+// first paint (markup in index.html); the unlock password dialog opens on top (z-index), then it
+// swaps to the spinner and lifts once the wallet+vault core is ready (messages keep loading behind).
+const bootScreen = document.querySelector('#bootScreen');
+const bootSignalCanvas = document.querySelector('#bootSignal');
+let bootScreenActive = Boolean(bootScreen) && bootScreen.hidden !== true;
+let stopBootSignalField = null;
+let bootScreenSafetyTimer = null;
+
+// The signal-field backdrop (ported from about.platho.app): a living teal lattice with roaming
+// flashlights + short "signal" routes. Returns a stop() that cancels the animation loop.
+function startBootSignalField(canvas) {
+  if (!canvas) return () => {};
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return () => {};
+  const TEAL = '48, 213, 176';
+  const TWO_PI = Math.PI * 2;
+  const GAP = 38;
+  const AMBIENT = 0.11;
+  const BOOST = 0.34;
+  const reduceMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let W = 0; let H = 0; let cols = 0; let rows = 0; let ox = 0; let oy = 0; let cx = 0; let cy = 0;
+  let lights = [];
+  let raf = null; let last = 0; let acc = 0; let gate = 0; let stopped = false;
+
+  function sizeLights() {
+    const m = Math.min(W, H);
+    if (!lights.length) {
+      lights = [
+        { x: W * 0.30, y: H * 0.34, ang: 0.8, sp: 92 },
+        { x: W * 0.72, y: H * 0.66, ang: 3.7, sp: 72 },
+      ];
+    }
+    const radii = [Math.max(240, Math.min(520, m * 0.44)), Math.max(180, Math.min(400, m * 0.30))];
+    for (let i = 0; i < lights.length; i += 1) {
+      const L = lights[i];
+      L.R = radii[i] || radii[radii.length - 1];
+      L.r2 = L.R * L.R;
+      if (L.x > W) L.x = W;
+      if (L.y > H) L.y = H;
+    }
+  }
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    if (!W || !H) return;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = `${W}px`;
+    canvas.style.height = `${H}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cols = Math.ceil(W / GAP) + 1;
+    rows = Math.ceil(H / GAP) + 1;
+    ox = (W - (cols - 1) * GAP) / 2;
+    oy = (H - (rows - 1) * GAP) / 2;
+    cx = W / 2; cy = H / 2;
+    sizeLights();
+  }
+  const nx = (c) => ox + c * GAP;
+  const ny = (r) => oy + r * GAP;
+  function edgeFade(x, y) {
+    const dx = (x - cx) / (W * 0.5);
+    const dy = (y - cy) / (H * 0.5);
+    const d = Math.min(1, Math.sqrt(dx * dx + dy * dy));
+    return 1 - 0.32 * d;
+  }
+  function lightAt(x, y) {
+    let b = 0;
+    for (let i = 0; i < lights.length; i += 1) {
+      const L = lights[i];
+      const ddx = x - L.x; const ddy = y - L.y;
+      const d2 = ddx * ddx + ddy * ddy;
+      if (d2 < L.r2) { let f = 1 - d2 / L.r2; f *= f; if (f > b) b = f; }
+    }
+    return b;
+  }
+  function drawDots() {
+    for (let c = 0; c < cols; c += 1) {
+      for (let r = 0; r < rows; r += 1) {
+        const x = nx(c); const y = ny(r);
+        const lb = lightAt(x, y);
+        const a = (AMBIENT + BOOST * lb) * edgeFade(x, y);
+        ctx.beginPath();
+        ctx.arc(x, y, 1.3 + 1.1 * lb, 0, TWO_PI);
+        ctx.fillStyle = `rgba(${TEAL},${a.toFixed(3)})`;
+        ctx.fill();
+      }
+    }
+  }
+  function updateLights(dt) {
+    const s = dt / 1000;
+    for (let i = 0; i < lights.length; i += 1) {
+      const L = lights[i];
+      L.ang += (Math.random() - 0.5) * 1.4 * s;
+      L.x += Math.cos(L.ang) * L.sp * s;
+      L.y += Math.sin(L.ang) * L.sp * s;
+      if (L.x < 0) { L.x = 0; L.ang = Math.PI - L.ang; } else if (L.x > W) { L.x = W; L.ang = Math.PI - L.ang; }
+      if (L.y < 0) { L.y = 0; L.ang = -L.ang; } else if (L.y > H) { L.y = H; L.ang = -L.ang; }
+    }
+  }
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  const signals = [];
+  const HOP = 170; const TAU = 620;
+  const maxSignals = () => Math.min(24, Math.max(12, Math.round((W * H) / 26000)));
+  function spawn() {
+    const path = [{ c: Math.floor(Math.random() * cols), r: Math.floor(Math.random() * rows) }];
+    const len = 6 + Math.floor(Math.random() * 7);
+    let prev = null;
+    for (let i = 0; i < len; i += 1) {
+      const cur = path[path.length - 1];
+      const cand = [];
+      for (let d = 0; d < DIRS.length; d += 1) {
+        const nc = cur.c + DIRS[d][0]; const nr = cur.r + DIRS[d][1];
+        if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+        if (prev && nc === prev.c && nr === prev.r) continue;
+        cand.push({ c: nc, r: nr });
+      }
+      if (!cand.length) break;
+      path.push(cand[Math.floor(Math.random() * cand.length)]);
+      prev = cur;
+    }
+    if (path.length >= 2) signals.push({ path, t: 0 });
+  }
+  function strokeEdge(x0, y0, x1, y1, a) {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.strokeStyle = `rgba(${TEAL},${a.toFixed(3)})`;
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+  }
+  function litNode(x, y, inten, v) {
+    if (inten > 0.55) {
+      ctx.save();
+      ctx.shadowColor = `rgba(${TEAL},0.9)`;
+      ctx.shadowBlur = 10 * inten;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5 + 2.4 * inten, 0, TWO_PI);
+      ctx.fillStyle = `rgba(210, 255, 244,${(0.9 * inten * v).toFixed(3)})`;
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, 1.4 + 2 * inten, 0, TWO_PI);
+      ctx.fillStyle = `rgba(${TEAL},${(0.85 * inten * v).toFixed(3)})`;
+      ctx.fill();
+    }
+  }
+  function drawSignals(dt) {
+    for (let s = signals.length - 1; s >= 0; s -= 1) {
+      const sig = signals[s];
+      sig.t += dt;
+      const prog = sig.t / HOP;
+      const hi = Math.floor(prog);
+      const n = sig.path.length;
+      const top = Math.min(hi, n - 1);
+      for (let i = 0; i <= top; i += 1) {
+        const since = (prog - i) * HOP;
+        const inten = Math.exp(-since / TAU);
+        if (inten < 0.02) continue;
+        const p = sig.path[i];
+        const x = nx(p.c); const y = ny(p.r); const v = edgeFade(x, y);
+        if (i > 0) { const pp = sig.path[i - 1]; strokeEdge(nx(pp.c), ny(pp.r), x, y, 0.5 * inten * v); }
+        litNode(x, y, inten, v);
+      }
+      if (hi < n - 1) {
+        const a = sig.path[hi]; const b = sig.path[hi + 1];
+        const f = prog - hi;
+        const axp = nx(a.c); const ayp = ny(a.r); const bx = nx(b.c); const by = ny(b.r);
+        strokeEdge(axp, ayp, axp + (bx - axp) * f, ayp + (by - ayp) * f, 0.55 * edgeFade(axp, ayp));
+      }
+      if (prog > (n - 1) + (TAU * 3) / HOP) signals.splice(s, 1);
+    }
+  }
+  function paintOnce() {
+    if (!W || !H) return;
+    ctx.clearRect(0, 0, W, H);
+    drawDots();
+    drawSignals(0);
+  }
+  function frame(now) {
+    raf = null;
+    if (stopped) return;
+    const dt = last ? Math.min(now - last, 60) : 16;
+    last = now;
+    gate += dt;
+    if (gate >= 30) {
+      updateLights(gate);
+      ctx.clearRect(0, 0, W, H);
+      drawDots();
+      acc += gate;
+      if (acc > 240 && signals.length < maxSignals()) { spawn(); acc = 0; }
+      drawSignals(gate);
+      gate = 0;
+    }
+    schedule();
+  }
+  function schedule() { if (raf === null && !stopped) raf = requestAnimationFrame(frame); }
+  const onResize = () => { resize(); paintOnce(); };
+
+  resize();
+  window.addEventListener('resize', onResize);
+  if (reduceMotion) {
+    paintOnce();
+  } else {
+    for (let i = 0; i < maxSignals(); i += 1) { spawn(); if (signals.length) signals[signals.length - 1].t = Math.random() * HOP * 4; }
+    paintOnce();
+    schedule();
+  }
+  return () => {
+    stopped = true;
+    if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
+    window.removeEventListener('resize', onResize);
+  };
+}
+
+function initBootScreen() {
+  if (!bootScreenActive) return;
+  try { stopBootSignalField = startBootSignalField(bootSignalCanvas); } catch (error) { console.error(error); }
+  // Failsafe: never trap the user behind the overlay if a milestone never fires (RPC hang, unexpected path).
+  bootScreenSafetyTimer = setTimeout(() => hideBootScreen(), 30_000);
+}
+
+// Idle (unlock dialog on top) -> loading (spinner). No-op once the screen is gone or was never up.
+function setBootScreenPhase(phase) {
+  if (!bootScreenActive || !bootScreen) return;
+  bootScreen.dataset.phase = phase;
+}
+
+function hideBootScreen() {
+  if (!bootScreenActive || !bootScreen) return;
+  bootScreenActive = false;
+  if (bootScreenSafetyTimer) { clearTimeout(bootScreenSafetyTimer); bootScreenSafetyTimer = null; }
+  bootScreen.classList.add('is-hiding');
+  const finalize = () => {
+    bootScreen.hidden = true;
+    if (typeof stopBootSignalField === 'function') { try { stopBootSignalField(); } catch { /* ignore */ } stopBootSignalField = null; }
+  };
+  // Remove after the fade; a fallback timer covers a missed transitionend (reduced-motion / display quirks).
+  let done = false;
+  const once = () => { if (done) return; done = true; bootScreen.removeEventListener('transitionend', once); finalize(); };
+  bootScreen.addEventListener('transitionend', once);
+  setTimeout(once, 620);
+}
+
+// The wallet+vault core is ready (keys derived, activation known) — messages keep loading behind the app.
+function markBootAppReady() {
+  hideBootScreen();
+}
+
 async function bootCrypto() {
   try {
     if (!plathoWallet) {
@@ -24012,6 +24268,9 @@ async function bootCrypto() {
       setText(vaultRotateStatus, requiredStatus);
       localProfileAvatarPointer = null;
       refreshComposerPublishPolicy();
+      // No stored wallet (first run / public-only browsing): nothing to unlock or sync, so lift the boot
+      // screen immediately. A stored-but-locked wallet keeps it up until the unlock dialog + core sync run.
+      if (!hasStoredWallet) markBootAppReady();
       return null;
     }
     await bootWalletScopedLocalStores();
@@ -24045,6 +24304,9 @@ async function bootCrypto() {
     setText(capsulePolicyStatus, t('common.checking'));
     setText(keyAuthStatus, verifiedBundle.signingPublicKey.length === 32 ? t('vault.signedBundle') : t('vault.review'));
     refreshMessagingControls();
+    // The wallet+vault core is ready here (keys derived, activation known) — reveal the app now. The message
+    // sync below and the vault balance refresh keep running behind the live interface, as the owner asked.
+    markBootAppReady();
     new Promise((resolve) => setTimeout(resolve, 0))
       .then(() => runPlathoCryptoSelfTest())
       .then((result) => {
@@ -24099,6 +24361,8 @@ async function bootCrypto() {
     refreshMessagingControls();
     setText(walletAddressStatus, t('common.blocked'));
     setText(vaultRecordStatus, t('common.blocked'));
+    // Never strand the user behind the overlay on a boot error — show the app with its error statuses.
+    markBootAppReady();
     console.error(error);
   }
 }
@@ -24211,6 +24475,9 @@ publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
 // faces immediately (no letter-tile placeholder + chain-refetch flash). Top-level await (app.js is a module),
 // bounded by a short deadline so a slow/unavailable IndexedDB can never hang boot — past it the remaining
 // avatars just hydrate from chain. Then migrate any legacy localStorage avatar cache off-thread.
+// Start the branded boot-screen backdrop animation as early as possible (before the avatar-warm wait below),
+// so the overlay that is already painted from HTML comes alive immediately.
+initBootScreen();
 await Promise.race([warmPublicChannelAvatarsFromCache(), delay(400)]);
 setTimeout(() => { void migrateLegacyAvatarMediaCacheToIndexedDb(); }, 0);
 // One-time cleanup: an EXISTING device cache (written before the strip below) may still hold megabytes of
@@ -24731,7 +24998,12 @@ bootCrypto()
     // never exported), the backup step does its own unlock — don't also pop the startup unlock prompt
     // (avoids a confusing double password). Otherwise unlock as usual.
     const drivingBackup = walletKeyBackupPendingForStoredWallet();
-    try { maybeShowQuickStartOnFirstRun(); } catch (error) { console.error(error); }
+    let quickStartShown = false;
+    try { quickStartShown = maybeShowQuickStartOnFirstRun(); } catch (error) { console.error(error); }
+    // The boot screen (z-index 55) stays up ONLY for the pure password-unlock path, where the unlock dialog
+    // (#actionDialog, z-index 60) sits on top of it. Quick-start / backup dialogs are modal-backdrops
+    // (z-index 40) that would be BURIED behind the overlay — so reveal the app before they show.
+    if (quickStartShown || drivingBackup) markBootAppReady();
     if (!drivingBackup) {
       promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
     }

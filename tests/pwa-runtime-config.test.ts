@@ -271,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v655<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v655'/);
+    expect(html).toMatch(/id="appVersionLabel">v656<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v656'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=655" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=656" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2197,7 +2197,7 @@ describe('PWA runtime config guard', () => {
     // Step 2 (TON Center key) reads the input and applies the key (after validating it — see PWA-TONCENTER-KEY-VALIDATE-01).
     expect(app).toMatch(/const value = quickStartStepBody\?\.querySelector\('#quickStartKeyInput'\)\?\.value;[\s\S]*applyToncenterApiKey\(trimmed\)/);
     // Wired into the boot chain, defensively, after the wallet state is known.
-    expect(app).toMatch(/try \{ maybeShowQuickStartOnFirstRun\(\); \} catch \(error\) \{ console\.error\(error\); \}/);
+    expect(app).toMatch(/try \{ quickStartShown = maybeShowQuickStartOnFirstRun\(\); \} catch \(error\) \{ console\.error\(error\); \}/);
   });
 
   it('PWA-QUICKSTART-TMA-01: quick-start works inside the Telegram Mini App (modal stacking, awaitable export, TG link, cloud dismissal)', () => {
@@ -5786,14 +5786,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v726/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=211/);
+    expect(sw).toMatch(/platho-pwa-prototype-v727/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=212/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=655/);
+    expect(sw).toMatch(/\.\/app\.js\?v=656/);
     // i18n engine + dictionaries are precached (offline language switch).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=1/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=1/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=2/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=2/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
@@ -5909,5 +5909,52 @@ describe('PWA runtime config guard', () => {
     expect(readFileSync('web/app.js', 'utf8')).toMatch(/dataset\.plathoAppJs !== 'ready'/);
     expect(bootGuard).toMatch(/addEventListener\('error'/);
     expect(bootGuard).toMatch(/unhandledrejection/);
+  });
+
+  it('PWA-BOOT-SCREEN-01: branded boot overlay masks the post-unlock sync and lifts at the core-ready milestone', () => {
+    const html = readFileSync('web/index.html', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+
+    // Markup: overlay visible from first paint (NOT hidden), signal canvas, spinner, i18n label + tagline.
+    expect(html).toMatch(/<div class="boot-screen" id="bootScreen" data-phase="idle">/);
+    expect(html).toMatch(/<canvas class="boot-signal" id="bootSignal"/);
+    expect(html).toMatch(/class="boot-spinner"/);
+    expect(html).toMatch(/data-i18n="boot\.loading"/);
+    expect(html).toMatch(/data-i18n="boot\.tagline"/);
+
+    // Layering: overlay above the shell, below the unlock dialog (#actionDialog 60) so the password modal
+    // sits ON the branded backdrop.
+    expect(css).toMatch(/\.boot-screen \{[\s\S]*?z-index: 55;/);
+    expect(css).toMatch(/@keyframes bootSpin \{/);
+    expect(css).toMatch(/@keyframes bootCorePulse \{/);
+    // The core/orbit fills must not be clobbered by the higher-specificity ring rule.
+    expect(css).toMatch(/\.boot-spinner-track,\s*\.boot-spinner-arc \{\s*fill: none;/);
+
+    // Controller + failsafe.
+    expect(app).toMatch(/function startBootSignalField\(canvas\)/);
+    expect(app).toMatch(/function initBootScreen\(\)/);
+    expect(app).toMatch(/function setBootScreenPhase\(phase\)/);
+    expect(app).toMatch(/function hideBootScreen\(\)/);
+    expect(app).toMatch(/function markBootAppReady\(\)/);
+    expect(app).toMatch(/bootScreenSafetyTimer = setTimeout\(\(\) => hideBootScreen\(\), 30_000\)/);
+
+    // Hooks: swap to the spinner on unlock, lift at the vault-core-ready milestone (BEFORE the message sync),
+    // lift immediately when there is nothing to unlock, and never strand on a boot error.
+    expect(app).toMatch(/setBootScreenPhase\('loading'\);\s*\n\s*markWalletUnlocked\(\);/);
+    expect(app).toMatch(/if \(!hasStoredWallet\) markBootAppReady\(\);/);
+    // Core-ready lift happens after the activation refresh (keys derived, activation known).
+    const activationIdx = app.indexOf('await refreshVaultActivationStatus({ skipGlobal: true });');
+    const readyLiftIdx = app.indexOf('markBootAppReady();', activationIdx);
+    expect(activationIdx).toBeGreaterThan(-1);
+    expect(readyLiftIdx).toBeGreaterThan(activationIdx);
+    // markBootAppReady is invoked in the bootCrypto catch (error) path too.
+    const bootCryptoCatch = app.slice(app.indexOf('async function bootCrypto()'));
+    expect(bootCryptoCatch).toMatch(/setText\(vaultRecordStatus, t\('common\.blocked'\)\);\s*\n\s*\/\/[\s\S]{0,120}?markBootAppReady\(\);/);
+    // The lift happens strictly before the private message sync begins (owner: don't wait for everything).
+    const readyIdx = app.indexOf("// The wallet+vault core is ready here");
+    const syncIdx = app.indexOf('beginMessageSyncUi();', readyIdx);
+    expect(readyIdx).toBeGreaterThan(-1);
+    expect(syncIdx).toBeGreaterThan(readyIdx);
   });
 });
