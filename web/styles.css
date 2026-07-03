@@ -943,6 +943,13 @@ html[data-platho-telegram="true"] .install-header-button {
   border-color: var(--accent);
 }
 
+/* A failed publish badge doubles as its own Retry control (v649) — the red text is the affordance. */
+.public-publish-status--retryable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .message.is-swiping,
 .comment-item.is-swiping {
   transition: none;

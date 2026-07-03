@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v648<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v648'/);
+    expect(html).toMatch(/id="appVersionLabel">v649<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v649'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=648" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=649" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4254,6 +4254,27 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/foreign slot \(partCount mismatch\)/);
   });
 
+  it('PWA-PRIVATE-STRADDLE-01: a multipart group straddling the index-walk window extends the walk in-pass (never a cursor past a half-fetched message)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Bounded extension budget (8-part compose cap x interleave margin).
+    expect(app).toMatch(/const PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;/);
+    // Role-scoped incompleteness check: only THIS role's groups (key starts with openedAs) with an indexed part.
+    expect(app).toMatch(/const rolePartGroupsIncomplete = \(role\) => \{/);
+    expect(app).toMatch(/if \(!key\.startsWith\(`\$\{role\}:`\)\) continue;/);
+    expect(app).toMatch(/if \(group\.hasIndexedPart !== true\) continue;/);
+    // The extension runs INSIDE walkIndexedRole after the window loop and BEFORE the cursor-exit branches, so a
+    // closed group flows into normal assembly and the catch-up cursor resumes BELOW the group.
+    const walk = app.slice(app.indexOf('const walkIndexedRole = async'), app.indexOf('const walkRecentIndexedRoleForRepair'));
+    const extensionIdx = walk.indexOf('extendedScans < PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT');
+    const catchUpIdx = walk.indexOf('catchUpRemaining += 1');
+    expect(extensionIdx).toBeGreaterThan(-1);
+    expect(catchUpIdx).toBeGreaterThan(extensionIdx);
+    // The extension keeps the walk's safety contract: fail-closed on a bad scan + the slow-device yield.
+    const extension = walk.slice(walk.indexOf('Boundary-straddle extension'), catchUpIdx);
+    expect(extension).toMatch(/if \(!result\.ok\) \{\s*scanComplete = false;\s*return;\s*\}/);
+    expect(extension).toMatch(/await cooperativeYield\(\);/);
+  });
+
   it('PWA-PUBLIC-COMMENTS-BACKGROUND-FREE: comments load ONLY on thread open — no background walker exists (owner scalability requirement 2026-07-02)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const syncPublicSource = app.slice(
@@ -5561,11 +5582,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v719/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=205/);
+    expect(sw).toMatch(/platho-pwa-prototype-v720/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=206/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=648/);
+    expect(sw).toMatch(/\.\/app\.js\?v=649/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

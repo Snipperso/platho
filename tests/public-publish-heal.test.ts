@@ -142,6 +142,30 @@ describe('public publish heal driver guard', () => {
   });
 });
 
+describe('public publish manual retry', () => {
+  const app = readFileSync('web/app.js', 'utf8');
+  const css = readFileSync('web/styles.css', 'utf8');
+
+  it('PWA-PUBLIC-HEAL-10: a terminaled public publish retries from its badge (nonce-floor escape without reload)', () => {
+    // The FAILED badge itself is the affordance (owner rule: no extra Retry/Dismiss buttons) — clickable +
+    // keyboard-accessible, and inert when nothing was ever signed (no publishState = nothing to re-broadcast).
+    expect(app).toMatch(/function retryPublicPublishFromUi\(item, kind\)/);
+    expect(app).toMatch(/function wirePublicPublishRetryBadge\(statusBadge, item, kind\)/);
+    expect(app).toMatch(/if \(!String\(item\?\.publishStatus \?\? ''\)\.endsWith\('failed'\) \|\| !item\?\.publishState\) return;/);
+    // Both badge render sites (feed post + comment) wire it.
+    expect(app).toMatch(/wirePublicPublishRetryBadge\(statusBadge, item, 'post'\);/);
+    expect(app).toMatch(/wirePublicPublishRetryBadge\(statusBadge, comment, 'comment'\);/);
+    // The retry mirrors the private already-signed branch: re-arm the broadcast budget on the SAME persisted
+    // publishState (same-nonce re-broadcast is idempotent) + a FRESH driver job so the scaled age terminal
+    // opens a new window.
+    const retry = app.slice(app.indexOf('function retryPublicPublishFromUi'), app.indexOf('function wirePublicPublishRetryBadge'));
+    expect(retry).toMatch(/resetPublishBroadcastBudgetForManualRetry\(item\.publishState\);/);
+    expect(retry).toMatch(/startPublicPublishConfirmation\(\{ channelId, localId, kind, createdAt: Date\.now\(\), publishState: item\.publishState \}\);/);
+    // Visual affordance is a CSS class (prod CSP bans inline styles).
+    expect(css).toMatch(/\.public-publish-status--retryable \{/);
+  });
+});
+
 describe('public comment parent_link publish wiring', () => {
   // Chain forensics (2026-07-02, mainnet probe): EVERY public entry since genesis had parent_link=0 and
   // get_public_parent_index(entryId) returned exists=false for all posts — comments were silently published as

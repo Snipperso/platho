@@ -163,7 +163,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v648';
+const PLATHO_APP_RUNTIME_VERSION = 'v649';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -963,6 +963,14 @@ const PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP = 8;
 const PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP = 6;
 const PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX = 'platho.private.chain.head.repair.v1';
 const PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT = 8;
+// Straddle extension budget (v649): when the per-pass index walk hits its window limit mid-multipart-group, keep
+// walking deeper up to this many EXTRA entries until the group's remaining parts are found — the private analogue
+// of the public comment loader's boundary-straddle extension. Without it a group crossing the window boundary was
+// never assembled: FRESH it vetoed the cursor (head-restart livelock for ~10min), STALE the cursor advanced past
+// its head-side parts forever (invisible until a manual Sync). 32 covers the 8-part compose cap with a 4x
+// interleave margin; a group still open past the budget degrades exactly as before (honest veto, never a cursor
+// past a half-fetched message).
+const PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.public.chain.history.unavailable.v1';
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 400;
 const LEGACY_MESSAGE_HISTORY_DB_NAME = 'platho-local-message-history-v1';
@@ -5069,6 +5077,7 @@ function appendPublicItemComments(article, item) {
       const statusBadge = document.createElement('span');
       statusBadge.className = `public-publish-status${String(comment.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
       statusBadge.textContent = (comment.publishState ? publishStateMeta(comment.publishState) : null) || comment.publishStatus;
+      wirePublicPublishRetryBadge(statusBadge, comment, 'comment');
       commentMeta.append(statusBadge);
     }
     commentAuthorRow.append(commentAvatar, commentMeta);
@@ -5231,6 +5240,7 @@ function renderPublicFeed(items, options = {}) {
       // Private-style live status ('sending 2 parts' / 'submitted 1/2, confirming' / …) when a publishState is
       // streaming; the machine-readable publishStatus marker is the fallback.
       statusBadge.textContent = (item.publishState ? publishStateMeta(item.publishState) : null) || item.publishStatus;
+      wirePublicPublishRetryBadge(statusBadge, item, 'post');
       meta.append(statusBadge);
     }
     // The "Display as" chevron lives top-right in the author row.
@@ -9488,6 +9498,21 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   // flight (privateChainSyncPromise guards syncPrivateCapsulesFromChainOnce), so yielding mid-walk cannot
   // let a second pass interleave. Background sync takes marginally longer wall-clock; the UI never blocks.
   const cooperativeYield = () => new Promise((resolve) => setTimeout(resolve, 0));
+  // TRUE while this role's walk has collected a multipart group that is still missing parts (unique partIndex
+  // count below partCount). Group keys start with the openedAs role (privatePartKey), which matches the walked
+  // index: the recipient index only yields recipient-opened parts and vice versa — so extending THIS role's walk
+  // is exactly what can close them. history-retry-only groups (hasIndexedPart false) never trigger an extension.
+  const rolePartGroupsIncomplete = (role) => {
+    for (const [key, group] of privatePartGroups) {
+      if (!key.startsWith(`${role}:`)) continue;
+      if (group.hasIndexedPart !== true) continue;
+      const unique = new Set();
+      for (const part of group.parts) unique.add(Number(part.opened?.payload?.partIndex ?? 0));
+      if (unique.size < group.partCount) return true;
+    }
+    return false;
+  };
+
   const walkIndexedRole = async (role, latestHeadLink) => {
     const cursor = forceIndexRescan
       ? normalizePrivateChainIndexCursor(null)
@@ -9526,6 +9551,38 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         return;
       }
       currentLink = previousLink;
+    }
+    // Boundary-straddle extension (v649, the public comment loader's rule applied here): a window-limit exit in
+    // the MIDDLE of a multipart group would either veto the cursor while fresh (head-restart livelock) or —
+    // once stale — advance the cursor past the group's head-side parts forever. Keep walking (bounded) until
+    // every group this role collected is closed; the exit branches below then see the EXTENDED position, so a
+    // completed group flows into normal assembly and the catch-up cursor resumes below it.
+    if (currentLink > 0n && currentLink !== stopLink && rolePartGroupsIncomplete(role)) {
+      let extendedScans = 0;
+      while (currentLink > 0n && currentLink !== stopLink
+        && extendedScans < PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT
+        && rolePartGroupsIncomplete(role)) {
+        const entryId = privateIndexEntryIdFromLink(currentLink);
+        if (entryId === null) {
+          nextLink = 0n;
+          break;
+        }
+        const result = await scanPrivateEntryId(entryId, { source: role });
+        if (!result.ok) {
+          scanComplete = false;
+          return;
+        }
+        indexEntriesScanned += 1;
+        extendedScans += 1;
+        await cooperativeYield();
+        const previousLink = privateIndexPreviousLink(result.entry, role);
+        nextLink = previousLink;
+        if (previousLink === currentLink) {
+          scanComplete = false;
+          return;
+        }
+        currentLink = previousLink;
+      }
     }
     if (currentLink > 0n && currentLink !== stopLink) {
       if (canPersistPrivateIndexCursor) {
@@ -22629,6 +22686,44 @@ function schedulePublicPublishConfirmationPass(job, delayMs) {
     runPublicPublishConfirmationPass(job).catch((error) => console.error(error));
   }, Math.max(250, delayMs));
   publicPublishConfirmJobs.set(key, job);
+}
+
+// Manual Retry for a terminaled public publish (v649) — the badge itself is the affordance (owner rule: no extra
+// Retry/Dismiss buttons). Mirrors retryPrivateMessageFromUi's already-signed branch: re-arm the per-part broadcast
+// budget on the persisted publishState (same-nonce re-broadcast is contract-idempotent — the first pass's fresh
+// nonce READ flips a late-landed send straight to confirmed) and start a FRESH driver job (createdAt now, so the
+// part-count-scaled age terminal opens a new window). This is also the session's nonce-floor escape hatch: a
+// terminal with deferred never-POSTed batches previously left the floor raised past the chain nonce until reload.
+function retryPublicPublishFromUi(item, kind) {
+  const channelId = item?.channelId;
+  const localId = item?.id;
+  if (!channelId || !localId || !item?.publishState) return;
+  console.info('[platho] send timeline', { event: 'public publish manual retry', key: `${channelId}:${localId}` });
+  resetPublishBroadcastBudgetForManualRetry(item.publishState);
+  persistPublicPublishProgress({ channelId, localId, publishState: item.publishState }, {
+    publishStatus: publishStateMeta(item.publishState) || 'public publish submitted',
+  });
+  startPublicPublishConfirmation({ channelId, localId, kind, createdAt: Date.now(), publishState: item.publishState });
+}
+
+// A FAILED badge becomes clickable (role/button semantics; a record with no publishState never signed anything —
+// there is nothing to re-broadcast, so it stays inert).
+function wirePublicPublishRetryBadge(statusBadge, item, kind) {
+  if (!String(item?.publishStatus ?? '').endsWith('failed') || !item?.publishState) return;
+  statusBadge.classList.add('public-publish-status--retryable');
+  statusBadge.title = 'Retry publish';
+  statusBadge.setAttribute('role', 'button');
+  statusBadge.tabIndex = 0;
+  const retry = (event) => {
+    event.stopPropagation();
+    retryPublicPublishFromUi(item, kind);
+  };
+  statusBadge.addEventListener('click', retry);
+  statusBadge.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    retry(event);
+  });
 }
 
 function startPublicPublishConfirmation(record) {
