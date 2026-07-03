@@ -874,6 +874,10 @@ html[data-platho-telegram="true"] .install-header-button {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Swipe-to-reply grabs the whole ROW LINE (v647), so the CONTAINER must also surrender horizontal touch
+     gestures to JS: without pan-y here, a swipe starting on the strip's empty space beside a bubble lets the
+     browser claim the gesture and fire pointercancel mid-drag — the row jerks and snaps back (v648). */
+  touch-action: pan-y;
   padding: 22px;
 }
 
@@ -1918,6 +1922,9 @@ button.feed-item:hover {
   flex-direction: column;
   gap: 14px;
   min-height: 0;
+  /* Same as .message-strip: the comment swipe grabs the row LINE, so the scroller itself must hand horizontal
+     touch gestures to JS (v648) — else a swipe from the row's padding gets pointercancel'd by native scroll. */
+  touch-action: pan-y;
   /* The detail bled to the pane edges, so re-inset the content here (matches the pane's 24px gutter). */
   padding: 16px 24px 0;
 }

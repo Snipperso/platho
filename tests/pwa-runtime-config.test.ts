@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v647<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v647'/);
+    expect(html).toMatch(/id="appVersionLabel">v648<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v648'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=647" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=648" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1252,7 +1252,7 @@ describe('PWA runtime config guard', () => {
     // matching the actually-signed batchMaxChargeForItems — NOT the per-capsule canonical sum (which
     // N-counts SHARED_BASE and produced the phantom multi-capsule "Price changed" dialog + over-strict
     // balance gate).
-    expect(app).toMatch(/batchMaxChargeForItems,\s*\n\} from '\.\/publish-batch-orchestration\.mjs/);
+    expect(app).toMatch(/batchMaxChargeForItems,\s*\n\s*MAX_BATCH_PARTS,\s*\n\} from '\.\/publish-batch-orchestration\.mjs/);
     expect(prepareSource).toMatch(/const groupedBatchesForHold = groupPublishItemsIntoBatches\(chargePlans\)/);
     expect(prepareSource).toMatch(/batchMaxChargeForItems\(batch\.items\)/);
     expect(prepareSource).toMatch(/\+ surcharge \* BigInt\(normalizedCapsules\.length\)/);
@@ -1312,8 +1312,9 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The private publish-confirm auto-retry is bounded by AGE-based terminals (decoupled from the poll cadence,
     // so tight ~1s polling never trips them early): past the no-progress deadline with nothing fully confirmed it
-    // STOPS and surfaces a durable Retry instead of spinning on "submitted N/N, confirming" forever.
-    expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
+    // STOPS and surfaces a durable Retry instead of spinning on "submitted N/N, confirming" forever. v648: the
+    // deadline is PART-COUNT SCALED (the flat 6-min constant was the 2-capsule calibration).
+    expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\.publishState\)/);
     expect(app).toMatch(/Number\(message\.publishState\?\.confirmedCount \?\? 0\) === 0/);
     expect(app).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
     expect(app).toMatch(/error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'\) return 'not confirmed: chain confirmation timed out'/);
@@ -1328,17 +1329,18 @@ describe('PWA runtime config guard', () => {
     // STABLE-age trigger: a long-stuck no-progress message surfaces Retry without restarting the
     // per-session attempt budget (the age is anchored on message creation, not publishState.updatedAt).
     // v632 (owner-directed): the no-progress terminal = the computed factual maximum (~5.5min worst keyless
-    // 2-cap ladder: 2 × 20 fresh-variant tickets + pre-send + confirms) + margin, instead of the legacy 10min.
+    // 2-cap ladder) + margin. v648: that figure became the 2-part point of the part-count-scaled formula
+    // (base 60s + 150s per part); the flat constant remains as the pre-publishState fallback only.
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 6 \* 60 \* 1000/);
+    expect(app).toMatch(/function publishConfirmNoProgressDeadlineMs\(publishState\)/);
     expect(app).toMatch(/function privatePendingPublishConfirmAgeMs\(message\)/);
     expect(app).toMatch(/const createdAtMs = messageCreatedAtMs\(message\)/);
-    expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
     // Resume immediately surfaces Retry for an already-stuck no-progress message (no confirm round-trip).
     const resumeSrc = app.slice(
       app.indexOf('function resumePendingPrivatePublishConfirmations'),
       app.indexOf('function hasPendingPrivateSendRetry'),
     );
-    expect(resumeSrc).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
+    expect(resumeSrc).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\?\.publishState\)/);
     expect(resumeSrc).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
     // Stopping marks the message for manual recovery (the Retry button's render condition).
     const stopSource = app.slice(
@@ -1666,7 +1668,8 @@ describe('PWA runtime config guard', () => {
     // v633: the dead confirmFinalNonce is REMOVED from the public path — the public publish confirm driver
     // (tests/public-publish-heal.test.ts) owns final-batch heal/confirmation for posts/comments.
     expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]{0,400}allowOwnVaultActionReadFallback: true \}\);/);
-    expect(sendSource).toMatch(/const nonceWaitOptions = \{\s*timeoutMs: options\.timeoutMs \?\? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,\s*requestTimeoutMs: options\.requestTimeoutMs,\s*queueTimeoutMs: options\.queueTimeoutMs,\s*\}/);
+    // v648: batch K's background nonce wait scales with its burst position (K prior serial landings first).
+    expect(sendSource).toMatch(/timeoutMs: options\.timeoutMs \?\? \(VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS \* \(batchIndex \+ 1\)\),\s*requestTimeoutMs: options\.requestTimeoutMs,\s*queueTimeoutMs: options\.queueTimeoutMs,\s*\}/);
     expect(sendSource).not.toMatch(/needsQueuedNonce|VAULT_PUBLISH_QUEUE_NONCE_CONFIRM_TIMEOUT_MS/);
     // v629 mobilization: with max_charge-variant rotation EVERY retry is a REAL broadcast (new root hash beats
     // all ~60s dedup layers), so the tail is 3.5s and the fast budget is 20 (a ~70s fast window); past it,
@@ -3149,7 +3152,7 @@ describe('PWA runtime config guard', () => {
     // A multi-part publish that never FULLY confirms STOPS at the AGE-based no-progress deadline (decoupled from
     // the poll cadence) and surfaces a manual Retry instead of spinning forever on "submitted N/N, confirming".
     // The manual Retry for a fully-submitted message re-confirms (never re-publishes), so no double-send regression.
-    expect(confirmationRetry).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS[\s\S]{0,200}stopPrivatePublishConfirmationRetry/);
+    expect(confirmationRetry).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\.publishState\)[\s\S]{0,200}stopPrivatePublishConfirmationRetry/);
     expect(confirmationRetry).toMatch(/const delayMs = privatePublishConfirmDelayMs\(message, error\)/);
     expect(sendRetry).toMatch(/isStalePrivatePendingPublish\(message\) && !privateMessageHasPublishAttempt\(message\)/);
     expect(resumeSource).toMatch(/isStalePrivatePendingPublishConfirmation\(message\)/);
@@ -4212,6 +4215,45 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).toMatch(/prunePublicPostsBelowFloor\(/);
   });
 
+  it('PWA-MULTIPART-SEND-01: terminal deadlines + compose caps scale with the capsule count (owner audit 2026-07-03)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The no-progress terminal SCALES by part count: base 60s + 150s per external (1 part -> 3.5min, 2 -> the
+    // old 6min calibration, 8 -> 21min). The flat constant remains ONLY as the pre-publishState fallback.
+    expect(app).toMatch(/const PUBLISH_CONFIRM_NO_PROGRESS_BASE_MS = 60 \* 1000;/);
+    expect(app).toMatch(/const PUBLISH_CONFIRM_NO_PROGRESS_PER_PART_MS = 150 \* 1000;/);
+    expect(app).toMatch(/function publishConfirmNoProgressDeadlineMs\(publishState\)/);
+    // All three live drivers (private pass, private resume sweep, public shim) use the scaled deadline.
+    expect(app.match(/>= publishConfirmNoProgressDeadlineMs\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // The partial-retry window stays ABOVE the scaled terminal (old relation: 15min = 6min + 9min slack).
+    expect(app).toMatch(/publishConfirmNoProgressDeadlineMs\(message\?\.publishState\) \+ 9 \* 60 \* 1000/);
+    // Batch K's background nonce wait scales with its position in the burst.
+    expect(app).toMatch(/VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS \* \(batchIndex \+ 1\)/);
+    // ONE message is capped at 8 capsules (= MAX_BATCH_PARTS) on BOTH surfaces — compose-time friendly block +
+    // fail-closed asserts on every programmatic path.
+    expect(app).toMatch(/const COMPOSER_MAX_MESSAGE_PARTS = MAX_BATCH_PARTS;/);
+    expect(app).toMatch(/Math\.min\(privateComposerRetrievalPartLimit\(\), COMPOSER_MAX_MESSAGE_PARTS\)/);
+    expect(app).toMatch(/function publicComposerPartLimitMessage\(partCount\)/);
+    expect(app).toMatch(/function assertPublicComposerPartLimit\(partCount\)/);
+    expect(app).toMatch(/assertPublicComposerPartLimit\(totalParts\);/);
+    // The public composer blocks BEFORE clearing/signing, shows the split-it message, and disables the button.
+    expect(app).toMatch(/if \(publicComposerPartLimitMessage\(publicComposerSendPlan\(text, attachments\)\.length\)\) \{/);
+    expect(app).toMatch(/const publicLimitMessage = publicComposerPartLimitMessage\(publicPlan\.length\);/);
+    expect(app).toMatch(/if \(publicComposerPartLimitMessage\(plan\.length\)\) return true;/);
+    // The private button tooltip states the REAL reason (the limit message), not a GRAM-shortfall misattribution.
+    const reason = app.slice(app.indexOf('function privateSendBlockReason'), app.indexOf('function privateSendBlockReason') + 2400);
+    const limitIdx = reason.indexOf('privateComposerPartLimitMessage(plan.length)');
+    const shortfallIdx = reason.indexOf('privateComposerKnownVaultTonShortfall()');
+    expect(limitIdx).toBeGreaterThan(-1);
+    expect(shortfallIdx).toBeGreaterThan(limitIdx);
+    // Receipt foreign-slot guard: a nonce-keyed receipt whose partCount differs from OUR batch is never used to
+    // confirm/fail our parts (an orphaned prior external landing a race must not misattribute). Compared against
+    // ALL parts signed under the nonce — batch.parts holds only PENDING ones, so a partially-confirmed batch
+    // must not make our own receipt look foreign.
+    expect(app).toMatch(/Number\(interp\.partCount\) !== nonceTotalParts/);
+    expect(app).toMatch(/BigInt\(statePart\.clientNonce\) === batch\.nonce/);
+    expect(app).toMatch(/foreign slot \(partCount mismatch\)/);
+  });
+
   it('PWA-PUBLIC-COMMENTS-BACKGROUND-FREE: comments load ONLY on thread open — no background walker exists (owner scalability requirement 2026-07-02)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const syncPublicSource = app.slice(
@@ -4315,6 +4357,11 @@ describe('PWA runtime config guard', () => {
     // desktop hover Reply button).
     expect(html).toMatch(/id="privateReplyContext"/);
     expect(css).toMatch(/\.message,\s*\.comment-item \{\s*position: relative;\s*touch-action: pan-y;/);
+    // v648 (owner: "дёргается и возвращается"): the swipe CONTAINERS surrender horizontal touch gestures too —
+    // a row-LINE swipe starts on the scroller's own space, and without pan-y there the browser claims the
+    // gesture and pointercancels the drag mid-flight.
+    expect(css).toMatch(/\.message-strip \{[\s\S]*?touch-action: pan-y;/);
+    expect(css).toMatch(/\.public-post-detail-body \{[\s\S]*?touch-action: pan-y;/);
     expect(css).toMatch(/\.message-reply-quote \{/);
     expect(css).toMatch(/\.reply-target-flash \{/);
     // v647 UX pass (owner feedback): EITHER direction triggers (a one-letter incoming bubble at the screen edge
@@ -5514,11 +5561,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v718/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=204/);
+    expect(sw).toMatch(/platho-pwa-prototype-v719/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=205/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=647/);
+    expect(sw).toMatch(/\.\/app\.js\?v=648/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

@@ -26,7 +26,8 @@ describe('public publish heal driver guard', () => {
 
   it('PWA-PUBLIC-HEAL-02: age terminals fire BEFORE any RPC (no post-offline storm) with the shared constants', () => {
     const pass = app.slice(app.indexOf('async function runPublicPublishConfirmationPass'), app.indexOf('function resumePendingPublicPublishConfirmations'));
-    const terminalIndex = pass.indexOf('PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS');
+    // v648: the no-progress terminal is the part-count-scaled helper (shared with the private drivers).
+    const terminalIndex = pass.indexOf('publishConfirmNoProgressDeadlineMs(publishState)');
     const rpcIndex = pass.indexOf('retryUnconfirmedVaultPublishBroadcasts');
     expect(terminalIndex).toBeGreaterThan(-1);
     expect(rpcIndex).toBeGreaterThan(terminalIndex);

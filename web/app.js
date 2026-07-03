@@ -141,6 +141,7 @@ import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
+  MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=6';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=38';
 import {
@@ -162,7 +163,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v647';
+const PLATHO_APP_RUNTIME_VERSION = 'v648';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -889,6 +890,18 @@ const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 // Retry (safe: the retry's first nonce READ flips a late-landed send straight to confirmed, same-nonce
 // re-broadcast is contract-idempotent, no double-spend).
 const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 6 * 60 * 1000;
+// v648 (owner): the 6-min constant above was derived for the worst realistic TWO-capsule send — but one message
+// can be up to 8 capsules, each a FULL serial ladder on the nonce chain. The deadline used by the live drivers
+// therefore SCALES with the part count: base (~pre-send + receipts + margin) + one worst-case per-external ladder
+// (~150s) per part. 1 part -> 3.5min (the owner's "shortest for one capsule"), 2 -> 6min (exactly the old
+// calibration), 8 -> 21min. The flat constant remains the fallback where no publishState exists yet (a record
+// that never signed has no parts to scale by).
+const PUBLISH_CONFIRM_NO_PROGRESS_BASE_MS = 60 * 1000;
+const PUBLISH_CONFIRM_NO_PROGRESS_PER_PART_MS = 150 * 1000;
+function publishConfirmNoProgressDeadlineMs(publishState) {
+  const parts = Math.max(1, Number(publishState?.partCount ?? 1) || 1);
+  return PUBLISH_CONFIRM_NO_PROGRESS_BASE_MS + parts * PUBLISH_CONFIRM_NO_PROGRESS_PER_PART_MS;
+}
 // Surface the actionable "RPC broadcast unavailable, retry" terminal EARLY (long before the no-progress
 // deadline) when the broadcast is provably erroring: nothing landed AND every in-flight external is failing to
 // relay for this long. A send whose broadcast SUCCEEDED but is just slow to confirm keeps the patient path —
@@ -11197,6 +11210,15 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
   if (!hasActivePlathoAccount()) {
     return 'Activate Platho account before sending';
   }
+  // Part-cap first (v648): an over-limit draft previously fell through to the shortfall branch and the button
+  // tooltip misattributed the block to balance ("Vault GRAM hold required") while the cost line said "split it".
+  {
+    const plan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachments, currentPrivateSenderOptions(), {
+      paymentCheck: privatePaymentCheckDraft,
+    });
+    const limitMessage = privateComposerPartLimitMessage(plan.length);
+    if (limitMessage) return limitMessage;
+  }
   if (options.includeVaultShortfall !== false && privateComposerKnownVaultTonShortfall()) {
     return 'Vault GRAM hold required';
   }
@@ -11461,11 +11483,29 @@ function privateComposerRetrievalPartLimit() {
     : PRIVATE_CHAIN_INDEX_READ_LIMIT;
 }
 
+// v648 (owner): ONE message is capped at 8 capsules on BOTH surfaces. Before this the private cap was the
+// RETRIEVAL bound (120 — the recipient index walk), which let a user compose a ~3.8MB monster whose serial
+// nonce-chain send would run for HOURS (and the public composer had NO cap at all — the symmetric-case miss).
+// 8 = MAX_BATCH_PARTS: matches the batch unit, bounds the worst-case send at the scaled ~21-minute terminal, and
+// still fits 4 Maximum-quality images or ~256KB of text per message.
+const COMPOSER_MAX_MESSAGE_PARTS = MAX_BATCH_PARTS;
+
 function privateComposerPartLimitMessage(partCount) {
   const parts = Number(partCount ?? 0);
-  const limit = privateComposerRetrievalPartLimit();
+  const limit = Math.min(privateComposerRetrievalPartLimit(), COMPOSER_MAX_MESSAGE_PARTS);
   if (!Number.isFinite(parts) || parts <= limit) return null;
   return `Private message has ${parts} capsules; split it into messages of ${limit} capsules or fewer`;
+}
+
+function publicComposerPartLimitMessage(partCount) {
+  const parts = Number(partCount ?? 0);
+  if (!Number.isFinite(parts) || parts <= COMPOSER_MAX_MESSAGE_PARTS) return null;
+  return `Post has ${parts} capsules; split it into posts of ${COMPOSER_MAX_MESSAGE_PARTS} capsules or fewer`;
+}
+
+function assertPublicComposerPartLimit(partCount) {
+  const message = publicComposerPartLimitMessage(partCount);
+  if (message) throw new Error(message);
 }
 
 function assertPrivateComposerPartLimit(partCount) {
@@ -11755,6 +11795,9 @@ function privateComposerKnownVaultTonShortfall() {
 
 function publicComposerKnownVaultTonShortfall() {
   const plan = publicComposerSendPlan(publicMessageInput?.value ?? '', publicImageAttachments);
+  // Part-cap disables the send button too (v648, mirrors the private branch); the cost status carries the
+  // split-it message so the disabled state is explained right below the composer.
+  if (publicComposerPartLimitMessage(plan.length)) return true;
   return composerKnownVaultTonShortfall(publicComposerPublishProfilesForPlan(plan), 1);
 }
 
@@ -11958,16 +12001,21 @@ function refreshComposerCostStatus() {
   refreshPrivateSendButtonState();
   if (publicComposerCostStatus) {
     const publicPlan = publicComposerSendPlan(publicMessageInput?.value ?? '', publicImageAttachments);
-    const status = composerCostStatusText(
-      publicComposerPublishProfile(),
-      publicMessageInput?.value ?? '',
-      PUBLIC_POST_TEXT_MAX_BYTES,
-      publicImageAttachments,
-      {
-        parts: Math.max(1, publicPlan.length),
-        pricedProfile: publicComposerPublishProfilesForPlan(publicPlan),
-      },
-    );
+    // Part-cap gate (v648, symmetric with the private branch above): an over-limit draft shows the split-it
+    // message instead of a price, and the submit path re-checks before anything clears or signs.
+    const publicLimitMessage = publicComposerPartLimitMessage(publicPlan.length);
+    const status = publicLimitMessage
+      ? { text: publicLimitMessage, state: 'short' }
+      : composerCostStatusText(
+        publicComposerPublishProfile(),
+        publicMessageInput?.value ?? '',
+        PUBLIC_POST_TEXT_MAX_BYTES,
+        publicImageAttachments,
+        {
+          parts: Math.max(1, publicPlan.length),
+          pricedProfile: publicComposerPublishProfilesForPlan(publicPlan),
+        },
+      );
     publicComposerCostStatus.textContent = status.text;
     publicComposerCostStatus.dataset.state = status.state;
   }
@@ -14122,6 +14170,13 @@ publicComposer?.addEventListener('submit', async (event) => {
   }
   if (tonRpcLimited()) {
     refreshComposerCostStatus();
+    return;
+  }
+  // Part-cap gate (v648): block BEFORE the composer clears/signs — the draft stays intact with the split-it
+  // message in the cost status (parity with the private composer's limitMessage block).
+  if (publicComposerPartLimitMessage(publicComposerSendPlan(text, attachments).length)) {
+    refreshComposerCostStatus();
+    setPublicStatus('message too large');
     return;
   }
   const commentsAllowed = publicComposerCommentsCheckbox?.checked !== false;
@@ -20144,6 +20199,25 @@ async function confirmVaultBatchReceiptsFromPublishState(publishState, options =
       continue;
     }
     if (!interp) continue;
+    // Foreign-slot guard (v648): the receipt ring is keyed by nonce ALONE, and a nonce can be consumed by a
+    // DIFFERENT external than ours (a prior send's orphaned external landing a race after this session re-signed
+    // the nonce). The contract writes the landed batch's OWN part_count into the slot (Vault.tact:2103, parsed
+    // from the signed root) — a mismatch proves the slot is not our batch: never confirm/fail OUR parts off it
+    // (the content-addressed entry-scan fallback below decides truthfully). Compare against ALL parts signed
+    // under this nonce — batch.parts holds only the still-PENDING ones, and a partially-confirmed batch must
+    // not make our own receipt look foreign.
+    const nonceTotalParts = (publishState.parts ?? []).filter((statePart) => {
+      if (statePart?.clientNonce === undefined || statePart?.clientNonce === null) return false;
+      try { return BigInt(statePart.clientNonce) === batch.nonce; } catch { return false; }
+    }).length;
+    if (interp.partCount !== undefined
+      && interp.status !== BATCH_PUBLISH_RECEIPT_STATUS.EVICTED
+      && Number(interp.partCount) !== nonceTotalParts) {
+      console.warn('[platho] vault publish receipt: foreign slot (partCount mismatch)', {
+        nonce: String(batch.nonce), ours: nonceTotalParts, slot: Number(interp.partCount), status: interp.status,
+      });
+      continue;
+    }
     if (interp.status === BATCH_PUBLISH_RECEIPT_STATUS.CONFIRMED) {
       const firstEntryId = interp.firstEntryId === undefined || interp.firstEntryId === null
         ? null
@@ -20717,7 +20791,10 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
         }
         if (shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)) {
           const nonceWaitOptions = {
-            timeoutMs: options.timeoutMs ?? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,
+            // Batch K's nonce only lands after K prior serial landings — its background wait scales with its
+            // position (v648) so a mid-burst slowdown doesn't expire the poll before the batch's turn (a lapsed
+            // wait is swallowed and healed later anyway; this just keeps the SENT->VAULT_SUBMITTED flip live).
+            timeoutMs: options.timeoutMs ?? (VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS * (batchIndex + 1)),
             requestTimeoutMs: options.requestTimeoutMs,
             queueTimeoutMs: options.queueTimeoutMs,
           };
@@ -20890,7 +20967,14 @@ function privatePartialSendRetryAgeMs(message) {
 function privatePartialSendRetryExpired(message) {
   if (!privateMessageHasPartialRetryablePublish(message)) return false;
   const ageMs = privatePartialSendRetryAgeMs(message);
-  return ageMs !== null && ageMs >= PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS;
+  // Part-count scaled (v648): the partial-retry window must stay ABOVE the scaled no-progress terminal (its
+  // calibrated 2-part relation was 15min = 6min terminal + 9min slack) or an honest N>=3 partial would lose its
+  // retry machinery while the confirm driver still legitimately waits.
+  const deadlineMs = Math.max(
+    PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS,
+    publishConfirmNoProgressDeadlineMs(message?.publishState) + 9 * 60 * 1000,
+  );
+  return ageMs !== null && ageMs >= deadlineMs;
 }
 
 function publishPartAlreadyAttempted(part) {
@@ -21792,9 +21876,10 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
     return;
   }
   // (b) No FULL confirmation by the no-progress deadline (covers a PARTIAL: one part landed, another never
-  // confirmed) -> durable "chain lookup timed out" terminal + Retry instead of spinning forever.
+  // confirmed) -> durable "chain lookup timed out" terminal + Retry instead of spinning forever. Part-count
+  // scaled (v648): an 8-capsule send legitimately runs its serial ladders far past the 2-capsule 6-min figure.
   if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-    && privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
+    && privatePendingPublishConfirmAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message.publishState)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
     return;
   }
@@ -22033,7 +22118,7 @@ function resumePendingPrivatePublishConfirmations() {
       if (privateMessageHasPublishAttempt(message)
         && message?.privatePublishConfirmStopped !== true
         && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-        && privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
+        && privatePendingPublishConfirmAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message?.publishState)) {
         stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
         continue;
       }
@@ -22578,7 +22663,7 @@ async function runPublicPublishConfirmationPass(job) {
   // Age terminals BEFORE any RPC — also protects resume-after-long-offline from an RPC storm: stale records
   // terminal out without a single request.
   if (publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-    && ageMs >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
+    && ageMs >= publishConfirmNoProgressDeadlineMs(publishState)) {
     console.warn('[platho] public publish: no-progress terminal', { key: `${job.channelId}:${job.localId}` });
     stopPublicPublishConfirmation(job, { publishStatus: 'public publish failed' });
     setPublicStatus('publish failed');
@@ -22980,6 +23065,9 @@ async function createPublicPayloadParts({ type, text, attachments = publicImageA
   const documentParts = publicComposerSendPlan(text, attachments);
   const totalParts = documentParts.length;
   if (totalParts <= 0) return [];
+  // Fail-closed cap (v648, mirrors assertPrivateComposerPartLimit in createPrivateComposerCapsules): the composer
+  // UI blocks earlier with the friendly message; this guard covers every programmatic path.
+  assertPublicComposerPartLimit(totalParts);
   const streamId = randomBytes(16);
   const createdAtSec = Math.floor(Date.now() / 1000);
   const profilePointer = currentProfilePointerFields();
