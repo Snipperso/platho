@@ -179,7 +179,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v656';
+const PLATHO_APP_RUNTIME_VERSION = 'v657';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -24128,21 +24128,14 @@ function startBootSignalField(canvas) {
     ctx.stroke();
   }
   function litNode(x, y, inten, v) {
-    if (inten > 0.55) {
-      ctx.save();
-      ctx.shadowColor = `rgba(${TEAL},0.9)`;
-      ctx.shadowBlur = 10 * inten;
-      ctx.beginPath();
-      ctx.arc(x, y, 1.5 + 2.4 * inten, 0, TWO_PI);
-      ctx.fillStyle = `rgba(210, 255, 244,${(0.9 * inten * v).toFixed(3)})`;
-      ctx.fill();
-      ctx.restore();
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, 1.4 + 2 * inten, 0, TWO_PI);
-      ctx.fillStyle = `rgba(${TEAL},${(0.85 * inten * v).toFixed(3)})`;
-      ctx.fill();
-    }
+    // No canvas shadowBlur here: it is the single most expensive op per frame and starves the main thread on
+    // mobile during the crypto-heavy post-unlock boot. A brighter cyan fill on lit routes reads the same.
+    ctx.beginPath();
+    ctx.arc(x, y, 1.4 + 2.2 * inten, 0, TWO_PI);
+    ctx.fillStyle = inten > 0.55
+      ? `rgba(210, 255, 244,${(0.9 * inten * v).toFixed(3)})`
+      : `rgba(${TEAL},${(0.85 * inten * v).toFixed(3)})`;
+    ctx.fill();
   }
   function drawSignals(dt) {
     for (let s = signals.length - 1; s >= 0; s -= 1) {
@@ -24215,14 +24208,34 @@ function startBootSignalField(canvas) {
 function initBootScreen() {
   if (!bootScreenActive) return;
   try { stopBootSignalField = startBootSignalField(bootSignalCanvas); } catch (error) { console.error(error); }
-  // Failsafe: never trap the user behind the overlay if a milestone never fires (RPC hang, unexpected path).
-  bootScreenSafetyTimer = setTimeout(() => hideBootScreen(), 30_000);
 }
 
-// Idle (unlock dialog on top) -> loading (spinner). No-op once the screen is gone or was never up.
+// Idle (unlock dialog on top) -> loading (spinner). No-op once the screen is gone or was never up. The failsafe
+// timer is armed on entering 'loading' — that is the only state where a milestone (post-unlock sync) could
+// hang; 'idle' always resolves on its own (the unlock dialog is awaited and either unlocks or cancels).
 function setBootScreenPhase(phase) {
   if (!bootScreenActive || !bootScreen) return;
   bootScreen.dataset.phase = phase;
+  if (phase === 'loading' && !bootScreenSafetyTimer) {
+    bootScreenSafetyTimer = setTimeout(() => hideBootScreen(), 45_000);
+  }
+}
+
+// Drives the startup unlock DIRECTLY on the boot screen: opens the password dialog now (no visibility-gated
+// deferral that races the overlay on a slow mobile cold-start), and keeps the overlay up until the wallet+vault
+// core is ready (bootCrypto lifts it) or the user cancels.
+async function runBootScreenUnlock() {
+  try {
+    const wallet = await loadPlathoWallet();
+    if (!wallet) { markBootAppReady(); return; }
+    // loadPlathoWallet already switched the overlay to the spinner phase on success.
+    await bootCrypto();
+    await enforceTelegramSeedBackupGate(wallet);
+    flashWalletIdentityStatus(t('wallet.unlocked'));
+  } catch (error) {
+    markBootAppReady();
+    console.error(error);
+  }
 }
 
 function hideBootScreen() {
@@ -24992,7 +25005,7 @@ bootCrypto()
   .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))
   .then(() => restoreQuickStartDismissalFromTelegramCloud().catch(() => {}))
   .then(() => restoreWalletKeyBackupPendingFromTelegramCloud().catch(() => {}))
-  .then(() => setTimeout(() => {
+  .then(() => {
     try { refreshWalletBackupWarning(); } catch (error) { console.error(error); }
     // If we are driving the user through the mandatory wallet-key backup (a wallet exists but its key was
     // never exported), the backup step does its own unlock — don't also pop the startup unlock prompt
@@ -25000,12 +25013,19 @@ bootCrypto()
     const drivingBackup = walletKeyBackupPendingForStoredWallet();
     let quickStartShown = false;
     try { quickStartShown = maybeShowQuickStartOnFirstRun(); } catch (error) { console.error(error); }
-    // The boot screen (z-index 55) stays up ONLY for the pure password-unlock path, where the unlock dialog
-    // (#actionDialog, z-index 60) sits on top of it. Quick-start / backup dialogs are modal-backdrops
-    // (z-index 40) that would be BURIED behind the overlay — so reveal the app before they show.
-    if (quickStartShown || drivingBackup) markBootAppReady();
-    if (!drivingBackup) {
-      promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
+    // Quick-start / backup dialogs are modal-backdrops (z-index 40) that the overlay (55) would bury — reveal
+    // the app before they show. The overlay stays up ONLY for the pure password-unlock path.
+    if (quickStartShown || drivingBackup) {
+      markBootAppReady();
+      if (!drivingBackup) promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
+      return;
     }
-  }, 250))
+    if (hasStoredPlathoWalletRecord() && !plathoWallet) {
+      // Stored + locked: drive the unlock ON the overlay and keep it up until the core is ready / cancelled.
+      void runBootScreenUnlock();
+    } else {
+      // Nothing to unlock (no wallet, or already unlocked) — reveal the app.
+      markBootAppReady();
+    }
+  })
   .catch((error) => console.error(error));

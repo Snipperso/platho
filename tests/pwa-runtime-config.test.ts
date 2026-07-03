@@ -271,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v656<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v656'/);
+    expect(html).toMatch(/id="appVersionLabel">v657<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v657'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=656" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=657" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2364,7 +2364,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(!quickStartBackupMode\) \{[\s\S]*QUICK_START_DISMISSED_KEY/);
     // Boot restores the flag from cloud and skips the startup unlock prompt while driving the backup (no double password).
     expect(app).toMatch(/restoreWalletKeyBackupPendingFromTelegramCloud\(\)\.catch/);
-    expect(app).toMatch(/const drivingBackup = walletKeyBackupPendingForStoredWallet\(\);[\s\S]*if \(!drivingBackup\) \{\s*promptStoredWalletUnlockOnStartup/);
+    expect(app).toMatch(/const drivingBackup = walletKeyBackupPendingForStoredWallet\(\);[\s\S]*if \(!drivingBackup\) promptStoredWalletUnlockOnStartup/);
     // A visible Profile warning row, shown only while pending; tapping it exports.
     expect(html).toMatch(/id="walletBackupWarning"/);
     expect(app).toMatch(/function refreshWalletBackupWarning\(\)[\s\S]*walletBackupWarning\.hidden = !walletKeyBackupPendingForStoredWallet\(\)/);
@@ -5786,11 +5786,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v727/);
+    expect(sw).toMatch(/platho-pwa-prototype-v728/);
     expect(sw).toMatch(/\.\/styles\.css\?v=212/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=656/);
+    expect(sw).toMatch(/\.\/app\.js\?v=657/);
     // i18n engine + dictionaries are precached (offline language switch).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=2/);
@@ -5937,7 +5937,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function setBootScreenPhase\(phase\)/);
     expect(app).toMatch(/function hideBootScreen\(\)/);
     expect(app).toMatch(/function markBootAppReady\(\)/);
-    expect(app).toMatch(/bootScreenSafetyTimer = setTimeout\(\(\) => hideBootScreen\(\), 30_000\)/);
+    // Failsafe armed on entering the LOADING phase (post-unlock, the only state that can hang); idle resolves
+    // on its own via the awaited unlock dialog.
+    expect(app).toMatch(/bootScreenSafetyTimer = setTimeout\(\(\) => hideBootScreen\(\), 45_000\)/);
+    expect(app).toMatch(/if \(phase === 'loading' && !bootScreenSafetyTimer\)/);
+    // Startup unlock is driven directly on the overlay (no visibility-gated deferral that races the overlay
+    // on a slow mobile cold-start).
+    expect(app).toMatch(/async function runBootScreenUnlock\(\)/);
+    expect(app).toMatch(/if \(hasStoredPlathoWalletRecord\(\) && !plathoWallet\) \{\s*\n\s*\/\/[\s\S]{0,120}?void runBootScreenUnlock\(\);/);
 
     // Hooks: swap to the spinner on unlock, lift at the vault-core-ready milestone (BEFORE the message sync),
     // lift immediately when there is nothing to unlock, and never strand on a boot error.
