@@ -2150,3 +2150,29 @@ export function readPublicPostPayload(payload, options = {}) {
   const bodyBytes = readSnakeCellBytes(bodyPayload, { maxBytes, name: 'public body snake cell' });
   return readPublicBodyBytes(headerBytes, bodyBytes);
 }
+
+// HEADER-ONLY multipart info (v650): every PPH1 kind carries the multipart fields at the same fixed offsets
+// (streamId @8..24, part_index @24..26, part_count @26..28), so a chain walker can group entries into multipart
+// streams WITHOUT the ~32KB body reads — used by the feed sync's boundary-straddle extension to keep walking
+// until a window-split post's parts are all inside the window. TOLERANT: any malformed/foreign/future header
+// returns null (the walker just treats the entry as single-part), never throws.
+export function readPublicPartHeaderInfo(headerPayload) {
+  try {
+    if (!headerPayload) return null;
+    const header = readSnakeCellBytes(headerPayload, { maxBytes: PUBLIC_COMMENT_HEADER_BYTES, name: 'public header snake cell' });
+    if (header.length < 28) return null;
+    if (new TextDecoder().decode(header.slice(0, 4)) !== PUBLIC_HEADER_MAGIC) return null;
+    if (header[4] !== PUBLIC_BODY_VERSION) return null;
+    const partIndex = Number(readBigUintBytes(header, 24, 2, 'part_index'));
+    const partCount = Number(readBigUintBytes(header, 26, 2, 'part_count'));
+    if (!Number.isFinite(partIndex) || !Number.isFinite(partCount) || partCount <= 0 || partIndex >= partCount) return null;
+    return {
+      kind: header[5],
+      streamId: `0x${bytesToHex(header.slice(8, 24))}`,
+      partIndex,
+      partCount,
+    };
+  } catch {
+    return null;
+  }
+}

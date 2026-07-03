@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v649<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v649'/);
+    expect(html).toMatch(/id="appVersionLabel">v650<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v650'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=649" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=650" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4275,6 +4275,21 @@ describe('PWA runtime config guard', () => {
     expect(extension).toMatch(/await cooperativeYield\(\);/);
   });
 
+  it('PWA-PUBLIC-STRADDLE-01: a multipart POST straddling the per-author feed window extends the walk (header-only, no body reads)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/const PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;/);
+    // The walker groups entries into multipart streams from the HEADER alone (streamId/partIndex/partCount at
+    // fixed offsets — readPublicPartHeaderInfo is null-tolerant and unit-tested in pwa-contract-transactions).
+    const walk = app.slice(app.indexOf('const walkPublicChainIds = async'), app.indexOf("const allTime = syncWindow === 'long'"));
+    expect(walk).toMatch(/const info = readPublicPartHeaderInfo\(entry\?\.header_boc \?\? entry\?\.headerBoc\);/);
+    expect(walk).toMatch(/if \(!info \|\| info\.partCount <= 1\) return;/);
+    // The extension runs ONLY on a truncated exit with a split stream, bounded, and reuses the SAME walk step
+    // (so extended entries land in ids/entryIdsToScan and resolve+assemble normally this cycle).
+    expect(walk).toMatch(/if \(truncated && hasSplitPartStream\(\)\) \{/);
+    expect(walk).toMatch(/extendedScans < PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT && hasSplitPartStream\(\)/);
+    expect(walk).toMatch(/if \(!\(await walkOne\(\)\)\) return \{ ids, truncated \};/);
+  });
+
   it('PWA-PUBLIC-COMMENTS-BACKGROUND-FREE: comments load ONLY on thread open — no background walker exists (owner scalability requirement 2026-07-02)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const syncPublicSource = app.slice(
@@ -5582,11 +5597,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v720/);
+    expect(sw).toMatch(/platho-pwa-prototype-v721/);
     expect(sw).toMatch(/\.\/styles\.css\?v=206/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=649/);
+    expect(sw).toMatch(/\.\/app\.js\?v=650/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
@@ -5598,7 +5613,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=15/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=31/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=32/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=58/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=40/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);

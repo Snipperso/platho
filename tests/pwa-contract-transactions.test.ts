@@ -66,6 +66,7 @@ import {
   REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
   estimateVaultAttachedValueNanotons,
   readPublicPostPayload,
+  readPublicPartHeaderInfo,
   tonCell,
 } from '../web/pwa-contract-transactions.mjs';
 import {
@@ -1038,5 +1039,41 @@ describe('PWA contract transaction builders', () => {
       profileVersion: 2,
       avatarHash,
     });
+  });
+});
+
+// Header-ONLY multipart info (v650): the feed walk's straddle extension groups entries into multipart streams
+// without body reads — the parser must round-trip the builder's headers for every kind and NEVER throw on junk.
+describe('readPublicPartHeaderInfo', () => {
+  it('PWA-PUB-HDR-01: round-trips multipart fields from real builder headers (post, image, comment kinds)', async () => {
+    const streamId = new Uint8Array(16).fill(0x5a);
+    const image = await createPublicPostPayload({
+      type: 'image', bytes: new Uint8Array(64).fill(7), mediaFormat: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
+      streamId, partIndex: 1, partCount: 2, createdAtSec: 1_783_000_000,
+      profileVersion: 0, avatarHash: `0x${'00'.repeat(32)}`, commentsAllowed: true,
+    }, { sizeClass: 1 });
+    expect(readPublicPartHeaderInfo(image.header_boc)).toMatchObject({
+      kind: PUBLIC_BODY_KIND.IMAGE_POST,
+      streamId: `0x${'5a'.repeat(16)}`,
+      partIndex: 1,
+      partCount: 2,
+    });
+    const comment = await createPublicPostPayload({
+      type: 'comment', text: 'hi', streamId, partIndex: 0, partCount: 1, createdAtSec: 1_783_000_000,
+      profileVersion: 0, avatarHash: `0x${'00'.repeat(32)}`,
+      parentEntryId: 7n, parentHash: `0x${'11'.repeat(32)}`,
+    }, { sizeClass: 1 });
+    expect(readPublicPartHeaderInfo(comment.header_boc)).toMatchObject({
+      kind: PUBLIC_BODY_KIND.COMMENT,
+      partIndex: 0,
+      partCount: 1,
+    });
+  });
+
+  it('PWA-PUB-HDR-02: tolerant null on junk — a malformed header must never throw out of the walker', () => {
+    expect(readPublicPartHeaderInfo(null)).toBe(null);
+    expect(readPublicPartHeaderInfo(undefined)).toBe(null);
+    expect(readPublicPartHeaderInfo('not-a-boc')).toBe(null);
+    expect(readPublicPartHeaderInfo({ boc: 'AAAA' })).toBe(null);
   });
 });

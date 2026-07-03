@@ -128,6 +128,7 @@ import {
   PUBLIC_COMMENT_TEXT_MAX_BYTES,
   PUBLIC_POST_TEXT_MAX_BYTES,
   readPublicPostPayload,
+  readPublicPartHeaderInfo,
   RECEIVE_ASSETS,
   REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
   tonCell,
@@ -136,7 +137,7 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=31';
+} from './pwa-contract-transactions.mjs?v=32';
 import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
@@ -163,7 +164,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v649';
+const PLATHO_APP_RUNTIME_VERSION = 'v650';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -980,6 +981,10 @@ const PUBLIC_CHAIN_READ_LIMIT = 128;
 // generous safety cap so a pathological high-volume author cannot wedge the client; past it the feed honestly
 // reports itself incomplete (symmetric to the private walk's catch-up signal).
 const PUBLIC_CHAIN_LONG_READ_LIMIT = 4096;
+// Feed-walk straddle extension budget (v650, mirrors PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT): extra entries
+// the per-author walk may read past its window cap to close a multipart post split by the boundary. Cheap: these
+// are header-only entry reads (no bodies); the 8-part compose cap bounds real groups far below this.
+const PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;
 const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
 const PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT = 48;
 const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
@@ -7082,17 +7087,51 @@ async function syncPublicChannelFromChain() {
     const ids = [];
     let link = BigInt(latestLink ?? 0n);
     let truncated = false;
-    for (let n = 0; link > 0n; n += 1) {
-      if (n >= max) { truncated = true; break; }
+    // Header-only multipart tracking (v650): streamId/partIndex/partCount live at fixed header offsets, so the
+    // walker can tell a window-split multipart POST apart without any ~32KB body read.
+    const partStreams = new Map(); // streamId -> { partCount, seen:Set<partIndex> }
+    const noteWalkedHeader = (entry) => {
+      const info = readPublicPartHeaderInfo(entry?.header_boc ?? entry?.headerBoc);
+      if (!info || info.partCount <= 1) return;
+      const group = partStreams.get(info.streamId) ?? { partCount: info.partCount, seen: new Set() };
+      group.partCount = Math.max(group.partCount, info.partCount);
+      group.seen.add(info.partIndex);
+      partStreams.set(info.streamId, group);
+    };
+    const hasSplitPartStream = () => {
+      for (const group of partStreams.values()) {
+        if (group.seen.size < group.partCount) return true;
+      }
+      return false;
+    };
+    const walkOne = async () => {
       const entryId = link - 1n;
       const entry = await provider.getPublicEntry(entryId, readOptions);
       walkedEntries.set(entryId.toString(), entry);
-      if (entry.exists !== true) break;
+      if (entry.exists !== true) return false;
+      noteWalkedHeader(entry);
       ids.push(entryId);
       pushScanId(entryId);
       const prev = BigInt(entry.prev_link ?? 0n);
-      if (prev === link) break; // defensive: never spin on a self-referential link
+      if (prev === link) return false; // defensive: never spin on a self-referential link
       link = prev;
+      return true;
+    };
+    for (let n = 0; link > 0n; n += 1) {
+      if (n >= max) { truncated = true; break; }
+      if (!(await walkOne())) return { ids, truncated };
+    }
+    // Boundary-straddle extension (v650, the v649 private-walk rule applied to the feed's per-author walk): a
+    // window cap landing in the MIDDLE of a multipart post left the group incomplete forever — assemblePublicParts
+    // drops half groups, the ids never enter the cached set, and an unchanged author head never re-walks them.
+    // Keep walking (bounded) until every split stream seen by THIS walk closes; the ids then resolve+assemble
+    // normally in this same cycle.
+    if (truncated && hasSplitPartStream()) {
+      let extendedScans = 0;
+      while (link > 0n && extendedScans < PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT && hasSplitPartStream()) {
+        extendedScans += 1;
+        if (!(await walkOne())) return { ids, truncated };
+      }
     }
     return { ids, truncated };
   };

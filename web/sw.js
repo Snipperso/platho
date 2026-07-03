@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v720';
+const CACHE_NAME = 'platho-pwa-prototype-v721';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=206',
-  './app.js?v=649',
+  './app.js?v=650',
   './vendor/telegram-web-app.js?v=1',
   './boot-guard.js?v=3',
   './platho-config.mjs?v=98',
@@ -15,7 +15,7 @@ const ASSETS = [
   './encrypted-message-store.mjs?v=5',
   './platho-wallet.mjs?v=18',
   './ton-mnemonic-wordlist.mjs?v=1',
-  './pwa-contract-transactions.mjs?v=31',
+  './pwa-contract-transactions.mjs?v=32',
   './publish-batch-orchestration.mjs?v=6',
   './vault-ton-rpc-provider.mjs?v=58',
   './ton-dns-provider.mjs?v=36',
