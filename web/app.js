@@ -164,7 +164,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v650';
+const PLATHO_APP_RUNTIME_VERSION = 'v651';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -391,15 +391,35 @@ const rpcKeyRow = document.querySelector('#rpcKeyRow');
 // globalThis.plathoToncenterApiKey. Keyless toncenter keeps working without it.
 const TONCENTER_API_KEY_STORAGE_KEY = 'platho.toncenter.apiKey.v1';
 
+// Compact RPC-key status (v651, owner: "key active" ate the row) — a single pictogram with the full text in the
+// tooltip: ✓ active, ✕ rejected, ⏳ still checking/activating, empty when no key.
+const TONCENTER_KEY_STATUS_ICONS = Object.freeze({
+  active: { icon: '✓', state: 'ok', title: 'Key active' },
+  error: { icon: '✕', state: 'error', title: 'Key not accepted - re-check it' },
+  checking: { icon: '⏳', state: '', title: 'Checking...' },
+  activating: { icon: '⏳', state: '', title: 'Saved - activating (up to ~1 min)' },
+  empty: { icon: '', state: '', title: '' },
+});
+
+function setToncenterKeyStatusIcon(kind) {
+  if (!toncenterKeyStatus) return;
+  const entry = TONCENTER_KEY_STATUS_ICONS[kind] ?? TONCENTER_KEY_STATUS_ICONS.empty;
+  toncenterKeyStatus.textContent = entry.icon;
+  toncenterKeyStatus.title = entry.title;
+  toncenterKeyStatus.setAttribute('aria-label', entry.title);
+  if (entry.state) {
+    toncenterKeyStatus.setAttribute('data-state', entry.state);
+  } else {
+    toncenterKeyStatus.removeAttribute('data-state');
+  }
+}
+
 function refreshToncenterKeyUi() {
   let key = globalThis.plathoToncenterApiKey ?? null;
   if (key == null) {
     try { key = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { key = null; }
   }
-  if (toncenterKeyStatus) {
-    toncenterKeyStatus.textContent = key ? 'key active' : '';
-    toncenterKeyStatus.removeAttribute('data-state');
-  }
+  setToncenterKeyStatusIcon(key ? 'active' : 'empty');
   if (toncenterApiKeyInput && document.activeElement !== toncenterApiKeyInput) {
     toncenterApiKeyInput.value = key ?? '';
   }
@@ -466,10 +486,7 @@ function scheduleToncenterKeyReverify(key) {
     if ((globalThis.plathoToncenterApiKey ?? null) !== key) return;
     if (result.ok) {
       clearToncenterKeyReverify();
-      if (toncenterKeyStatus) {
-        toncenterKeyStatus.textContent = 'key active';
-        toncenterKeyStatus.removeAttribute('data-state');
-      }
+      setToncenterKeyStatusIcon('active');
       return;
     }
     if (isFinal && result.reason === 'invalid') {
@@ -477,10 +494,7 @@ function scheduleToncenterKeyReverify(key) {
       // does not 401 every read forever; the user sees a clear, actionable status.
       applyToncenterApiKey('');
       if (toncenterApiKeyInput && document.activeElement !== toncenterApiKeyInput) toncenterApiKeyInput.value = '';
-      if (toncenterKeyStatus) {
-        toncenterKeyStatus.textContent = 'key not accepted - re-check it';
-        toncenterKeyStatus.setAttribute('data-state', 'error');
-      }
+      setToncenterKeyStatusIcon('error');
     }
   };
   // toncenter activation typically lands within a minute; re-check at 25s and (final) 60s.
@@ -504,10 +518,7 @@ async function commitToncenterKeyFromInput() {
     refreshToncenterKeyUi();
     return;
   }
-  if (toncenterKeyStatus) {
-    toncenterKeyStatus.textContent = 'checking...';
-    toncenterKeyStatus.removeAttribute('data-state');
-  }
+  setToncenterKeyStatusIcon('checking');
   // Keep "checking..." on screen for a perceptible beat even when the network validation returns fast,
   // so the user actually sees the key being verified before it flips to its result.
   const minCheckingVisible = new Promise((resolve) => setTimeout(resolve, 450));
@@ -516,10 +527,7 @@ async function commitToncenterKeyFromInput() {
   applyToncenterApiKey(trimmed);
   if (result.reason === 'invalid') {
     // Not a hard reject: a just-issued key is not active yet. Keep it, show activating, and re-verify.
-    if (toncenterKeyStatus) {
-      toncenterKeyStatus.textContent = 'saved - activating (up to ~1 min)';
-      toncenterKeyStatus.removeAttribute('data-state');
-    }
+    setToncenterKeyStatusIcon('activating');
     scheduleToncenterKeyReverify(trimmed);
   }
 }
@@ -2263,10 +2271,15 @@ function setAvatarNode(node, fallback, imageUrl = null) {
     node.textContent = '';
     node.classList.add('has-image');
     node.style.backgroundImage = `url("${imageUrl}")`;
+    // Tap-to-view (v651): the delegated document click opens any image-bearing avatar in the fullscreen
+    // lightbox — the url rides in the dataset so the handler needs no re-resolution. Avatars inside BUTTONS
+    // (thread list rows etc.) are excluded there: their click keeps its own meaning.
+    node.dataset.avatarUrl = imageUrl;
     return;
   }
   node.classList.remove('has-image');
   node.style.backgroundImage = '';
+  delete node.dataset.avatarUrl;
   node.textContent = String(fallback ?? 'P').slice(0, 2).toUpperCase();
 }
 
@@ -5089,6 +5102,7 @@ function appendPublicItemComments(article, item) {
     row.append(commentAuthorRow);
     appendPublicItemContent(row, comment);
     appendRowReplyButton(row, beginPublicCommentReplyForRow);
+    appendRowCopyButton(row, copyTextFromContent(comment));
     commentList.append(row);
   }
   article.append(commentList);
@@ -13371,6 +13385,7 @@ function renderConversation() {
     }
     if (manualActions) row.append(manualActions);
     appendRowReplyButton(row, beginPrivateReplyForRow);
+    appendRowCopyButton(row, copyTextFromContent(message));
     messageStrip.append(row);
   });
 
@@ -13571,6 +13586,18 @@ publicPane?.addEventListener('keydown', (event) => {
   openImageLightbox(target.dataset.fullImageSrc, target.dataset.fullImageMeta);
 });
 
+// Avatar tap-to-view (v651): any image-bearing avatar opens in the fullscreen lightbox (pinch-zoomable, like
+// message images). Avatars inside interactive elements keep their own click (thread rows are buttons — opening
+// the chat wins); everywhere else (chat header, feed author rows, comment rows, post detail header) the avatar
+// itself is the affordance.
+document.body.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  const avatar = target?.closest?.('.avatar[data-avatar-url]');
+  if (!avatar) return;
+  if (avatar.closest('button, a, [role="button"]')) return;
+  openImageLightbox(avatar.dataset.avatarUrl, 'Avatar');
+});
+
 // ---- Swipe-to-reply gesture (v646, v647 UX pass) ------------------------------------------------------------------
 // Telegram-style: drag a row PAST the threshold — EITHER direction (v647: a one-letter incoming bubble sits at
 // the screen edge, leaving no room to drag left; rightward works everywhere) — to quote it in the composer.
@@ -13662,6 +13689,24 @@ function appendRowReplyButton(row, onReply) {
   row.append(button);
 }
 
+// Desktop-visible copy affordance (v651, mobile = long-press): rendered only when the row has copyable TEXT
+// (captured at render time — no re-resolution on click). Same hover-only CSS family as the Reply button.
+function appendRowCopyButton(row, copyText) {
+  const value = String(copyText ?? '').trim();
+  if (!value) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'row-reply-button row-copy-button';
+  button.title = 'Copy text';
+  button.setAttribute('aria-label', 'Copy text');
+  button.textContent = '⧉';
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    copyRowText(row, value);
+  });
+  row.append(button);
+}
+
 function beginPrivateReplyForRow(row) {
   const entryId = row?.dataset?.entryId;
   const thread = threads.find((candidate) => candidate.id === activeThreadId);
@@ -13690,6 +13735,108 @@ function beginPublicCommentReplyForRow(row) {
 
 attachSwipeToReply(messageStrip, '.message', beginPrivateReplyForRow);
 attachSwipeToReply(publicPane, '.comment-item', beginPublicCommentReplyForRow);
+
+// ---- Long-press to copy (v651) ------------------------------------------------------------------------------------
+// Telegram-style: hold a message/comment (~0.5s, touch only) to copy its TEXT to the clipboard with a green
+// camera-flash confirmation on the bubble. Desktop gets a hover Copy button next to the Reply one. The full text
+// (not the reply-snippet cap) — text blocks joined, quote/payment/image blocks excluded.
+const LONG_PRESS_COPY_MS = 500;
+
+function copyTextFromContent(item) {
+  const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
+  const fromBlocks = blocks
+    .filter((block) => block?.type === 'text' && String(block.text ?? '').trim())
+    .map((block) => String(block.text).trim())
+    .join('\n');
+  return fromBlocks || String(item?.text ?? '').trim();
+}
+
+function flashCopyFeedback(row) {
+  const target = row?.querySelector?.('.bubble') ?? row;
+  if (!target) return;
+  target.classList.remove('copy-flash');
+  requestAnimationFrame(() => target.classList.add('copy-flash'));
+  window.setTimeout(() => target.classList.remove('copy-flash'), 800);
+}
+
+async function copyRowText(row, text) {
+  const value = String(text ?? '').trim();
+  if (!value || !navigator.clipboard?.writeText) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    flashCopyFeedback(row);
+  } catch {
+    /* clipboard permission denied — no feedback, nothing copied */
+  }
+}
+
+function privateRowCopyText(row) {
+  const entryId = row?.dataset?.entryId;
+  const thread = threads.find((candidate) => candidate.id === activeThreadId);
+  if (!entryId || !thread) return '';
+  const message = thread.messages.find((candidate) => String(candidate.chainEntryId ?? '') === entryId);
+  return message ? copyTextFromContent(message) : '';
+}
+
+function publicCommentRowCopyText(row) {
+  const entryId = row?.dataset?.entryId;
+  if (!entryId || !publicPostDetailOpen) return '';
+  const comment = publicPostDetailMergedComments().find((candidate) => String(candidate.entryId ?? '') === entryId);
+  return comment ? copyTextFromContent(comment) : '';
+}
+
+// Touch-only long-press: fires when the finger stays within the slop for the hold window. Movement hands the
+// gesture to the swipe engine / native scroll; the release click is swallowed (capture phase) so a long-press
+// over an image never pops the lightbox. Android's native contextmenu on touch-hold is suppressed for rows —
+// our copy IS the long-press action (iOS shows no contextmenu; its selection callout is disabled via CSS).
+function attachLongPressCopy(container, rowSelector, getText) {
+  if (!container) return;
+  let press = null; // { pointerId, row, startX, startY, timer }
+  let suppressClickUntil = 0;
+  container.addEventListener('click', (event) => {
+    if (Date.now() >= suppressClickUntil) return;
+    suppressClickUntil = 0;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+  const cancelPress = () => {
+    if (!press) return;
+    window.clearTimeout(press.timer);
+    press = null;
+  };
+  container.addEventListener('pointerdown', (event) => {
+    if (event.pointerType !== 'touch') return;
+    const row = event.target instanceof Element ? event.target.closest(rowSelector) : null;
+    if (!row) return;
+    cancelPress();
+    press = {
+      pointerId: event.pointerId,
+      row,
+      startX: event.clientX,
+      startY: event.clientY,
+      timer: window.setTimeout(() => {
+        const held = press;
+        press = null;
+        if (!held) return;
+        suppressClickUntil = Date.now() + 400;
+        copyRowText(held.row, getText(held.row));
+      }, LONG_PRESS_COPY_MS),
+    };
+  });
+  container.addEventListener('pointermove', (event) => {
+    if (!press || event.pointerId !== press.pointerId) return;
+    if (Math.abs(event.clientX - press.startX) >= 10 || Math.abs(event.clientY - press.startY) >= 10) cancelPress();
+  });
+  container.addEventListener('pointerup', cancelPress);
+  container.addEventListener('pointercancel', cancelPress);
+  container.addEventListener('contextmenu', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (press || (Date.now() < suppressClickUntil && target?.closest?.(rowSelector))) event.preventDefault();
+  });
+}
+
+attachLongPressCopy(messageStrip, '.message', privateRowCopyText);
+attachLongPressCopy(publicPane, '.comment-item', publicCommentRowCopyText);
 
 // Desktop parity (Telegram desktop convention): double-click a message/comment to reply. Images keep their
 // lightbox (a dblclick on an image is ignored here), buttons keep their own actions.
@@ -19335,7 +19482,6 @@ async function attemptPrivatePaymentCheckPublish(context) {
   let createResult = null;
   let intentCreateSubmitted = false;
   try {
-    setText(identitySubtitle, 'creating payment check');
     message.meta = 'creating payment check';
     await updateMessageInEncryptedHistory(thread, message);
     createResult = await submitVaultReceiveIntentExternal('CreateReceiveIntent', {
@@ -19515,7 +19661,6 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
   const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
   const intent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId);
   assertReceiveIntentMatchesPayment(intent, payment);
-  setText(identitySubtitle, 'claim signing');
   await options.onStatus?.('check claim signing');
   const result = await submitVaultReceiveIntentExternal('ClaimReceiveIntent', {
     intent_id: intentId,
@@ -19525,7 +19670,6 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
     user: beforeUser,
     allowPendingServiceWorkerUpdate: true,
   });
-  setText(identitySubtitle, 'claim confirming');
   await options.onStatus?.('check claim submitted, confirming');
   await markPendingPaymentCheckLedgerRecord(payment, {
     status: 'claim_submitted',
@@ -19550,7 +19694,6 @@ async function submitVaultCancelPaymentCheck(payment, options = {}) {
   const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
   const intent = await readFreshReceiveIntentForCancel(provider, intentId);
   assertReceiveIntentCancelableBySender(intent, payment);
-  setText(identitySubtitle, 'cancel signing');
   await options.onStatus?.('check cancel signing');
   const result = await submitVaultReceiveIntentExternal('CancelReceiveIntent', {
     intent_id: intentId,
@@ -19559,7 +19702,6 @@ async function submitVaultCancelPaymentCheck(payment, options = {}) {
     user: beforeUser,
     allowPendingServiceWorkerUpdate: true,
   });
-  setText(identitySubtitle, 'cancel confirming');
   await options.onStatus?.('check cancel submitted, confirming');
   await markPendingPaymentCheckLedgerRecord(payment, {
     status: 'cancel_submitted',

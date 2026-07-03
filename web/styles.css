@@ -950,6 +950,51 @@ html[data-platho-telegram="true"] .install-header-button {
   text-underline-offset: 2px;
 }
 
+/* Desktop Copy button (v651): sits next to the Reply button; outgoing bubbles flip both to the left corner. */
+.row-copy-button {
+  right: 32px;
+}
+
+.message.out .row-copy-button {
+  right: auto;
+  left: 32px;
+}
+
+@media (hover: hover) {
+  .message:hover > .row-copy-button,
+  .comment-item:hover > .row-copy-button,
+  .row-copy-button:focus-visible {
+    display: inline-flex;
+  }
+}
+
+/* Long-press copy confirmation (v651): a quick green "camera flash" over the bubble/row. */
+@keyframes copy-flash {
+  0% { background-color: rgba(48, 213, 176, 0); }
+  18% { background-color: rgba(48, 213, 176, 0.55); }
+  100% { background-color: transparent; }
+}
+
+.copy-flash {
+  animation: copy-flash 0.6s ease-out 1;
+}
+
+/* Touch devices: long-press IS the copy action — suppress the native selection callout / context selection on
+   the rows (desktop keeps normal text selection; this applies only where hover is unavailable). */
+@media (hover: none) {
+  .message .bubble,
+  .comment-item {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* An image-bearing avatar is tappable (v651) — zoom cursor everywhere it opens the lightbox. */
+.avatar.has-image {
+  cursor: zoom-in;
+}
+
 .message.is-swiping,
 .comment-item.is-swiping {
   transition: none;
@@ -957,6 +1002,12 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .message.swipe-armed .bubble,
 .comment-item.swipe-armed {
+  border-color: var(--accent);
+}
+
+/* Own bubbles override border-color later in the sheet (.message.out .bubble) at equal specificity — this
+   higher-specificity rule keeps the armed ring visible on OUTGOING messages too (v651, owner report). */
+.message.out.swipe-armed .bubble {
   border-color: var(--accent);
 }
 
@@ -2504,7 +2555,9 @@ button.feed-item:hover {
   flex: 0 0 auto;
   color: var(--muted);
   white-space: nowrap;
-  font-size: 13px;
+  /* A single pictogram since v651 (✓ / ✕ / ⏳, full text in the tooltip) — bigger glyph, no more row squeeze. */
+  font-size: 16px;
+  line-height: 1;
 }
 
 .rpc-key-status[data-state="error"] {

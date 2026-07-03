@@ -262,12 +262,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v650<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v650'/);
+    expect(html).toMatch(/id="appVersionLabel">v651<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v651'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=650" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=651" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2260,12 +2260,17 @@ describe('PWA runtime config guard', () => {
     // Optimistic save BEFORE the invalid-branch: a 401/403 shows 'activating' + schedules a background re-verify
     // instead of hard-rejecting; a persistent reject after the grace window reverts to keyless with a clear status.
     expect(app).toMatch(/await minCheckingVisible;\s*applyToncenterApiKey\(trimmed\);\s*if \(result\.reason === 'invalid'\) \{/);
-    expect(app).toMatch(/toncenterKeyStatus\.textContent = 'saved - activating \(up to ~1 min\)'/);
+    // v651: the row status is a single PICTOGRAM (✓ / ✕ / ⏳) with the full text in the tooltip — the old
+    // 'key active' text ate half the row on a phone. setToncenterKeyStatusIcon is the ONLY status writer.
+    expect(app).toMatch(/setToncenterKeyStatusIcon\('activating'\);/);
     expect(app).toMatch(/scheduleToncenterKeyReverify\(trimmed\)/);
-    expect(app).toMatch(/toncenterKeyStatus\.textContent = 'key not accepted - re-check it'/);
+    expect(app).toMatch(/setToncenterKeyStatusIcon\('error'\);/);
+    expect(app).toMatch(/setToncenterKeyStatusIcon\('checking'\);/);
+    expect(app).toMatch(/const TONCENTER_KEY_STATUS_ICONS = Object\.freeze\(\{/);
+    expect(app).toMatch(/toncenterKeyStatus\.title = entry\.title;/);
     // "recommended" lives in the section heading, not the row, so it never crowds the key input on a narrow
-    // phone; the in-row status is empty when there is no key (validation states like 'invalid key' still show).
-    expect(app).toMatch(/toncenterKeyStatus\.textContent = key \? 'key active' : ''/);
+    // phone; the in-row status is empty when there is no key.
+    expect(app).toMatch(/setToncenterKeyStatusIcon\(key \? 'active' : 'empty'\);/);
     expect(readFileSync('web/index.html', 'utf8')).toMatch(/<h2>RPC access \(recommended\)<\/h2>/);
     // The key input is a distinct dark field box (not frameless/transparent) so it reads as a text input on the row.
     expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.settings-rpc-row input\s*\{[\s\S]*?background:\s*var\(--panel\)/);
@@ -4290,6 +4295,42 @@ describe('PWA runtime config guard', () => {
     expect(walk).toMatch(/if \(!\(await walkOne\(\)\)\) return \{ ids, truncated \};/);
   });
 
+  it('PWA-COPY-01: long-press copies message/comment text with a flash (touch); desktop gets a hover Copy button; avatars open the lightbox', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // Long-press engine: touch-only, hold window, cancel-on-move, release click swallowed, Android contextmenu
+    // suppressed for rows (our copy IS the long-press action).
+    expect(app).toMatch(/const LONG_PRESS_COPY_MS = 500;/);
+    expect(app).toMatch(/function attachLongPressCopy\(container, rowSelector, getText\)/);
+    const press = app.slice(app.indexOf('function attachLongPressCopy'), app.indexOf('attachLongPressCopy(messageStrip'));
+    expect(press).toMatch(/if \(event\.pointerType !== 'touch'\) return;/);
+    expect(press).toMatch(/>= 10 \|\| Math\.abs\(event\.clientY - press\.startY\) >= 10\) cancelPress\(\);/);
+    expect(press).toMatch(/container\.addEventListener\('contextmenu'/);
+    // Wired on BOTH surfaces with object-resolving text getters (full text, not the reply-snippet cap).
+    expect(app).toMatch(/attachLongPressCopy\(messageStrip, '\.message', privateRowCopyText\);/);
+    expect(app).toMatch(/attachLongPressCopy\(publicPane, '\.comment-item', publicCommentRowCopyText\);/);
+    expect(app).toMatch(/function copyTextFromContent\(item\)/);
+    // Clipboard write + flash only on success; the flash is a CSS class (prod CSP).
+    expect(app).toMatch(/await navigator\.clipboard\.writeText\(value\);\s*flashCopyFeedback\(row\);/);
+    expect(css).toMatch(/@keyframes copy-flash \{/);
+    expect(css).toMatch(/\.copy-flash \{\s*animation: copy-flash/);
+    // Desktop hover Copy button rendered ONLY for rows with copyable text, on both surfaces.
+    expect(app).toMatch(/function appendRowCopyButton\(row, copyText\)/);
+    expect(app).toMatch(/appendRowCopyButton\(row, copyTextFromContent\(message\)\);/);
+    expect(app).toMatch(/appendRowCopyButton\(row, copyTextFromContent\(comment\)\);/);
+    expect(css).toMatch(/\.row-copy-button \{\s*right: 32px;/);
+    // Touch devices: native selection callout suppressed on rows (long-press is the copy action there).
+    expect(css).toMatch(/@media \(hover: none\) \{[\s\S]*?-webkit-touch-callout: none;/);
+    // Armed swipe ring stays visible on OUTGOING bubbles (their border-color override loses to this rule).
+    expect(css).toMatch(/\.message\.out\.swipe-armed \.bubble \{\s*border-color: var\(--accent\);/);
+    // Avatar tap-to-view: dataset url + delegated click that skips avatars inside interactive elements.
+    expect(app).toMatch(/node\.dataset\.avatarUrl = imageUrl;/);
+    expect(app).toMatch(/\.closest\?\.\('\.avatar\[data-avatar-url\]'\)/);
+    expect(app).toMatch(/if \(avatar\.closest\('button, a, \[role="button"\]'\)\) return;/);
+    expect(app).toMatch(/openImageLightbox\(avatar\.dataset\.avatarUrl, 'Avatar'\);/);
+    expect(css).toMatch(/\.avatar\.has-image \{\s*cursor: zoom-in;/);
+  });
+
   it('PWA-PUBLIC-COMMENTS-BACKGROUND-FREE: comments load ONLY on thread open — no background walker exists (owner scalability requirement 2026-07-02)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const syncPublicSource = app.slice(
@@ -5597,11 +5638,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v721/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=206/);
+    expect(sw).toMatch(/platho-pwa-prototype-v722/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=207/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=650/);
+    expect(sw).toMatch(/\.\/app\.js\?v=651/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
