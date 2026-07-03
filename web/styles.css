@@ -3931,63 +3931,46 @@ button.feed-item:hover {
   visibility: hidden;
 }
 
+/* Pure-CSS spinner: ONLY transform/opacity animate, so the browser composites them on the GPU thread and they
+   keep moving even while the main thread is blocked by the synchronous post-unlock crypto. No SVG filter (that
+   forces main-thread paint and would freeze). The teal glow is a STATIC box-shadow that rides the composited
+   transform. */
 .boot-spinner {
-  width: clamp(84px, 22vw, 112px);
-  height: clamp(84px, 22vw, 112px);
+  position: relative;
+  width: clamp(84px, 22vw, 108px);
+  height: clamp(84px, 22vw, 108px);
 }
 
-.boot-spinner svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+.boot-spinner-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  will-change: transform;
 }
 
-.boot-spinner circle {
-  transform-origin: 60px 60px;
+.boot-spinner-ring-outer {
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  box-shadow: 0 0 10px rgba(48, 213, 176, 0.35);
+  animation: bootSpin 1.4s linear infinite;
 }
 
-/* fill:none only on the ring strokes — NOT via `.boot-spinner circle` (that 0,1,1 selector would beat the
-   single-class fill on the core/orbit dot and hide them). */
-.boot-spinner-track,
-.boot-spinner-arc {
-  fill: none;
-}
-
-.boot-spinner-track {
-  stroke: rgba(48, 213, 176, 0.13);
-  stroke-width: 2;
-}
-
-.boot-spinner-arc {
-  stroke: var(--accent);
-  stroke-width: 3;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 6px rgba(48, 213, 176, 0.55));
-}
-
-.boot-spinner-arc-outer {
-  stroke-dasharray: 74 215;
-  animation: bootSpin 1.5s linear infinite;
-}
-
-.boot-spinner-arc-inner {
-  stroke: rgba(48, 213, 176, 0.72);
-  stroke-dasharray: 40 148;
-  animation: bootSpinReverse 2.1s linear infinite;
+.boot-spinner-ring-inner {
+  inset: 20%;
+  border-bottom-color: rgba(48, 213, 176, 0.72);
+  border-left-color: rgba(48, 213, 176, 0.72);
+  animation: bootSpinReverse 2s linear infinite;
 }
 
 .boot-spinner-core {
-  fill: var(--accent);
-  stroke: none;
-  filter: drop-shadow(0 0 9px rgba(48, 213, 176, 0.85));
+  position: absolute;
+  inset: 41%;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(48, 213, 176, 0.8);
+  will-change: transform, opacity;
   animation: bootCorePulse 1.5s ease-in-out infinite;
-}
-
-.boot-spinner-orbit-dot {
-  fill: #d2fff4;
-  stroke: none;
-  filter: drop-shadow(0 0 7px rgba(48, 213, 176, 0.95));
-  animation: bootSpin 1.5s linear infinite;
 }
 
 @keyframes bootSpin {
@@ -4021,9 +4004,8 @@ button.feed-item:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .boot-spinner-arc-outer,
-  .boot-spinner-arc-inner,
-  .boot-spinner-orbit-dot {
+  .boot-spinner-ring-outer,
+  .boot-spinner-ring-inner {
     animation: none;
   }
   .boot-spinner-core {

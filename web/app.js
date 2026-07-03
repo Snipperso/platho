@@ -172,14 +172,15 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=2';
+} from './i18n.mjs?v=3';
+import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
 // Locale resolves BEFORE any rendering (stored choice -> Telegram profile -> browser); static HTML gets its
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v657';
+const PLATHO_APP_RUNTIME_VERSION = 'v658';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -24005,199 +24006,46 @@ let bootScreenActive = Boolean(bootScreen) && bootScreen.hidden !== true;
 let stopBootSignalField = null;
 let bootScreenSafetyTimer = null;
 
-// The signal-field backdrop (ported from about.platho.app): a living teal lattice with roaming
-// flashlights + short "signal" routes. Returns a stop() that cancels the animation loop.
+// The signal-field backdrop (ported from about.platho.app): a living teal lattice. Runs OFF the main thread
+// on an OffscreenCanvas worker when supported (so it never freezes under the crypto-heavy boot — owner's ask),
+// falling back to a main-thread loop otherwise. Returns a stop() that tears the animation down.
 function startBootSignalField(canvas) {
   if (!canvas) return () => {};
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const reduceMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // Preferred path: transfer the canvas to a worker and animate there, immune to main-thread jank.
+  if (typeof Worker !== 'undefined' && typeof canvas.transferControlToOffscreen === 'function') {
+    try {
+      const worker = new Worker('./boot-signal-worker.js?v=1', { type: 'module' });
+      const offscreen = canvas.transferControlToOffscreen();
+      worker.postMessage(
+        { type: 'init', canvas: offscreen, width: window.innerWidth, height: window.innerHeight, dpr, reduceMotion },
+        [offscreen],
+      );
+      const onResize = () => { try { worker.postMessage({ type: 'resize', width: window.innerWidth, height: window.innerHeight }); } catch { /* worker gone */ } };
+      window.addEventListener('resize', onResize);
+      return () => {
+        window.removeEventListener('resize', onResize);
+        try { worker.postMessage({ type: 'stop' }); } catch { /* ignore */ }
+        try { worker.terminate(); } catch { /* ignore */ }
+      };
+    } catch (error) {
+      // transferControlToOffscreen not actually usable here — fall through to the main-thread loop below.
+      console.error(error);
+    }
+  }
+  // Fallback: main-thread loop (can jank under heavy crypto, but works everywhere).
   const ctx = canvas.getContext('2d');
   if (!ctx) return () => {};
-  const TEAL = '48, 213, 176';
-  const TWO_PI = Math.PI * 2;
-  const GAP = 38;
-  const AMBIENT = 0.11;
-  const BOOST = 0.34;
-  const reduceMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  let W = 0; let H = 0; let cols = 0; let rows = 0; let ox = 0; let oy = 0; let cx = 0; let cy = 0;
-  let lights = [];
-  let raf = null; let last = 0; let acc = 0; let gate = 0; let stopped = false;
-
-  function sizeLights() {
-    const m = Math.min(W, H);
-    if (!lights.length) {
-      lights = [
-        { x: W * 0.30, y: H * 0.34, ang: 0.8, sp: 92 },
-        { x: W * 0.72, y: H * 0.66, ang: 3.7, sp: 72 },
-      ];
-    }
-    const radii = [Math.max(240, Math.min(520, m * 0.44)), Math.max(180, Math.min(400, m * 0.30))];
-    for (let i = 0; i < lights.length; i += 1) {
-      const L = lights[i];
-      L.R = radii[i] || radii[radii.length - 1];
-      L.r2 = L.R * L.R;
-      if (L.x > W) L.x = W;
-      if (L.y > H) L.y = H;
-    }
-  }
-  function resize() {
-    W = window.innerWidth; H = window.innerHeight;
-    if (!W || !H) return;
-    canvas.width = Math.floor(W * dpr);
-    canvas.height = Math.floor(H * dpr);
-    canvas.style.width = `${W}px`;
-    canvas.style.height = `${H}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    cols = Math.ceil(W / GAP) + 1;
-    rows = Math.ceil(H / GAP) + 1;
-    ox = (W - (cols - 1) * GAP) / 2;
-    oy = (H - (rows - 1) * GAP) / 2;
-    cx = W / 2; cy = H / 2;
-    sizeLights();
-  }
-  const nx = (c) => ox + c * GAP;
-  const ny = (r) => oy + r * GAP;
-  function edgeFade(x, y) {
-    const dx = (x - cx) / (W * 0.5);
-    const dy = (y - cy) / (H * 0.5);
-    const d = Math.min(1, Math.sqrt(dx * dx + dy * dy));
-    return 1 - 0.32 * d;
-  }
-  function lightAt(x, y) {
-    let b = 0;
-    for (let i = 0; i < lights.length; i += 1) {
-      const L = lights[i];
-      const ddx = x - L.x; const ddy = y - L.y;
-      const d2 = ddx * ddx + ddy * ddy;
-      if (d2 < L.r2) { let f = 1 - d2 / L.r2; f *= f; if (f > b) b = f; }
-    }
-    return b;
-  }
-  function drawDots() {
-    for (let c = 0; c < cols; c += 1) {
-      for (let r = 0; r < rows; r += 1) {
-        const x = nx(c); const y = ny(r);
-        const lb = lightAt(x, y);
-        const a = (AMBIENT + BOOST * lb) * edgeFade(x, y);
-        ctx.beginPath();
-        ctx.arc(x, y, 1.3 + 1.1 * lb, 0, TWO_PI);
-        ctx.fillStyle = `rgba(${TEAL},${a.toFixed(3)})`;
-        ctx.fill();
-      }
-    }
-  }
-  function updateLights(dt) {
-    const s = dt / 1000;
-    for (let i = 0; i < lights.length; i += 1) {
-      const L = lights[i];
-      L.ang += (Math.random() - 0.5) * 1.4 * s;
-      L.x += Math.cos(L.ang) * L.sp * s;
-      L.y += Math.sin(L.ang) * L.sp * s;
-      if (L.x < 0) { L.x = 0; L.ang = Math.PI - L.ang; } else if (L.x > W) { L.x = W; L.ang = Math.PI - L.ang; }
-      if (L.y < 0) { L.y = 0; L.ang = -L.ang; } else if (L.y > H) { L.y = H; L.ang = -L.ang; }
-    }
-  }
-  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-  const signals = [];
-  const HOP = 170; const TAU = 620;
-  const maxSignals = () => Math.min(24, Math.max(12, Math.round((W * H) / 26000)));
-  function spawn() {
-    const path = [{ c: Math.floor(Math.random() * cols), r: Math.floor(Math.random() * rows) }];
-    const len = 6 + Math.floor(Math.random() * 7);
-    let prev = null;
-    for (let i = 0; i < len; i += 1) {
-      const cur = path[path.length - 1];
-      const cand = [];
-      for (let d = 0; d < DIRS.length; d += 1) {
-        const nc = cur.c + DIRS[d][0]; const nr = cur.r + DIRS[d][1];
-        if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
-        if (prev && nc === prev.c && nr === prev.r) continue;
-        cand.push({ c: nc, r: nr });
-      }
-      if (!cand.length) break;
-      path.push(cand[Math.floor(Math.random() * cand.length)]);
-      prev = cur;
-    }
-    if (path.length >= 2) signals.push({ path, t: 0 });
-  }
-  function strokeEdge(x0, y0, x1, y1, a) {
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x1, y1);
-    ctx.strokeStyle = `rgba(${TEAL},${a.toFixed(3)})`;
-    ctx.lineWidth = 1.1;
-    ctx.stroke();
-  }
-  function litNode(x, y, inten, v) {
-    // No canvas shadowBlur here: it is the single most expensive op per frame and starves the main thread on
-    // mobile during the crypto-heavy post-unlock boot. A brighter cyan fill on lit routes reads the same.
-    ctx.beginPath();
-    ctx.arc(x, y, 1.4 + 2.2 * inten, 0, TWO_PI);
-    ctx.fillStyle = inten > 0.55
-      ? `rgba(210, 255, 244,${(0.9 * inten * v).toFixed(3)})`
-      : `rgba(${TEAL},${(0.85 * inten * v).toFixed(3)})`;
-    ctx.fill();
-  }
-  function drawSignals(dt) {
-    for (let s = signals.length - 1; s >= 0; s -= 1) {
-      const sig = signals[s];
-      sig.t += dt;
-      const prog = sig.t / HOP;
-      const hi = Math.floor(prog);
-      const n = sig.path.length;
-      const top = Math.min(hi, n - 1);
-      for (let i = 0; i <= top; i += 1) {
-        const since = (prog - i) * HOP;
-        const inten = Math.exp(-since / TAU);
-        if (inten < 0.02) continue;
-        const p = sig.path[i];
-        const x = nx(p.c); const y = ny(p.r); const v = edgeFade(x, y);
-        if (i > 0) { const pp = sig.path[i - 1]; strokeEdge(nx(pp.c), ny(pp.r), x, y, 0.5 * inten * v); }
-        litNode(x, y, inten, v);
-      }
-      if (hi < n - 1) {
-        const a = sig.path[hi]; const b = sig.path[hi + 1];
-        const f = prog - hi;
-        const axp = nx(a.c); const ayp = ny(a.r); const bx = nx(b.c); const by = ny(b.r);
-        strokeEdge(axp, ayp, axp + (bx - axp) * f, ayp + (by - ayp) * f, 0.55 * edgeFade(axp, ayp));
-      }
-      if (prog > (n - 1) + (TAU * 3) / HOP) signals.splice(s, 1);
-    }
-  }
-  function paintOnce() {
-    if (!W || !H) return;
-    ctx.clearRect(0, 0, W, H);
-    drawDots();
-    drawSignals(0);
-  }
-  function frame(now) {
-    raf = null;
-    if (stopped) return;
-    const dt = last ? Math.min(now - last, 60) : 16;
-    last = now;
-    gate += dt;
-    if (gate >= 30) {
-      updateLights(gate);
-      ctx.clearRect(0, 0, W, H);
-      drawDots();
-      acc += gate;
-      if (acc > 240 && signals.length < maxSignals()) { spawn(); acc = 0; }
-      drawSignals(gate);
-      gate = 0;
-    }
-    schedule();
-  }
-  function schedule() { if (raf === null && !stopped) raf = requestAnimationFrame(frame); }
-  const onResize = () => { resize(); paintOnce(); };
-
-  resize();
+  const field = createBootSignalField(ctx, { reduceMotion });
+  field.resize(window.innerWidth, window.innerHeight, dpr);
+  field.start();
+  let raf = null;
+  let stopped = false;
+  const loop = (now) => { raf = null; if (stopped) return; field.tick(now); raf = requestAnimationFrame(loop); };
+  const onResize = () => { field.resize(window.innerWidth, window.innerHeight, dpr); field.paintOnce(); };
   window.addEventListener('resize', onResize);
-  if (reduceMotion) {
-    paintOnce();
-  } else {
-    for (let i = 0; i < maxSignals(); i += 1) { spawn(); if (signals.length) signals[signals.length - 1].t = Math.random() * HOP * 4; }
-    paintOnce();
-    schedule();
-  }
+  if (!reduceMotion) raf = requestAnimationFrame(loop);
   return () => {
     stopped = true;
     if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
@@ -25002,9 +24850,19 @@ refreshMessagingControls();
 scheduleMessageAutoSync(2_000);
 document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
+  // A device WITHOUT a local wallet may hold one in Telegram CloudStorage — wait for that (it returns instantly
+  // when a local copy already exists, which is the common returning-user case).
   .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))
-  .then(() => restoreQuickStartDismissalFromTelegramCloud().catch(() => {}))
-  .then(() => restoreWalletKeyBackupPendingFromTelegramCloud().catch(() => {}))
+  // The dismissal + backup-flag cloud reads are NON-critical for showing the unlock modal, and Telegram
+  // CloudStorage can be slow (this was the mobile "~20s blank boot screen"): bound them so the unlock decision
+  // below is never gated more than ~1.5s. They finish in the background and their effects apply late. (These are
+  // CloudStorage reads, not toncenter reads, so outside the PWA-FUNDS-SERIAL-01 concurrent-read concern; still
+  // no Promise.all array literal — the two run concurrently, are chained, then raced against a cap.)
+  .then(() => {
+    const dismissalRestore = restoreQuickStartDismissalFromTelegramCloud().catch(() => {});
+    const backupRestore = restoreWalletKeyBackupPendingFromTelegramCloud().catch(() => {});
+    return Promise.race([dismissalRestore.then(() => backupRestore), delay(1500)]).catch(() => {});
+  })
   .then(() => {
     try { refreshWalletBackupWarning(); } catch (error) { console.error(error); }
     // If we are driving the user through the mandatory wallet-key backup (a wallet exists but its key was
