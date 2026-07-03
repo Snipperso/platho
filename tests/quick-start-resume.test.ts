@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { I18N_STRINGS } from '../web/i18n-strings.mjs';
 
 // Quick-start onboarding: resume-after-background-lock + activation funds gate (owner UX request 2026-07-02).
 // Structural guards — the flow itself is exercised on-device; these pin the wiring so it can't silently regress.
@@ -32,7 +33,9 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app).toMatch(/backBtn\.addEventListener\('click', \(\) => \{ quickStartGoToStepByKey\('topup'\); \}\)/);
     // run() double-checks funds and returns guidance instead of attempting a doomed on-chain activation.
     const activateStep = app.slice(app.indexOf("key: 'activate'"), app.indexOf("key: 'activate'") + 1200);
-    expect(activateStep).toMatch(/if \(bal !== null && bal < fee\) \{\s*return `Not enough GRAM/);
+    expect(activateStep).toMatch(/if \(bal !== null && bal < fee\) \{\s*return t\('quickstart\.notEnoughToActivate'/);
+    // ...and the shipped copy for that key still tells the user they're short on GRAM.
+    expect(I18N_STRINGS.en['quickstart.notEnoughToActivate']).toMatch(/Not enough GRAM/);
     // Top-up step shows a live balance so arrived funds are visible.
     expect(app).toMatch(/function buildQuickStartTopUpBody\(\)/);
     expect(app).toMatch(/function quickStartWalletTonNanotons\(\)/);

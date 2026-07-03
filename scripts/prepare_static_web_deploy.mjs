@@ -23,6 +23,8 @@ const ROOT_RUNTIME_FILES = new Set([
   'styles.css',
   'app.js',
   'boot-guard.js',
+  'i18n.mjs',
+  'i18n-strings.mjs',
   'platho-config.mjs',
   'capsule-part-policy.mjs',
   'message-pricing-policy.mjs',

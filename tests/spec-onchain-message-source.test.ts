@@ -1,5 +1,17 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
+import { I18N_STRINGS } from '../web/i18n-strings.mjs';
+
+// Hundreds of user-facing English literals that used to live inline in web/app.js and
+// web/index.html were converted to t('key') calls; the shipped English COPY now lives in
+// web/i18n-strings.mjs under I18N_STRINGS.en. Guards that pinned that copy against web/app.js
+// must now also (or instead) look at the en dictionary, because the phrase moved out of app.js.
+// EN_COPY is the joined shipped English copy; EN(...) reads the exact copy for named keys so a
+// guard can keep its original specificity by pinning the precise strings it protects.
+const EN_COPY: string = Object.values(I18N_STRINGS.en).join('\n');
+function EN(...keys: string[]): string {
+  return keys.map((k) => (I18N_STRINGS.en as Record<string, string>)[k] ?? '').join('\n');
+}
 
 const SPEC_FILES = [
   'artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md',
@@ -68,7 +80,11 @@ describe('v1 on-chain message source of truth', () => {
     ];
 
     for (const path of activeBodyDocs) {
-      const text = read(path);
+      // web/app.js kept the body_hash / provider-history wording but its "accepted TON transaction
+      // body" copy moved into the en dictionary via t('key'); fold the shipped en copy into the
+      // app.js haystack for both the positive pins and the forbidden-wording checks so a stale
+      // phrase cannot hide in the dictionary either.
+      const text = path === 'web/app.js' ? `${read(path)}\n${EN_COPY}` : read(path);
       expect(text, path).toMatch(/accepted[\s\S]{0,80}transaction bod/i);
       expect(text, path).toMatch(/body_hash|CapsuleHub hashes/i);
       expect(text, path).toMatch(/provider history|message history|local (encrypted )?cache/i);
@@ -194,7 +210,10 @@ describe('v1 on-chain message source of truth', () => {
       }
     }
 
-    const app = read('web/app.js');
+    // The discount composer copy moved from inline literals in web/app.js into the en dictionary
+    // (composer.athDiscountLocked / athDiscountFull / athDiscountPartial). Pin the shipped copy in
+    // app.js source + en copy; the negative also spans both so a bad phrase can't hide in either.
+    const app = `${read('web/app.js')}\n${EN_COPY}`;
     expect(app).toMatch(/ATH protocol-fee discount locked until activity airdrop is fully distributed/);
     expect(app).toMatch(/ATH protocol-fee discount 100% - Platho fee 0 GRAM/);
     expect(app).toMatch(/max reduction 0.010 GRAM/);
@@ -213,7 +232,10 @@ describe('v1 on-chain message source of truth', () => {
     expect(about).not.toMatch(/stays on-chain without deletion/i);
 
     const installHtml = read('web/index.html');
-    const installApp = read('web/app.js');
+    // The install-prompt copy stays as visible fallback text in index.html, but in web/app.js it is
+    // now emitted via t('install.*'); the shipped English lives in the en dictionary. Fold the en
+    // copy into the app.js haystack so the shipped install copy is still pinned.
+    const installApp = `${read('web/app.js')}\n${EN_COPY}`;
     for (const text of [installHtml, installApp]) {
       expect(text).toMatch(/bounded local encrypted history/);
       expect(text).toMatch(/not a universal backup/);
@@ -326,11 +348,37 @@ describe('v1 on-chain message source of truth', () => {
 
   it('SPEC-MSG-SOURCE-03D: public comments warning is immutable-but-not-forever retention copy', () => {
     const app = read('web/app.js');
-    const source = app.slice(
+    const fn = app.slice(
       app.indexOf('async function confirmPublicCommentsRisk'),
       app.indexOf('function renderVaultCards'),
     );
 
+    // The confirmPublicCommentsRisk dialog copy moved out of inline literals; the function now wires
+    // the exact public.openCommentsRisk* keys and the shipped English lives in the en dictionary.
+    // Structural pin: the dialog still sources its title/hint/summary from those specific keys.
+    for (const key of [
+      'public.openCommentsRiskTitle',
+      'public.openCommentsRiskHint',
+      'public.openCommentsRiskModeration',
+      'public.openCommentsRiskPrune',
+      'public.openCommentsRiskClose',
+    ]) {
+      expect(fn, `confirmPublicCommentsRisk must wire t('${key}')`).toMatch(
+        new RegExp(`t\\('${key.replace('.', '\\.')}'\\)`),
+      );
+    }
+
+    // Copy pin: assert the retention wording against exactly the en copy those keys resolve to, so
+    // the guard still fails if the shipped warning regresses. The negative also spans this copy so a
+    // forbidden phrase cannot hide in the dictionary.
+    const source = EN(
+      'public.openCommentsRiskTitle',
+      'public.openCommentsRiskHint',
+      'public.openCommentsRiskAnyone',
+      'public.openCommentsRiskModeration',
+      'public.openCommentsRiskPrune',
+      'public.openCommentsRiskClose',
+    );
     expect(source).toMatch(/Public comments are immutable while retained/);
     expect(source).toMatch(/not a permanent archive/);
     expect(source).toMatch(/cannot edit or moderate accepted comments before prune/);

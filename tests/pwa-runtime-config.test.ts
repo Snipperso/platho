@@ -11,6 +11,15 @@ import {
   DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET,
   DEFAULT_PUBLIC_CHANNELS,
 } from '../web/public-channel-subscriptions.mjs';
+import { I18N_STRINGS } from '../web/i18n-strings.mjs';
+
+// i18n: hundreds of user-facing English literals in web/app.js and web/index.html moved into
+// I18N_STRINGS.en (keyed t('...') copy). Source guards that used to pin the English literal in app.js
+// now pin the t('key') call there and/or assert the shipped COPY against the en dictionary. `enCopy`
+// is the joined en values so "copy must/must-not contain phrase X" guards still cover the dictionary
+// (a forbidden phrase must not be able to hide inside the moved copy).
+const EN_STRINGS: Record<string, string> = I18N_STRINGS.en as Record<string, string>;
+const enCopy: string = Object.values(EN_STRINGS).join('\n');
 
 const productionConfig = {
   mode: PLATHO_APP_MODES.PRODUCTION,
@@ -262,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v654<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v654'/);
+    expect(html).toMatch(/id="appVersionLabel">v655<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v655'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=654" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=655" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -280,7 +289,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/<h1>Platho\.app<\/h1>[\s\S]*Profile/);
     expect(html).toMatch(/id="backToChatsButton"/);
     expect(html).toMatch(/aria-label="Private"/);
-    expect(html).toMatch(/<span>Private<\/span>/);
+    expect(html).toMatch(/<span data-i18n="nav\.private">Private<\/span>/);
     expect(html).toMatch(/Search private/);
     expect(html).toMatch(/id="recipientLocalLabel"/);
     expect(html).toMatch(/Optional, e\.g\. Anonymous/);
@@ -293,8 +302,8 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="paymentCheckButton"/);
     expect(html).toMatch(/id="privateAnonymousButton"/);
     expect(html).toMatch(/icon-eye-off/);
-    expect(app).toMatch(/Recipient will see your wallet address/);
-    expect(app).toMatch(/Pseudonymous: wallet address hidden, sender key may still link messages/);
+    expect(enCopy).toMatch(/Recipient will see your wallet address/);
+    expect(enCopy).toMatch(/Pseudonymous: wallet address hidden, sender key may still link messages/);
     expect(app).toMatch(/icon\.classList\.toggle\('icon-eye', !anonymous\)/);
     expect(app).toMatch(/icon\.classList\.toggle\('icon-eye-off', anonymous\)/);
     expect(html).toMatch(/aria-label="Choose display name"/);
@@ -303,7 +312,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function displayIdentityLabel\(identity\)[\s\S]*canonicalUsernameDisplay\(identity\.label \?\? identity\.value \?\? ''\)/);
     expect(css).toMatch(/\.identity-label-ton\s*\{\s*color:\s*#9fd3f2;/);
     expect(css).toMatch(/\.identity-label-platho\s*\{\s*color:\s*#8fdcc8;/);
-    expect(app).toMatch(/function identityDisplayOptions\(thread\)[\s\S]*subtitle: 'Local name'[\s\S]*uniqueDisplayIdentityVariants\(thread\)/);
+    expect(app).toMatch(/function identityDisplayOptions\(thread\)[\s\S]*subtitle: t\('chat\.localName'\)[\s\S]*uniqueDisplayIdentityVariants\(thread\)/);
+    expect(EN_STRINGS['chat.localName']).toBe('Local name');
     expect(app).toMatch(/thread\.displayIdentity = selected\.identity \?\? null/);
     expect(app).toMatch(/persistThreadDisplayPreference\(thread\)/);
     expect(app).toMatch(/function threadSelectedIdentity\(thread\)[\s\S]*if \(thread\?\.localLabel\) return null/);
@@ -319,8 +329,10 @@ describe('PWA runtime config guard', () => {
     // separate "Edit local name" menu item; a plain "Set local name" action only shows when none exists.
     expect(app).toMatch(/function createPencilIcon\(\)/);
     expect(app).toMatch(/className = 'identity-variant-edit'/);
-    expect(app).toMatch(/setAttribute\('aria-label', 'Edit local name'\)/);
-    expect(app).toMatch(/if \(!localLabelExists\) \{[\s\S]*'Set local name'/);
+    expect(app).toMatch(/setAttribute\('aria-label', t\('chat\.editLocalName'\)\)/);
+    expect(EN_STRINGS['chat.editLocalName']).toBe('Edit local name');
+    expect(app).toMatch(/if \(!localLabelExists\) \{[\s\S]*t\('chat\.setLocalName'\)/);
+    expect(EN_STRINGS['chat.setLocalName']).toBe('Set local name');
     expect(app).toMatch(/identity-variant-action/);
     expect(app).toMatch(/promptThreadLocalLabel\(thread\)\.catch/);
     expect(app).toMatch(/identityMenuButton\.hidden = identityDisplayOptions\(thread\)\.length < 1/);
@@ -377,7 +389,9 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.composer-post-option::after\s*{[\s\S]*?transform: translate\(-50%, -50%\) rotate\(-45deg\);/);
     expect(css).toMatch(/\.composer-post-option:has\(input:checked\)::after\s*{\s*opacity: 0;/);
     expect(app).toMatch(/function updatePublicCommentsToggleUi\(\)/);
-    expect(app).toMatch(/'Comments on - tap to turn off' : 'Comments off - tap to turn on'/);
+    expect(app).toMatch(/t\('public\.commentsOnTapOff'\) : t\('public\.commentsOffTapOn'\)/);
+    expect(EN_STRINGS['public.commentsOnTapOff']).toBe('Comments on - tap to turn off');
+    expect(EN_STRINGS['public.commentsOffTapOn']).toBe('Comments off - tap to turn on');
 
     // Feed-mode posts fill the column width (consistent with the compact cards), not capped to image width.
     expect(css).toMatch(/\.public-feed\[data-public-mode="feed"\] > \.feed-item:not\(\.compact\)\s*{[\s\S]*?width: 100%;/);
@@ -428,25 +442,25 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="copyWalletAddressButton"/);
     expect(html).toMatch(/aria-label="Copy wallet address"/);
     expect(html).toMatch(/id="walletDisplayModeSelect"/);
-    expect(html).toMatch(/<option value="address">Address<\/option>/);
-    expect(html).not.toMatch(/<option value="ton_dns">TON DNS<\/option>/);
-    expect(html).toMatch(/<option value="platho_nft">Platho name<\/option>/);
-    expect(app).toMatch(/Wallet address copied/);
+    expect(html).toMatch(/<option value="address" data-i18n="wallet\.optionAddress">Address<\/option>/);
+    expect(html).not.toMatch(/<option value="ton_dns"[^>]*>TON DNS<\/option>/);
+    expect(html).toMatch(/<option value="platho_nft" data-i18n="wallet\.optionPlathoName">Platho name<\/option>/);
+    expect(enCopy).toMatch(/Wallet address copied/);
     expect(app).toMatch(/flashWalletIdentityStatus/);
     expect(app).toMatch(/walletIdentityFlashTimer/);
     expect(app).toMatch(/copyTextToClipboard/);
     expect(app).toMatch(/confirmWalletReplacement/);
-    expect(app).toMatch(/Replace local wallet\?/);
-    expect(app).toMatch(/Export the current recovery phrase first/);
+    expect(enCopy).toMatch(/Replace local wallet\?/);
+    expect(enCopy).toMatch(/Export the current recovery phrase first/);
     expect(app).toMatch(/tone: 'muted'/);
-    expect(app).toMatch(/Import and replace/);
+    expect(enCopy).toMatch(/Import and replace/);
     expect(app).toMatch(/platho\.wallet\.encrypted\.v1/);
     expect(app).toMatch(/platho\.wallet\.recovery\.v1/);
     expect(app).toMatch(/AES-GCM-256/);
     expect(app).toMatch(/PBKDF2-SHA256/);
     expect(app).toMatch(/PLATHO_WALLET_PASSWORD_MIN_LENGTH = 10/);
     expect(app).toMatch(/PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH = 20/);
-    expect(app).toMatch(/Use your browser password manager/);
+    expect(enCopy).toMatch(/Use your browser password manager/);
     expect(app).not.toMatch(/generate-wallet-password/);
     expect(app).not.toMatch(/PasswordCredential/);
     expect(app).not.toMatch(/passwordrules/);
@@ -454,13 +468,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/minLength: create \? PLATHO_WALLET_PASSWORD_MIN_LENGTH : undefined/);
     expect(app).toMatch(/storedNetworkGlobalId/);
     expect(app).toMatch(/PLATHO_WALLET_ADDRESS_METADATA_MISMATCH/);
-    expect(app).toMatch(/Password accepted, but stored wallet metadata is inconsistent/);
+    expect(enCopy).toMatch(/Password accepted, but stored wallet metadata is inconsistent/);
     expect(app).toMatch(/PLATHO_WALLET_KEY_BACKUP_KIND = 'platho\.wallet\.key\.backup\.v1'/);
     expect(app).toMatch(/walletKeyBackupFromRecord/);
     expect(app).toMatch(/offerEncryptedWalletKeyBackup/);
-    expect(app).toMatch(/Save wallet key backup/);
-    expect(app).toMatch(/Save encrypted key/);
-    expect(app).toMatch(/browser storage can be cleared, especially on iPhone Safari/);
+    expect(enCopy).toMatch(/Save wallet key backup/);
+    expect(enCopy).toMatch(/Save encrypted key/);
+    expect(enCopy).toMatch(/browser storage can be cleared, especially on iPhone Safari/);
     expect(app).toMatch(/encryptedWalletRecordFromBackup/);
     expect(app).toMatch(/exportEncryptedWalletKeyFile/);
     expect(app).toMatch(/importEncryptedWalletKeyFile/);
@@ -501,16 +515,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/WALLET_AUTO_LOCK_MS/);
     expect(app).toMatch(/requestNewWalletStoragePassword/);
     expect(app).toMatch(/changeStoredPlathoWalletPassword/);
-    expect(app).toMatch(/Change wallet password/);
-    expect(app).toMatch(/Set new wallet password/);
-    expect(app).toMatch(/Password changed/);
-    expect(app).toMatch(/Wallet key exported/);
-    expect(app).toMatch(/Wallet key imported/);
+    expect(enCopy).toMatch(/Change wallet password/);
+    expect(enCopy).toMatch(/Set new wallet password/);
+    expect(enCopy).toMatch(/Password changed/);
+    expect(enCopy).toMatch(/Wallet key exported/);
+    expect(enCopy).toMatch(/Wallet key imported/);
     expect(app).toMatch(/showReceiveWalletTonDialog/);
     expect(app).toMatch(/createWalletReceiveQrNode/);
     expect(app).toMatch(/createQrSvgDataUrl/);
     expect(app).toMatch(/submitWalletTonTransfer/);
-    expect(app).toMatch(/local Platho wallet, not Vault/);
+    expect(enCopy).toMatch(/local Platho wallet, not Vault/);
     expect(app).toMatch(/GRAM transfer submitted/);
     expect(app).toMatch(/confirmWalletPasswordForExport/);
     expect(app).toMatch(/lockPlathoWallet/);
@@ -615,11 +629,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/readLinkedPlathoUsername/);
     expect(app).toMatch(/writeLinkedPlathoUsername/);
     expect(app).not.toMatch(/name resolves to this wallet/);
-    expect(app).toMatch(/permanent name, currently owned by this wallet/);
+    expect(enCopy).toMatch(/permanent name, currently owned by this wallet/);
     expect(app).not.toMatch(/No TON DNS linked/);
     expect(app).not.toMatch(/Optional setup', value: 'Link TON DNS in Usernames and Avatars/);
-    expect(app).toMatch(/No \.ath name linked/);
-    expect(app).toMatch(/Optional setup', value: 'Link \.ath name in Usernames and Avatars/);
+    expect(enCopy).toMatch(/No \.ath name linked/);
+    expect(app).toMatch(/t\('username\.optionalSetup'\), value: t\('username\.linkAthNameValue'\)/);
+    expect(EN_STRINGS['username.optionalSetup']).toBe('Optional setup');
+    expect(EN_STRINGS['username.linkAthNameValue']).toMatch(/Link \.ath name in Usernames and Avatars/);
     expect(app).not.toMatch(/Copied value/);
     expect(app).toMatch(/suppressProfileAvatarPicker/);
     expect(app).toMatch(/isProfileAvatarPickerSuppressed/);
@@ -645,13 +661,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/indexedDB\.databases\(\)/);
     expect(app).toMatch(/caches\.keys\(\)/);
     expect(app).toMatch(/navigator\.serviceWorker\?\.getRegistrations/);
-    expect(html).toMatch(/<h2>Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="walletTonBalanceButton"[\s\S]*id="registerVaultKeysButton"/);
+    expect(html).toMatch(/<h2 data-i18n="common\.wallet">Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="walletTonBalanceButton"[\s\S]*id="registerVaultKeysButton"/);
     expect(html).toMatch(/Wallet GRAM[\s\S]*id="walletTonBalanceStatus"/);
     expect(html).toMatch(/Activate Platho account[\s\S]*id="vaultDraftStatus"[\s\S]*wallet required/);
-    expect(html).toMatch(/<h2>Messages<\/h2>[\s\S]*id="syncMessagesButton"[\s\S]*id="replaceVaultKeysButton"/);
+    expect(html).toMatch(/<h2 data-i18n="chat\.messages">Messages<\/h2>[\s\S]*id="syncMessagesButton"[\s\S]*id="replaceVaultKeysButton"/);
     expect(html).toMatch(/Sync messages[\s\S]*tap to sync/);
     expect(html).toMatch(/Replace message keys[\s\S]*activate account first/);
-    expect(app).toMatch(/up to date/);
+    expect(enCopy).toMatch(/up to date/);
     expect(app).toMatch(/hasActiveVaultMessagingKeys/);
     expect(app).toMatch(/hasActivePlathoAccount/);
     expect(app).toMatch(/plathoAccountActivationFeeLabel/);
@@ -660,15 +676,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/item\.disabled = false/);
     expect(app).not.toMatch(/item\.dataset\.tab !== 'profile'/);
     expect(app).not.toMatch(/!hasActivePlathoAccount\(\)[\s\S]*setView\('profile'\)/);
-    expect(app).toMatch(/Update ready - reload before sending/);
-    expect(app).toMatch(/reload app/);
+    expect(enCopy).toMatch(/Update ready - reload before sending/);
+    expect(enCopy).toMatch(/reload app/);
     expect(app).toMatch(/await refreshVaultActivationStatus\(\{ skipGlobal: true \}\)/);
-    expect(app).toMatch(/setText\(vaultRecordStatus, 'checking'\)/);
-    expect(app).toMatch(/setText\(vaultDraftStatus, 'checking'\)/);
+    expect(app).toMatch(/setText\(vaultRecordStatus, t\('common\.checking'\)/);
+    expect(app).toMatch(/setText\(vaultDraftStatus, t\('common\.checking'\)/);
+    expect(EN_STRINGS['common.checking']).toBe('checking');
     expect(app).not.toMatch(/rotate blocked/);
     expect(app).not.toMatch(/setText\(vaultRotateStatus, label\)/);
     expect(app).not.toMatch(/vaultDraftStatus\.textContent = 'ready'/);
-    expect(app).toMatch(/Export key and activate/);
+    expect(enCopy).toMatch(/Export key and activate/);
     expect(app).toMatch(/backupConfirmed/);
     expect(app).toMatch(/activationConfirmed/);
     expect(app).toMatch(/downloadEncryptedWalletKeyBackup\(\)/);
@@ -677,7 +694,9 @@ describe('PWA runtime config guard', () => {
     // just confirms the on-chain activation.
     expect(app).toMatch(/const needsKeyBackup = walletKeyBackupPendingForStoredWallet\(\)/);
     expect(app).toMatch(/if \(needsKeyBackup\) \{ await downloadEncryptedWalletKeyBackup\(\); \}/);
-    expect(app).toMatch(/submitLabel: needsKeyBackup \? 'Export key and activate' : 'Activate account'/);
+    expect(app).toMatch(/submitLabel: needsKeyBackup \? t\('vault\.exportKeyAndActivate'\) : t\('vault\.activateAccount'\)/);
+    expect(EN_STRINGS['vault.exportKeyAndActivate']).toBe('Export key and activate');
+    expect(EN_STRINGS['vault.activateAccount']).toBe('Activate account');
     expect(app).toMatch(/VAULT_RECEIVE_CRYPTO_SUITE = CRYPTO_SUITES\.HYBRID_V1/);
     expect(app).toMatch(/loadMessagingIdentityFromWallet\(VAULT_RECEIVE_CRYPTO_SUITE\)/);
     expect(app).not.toMatch(/postquantum only/);
@@ -696,10 +715,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/requireProfileRegistryVaultRoute/);
     expect(app).toMatch(/ProfileRegistry is not bound back to Vault/);
     expect(app).toMatch(/ProfileRegistry official ATH wallet is not the derived registry wallet/);
-    expect(app).toMatch(/avatar not active yet/);
-    expect(app).toMatch(/setProfileAvatarStatus\('avatar not active yet', 'error'\)/);
-    expect(html).toMatch(/<h2>Public channels<\/h2>[\s\S]*id="publicSyncWindowSelect"[\s\S]*id="publicCommentsDefaultSelect"/);
-    expect(html).toMatch(/<h2>Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="linkUsernameButton"[\s\S]*id="setAvatarButton"/);
+    expect(enCopy).toMatch(/avatar not active yet/);
+    expect(app).toMatch(/setProfileAvatarStatus\(t\('avatar\.notActiveYet'\), 'error'\)/);
+    expect(EN_STRINGS['avatar.notActiveYet']).toBe('avatar not active yet');
+    expect(html).toMatch(/<h2 data-i18n="public\.channels">Public channels<\/h2>[\s\S]*id="publicSyncWindowSelect"[\s\S]*id="publicCommentsDefaultSelect"/);
+    expect(html).toMatch(/<h2 data-i18n="username\.usernamesAndAvatars">Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="linkUsernameButton"[\s\S]*id="setAvatarButton"/);
     expect(html).toMatch(/Mint \.ath name[\s\S]*100-10k ATH \+ GRAM fee/);
     expect(html).not.toMatch(/Link TON DNS[\s\S]*id="linkedTonDnsStatus"[\s\S]*verify/);
     expect(html).toMatch(/Link \.ath name[\s\S]*id="linkedUsernameStatus"[\s\S]*verify/);
@@ -710,11 +730,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/setPublicChannelSubscribed/);
     expect(app).toMatch(/Unfollow/);
     expect(app).toMatch(/channel hidden/);
-    expect(app).toMatch(/unfollowButton\.title = 'Stop following this channel'/);
+    expect(app).toMatch(/unfollowButton\.title = t\('public\.stopFollowingChannel'\)/);
+    expect(EN_STRINGS['public.stopFollowingChannel']).toBe('Stop following this channel');
     expect(app).toMatch(/const linked = readLinkedPlathoUsername\(plathoWallet\.address\)/);
     expect(app).toMatch(/autoLinkMintedUsername/);
     expect(app).toMatch(/waitForPlathoUsernameOwnership/);
-    expect(app).toMatch(/mint submitted; link after sync/);
+    expect(enCopy).toMatch(/mint submitted; link after sync/);
     expect(app).toMatch(/function usernameMintPricePreview/);
     expect(app).toMatch(/usernameMintPricePreview\(raw\)/);
     expect(app).toMatch(/USERNAME_PRICE_6_PLUS_CHARS_ATOMIC = 100_000_000_000n/);
@@ -723,24 +744,26 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function setUsernameMintStatus/);
     expect(app).toMatch(/setUsernameMintStatus\(rateLimited \? TON_RPC_CONNECTING_STATUS : usernameMintStatusText\(error\), rateLimited \? 'busy' : 'error'\)/);
     expect(app).toMatch(/estimatedUsernameMintTonFeeNanotons/);
-    expect(app).toMatch(/up to \$\{formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\)\} GRAM from Vault/);
+    expect(app).toMatch(/t\('username\.gramHoldValue', \{ amount: formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\) \}\)/);
+    expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');
     expect(app).toMatch(/assertVaultUsernameMintCanStart/);
     expect(app).toMatch(/submitVaultUsernameMint/);
     expect(app).toMatch(/requireUsernameRegistryVaultRoute/);
     expect(app).toMatch(/UsernameRegistry is not bound back to Vault/);
     expect(app).toMatch(/UsernameRegistry official ATH wallet is not the derived registry wallet/);
-    expect(app).toMatch(/ATH; 50% goes to burn/);
+    expect(enCopy).toMatch(/ATH; 50% goes to burn/);
     expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ GRAM fee/);
-    expect(app).toMatch(/Set profile avatar/);
+    expect(enCopy).toMatch(/Set profile avatar/);
     expect(app).toMatch(/requestProfileAvatarUploadDetails/);
     expect(app).toMatch(/estimatedProfileAvatarTonFeeNanotons/);
-    expect(app).toMatch(/up to \$\{formatTonNanotons\(estimatedProfileAvatarTonFeeNanotons\(attachment\)\)\} GRAM/);
-    expect(app).toMatch(/Preview final image/);
+    expect(app).toMatch(/t\('avatar\.feeUpTo', \{ amount: formatTonNanotons\(estimatedProfileAvatarTonFeeNanotons\(attachment\)\), capsules: capsuleLabel \}\)/);
+    expect(EN_STRINGS['avatar.feeUpTo']).toMatch(/up to \{amount\} GRAM/);
+    expect(enCopy).toMatch(/Preview final image/);
     expect(html).toMatch(/id="imageLightboxDialog"/);
     expect(html).toMatch(/Full-size preview/);
     expect(html).toMatch(/id="imageLightboxDownloadButton"/);
     expect(html).toMatch(/class="icon icon-download"/);
-    expect(html).toMatch(/<div class="image-lightbox-viewport">\s*<img id="imageLightboxImage" alt="Full-size final image preview" draggable="false">\s*<\/div>\s*<\/section>\s*<\/div>/);
+    expect(html).toMatch(/<div class="image-lightbox-viewport">\s*<img id="imageLightboxImage" alt="Full-size final image preview" draggable="false" data-i18n-alt="dialog\.fullSizeImageAlt">\s*<\/div>\s*<\/section>\s*<\/div>/);
     expect(app).toMatch(/openImageLightbox/);
     expect(app).toMatch(/downloadImageLightboxImage/);
     expect(app).toMatch(/imageLightboxDownloadFilename/);
@@ -758,30 +781,30 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.icon-download/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.modal-backdrop\s*{\s*align-items: center;/);
     expect(css).toMatch(/icon-open-app/);
-    expect(app).toMatch(/On-chain size/);
+    expect(enCopy).toMatch(/On-chain size/);
     expect(app).toMatch(/requestCompressedImageFile/);
-    expect(app).toMatch(/The final WebP bytes are encrypted before publish and verified by CapsuleHub hashes/);
-    expect(app).toMatch(/The final WebP bytes are public in the accepted TON transaction body and verified by CapsuleHub hashes/);
+    expect(enCopy).toMatch(/The final WebP bytes are encrypted before publish and verified by CapsuleHub hashes/);
+    expect(enCopy).toMatch(/The final WebP bytes are public in the accepted TON transaction body and verified by CapsuleHub hashes/);
     expect(app).not.toMatch(/remain in on-chain capsules/);
     expect(app).toMatch(/encodeCanvasToWebp/);
     expect(app).toMatch(/isWebpBytes/);
     expect(app).toMatch(/nativeCanvasWebpEncodeSupported = false/);
     expect(app).toMatch(/Image encoder did not produce WebP bytes/);
-    expect(app).toMatch(/avatar media is public/);
+    expect(enCopy).toMatch(/avatar media is public/);
     expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="athSupplyStatus"[\s\S]*id="athDropIssuedStatus"[\s\S]*id="flushAthButton"[\s\S]*id="flushAthStatus"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
     expect(html).toMatch(/id="syncMessagesButton"/);
     expect(html).not.toMatch(/id="keySuiteStatus"/);
     expect(app).toMatch(/installActionState/);
-    expect(app).toMatch(/Got it/);
-    expect(app).toMatch(/Platho is already installed on this device/);
+    expect(enCopy).toMatch(/Got it/);
+    expect(enCopy).toMatch(/Platho is already installed on this device/);
     expect(app).toMatch(/getInstalledRelatedApps/);
-    expect(app).toMatch(/Open Platho app/);
-    expect(app).toMatch(/Open or install Platho/);
-    expect(app).toMatch(/How to install on iPhone/);
+    expect(enCopy).toMatch(/Open Platho app/);
+    expect(enCopy).toMatch(/Open or install Platho/);
+    expect(enCopy).toMatch(/How to install on iPhone/);
     expect(app).toMatch(/isIosDevice/);
-    expect(app).toMatch(/Open platho\.app in Safari/);
-    expect(app).toMatch(/Choose Add to Home Screen/);
+    expect(enCopy).toMatch(/Open platho\.app in Safari/);
+    expect(enCopy).toMatch(/Choose Add to Home Screen/);
     expect(html).toMatch(/id="installSteps"/);
     expect(css).toMatch(/install-steps/);
     expect(css).toMatch(/wallet-receive-card/);
@@ -798,7 +821,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/handleServiceWorkerControllerChange/);
     expect(app).toMatch(/shouldDeferServiceWorkerReload/);
     expect(app).toMatch(/pendingServiceWorkerAppShellReload/);
-    expect(app).toMatch(/Update ready/);
+    expect(enCopy).toMatch(/Update ready/);
     expect(app).toMatch(/window\.location\.reload\(\)/);
     expect(html).toMatch(/id="installLead"/);
     expect(html).toMatch(/id="installBody"/);
@@ -808,7 +831,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="publicCommentsDefaultSelect"/);
     expect(html).toMatch(/>Closed</);
     expect(html).toMatch(/>Allowed - not recommended</);
-    expect(html).toMatch(/<option value="disabled">Closed<\/option>[\s\S]*<option value="enabled">Allowed - not recommended<\/option>/);
+    expect(html).toMatch(/<option value="disabled" data-i18n="public\.commentsClosed">Closed<\/option>[\s\S]*<option value="enabled" data-i18n="public\.commentsAllowedNotRecommended">Allowed - not recommended<\/option>/);
     expect(html).toMatch(/Short - newest 128 entries/);
     expect(html).toMatch(/Long - retained history, up to 1 year/);
     expect(html).toMatch(/id="walletAddressStatus"/);
@@ -878,7 +901,8 @@ describe('PWA runtime config guard', () => {
     // The DYNAMIC move-button refresh must use the GRAM/ATH display label, not the internal card.asset key
     // ('TON') -- otherwise the button re-renders as "Move TON to Vault" after the first refresh (the static
     // HTML default above is correct, but the refresh overwrote it).
-    expect(readFileSync('web/app.js', 'utf8')).toMatch(/const assetLabel = card\.asset === 'ATH' \? 'ATH' : 'GRAM'[\s\S]*?Move \$\{assetLabel\} to Vault/);
+    expect(readFileSync('web/app.js', 'utf8')).toMatch(/const assetLabel = card\.asset === 'ATH' \? 'ATH' : 'GRAM'[\s\S]*?t\('vault\.moveToVault', \{ asset: assetLabel \}\)/);
+    expect(EN_STRINGS['vault.moveToVault']).toBe('Move {asset} to Vault');
     expect(html).not.toMatch(/Wallet runtime|Key auth|Vault record|Replay store|Local state/);
     expect(app).not.toMatch(/window\.prompt|window\.alert/);
     expect(html).not.toMatch(/Messaging key backup|exportMessagingKeyBackupButton|importMessagingKeyBackupButton|messagingKeyBackupInput/);
@@ -901,22 +925,26 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="publicComposerCostStatus"/);
     expect(html).not.toMatch(/Price checking\s+Wallet required/);
     expect(app).toMatch(/if \(!plathoWallet\) \{/);
-    expect(app).toMatch(/text: 'Wallet required'/);
-    expect(app).toMatch(/return publicCommentTarget \? 'Public comment' : 'Public message'/);
-    expect(app).toMatch(/return 'Private message'/);
+    expect(app).toMatch(/text: t\('common\.walletRequired'\)/);
+    expect(EN_STRINGS['common.walletRequired']).toBe('Wallet required');
+    expect(app).toMatch(/return publicCommentTarget \? t\('composer\.publicComment'\) : t\('composer\.publicMessage'\)/);
+    expect(EN_STRINGS['composer.publicComment']).toBe('Public comment');
+    expect(EN_STRINGS['composer.publicMessage']).toBe('Public message');
+    expect(app).toMatch(/return t\('composer\.privateMessage'\)/);
+    expect(EN_STRINGS['composer.privateMessage']).toBe('Private message');
     expect(html).toMatch(/id="publicComposer"/);
     expect(html).toMatch(/id="publicComposerCommentsCheckbox"/);
     expect(html).toMatch(/id="publicComposer"[\s\S]*id="publicComposerCommentsCheckbox"[\s\S]*<textarea id="publicMessageInput"/);
     expect(html).toMatch(/Allow comments/);
-    expect(app).toMatch(/Open public comments\?/);
-    expect(app).toMatch(/Publish with comments/);
+    expect(enCopy).toMatch(/Open public comments\?/);
+    expect(enCopy).toMatch(/Publish with comments/);
     expect(app).toMatch(/Private chat/);
     expect(app).toMatch(/openPrivateThreadForWallet/);
-    expect(app).toMatch(/Add public channel/);
-    expect(app).toMatch(/ATH protocol-fee discount/);
-    expect(app).toMatch(/locked until activity airdrop is fully distributed/);
-    expect(app).toMatch(/Platho fee 0 GRAM/);
-    expect(app).toMatch(/max reduction 0.010 GRAM/);
+    expect(enCopy).toMatch(/Add public channel/);
+    expect(enCopy).toMatch(/ATH protocol-fee discount/);
+    expect(enCopy).toMatch(/locked until activity airdrop is fully distributed/);
+    expect(enCopy).toMatch(/Platho fee 0 GRAM/);
+    expect(enCopy).toMatch(/max reduction 0.010 GRAM/);
     expect(app).not.toMatch(/ATH discount \$\{percent\}/);
     expect(app).not.toMatch(/locked until 15%/);
     expect(app).toMatch(/messageDiscountUnlocked/);
@@ -925,11 +953,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/composerEstimatedNetCostNanotons/);
     expect(app).toMatch(/composerProfileNetPriceNanotons/);
     expect(app).toMatch(/function confirmPublishPriceIncrease/);
-    expect(app).toMatch(/The chain returned a higher fresh price before signing/);
-    expect(app).toMatch(/Send with new price/);
+    expect(enCopy).toMatch(/The chain returned a higher fresh price before signing/);
+    expect(enCopy).toMatch(/Send with new price/);
     expect(app).toMatch(/function confirmHighNetworkFeeSurcharge/);
-    expect(app).toMatch(/High network surcharge/);
-    expect(app).toMatch(/Manual network fee override/);
+    expect(enCopy).toMatch(/High network surcharge/);
+    expect(enCopy).toMatch(/Manual network fee override/);
     expect(app).toMatch(/requiresHighNetworkFeeSurchargeConfirmation/);
     expect(app).toMatch(/requiresManualNetworkFeeSurchargeOverride/);
     expect(app).toMatch(/networkFeeSurchargeExceedsMax/);
@@ -959,13 +987,13 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toMatch(/Checking Vault balance/);
     expect(app).toMatch(/privateComposerKnownVaultTonShortfall/);
     expect(app).toMatch(/networkFeeSurchargeNanotons/);
-    expect(app).toMatch(/surcharge is retained by CapsuleHub reserve/);
-    expect(app).toMatch(/not accrued_plato_fee_ton at publish time/);
-    expect(app).toMatch(/Surplus reserve may later be swept by protocol reserve rules/);
+    expect(enCopy).toMatch(/surcharge is retained by CapsuleHub reserve/);
+    expect(enCopy).toMatch(/not accrued_plato_fee_ton at publish time/);
+    expect(enCopy).toMatch(/Surplus reserve may later be swept by protocol reserve rules/);
     expect(app).toMatch(/function privateImageAttachmentPartCount/);
     expect(app).toMatch(/partCounter: kind === 'private' \? privateImageAttachmentPartCount : imageAttachmentPartCount/);
     expect(app).toMatch(/partCounter: options\.partCounter/);
-    expect(app).toMatch(/Local label/);
+    expect(enCopy).toMatch(/Local label/);
     expect(app).not.toMatch(/Shown as/);
     expect(app).toMatch(/resolvePublicChannelIdentity/);
     expect(html).toMatch(/id="privateImageButton"/);
@@ -1029,12 +1057,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/return walletScopedIndexedDbName\(LEGACY_REPLAY_DB_NAME, walletAddress\)/);
     expect(bootSource).toMatch(/if \(!plathoWallet\?\.address\) \{/);
     expect(bootSource).toMatch(/createMemoryReplayStore\(\)/);
-    expect(bootSource).toMatch(/unlock required/);
+    expect(bootSource).toMatch(/t\('common\.unlockRequired'\)/);
+    expect(EN_STRINGS['common.unlockRequired']).toBe('unlock required');
     expect(bootSource).toMatch(/encryptedMessageStore = null/);
-    expect(bootSource).toMatch(/history locked/);
+    expect(bootSource).toMatch(/t\('sync\.historyLocked'\)/);
+    expect(EN_STRINGS['sync.historyLocked']).toBe('history locked');
     expect(bootSource).toMatch(/createIndexedDbEncryptedMessageHistoryStore\(\{ dbName: currentMessageHistoryDbName\(\) \}\)/);
-    expect(app).toMatch(/device-encrypted local cache/);
-    expect(app).toMatch(/bounded local encrypted history cache/);
+    expect(app).toMatch(/t\('vault\.historyLocalCache'/);
+    expect(EN_STRINGS['vault.historyLocalCache']).toMatch(/device-encrypted local cache/);
+    expect(app).toMatch(/t\('install\.bodyPrompt'\)/);
+    expect(EN_STRINGS['install.bodyPrompt']).toMatch(/bounded local encrypted history cache/);
     expect(app).not.toMatch(/`encrypted db \(\$\{limit\}\)`/);
     expect(bootSource).toMatch(/createIndexedDbReplayStore\(\{ dbName: currentReplayDbName\(\) \}\)/);
     expect(cryptoSource).toMatch(/await bootWalletScopedLocalStores\(\)/);
@@ -1480,8 +1512,10 @@ describe('PWA runtime config guard', () => {
       app.indexOf('publicSyncWindowSelect?.addEventListener'),
     );
 
-    expect(helperSource).toMatch(/Activate Platho account before moving GRAM from Vault/);
-    expect(helperSource).toMatch(/Unlock and activate Platho account before Vault actions/);
+    expect(helperSource).toMatch(/return t\('vault\.activateBeforeMove'\)/);
+    expect(EN_STRINGS['vault.activateBeforeMove']).toBe('Activate Platho account before moving GRAM from Vault');
+    expect(helperSource).toMatch(/return t\('vault\.unlockActivateBeforeActions'\)/);
+    expect(EN_STRINGS['vault.unlockActivateBeforeActions']).toBe('Unlock and activate Platho account before Vault actions');
     expect(submitSource).toMatch(/vaultActionBlockedStatusText\(error, 'move blocked'\)/);
   });
 
@@ -2238,7 +2272,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const TELEGRAM_BACKGROUND_LOCK_GRACE_MS = 300_000/);
     expect(app).toMatch(/const SEND_LOCK_MAX_GRACE_MS = 600 \* 1000/);
     // The hard idle lock still exists (this is a relaxation, not a removal).
-    expect(app).toMatch(/walletAutoLockTimer = setTimeout\(\(\) => \{\s*lockPlathoWallet\('Wallet locked'\);\s*\}, WALLET_AUTO_LOCK_MS\)/);
+    expect(app).toMatch(/walletAutoLockTimer = setTimeout\(\(\) => \{\s*lockPlathoWallet\(t\('wallet\.locked'\)\);\s*\}, WALLET_AUTO_LOCK_MS\)/);
+    expect(EN_STRINGS['wallet.locked']).toBe('Wallet locked');
   });
 
   it('PWA-TONCENTER-KEY-VALIDATE-01: a user-entered TON Center key is validated before it is saved', () => {
@@ -2271,7 +2306,7 @@ describe('PWA runtime config guard', () => {
     // "recommended" lives in the section heading, not the row, so it never crowds the key input on a narrow
     // phone; the in-row status is empty when there is no key.
     expect(app).toMatch(/setToncenterKeyStatusIcon\(key \? 'active' : 'empty'\);/);
-    expect(readFileSync('web/index.html', 'utf8')).toMatch(/<h2>RPC access \(recommended\)<\/h2>/);
+    expect(readFileSync('web/index.html', 'utf8')).toMatch(/<h2 data-i18n="profile\.rpcAccessRecommended">RPC access \(recommended\)<\/h2>/);
     // The key input is a distinct dark field box (not frameless/transparent) so it reads as a text input on the row.
     expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.settings-rpc-row input\s*\{[\s\S]*?background:\s*var\(--panel\)/);
     // The row itself doubles as the Get button (except a click on the field). "Get" no longer dumps the user
@@ -2280,10 +2315,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function openRpcKeyHelpDialog\(\)/);
     // The help modal: title + the "any name" and "mainnet" guidance + a bot-link CTA, and it opens the bot
     // ONLY when the user confirms via the CTA (proceed), not on dismiss.
-    expect(app).toMatch(/title: 'Get an RPC key'/);
-    expect(app).toMatch(/you can enter any name/);
-    expect(app).toMatch(/select mainnet/);
-    expect(app).toMatch(/submitLabel: 'Open @toncenter bot'/);
+    expect(app).toMatch(/title: t\('wallet\.rpcKeyHelpTitle'\)/);
+    expect(EN_STRINGS['wallet.rpcKeyHelpTitle']).toBe('Get an RPC key');
+    expect(app).toMatch(/steps: \[[\s\S]*t\('wallet\.rpcKeyHelpStep2'\)[\s\S]*t\('wallet\.rpcKeyHelpStep3'\)/);
+    expect(EN_STRINGS['wallet.rpcKeyHelpStep2']).toMatch(/you can enter any name/);
+    expect(EN_STRINGS['wallet.rpcKeyHelpStep3']).toMatch(/select mainnet/);
+    expect(app).toMatch(/submitLabel: t\('wallet\.rpcKeyHelpOpenBot'\)/);
+    expect(EN_STRINGS['wallet.rpcKeyHelpOpenBot']).toBe('Open @toncenter bot');
     expect(app).toMatch(/if \(proceed\) openToncenterBotLink\(\)/);
     // The 'note' field type renders the informational steps block (no input, not collected as a value).
     expect(app).toMatch(/if \(field\.type === 'note'\)/);
@@ -2291,7 +2329,8 @@ describe('PWA runtime config guard', () => {
     // The Save button is gone.
     expect(app).not.toMatch(/saveToncenterKeyButton/);
     // Quick-start step 2 validates too: an invalid key surfaces a message and does NOT advance the stepper.
-    expect(app).toMatch(/if \(result\.reason === 'invalid'\) return 'That key was rejected by TON Center\. Check it and retry, or Skip\.'/);
+    expect(app).toMatch(/if \(result\.reason === 'invalid'\) return t\('quickstart\.keyRejected'\)/);
+    expect(EN_STRINGS['quickstart.keyRejected']).toBe('That key was rejected by TON Center. Check it and retry, or Skip.');
     // The stepper handler renders a string run() result as a non-advancing failure message.
     expect(app).toMatch(/if \(typeof ok === 'string'\) \{[\s\S]*setText\(quickStartStepStatus, ok\)/);
   });
@@ -2318,7 +2357,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(walletKeyBackupPendingForStoredWallet\(\)\) \{\s*openQuickStartAtBackup\(\);\s*return true;/);
     expect(app).toMatch(/function openQuickStartAtBackup\(\)[\s\S]*quickStartStepIndexByKey\('export'\)/);
     // The export step is keyed so the lookup is robust to reordering.
-    expect(app).toMatch(/key: 'export',\s*title: 'Back up your wallet key'/);
+    expect(app).toMatch(/key: 'export',\s*title: t\('quickstart\.backupKeyTitle'\)/);
+    expect(EN_STRINGS['quickstart.backupKeyTitle']).toBe('Back up your wallet key');
     // Closing the backup re-prompt must NOT permanently dismiss onboarding (the backup is still pending).
     expect(app).toMatch(/let quickStartBackupMode = false/);
     expect(app).toMatch(/if \(!quickStartBackupMode\) \{[\s\S]*QUICK_START_DISMISSED_KEY/);
@@ -2474,7 +2514,8 @@ describe('PWA runtime config guard', () => {
     expect(mintSource).toMatch(/athBalance < priceAtomic/);
     expect(mintSource).toMatch(/Insufficient ATH/);
     // The summary surfaces the live ATH balance with a "not enough" flag.
-    expect(mintSource).toMatch(/label: 'Your ATH'/);
+    expect(mintSource).toMatch(/label: t\('username\.yourAth'\)/);
+    expect(EN_STRINGS['username.yourAth']).toBe('Your ATH');
   });
 
   it('PWA-VAULT-ATH-DEPOSIT-PREFLIGHT-01: Vault ATH deposit preflights Vault ATHMaster and official wallet route', () => {
@@ -2552,21 +2593,24 @@ describe('PWA runtime config guard', () => {
     expect(swSource).toMatch(/liveVersion === PLATHO_APP_RUNTIME_VERSION/);
     expect(swSource).toMatch(/pendingServiceWorkerAppShellReload = false/);
     expect(swSource).toMatch(/pendingServiceWorkerAppShellReload = true/);
-    expect(swSource).toMatch(/Update ready - reload before sending/);
+    expect(swSource).toMatch(/flashWalletIdentityStatus\(t\('wallet\.updateReadyReload'\)\)/);
+    expect(EN_STRINGS['wallet.updateReadyReload']).toBe('Update ready - reload before sending');
     expect(app).toMatch(/signedActionsReady = accountActive && !appShellReloadPending/);
     expect(app).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending/);
     expect(app).toMatch(/mintUsernameButton\.disabled = false/);
     expect(app).toMatch(/linkUsernameButton\.disabled = false/);
     expect(app).toMatch(/setAvatarButton\.disabled = plathoProfileAvatarPending/);
-    expect(app).toMatch(/if \(!plathoWallet\) \{[\s\S]*flashWalletIdentityStatus\('create wallet first'\)/);
+    expect(app).toMatch(/if \(!plathoWallet\) \{[\s\S]*flashWalletIdentityStatus\(t\('wallet\.createWalletFirst'\)\)/);
+    expect(EN_STRINGS['wallet.createWalletFirst']).toBe('create wallet first');
     expect(app).not.toMatch(/mintUsernameButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
     expect(app).not.toMatch(/setAvatarButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
     expect(app).toMatch(/function canAttemptPrivateSend/);
     expect(app).toMatch(/function privateSendBlockReason/);
     expect(app).toMatch(/const reason = privateSendBlockReason\(thread\)/);
     expect(app).toMatch(/sendButton\.disabled = Boolean\(reason\)/);
-    expect(app).toMatch(/sendButton\.title = reason \?\? 'Send private message'/);
-    expect(app).toMatch(/Update ready - reload app/);
+    expect(app).toMatch(/sendButton\.title = reason \?\? t\('send\.sendPrivateMessage'\)/);
+    expect(EN_STRINGS['send.sendPrivateMessage']).toBe('Send private message');
+    expect(enCopy).toMatch(/Update ready - reload app/);
     expect(app).toMatch(/pendingServiceWorkerAppShellReload !== true/);
     expect(app).toMatch(/publicSendButton\.disabled = !plathoWallet \|\| !hasActivePlathoAccount\(\) \|\| pendingServiceWorkerAppShellReload/);
     expect(swSource).toMatch(/throw serviceWorkerUpdateReloadError\(\)/);
@@ -2610,7 +2654,8 @@ describe('PWA runtime config guard', () => {
     expect(activationSource).toMatch(/const expectedUnavailable = isExpectedVaultProviderUnavailable\(error\)/);
     expect(activationSource).toMatch(/const keepCurrentBinding = expectedUnavailable && hasCurrentWalletVaultBinding\(\)/);
     expect(activationSource).toMatch(/if \(!keepCurrentBinding\) delete globalThis\.plathoVaultBinding/);
-    expect(activationSource).toMatch(/setText\(vaultRecordStatus, keepCurrentBinding[\s\S]*\? 'activated'/);
+    expect(activationSource).toMatch(/setText\(vaultRecordStatus, keepCurrentBinding[\s\S]*\? t\('vault\.activated'\)/);
+    expect(EN_STRINGS['vault.activated']).toBe('activated');
   });
 
   it('PWA-WALLET-REPLACE-01: replacing the local wallet clears private runtime state in the same tab', () => {
@@ -2771,7 +2816,8 @@ describe('PWA runtime config guard', () => {
     expect(controls).toMatch(/if \(accountActive\) plathoAccountActivationPending = false;/);
     expect(controls).toMatch(/const activationPending = plathoAccountActivationPending && !accountActive/);
     expect(controls).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending \|\| activationPending/);
-    expect(controls).toMatch(/activationPending\s*\?\s*'activating'/);
+    expect(controls).toMatch(/activationPending\s*\?\s*t\('vault\.statusActivating'\)/);
+    expect(EN_STRINGS['vault.statusActivating']).toBe('activating');
     // Hide the dead rows instead of showing disabled placeholders: Unlock only when a stored wallet is
     // locked (actionable); Activate only while activation is actionable or in progress (wallet unlocked AND
     // not yet active) — so the "active"/"unlocked"/"not stored" dead states disappear from the profile.
@@ -2809,7 +2855,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function syncPrivateCapsulesFromChain'),
     );
     expect(statusText).toMatch(/incompletePrivateStreamCount \?\? 0\) > 0/);
-    expect(statusText).toMatch(/message parts pending/);
+    expect(statusText).toMatch(/t\('sync\.partsPending'\)/);
+    expect(EN_STRINGS['sync.partsPending']).toBe('message parts pending');
     expect(statusText).toMatch(/Number\(result\.skipped \?\? 0\) > 0/);
   });
 
@@ -2838,7 +2885,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const undeliveredCount = privateStuckEntrySurfacedCount\(address\)/);
     expect(app).toMatch(/Number\(result\.undeliveredCount \?\? 0\) === 0/);
     expect(app).toMatch(/'private_entry_undelivered'/);
-    expect(app).toMatch(/undelivered`/);
+    expect(app).toMatch(/tPlural\('sync\.undelivered', n\)/);
+    expect(EN_STRINGS['sync.undelivered#other']).toMatch(/undelivered/);
   });
 
   it('PWA-DOUBLEPUBLISH-01: a possibly-delivered external is never fresh-re-signed under a new nonce', () => {
@@ -2894,7 +2942,8 @@ describe('PWA runtime config guard', () => {
     // rate-limit backoff (backpressure). The "RPC busy" copy is unique to the
     // private gate (the public composer's tonRpcLimited() gate returns silently),
     // so assert it sits directly inside a tonRpcLimited() guard.
-    expect(app).toMatch(/if \(tonRpcLimited\(\)\) \{[\s\S]{0,800}?RPC busy, send again in a moment/);
+    expect(app).toMatch(/if \(tonRpcLimited\(\)\) \{[\s\S]{0,800}?t\('chat\.rpcBusy'\)/);
+    expect(EN_STRINGS['chat.rpcBusy']).toBe('RPC busy, send again in a moment');
 
     // #4: a PRIMARY (non-emergency) gateway HTTP-5xx on sendBoc stops the loop
     // (confirm-via-read) rather than re-broadcasting to the keyless emergency
@@ -3244,14 +3293,16 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).toMatch(/publicReadLimit \?\? PUBLIC_CHAIN_READ_LIMIT/);
     expect(syncPublicSource).toMatch(/const readLimit = Number\.isFinite\(configuredLimit\)/);
     expect(syncPublicSource).toMatch(/const minEntryId = syncWindow === 'long' \? 0 : Math\.max\(0, latest - readLimit\)/);
-    expect(html).toMatch(/<option value="short">Short - newest 128 entries<\/option>/);
-    expect(html).toMatch(/<option value="long">Long - retained history, up to 1 year<\/option>/);
+    expect(html).toMatch(/<option value="short" data-i18n="public\.syncWindowShort">Short - newest 128 entries<\/option>/);
+    expect(html).toMatch(/<option value="long" data-i18n="public\.syncWindowLong">Long - retained history, up to 1 year<\/option>/);
     expect(html).not.toMatch(/<option value="7">/);
     expect(html).not.toMatch(/<option value="30">/);
     expect(html).not.toMatch(/<option value="90">/);
     expect(app).toMatch(/if \(text === 'all' \|\| text === 'long'\) return 'long'/);
     expect(app).toMatch(/return 'short'/);
-    expect(app).toMatch(/return normalized === 'long' \? 'long public history' : 'short public history'/);
+    expect(app).toMatch(/return normalized === 'long' \? t\('public\.longHistory'\) : t\('public\.shortHistory'\)/);
+    expect(EN_STRINGS['public.longHistory']).toBe('long public history');
+    expect(EN_STRINGS['public.shortHistory']).toBe('short public history');
   });
 
   it('PWA-MSG-02: private composer cannot create streams larger than the default private sync window', () => {
@@ -3332,7 +3383,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/privateAnonymousButton\.disabled = Boolean\(blockReason\)/);
     expect(app).toMatch(/privateAnonymousButton\.title = blockReason \?\? \(/);
     expect(app).toMatch(/privateAnonymousButton\?\.addEventListener\('click', \(\) => \{[\s\S]*if \(!canTogglePrivateSenderMode\(\)\)/);
-    expect(app).toMatch(/Pseudonymous: wallet address hidden, sender key may still link messages/);
+    expect(enCopy).toMatch(/Pseudonymous: wallet address hidden, sender key may still link messages/);
     const senderModeUiSource = app.slice(
       app.indexOf('function updatePrivateSenderModeUi'),
       app.indexOf('function normalizeLinkedPlathoUsername'),
@@ -3556,7 +3607,9 @@ describe('PWA runtime config guard', () => {
     expect(profileSource).toMatch(/async function submitVaultProfileAvatarRegistration[\s\S]*submitVaultAuthExternalWithNonceConfirmation/);
     expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*submitVaultAuthExternalWithNonceConfirmation/);
     expect(keyRotateSource).toMatch(/submitVaultAuthExternalWithNonceConfirmation/);
-    expect(keyRotateSource).toMatch(/submission\.confirmationPending \? 'key update submitted, confirming' : 'key update sent'/);
+    expect(keyRotateSource).toMatch(/submission\.confirmationPending \? t\('vault\.keyUpdateSubmittedConfirming'\) : t\('vault\.keyUpdateSent'\)/);
+    expect(EN_STRINGS['vault.keyUpdateSubmittedConfirming']).toBe('key update submitted, confirming');
+    expect(EN_STRINGS['vault.keyUpdateSent']).toBe('key update sent');
     expect(profileSource).toMatch(/await waitForProfileAvatarRegistryUpdate\(owner, avatarHash\)/);
     expect(usernameFlow).toMatch(/autoLinkMintedUsername\(username, owner,/);
   });
@@ -3596,7 +3649,7 @@ describe('PWA runtime config guard', () => {
     const assertIntentIndex = claimSource.indexOf('assertReceiveIntentMatchesPayment(intent, payment)');
     const submitIndex = claimSource.indexOf("submitVaultReceiveIntentExternal('ClaimReceiveIntent'");
     const waitIndex = claimSource.indexOf('waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser)');
-    const flashIndex = claimSource.indexOf('flashWalletIdentityStatus(`check claimed +');
+    const flashIndex = claimSource.indexOf("flashWalletIdentityStatus(t('payment.checkClaimed'");
 
     expect(readUserIndex).toBeGreaterThanOrEqual(0);
     expect(readIntentIndex).toBeGreaterThan(readUserIndex);
@@ -3655,7 +3708,7 @@ describe('PWA runtime config guard', () => {
     const assertIndex = cancelSource.indexOf('assertReceiveIntentCancelableBySender(intent, payment)');
     const submitIndex = cancelSource.indexOf("submitVaultReceiveIntentExternal('CancelReceiveIntent'");
     const waitIndex = cancelSource.indexOf('waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser)');
-    const flashIndex = cancelSource.indexOf("flashWalletIdentityStatus('check cancelled')");
+    const flashIndex = cancelSource.indexOf("flashWalletIdentityStatus(t('payment.checkCancelled'))");
 
     expect(helpers).toMatch(/function assertReceiveIntentCancelableBySender/);
     expect(helpers).toMatch(/sameWalletAddress\(intent\.sender_wallet, connectedWallet\)/);
@@ -3868,7 +3921,8 @@ describe('PWA runtime config guard', () => {
     // Private chat + Unfollow — so an empty channel stays unfollowable, with Unfollow the clear action.
     expect(app).toMatch(/if \(!item\.emptyChannel\) \{[\s\S]*?const commentButton = document\.createElement\('button'\)/);
     // Unfollow is the shared post action, so it also reaches the empty-channel placeholder card.
-    expect(app).toMatch(/if \(!isOwnPost && isPublicChannelSubscribed\(item\.channelId\)\)[\s\S]*?textContent = 'Unfollow'/);
+    expect(app).toMatch(/if \(!isOwnPost && isPublicChannelSubscribed\(item\.channelId\)\)[\s\S]*?textContent = t\('public\.unfollow'\)/);
+    expect(EN_STRINGS['public.unfollow']).toBe('Unfollow');
   });
 
   it('PWA-CONFIG-02: production config passes only with mainnet and provider module configured', () => {
@@ -4342,12 +4396,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(!thread \|\| isSavedMessagesThread\(thread\) \|\| isThreadConversationVisible\(thread\)\) return;/);
     // 'Saved' is a RENDER-ONLY display name (threadDisplayLabel feeds the contact store + the own public
     // channel name — storing it would rename the channel everywhere).
-    expect(app.match(/isSavedMessagesThread\(thread\) \? 'My notes' : threadDisplayLabel\(thread\)/g)?.length ?? 0).toBe(2);
+    expect(app.match(/isSavedMessagesThread\(thread\) \? t\('chat\.myNotes'\) : threadDisplayLabel\(thread\)/g)?.length ?? 0).toBe(2);
+    expect(EN_STRINGS['chat.myNotes']).toBe('My notes');
     expect(app).not.toMatch(/localLabel: '(Saved|My notes)'/);
     // Anonymity to yourself is meaningless AND breaks the self detection (payload.senderWallet stripped -> the
     // note renders as incoming): self sends always carry the sender wallet, and the toggle explains why.
     expect(app).toMatch(/const includeSenderWalletMetadata = savedThread \|\| currentPrivateSenderMode\(\) !== PRIVATE_SENDER_MODES\.ANONYMOUS;/);
-    expect(app).toMatch(/if \(isSavedMessagesThread\(activeThread\(\)\)\) return 'Notes to yourself are never anonymous';/);
+    expect(app).toMatch(/if \(isSavedMessagesThread\(activeThread\(\)\)\) return t\('chat\.blockSavedAnonymous'\);/);
+    expect(EN_STRINGS['chat.blockSavedAnonymous']).toBe('Notes to yourself are never anonymous');
   });
 
   it('PWA-SAVED-02: My notes pinned first + pencil avatar; thread-time shows the real last-message time', () => {
@@ -4554,7 +4610,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function appendPublicItemActions('),
       app.indexOf('function renderPublicFeed('),
     );
-    expect(actionsSource).toMatch(/commentButton\.textContent = 'Comments';/);
+    expect(actionsSource).toMatch(/commentButton\.textContent = t\('public\.comments'\);/);
+    expect(EN_STRINGS['public.comments']).toBe('Comments');
     // Viewing comments needs no wallet — gated on the on-chain post only, not plathoWallet.
     expect(actionsSource).toMatch(/const canViewComments = Boolean\(commentsAllowed && hasChainCommentTarget\);/);
     expect(actionsSource).toMatch(/commentButton\.disabled = !canViewComments;/);
@@ -4677,7 +4734,8 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="savePrefsStatus"/);
     expect(app).toMatch(/savePrefsButton\?\.addEventListener\('click'/);
     expect(app).toMatch(/savePrefsButton\.disabled = !\(Boolean\(plathoWallet && hasActivePlathoAccount\(\)\) && prefsDirty && !prefsSyncInFlight\)/);
-    expect(app).toMatch(/saved \$\{prefsSyncedDateLabel\(prefsLastSyncedAt\)\}/);
+    expect(app).toMatch(/t\('sync\.savedAt', \{ date: prefsSyncedDateLabel\(prefsLastSyncedAt\) \}\)/);
+    expect(EN_STRINGS['sync.savedAt']).toBe('saved {date}');
     expect(app).toMatch(/refreshPrefsSyncUi\(\);/);
   });
 
@@ -4994,8 +5052,10 @@ describe('PWA runtime config guard', () => {
     expect(finalizeAvatarSource.indexOf('registryPointer = await waitForProfileAvatarRegistryUpdate')).toBeGreaterThan(
       finalizeAvatarSource.indexOf('await submitVaultProfileAvatarRegistration'),
     );
-    expect(finalizeAvatarSource).toMatch(/confirming registry/);
-    expect(finalizeAvatarSource).toMatch(/avatar not active yet/);
+    expect(finalizeAvatarSource).toMatch(/t\('avatar\.confirmingRegistry'\)/);
+    expect(EN_STRINGS['avatar.confirmingRegistry']).toBe('confirming registry');
+    expect(finalizeAvatarSource).toMatch(/t\('avatar\.notActiveYet'\)/);
+    expect(EN_STRINGS['avatar.notActiveYet']).toBe('avatar not active yet');
     expect(finalizeAvatarSource).toMatch(/registrySubmission \?\? await submitVaultProfileAvatarRegistration/);
     expect(submitAvatarSource).toMatch(/profileAvatarPublishRecoveryFor\(owner, avatarHash\)/);
     expect(submitAvatarSource).toMatch(/scheduleProfileAvatarPublishRecovery\(existingRecovery, 0\)/);
@@ -5013,7 +5073,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PROFILE_AVATAR_ROUTE_RETRY_DELAYS_MS = \[1_000, 2_000, 4_000, 8_000\]/);
     expect(submitAvatarSource).toMatch(/isVaultPublishPartialError\(error\)/);
     expect(submitAvatarSource).toMatch(/plathoLastProfileAvatarPublishPartial/);
-    expect(submitAvatarSource).toMatch(/publish submitted, confirming/);
+    expect(submitAvatarSource).toMatch(/t\('avatar\.publishSubmittedConfirming'\)/);
+    expect(EN_STRINGS['avatar.publishSubmittedConfirming']).toBe('publish submitted, confirming');
     expect(submitAvatarSource).toMatch(/confirmCapsuleHubPublishEntries\(publishResult\.publishState, \{/);
     expect(submitAvatarSource).toMatch(/findConfirmedAvatarEntriesFromPublishState\(owner, pendingPointer, publishResult\.publishState\)/);
     expect(submitAvatarSource).toMatch(/scanAvailableTransports:\s*true/);
@@ -5029,7 +5090,8 @@ describe('PWA runtime config guard', () => {
     expect(submitAvatarSource).not.toMatch(/markPublishStateAwaitingPartsForRetry\(/);
     expect(submitAvatarSource).toMatch(/retryUnconfirmedVaultPublishBroadcasts\(publishResult\.publishState, \{/);
     expect(submitAvatarSource).toMatch(/owner,/);
-    expect(submitAvatarSource).toMatch(/broadcast retrying/);
+    expect(submitAvatarSource).toMatch(/t\('avatar\.broadcastRetrying'\)/);
+    expect(EN_STRINGS['avatar.broadcastRetrying']).toBe('broadcast retrying');
     expect(submitAvatarSource).toMatch(/plathoLastProfileAvatarPublishRecovery/);
     expect(submitAvatarSource).toMatch(/capturePublishSnapshot\('before-public-publish'/);
     expect(submitAvatarSource).toMatch(/capturePublishSnapshot\('after-avatar-not-visible'/);
@@ -5038,12 +5100,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoProfileAvatarPublishDiagnosticsJson/);
     expect(app).toMatch(/safeDiagnosticsJson/);
     expect(submitAvatarSource).toMatch(/publishDiagnostics\.initialPublishError = shortUiErrorText\(error\.cause \?\? error, 'avatar publish failed'\)/);
-    expect(submitAvatarSource).toMatch(/broadcast uncertain:/);
+    expect(submitAvatarSource).toMatch(/t\('avatar\.broadcastUncertainDetail', \{ status: broadcastStatus \}\)/);
+    expect(EN_STRINGS['avatar.broadcastUncertainDetail']).toMatch(/^broadcast uncertain: /);
     expect(app).toMatch(/externalBocLength/);
     expect(app).toMatch(/TON RPC broadcast failed:/);
     expect(submitAvatarSource).not.toMatch(/avatar publish retrying/);
+    expect(enCopy).not.toMatch(/avatar publish retrying/);
     expect(submitAvatarSource).not.toMatch(/profile-avatar-retry-/);
-    expect(submitAvatarSource).toMatch(/avatar still confirming/);
+    expect(enCopy).not.toMatch(/profile-avatar-retry-/);
+    expect(submitAvatarSource).toMatch(/t\('avatar\.stillConfirming'\)/);
+    expect(EN_STRINGS['avatar.stillConfirming']).toBe('avatar still confirming');
     expect(readAvatarPartsSource).toMatch(/assembledAvatarPartGroup\(parts, pointer\)/);
     expect(findAvatarPartsSource).toMatch(/assembledAvatarPartGroup\(parts, pointer\)/);
     expect(app).toMatch(/async function findConfirmedAvatarEntriesFromPublishState\(ownerWallet, pointer, publishState\)/);
@@ -5303,7 +5369,8 @@ describe('PWA runtime config guard', () => {
     expect(waitSource).toMatch(/clearPendingUsernameMint\(username, owner\)/);
     expect(submitSource).toMatch(/assertNoPendingUsernameMintRetry\(username, owner\)/);
     expect(submitSource).toMatch(/rememberPendingUsernameMint\(username, owner, result\)/);
-    expect(submitSource).toMatch(/mint submitted, finalizing/);
+    expect(submitSource).toMatch(/t\('username\.mintSubmittedFinalizing'\)/);
+    expect(EN_STRINGS['username.mintSubmittedFinalizing']).toBe('mint submitted, finalizing');
     expect(submitSource).toMatch(/attempts: USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS/);
     expect(submitSource).toMatch(/delayMs: USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS/);
   });
@@ -5346,7 +5413,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/throw new VaultChainProviderUnavailableError\('Vault chain provider is not configured'\)/);
     expect(app).toMatch(/const VAULT_AUTO_REFRESH_MS = 60 \* 1000/);
     expect(app).toMatch(/const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 \* 1000/);
-    expect(app).toMatch(/const TON_RPC_CONNECTING_STATUS = 'RPC busy - retrying'/);
+    expect(app).toMatch(/const TON_RPC_CONNECTING_STATUS = t\('common\.rpcBusyRetrying'\)/);
+    expect(EN_STRINGS['common.rpcBusyRetrying']).toBe('RPC busy - retrying');
     expect(app).toMatch(/let tonRpcLimitedUntil = 0/);
     expect(app).toMatch(/function noteTonRpcRateLimit/);
     expect(app).toMatch(/function markTonRpcLimited/);
@@ -5461,7 +5529,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function messageAutoSyncCountdownText/);
     // State-only sync label: the "next sync in Ns" countdown was removed (owner: drop the next-sync timer).
     expect(app).not.toMatch(/next sync in \$\{seconds\}s/);
-    expect(app).toMatch(/if \(messageAutoSyncPhase === 'synced'\) return '✓ Synced'/);
+    expect(app).toMatch(/if \(messageAutoSyncPhase === 'synced'\) return t\('sync\.syncedCheck'\)/);
+    expect(EN_STRINGS['sync.syncedCheck']).toBe('✓ Synced');
     expect(app).toMatch(/if \(messageAutoSyncPhase === 'delayed'\) return messageAutoSyncLastErrorLabel/);
     expect(app).toMatch(/function beginMessageSyncUi/);
     expect(app).toMatch(/function completeMessageSyncUi/);
@@ -5520,7 +5589,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/catch_up_pending/);
     expect(app).toMatch(/partial_stream_pending/);
     expect(app).toMatch(/index_limit_without_cursor/);
-    expect(app).toMatch(/index scan limited/);
+    expect(enCopy).toMatch(/index scan limited/);
     expect(app).toMatch(/catch-up/);
     expect(app).toMatch(/function privateIndexSyncReadLimit\(options = \{\}\)/);
     expect(app).toMatch(/options\.readLimit/);
@@ -5688,7 +5757,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function isOwnPublicAuthor\(authorWallet\)/);
     expect(app).toMatch(/const ownAddress = plathoWallet\?\.address \?\? storedPlathoWalletRecord\(\)\?\.address \?\? null/);
     expect(app).toMatch(/const isOwnPost = isOwnPublicAuthor\(authorWallet\)/);
-    expect(app).toMatch(/if \(!isOwnPost\) \{[\s\S]*?textContent = 'Private chat'/);
+    expect(app).toMatch(/if \(!isOwnPost\) \{[\s\S]*?textContent = t\('public\.privateChat'\)/);
+    expect(EN_STRINGS['public.privateChat']).toBe('Private chat');
     // 6A. Feed posts get the "Display as" chevron in the AUTHOR ROW (top-right), FEED mode only — channels mode
     // omits it on post cards (the channel-detail header already carries it). Reuses the shared popover.
     expect(app).toMatch(/function publicItemIdentityButton\(item\)/);
@@ -5716,11 +5786,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v725/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=210/);
+    expect(sw).toMatch(/platho-pwa-prototype-v726/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=211/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=654/);
+    expect(sw).toMatch(/\.\/app\.js\?v=655/);
+    // i18n engine + dictionaries are precached (offline language switch).
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=1/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

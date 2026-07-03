@@ -9,9 +9,16 @@ import { shouldIncludeWebRuntimeFile } from '../scripts/prepare_static_web_deplo
 // language), so a hardcoded Russian string would reveal the developers' origin.
 // Shipped runtime copy is English-only. This regression was real: the boot
 // watchdog shipped bilingual RU/EN text.
+//
+// i18n era (v655): the ONE exemption is the locale dictionary file, where Russian
+// is one of ten equal languages. The anti-leak invariant moves to key parity —
+// every locale carries the identical key set (tests/i18n.test.ts), so the ru
+// dictionary can never be more complete (i.e. more loved) than the others.
 
 const WEB_ROOT = resolve('web');
 const TEXT_EXTENSIONS = new Set(['.js', '.mjs', '.html', '.css', '.json', '.md', '.webmanifest', '.svg', '.txt']);
+// The only file allowed to carry non-English (incl. Cyrillic) text.
+const I18N_DICTIONARY_FILE = 'i18n-strings.mjs';
 // Cyrillic + Cyrillic Supplement; the only locale we actually risk leaking.
 const CYRILLIC = /[Ѐ-ӿԀ-ԯ]/;
 
@@ -34,6 +41,7 @@ describe('shipped PWA leaks no developer locale', () => {
     for (const abs of walk(WEB_ROOT)) {
       const rel = toPosix(relative(WEB_ROOT, abs));
       if (!shouldIncludeWebRuntimeFile(rel)) continue; // only inspect what actually ships
+      if (rel === I18N_DICTIONARY_FILE) continue; // the locale dictionaries — parity-guarded instead
       if (!TEXT_EXTENSIONS.has(extname(abs).toLowerCase())) continue; // skip binaries
 
       const src = readFileSync(abs, 'utf8');

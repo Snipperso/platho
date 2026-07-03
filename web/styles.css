@@ -2748,6 +2748,28 @@ button.feed-item:hover {
   display: none;
 }
 
+.quick-start-language-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quick-start-language-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quick-start-language-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(48, 213, 176, 0.25);
+  border-radius: 8px;
+  background: #101815;
+  color: var(--text);
+  font: inherit;
+}
+
 .quick-start-pitch,
 .quick-start-step-why {
   margin: 0;

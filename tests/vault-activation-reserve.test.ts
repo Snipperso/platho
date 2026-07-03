@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 describe('vault activation-reserve trap guard', () => {
   const app = readFileSync('web/app.js', 'utf8');
   const css = readFileSync('web/styles.css', 'utf8');
+  // User-facing copy now lives in the i18n dictionaries; the en reference is what ships in English.
+  const i18n = readFileSync('web/i18n-strings.mjs', 'utf8');
 
   it('VAULT-RESERVE-01: MAX keeps the activation cost in the wallet while un-activated', () => {
     expect(app).toMatch(/function vaultMoveWalletTonReserveNanotons\(\)/);
@@ -27,7 +29,9 @@ describe('vault activation-reserve trap guard', () => {
     expect(app).toMatch(/if \(hasActivePlathoAccount\(\)\) return true;/);
     expect(app).toMatch(/if \(walletBal - amt >= reserve\) return true;/);
     // It is a CONFIRM ("Move anyway"), not a hard block — a user funding activation elsewhere may proceed.
-    expect(app).toMatch(/submitLabel: 'Move anyway'/);
+    // Source now references the copy via i18n; the shipped en label must still read "Move anyway".
+    expect(app).toMatch(/submitLabel: t\('vault\.moveAnyway'\)/);
+    expect(i18n).toMatch(/"vault\.moveAnyway": "Move anyway"/);
     // The guard lives INSIDE submitVaultDepositTonAmount so EVERY deposit entry point is covered (card submit,
     // the submitVaultDepositTon wrapper, and the globalThis export) — not just the card handler.
     expect(app).toMatch(/async function submitVaultDepositTonAmount\(amount\) \{[\s\S]{0,300}if \(!\(await confirmVaultDepositKeepsActivationReserve\(amount\)\)\) \{\s*setVaultStatus\('move cancelled'\);\s*return null;/);
@@ -35,7 +39,10 @@ describe('vault activation-reserve trap guard', () => {
 
   it('VAULT-RESERVE-03: the reserve note is class-styled (prod CSP bans inline styles)', () => {
     expect(app).toMatch(/card\.note\.className = 'vault-move-note'/);
-    expect(app).toMatch(/to activate your account/);
+    // The reserve note's explanatory copy now lives in the i18n dictionary; the app pins the key, the en
+    // dictionary carries the "to activate your account" wording.
+    expect(app).toMatch(/t\('vault\.activationReserveNote'/);
+    expect(i18n).toMatch(/"vault\.activationReserveNote": "[^"\n]*to activate your account/);
     expect(css).toMatch(/\.vault-move-note \{/);
     expect(app).not.toMatch(/style\s*=\s*["'`][^"'`]*vault-move-note/);
   });

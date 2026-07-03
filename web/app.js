@@ -164,9 +164,22 @@ import {
   isWebpBytes,
 } from './webp-encoder.mjs?v=1';
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
+import {
+  t,
+  tPlural,
+  initI18n,
+  setLocale,
+  currentLocale,
+  applyStaticTranslations,
+  I18N_LOCALES,
+} from './i18n.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v654';
+// Locale resolves BEFORE any rendering (stored choice -> Telegram profile -> browser); static HTML gets its
+// dictionary pass here so even pre-shell paints are already in the user's language.
+initI18n();
+applyStaticTranslations();
+const PLATHO_APP_RUNTIME_VERSION = 'v655';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -245,20 +258,20 @@ installConfiguredTonRuntime(appConfig);
 const APP_DOCS = [
   {
     id: 'about',
-    label: 'About',
-    title: 'About Platho',
+    label: t('docs.aboutNav'),
+    title: t('docs.aboutTitle'),
     path: './docs/about-platho.md',
   },
   {
     id: 'ath',
     label: 'ATH',
-    title: 'ATH Whitepaper',
+    title: t('docs.athWhitepaperTitle'),
     path: './docs/ath-whitepaper.md',
   },
   {
     id: 'crypto',
-    label: 'Crypto',
-    title: 'Crypto Protocol',
+    label: t('docs.cryptoNav'),
+    title: t('docs.cryptoTitle'),
     path: './docs/crypto-protocol.md',
   },
 ];
@@ -380,6 +393,26 @@ const replaceVaultKeysButton = document.querySelector('#replaceVaultKeysButton')
 const vaultRotateStatus = document.querySelector('#vaultRotateStatus');
 const syncMessagesButton = document.querySelector('#syncMessagesButton');
 const messageSyncStatus = document.querySelector('#messageSyncStatus');
+// messageSyncStatus doubles as a display node AND a state store: several call sites read its current text
+// to decide whether to overwrite it (keep a rate-limit note over a generic failure, replace a placeholder,
+// stop clobbering a mid-sync label). With i18n the display text is translated, so the machine-readable state
+// must live in a stable, locale-independent marker instead of the rendered text.
+function setMessageSyncStatus(text, state = '') {
+  if (!messageSyncStatus) return;
+  messageSyncStatus.textContent = text ?? '';
+  if (state) messageSyncStatus.dataset.syncState = state;
+  else delete messageSyncStatus.dataset.syncState;
+}
+function messageSyncStatusState() {
+  return messageSyncStatus?.dataset.syncState ?? '';
+}
+// Companion to privateSyncStatusText: the ONE state distinction downstream cares about is 'delayed'
+// (rate-limit / RPC-delayed) versus a normal settled result.
+function privateSyncStatusState(result) {
+  if (result && typeof result === 'object'
+    && (result.rateLimited || result.rpcDelayed || result.reason === 'private_index_read_failed')) return 'delayed';
+  return 'result';
+}
 const publicSyncWindowSelect = document.querySelector('#publicSyncWindowSelect');
 const publicCommentsDefaultSelect = document.querySelector('#publicCommentsDefaultSelect');
 const setAvatarButton = document.querySelector('#setAvatarButton');
@@ -401,10 +434,10 @@ const TONCENTER_API_KEY_STORAGE_KEY = 'platho.toncenter.apiKey.v1';
 // Compact RPC-key status (v651, owner: "key active" ate the row) — a single pictogram with the full text in the
 // tooltip: ✓ active, ✕ rejected, ⏳ still checking/activating, empty when no key.
 const TONCENTER_KEY_STATUS_ICONS = Object.freeze({
-  active: { icon: '✓', state: 'ok', title: 'Key active' },
-  error: { icon: '✕', state: 'error', title: 'Key not accepted - re-check it' },
-  checking: { icon: '⏳', state: '', title: 'Checking...' },
-  activating: { icon: '⏳', state: '', title: 'Saved - activating (up to ~1 min)' },
+  active: { icon: '✓', state: 'ok', title: t('wallet.rpcKeyStatusActive') },
+  error: { icon: '✕', state: 'error', title: t('wallet.rpcKeyStatusError') },
+  checking: { icon: '⏳', state: '', title: t('wallet.rpcKeyStatusChecking') },
+  activating: { icon: '⏳', state: '', title: t('wallet.rpcKeyStatusActivating') },
   empty: { icon: '', state: '', title: '' },
 });
 
@@ -874,7 +907,7 @@ const TON_WALLET_BALANCE_CACHE_MS = 20 * 1000;
 // poll never settles). On timeout the fetch aborts, the caller catches it and returns null, and the next
 // poll retries — a stale/blank balance with retry instead of a forever-pending read.
 const TON_WALLET_BALANCE_FETCH_TIMEOUT_MS = 10 * 1000;
-const TON_RPC_CONNECTING_STATUS = 'RPC busy - retrying';
+const TON_RPC_CONNECTING_STATUS = t('common.rpcBusyRetrying');
 const TON_RPC_LIMIT_FALLBACK_BACKOFF_MS = 60 * 1000;
 const TON_RPC_LIMIT_MIN_BACKOFF_MS = 5 * 1000;
 const MESSAGE_SYNC_COUNTDOWN_TICK_MS = 1_000;
@@ -1113,8 +1146,8 @@ const PRIVATE_SENDER_MODES = Object.freeze({
   ANONYMOUS: 'anonymous',
 });
 const WALLET_DISPLAY_MODE_LABELS = Object.freeze({
-  [WALLET_DISPLAY_MODES.ADDRESS]: 'Address',
-  [WALLET_DISPLAY_MODES.PLATHO_NFT]: 'Platho name',
+  [WALLET_DISPLAY_MODES.ADDRESS]: t('wallet.displayModeAddress'),
+  [WALLET_DISPLAY_MODES.PLATHO_NFT]: t('wallet.displayModePlathoName'),
 });
 let vaultPocketState = {
   wallet: { ton_balance: null, ath_balance: null },
@@ -1388,12 +1421,12 @@ function refreshInstallButtons() {
   installButtons.forEach((button) => {
     button.toggleAttribute('hidden', !canInstall);
     const label = state === 'prompt'
-      ? 'Install Platho'
+      ? t('install.installPlatho')
       : state === 'open-in-app'
-      ? 'Open Platho app'
+      ? t('install.openPlathoApp')
       : state === 'ios-instructions'
-      ? 'How to install on iPhone'
-      : 'Open or install Platho';
+      ? t('install.howToInstallIphone')
+      : t('install.openOrInstall');
     button.setAttribute('aria-label', label);
     button.title = label;
     const icon = button.querySelector('.icon');
@@ -1402,55 +1435,55 @@ function refreshInstallButtons() {
   });
   if (installTitle) {
     installTitle.textContent = state === 'prompt'
-      ? 'Install Platho'
+      ? t('install.installPlatho')
       : state === 'open-in-app'
-      ? 'Open Platho app'
+      ? t('install.openPlathoApp')
       : state === 'ios-instructions'
-      ? 'Install on iPhone'
-      : 'Open or install Platho';
+      ? t('install.installOnIphone')
+      : t('install.openOrInstall');
   }
   if (installConfirmButton) {
-    installConfirmButton.textContent = state === 'prompt' ? 'Install' : 'Got it';
+    installConfirmButton.textContent = state === 'prompt' ? t('install.install') : t('install.gotIt');
   }
   if (installDismissButton) {
-    installDismissButton.textContent = 'Not now';
+    installDismissButton.textContent = t('install.notNow');
     installDismissButton.hidden = state !== 'prompt';
   }
   if (installLead) {
     installLead.textContent = state === 'open-in-app'
-      ? 'Platho is already installed on this device.'
+      ? t('install.leadOpenInApp')
       : state === 'ios-instructions'
-      ? 'Use Home Screen mode for fewer Safari-tab problems.'
+      ? t('install.leadIos')
       : state === 'instructions'
-      ? 'Use the browser app button when Platho is already installed.'
-      : 'Use it as an app, outside stores and platform gates.';
+      ? t('install.leadInstructions')
+      : t('install.leadPrompt');
   }
   if (installBody) {
     installBody.textContent = state === 'open-in-app'
-      ? 'Your browser already recognizes Platho as an installed app. Use the open-app button in the address bar, launcher, dock, or app list to switch into the installed app window.'
+      ? t('install.bodyOpenInApp')
       : state === 'ios-instructions'
-      ? 'Safari does not let Platho open the install sheet directly. Tap Share, choose Add to Home Screen, then launch Platho from the Home Screen. It runs in a cleaner app window and is less fragile than a normal Safari tab, but keep your encrypted wallet key backup anyway.'
+      ? t('install.bodyIos')
       : state === 'instructions'
-      ? 'If Platho is already installed, use the open-app button in the address bar, launcher, dock, or app list. If it is not installed yet, use the browser menu install action. Browsers do not always expose installed-app status to web pages.'
-      : 'Platho is a static PWA. After installation, the app shell, docs, and bounded local encrypted history cache are stored on this device. The cache improves recovery, but it is not a universal backup. Network access is still required for contract reads, verified public feed updates, message-history retrieval, and sending transactions. Platho does not use a server account that can read your messages or hold your keys.';
+      ? t('install.bodyInstructions')
+      : t('install.bodyPrompt');
   }
   setInstallSteps(state === 'ios-instructions'
     ? [
-      'Open platho.app in Safari.',
-      'Tap Share. If you only see the three-dot menu, tap it first and choose Share.',
-      'Choose Add to Home Screen.',
-      'Tap Add, then open Platho from the Home Screen.',
+      t('install.iosStep1'),
+      t('install.iosStep2'),
+      t('install.iosStep3'),
+      t('install.iosStep4'),
     ]
     : []);
   if (installHelp) {
     installHelp.textContent = state === 'installed'
-      ? 'Platho is already installed on this device. Open it from your home screen, launcher, dock, or app list.'
+      ? t('install.helpInstalled')
       : state === 'open-in-app'
-      ? 'Browsers do not expose a reliable web API that lets Platho launch the installed app directly from this page.'
+      ? t('install.helpOpenInApp')
       : state === 'ios-instructions'
-      ? 'Home Screen mode is the recommended iPhone mode. If Add to Home Screen is missing, make sure this page is open in Safari, not inside another app browser.'
+      ? t('install.helpIos')
       : state === 'prompt'
-      ? 'The next step opens your browser install sheet. If you cancel it, the install button stays here so you can still find the manual path.'
+      ? t('install.helpPrompt')
       : installHelpText();
   }
 }
@@ -1674,18 +1707,18 @@ function openToncenterBotLink() {
 // the modal (✕ / outside-click) does nothing; only the CTA opens the bot.
 async function openRpcKeyHelpDialog() {
   const proceed = await openActionDialog({
-    title: 'Get an RPC key',
-    hint: 'A free TON Center API key speeds up reads. It is optional — Platho also works without one. To get a key from the @toncenter bot:',
+    title: t('wallet.rpcKeyHelpTitle'),
+    hint: t('wallet.rpcKeyHelpHint'),
     fields: [{
       type: 'note',
       steps: [
-        'Open the @toncenter bot and send /start.',
-        'Choose to create an API key — you can enter any name.',
-        'When asked for the network, select mainnet.',
-        'Copy the key the bot sends you, then paste it into the RPC Key field here.',
+        t('wallet.rpcKeyHelpStep1'),
+        t('wallet.rpcKeyHelpStep2'),
+        t('wallet.rpcKeyHelpStep3'),
+        t('wallet.rpcKeyHelpStep4'),
       ],
     }],
-    submitLabel: 'Open @toncenter bot',
+    submitLabel: t('wallet.rpcKeyHelpOpenBot'),
   });
   if (proceed) openToncenterBotLink();
 }
@@ -1936,16 +1969,16 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop
     const result = await openActionDialog({
-      title: 'Back up your recovery phrase',
-      hint: 'Telegram can clear local storage in this app. Write these 24 words on paper now - they are the ONLY way to recover this wallet and its funds.',
+      title: t('wallet.seedBackupTitle'),
+      hint: t('wallet.seedBackupHint'),
       tone: 'error',
       cancellable: false,
       dismissOnBackdrop: false,
-      submitLabel: 'I wrote it down',
+      submitLabel: t('wallet.seedBackupSubmit'),
       fields: [
         {
           id: 'recoveryPhrase',
-          label: 'Recovery phrase (write on paper)',
+          label: t('wallet.seedBackupPhraseLabel'),
           type: 'textarea',
           value: phrase,
           readOnly: true,
@@ -1962,7 +1995,7 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
           spellcheck: false,
         },
       ],
-      summary: ['Without this backup, clearing storage permanently loses the wallet.'],
+      summary: [t('wallet.seedBackupSummary')],
     });
     if (String(result?.confirmText ?? '').trim().toUpperCase() === 'SAVED') {
       markTelegramSeedBackupConfirmed(wallet.address);
@@ -1973,9 +2006,9 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
 
 function showTelegramManualExportDialog(filename, content) {
   return openActionDialog({
-    title: 'Copy your wallet backup',
-    hint: 'Saving files is unreliable inside Telegram. Copy this encrypted wallet key and store it somewhere safe - it is protected by your password.',
-    submitLabel: 'Done',
+    title: t('wallet.exportBackupTitle'),
+    hint: t('wallet.exportBackupHint'),
+    submitLabel: t('common.done'),
     fields: [{
       id: 'walletKeyBackup',
       label: filename,
@@ -1984,7 +2017,7 @@ function showTelegramManualExportDialog(filename, content) {
       readOnly: true,
       required: false,
     }],
-    summary: ['This is your password-encrypted wallet key, not the recovery phrase.'],
+    summary: [t('wallet.exportBackupSummary')],
   }).catch(() => {});
 }
 
@@ -2023,12 +2056,12 @@ async function promptInstallApp() {
 function installHelpText() {
   const ua = navigator.userAgent || '';
   if (/iPad|iPhone|iPod/.test(ua)) {
-    return 'On iPhone or iPad, open this page in Safari, tap Share, then Add to Home Screen.';
+    return t('install.helpTextIos');
   }
   if (/Android/i.test(ua)) {
-    return 'On Android Chrome, open the browser menu and choose Install app or Add to Home screen.';
+    return t('install.helpTextAndroid');
   }
-  return 'In Chrome or Edge, use the address bar install icon or the browser menu: Apps / Install this site.';
+  return t('install.helpTextDesktop');
 }
 
 async function refreshInstalledRelatedPwaState() {
@@ -2324,10 +2357,11 @@ function formatThreadListTimestamp(ms) {
   const now = new Date();
   const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const dayDiff = Math.round((dayStart(now) - dayStart(date)) / 86_400_000);
-  if (dayDiff <= 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (dayDiff < 7) return date.toLocaleDateString([], { weekday: 'short' });
-  if (date.getFullYear() === now.getFullYear()) return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+  // The APP locale, not the browser one — otherwise weekday/month names contradict the chosen UI language.
+  if (dayDiff <= 0) return date.toLocaleTimeString(currentLocale(), { hour: '2-digit', minute: '2-digit' });
+  if (dayDiff < 7) return date.toLocaleDateString(currentLocale(), { weekday: 'short' });
+  if (date.getFullYear() === now.getFullYear()) return date.toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(currentLocale(), { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function setText(node, value) {
@@ -2351,8 +2385,8 @@ function createWalletReceiveQrNode(address) {
   wrapper.className = 'wallet-receive-card';
   const image = document.createElement('img');
   image.className = 'wallet-receive-qr';
-  image.alt = 'GRAM wallet QR';
-  image.src = createQrSvgDataUrl(walletTonTransferUri(address), { title: 'GRAM wallet receive address' });
+  image.alt = t('wallet.qrAlt');
+  image.src = createQrSvgDataUrl(walletTonTransferUri(address), { title: t('wallet.qrTitle') });
   const addressBox = document.createElement('div');
   addressBox.className = 'wallet-receive-address';
   addressBox.textContent = address;
@@ -2501,7 +2535,7 @@ function normalizePrivateSenderMode(value) {
 }
 
 function privateSenderModeLabel(value) {
-  return normalizePrivateSenderMode(value) === PRIVATE_SENDER_MODES.ANONYMOUS ? 'anonymous' : 'share address';
+  return normalizePrivateSenderMode(value) === PRIVATE_SENDER_MODES.ANONYMOUS ? t('chat.senderModeAnonymous') : t('chat.senderModeShare');
 }
 
 function normalizeWalletDisplayIdentity(input) {
@@ -2709,10 +2743,10 @@ function currentPrivateSenderOptions() {
 }
 
 function privateSenderModeToggleBlockReason() {
-  if (!plathoWallet) return 'Wallet required';
-  if (pendingServiceWorkerAppShellReload === true) return 'Update ready - reload app';
-  if (composer?.dataset.readOnly === 'true') return 'Read-only channel';
-  if (isSavedMessagesThread(activeThread())) return 'Notes to yourself are never anonymous';
+  if (!plathoWallet) return t('common.walletRequired');
+  if (pendingServiceWorkerAppShellReload === true) return t('chat.blockUpdateReady');
+  if (composer?.dataset.readOnly === 'true') return t('chat.blockReadOnly');
+  if (isSavedMessagesThread(activeThread())) return t('chat.blockSavedAnonymous');
   return null;
 }
 
@@ -2734,11 +2768,11 @@ function updatePrivateSenderModeUi() {
     privateAnonymousButton.setAttribute('aria-pressed', anonymous ? 'true' : 'false');
     privateAnonymousButton.setAttribute(
       'aria-label',
-      anonymous ? 'Share wallet address' : 'Send pseudonymously without wallet address',
+      anonymous ? t('chat.shareWalletAddress') : t('chat.sendPseudonymously'),
     );
     privateAnonymousButton.title = blockReason ?? (anonymous
-      ? 'Pseudonymous: wallet address hidden, sender key may still link messages'
-      : 'Recipient will see your wallet address');
+      ? t('chat.anonymousOnTooltip')
+      : t('chat.anonymousOffTooltip'));
     if (icon) {
       icon.classList.toggle('icon-eye', !anonymous);
       icon.classList.toggle('icon-eye-off', anonymous);
@@ -2846,8 +2880,8 @@ function walletDisplayName(wallet = plathoWallet) {
 
 function walletDisplaySubtitle(wallet = plathoWallet) {
   const identity = readWalletDisplayIdentity(wallet?.address);
-  if (identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && readLinkedPlathoUsername(wallet?.address)) return 'Platho name';
-  return 'Wallet ready';
+  if (identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && readLinkedPlathoUsername(wallet?.address)) return t('wallet.plathoName');
+  return t('wallet.ready');
 }
 
 function renderWalletIdentity(status = null) {
@@ -2857,11 +2891,11 @@ function renderWalletIdentity(status = null) {
     const hasStored = Boolean(storedRecord);
     const storedAddress = storedWalletAddressForCopy(storedRecord);
     const storedLabel = storedAddress ? shortAddress(storedAddress) : storedWalletShortLabel();
-    setText(identityName, hasStored ? storedLabel : 'No wallet');
-    setText(identitySubtitle, status ?? (hasStored ? 'Unlock local wallet' : 'Create or import a wallet'));
-    setText(walletAddressStatus, hasStored ? storedLabel : 'not created');
-    setText(walletDisplayModeStatus, 'address');
-    setText(linkedUsernameStatus, 'verify');
+    setText(identityName, hasStored ? storedLabel : t('wallet.noWallet'));
+    setText(identitySubtitle, status ?? (hasStored ? t('wallet.unlockLocal') : t('wallet.createOrImport')));
+    setText(walletAddressStatus, hasStored ? storedLabel : t('wallet.notCreated'));
+    setText(walletDisplayModeStatus, t('wallet.addressMode'));
+    setText(linkedUsernameStatus, t('wallet.verify'));
     if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.ADDRESS;
     if (copyWalletAddressButton) copyWalletAddressButton.disabled = !storedAddress;
     return;
@@ -2872,9 +2906,9 @@ function renderWalletIdentity(status = null) {
   setText(identitySubtitle, status ?? walletDisplaySubtitle(plathoWallet));
   setText(walletAddressStatus, shortAddress(walletAddressForCopy(plathoWallet)));
   setText(walletDisplayModeStatus, identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT
-    ? canonicalUsernameDisplay(linkedUsername?.label) || 'optional'
-    : 'address');
-  setText(linkedUsernameStatus, canonicalUsernameDisplay(linkedUsername?.label) || 'optional');
+    ? canonicalUsernameDisplay(linkedUsername?.label) || t('wallet.optional')
+    : t('wallet.addressMode'));
+  setText(linkedUsernameStatus, canonicalUsernameDisplay(linkedUsername?.label) || t('wallet.optional'));
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = identity.mode;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = false;
 }
@@ -2940,7 +2974,7 @@ function scheduleWalletAutoLock() {
   clearWalletAutoLockTimer();
   if (!plathoWallet) return;
   walletAutoLockTimer = setTimeout(() => {
-    lockPlathoWallet('Wallet locked');
+    lockPlathoWallet(t('wallet.locked'));
   }, WALLET_AUTO_LOCK_MS);
 }
 
@@ -2973,7 +3007,7 @@ function serviceWorkerUpdateReloadError() {
 
 function requireNoPendingServiceWorkerAppShellReload() {
   if (!pendingServiceWorkerAppShellReload) return;
-  flashWalletIdentityStatus('Update ready - reload before sending');
+  flashWalletIdentityStatus(t('wallet.updateReadyReload'));
   throw serviceWorkerUpdateReloadError();
 }
 
@@ -3013,14 +3047,14 @@ async function handleServiceWorkerControllerChange() {
   }
   if (shouldDeferServiceWorkerReload()) {
     pendingServiceWorkerAppShellReload = true;
-    flashWalletIdentityStatus('Update ready - reload before sending');
+    flashWalletIdentityStatus(t('wallet.updateReadyReload'));
     refreshMessagingControls();
     return;
   }
   window.location.reload();
 }
 
-function lockPlathoWallet(status = 'Wallet locked', options = {}) {
+function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   if (!plathoWallet) {
     reloadForPendingServiceWorkerAppShellUpdate();
     return;
@@ -3044,12 +3078,12 @@ function lockPlathoWallet(status = 'Wallet locked', options = {}) {
   resetVaultPocketState();
   renderWalletIdentity();
   flashWalletIdentityStatus(status);
-  setText(encryptionStatus, 'unlock required');
-  setText(keyAuthStatus, 'locked');
-  setText(vaultDraftStatus, 'locked');
-  setText(vaultRecordStatus, 'locked');
-  setText(messageSyncStatus, 'locked');
-  setText(vaultRotateStatus, 'locked');
+  setText(encryptionStatus, t('wallet.unlockRequired'));
+  setText(keyAuthStatus, t('common.locked'));
+  setText(vaultDraftStatus, t('common.locked'));
+  setText(vaultRecordStatus, t('common.locked'));
+  setMessageSyncStatus(t('common.locked'), 'locked');
+  setText(vaultRotateStatus, t('common.locked'));
   refreshMessagingControls();
   refreshComposerPublishPolicy();
   armWalletUnlockPrompt();
@@ -3078,7 +3112,7 @@ function scheduleTelegramBackgroundLock() {
       scheduleTelegramBackgroundLock();
       return;
     }
-    lockPlathoWallet('Wallet locked');
+    lockPlathoWallet(t('wallet.locked'));
   }, TELEGRAM_BACKGROUND_LOCK_GRACE_MS);
 }
 
@@ -3093,7 +3127,7 @@ function lockPlathoWalletForBackground() {
     scheduleTelegramBackgroundLock();
     return;
   }
-  lockPlathoWallet('Wallet locked', { transient: true });
+  lockPlathoWallet(t('wallet.locked'), { transient: true });
 }
 
 function shouldOpenWalletUnlockPrompt() {
@@ -3124,7 +3158,7 @@ function scheduleWalletUnlockPrompt(delayMs = 180) {
       // startup), not just the explicit unlock button — otherwise a user who once
       // declined the gate could keep using funds with no durable backup.
       await enforceTelegramSeedBackupGate(wallet);
-      flashWalletIdentityStatus('Wallet unlocked');
+      flashWalletIdentityStatus(t('wallet.unlocked'));
     } catch (error) {
       console.error(error);
       renderWalletIdentity();
@@ -3170,10 +3204,10 @@ async function copyTextToClipboard(text) {
 }
 
 function renderPaneHeaders() {
-  setText(chatCountLabel, 'Private chats');
-  setText(publicSubtitle, 'Public channels');
-  setText(vaultSubtitle, 'Vault');
-  setText(profileHandle, 'Profile');
+  setText(chatCountLabel, t('nav.privateChats'));
+  setText(publicSubtitle, t('nav.publicChannels'));
+  setText(vaultSubtitle, t('nav.vault'));
+  setText(profileHandle, t('nav.profile'));
 }
 
 // Pane status lines are logged only when they CHANGE: renderPublicSurface re-runs several times per background
@@ -3224,7 +3258,7 @@ function routeIdentitySubtitle(thread) {
   const identity = primaryThreadIdentity(thread);
   if (!identity) return thread?.subtitle ?? '';
   const label = displayIdentityLabel(identity);
-  return label ? `${identityTypeLabel(identity)} - ${label}` : identityTypeLabel(identity);
+  return label ? t('chat.identityTypeWithLabel', { type: identityTypeLabel(identity), label }) : identityTypeLabel(identity);
 }
 
 function applyThreadDisplayFields(thread) {
@@ -3359,7 +3393,7 @@ function hydrateThreadDisplayFromContactStore(thread) {
 function setIdentityLabel(node, thread, baseClass = 'identity-label') {
   const tone = threadDisplayTone(thread);
   // Saved display name is RENDER-ONLY (threadDisplayLabel feeds the contact store + the own public channel name).
-  node.textContent = isSavedMessagesThread(thread) ? 'My notes' : threadDisplayLabel(thread);
+  node.textContent = isSavedMessagesThread(thread) ? t('chat.myNotes') : threadDisplayLabel(thread);
   node.className = `${baseClass}${tone ? ` identity-label-${tone}` : ''}`;
 }
 
@@ -3372,7 +3406,7 @@ function identityVariantRow(option, selected, onSelect) {
   const label = document.createElement('strong');
   label.textContent = option.label;
   const type = document.createElement('span');
-  type.textContent = selected ? `${option.subtitle} - selected` : option.subtitle;
+  type.textContent = selected ? t('chat.subtitleSelected', { subtitle: option.subtitle }) : option.subtitle;
   row.append(label, type);
   row.addEventListener('click', () => onSelect(option));
   return row;
@@ -3405,7 +3439,7 @@ function identityDisplayOptions(thread) {
     options.push({
       key: 'local-label',
       label: thread.localLabel,
-      subtitle: 'Local name',
+      subtitle: t('chat.localName'),
       identity: null,
     });
   }
@@ -3467,14 +3501,14 @@ async function promptThreadLocalLabel(thread) {
   if (!thread) return;
   const current = typeof thread.localLabel === 'string' ? thread.localLabel : '';
   const result = await openActionDialog({
-    title: current ? 'Edit local name' : 'Set local name',
-    hint: 'A private label shown only on this device. It is never sent to the other side. Leave empty to clear it.',
-    submitLabel: 'Save',
+    title: current ? t('chat.editLocalName') : t('chat.setLocalName'),
+    hint: t('chat.localNameHint'),
+    submitLabel: t('common.save'),
     fields: [
       {
         id: 'localLabel',
-        label: 'Local name',
-        placeholder: 'Optional, e.g. Anonymous',
+        label: t('chat.localName'),
+        placeholder: t('chat.localNamePlaceholder'),
         value: current,
         required: false,
         autocomplete: 'off',
@@ -3503,14 +3537,14 @@ async function promptContactLocalLabel(counterpartyWallet) {
   const stored = readContactDisplayPreference(counterpartyWallet);
   const current = stored?.localLabel ?? '';
   const result = await openActionDialog({
-    title: current ? 'Edit local name' : 'Set local name',
-    hint: 'A private label shown only on this device. It is never sent to the other side. Leave empty to clear it.',
-    submitLabel: 'Save',
+    title: current ? t('chat.editLocalName') : t('chat.setLocalName'),
+    hint: t('chat.localNameHint'),
+    submitLabel: t('common.save'),
     fields: [
       {
         id: 'localLabel',
-        label: 'Local name',
-        placeholder: 'Optional, e.g. Anonymous',
+        label: t('chat.localName'),
+        placeholder: t('chat.localNamePlaceholder'),
         value: current,
         required: false,
         autocomplete: 'off',
@@ -3552,7 +3586,7 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
   popover.replaceChildren();
   const title = document.createElement('div');
   title.className = 'identity-popover-title';
-  title.textContent = 'Display as';
+  title.textContent = t('chat.displayAs');
   popover.append(title);
   const openEdit = () => {
     hideIdentityPopover();
@@ -3566,9 +3600,9 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
     localNameRow.className = 'identity-variant identity-variant-action';
     localNameRow.setAttribute('role', 'menuitem');
     const localNameLabel = document.createElement('strong');
-    localNameLabel.textContent = 'Set local name';
+    localNameLabel.textContent = t('chat.setLocalName');
     const localNameType = document.createElement('span');
-    localNameType.textContent = 'Only shown on this device';
+    localNameType.textContent = t('chat.onlyShownThisDevice');
     localNameRow.append(localNameLabel, localNameType);
     localNameRow.addEventListener('click', openEdit);
     popover.append(localNameRow);
@@ -3588,8 +3622,8 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       editButton.type = 'button';
       editButton.className = 'identity-variant-edit';
       editButton.setAttribute('role', 'menuitem');
-      editButton.setAttribute('aria-label', 'Edit local name');
-      editButton.title = 'Edit local name';
+      editButton.setAttribute('aria-label', t('chat.editLocalName'));
+      editButton.title = t('chat.editLocalName');
       editButton.append(createPencilIcon());
       editButton.addEventListener('click', openEdit);
       row.append(selectRow, editButton);
@@ -3665,13 +3699,13 @@ function showPublicChannelDisplayPopover(channel, anchor) {
 
 function renderConversationIdentity(thread) {
   const identity = threadSelectedIdentity(thread);
-  const labelText = isSavedMessagesThread(thread) ? 'My notes' : threadDisplayLabel(thread);
+  const labelText = isSavedMessagesThread(thread) ? t('chat.myNotes') : threadDisplayLabel(thread);
   if (!identity) {
     activeTitle.textContent = labelText;
     if (identityMenuButton) {
       identityMenuButton.hidden = identityDisplayOptions(thread).length < 1;
-      identityMenuButton.setAttribute('aria-label', `Choose display name for ${labelText}`);
-      identityMenuButton.setAttribute('title', 'Choose display name');
+      identityMenuButton.setAttribute('aria-label', t('chat.chooseDisplayNameFor', { name: labelText }));
+      identityMenuButton.setAttribute('title', t('chat.chooseDisplayName'));
     }
     return;
   }
@@ -3681,8 +3715,8 @@ function renderConversationIdentity(thread) {
   activeTitle.replaceChildren(label);
   if (identityMenuButton) {
     identityMenuButton.hidden = identityDisplayOptions(thread).length <= 1;
-    identityMenuButton.setAttribute('aria-label', `Choose display name for ${labelText}`);
-    identityMenuButton.setAttribute('title', 'Choose display name');
+    identityMenuButton.setAttribute('aria-label', t('chat.chooseDisplayNameFor', { name: labelText }));
+    identityMenuButton.setAttribute('title', t('chat.chooseDisplayName'));
   }
 }
 
@@ -3694,8 +3728,8 @@ function messageAutoSyncCountdownText() {
   if (messageAutoSyncPhase === 'syncing') {
     return MESSAGE_SYNC_LOADING_FRAMES[messageAutoSyncLoadingFrame % MESSAGE_SYNC_LOADING_FRAMES.length];
   }
-  if (messageAutoSyncPhase === 'synced') return '✓ Synced';
-  if (messageAutoSyncPhase === 'delayed') return messageAutoSyncLastErrorLabel ?? 'Sync delayed';
+  if (messageAutoSyncPhase === 'synced') return t('sync.syncedCheck');
+  if (messageAutoSyncPhase === 'delayed') return messageAutoSyncLastErrorLabel ?? t('sync.delayed');
   return null;
 }
 
@@ -3716,8 +3750,8 @@ function refreshGlobalSyncIndicator() {
   const active = isGlobalSyncActive();
   for (const el of globalSyncIndicators) {
     el.dataset.syncing = active ? 'true' : 'false';
-    el.setAttribute('aria-label', active ? 'Syncing' : 'Synced');
-    el.title = active ? 'Syncing…' : 'Synced';
+    el.setAttribute('aria-label', active ? t('sync.syncing') : t('sync.synced'));
+    el.title = active ? t('sync.syncingEllipsis') : t('sync.synced');
   }
 }
 
@@ -3910,7 +3944,7 @@ function beginMessageSyncUi() {
   messageAutoSyncAt = 0;
   messageAutoSyncLastErrorLabel = null;
   messageAutoSyncLoadingFrame = 0;
-  setText(messageSyncStatus, 'syncing');
+  setMessageSyncStatus(t('sync.statusSyncing'), 'syncing');
   scheduleMessageAutoSyncCountdownUi();
 }
 
@@ -3933,7 +3967,7 @@ function completeMessageSyncUi(result) {
 
 function failMessageSyncUi(label) {
   messageAutoSyncPhase = 'delayed';
-  messageAutoSyncLastErrorLabel = label || 'Sync delayed';
+  messageAutoSyncLastErrorLabel = label || t('sync.delayed');
   refreshConversationSubtitle();
 }
 
@@ -3941,7 +3975,7 @@ function openNewChatDialog() {
   if (!newChatDialog || !recipientInput || !recipientHint) return;
   recipientInput.value = '';
   if (recipientLocalLabel) recipientLocalLabel.value = '';
-  recipientHint.textContent = 'Use a Platho name, .ath, .ton, or wallet address. Local label is only shown on this device. Bare @alex is not accepted.';
+  recipientHint.textContent = t('chat.newChatRecipientHint');
   recipientHint.dataset.tone = 'muted';
   newChatDialog.hidden = false;
   requestAnimationFrame(() => recipientInput.focus());
@@ -3974,7 +4008,7 @@ function renderActionSummary(summary, values = {}) {
       row.textContent = line;
     } else {
       const label = document.createElement('strong');
-      label.textContent = `${line.label}: `;
+      label.textContent = t('dialog.labelPrefix', { label: line.label });
       row.append(label, document.createTextNode(String(line.value ?? '')));
     }
     actionSummary.append(row);
@@ -4042,15 +4076,15 @@ function createActionField(field) {
     card.className = 'image-preview-card';
     const image = document.createElement('img');
     image.id = field.id;
-    image.alt = field.alt ?? 'Final image preview';
+    image.alt = field.alt ?? t('dialog.imagePreviewAlt');
     image.loading = 'eager';
     image.tabIndex = 0;
     image.setAttribute('role', 'button');
-    image.title = 'Open full-size preview';
+    image.title = t('dialog.openFullSizePreview');
     const meta = document.createElement('div');
     meta.id = field.metaId ?? `${field.id}Meta`;
     meta.className = 'image-preview-meta';
-    meta.textContent = field.meta ?? 'Preparing preview';
+    meta.textContent = field.meta ?? t('dialog.preparingPreview');
     card.append(image, meta);
     wrapper.append(label, card);
     return wrapper;
@@ -4128,7 +4162,7 @@ function openImageLightbox(src, meta = '') {
   imageLightboxPreviousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   resetImageLightboxZoom();
   imageLightboxImage.src = src;
-  if (imageLightboxMeta) imageLightboxMeta.textContent = meta || 'Final compressed image';
+  if (imageLightboxMeta) imageLightboxMeta.textContent = meta || t('common.finalCompressedImage');
   if (imageLightboxDownloadButton) imageLightboxDownloadButton.disabled = false;
   imageLightboxDialog.hidden = false;
   imageLightboxCloseButton?.focus();
@@ -4352,10 +4386,10 @@ async function openActionDialog(config = {}) {
       // Optional async gate: run on submit BEFORE the dialog closes. Resolves { ok, result?, error? }. When it
       // returns ok:false the dialog STAYS OPEN and shows the error inline (no close+reopen flicker).
       validateSubmit: config.validateSubmit ?? null,
-      checkingHint: config.checkingHint ?? 'Checking…',
+      checkingHint: config.checkingHint ?? t('dialog.checking'),
     };
-    actionTitle.textContent = config.title ?? 'Action';
-    actionHint.textContent = config.hint ?? 'Review details before signing.';
+    actionTitle.textContent = config.title ?? t('dialog.defaultTitle');
+    actionHint.textContent = config.hint ?? t('dialog.reviewBeforeSigning');
     actionHint.dataset.tone = config.tone ?? 'muted';
     actionForm.autocomplete = config.formAutocomplete ?? 'off';
     actionForm.method = config.formMethod ?? 'post';
@@ -4364,7 +4398,7 @@ async function openActionDialog(config = {}) {
       actionCancelButton.hidden = !cancellable;
       actionCancelButton.disabled = !cancellable;
     }
-    actionSubmitButton.textContent = config.submitLabel ?? 'Continue';
+    actionSubmitButton.textContent = config.submitLabel ?? t('common.continue');
     actionSubmitButton.disabled = false;
     actionFields.replaceChildren(...(config.fields ?? []).map(createActionField));
     renderActionSummary(config.summary, collectActionDialogValues());
@@ -4421,8 +4455,8 @@ async function selectDoc(docId) {
   activeDocId = doc.id;
   renderDocsNav();
   if (docsTitle) docsTitle.textContent = doc.title;
-  if (docsLead) docsLead.textContent = 'Protocol notes and application model.';
-  setDocsStatus('Loading');
+  if (docsLead) docsLead.textContent = t('docs.lead');
+  setDocsStatus(t('docs.loading'));
   try {
     let markdown = docsCache.get(doc.id);
     if (!markdown) {
@@ -4435,7 +4469,7 @@ async function selectDoc(docId) {
     docsContent.scrollTop = 0;
   } catch (error) {
     console.error(error);
-    setDocsStatus('Document unavailable', 'error');
+    setDocsStatus(t('docs.unavailable'), 'error');
   }
 }
 
@@ -5019,7 +5053,7 @@ function updatePublicModeButtons() {
   // Public has a single view now (the Feed). Keep the dataset.publicMode='feed' marker so the feed-only CSS
   // ([data-public-mode="feed"]) keeps matching.
   if (publicPane) publicPane.dataset.publicMode = 'feed';
-  if (publicChannelSearch) publicChannelSearch.placeholder = 'Search public';
+  if (publicChannelSearch) publicChannelSearch.placeholder = t('public.searchPlaceholder');
   updatePublicJumpDownVisibility();
   if (publicComposer) publicComposer.hidden = false;
 }
@@ -5069,18 +5103,18 @@ function renderPublicEmpty(titleText, bodyText) {
 // the SAME full-size lightbox (delegated click/keydown on publicPane). Meta (dimensions + approx on-chain byte
 // size, derivable from the data URL's base64 length) fills in once the image decodes.
 function wirePublicImageLightbox(image, src) {
-  image.alt = 'Open image';
+  image.alt = t('public.openImage');
   image.tabIndex = 0;
   image.role = 'button';
-  image.title = 'Open full-size image';
+  image.title = t('public.openFullSizeImage');
   image.dataset.fullImageSrc = src;
-  image.dataset.fullImageMeta = 'Public image';
+  image.dataset.fullImageMeta = t('public.publicImage');
   image.addEventListener('load', () => {
     const base64 = String(src).split(',')[1] ?? '';
     const bytes = Math.floor(base64.length * 3 / 4);
     const dimensions = image.naturalWidth > 0 ? `${image.naturalWidth}x${image.naturalHeight}` : '';
     image.dataset.fullImageMeta = [dimensions, bytes > 0 ? imageByteCountLabel(bytes) : '']
-      .filter(Boolean).join(' - ') || 'Public image';
+      .filter(Boolean).join(' - ') || t('public.publicImage');
   }, { once: true });
 }
 
@@ -5189,7 +5223,7 @@ function publicItemIdentityButton(item) {
   identityButton.className = 'icon-button feed-author-identity';
   identityButton.setAttribute('aria-haspopup', 'menu');
   identityButton.setAttribute('aria-expanded', 'false');
-  identityButton.title = 'Choose display name';
+  identityButton.title = t('public.chooseDisplayName');
   const identityIcon = document.createElement('span');
   identityIcon.className = 'icon icon-chevron-down';
   identityButton.append(identityIcon);
@@ -5220,18 +5254,18 @@ function appendPublicItemActions(article, item) {
     // requires a wallet (enforced by the post detail composer). "Comments off" / "Preview only" stay disabled.
     const canViewComments = Boolean(commentsAllowed && hasChainCommentTarget);
     if (!commentsAllowed) {
-      commentButton.textContent = 'Comments off';
+      commentButton.textContent = t('public.commentsOff');
     } else if (!hasChainCommentTarget) {
-      commentButton.textContent = 'Preview only';
+      commentButton.textContent = t('public.previewOnly');
     } else {
-      commentButton.textContent = 'Comments';
+      commentButton.textContent = t('public.comments');
     }
     commentButton.disabled = !canViewComments;
     commentButton.title = !commentsAllowed
-      ? 'The author closed comments for this post'
+      ? t('public.commentsClosedByAuthor')
       : (!hasChainCommentTarget
-          ? 'This preview post is not an on-chain capsule yet'
-          : 'Open comments for this post');
+          ? t('public.previewNotOnChain')
+          : t('public.openCommentsForPost'));
     commentButton.addEventListener('click', () => {
       if (!canViewComments) return;
       openPublicPostDetail(item);
@@ -5249,11 +5283,11 @@ function appendPublicItemActions(article, item) {
   if (!isOwnPost) {
     const privateButton = document.createElement('button');
     privateButton.type = 'button';
-    privateButton.textContent = 'Private chat';
+    privateButton.textContent = t('public.privateChat');
     privateButton.disabled = !authorWallet;
     privateButton.title = authorWallet
-      ? 'Open this author in Private'
-      : 'Author wallet is not available for this public item';
+      ? t('public.openAuthorInPrivate')
+      : t('public.authorWalletUnavailable');
     privateButton.addEventListener('click', () => {
       if (!authorWallet) return;
       openPrivateThreadForWallet(authorWallet);
@@ -5268,8 +5302,8 @@ function appendPublicItemActions(article, item) {
   if (!isOwnPost && isPublicChannelSubscribed(item.channelId)) {
     const unfollowButton = document.createElement('button');
     unfollowButton.type = 'button';
-    unfollowButton.textContent = 'Unfollow';
-    unfollowButton.title = 'Stop following this channel';
+    unfollowButton.textContent = t('public.unfollow');
+    unfollowButton.title = t('public.stopFollowingChannel');
     unfollowButton.addEventListener('click', () => {
       setPublicChannelSubscribed(item.channelId, false);
     });
@@ -5283,7 +5317,7 @@ function renderPublicFeed(items, options = {}) {
   publicFeed.dataset.publicMode = 'feed';
   publicFeed.replaceChildren();
   if ((items ?? []).length === 0) {
-    renderPublicEmpty(publicChannelSearchQuery ? 'No public posts found' : 'No public posts', publicChannelSearchQuery ? 'Try another search.' : 'Follow a channel or publish the first post.');
+    renderPublicEmpty(publicChannelSearchQuery ? t('public.noPostsFound') : t('public.noPosts'), publicChannelSearchQuery ? t('public.tryAnotherSearch') : t('public.followOrPublishFirst'));
     requestAnimationFrame(updatePublicJumpDownVisibility);
     return;
   }
@@ -5302,7 +5336,7 @@ function renderPublicFeed(items, options = {}) {
     setAvatarNode(authorAvatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
     const meta = document.createElement('div');
     meta.className = 'feed-meta';
-    for (const label of [...(item.meta ?? []), unread ? 'unread' : null].filter(Boolean)) {
+    for (const label of [...(item.meta ?? []), unread ? t('public.unread') : null].filter(Boolean)) {
       const span = document.createElement('span');
       span.textContent = label;
       meta.append(span);
@@ -5371,7 +5405,7 @@ function setPublicCommentTarget(item = null, { focus = true, showContext = true 
   if (publicCommentContext) publicCommentContext.hidden = publicCommentContextSuppressed;
   if (publicPostCommentsToggle) publicPostCommentsToggle.hidden = active;
   if (active) {
-    setText(publicCommentContextText, `Comment to ${item.title ?? item.id ?? 'post'}`);
+    setText(publicCommentContextText, t('public.commentTo', { target: item.title ?? item.id ?? t('public.postFallback') }));
     if (publicMessageInput) {
       publicMessageInput.placeholder = publicComposerPlaceholder();
       if (focus) publicMessageInput.focus();
@@ -5395,7 +5429,7 @@ function replyStripContent(node, reply, cancelLabelNode) {
   if (!node) return;
   const author = document.createElement('span');
   author.className = 'composer-reply-author';
-  author.textContent = reply.author || 'Reply';
+  author.textContent = reply.author || t('chat.reply');
   const snippet = document.createElement('span');
   snippet.textContent = reply.snippet || '';
   const wrap = document.createElement('span');
@@ -5425,7 +5459,7 @@ function refreshPublicCommentReplyUi() {
     replyStripContent(publicCommentContextText, publicCommentReplyTo);
     publicCommentContext.hidden = false;
   } else {
-    if (publicCommentTarget) setText(publicCommentContextText, `Comment to ${publicCommentTarget.title ?? publicCommentTarget.id ?? 'post'}`);
+    if (publicCommentTarget) setText(publicCommentContextText, t('public.commentTo', { target: publicCommentTarget.title ?? publicCommentTarget.id ?? t('public.postFallback') }));
     publicCommentContext.hidden = publicCommentContextSuppressed;
   }
 }
@@ -5445,7 +5479,7 @@ function buildReplyQuoteNode(reply, scroller) {
   quote.className = 'message-reply-quote';
   const author = document.createElement('span');
   author.className = 'message-reply-quote-author';
-  author.textContent = reply.author || 'Reply';
+  author.textContent = reply.author || t('chat.reply');
   const snippet = document.createElement('span');
   snippet.className = 'message-reply-quote-snippet';
   snippet.textContent = reply.snippet || '';
@@ -5523,7 +5557,7 @@ function publicDetailStatusNode(text, { retry = false } = {}) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'public-detail-retry';
-    button.textContent = 'Retry';
+    button.textContent = t('common.retry');
     button.addEventListener('click', () => { refreshPublicPostDetailComments(); });
     node.append(' ', button);
   }
@@ -5544,7 +5578,7 @@ function renderPublicPostDetail() {
   // name + a short subtitle), so the body below can show just the post content + comments without repeating the
   // author on every row.
   const flatMeta = (item.meta ?? []).flat().filter(Boolean);
-  const authorName = item.author || flatMeta[0] || item.title || 'Post';
+  const authorName = item.author || flatMeta[0] || item.title || t('public.postTitleFallback');
   const dateLabel = flatMeta.length > 1 ? String(flatMeta[flatMeta.length - 1]) : '';
   // Title carries the author's identity tone (e.g. the teal ".ath" colour) — parity with the private chat header
   // (renderConversationIdentity). The date is NOT shown here; it moves into the post card below (like the feed),
@@ -5598,21 +5632,21 @@ function renderPublicPostDetail() {
   const comments = publicPostDetailMergedComments();
   const heading = document.createElement('h3');
   heading.className = 'public-detail-comments-heading';
-  heading.textContent = comments.length > 0 ? `Comments (${comments.length})` : 'Comments';
+  heading.textContent = comments.length > 0 ? t('public.commentsWithCount', { count: comments.length }) : t('public.comments');
   section.append(heading);
   if (comments.length > 0) appendPublicItemComments(section, { comments });
   if (publicPostDetailLoadState === 'loading') {
-    section.append(publicDetailStatusNode(comments.length > 0 ? 'Loading more comments...' : 'Loading comments...'));
+    section.append(publicDetailStatusNode(comments.length > 0 ? t('public.loadingMoreComments') : t('public.loadingComments')));
   } else if (publicPostDetailLoadState === 'error' && comments.length === 0) {
     // The read failed (rate-limited / unreachable) after retries — we do NOT know if there are comments.
-    section.append(publicDetailStatusNode('Comments not loaded — check your connection and retry.', { retry: true }));
+    section.append(publicDetailStatusNode(t('public.commentsNotLoadedRetry'), { retry: true }));
   } else if (publicPostDetailLoadState === 'ready' && comments.length === 0) {
     // A clean read distinguishes the two honestly: parentExists === false means the post's comment index was
     // genuinely never created (no one has commented). parentExists === true with nothing shown is anomalous (index
     // present but no comment resolved) — treat as not-yet-loaded with a retry, not as "no comments".
     section.append(publicPostDetailParentExists === false
-      ? publicDetailStatusNode('No comments yet. Be the first to comment.')
-      : publicDetailStatusNode('Comments not loaded yet.', { retry: true }));
+      ? publicDetailStatusNode(t('public.noCommentsYet'))
+      : publicDetailStatusNode(t('public.commentsNotLoadedYet'), { retry: true }));
   }
   publicPostDetailBody.append(section);
 }
@@ -5967,16 +6001,16 @@ async function refreshPublicPostDetailComments() {
 
 async function confirmPublicCommentsRisk() {
   const result = await openActionDialog({
-    title: 'Open public comments?',
-    hint: 'Public comments are immutable while retained, but Platho v1 is not a permanent archive.',
+    title: t('public.openCommentsRiskTitle'),
+    hint: t('public.openCommentsRiskHint'),
     tone: 'error',
-    submitLabel: 'Publish with comments',
+    submitLabel: t('public.publishWithComments'),
     fields: [],
     summary: [
-      'Anyone can write an immutable public comment under this post.',
-      'The protocol cannot edit or moderate accepted comments before prune; abusive content may remain visible while retained or available through history providers.',
-      'Compact entries can be pruned after the retention window, and old bodies may depend on RPC history or local cache.',
-      'Close comments for this post if you do not want that risk.',
+      t('public.openCommentsRiskAnyone'),
+      t('public.openCommentsRiskModeration'),
+      t('public.openCommentsRiskPrune'),
+      t('public.openCommentsRiskClose'),
     ],
   });
   return result !== null;
@@ -6796,9 +6830,9 @@ function ownPublicChannel() {
   if (existing) return existing;
   return {
     id: `wallet:${wallet}`,
-    name: 'you',
-    avatar: publicChannelAvatar('you'),
-    subtitle: `your public channel - ${shortAddress(wallet)}`,
+    name: t('public.you'),
+    avatar: publicChannelAvatar(t('public.you')),
+    subtitle: t('public.ownChannelSubtitle', { address: shortAddress(wallet) }),
     authorWallet: wallet,
   };
 }
@@ -9320,45 +9354,45 @@ function privateSyncImported(result) {
 }
 
 function privateSyncStatusText(result) {
-  if (typeof result === 'boolean') return result ? 'new messages' : 'up to date';
-  if (!result) return 'up to date';
-  if (result.rateLimited || result.rpcDelayed) return 'sync delayed';
+  if (typeof result === 'boolean') return result ? t('sync.newMessages') : t('sync.upToDate');
+  if (!result) return t('sync.upToDate');
+  if (result.rateLimited || result.rpcDelayed) return t('sync.delayedShort');
   if (Number(result.historyUnavailableCount ?? 0) > 0) {
-    return result.imported > 0 ? 'new messages, history gaps' : `history gaps ${result.historyUnavailableCount}`;
+    return result.imported > 0 ? t('sync.newMessagesHistoryGaps') : t('sync.historyGaps', { count: result.historyUnavailableCount });
   }
   if (result.reason === 'body_history_unavailable') {
-    return result.blockedEntryId ? `history unavailable #${result.blockedEntryId}` : 'history unavailable';
+    return result.blockedEntryId ? t('sync.historyUnavailableEntry', { id: result.blockedEntryId }) : t('sync.historyUnavailable');
   }
   if (result.reason === 'private_key_open_failed') {
-    return result.blockedEntryId ? `message key mismatch #${result.blockedEntryId}` : 'message key mismatch';
+    return result.blockedEntryId ? t('sync.keyMismatchEntry', { id: result.blockedEntryId }) : t('sync.keyMismatch');
   }
   if (result.reason === 'private_index_unavailable') {
-    return 'message index unavailable';
+    return t('sync.indexUnavailable');
   }
   if (result.reason === 'private_index_read_failed') {
-    return 'sync delayed';
+    return t('sync.delayedShort');
   }
   if (result.reason === 'partial_stream_pending') {
-    return 'message parts pending';
+    return t('sync.partsPending');
   }
   if (result.reason === 'index_limit_without_cursor') {
-    return result.imported > 0 ? 'new messages, index scan limited' : 'index scan limited';
+    return result.imported > 0 ? t('sync.newMessagesScanLimited') : t('sync.scanLimited');
   }
   if (result.reason === 'catch_up_pending') {
-    return result.imported > 0 ? 'new messages, catch-up pending' : `catch-up ${result.catchUpRemaining ?? 0} left`;
+    return result.imported > 0 ? t('sync.newMessagesCatchUp') : t('sync.catchUpLeft', { count: result.catchUpRemaining ?? 0 });
   }
   if (result.reason === 'private_entry_undelivered' || Number(result.undeliveredCount ?? 0) > 0) {
     const n = Number(result.undeliveredCount ?? 0) || 1;
-    return result.imported > 0 ? `new messages, ${n} undelivered` : (n === 1 ? '1 undelivered' : `${n} undelivered`);
+    return result.imported > 0 ? t('sync.newMessagesUndelivered', { n }) : tPlural('sync.undelivered', n);
   }
   if (Number(result.incompletePrivateStreamCount ?? 0) > 0) {
-    return result.imported > 0 ? 'new messages, parts pending' : 'message parts pending';
+    return result.imported > 0 ? t('sync.newMessagesPartsPending') : t('sync.partsPending');
   }
   if (Number(result.skipped ?? 0) > 0) {
-    return result.imported > 0 ? 'new messages, some delayed' : 'some messages delayed';
+    return result.imported > 0 ? t('sync.newMessagesSomeDelayed') : t('sync.someDelayed');
   }
-  if (result.ok === false || result.scanComplete === false) return 'sync incomplete';
-  return result.imported > 0 ? 'new messages' : 'up to date';
+  if (result.ok === false || result.scanComplete === false) return t('sync.incomplete');
+  return result.imported > 0 ? t('sync.newMessages') : t('sync.upToDate');
 }
 
 async function syncPrivateCapsulesFromChain(options = {}) {
@@ -10190,15 +10224,15 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
         nextSyncDelayMs = MESSAGE_AUTO_SYNC_IDLE_MS;
       }
       if (privateSyncImported(result)) {
-        setText(messageSyncStatus, 'new messages');
-      } else if (messageSyncStatus?.textContent === 'syncing') {
-        setText(messageSyncStatus, privateSyncStatusText(result));
+        setMessageSyncStatus(t('sync.newMessages'), 'result');
+      } else if (messageSyncStatusState() === 'syncing') {
+        setMessageSyncStatus(privateSyncStatusText(result), privateSyncStatusState(result));
       }
     } catch (error) {
       const rateLimited = noteTonRpcRateLimit(error);
-      const label = rateLimited ? 'Sync delayed' : 'Sync failed';
+      const label = rateLimited ? t('sync.syncDelayed') : t('sync.syncFailed');
       failMessageSyncUi(label);
-      setText(messageSyncStatus, rateLimited ? 'sync delayed' : 'sync failed');
+      setMessageSyncStatus(rateLimited ? t('sync.delayedShort') : t('sync.failedShort'), rateLimited ? 'delayed' : 'failed');
       if (!rateLimited) console.error(error);
       if (rateLimited) nextSyncDelayMs = tonRpcLimitBackoffMs(error);
     } finally {
@@ -10210,24 +10244,24 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
 async function bootReplayStore() {
   if (!plathoWallet?.address) {
     localReplayStore = createMemoryReplayStore();
-    setText(replayStoreStatus, hasStoredPlathoWalletRecord() ? 'unlock required' : 'memory');
+    setText(replayStoreStatus, hasStoredPlathoWalletRecord() ? t('common.unlockRequired') : t('vault.storeMemory'));
     return;
   }
   try {
     localReplayStore = await createIndexedDbReplayStore({ dbName: currentReplayDbName() });
-    setText(replayStoreStatus, 'device db');
+    setText(replayStoreStatus, t('vault.storeDeviceDb'));
   } catch {
     localReplayStore = createMemoryReplayStore();
-    setText(replayStoreStatus, 'memory');
+    setText(replayStoreStatus, t('vault.storeMemory'));
   }
 }
 
 function historyStatusLabel() {
-  if (!encryptedMessageStore) return 'history off';
-  const limit = encryptedMessageStore.maxRecords ? `last ${encryptedMessageStore.maxRecords}` : 'local';
+  if (!encryptedMessageStore) return t('vault.historyOff');
+  const limit = encryptedMessageStore.maxRecords ? t('vault.historyLimitLast', { count: encryptedMessageStore.maxRecords }) : t('vault.historyLimitLocal');
   return encryptedMessageStore.persistent === false
-    ? `device-encrypted memory cache (${limit})`
-    : `device-encrypted local cache (${limit})`;
+    ? t('vault.historyMemoryCache', { limit })
+    : t('vault.historyLocalCache', { limit });
 }
 
 // Drop the pre-signed variant BoCs (~16 × ~47KB per part) before persisting: they are in-memory retry material
@@ -10412,7 +10446,7 @@ async function writeMessageToEncryptedHistory(thread, message) {
     setText(localStateLabel, historyStatusLabel());
     return stored;
   } catch (error) {
-    setText(localStateLabel, 'history blocked');
+    setText(localStateLabel, t('sync.historyBlocked'));
     console.error(error);
     return null;
   }
@@ -10456,8 +10490,8 @@ async function restoreEncryptedMessageHistory() {
       dbName: currentMessageHistoryDbName(),
       walletAddress: plathoWallet?.address ?? null,
     };
-    const restoredLabel = restored.length > 0 ? `${historyStatusLabel()} ${restored.length}` : historyStatusLabel();
-    setText(localStateLabel, failed.length > 0 ? `${restoredLabel} · ${failed.length} blocked` : restoredLabel);
+    const restoredLabel = restored.length > 0 ? t('sync.historyRestoredCount', { label: historyStatusLabel(), count: restored.length }) : historyStatusLabel();
+    setText(localStateLabel, failed.length > 0 ? t('sync.historyRestoredBlocked', { restored: restoredLabel, count: failed.length }) : restoredLabel);
     if (changed) {
       renderThreads();
       renderConversation();
@@ -10466,7 +10500,7 @@ async function restoreEncryptedMessageHistory() {
       resumePendingPrivateSendRetries();
     }
   } catch (error) {
-    setText(localStateLabel, 'history blocked');
+    setText(localStateLabel, t('sync.historyBlocked'));
     console.error(error);
   }
 }
@@ -10669,7 +10703,7 @@ async function removePendingPaymentCheckLedgerRecord(payment, options = {}) {
 async function bootEncryptedMessageHistory() {
   if (!plathoWallet?.address) {
     encryptedMessageStore = null;
-    setText(localStateLabel, hasStoredPlathoWalletRecord() ? 'history locked' : 'history off');
+    setText(localStateLabel, hasStoredPlathoWalletRecord() ? t('sync.historyLocked') : t('sync.historyOff'));
     return;
   }
   try {
@@ -10679,7 +10713,7 @@ async function bootEncryptedMessageHistory() {
       encryptedMessageStore = await createMemoryEncryptedMessageHistoryStore();
     } catch (memoryError) {
       encryptedMessageStore = null;
-      setText(localStateLabel, 'history unavailable');
+      setText(localStateLabel, t('sync.historyUnavailable'));
       console.error(indexedDbError);
       console.error(memoryError);
       return;
@@ -10811,14 +10845,14 @@ function hasStoredPlathoWalletRecord() {
 function storedWalletShortLabel() {
   const record = storedPlathoWalletRecord();
   const address = storedWalletAddressForCopy(record);
-  return address ? shortAddress(address) : 'encrypted';
+  return address ? shortAddress(address) : t('wallet.encrypted');
 }
 
 function storedWalletLockStatus() {
-  if (plathoWallet) return 'unlocked';
-  if (readEncryptedPlathoWalletRecord()) return 'encrypted';
-  if (readLegacyPlaintextPlathoWalletRecord()) return 'secure now';
-  return 'not stored';
+  if (plathoWallet) return t('wallet.unlockedStatus');
+  if (readEncryptedPlathoWalletRecord()) return t('wallet.encrypted');
+  if (readLegacyPlaintextPlathoWalletRecord()) return t('wallet.secureNow');
+  return t('wallet.notStored');
 }
 
 function walletPasswordManagerUsername(address = '', networkGlobalId = plathoWalletNetworkOptions().networkGlobalId) {
@@ -10922,10 +10956,10 @@ async function requestWalletPasswordInput({
     required: false,
   }, {
     id: 'walletPassword',
-    label: 'Local password',
+    label: t('wallet.localPasswordLabel'),
     type: 'password',
     autocomplete: create ? 'new-password' : 'current-password',
-    placeholder: 'Local wallet password',
+    placeholder: t('wallet.localPasswordPlaceholder'),
     autocapitalize: 'none',
     spellcheck: false,
     minLength: create ? PLATHO_WALLET_PASSWORD_MIN_LENGTH : undefined,
@@ -10933,10 +10967,10 @@ async function requestWalletPasswordInput({
   if (confirm) {
     fields.push({
       id: 'walletPasswordConfirm',
-      label: 'Repeat password',
+      label: t('wallet.repeatPasswordLabel'),
       type: 'password',
       autocomplete: 'new-password',
-      placeholder: 'Repeat local wallet password',
+      placeholder: t('wallet.repeatPasswordPlaceholder'),
       autocapitalize: 'none',
       spellcheck: false,
       minLength: PLATHO_WALLET_PASSWORD_MIN_LENGTH,
@@ -10960,38 +10994,38 @@ async function requestWalletPasswordInput({
   };
 }
 
-async function requestNewWalletStoragePassword(title = 'Encrypt local wallet', {
+async function requestNewWalletStoragePassword(title = t('wallet.encryptLocalWalletTitle'), {
   passwordManagerUsername = PLATHO_WALLET_PASSWORD_MANAGER_USERNAME,
   passwordManagerNetworkGlobalId = plathoWalletNetworkOptions().networkGlobalId,
 } = {}) {
-  let hint = `Set a local password. Minimum ${PLATHO_WALLET_PASSWORD_MIN_LENGTH} characters; ${PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH}+ is recommended.`;
+  let hint = t('wallet.setLocalPasswordHint', { min: PLATHO_WALLET_PASSWORD_MIN_LENGTH, recommended: PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH });
   let tone = 'muted';
   while (true) {
     const result = await requestWalletPasswordInput({
       title,
       hint,
       tone,
-      submitLabel: 'Encrypt wallet',
+      submitLabel: t('wallet.encryptWalletSubmit'),
       confirm: true,
       create: true,
       passwordManagerUsername,
       passwordManagerNetworkGlobalId,
       summary: [
-        'The password is not sent to Platho and cannot be recovered.',
-        `Use your browser password manager. Minimum ${PLATHO_WALLET_PASSWORD_MIN_LENGTH} characters, recommended ${PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH}+.`,
-        'The recovery phrase is stored only as encrypted WebCrypto data.',
+        t('wallet.passwordNotSentSummary'),
+        t('wallet.passwordManagerSummary', { min: PLATHO_WALLET_PASSWORD_MIN_LENGTH, recommended: PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH }),
+        t('wallet.recoveryPhraseEncryptedSummary'),
       ],
     });
     if (!result) return null;
     const password = normalizeWalletPasswordInput(result.password);
     const confirmPassword = normalizeWalletPasswordInput(result.confirmPassword);
     if (password.length < PLATHO_WALLET_PASSWORD_MIN_LENGTH) {
-      hint = `Password must be at least ${PLATHO_WALLET_PASSWORD_MIN_LENGTH} characters.`;
+      hint = t('wallet.passwordTooShort', { min: PLATHO_WALLET_PASSWORD_MIN_LENGTH });
       tone = 'error';
       continue;
     }
     if (password !== confirmPassword) {
-      hint = 'Passwords do not match.';
+      hint = t('wallet.passwordsDoNotMatch');
       tone = 'error';
       continue;
     }
@@ -11000,9 +11034,9 @@ async function requestNewWalletStoragePassword(title = 'Encrypt local wallet', {
 }
 
 async function requestAndDecryptEncryptedWallet(record, {
-  title = 'Unlock wallet',
-  hint = 'Enter the local password for this encrypted wallet.',
-  submitLabel = 'Unlock wallet',
+  title = t('wallet.unlockWallet'),
+  hint = t('wallet.unlockWalletHint'),
+  submitLabel = t('wallet.unlockWallet'),
 } = {}) {
   let feedback = hint;
   let tone = 'muted';
@@ -11018,8 +11052,8 @@ async function requestAndDecryptEncryptedWallet(record, {
       passwordManagerUsername: record?.address,
       passwordManagerNetworkGlobalId: record?.networkGlobalId,
       summary: [
-        { label: 'Stored wallet', value: record?.address ? shortAddress(record.address) : 'encrypted' },
-        { label: 'Storage', value: `${record?.cipher ?? PLATHO_WALLET_CIPHER_NAME} + ${record?.kdf ?? PLATHO_WALLET_KDF_NAME}` },
+        { label: t('wallet.storedWalletLabel'), value: record?.address ? shortAddress(record.address) : t('wallet.encrypted') },
+        { label: t('wallet.storageLabel'), value: `${record?.cipher ?? PLATHO_WALLET_CIPHER_NAME} + ${record?.kdf ?? PLATHO_WALLET_KDF_NAME}` },
       ],
     });
     if (!result) return null;
@@ -11028,8 +11062,8 @@ async function requestAndDecryptEncryptedWallet(record, {
     } catch (error) {
       console.error(error);
       feedback = error?.code === 'PLATHO_WALLET_ADDRESS_METADATA_MISMATCH'
-        ? 'Password accepted, but stored wallet metadata is inconsistent. Export/import recovery phrase if you still have it.'
-        : 'Wrong password or damaged encrypted wallet data.';
+        ? t('wallet.metadataMismatch')
+        : t('wallet.wrongPassword');
       tone = 'error';
     }
   }
@@ -11044,7 +11078,7 @@ async function readStoredPlathoWallet() {
     const legacyRecord = readLegacyPlaintextPlathoWalletRecord();
     if (!legacyRecord) return null;
     const wallet = await importPlathoWallet(legacyRecord.recoveryPhrase, plathoWalletNetworkOptions());
-    const password = await requestNewWalletStoragePassword('Secure existing wallet', {
+    const password = await requestNewWalletStoragePassword(t('wallet.secureExistingWalletTitle'), {
       passwordManagerUsername: wallet.address,
       passwordManagerNetworkGlobalId: wallet.networkGlobalId,
     });
@@ -11096,12 +11130,12 @@ async function changeStoredPlathoWalletPassword() {
   const record = readEncryptedPlathoWalletRecord();
   if (!record) throw new Error('No encrypted wallet is stored on this device');
   const wallet = await requestAndDecryptEncryptedWallet(record, {
-    title: 'Change wallet password',
-    hint: 'Enter the current local wallet password before setting a new one.',
-    submitLabel: 'Continue',
+    title: t('wallet.changePasswordTitle'),
+    hint: t('wallet.changePasswordHint'),
+    submitLabel: t('common.continue'),
   });
   if (!wallet) return false;
-  const newPassword = await requestNewWalletStoragePassword('Set new wallet password', {
+  const newPassword = await requestNewWalletStoragePassword(t('wallet.setNewPasswordTitle'), {
     passwordManagerUsername: wallet.address,
     passwordManagerNetworkGlobalId: wallet.networkGlobalId,
   });
@@ -11235,7 +11269,7 @@ function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
 }
 
 function plathoAccountActivationFeeLabel(user = currentVaultUserSource()) {
-  return `${formatTonNanotons(plathoAccountActivationFeeNanotons(user))} GRAM`;
+  return t('common.gramAmount', { amount: formatTonNanotons(plathoAccountActivationFeeNanotons(user)) });
 }
 
 function clearNavVaultBalanceRetryTimer() {
@@ -11300,7 +11334,7 @@ function markNavVaultBalanceRetryNeeded(reason = 'retrying') {
 
 function walletTonBalanceLabel() {
   const balance = vaultPocketState.wallet?.ton_balance;
-  return balance === null || balance === undefined ? '-' : `${formatTonNanotons(balance)} GRAM`;
+  return balance === null || balance === undefined ? '-' : t('common.gramAmount', { amount: formatTonNanotons(balance) });
 }
 
 function refreshWalletTonProfileStatus() {
@@ -11309,17 +11343,17 @@ function refreshWalletTonProfileStatus() {
 
 function refreshMessageActionStatuses(options = {}) {
   if (!plathoWallet) {
-    if (!options.keepSyncStatus) setText(messageSyncStatus, 'wallet required');
-    setText(vaultRotateStatus, 'wallet required');
+    if (!options.keepSyncStatus) setMessageSyncStatus(t('common.walletRequiredStatus'), 'wallet-required');
+    setText(vaultRotateStatus, t('common.walletRequiredStatus'));
     return;
   }
   if (!options.keepSyncStatus) {
-    const current = messageSyncStatus?.textContent?.trim() ?? '';
-    if (!current || current === 'wallet required' || current === 'chain') {
-      setText(messageSyncStatus, 'tap to sync');
+    const state = messageSyncStatusState();
+    if (!state || state === 'wallet-required' || state === 'chain') {
+      setMessageSyncStatus(t('sync.statusTapToSync'), 'idle');
     }
   }
-  setText(vaultRotateStatus, hasActivePlathoAccount() ? 'ready' : 'activate account first');
+  setText(vaultRotateStatus, hasActivePlathoAccount() ? t('vault.rotateReady') : t('vault.rotateActivateFirst'));
 }
 
 function plathoWalletNetworkOptions() {
@@ -11380,7 +11414,7 @@ function assertNetworkFeeSurchargeWithinCap() {
   throw new Error(`Network surcharge ${formatTonNanotons(rawSurcharge)} GRAM exceeds the production cap ${formatTonNanotons(maxSurcharge)} GRAM. Try another RPC/network estimate before sending.`);
 }
 
-function shortUiErrorText(error, fallback = 'Blocked') {
+function shortUiErrorText(error, fallback = t('common.blockedCap')) {
   const text = String(error?.message ?? error ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return fallback;
   return text.length > 180 ? `${text.slice(0, 177)}...` : text;
@@ -11409,13 +11443,13 @@ function privateSendBlockedStatusText(error) {
   return `not sent: ${privateSendPreflightStatusText(error)}`;
 }
 
-function vaultActionBlockedStatusText(error, fallback = 'move blocked') {
+function vaultActionBlockedStatusText(error, fallback = t('vault.moveBlocked')) {
   const message = shortUiErrorText(error, fallback);
   if (/unlock and activate your platho account before moving ton from vault/i.test(message)) {
-    return 'Activate Platho account before moving GRAM from Vault';
+    return t('vault.activateBeforeMove');
   }
   if (/local vault auth key is not ready/i.test(message)) {
-    return 'Unlock and activate Platho account before Vault actions';
+    return t('vault.unlockActivateBeforeActions');
   }
   return message;
 }
@@ -11427,12 +11461,12 @@ function canEditPrivateComposerDraft(thread = activeThread()) {
 }
 
 function privateSendBlockReason(thread = activeThread(), options = {}) {
-  if (!thread) return 'Choose a private chat';
-  if (thread.readOnly === true) return 'Read-only channel';
-  if (!plathoWallet) return 'Wallet required';
-  if (pendingServiceWorkerAppShellReload === true) return 'Update ready - reload app';
+  if (!thread) return t('chat.choosePrivateChat');
+  if (thread.readOnly === true) return t('chat.readOnlyChannel');
+  if (!plathoWallet) return t('common.walletRequired');
+  if (pendingServiceWorkerAppShellReload === true) return t('common.updateReadyReload');
   if (!localIdentity || !localRecipientKeyPair || !localSignedPublicBundle) {
-    return 'Unlock and activate Platho account before sending';
+    return t('send.unlockActivateBeforeSending');
   }
   // Activation gate, mirroring the public send button (refreshPublicSendButtonState): an unlocked-but-not-
   // activated sender has the local keys but NO Vault user record, so publishing would be rejected downstream
@@ -11440,7 +11474,7 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
   // instead of letting the user send into an optimistic bubble that flips to "not sent". (The draft INPUT,
   // canEditPrivateComposerDraft, deliberately stays independent of this flickering state — PWA-ACTIVATION-02.)
   if (!hasActivePlathoAccount()) {
-    return 'Activate Platho account before sending';
+    return t('send.activateBeforeSending');
   }
   // Part-cap first (v648): an over-limit draft previously fell through to the shortfall branch and the button
   // tooltip misattributed the block to balance ("Vault GRAM hold required") while the cost line said "split it".
@@ -11452,7 +11486,7 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
     if (limitMessage) return limitMessage;
   }
   if (options.includeVaultShortfall !== false && privateComposerKnownVaultTonShortfall()) {
-    return 'Vault GRAM hold required';
+    return t('send.vaultHoldRequired');
   }
   return null;
 }
@@ -11580,13 +11614,13 @@ function formatDiscountPercent(bps = athDiscountBps()) {
 
 function formatAthDiscountLabel() {
   if (!messageDiscountUnlocked()) {
-    return 'ATH protocol-fee discount locked until activity airdrop is fully distributed';
+    return t('composer.athDiscountLocked');
   }
   const bps = athDiscountBps();
   if (bps >= 10_000n) {
-    return 'ATH protocol-fee discount 100% - Platho fee 0 GRAM';
+    return t('composer.athDiscountFull');
   }
-  return `ATH protocol-fee discount ${formatDiscountPercent(bps)} - max reduction 0.010 GRAM`;
+  return t('composer.athDiscountPartial', { percent: formatDiscountPercent(bps) });
 }
 
 function discountedProtocolFeeNanotons(fullFee) {
@@ -11786,9 +11820,9 @@ function privateComposerPublishProfilesForPlan(suite, plan) {
 }
 
 function imageAttachmentSizeLabel(attachment) {
-  if (!attachment?.bytes?.length) return '0 KiB';
+  if (!attachment?.bytes?.length) return t('common.kibAmount', { amount: 0 });
   const kib = attachment.bytes.length / 1024;
-  return kib < 10 ? `${kib.toFixed(1)} KiB` : `${Math.ceil(kib)} KiB`;
+  return kib < 10 ? t('common.kibAmount', { amount: kib.toFixed(1) }) : t('common.kibAmount', { amount: Math.ceil(kib) });
 }
 
 function imageByteCountLabel(value) {
@@ -11798,17 +11832,17 @@ function imageByteCountLabel(value) {
   const length = Number(bytes);
   if (!Number.isFinite(length) || length <= 0) return '';
   const kib = length / 1024;
-  return kib < 10 ? `${kib.toFixed(1)} KiB` : `${Math.ceil(kib)} KiB`;
+  return kib < 10 ? t('common.kibAmount', { amount: kib.toFixed(1) }) : t('common.kibAmount', { amount: Math.ceil(kib) });
 }
 
 function messageImageLightboxMeta(attachment, image = null) {
   const width = Number(attachment?.width ?? image?.naturalWidth ?? 0);
   const height = Number(attachment?.height ?? image?.naturalHeight ?? 0);
-  const dimensions = width > 0 && height > 0 ? `${width}x${height}` : '';
+  const dimensions = width > 0 && height > 0 ? t('common.dimensions', { width, height }) : '';
   const size = imageByteCountLabel(attachment?.bytes);
   const mode = attachment?.modeLabel
     ?? (attachment?.mode ? imageCompressionMode(attachment.mode).label : '');
-  return [dimensions, size, mode].filter(Boolean).join(' - ') || 'Chat image';
+  return [dimensions, size, mode].filter(Boolean).join(' - ') || t('chat.chatImage');
 }
 
 function imageAttachmentSummaryRows(attachment, options = {}) {
@@ -11816,15 +11850,15 @@ function imageAttachmentSummaryRows(attachment, options = {}) {
   const partCounter = typeof options.partCounter === 'function' ? options.partCounter : imageAttachmentPartCount;
   const parts = partCounter(attachment);
   const rows = [
-    { label: 'Quality', value: mode.label },
+    { label: t('composer.qualityLabel'), value: mode.label },
   ];
   if (attachment) {
     rows.push(
-      { label: 'Final image', value: `${attachment.width}x${attachment.height} WebP` },
-      { label: 'On-chain size', value: `${imageAttachmentSizeLabel(attachment)} / ${parts} capsule${parts === 1 ? '' : 's'}` },
+      { label: t('composer.finalImageLabel'), value: t('composer.finalImageValue', { width: attachment.width, height: attachment.height }) },
+      { label: t('composer.onChainSizeLabel'), value: tPlural('composer.onChainSizeValue', parts, { size: imageAttachmentSizeLabel(attachment) }) },
     );
   } else {
-    rows.push({ label: 'Preview', value: 'compressing selected quality' });
+    rows.push({ label: t('composer.previewLabel'), value: t('composer.compressingSelectedQuality') });
   }
   const extraRows = typeof options.extraRows === 'function'
     ? options.extraRows(attachment)
@@ -11839,14 +11873,14 @@ function setImagePreviewNodes(previewId, attachment, status = '') {
   if (preview instanceof HTMLImageElement && attachment?.dataUrl) {
     preview.src = attachment.dataUrl;
     preview.dataset.fullImageSrc = attachment.dataUrl;
-    preview.dataset.fullImageMeta = `${attachment.width}x${attachment.height} - ${imageAttachmentSizeLabel(attachment)} - ${attachment.mode.label}`;
+    preview.dataset.fullImageMeta = t('composer.imageMetaLine', { width: attachment.width, height: attachment.height, size: imageAttachmentSizeLabel(attachment), mode: attachment.mode.label });
   } else if (preview instanceof HTMLImageElement) {
     delete preview.dataset.fullImageSrc;
     delete preview.dataset.fullImageMeta;
   }
   if (meta) {
     meta.textContent = attachment
-      ? `${attachment.width}x${attachment.height} - ${imageAttachmentSizeLabel(attachment)} - ${attachment.mode.label}`
+      ? t('composer.imageMetaLine', { width: attachment.width, height: attachment.height, size: imageAttachmentSizeLabel(attachment), mode: attachment.mode.label })
       : status;
   }
 }
@@ -11861,20 +11895,20 @@ async function requestCompressedImageFile(file, options = {}) {
   let sequence = 0;
 
   const dialogPromise = openActionDialog({
-    title: options.title ?? 'Attach image',
-    hint: options.hint ?? 'Choose the final quality after previewing the image. The compressed result is carried in the accepted TON transaction body and verified by CapsuleHub hashes.',
+    title: options.title ?? t('composer.attachImageTitle'),
+    hint: options.hint ?? t('composer.attachImageHint'),
     tone: options.tone ?? 'muted',
-    submitLabel: options.submitLabel ?? 'Use image',
+    submitLabel: options.submitLabel ?? t('composer.useImageSubmit'),
     fields: [
       {
         id: previewId,
-        label: 'Preview final image',
+        label: t('composer.previewFinalImageLabel'),
         type: 'image-preview',
-        meta: 'Compressing preview',
+        meta: t('composer.compressingPreview'),
       },
       {
         id: 'imageQuality',
-        label: 'Quality',
+        label: t('composer.qualityLabel'),
         type: 'select',
         options: avatarCompressionOptions(),
         value: initialMode.id,
@@ -11884,8 +11918,8 @@ async function requestCompressedImageFile(file, options = {}) {
       const mode = imageCompressionMode(values.imageQuality ?? selectedModeId);
       if (errorText) {
         return [
-          { label: 'Quality', value: mode.label },
-          { label: 'Status', value: errorText },
+          { label: t('composer.qualityLabel'), value: mode.label },
+          { label: t('common.statusLabel'), value: errorText },
         ];
       }
       if (!selectedAttachment || selectedAttachment.mode.id !== mode.id) {
@@ -11910,7 +11944,7 @@ async function requestCompressedImageFile(file, options = {}) {
     selectedAttachment = null;
     errorText = '';
     if (actionSubmitButton) actionSubmitButton.disabled = true;
-    setImagePreviewNodes(previewId, null, `Compressing ${mode.label.toLowerCase()} preview`);
+    setImagePreviewNodes(previewId, null, t('composer.compressingModePreview', { mode: mode.label.toLowerCase() }));
     renderActionSummary(activeActionDialog?.summary, collectActionDialogValues());
     try {
       const attachment = await compressImageFile(file, mode.id);
@@ -11919,7 +11953,7 @@ async function requestCompressedImageFile(file, options = {}) {
       setImagePreviewNodes(previewId, attachment);
     } catch (error) {
       if (run !== sequence) return;
-      errorText = error?.message ?? 'Image compression blocked';
+      errorText = error?.message ?? t('composer.imageCompressionBlocked');
       setImagePreviewNodes(previewId, null, errorText);
       console.error(error);
     } finally {
@@ -11932,12 +11966,12 @@ async function requestCompressedImageFile(file, options = {}) {
 
   qualitySelect?.addEventListener('change', () => {
     compressSelected().catch((error) => {
-      errorText = error?.message ?? 'Image compression blocked';
+      errorText = error?.message ?? t('composer.imageCompressionBlocked');
       renderActionSummary(activeActionDialog?.summary, collectActionDialogValues());
     });
   });
   compressSelected().catch((error) => {
-    errorText = error?.message ?? 'Image compression blocked';
+    errorText = error?.message ?? t('composer.imageCompressionBlocked');
     renderActionSummary(activeActionDialog?.summary, collectActionDialogValues());
   });
 
@@ -12073,17 +12107,17 @@ async function confirmPublishPriceIncrease({ previousHold, finalHold, previousNe
   // SHARED_BASE per extra part) would prompt spuriously even though the chain price is unchanged.
   if (newCost <= oldCost) return true;
   const result = await openActionDialog({
-    title: 'Price changed',
-    hint: 'The chain returned a higher fresh price before signing. Nothing is sent unless you confirm the new price.',
+    title: t('dialog.priceChangedTitle'),
+    hint: t('dialog.priceChangedHint'),
     tone: 'error',
-    submitLabel: 'Send with new price',
+    submitLabel: t('dialog.sendWithNewPrice'),
     dismissOnBackdrop: false,
     summary: [
-      { label: 'Capsules', value: String(Math.max(1, Number(parts) || 1)) },
-      { label: 'Previous cost', value: `${formatTonNanotons(oldCost)} GRAM` },
-      { label: 'New cost', value: `${formatTonNanotons(newCost)} GRAM` },
-      { label: 'Previous hold', value: `${formatTonNanotons(oldHold)} GRAM` },
-      { label: 'New hold', value: `${formatTonNanotons(newHold)} GRAM` },
+      { label: t('composer.capsulesLabel'), value: String(Math.max(1, Number(parts) || 1)) },
+      { label: t('dialog.previousCostLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(oldCost) }) },
+      { label: t('dialog.newCostLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(newCost) }) },
+      { label: t('dialog.previousHoldLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(oldHold) }) },
+      { label: t('dialog.newHoldLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(newHold) }) },
     ],
   });
   return result !== null;
@@ -12099,17 +12133,17 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
   const baseNetCost = netCost > totalSurcharge ? netCost - totalSurcharge : 0n;
   const manualOverride = requiresManualNetworkFeeSurchargeOverride(perCapsuleSurcharge, pricingOptions);
   const result = await openActionDialog({
-    title: manualOverride ? 'Manual network fee override' : 'High network surcharge',
-    hint: 'The network fee estimate is unusually high. The surcharge is retained by CapsuleHub reserve, is not accrued_plato_fee_ton at publish time, and is not an ACK refund. Surplus reserve may later be swept by protocol reserve rules.',
+    title: manualOverride ? t('dialog.manualNetworkFeeOverrideTitle') : t('dialog.highNetworkSurchargeTitle'),
+    hint: t('dialog.highNetworkSurchargeHint'),
     tone: manualOverride ? 'error' : 'warning',
-    submitLabel: manualOverride ? 'Manual override: send' : 'Confirm surcharge',
+    submitLabel: manualOverride ? t('dialog.manualOverrideSend') : t('dialog.confirmSurcharge'),
     dismissOnBackdrop: false,
     summary: [
-      { label: 'Capsules', value: String(capsuleCount) },
-      { label: 'Base cost', value: `${formatTonNanotons(baseNetCost)} GRAM` },
-      { label: 'Network surcharge', value: `${formatTonNanotons(totalSurcharge)} GRAM` },
-      { label: 'Expected cost', value: `${formatTonNanotons(netCost)} GRAM` },
-      { label: 'Hold', value: `${formatTonNanotons(finalHold)} GRAM` },
+      { label: t('composer.capsulesLabel'), value: String(capsuleCount) },
+      { label: t('dialog.baseCostLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(baseNetCost) }) },
+      { label: t('dialog.networkSurchargeLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(totalSurcharge) }) },
+      { label: t('dialog.expectedCostLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(netCost) }) },
+      { label: t('dialog.holdLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(finalHold) }) },
     ],
   });
   return result !== null;
@@ -12120,7 +12154,7 @@ function refreshPrivateSendButtonState() {
   const thread = activeThread();
   const reason = privateSendBlockReason(thread);
   sendButton.disabled = Boolean(reason);
-  sendButton.title = reason ?? 'Send private message';
+  sendButton.title = reason ?? t('send.sendPrivateMessage');
 }
 
 function refreshPublicSendButtonState() {
@@ -12156,10 +12190,10 @@ function estimatedProfileAvatarTonFeeNanotons(attachment) {
 }
 
 function profileAvatarTonFeeLabel(attachment) {
-  if (!attachment) return 'estimated after compression';
+  if (!attachment) return t('avatar.estimatedAfterCompression');
   const parts = Math.max(1, imageAttachmentPartCount(attachment));
-  const capsuleLabel = `${parts} public capsule${parts === 1 ? '' : 's'}`;
-  return `up to ${formatTonNanotons(estimatedProfileAvatarTonFeeNanotons(attachment))} GRAM (${capsuleLabel} + registry)`;
+  const capsuleLabel = tPlural('avatar.publicCapsules', parts);
+  return t('avatar.feeUpTo', { amount: formatTonNanotons(estimatedProfileAvatarTonFeeNanotons(attachment)), capsules: capsuleLabel });
 }
 
 function composerCostStatusText(profile, text, maxTextBytes, attachment = null, options = {}) {
@@ -12167,7 +12201,7 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
   const pricedProfile = options.pricedProfile ?? profile;
   if (!plathoWallet) {
     return {
-      text: 'Wallet required',
+      text: t('common.walletRequired'),
       state: 'short',
       parts,
     };
@@ -12181,7 +12215,7 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
   }
   if (pendingServiceWorkerAppShellReload === true) {
     return {
-      text: 'Update ready - reload app',
+      text: t('common.updateReadyReload'),
       state: 'short',
       parts,
     };
@@ -12192,17 +12226,17 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
     ? pricedProfile.length
     : Math.max(1, Number(parts) || 1);
   const surcharge = currentNetworkFeeSurchargeNanotons() * BigInt(surchargeParts);
-  const surchargeText = surcharge > 0n ? ` - Network +${formatTonNanotons(surcharge)} GRAM` : '';
+  const surchargeText = surcharge > 0n ? t('composer.networkSurchargeSuffix', { amount: formatTonNanotons(surcharge) }) : '';
   const user = currentVaultUserSource();
   if (user?.exists === true && vaultTonBalanceNanotons(user) < hold) {
     return {
-      text: `Need ${formatTonNanotons(hold)} GRAM hold - Vault ${formatTonNanotons(vaultTonBalanceNanotons(user))} GRAM`,
+      text: t('composer.needHoldStatus', { hold: formatTonNanotons(hold), vault: formatTonNanotons(vaultTonBalanceNanotons(user)) }),
       state: 'short',
       parts,
     };
   }
   return {
-    text: `Cost ${formatTonNanotons(price)} GRAM - Hold ${formatTonNanotons(hold)} GRAM${surchargeText} - ${formatAthDiscountLabel()}`,
+    text: t('composer.costHoldStatus', { cost: formatTonNanotons(price), hold: formatTonNanotons(hold), surcharge: surchargeText, discount: formatAthDiscountLabel() }),
     state: 'ready',
     parts,
   };
@@ -12231,7 +12265,7 @@ function refreshComposerCostStatus() {
         },
       );
     const paymentDraftText = privatePaymentCheckDraft
-      ? ` + ${paymentAssetLabel(privatePaymentCheckDraft.asset)} check ${formatAtomicAmount(privatePaymentCheckDraft.amount)}`
+      ? t('payment.checkDraftSuffix', { asset: paymentAssetLabel(privatePaymentCheckDraft.asset), amount: formatAtomicAmount(privatePaymentCheckDraft.amount) })
       : '';
     privateComposerCostStatus.textContent = `${status.text}${paymentDraftText}`;
     privateComposerCostStatus.dataset.state = status.state;
@@ -12308,7 +12342,7 @@ function writePublicCommentsDefault(value) {
 }
 
 function publicCommentsDefaultLabel(value = readPublicCommentsDefault()) {
-  return normalizePublicCommentsDefault(value) === 'disabled' ? 'closed' : 'allowed';
+  return normalizePublicCommentsDefault(value) === 'disabled' ? t('public.commentsClosedStatus') : t('public.commentsAllowedStatus');
 }
 
 function updatePublicCommentsDefaultUi() {
@@ -12323,14 +12357,14 @@ function updatePublicCommentsDefaultUi() {
 function updatePublicCommentsToggleUi() {
   if (!publicPostCommentsToggle) return;
   const on = publicComposerCommentsCheckbox?.checked !== false;
-  const label = on ? 'Comments on - tap to turn off' : 'Comments off - tap to turn on';
+  const label = on ? t('public.commentsOnTapOff') : t('public.commentsOffTapOn');
   publicPostCommentsToggle.setAttribute('aria-label', label);
   publicPostCommentsToggle.title = label;
 }
 
 function publicSyncWindowLabel(value = readPublicSyncWindow()) {
   const normalized = normalizePublicSyncWindow(value);
-  return normalized === 'long' ? 'long public history' : 'short public history';
+  return normalized === 'long' ? t('public.longHistory') : t('public.shortHistory');
 }
 
 function publicSyncCutoffMs(value = readPublicSyncWindow()) {
@@ -12361,17 +12395,17 @@ function autoResizeComposerTextarea(node) {
 
 function privateAttachmentLabelForImage(attachment) {
   return attachment
-    ? `${attachment.name} - ${Math.ceil(attachment.bytes.length / 1024)} KiB ${attachment.mode.label.toLowerCase()}`
-    : 'Image';
+    ? t('composer.imageAttachmentLabel', { name: attachment.name, kib: Math.ceil(attachment.bytes.length / 1024), mode: attachment.mode.label.toLowerCase() })
+    : t('composer.image');
 }
 
 function createImageModeSelect(attachment, onChange) {
   const select = document.createElement('select');
-  select.setAttribute('aria-label', 'Image compression');
+  select.setAttribute('aria-label', t('composer.imageCompressionAria'));
   for (const mode of Object.values(IMAGE_COMPRESSION_MODES)) {
     const option = document.createElement('option');
     option.value = mode.id;
-    option.textContent = `${mode.label} ${Math.round(mode.maxBytes / 1024)} KiB`;
+    option.textContent = t('composer.imageModeOption', { mode: mode.label, kib: Math.round(mode.maxBytes / 1024) });
     select.append(option);
   }
   select.value = attachment?.mode?.id ?? DEFAULT_IMAGE_COMPRESSION_MODE_ID;
@@ -12403,7 +12437,7 @@ function updatePrivateAttachmentUi() {
     });
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.textContent = 'Remove';
+    remove.textContent = t('common.remove');
     remove.addEventListener('click', () => {
       privateImageAttachments = privateImageAttachments.filter((_, itemIndex) => itemIndex !== index);
       updateImageAttachmentUi('private');
@@ -12417,10 +12451,10 @@ function updatePrivateAttachmentUi() {
     row.className = 'composer-attachment-row';
     const label = document.createElement('span');
     label.className = 'composer-attachment-label';
-    label.textContent = `Payment check - ${paymentAssetLabel(privatePaymentCheckDraft.asset)} ${formatAtomicAmount(privatePaymentCheckDraft.amount)}`;
+    label.textContent = t('composer.paymentCheckAttachment', { asset: paymentAssetLabel(privatePaymentCheckDraft.asset), amount: formatAtomicAmount(privatePaymentCheckDraft.amount) });
     const edit = document.createElement('button');
     edit.type = 'button';
-    edit.textContent = 'Edit';
+    edit.textContent = t('common.edit');
     edit.addEventListener('click', async () => {
       const paymentDetails = await requestPaymentCheckDetails(privatePaymentCheckDraft);
       if (!paymentDetails) return;
@@ -12430,7 +12464,7 @@ function updatePrivateAttachmentUi() {
     });
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.textContent = 'Remove';
+    remove.textContent = t('common.remove');
     remove.addEventListener('click', () => {
       privatePaymentCheckDraft = null;
       updateImageAttachmentUi('private');
@@ -12455,10 +12489,10 @@ function updateImageAttachmentUi(kind) {
   if (panel) panel.hidden = attachments.length === 0;
   if (label) {
     label.textContent = attachments.length > 1
-      ? `${attachments.length} images attached`
+      ? tPlural('composer.imagesAttached', attachments.length)
       : attachment
-      ? `${attachment.name} - ${Math.ceil(attachment.bytes.length / 1024)} KiB ${attachment.mode.label.toLowerCase()}`
-      : 'No image';
+      ? t('composer.imageAttachmentLabel', { name: attachment.name, kib: Math.ceil(attachment.bytes.length / 1024), mode: attachment.mode.label.toLowerCase() })
+      : t('composer.noImage');
   }
   if (modeSelect && attachment) modeSelect.value = attachment.mode.id;
 }
@@ -12469,20 +12503,20 @@ async function setImageAttachment(kind, file, modeId) {
   const button = kind === 'public' ? publicImageButton : privateImageButton;
   try {
     if (status) {
-      status.textContent = 'Preparing image preview';
+      status.textContent = t('composer.preparingImagePreview');
       status.dataset.state = 'short';
     }
     if (button) button.disabled = true;
     const attachment = await requestCompressedImageFile(file, {
       modeId,
-      title: kind === 'public' ? 'Attach public image' : 'Attach private image',
+      title: kind === 'public' ? t('composer.attachPublicImageTitle') : t('composer.attachPrivateImageTitle'),
       hint: kind === 'public'
-        ? 'Preview the compressed public image before publishing. The final WebP bytes are public in the accepted TON transaction body and verified by CapsuleHub hashes.'
-        : 'Preview the compressed image before attaching it. The final WebP bytes are encrypted before publish and verified by CapsuleHub hashes.',
-      submitLabel: 'Attach image',
+        ? t('composer.publicImageHint')
+        : t('composer.privateImageHint'),
+      submitLabel: t('composer.attachImage'),
       partCounter: kind === 'private' ? privateImageAttachmentPartCount : imageAttachmentPartCount,
       extraRows: [
-        { label: 'GRAM fee', value: 'depends on capsule count' },
+        { label: t('composer.gramFee'), value: t('composer.feeDependsOnCapsuleCount') },
       ],
     });
     if (!attachment) {
@@ -12504,7 +12538,7 @@ async function setImageAttachment(kind, file, modeId) {
     }
     updateImageAttachmentUi(kind);
     if (status) {
-      status.textContent = error?.message ?? 'Image compression blocked';
+      status.textContent = error?.message ?? t('composer.imageCompressionBlocked');
       status.dataset.state = 'short';
     }
     console.error(error);
@@ -12520,7 +12554,7 @@ async function recompressPrivateImageAttachment(index, modeId) {
   const status = privateComposerCostStatus;
   try {
     if (status) {
-      status.textContent = 'Recompressing image';
+      status.textContent = t('composer.recompressingImage');
       status.dataset.state = 'short';
     }
     const next = await compressImageFile(attachment.sourceFile, modeId);
@@ -12531,7 +12565,7 @@ async function recompressPrivateImageAttachment(index, modeId) {
     refreshComposerCostStatus();
   } catch (error) {
     if (status) {
-      status.textContent = error?.message ?? 'Image compression blocked';
+      status.textContent = error?.message ?? t('composer.imageCompressionBlocked');
       status.dataset.state = 'short';
     }
     throw error;
@@ -12553,14 +12587,14 @@ async function recompressImageAttachment(kind) {
 }
 
 function privateComposerPlaceholder({ readOnly = false } = {}) {
-  if (!plathoWallet) return 'Wallet required';
-  if (readOnly) return 'Read-only channel';
-  return 'Private message';
+  if (!plathoWallet) return t('common.walletRequired');
+  if (readOnly) return t('composer.readOnlyChannel');
+  return t('composer.privateMessage');
 }
 
 function publicComposerPlaceholder() {
-  if (!plathoWallet) return 'Wallet required';
-  return publicCommentTarget ? 'Public comment' : 'Public message';
+  if (!plathoWallet) return t('common.walletRequired');
+  return publicCommentTarget ? t('composer.publicComment') : t('composer.publicMessage');
 }
 
 function refreshComposerPublishPolicy() {
@@ -12584,15 +12618,15 @@ function refreshComposerPublishPolicy() {
     control.hidden = false;
     control.setAttribute('aria-disabled', canPublish ? 'false' : 'true');
     if (control.classList?.contains('attachment-button')) {
-      control.title = canPublish ? 'Attach image' : 'Create or import a wallet to attach images';
+      control.title = canPublish ? t('composer.attachImage') : t('composer.walletToAttachImages');
     }
   }
   if (paymentCheckButton) {
-    paymentCheckButton.title = canPublish ? 'Attach private payment check' : 'Create or import a wallet to attach a private payment check';
+    paymentCheckButton.title = canPublish ? t('composer.attachPaymentCheck') : t('composer.walletToAttachPaymentCheck');
   }
   if (privateComposerAddButton) {
     privateComposerAddButton.disabled = !canPublish;
-    privateComposerAddButton.title = canPublish ? 'Add image or payment check' : 'Create or import a wallet to add attachments';
+    privateComposerAddButton.title = canPublish ? t('composer.addImageOrCheck') : t('composer.walletToAddAttachments');
   }
   if (privateImageModeSelect) {
     privateImageModeSelect.disabled = !canPublish;
@@ -12790,9 +12824,9 @@ async function downloadFileBlock(block) {
   if (!url.startsWith('data:')) return;
   if (isTelegramEnv()) {
     await openActionDialog({
-      title: 'Download in a browser',
-      hint: `Telegram's in-app view cannot save files. Open platho.app in your browser to download "${name}".`,
-      submitLabel: 'OK',
+      title: t('dialog.downloadInBrowserTitle'),
+      hint: t('dialog.telegramDownloadHint', { name }),
+      submitLabel: t('common.ok'),
       fields: [],
     });
     return;
@@ -12821,12 +12855,12 @@ function buildFileBlockChip(block) {
   icon.className = 'icon icon-download';
   const name = document.createElement('span');
   name.className = 'message-file-name';
-  name.textContent = String(block.name ?? 'file');
+  name.textContent = String(block.name ?? t('chat.fileFallbackName'));
   const size = document.createElement('span');
   size.className = 'message-file-size';
   size.textContent = imageByteCountLabel(block.size);
   chip.append(icon, name, size);
-  chip.title = `Download ${block.name ?? 'file'}`;
+  chip.title = t('chat.downloadFileTitle', { name: block.name ?? t('chat.fileFallbackName') });
   chip.addEventListener('click', (event) => {
     event.stopPropagation();
     downloadFileBlock(block).catch((error) => console.error(error));
@@ -12939,20 +12973,20 @@ async function downloadEncryptedWalletKeyBackup(record = readEncryptedPlathoWall
   markWalletKeyBackupDone(storedWalletAddressForCopy(record) || record?.address || null);
 }
 
-async function offerEncryptedWalletKeyBackup(reason = 'Save this encrypted wallet key file before adding funds.') {
+async function offerEncryptedWalletKeyBackup(reason = t('wallet.backupReasonDefault')) {
   const record = readEncryptedPlathoWalletRecord();
   if (!record) return false;
   const result = await openActionDialog({
-    title: 'Save wallet key backup',
+    title: t('wallet.saveKeyBackupTitle'),
     hint: reason,
-    submitLabel: 'Save encrypted key',
+    submitLabel: t('wallet.saveEncryptedKey'),
     dismissOnBackdrop: false,
     fields: [],
     summary: [
-      { label: 'File', value: 'encrypted Platho wallet key' },
-      { label: 'Password', value: 'same local wallet password' },
-      { label: 'Use', value: 'restore this wallet on this or another device' },
-      { label: 'Why', value: 'browser storage can be cleared, especially on iPhone Safari' },
+      { label: t('wallet.backupRowFile'), value: t('wallet.backupRowFileValue') },
+      { label: t('wallet.backupRowPassword'), value: t('wallet.backupRowPasswordValue') },
+      { label: t('wallet.backupRowUse'), value: t('wallet.backupRowUseValue') },
+      { label: t('wallet.backupRowWhy'), value: t('wallet.backupRowWhyValue') },
     ],
   });
   if (!result) return false;
@@ -12961,9 +12995,9 @@ async function offerEncryptedWalletKeyBackup(reason = 'Save this encrypted walle
   let unlockedWallet = plathoWallet;
   if (!unlockedWallet && readStoredToncenterApiKey()) {
     unlockedWallet = await requestAndDecryptEncryptedWallet(record, {
-      title: 'Protect RPC key',
-      hint: 'Enter your wallet password so your RPC key is encrypted inside the backup.',
-      submitLabel: 'Save encrypted key',
+      title: t('wallet.protectRpcKeyTitle'),
+      hint: t('wallet.protectRpcKeyHint'),
+      submitLabel: t('wallet.saveEncryptedKey'),
     });
   }
   await downloadEncryptedWalletKeyBackup(record, unlockedWallet);
@@ -13070,7 +13104,7 @@ function refreshVaultTabLock() {
     item.classList.toggle('is-locked', locked);
     item.disabled = locked;
     item.setAttribute('aria-disabled', locked ? 'true' : 'false');
-    item.title = locked ? 'Activate your Platho account first (Profile tab)' : 'Vault';
+    item.title = locked ? t('vault.activateAccountFirstTooltip') : t('nav.vault');
   }
   // Never sit on a locked Vault view (a stale deep-link / a just-de-activated edge): fall back to Public.
   if (locked && appShell?.dataset.view === 'vault') setView('public');
@@ -13086,9 +13120,9 @@ function refreshMessagingControls() {
   const hasStoredWallet = hasStoredPlathoWalletRecord();
   const hasKnownWallet = Boolean(plathoWallet || hasStoredWallet);
   if (createWalletButton) createWalletButton.disabled = false;
-  setText(createWalletStatus, hasKnownWallet ? 'replace' : 'recommended');
+  setText(createWalletStatus, hasKnownWallet ? t('wallet.statusReplace') : t('wallet.statusRecommended'));
   if (importWalletButton) importWalletButton.disabled = false;
-  setText(importWalletStatus, hasKnownWallet ? 'replace' : '24 words');
+  setText(importWalletStatus, hasKnownWallet ? t('wallet.statusReplace') : t('wallet.status24Words'));
   if (unlockWalletButton) {
     unlockWalletButton.disabled = Boolean(plathoWallet) || !hasStoredWallet;
     // Only show the Unlock row when it is actionable (a stored wallet that is currently locked). Hide the
@@ -13097,17 +13131,17 @@ function refreshMessagingControls() {
   }
   setText(unlockWalletStatus, storedWalletLockStatus());
   if (changeWalletPasswordButton) changeWalletPasswordButton.disabled = !hasStoredWallet;
-  setText(changeWalletPasswordStatus, hasStoredWallet ? 'change' : 'not stored');
+  setText(changeWalletPasswordStatus, hasStoredWallet ? t('wallet.statusChange') : t('wallet.statusNotStored'));
   if (receiveWalletTonButton) receiveWalletTonButton.disabled = !currentWalletReceiveAddress();
-  setText(receiveWalletTonStatus, currentWalletReceiveAddress() ? 'QR' : 'no wallet');
+  setText(receiveWalletTonStatus, currentWalletReceiveAddress() ? 'QR' : t('wallet.statusNoWallet'));
   if (sendWalletTonButton) sendWalletTonButton.disabled = !plathoWallet;
-  setText(sendWalletTonStatus, plathoWallet ? 'wallet' : 'unlock');
+  setText(sendWalletTonStatus, plathoWallet ? t('wallet.statusWallet') : t('wallet.statusUnlock'));
   if (walletTonBalanceButton) walletTonBalanceButton.disabled = !plathoWallet;
   refreshWalletTonProfileStatus();
   if (exportWalletKeyButton) exportWalletKeyButton.disabled = !readEncryptedPlathoWalletRecord();
-  setText(exportWalletKeyStatus, readEncryptedPlathoWalletRecord() ? 'encrypted file' : 'not stored');
+  setText(exportWalletKeyStatus, readEncryptedPlathoWalletRecord() ? t('wallet.statusEncryptedFile') : t('wallet.statusNotStored'));
   if (importWalletKeyButton) importWalletKeyButton.disabled = false;
-  setText(importWalletKeyStatus, hasKnownWallet ? 'replace' : 'file');
+  setText(importWalletKeyStatus, hasKnownWallet ? t('wallet.statusReplace') : t('wallet.statusFile'));
   // Keep the toncenter key field in sync with stored state on every messaging refresh — importing a v2 wallet-key
   // backup restores the key into storage, and this guarantees the Profile field reflects it (refreshMessagingControls
   // runs in the import's finally) even if the field was rendered empty before the import completed.
@@ -13134,14 +13168,14 @@ function refreshMessagingControls() {
     registerVaultKeysButton.hidden = !(Boolean(plathoWallet) && !accountActive && !appShellReloadPending);
   }
   setText(vaultDraftStatus, !plathoWallet
-    ? 'wallet required'
+    ? t('vault.statusWalletRequired')
     : appShellReloadPending
-      ? 'reload app'
+      ? t('vault.statusReloadApp')
       : accountActive
-      ? 'active'
+      ? t('vault.statusActive')
       : activationPending
-      ? 'activating'
-      : `${plathoAccountActivationFeeLabel()} GRAM`);
+      ? t('vault.statusActivating')
+      : t('vault.activationFeeGram', { fee: plathoAccountActivationFeeLabel() }));
   if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !signedActionsReady;
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady || messageSyncManualInFlight;
   if (mintUsernameButton) mintUsernameButton.disabled = false;
@@ -13287,7 +13321,7 @@ function renderThreads() {
       if (unread > 0) {
         const badge = document.createElement('div');
         badge.className = 'thread-unread-badge';
-        badge.textContent = unread > 99 ? '99+ unread' : `${unread} unread`;
+        badge.textContent = unread > 99 ? t('chat.unreadOverflow') : tPlural('chat.unreadCount', unread);
         side.append(badge);
       }
       top.append(name);
@@ -13345,8 +13379,8 @@ function renderConversation() {
   const thread = activeThread();
   if (!thread) {
     setAvatarNode(activeAvatar, 'P', null);
-    activeTitle.textContent = 'No private chat';
-    activeSubtitle.textContent = 'Create or choose a chat';
+    activeTitle.textContent = t('chat.noPrivateChat');
+    activeSubtitle.textContent = t('chat.createOrChooseChat');
     messageStrip.innerHTML = '';
     if (identityMenuButton) {
       identityMenuButton.hidden = true;
@@ -13356,7 +13390,7 @@ function renderConversation() {
     refreshComposerPublishPolicy();
     if (messageInput) {
       messageInput.disabled = true;
-      messageInput.placeholder = plathoWallet ? 'Create or choose a private chat' : 'Wallet required';
+      messageInput.placeholder = plathoWallet ? t('chat.createOrChoosePrivateChat') : t('common.walletRequired');
       autoResizeComposerTextarea(messageInput);
     }
     if (sendButton) sendButton.disabled = true;
@@ -13437,14 +13471,14 @@ function renderConversation() {
           const image = document.createElement('img');
           image.className = 'message-image';
           image.src = block.url;
-          image.alt = 'Open image';
+          image.alt = t('chat.openImageAlt');
           // Lazy: only load images as they near the viewport (lighter for image-heavy chats). The conversation now
           // renders only when its tab is visible (not into a hidden pane), and the load handler below re-anchors to
           // the bottom as each image decodes — so scroll-to-end keeps up as the in-view images load.
           image.loading = 'lazy';
           image.tabIndex = 0;
           image.role = 'button';
-          image.title = 'Open full-size image';
+          image.title = t('chat.openFullSizeImage');
           image.dataset.fullImageSrc = block.url;
           image.dataset.fullImageMeta = messageImageLightboxMeta(block);
           image.addEventListener('load', () => {
@@ -13460,7 +13494,7 @@ function renderConversation() {
           paymentBlock.className = 'message-payment-block';
           const paymentLabel = document.createElement('span');
           paymentLabel.className = 'message-payment-label';
-          paymentLabel.textContent = payment ? paymentMessageText(payment) : 'Payment check';
+          paymentLabel.textContent = payment ? paymentMessageText(payment) : t('payment.paymentCheck');
           paymentBlock.append(paymentLabel);
           paymentBlockElement = paymentBlock;
           bubble.append(paymentBlock);
@@ -13477,13 +13511,13 @@ function renderConversation() {
       const image = document.createElement('img');
       image.className = 'message-image';
       image.src = message.attachment.url;
-      image.alt = 'Open image';
+      image.alt = t('chat.openImageAlt');
       // Lazy (see the block-image note above): load as images near the viewport; the load handler re-anchors to the
       // bottom as each decodes.
       image.loading = 'lazy';
       image.tabIndex = 0;
       image.role = 'button';
-      image.title = 'Open full-size image';
+      image.title = t('chat.openFullSizeImage');
       image.dataset.fullImageSrc = message.attachment.url;
       image.dataset.fullImageMeta = messageImageLightboxMeta(message.attachment);
       image.addEventListener('load', () => {
@@ -13511,7 +13545,7 @@ function renderConversation() {
       if (message.type !== 'out' && !paymentActionPending && !paymentActionTerminal) {
         const claim = document.createElement('button');
         claim.type = 'button';
-        claim.textContent = 'Claim';
+        claim.textContent = t('payment.claim');
         claim.addEventListener('click', async () => {
           claim.disabled = true;
           try {
@@ -13543,7 +13577,7 @@ function renderConversation() {
       if (message.type === 'out' && !paymentActionPending && !paymentActionTerminal) {
         const cancel = document.createElement('button');
         cancel.type = 'button';
-        cancel.textContent = 'Cancel';
+        cancel.textContent = t('common.cancel');
         cancel.addEventListener('click', async () => {
           cancel.disabled = true;
           try {
@@ -13630,7 +13664,7 @@ docsButtons.forEach((button) => {
   button.addEventListener('click', () => {
     openDocsDialog(activeDocId).catch((error) => {
       console.error(error);
-      setDocsStatus('Document unavailable', 'error');
+      setDocsStatus(t('docs.documentUnavailable'), 'error');
     });
   });
 });
@@ -13659,7 +13693,7 @@ docsNav?.addEventListener('click', (event) => {
   if (!button) return;
   selectDoc(button.dataset.docId).catch((error) => {
     console.error(error);
-    setDocsStatus('Document unavailable', 'error');
+    setDocsStatus(t('docs.documentUnavailable'), 'error');
   });
 });
 
@@ -13709,13 +13743,13 @@ newChatForm?.addEventListener('submit', async (event) => {
   // key the dialog by that wallet, so addressing a transferred username opens the NEW owner's dialog and we can
   // relabel any old-owner dialog still wearing it. The resolve also validates the name actually exists.
   isResolvingNewChat = true;
-  showNewChatHint(`Resolving ${canonicalUsernameDisplay(identity.label)}…`, 'info');
+  showNewChatHint(t('chat.resolvingUsername', { name: canonicalUsernameDisplay(identity.label) }), 'info');
   try {
     let ownerWallet = null;
     try {
       ownerWallet = await resolveRecipientWalletForThread(parsed.thread);
     } catch (error) {
-      if (error instanceof UsernameNotRegisteredError) { showNewChatHint(`${canonicalUsernameDisplay(identity.label)} is not registered`); return; }
+      if (error instanceof UsernameNotRegisteredError) { showNewChatHint(t('chat.usernameNotRegistered', { name: canonicalUsernameDisplay(identity.label) })); return; }
       // Transient RPC/network failure — don't hard-block the user; fall back to the legacy path (the send-time
       // resolve still routes to the current owner).
       console.warn('Username resolve failed (transient); using legacy path', error);
@@ -13890,8 +13924,8 @@ function appendRowReplyButton(row, onReply) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'row-reply-button';
-  button.title = 'Reply';
-  button.setAttribute('aria-label', 'Reply');
+  button.title = t('chat.reply');
+  button.setAttribute('aria-label', t('chat.reply'));
   button.textContent = '↩';
   button.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -13908,8 +13942,8 @@ function appendRowCopyButton(row, copyText) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'row-reply-button row-copy-button';
-  button.title = 'Copy text';
-  button.setAttribute('aria-label', 'Copy text');
+  button.title = t('chat.copyText');
+  button.setAttribute('aria-label', t('chat.copyText'));
   button.textContent = '⧉';
   button.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -14080,12 +14114,12 @@ actionForm?.addEventListener('submit', async (event) => {
     // Validate IN-PLACE before closing: keep the dialog open and show the error inline on failure, so a bad input
     // (e.g. an unregistered .ath name) no longer makes the modal close and immediately re-open (the flicker).
     if (actionSubmitButton) actionSubmitButton.disabled = true;
-    if (actionHint) { actionHint.textContent = dialogAtStart.checkingHint ?? 'Checking…'; actionHint.dataset.tone = 'muted'; }
+    if (actionHint) { actionHint.textContent = dialogAtStart.checkingHint ?? t('dialog.checking'); actionHint.dataset.tone = 'muted'; }
     let outcome = null;
     try {
       outcome = await validate(values);
     } catch (error) {
-      outcome = { ok: false, error: error?.message || 'Validation failed' };
+      outcome = { ok: false, error: error?.message || t('dialog.validationFailed') };
     }
     if (activeActionDialog !== dialogAtStart) return; // dialog was cancelled/replaced while validating
     if (outcome && outcome.ok) {
@@ -14093,7 +14127,7 @@ actionForm?.addEventListener('submit', async (event) => {
       return;
     }
     if (actionHint) {
-      actionHint.textContent = (outcome && outcome.error) || 'Invalid input';
+      actionHint.textContent = (outcome && outcome.error) || t('dialog.invalidInput');
       actionHint.dataset.tone = 'error';
     }
     if (actionSubmitButton) actionSubmitButton.disabled = false;
@@ -14215,13 +14249,13 @@ privateSenderModeSelect?.addEventListener('change', () => {
   const value = writePrivateSenderMode(privateSenderModeSelect.value);
   updatePrivateSenderModeUi();
   refreshComposerCostStatus();
-  flashWalletIdentityStatus(`Private sender: ${privateSenderModeLabel(value)}`);
+  flashWalletIdentityStatus(t('wallet.privateSenderFlash', { mode: privateSenderModeLabel(value) }));
 });
 
 mintUsernameButton?.addEventListener('click', async () => {
   try {
     if (!plathoWallet) {
-      setUsernameMintStatus('create wallet first', 'error');
+      setUsernameMintStatus(t('profile.createWalletFirst'), 'error');
       return;
     }
     mintUsernameButton.disabled = true;
@@ -14237,7 +14271,7 @@ mintUsernameButton?.addEventListener('click', async () => {
 
 linkUsernameButton?.addEventListener('click', async () => {
   if (!plathoWallet) {
-    setProfileAvatarStatus('create wallet first', 'error');
+    setProfileAvatarStatus(t('profile.createWalletFirst'), 'error');
     return;
   }
   const previous = readWalletDisplayIdentity(plathoWallet?.address);
@@ -14248,11 +14282,11 @@ linkUsernameButton?.addEventListener('click', async () => {
     if (!identity) return;
     writeLinkedPlathoUsername(identity, plathoWallet.address);
     writeWalletDisplayIdentity(identity, plathoWallet.address);
-    flashWalletIdentityStatus(`Linked ${canonicalUsernameDisplay(identity.label)}`);
+    flashWalletIdentityStatus(t('username.linkedName', { name: canonicalUsernameDisplay(identity.label) }));
   } catch (error) {
-    flashWalletIdentityStatus('name link blocked');
+    flashWalletIdentityStatus(t('username.nameLinkBlocked'));
     if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-    setText(linkedUsernameStatus, canonicalUsernameDisplay(previousLinked?.label) || 'optional');
+    setText(linkedUsernameStatus, canonicalUsernameDisplay(previousLinked?.label) || t('username.optional'));
     console.error(error);
   } finally {
     linkUsernameButton.disabled = false;
@@ -14270,7 +14304,7 @@ flushAthButton?.addEventListener('click', async () => {
       error: String(error?.message ?? error ?? 'ATH flush blocked'),
     };
     renderAthFlushStatus();
-    flashWalletIdentityStatus('ATH flush blocked');
+    flashWalletIdentityStatus(t('wallet.athFlushBlocked'));
     console.error(error);
   } finally {
     renderAthFlushStatus();
@@ -14280,10 +14314,10 @@ flushAthButton?.addEventListener('click', async () => {
 replaceVaultKeysButton?.addEventListener('click', async () => {
   try {
     replaceVaultKeysButton.disabled = true;
-    setText(vaultRotateStatus, 'checking');
+    setText(vaultRotateStatus, t('vault.rotateChecking'));
     await submitVaultReplaceMessagingKeys();
   } catch (error) {
-    setText(vaultRotateStatus, 'not ready');
+    setText(vaultRotateStatus, t('vault.rotateNotReady'));
     console.error(error);
   } finally {
     replaceVaultKeysButton.disabled = !plathoWallet || !hasActiveVaultMessagingKeys();
@@ -14303,11 +14337,11 @@ syncMessagesButton?.addEventListener('click', async () => {
       forceIndexRescan: true,
     });
     completeMessageSyncUi(result);
-    setText(messageSyncStatus, privateSyncStatusText(result));
+    setMessageSyncStatus(privateSyncStatusText(result), privateSyncStatusState(result));
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
-    failMessageSyncUi(rateLimited ? 'Sync delayed' : 'Sync failed');
-    setText(messageSyncStatus, rateLimited ? 'sync delayed' : 'sync failed');
+    failMessageSyncUi(rateLimited ? t('sync.delayed') : t('sync.failed'));
+    setMessageSyncStatus(rateLimited ? t('sync.delayedShort') : t('sync.failedShort'), rateLimited ? 'delayed' : 'failed');
     if (!rateLimited) console.error(error);
   } finally {
     messageSyncManualInFlight = false;
@@ -14324,20 +14358,20 @@ publicChannelSearch?.addEventListener('input', () => {
 addPublicChannelButton?.addEventListener('click', async () => {
   try {
     const result = await openActionDialog({
-      title: 'Add public channel',
-      hint: 'Use a Platho name, .ath, .ton, or wallet address. Local label is only shown on this device.',
-      submitLabel: 'Add channel',
+      title: t('public.addChannelTitle'),
+      hint: t('public.addChannelHint'),
+      submitLabel: t('public.addChannelSubmit'),
       fields: [
         {
           id: 'channelIdentity',
-          label: 'Channel',
-          placeholder: 'alex, alex.ath, alex.ton, or EQ...',
+          label: t('public.channelFieldLabel'),
+          placeholder: t('public.channelPlaceholder'),
           autocomplete: 'off',
         },
         {
           id: 'localLabel',
-          label: 'Local label',
-          placeholder: 'Optional, e.g. Anonymous',
+          label: t('public.localLabelField'),
+          placeholder: t('public.localLabelPlaceholder'),
           required: false,
           autocomplete: 'off',
         },
@@ -14478,7 +14512,7 @@ registerVaultKeysButton?.addEventListener('click', async () => {
     registerVaultKeysButton.disabled = true;
     await submitVaultRegisterMessagingKeys();
   } catch (error) {
-    vaultDraftStatus.textContent = 'activation blocked';
+    vaultDraftStatus.textContent = t('vault.activationBlocked');
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -14549,13 +14583,13 @@ function updatePrivateFileAttachmentUi() {
   const files = normalizePrivateFileAttachments(privateFileAttachments);
   privateFilePanel.hidden = files.length === 0;
   if (files.length === 0) {
-    setText(privateFileLabel, 'No files');
+    setText(privateFileLabel, t('chat.noFiles'));
     return;
   }
   const total = files.reduce((sum, file) => sum + file.bytes.length, 0);
   setText(privateFileLabel, files.length === 1
     ? `${files[0].name} - ${imageByteCountLabel(total)}`
-    : `${files.length} files - ${imageByteCountLabel(total)}`);
+    : tPlural('chat.filesWithSize', files.length, { size: imageByteCountLabel(total) }));
 }
 
 privateFileButton?.addEventListener('click', () => {
@@ -14573,7 +14607,7 @@ privateFileInput?.addEventListener('change', async () => {
   if (!file) return;
   if (file.size > PRIVATE_FILE_ATTACHMENT_MAX_BYTES) {
     if (privateComposerCostStatus) {
-      privateComposerCostStatus.textContent = `File is ${imageByteCountLabel(file.size)}; the limit is ${imageByteCountLabel(PRIVATE_FILE_ATTACHMENT_MAX_BYTES)} per message`;
+      privateComposerCostStatus.textContent = t('chat.fileTooLarge', { size: imageByteCountLabel(file.size), limit: imageByteCountLabel(PRIVATE_FILE_ATTACHMENT_MAX_BYTES) });
       privateComposerCostStatus.dataset.state = 'short';
     }
     return;
@@ -14619,7 +14653,7 @@ setAvatarButton?.addEventListener('click', async (event) => {
     return;
   }
   if (!plathoWallet) {
-    flashWalletIdentityStatus('create wallet first');
+    flashWalletIdentityStatus(t('wallet.createWalletFirst'));
     return;
   }
   profileAvatarInput?.click();
@@ -14765,7 +14799,7 @@ composer?.addEventListener('submit', async (event) => {
   }
   if (!localIdentity || !localRecipientKeyPair || !localSignedPublicBundle) {
     if (privateComposerCostStatus) {
-      privateComposerCostStatus.textContent = 'Activate Platho account before sending';
+      privateComposerCostStatus.textContent = t('chat.activateBeforeSending');
       privateComposerCostStatus.dataset.state = 'short';
     }
     refreshMessagingControls();
@@ -14778,7 +14812,7 @@ composer?.addEventListener('submit', async (event) => {
   // the authoritative downstream check.
   if (!hasActivePlathoAccount()) {
     if (privateComposerCostStatus) {
-      privateComposerCostStatus.textContent = 'Activate Platho account before sending';
+      privateComposerCostStatus.textContent = t('chat.activateBeforeSending');
       privateComposerCostStatus.dataset.state = 'short';
     }
     refreshPrivateSendButtonState();
@@ -14790,7 +14824,7 @@ composer?.addEventListener('submit', async (event) => {
     // the already-throttled keyless verifier (the burst self-amplification that
     // turns one 429 into a storm). Mirrors the public composer gate (10128).
     if (privateComposerCostStatus) {
-      privateComposerCostStatus.textContent = 'RPC busy, send again in a moment';
+      privateComposerCostStatus.textContent = t('chat.rpcBusy');
       privateComposerCostStatus.dataset.state = 'short';
     }
     refreshPrivateSendButtonState();
@@ -14897,9 +14931,9 @@ composer?.addEventListener('submit', async (event) => {
 
 createWalletButton?.addEventListener('click', async () => {
   try {
-    if (!(await confirmWalletReplacement('Create new wallet'))) return;
+    if (!(await confirmWalletReplacement(t('wallet.createNewWallet')))) return;
     const walletDraft = await createPlathoWallet(plathoWalletNetworkOptions());
-    const password = await requestNewWalletStoragePassword('Encrypt new wallet', {
+    const password = await requestNewWalletStoragePassword(t('wallet.encryptNewWallet'), {
       passwordManagerUsername: walletDraft.address,
       passwordManagerNetworkGlobalId: walletDraft.networkGlobalId,
     });
@@ -14910,9 +14944,9 @@ createWalletButton?.addEventListener('click', async () => {
     // Inside Telegram, force a confirmed seed backup right after generation: the
     // WebView can evict localStorage and the seed is the only recovery path.
     await enforceTelegramSeedBackupGate(walletDraft, { force: true });
-    flashWalletIdentityStatus('Wallet ready');
+    flashWalletIdentityStatus(t('wallet.walletReady'));
   } catch (error) {
-    setText(walletAddressStatus, 'blocked');
+    setText(walletAddressStatus, t('common.blocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -14920,12 +14954,12 @@ createWalletButton?.addEventListener('click', async () => {
 });
 
 importWalletButton?.addEventListener('click', async () => {
-  if (!(await confirmWalletReplacement('Import and replace'))) return;
+  if (!(await confirmWalletReplacement(t('wallet.importAndReplace')))) return;
   const recoveryPhrase = await requestWalletSeedImport();
   if (!recoveryPhrase) return;
   try {
     const walletDraft = await importPlathoWallet(recoveryPhrase, plathoWalletNetworkOptions());
-    const password = await requestNewWalletStoragePassword('Encrypt imported wallet', {
+    const password = await requestNewWalletStoragePassword(t('wallet.encryptImportedWallet'), {
       passwordManagerUsername: walletDraft.address,
       passwordManagerNetworkGlobalId: walletDraft.networkGlobalId,
     });
@@ -14934,9 +14968,9 @@ importWalletButton?.addEventListener('click', async () => {
     await setPlathoWallet(walletDraft, { password });
     // The user just typed this phrase, so they demonstrably hold the backup.
     markTelegramSeedBackupConfirmed(walletDraft.address);
-    flashWalletIdentityStatus('Wallet ready');
+    flashWalletIdentityStatus(t('wallet.walletReady'));
   } catch (error) {
-    setText(walletAddressStatus, 'import blocked');
+    setText(walletAddressStatus, t('wallet.importBlocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -14948,17 +14982,17 @@ unlockWalletButton?.addEventListener('click', async () => {
     unlockWalletButton.disabled = true;
     const wallet = await loadPlathoWallet();
     if (!wallet) {
-      flashWalletIdentityStatus('Wallet locked');
+      flashWalletIdentityStatus(t('wallet.walletLocked'));
       return;
     }
     await bootCrypto();
     await enforceTelegramSeedBackupGate(wallet);
-    flashWalletIdentityStatus('Wallet unlocked');
+    flashWalletIdentityStatus(t('wallet.walletUnlocked'));
     // Return-from-background flow: a user who hopped to another wallet app to top up came back to a locked
     // Platho; on unlock, resume the quick-start at the step they were on (e.g. Top up / Activate).
     maybeResumeQuickStartAfterUnlock();
   } catch (error) {
-    setText(unlockWalletStatus, 'blocked');
+    setText(unlockWalletStatus, t('common.blocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -14970,13 +15004,13 @@ changeWalletPasswordButton?.addEventListener('click', async () => {
     changeWalletPasswordButton.disabled = true;
     const changed = await changeStoredPlathoWalletPassword();
     if (!changed) {
-      flashWalletIdentityStatus('Password unchanged');
+      flashWalletIdentityStatus(t('wallet.passwordUnchanged'));
       return;
     }
     await bootCrypto();
-    flashWalletIdentityStatus('Password changed');
+    flashWalletIdentityStatus(t('wallet.passwordChanged'));
   } catch (error) {
-    setText(changeWalletPasswordStatus, 'blocked');
+    setText(changeWalletPasswordStatus, t('common.blocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -14988,7 +15022,7 @@ receiveWalletTonButton?.addEventListener('click', async () => {
     receiveWalletTonButton.disabled = true;
     await showReceiveWalletTonDialog();
   } catch (error) {
-    setText(receiveWalletTonStatus, 'blocked');
+    setText(receiveWalletTonStatus, t('common.blocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -15000,7 +15034,7 @@ sendWalletTonButton?.addEventListener('click', async () => {
     sendWalletTonButton.disabled = true;
     await submitWalletTonTransfer();
   } catch (error) {
-    setText(sendWalletTonStatus, 'blocked');
+    setText(sendWalletTonStatus, t('common.blocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -15012,7 +15046,7 @@ walletTonBalanceButton?.addEventListener('click', async () => {
     walletTonBalanceButton.disabled = true;
     await refreshWalletTonBalanceForProfile();
   } catch (error) {
-    setText(walletTonBalanceStatus, 'blocked');
+    setText(walletTonBalanceStatus, t('common.blocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -15023,10 +15057,10 @@ exportWalletKeyButton?.addEventListener('click', async () => {
   try {
     exportWalletKeyButton.disabled = true;
     if (await exportEncryptedWalletKeyFile()) {
-      flashWalletIdentityStatus('Wallet key exported');
+      flashWalletIdentityStatus(t('wallet.walletKeyExported'));
     }
   } catch (error) {
-    setText(exportWalletKeyStatus, 'blocked');
+    setText(exportWalletKeyStatus, t('common.blocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -15043,7 +15077,7 @@ function refreshWalletBackupWarning() {
 walletBackupWarning?.addEventListener('click', async () => {
   try {
     walletBackupWarning.disabled = true;
-    if (await exportEncryptedWalletKeyFile()) flashWalletIdentityStatus('Wallet key exported');
+    if (await exportEncryptedWalletKeyFile()) flashWalletIdentityStatus(t('wallet.walletKeyExported'));
   } catch (error) {
     console.error(error);
   } finally {
@@ -15068,10 +15102,10 @@ walletKeyBackupInput?.addEventListener('change', async () => {
   try {
     if (importWalletKeyButton) importWalletKeyButton.disabled = true;
     if (await importEncryptedWalletKeyFile(file)) {
-      flashWalletIdentityStatus('Wallet key imported');
+      flashWalletIdentityStatus(t('wallet.walletKeyImported'));
     }
   } catch (error) {
-    setText(importWalletKeyStatus, 'blocked');
+    setText(importWalletKeyStatus, t('common.blocked'));
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -15082,9 +15116,9 @@ exportWalletSeedButton?.addEventListener('click', async () => {
   try {
     const wallet = requirePlathoWallet();
     if (!(await confirmWalletPasswordForExport(wallet))) return;
-    await showWalletSeed('Recovery phrase', exportPlathoWalletRecoveryPhrase(wallet));
+    await showWalletSeed(t('wallet.recoveryPhrase'), exportPlathoWalletRecoveryPhrase(wallet));
   } catch (error) {
-    setText(walletAddressStatus, 'export blocked');
+    setText(walletAddressStatus, t('wallet.exportBlocked'));
     console.error(error);
   }
 });
@@ -15092,17 +15126,17 @@ exportWalletSeedButton?.addEventListener('click', async () => {
 clearLocalDataButton?.addEventListener('click', async () => {
   try {
     if (!(await confirmClearLocalData())) {
-      setText(clearLocalDataStatus, 'not cleared');
+      setText(clearLocalDataStatus, t('profile.notCleared'));
       return;
     }
     clearLocalDataButton.disabled = true;
-    setText(clearLocalDataStatus, 'clearing');
+    setText(clearLocalDataStatus, t('profile.clearing'));
     await clearPlathoLocalData();
-    setText(clearLocalDataStatus, 'cleared');
+    setText(clearLocalDataStatus, t('profile.cleared'));
     window.setTimeout(() => window.location.reload(), 200);
   } catch (error) {
     clearLocalDataButton.disabled = false;
-    setText(clearLocalDataStatus, 'blocked');
+    setText(clearLocalDataStatus, t('common.blocked'));
     console.error(error);
   }
 });
@@ -15112,9 +15146,9 @@ copyWalletAddressButton?.addEventListener('click', async () => {
     const address = walletAddressForCopy(plathoWallet) || storedWalletAddressForCopy();
     if (!address) throw new Error('No wallet address to copy');
     await copyTextToClipboard(address);
-    flashWalletIdentityStatus('Wallet address copied');
+    flashWalletIdentityStatus(t('wallet.addressCopied'));
   } catch (error) {
-    flashWalletIdentityStatus('copy blocked');
+    flashWalletIdentityStatus(t('wallet.copyBlocked'));
     console.error(error);
   }
 });
@@ -15137,17 +15171,17 @@ walletDisplayModeSelect?.addEventListener('change', async () => {
       if (!linked) {
         if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
         await openActionDialog({
-          title: 'No .ath name linked',
-          hint: 'You can link a verified .ath name in Usernames and Avatars, or keep displaying the wallet address.',
+          title: t('username.noAthNameLinked'),
+          hint: t('username.noAthNameLinkedHint'),
           tone: 'muted',
-          submitLabel: 'Got it',
+          submitLabel: t('common.gotIt'),
           fields: [],
           summary: [
-            { label: 'Current display', value: 'Wallet address' },
-            { label: 'Optional setup', value: 'Link .ath name in Usernames and Avatars' },
+            { label: t('username.currentDisplay'), value: t('wallet.walletAddress') },
+            { label: t('username.optionalSetup'), value: t('username.linkAthNameValue') },
           ],
         });
-        flashWalletIdentityStatus('No .ath name linked');
+        flashWalletIdentityStatus(t('username.noAthNameLinked'));
         return;
       }
       identity = linked;
@@ -15159,18 +15193,18 @@ walletDisplayModeSelect?.addEventListener('change', async () => {
       return;
     }
     writeWalletDisplayIdentity(identity, plathoWallet.address);
-    flashWalletIdentityStatus(identity.mode === WALLET_DISPLAY_MODES.ADDRESS ? 'Showing wallet address' : `Showing ${canonicalUsernameDisplay(identity.label)}`);
+    flashWalletIdentityStatus(identity.mode === WALLET_DISPLAY_MODES.ADDRESS ? t('wallet.showingWalletAddress') : t('wallet.showingName', { name: canonicalUsernameDisplay(identity.label) }));
   } catch (error) {
     if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-    setText(walletDisplayModeStatus, previous.mode === WALLET_DISPLAY_MODES.ADDRESS ? 'address' : canonicalUsernameDisplay(previous.label));
-    flashWalletIdentityStatus('display blocked');
+    setText(walletDisplayModeStatus, previous.mode === WALLET_DISPLAY_MODES.ADDRESS ? t('wallet.addressMode') : canonicalUsernameDisplay(previous.label));
+    flashWalletIdentityStatus(t('wallet.displayBlocked'));
     console.error(error);
   }
 });
 
 function shortAddress(address) {
   const text = displayWalletAddress(address);
-  if (text.length <= 16) return text || 'connected';
+  if (text.length <= 16) return text || t('wallet.connected');
   return `${text.slice(0, 6)}...${text.slice(-6)}`;
 }
 
@@ -15311,7 +15345,9 @@ function formatAthAtomic(value) {
 
 function groupDecimalText(text) {
   const [whole, fraction] = String(text ?? '').split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // Narrow no-break space, not ',': in ru/de/etc a comma reads as the DECIMAL mark, so '1,234' would look
+  // like ~1.2 — a money-display ambiguity. The space groups unambiguously in every supported locale.
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
   return fraction ? `${grouped}.${fraction}` : grouped;
 }
 
@@ -15333,15 +15369,15 @@ function athFlushStateKnown(state = athFlushState) {
 }
 
 function athFlushStatusText(state = athFlushState) {
-  if (state.busy) return 'flushing';
-  if (state.error) return 'sync delayed';
-  if (!athFlushStateKnown(state)) return 'checking';
+  if (state.busy) return t('profile.flushing');
+  if (state.error) return t('common.syncDelayed');
+  if (!athFlushStateKnown(state)) return t('common.checking');
   const ready = athFlushReadyAmount(state);
   const pending = athFlushPendingCount(state);
-  if (ready > 0n && pending > 0n) return `${formatAthProfileAmount(ready)} ready + pending`;
-  if (ready > 0n) return `${formatAthProfileAmount(ready)} ready`;
-  if (pending > 0n) return 'flush pending';
-  return '0 ATH ready';
+  if (ready > 0n && pending > 0n) return t('profile.readyPlusPending', { amount: formatAthProfileAmount(ready) });
+  if (ready > 0n) return t('profile.readyAmount', { amount: formatAthProfileAmount(ready) });
+  if (pending > 0n) return t('profile.flushPending');
+  return t('profile.zeroAthReady');
 }
 
 function renderAthFlushStatus() {
@@ -15350,7 +15386,7 @@ function renderAthFlushStatus() {
   if (flushAthButton) flushAthButton.disabled = !canFlush;
   setProfileActionStatus(
     flushAthStatus,
-    !plathoWallet?.address ? 'wallet required' : athFlushStatusText(),
+    !plathoWallet?.address ? t('common.walletRequiredStatus') : athFlushStatusText(),
     athFlushState.error ? 'error' : (athFlushState.busy ? 'busy' : ''),
   );
 }
@@ -15455,10 +15491,10 @@ function usernameMintPricePreview(input) {
     const username = normalizeUsernameInput(input);
     const price = localUsernameMintPriceAtomic(username);
     return price === null
-      ? '100-10k ATH by length; 50% goes to burn'
-      : `${formatAthAtomic(price)} ATH; 50% goes to burn`;
+      ? t('username.priceRangeBurn')
+      : t('common.athPriceBurn', { price: formatAthAtomic(price) });
   } catch {
-    return '100-10k ATH by length; 50% goes to burn';
+    return t('username.priceRangeBurn');
   }
 }
 
@@ -15467,12 +15503,12 @@ function usernameMintStatusText(error) {
   if (/not enough vault ath|not enough vault ton|activate platho account|usernameregistry rejected/i.test(message)) {
     return message;
   }
-  if (/verification unavailable/i.test(message)) return 'RPC verification unavailable';
+  if (/verification unavailable/i.test(message)) return t('username.rpcVerificationUnavailable');
   if (/provider is not configured|username.*provider|ton rpc|sendboc/i.test(message)) return message;
-  return `username blocked: ${message}`;
+  return t('username.blockedWithDetail', { message });
 }
 
-async function requestAmountNanotons({ title, hint, symbol, parser, placeholder = '0.00' }) {
+async function requestAmountNanotons({ title, hint, symbol, parser, placeholder = t('dialog.amountPlaceholder') }) {
   let feedback = hint;
   let tone = 'muted';
   let amountValue = '';
@@ -15481,18 +15517,18 @@ async function requestAmountNanotons({ title, hint, symbol, parser, placeholder 
       title,
       hint: feedback,
       tone,
-      submitLabel: 'Review transaction',
+      submitLabel: t('dialog.reviewTransaction'),
       fields: [{
         id: 'amount',
-        label: `${symbol} amount`,
+        label: t('dialog.symbolAmount', { symbol }),
         inputMode: 'decimal',
         placeholder,
         autocomplete: 'off',
         value: amountValue,
       }],
       summary: (values) => [
-        { label: 'Asset', value: symbol },
-        { label: 'Amount', value: values.amount?.trim() || 'not set' },
+        { label: t('common.asset'), value: symbol },
+        { label: t('common.amount'), value: values.amount?.trim() || t('common.notSet') },
       ],
     });
     if (!result) return null;
@@ -15528,21 +15564,21 @@ async function showReceiveWalletTonDialog() {
   const address = currentWalletReceiveAddress();
   if (!address) throw new Error('Create or import a wallet first');
   const result = await openActionDialog({
-    title: 'Receive GRAM',
-    hint: 'Show this QR or copy the address. Funds arrive in the local Platho wallet, not in Vault.',
-    submitLabel: 'Copy address',
+    title: t('wallet.receiveGram'),
+    hint: t('wallet.receiveGramHint'),
+    submitLabel: t('wallet.copyAddress'),
     fields: [{
       type: 'custom',
       render: () => createWalletReceiveQrNode(address),
     }],
     summary: [
-      { label: 'Network', value: appConfig.network?.label ?? appConfig.network?.chain ?? 'TON' },
-      { label: 'Destination', value: 'local Platho wallet' },
+      { label: t('common.network'), value: appConfig.network?.label ?? appConfig.network?.chain ?? 'TON' },
+      { label: t('wallet.destination'), value: t('wallet.localPlathoWallet') },
     ],
   });
   if (!result) return false;
   await copyTextToClipboard(address);
-  flashWalletIdentityStatus('Wallet address copied');
+  flashWalletIdentityStatus(t('wallet.addressCopied'));
   return true;
 }
 
@@ -15550,13 +15586,13 @@ async function requestWalletTonTransferDetails() {
   const wallet = requirePlathoWallet();
   const fromAddress = walletAddressForCopy(wallet);
   const result = await openActionDialog({
-    title: 'Send GRAM',
-    hint: 'Sends GRAM directly from the local Platho wallet, not Vault. Vault funds stay separate.',
-    submitLabel: 'Send GRAM',
+    title: t('wallet.sendGram'),
+    hint: t('wallet.sendGramHint'),
+    submitLabel: t('wallet.sendGram'),
     fields: [
       {
         id: 'recipient',
-        label: 'Recipient address',
+        label: t('wallet.recipientAddress'),
         type: 'text',
         placeholder: 'UQ...',
         autocomplete: 'off',
@@ -15564,7 +15600,7 @@ async function requestWalletTonTransferDetails() {
       },
       {
         id: 'amount',
-        label: 'Amount',
+        label: t('common.amount'),
         type: 'text',
         placeholder: '0.1',
         inputMode: 'decimal',
@@ -15573,28 +15609,28 @@ async function requestWalletTonTransferDetails() {
     ],
     summary: (values) => {
       const lines = [
-        { label: 'From', value: shortAddress(fromAddress) },
-        { label: 'Source', value: 'local wallet, not Vault' },
+        { label: t('wallet.from'), value: shortAddress(fromAddress) },
+        { label: t('wallet.source'), value: t('wallet.localWalletNotVault') },
       ];
       const recipientText = values.recipient?.trim();
       if (recipientText) {
         try {
           const recipient = requireBasechainAddress(recipientText, 'Recipient');
           lines.push({
-            label: 'Recipient',
+            label: t('wallet.recipient'),
             value: shortAddress(formatTonUserFriendlyAddress(recipient, {
               testOnly: Number(wallet.networkGlobalId) === PLATHO_WALLET_NETWORK_GLOBAL_IDS.TESTNET,
             })),
           });
         } catch (error) {
-          lines.push({ label: 'Recipient', value: error.message });
+          lines.push({ label: t('wallet.recipient'), value: error.message });
         }
       }
       if (values.amount?.trim()) {
         try {
-          lines.push({ label: 'Amount', value: `${formatTonNanotons(parseTonAmountNanotons(values.amount))} GRAM` });
+          lines.push({ label: t('common.amount'), value: t('wallet.gramAmount', { amount: formatTonNanotons(parseTonAmountNanotons(values.amount)) }) });
         } catch (error) {
-          lines.push({ label: 'Amount', value: error.message });
+          lines.push({ label: t('common.amount'), value: error.message });
         }
       }
       return lines;
@@ -15618,7 +15654,7 @@ async function submitWalletTonTransfer() {
   const transaction = createWalletTransaction(message);
   const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
   globalThis.plathoLastWalletTonTransfer = { details, message, transaction, result };
-  flashWalletIdentityStatus('GRAM transfer submitted');
+  flashWalletIdentityStatus(t('wallet.gramTransferSubmitted'));
   setVaultStatus('wallet GRAM transfer submitted');
   queueVaultPostTransactionRefresh();
   return result;
@@ -15626,51 +15662,51 @@ async function submitWalletTonTransfer() {
 
 async function requestWalletSeedImport() {
   const result = await openActionDialog({
-    title: 'Import wallet',
-    hint: 'Paste the 24-word GRAM recovery phrase for the wallet that owns your messages.',
-    submitLabel: 'Import wallet',
+    title: t('wallet.importWallet'),
+    hint: t('wallet.importWalletHint'),
+    submitLabel: t('wallet.importWallet'),
     fields: [{
       id: 'recoveryPhrase',
-      label: 'Recovery phrase',
+      label: t('wallet.recoveryPhrase'),
       type: 'textarea',
-      placeholder: 'Paste 24 words',
+      placeholder: t('wallet.paste24Words'),
       autocomplete: 'off',
     }],
-    summary: ['This wallet key unlocks on-chain messages and signs protocol transactions.'],
+    summary: [t('wallet.importWalletSummary')],
   });
   const recoveryPhrase = result?.recoveryPhrase?.trim();
   return recoveryPhrase ? recoveryPhrase : null;
 }
 
-function showWalletSeed(title, recoveryPhrase, hint = 'Keep this recovery phrase private. It controls this wallet and its messages.') {
+function showWalletSeed(title, recoveryPhrase, hint = t('wallet.seedPrivateHint')) {
   return openActionDialog({
     title,
     hint,
-    submitLabel: 'Done',
+    submitLabel: t('common.done'),
     fields: [{
       id: 'recoveryPhrase',
-      label: 'Recovery phrase',
+      label: t('wallet.recoveryPhrase'),
       type: 'textarea',
       value: recoveryPhrase,
       readOnly: true,
       required: false,
     }],
-    summary: ['Store these 24 words now. The PWA cannot recover the wallet later without them.'],
+    summary: [t('wallet.seedStoreSummary')],
   });
 }
 
-async function confirmWalletReplacement(actionLabel = 'replace this wallet') {
+async function confirmWalletReplacement(actionLabel = t('wallet.replaceThisWallet')) {
   if (!plathoWallet && !hasStoredPlathoWalletRecord()) return true;
   const result = await openActionDialog({
-    title: 'Replace local wallet?',
-    hint: 'This will replace the wallet stored in this browser. Export the current recovery phrase first if you need this wallet later.',
+    title: t('wallet.replaceLocalWalletTitle'),
+    hint: t('wallet.replaceLocalWalletHint'),
     tone: 'muted',
     submitLabel: actionLabel,
     fields: [],
     summary: [
-      { label: 'Current wallet', value: plathoWallet ? shortAddress(walletAddressForCopy(plathoWallet)) : storedWalletShortLabel() },
-      { label: 'Stored on', value: 'this device only' },
-      { label: 'Effect', value: 'local wallet will be replaced' },
+      { label: t('wallet.currentWallet'), value: plathoWallet ? shortAddress(walletAddressForCopy(plathoWallet)) : storedWalletShortLabel() },
+      { label: t('wallet.storedOn'), value: t('wallet.thisDeviceOnly') },
+      { label: t('wallet.effect'), value: t('wallet.localWalletWillBeReplaced') },
     ],
   });
   return Boolean(result);
@@ -15678,10 +15714,10 @@ async function confirmWalletReplacement(actionLabel = 'replace this wallet') {
 
 async function confirmClearLocalData() {
   const result = await openActionDialog({
-    title: 'Clear local data?',
-    hint: 'This only clears data stored in this browser. It does not delete anything from chain, but it removes the local wallet record, chats, encrypted history, caches, and settings on this device.',
+    title: t('profile.clearLocalDataTitle'),
+    hint: t('profile.clearLocalDataHint'),
     tone: 'error',
-    submitLabel: 'Clear local data',
+    submitLabel: t('profile.clearLocalData'),
     dismissOnBackdrop: false,
     fields: [{
       id: 'clearLocalDataConfirmText',
@@ -15694,9 +15730,9 @@ async function confirmClearLocalData() {
       spellcheck: false,
     }],
     summary: [
-      { label: 'Scope', value: 'this device/browser only' },
-      { label: 'Deletes', value: 'wallet record, chats, encrypted history, caches, local settings' },
-      { label: 'Keeps', value: 'on-chain Vault, ATH, usernames, profile, public chain entries' },
+      { label: t('profile.scope'), value: t('profile.scopeThisDevice') },
+      { label: t('profile.deletes'), value: t('profile.clearDeletesList') },
+      { label: t('profile.keeps'), value: t('profile.clearKeepsList') },
     ],
   });
   return String(result?.confirmText ?? '').trim() === 'CLEAR';
@@ -15706,9 +15742,9 @@ async function confirmWalletPasswordForExport(wallet) {
   const record = readEncryptedPlathoWalletRecord();
   if (!record) return true;
   const unlocked = await requestAndDecryptEncryptedWallet(record, {
-    title: 'Show recovery phrase',
-    hint: 'Enter the local password before showing the recovery phrase.',
-    submitLabel: 'Show recovery phrase',
+    title: t('wallet.showRecoveryPhrase'),
+    hint: t('wallet.showRecoveryPhraseHint'),
+    submitLabel: t('wallet.showRecoveryPhrase'),
   });
   if (!unlocked) return false;
   if (!sameWalletAddress(unlocked.address, wallet.address)) {
@@ -15721,9 +15757,9 @@ async function exportEncryptedWalletKeyFile() {
   const record = readEncryptedPlathoWalletRecord();
   if (!record) throw new Error('No encrypted wallet key is stored on this device');
   const unlocked = await requestAndDecryptEncryptedWallet(record, {
-    title: 'Export wallet key',
-    hint: 'Enter the local password before exporting the encrypted wallet key file.',
-    submitLabel: 'Export wallet key',
+    title: t('wallet.exportWalletKey'),
+    hint: t('wallet.exportWalletKeyHint'),
+    submitLabel: t('wallet.exportWalletKey'),
   });
   if (!unlocked) return false;
   await downloadEncryptedWalletKeyBackup(record, unlocked);
@@ -15747,7 +15783,7 @@ async function activateImportedEncryptedWalletRecord(wallet, record) {
   // fully settles so the single vault read does not overlap the avatar read on iOS.
   queueVaultRefreshAfterWalletChange();
   refreshMessagingControls();
-  renderWalletIdentity('Wallet key imported');
+  renderWalletIdentity(t('wallet.walletKeyImported'));
   return true;
 }
 
@@ -15755,12 +15791,12 @@ async function importEncryptedWalletKeyFile(file) {
   const parsed = await readJsonFile(file);
   const record = encryptedWalletRecordFromBackup(parsed);
   const wallet = await requestAndDecryptEncryptedWallet(record, {
-    title: 'Import wallet key',
-    hint: 'Enter the password for this encrypted wallet key file.',
-    submitLabel: 'Import wallet key',
+    title: t('wallet.importWalletKey'),
+    hint: t('wallet.importWalletKeyHint'),
+    submitLabel: t('wallet.importWalletKey'),
   });
   if (!wallet) return false;
-  if (!(await confirmWalletReplacement('Import wallet key'))) return false;
+  if (!(await confirmWalletReplacement(t('wallet.importWalletKey')))) return false;
   const restored = await activateImportedEncryptedWalletRecord(wallet, record);
   // v2+ backups also carry the user's own toncenter API key — restore it so importing the wallet key on a
   // new device brings the RPC key too. v1 backups (no key) skip this. Keyless toncenter works either way.
@@ -15782,7 +15818,7 @@ async function requestWalletDisplayIdentity(mode) {
   const normalizedMode = normalizeWalletDisplayMode(mode);
   if (normalizedMode === WALLET_DISPLAY_MODES.ADDRESS) return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
   const suffix = '.ath';
-  let feedback = `Enter a ${suffix} name for this wallet. The copy button still copies the wallet address.`;
+  let feedback = t('username.linkNameHint', { suffix });
   let tone = 'muted';
   const current = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
     ? readLinkedPlathoUsername(plathoWallet?.address)
@@ -15798,15 +15834,15 @@ async function requestWalletDisplayIdentity(mode) {
     fields.push({
       id: 'pick',
       type: 'select',
-      label: 'Your linked names',
+      label: t('username.yourLinkedNames'),
       required: false,
-      options: [{ value: '', label: 'Enter a name below…' }, ...knownNames.map((label) => ({ value: label, label }))],
+      options: [{ value: '', label: t('username.enterNameBelow') }, ...knownNames.map((label) => ({ value: label, label }))],
       value: knownNames.includes(value) ? value : '',
     });
     fields.push({
       id: 'displayName',
-      label: `Or a different ${suffix} name`,
-      placeholder: 'name.ath',
+      label: t('username.orDifferentName', { suffix }),
+      placeholder: t('username.namePlaceholder'),
       autocomplete: 'off',
       required: false,
       value: '',
@@ -15815,7 +15851,7 @@ async function requestWalletDisplayIdentity(mode) {
     fields.push({
       id: 'displayName',
       label: WALLET_DISPLAY_MODE_LABELS[normalizedMode],
-      placeholder: 'name.ath',
+      placeholder: t('username.namePlaceholder'),
       autocomplete: 'off',
       value,
     });
@@ -15824,17 +15860,17 @@ async function requestWalletDisplayIdentity(mode) {
   // the name is not registered / not owned, instead of closing and immediately re-opening (the flicker the owner
   // reported). It only closes once the name passes verification.
   const verified = await openActionDialog({
-    title: 'Link Platho name',
+    title: t('username.linkPlathoName'),
     hint: feedback,
     tone,
-    submitLabel: 'Link name',
+    submitLabel: t('username.linkName'),
     fields,
-    checkingHint: 'Verifying name…',
+    checkingHint: t('username.verifyingName'),
     summary: (values) => {
       const chosen = (values.displayName?.trim() || values.pick || '').trim();
       return [{
         label: 'Check',
-        value: chosen ? `verify ${chosen} is owned by this wallet` : 'permanent name, currently owned by this wallet',
+        value: chosen ? t('username.verifyOwnership', { chosen }) : t('username.permanentNameOwned'),
       }];
     },
     validateSubmit: async (values) => {
@@ -15846,7 +15882,7 @@ async function requestWalletDisplayIdentity(mode) {
         }
         return { ok: true, result };
       } catch (error) {
-        return { ok: false, error: error?.message || `Use a verified ${suffix} name for this wallet.` };
+        return { ok: false, error: error?.message || t('username.useVerifiedName', { suffix }) };
       }
     },
   });
@@ -15854,27 +15890,27 @@ async function requestWalletDisplayIdentity(mode) {
 }
 
 async function requestUsernameMintName() {
-  let feedback = 'Choose the exact .ath name to mint. The ATH price does not include TON network fees.';
+  let feedback = t('username.mintHint');
   let tone = 'muted';
   let usernameValue = '';
   while (true) {
     const result = await openActionDialog({
-      title: 'Mint Platho name',
+      title: t('username.mintPlathoName'),
       hint: feedback,
       tone,
-      submitLabel: 'Review mint',
+      submitLabel: t('username.reviewMint'),
       fields: [{
         id: 'username',
-        label: 'Username',
-        placeholder: 'xxxx.ath',
+        label: t('username.usernameLabel'),
+        placeholder: t('username.mintPlaceholder'),
         autocomplete: 'off',
         value: usernameValue,
       }],
       summary: (values) => {
-        const raw = values.username?.trim() || 'not set';
+        const raw = values.username?.trim() || t('common.notSet');
         const lines = [
-          { label: 'Display', value: canonicalUsernameDisplay(raw) },
-          { label: 'ATH price', value: usernameMintPricePreview(raw) },
+          { label: t('username.display'), value: canonicalUsernameDisplay(raw) },
+          { label: t('username.athPrice'), value: usernameMintPricePreview(raw) },
         ];
         // Show the live ATH balance + an affordability flag — but only when the Vault user (hence the balance)
         // is actually loaded, so we never claim "not enough" against an unknown balance.
@@ -15883,10 +15919,10 @@ async function requestUsernameMintName() {
           try { priceAtomic = localUsernameMintPriceAtomic(normalizeUsernameInput(raw)); } catch { priceAtomic = null; }
           const athBalance = currentAthBalanceAtomic();
           const short = priceAtomic !== null && athBalance < priceAtomic;
-          lines.push({ label: 'Your ATH', value: `${formatAthAtomic(athBalance)} ATH${short ? ' — not enough' : ''}` });
+          lines.push({ label: t('username.yourAth'), value: short ? t('username.athBalanceNotEnough', { amount: formatAthAtomic(athBalance) }) : t('username.athBalance', { amount: formatAthAtomic(athBalance) }) });
         }
-        lines.push({ label: 'GRAM hold', value: `up to ${formatTonNanotons(estimatedUsernameMintTonFeeNanotons())} GRAM from Vault` });
-        lines.push({ label: 'Route', value: 'Vault' });
+        lines.push({ label: t('username.gramHold'), value: t('username.gramHoldValue', { amount: formatTonNanotons(estimatedUsernameMintTonFeeNanotons()) }) });
+        lines.push({ label: t('username.route'), value: t('vault.name') });
         return lines;
       },
     });
@@ -15915,26 +15951,26 @@ async function requestUsernameMintName() {
 function avatarCompressionOptions() {
   return Object.values(IMAGE_COMPRESSION_MODES).map((mode) => ({
     value: mode.id,
-    label: `${mode.label} · up to ${Math.round(mode.maxBytes / 1024)} KiB`,
+    label: t('avatar.compressionOption', { label: mode.label, kib: Math.round(mode.maxBytes / 1024) }),
   }));
 }
 
 async function requestProfileAvatarUploadDetails(file) {
   return requestCompressedImageFile(file, {
     modeId: pendingProfileAvatarModeId,
-    title: 'Set profile avatar',
-    hint: 'Preview the exact public WebP avatar before it is written into public avatar capsules and registered in ProfileRegistry.',
-    submitLabel: 'Use avatar',
+    title: t('avatar.setProfileAvatar'),
+    hint: t('avatar.uploadHint'),
+    submitLabel: t('avatar.useAvatar'),
     extraRows: (attachment) => [
-      { label: 'ATH price', value: `${formatAthAtomic(PROFILE_AVATAR_PRICE_ATH)} ATH; 50% goes to burn` },
-      { label: 'GRAM fee', value: profileAvatarTonFeeLabel(attachment) },
-      { label: 'Visibility', value: 'avatar media is public' },
+      { label: t('username.athPrice'), value: t('common.athPriceBurn', { price: formatAthAtomic(PROFILE_AVATAR_PRICE_ATH) }) },
+      { label: t('avatar.gramFee'), value: profileAvatarTonFeeLabel(attachment) },
+      { label: t('avatar.visibility'), value: t('avatar.mediaIsPublic') },
     ],
   });
 }
 
 async function requestPaymentCheckDetails(initial = null) {
-  let feedback = 'The encrypted check is readable by this chat only.';
+  let feedback = t('payment.checkHint');
   let tone = 'muted';
   let assetValue = BigInt(initial?.asset ?? RECEIVE_ASSETS.TON) === RECEIVE_ASSETS.ATH ? 'ATH' : 'TON';
   let amountValue = initial?.amount
@@ -15942,14 +15978,14 @@ async function requestPaymentCheckDetails(initial = null) {
     : '';
   while (true) {
     const result = await openActionDialog({
-      title: initial ? 'Edit payment check' : 'Create payment check',
+      title: initial ? t('payment.editCheck') : t('payment.createCheck'),
       hint: feedback,
       tone,
-      submitLabel: initial ? 'Save check' : 'Create check',
+      submitLabel: initial ? t('payment.saveCheck') : t('payment.createCheckShort'),
       fields: [
         {
           id: 'asset',
-          label: 'Asset',
+          label: t('common.asset'),
           type: 'select',
           options: [
             { value: 'TON', label: 'GRAM' },
@@ -15959,16 +15995,16 @@ async function requestPaymentCheckDetails(initial = null) {
         },
         {
           id: 'amount',
-          label: 'Amount',
+          label: t('common.amount'),
           inputMode: 'decimal',
-          placeholder: '0.00',
+          placeholder: t('dialog.amountPlaceholder'),
           autocomplete: 'off',
           value: amountValue,
         },
       ],
       summary: (values) => [
-        { label: 'Asset', value: values.asset === 'ATH' ? 'ATH' : 'GRAM' },
-        { label: 'Amount', value: values.amount?.trim() || 'not set' },
+        { label: t('common.asset'), value: values.asset === 'ATH' ? 'ATH' : 'GRAM' },
+        { label: t('common.amount'), value: values.amount?.trim() || t('common.notSet') },
       ],
     });
     if (!result) return null;
@@ -16846,8 +16882,8 @@ function isExpectedVaultProviderUnavailable(error) {
 }
 
 function vaultProviderStatusForError(error) {
-  if (noteTonRpcRateLimit(error)) return 'RPC busy, retrying';
-  return appConfig.vault?.provider?.unavailableStatus ?? 'provider required';
+  if (noteTonRpcRateLimit(error)) return t('vault.rpcBusyRetrying');
+  return appConfig.vault?.provider?.unavailableStatus ?? t('vault.providerRequired');
 }
 
 async function loadConnectedVaultUser(options = {}) {
@@ -17698,7 +17734,7 @@ function scheduleProfileAvatarPublishRecovery(context, delayMs = null) {
     job.status = 'needs_retry';
     job.nextRetryAt = null;
     writeProfileAvatarPublishRecovery(job);
-    setProfileAvatarStatus('avatar needs retry', 'error');
+    setProfileAvatarStatus(t('avatar.needsRetry'), 'error');
     refreshProfileAvatarRecoveryDebug();
     return job;
   }
@@ -17719,10 +17755,10 @@ function scheduleProfileAvatarPublishRecovery(context, delayMs = null) {
       latest.lastError = shortUiErrorText(error, 'avatar recovery failed');
       latest.updatedAt = new Date().toISOString();
       if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) {
-        setProfileAvatarStatus('avatar still confirming');
+        setProfileAvatarStatus(t('avatar.stillConfirming'));
         scheduleProfileAvatarPublishRecovery(latest);
       } else {
-        setProfileAvatarStatus('avatar needs retry', 'error');
+        setProfileAvatarStatus(t('avatar.needsRetry'), 'error');
         refreshProfileAvatarRecoveryDebug();
       }
     });
@@ -17804,7 +17840,7 @@ async function finalizeProfileAvatarUpdate({
     : pendingPointer?.avatarStreamId
       ? BigInt(pendingPointer.avatarStreamId)
       : bytesToBigIntValue(streamIdBytes);
-  setProfileAvatarStatus('signing avatar payment');
+  setProfileAvatarStatus(t('avatar.signingPayment'));
   const result = registrySubmission ?? await submitVaultProfileAvatarRegistration({
     owner,
     avatarHash,
@@ -17818,7 +17854,7 @@ async function finalizeProfileAvatarUpdate({
   let profilePaymentFinality = null;
   let profilePaymentFinalityError = null;
   try {
-    setProfileAvatarStatus('confirming registry');
+    setProfileAvatarStatus(t('avatar.confirmingRegistry'));
     registryPointer = await waitForProfileAvatarRegistryUpdate(owner, avatarHash);
     writeStoredProfileAvatarPointer(registryPointer, owner);
     if (confirmed?.imageUrl) setAvatarNode(profileAvatar, 'P', confirmed.imageUrl);
@@ -17837,7 +17873,7 @@ async function finalizeProfileAvatarUpdate({
   } catch (error) {
     registryError = error;
     if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) {
-      setProfileAvatarStatus('avatar payment submitted, confirming');
+      setProfileAvatarStatus(t('avatar.paymentSubmittedConfirming'));
       return {
         result,
         registryPointer: null,
@@ -17848,7 +17884,7 @@ async function finalizeProfileAvatarUpdate({
     }
     console.error(error);
     await refreshOwnProfileAvatar().catch((refreshError) => console.error(refreshError));
-    setProfileAvatarStatus('avatar not active yet', 'error');
+    setProfileAvatarStatus(t('avatar.notActiveYet'), 'error');
   }
   globalThis.plathoLastProfileAvatarUpdate = {
     avatarHash,
@@ -17891,13 +17927,13 @@ async function runProfileAvatarPublishRecovery(key) {
   job.updatedAt = new Date().toISOString();
   writeProfileAvatarPublishRecovery(job);
   refreshProfileAvatarRecoveryDebug();
-  setProfileAvatarStatus('avatar still confirming');
+  setProfileAvatarStatus(t('avatar.stillConfirming'));
   const confirmed = await findProfileAvatarPublishedEntriesFromRecovery(job);
   if (!confirmed) {
     const ageMs = profileAvatarRecoveryAgeMs(job);
     if (!job.publishState && ageMs !== null && ageMs >= PROFILE_AVATAR_RECOVERY_LOCAL_PENDING_MS) {
       clearProfileAvatarPublishRecovery(job);
-      setProfileAvatarStatus('avatar needs retry', 'error');
+      setProfileAvatarStatus(t('avatar.needsRetry'), 'error');
       return null;
     }
     job.status = 'pending';
@@ -17993,7 +18029,7 @@ async function refreshWalletTonBalanceForProfile() {
     refreshWalletTonProfileStatus();
     return null;
   }
-  setText(walletTonBalanceStatus, 'checking');
+  setText(walletTonBalanceStatus, t('wallet.checking'));
   const balance = await loadConnectedTonWalletBalance();
   vaultPocketState = {
     wallet: {
@@ -18199,8 +18235,8 @@ function refreshVaultMoveWidget() {
     const direction = vaultMoveDirection(card.asset);
     const source = vaultMoveSourcePocket(card.asset);
     const target = vaultMoveTargetPocket(card.asset);
-    const sourceLabel = source === 'wallet' ? 'Wallet' : 'Vault';
-    const targetLabel = target === 'wallet' ? 'Wallet' : 'Vault';
+    const sourceLabel = source === 'wallet' ? t('vault.wallet') : t('vault.vault');
+    const targetLabel = target === 'wallet' ? t('vault.wallet') : t('vault.vault');
     setText(card.walletBalance, vaultMoveFormattedBalance('wallet', card.asset));
     setText(card.vaultBalance, vaultMoveFormattedBalance('vault', card.asset));
     setText(card.fromLabel, sourceLabel);
@@ -18209,8 +18245,8 @@ function refreshVaultMoveWidget() {
       // card.asset is the internal key ('TON'/'ATH'); show the user-facing coin label (TON -> GRAM rebrand).
       const assetLabel = card.asset === 'ATH' ? 'ATH' : 'GRAM';
       card.submitButton.textContent = direction === 'to-vault'
-        ? `Move ${assetLabel} to Vault`
-        : `Move ${assetLabel} to Wallet`;
+        ? t('vault.moveToVault', { asset: assetLabel })
+        : t('vault.moveToWallet', { asset: assetLabel });
       card.submitButton.disabled = !plathoWallet;
     }
     if (card.form) {
@@ -18232,7 +18268,7 @@ function refreshVaultMoveWidget() {
       const showReserveNote = Boolean(plathoWallet) && !hasActivePlathoAccount() && direction === 'to-vault';
       card.note.hidden = !showReserveNote;
       if (showReserveNote) {
-        card.note.textContent = `Keeping GRAM in your wallet to activate your account (activation costs about ${formatTonNanotons(plathoAccountActivationFeeNanotons())} GRAM) — you'll need it, because GRAM can't move back OUT of the Vault until you activate.`;
+        card.note.textContent = t('vault.activationReserveNote', { fee: formatTonNanotons(plathoAccountActivationFeeNanotons()) });
       }
     }
   }
@@ -18758,7 +18794,7 @@ async function waitForPlathoUsernameOwnership(label, ownerWallet, options = {}) 
 
 async function autoLinkMintedUsername(username, ownerWallet, options = {}) {
   const owner = requireBasechainAddress(ownerWallet, 'Connected wallet');
-  setUsernameMintStatus(`${username} finalizing`);
+  setUsernameMintStatus(t('username.finalizing', { username }));
   const identity = await waitForPlathoUsernameOwnership(username, owner, options);
   if (!plathoWallet?.address || !sameWalletAddress(plathoWallet.address, owner)) return null;
   const linked = {
@@ -18771,7 +18807,7 @@ async function autoLinkMintedUsername(username, ownerWallet, options = {}) {
   writeWalletDisplayIdentity(linked, owner);
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.PLATHO_NFT;
   clearPendingUsernameMint(username, owner);
-  setUsernameMintStatus(`Linked ${canonicalUsernameDisplay(identity.label)}`, '');
+  setUsernameMintStatus(t('username.linked', { name: canonicalUsernameDisplay(identity.label) }), '');
   renderWalletIdentity();
   return linked;
 }
@@ -19085,7 +19121,7 @@ async function submitAthWalletMessage(type, params, options = {}) {
 }
 
 async function submitVaultDepositTon() {
-  const amount = await requestTonAmountNanotons('Move GRAM to Vault', 'Moves GRAM from your connected Platho wallet into the Vault pocket.');
+  const amount = await requestTonAmountNanotons(t('vault.moveGramToVaultTitle'), t('vault.moveGramToVaultHint'));
   if (amount === null) return null;
   return submitVaultDepositTonAmount(amount);
 }
@@ -19104,15 +19140,15 @@ async function confirmVaultDepositKeepsActivationReserve(amount) {
   if (walletBal - amt >= reserve) return true;
   const fee = plathoAccountActivationFeeNanotons();
   const result = await openActionDialog({
-    title: 'Keep GRAM to activate?',
+    title: t('vault.keepGramToActivateTitle'),
     tone: 'error',
-    submitLabel: 'Move anyway',
-    hint: `Your account is not activated yet. This leaves too little GRAM in your wallet to activate (activation costs about ${formatTonNanotons(fee)} GRAM), and GRAM cannot be moved back OUT of the Vault until you activate. Move a smaller amount, or continue if you'll fund activation from another wallet.`,
+    submitLabel: t('vault.moveAnyway'),
+    hint: t('vault.keepGramToActivateHint', { fee: formatTonNanotons(fee) }),
     fields: [],
     summary: [
-      { label: 'Wallet GRAM', value: `${formatTonNanotons(walletBal)} GRAM` },
-      { label: 'Moving to Vault', value: `${formatTonNanotons(amt)} GRAM` },
-      { label: 'Activation costs', value: `${formatTonNanotons(fee)} GRAM` },
+      { label: t('common.walletGram'), value: t('common.gramAmount', { amount: formatTonNanotons(walletBal) }) },
+      { label: t('vault.movingToVault'), value: t('common.gramAmount', { amount: formatTonNanotons(amt) }) },
+      { label: t('vault.activationCosts'), value: t('common.gramAmount', { amount: formatTonNanotons(fee) }) },
     ],
   });
   return result !== null;
@@ -19136,7 +19172,7 @@ async function submitVaultDepositTonAmount(amount) {
 }
 
 async function submitVaultWithdrawTon() {
-  const amount = await requestTonAmountNanotons('Move GRAM from Vault', 'Moves GRAM from the Vault pocket back to your connected Platho wallet.');
+  const amount = await requestTonAmountNanotons(t('vault.moveGramFromVaultTitle'), t('vault.moveGramFromVaultHint'));
   if (amount === null) return null;
   return submitVaultWithdrawTonAmount(amount);
 }
@@ -19179,7 +19215,7 @@ async function submitVaultWithdrawTonAmount(amount) {
 }
 
 async function submitVaultDepositAth() {
-  const amount = await requestAthAmountAtomic('Move ATH to Vault', 'Moves ATH from your connected Platho wallet into the Vault pocket.');
+  const amount = await requestAthAmountAtomic(t('vault.moveAthToVaultTitle'), t('vault.moveAthToVaultHint'));
   if (amount === null) return null;
   return submitVaultDepositAthAmount(amount);
 }
@@ -19203,7 +19239,7 @@ async function submitVaultDepositAthAmount(amount) {
 }
 
 async function submitVaultWithdrawAth() {
-  const amount = await requestAthAmountAtomic('Move ATH from Vault', 'Moves ATH from the Vault pocket back to your connected Platho wallet.');
+  const amount = await requestAthAmountAtomic(t('vault.moveAthFromVaultTitle'), t('vault.moveAthFromVaultHint'));
   if (amount === null) return null;
   return submitVaultWithdrawAthAmount(amount);
 }
@@ -19260,23 +19296,23 @@ async function submitUsernameMint() {
   const registry = requireBasechainAddress(requireUsernameRegistryAddress(), 'UsernameRegistry');
   const provider = await resolveUsernameRegistryProvider();
   const priceAtomic = await readUsernameMintPriceForOwnVaultAction(provider, registry, username);
-  setUsernameMintStatus('checking availability');
+  setUsernameMintStatus(t('username.checkingAvailability'));
   await readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username);
   assertNoPendingUsernameMintRetry(username, owner);
   await assertVaultUsernameMintCanStart(owner, username, priceAtomic);
-  setUsernameMintStatus('signing through Vault');
+  setUsernameMintStatus(t('username.signingThroughVault'));
   const result = await submitVaultUsernameMint({
     owner,
     username,
     priceAtomic,
   });
   rememberPendingUsernameMint(username, owner, result);
-  setUsernameMintStatus(result.confirmationPending === true ? 'mint submitted, finalizing' : 'mint finalizing');
+  setUsernameMintStatus(result.confirmationPending === true ? t('username.mintSubmittedFinalizing') : t('username.mintFinalizing'));
   autoLinkMintedUsername(username, owner, {
     attempts: USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS,
     delayMs: USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS,
   }).catch((error) => {
-    setUsernameMintStatus('mint submitted; link after sync');
+    setUsernameMintStatus(t('username.mintSubmittedLinkAfterSync'));
     console.error(error);
   });
   return result;
@@ -19344,7 +19380,7 @@ async function submitAthDueFlush() {
   globalThis.plathoLastAthDueFlush = { state, messages, transaction, result, flushedBuckets };
   renderAthFlushStatus();
   queueAthFlushPostTransactionRefresh();
-  flashWalletIdentityStatus('ATH flush submitted');
+  flashWalletIdentityStatus(t('wallet.athFlushSubmitted'));
   return result;
 }
 
@@ -19359,12 +19395,12 @@ async function submitProfileAvatarUpdate(avatar) {
     // user-initiated retry is not immediately re-parked by the attempts cap.
     existingRecovery.attempts = 0;
     setProfileAvatarPending(true);
-    setProfileAvatarStatus('avatar still confirming');
+    setProfileAvatarStatus(t('avatar.stillConfirming'));
     scheduleProfileAvatarPublishRecovery(existingRecovery, 0);
     return existingRecovery;
   }
   setProfileAvatarPending(true);
-  setProfileAvatarStatus('checking current avatar');
+  setProfileAvatarStatus(t('avatar.checkingCurrent'));
   const currentPointer = await readCurrentProfileAvatarPointerFromChain(owner, { required: true });
   if (currentPointer?.avatarHash?.toLowerCase?.() === normalizeAvatarHashHex(avatarHash).toLowerCase()) {
     await writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
@@ -19412,7 +19448,7 @@ async function submitProfileAvatarUpdate(avatar) {
   }
   publishDiagnostics.payloads = profileAvatarPublishPayloadDiagnostics(payloads);
 
-  setProfileAvatarStatus('checking Vault balance');
+  setProfileAvatarStatus(t('avatar.checkingVaultBalance'));
   try {
     for (let preflightAttempt = 0; ; preflightAttempt += 1) {
       try {
@@ -19436,7 +19472,7 @@ async function submitProfileAvatarUpdate(avatar) {
     // Bounded retry exhausted (or a hard error): land on a retryable terminal state that releases
     // the pending lock, not a "retrying" status that no longer retries.
     setProfileAvatarStatus(
-      rateLimited || recoverableRpc ? 'avatar needs retry' : String(error?.message ?? 'avatar blocked'),
+      rateLimited || recoverableRpc ? t('avatar.needsRetry') : String(error?.message ?? t('avatar.blocked')),
       'error',
     );
     throw error;
@@ -19460,7 +19496,7 @@ async function submitProfileAvatarUpdate(avatar) {
     publishResult,
     payloads,
   });
-  setProfileAvatarStatus('checking chain');
+  setProfileAvatarStatus(t('avatar.checkingChain'));
   let publishResult = null;
   let confirmed = await findPublishedAvatarEntries(owner, {
     ...pendingPointer,
@@ -19471,9 +19507,9 @@ async function submitProfileAvatarUpdate(avatar) {
   });
   if (confirmed?.streamId) streamId = bigIntToFixedBytes(BigInt(confirmed.streamId), 16, 'avatar stream id');
   if (confirmed) {
-    setProfileAvatarStatus('avatar already published');
+    setProfileAvatarStatus(t('avatar.alreadyPublished'));
   } else {
-    setProfileAvatarStatus('publishing avatar');
+    setProfileAvatarStatus(t('avatar.publishing'));
     await capturePublishSnapshot('before-public-publish', null);
     try {
       publishResult = await publishPublicPayloadParts(payloads, `profile-avatar-${Date.now()}`);
@@ -19500,11 +19536,11 @@ async function submitProfileAvatarUpdate(avatar) {
       };
       globalThis.plathoLastProfileAvatarPublish = globalThis.plathoLastProfileAvatarPublishPartial;
       const broadcastStatus = profileAvatarPublishBroadcastErrorStatus(publishDiagnostics);
-      setProfileAvatarStatus(broadcastStatus ? `broadcast uncertain: ${broadcastStatus}` : 'broadcast uncertain, confirming');
+      setProfileAvatarStatus(broadcastStatus ? t('avatar.broadcastUncertainDetail', { status: broadcastStatus }) : t('avatar.broadcastUncertainConfirming'));
     }
     if (publishResult?.publishState) {
       rememberProfileAvatarPublishRecovery(avatarRecoveryContext());
-      setProfileAvatarStatus('publish submitted, confirming');
+      setProfileAvatarStatus(t('avatar.publishSubmittedConfirming'));
       try {
         await confirmCapsuleHubPublishEntries(publishResult.publishState, {
           scanAvailableTransports: true,
@@ -19532,7 +19568,7 @@ async function submitProfileAvatarUpdate(avatar) {
       && publishResult?.status !== VAULT_PUBLISH_STATUS_SUBMITTED
       && publishResult?.status !== VAULT_PUBLISH_STATUS_PARTIAL
     ) {
-      setProfileAvatarStatus('publish blocked', 'error');
+      setProfileAvatarStatus(t('avatar.publishBlocked'), 'error');
       setProfileAvatarPending(false);
       return publishResult;
     }
@@ -19542,13 +19578,13 @@ async function submitProfileAvatarUpdate(avatar) {
       const knownFirstEntryId = minPublicEntryIdFromPublishState(publishResult.publishState);
       if (knownFirstEntryId !== null) pendingPointer.avatarEntryId = knownFirstEntryId.toString();
     }
-    setProfileAvatarStatus('confirming avatar capsules');
+    setProfileAvatarStatus(t('avatar.confirmingCapsules'));
     try {
       confirmed = confirmed ?? await waitForPublishedAvatarEntries(owner, pendingPointer);
     } catch (error) {
       if (error?.code !== 'PLATHO_AVATAR_CAPSULES_NOT_VISIBLE') throw error;
       if (publishResult?.publishState) {
-        setProfileAvatarStatus('checking chain');
+        setProfileAvatarStatus(t('avatar.checkingChain'));
         let broadcastRetries = 0;
         try {
           broadcastRetries = await retryUnconfirmedVaultPublishBroadcasts(publishResult.publishState, {
@@ -19566,7 +19602,7 @@ async function submitProfileAvatarUpdate(avatar) {
               broadcastRetries,
               at: new Date().toISOString(),
             };
-            setProfileAvatarStatus('broadcast retrying');
+            setProfileAvatarStatus(t('avatar.broadcastRetrying'));
           }
           await confirmCapsuleHubPublishEntries(publishResult.publishState, {
             scanAvailableTransports: true,
@@ -19581,7 +19617,7 @@ async function submitProfileAvatarUpdate(avatar) {
               return null;
             });
           if (!confirmed && broadcastRetries > 0) {
-            setProfileAvatarStatus('confirming avatar capsules');
+            setProfileAvatarStatus(t('avatar.confirmingCapsules'));
             confirmed = await waitForPublishedAvatarEntries(owner, pendingPointer)
               .catch((confirmError) => {
                 if (!isTonRpcRecoverableReadError(confirmError) && !noteTonRpcRateLimit(confirmError)) console.error(confirmError);
@@ -19611,7 +19647,7 @@ async function submitProfileAvatarUpdate(avatar) {
             ...avatarRecoveryContext(),
             lastError: diagnosticStatus ?? shortUiErrorText(error, 'avatar not visible yet'),
           });
-          setProfileAvatarStatus('avatar still confirming');
+          setProfileAvatarStatus(t('avatar.stillConfirming'));
           return {
             status: VAULT_PUBLISH_STATUS_SUBMITTED,
             publishState: publishResult.publishState,
@@ -19643,7 +19679,7 @@ async function submitProfileAvatarUpdate(avatar) {
       confirmed,
       lastError: shortUiErrorText(error, 'avatar registry delayed'),
     });
-    setProfileAvatarStatus('avatar still confirming');
+    setProfileAvatarStatus(t('avatar.stillConfirming'));
     return {
       status: 'pending',
       recoveryJob: profileAvatarRecoveryPublicDebug(job),
@@ -19964,7 +20000,7 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
   const claimedAmountText = BigInt(payment.asset ?? 0n) === RECEIVE_ASSETS.TON
     ? formatTonNanotons(BigInt(payment.amount ?? 0n))
     : formatAtomicAmount(payment.amount);
-  flashWalletIdentityStatus(`check claimed +${claimedAmountText} ${paymentAssetLabel(payment.asset)}`);
+  flashWalletIdentityStatus(t('payment.checkClaimed', { amount: claimedAmountText, asset: paymentAssetLabel(payment.asset) }));
   queueVaultPostTransactionRefresh();
   return { result, confirmed };
 }
@@ -19993,14 +20029,14 @@ async function submitVaultCancelPaymentCheck(payment, options = {}) {
   });
   const confirmed = await waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser);
   await removePendingPaymentCheckLedgerRecord(payment);
-  flashWalletIdentityStatus('check cancelled');
+  flashWalletIdentityStatus(t('payment.checkCancelled'));
   queueVaultPostTransactionRefresh();
   return { result, confirmed };
 }
 
 async function attemptCancelPaymentCheckAfterPublishFailure(payment) {
   if (!payment) return null;
-  setText(identitySubtitle, 'check auto-cancelling');
+  setText(identitySubtitle, t('payment.checkAutoCancelling'));
   return submitVaultCancelPaymentCheck(payment);
 }
 
@@ -20009,7 +20045,7 @@ async function submitVaultRegisterMessagingKeys() {
   const provider = await resolveVaultChainProvider();
   const user = await readFreshConnectedVaultUser(provider);
   if (user.current_key_id && BigInt(user.current_key_id) !== 0n) {
-    vaultDraftStatus.textContent = 'active';
+    vaultDraftStatus.textContent = t('vault.active');
     return null;
   }
   const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
@@ -20018,12 +20054,12 @@ async function submitVaultRegisterMessagingKeys() {
   // imported or already-exported wallet is provably backed up (markWalletKeyBackupDone cleared the flag), so
   // don't make the user re-download it just to activate.
   if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
-  vaultDraftStatus.textContent = 'signing';
+  vaultDraftStatus.textContent = t('vault.signing');
   const result = await submitVaultMessage('RegisterMessagingKeys', localVaultDraft.message, {
     userExists: user.exists === true,
   });
   plathoAccountActivationPending = true;
-  vaultDraftStatus.textContent = 'activation sent';
+  vaultDraftStatus.textContent = t('vault.activationSent');
   queueVaultPostTransactionRefresh({ pollActivation: true });
   return result;
 }
@@ -20032,11 +20068,11 @@ async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = 
   const fee = plathoAccountActivationFeeNanotons(user);
   const walletBalance = await refreshWalletTonBalanceForProfile().catch(() => null);
   let feedback = needsKeyBackup
-    ? 'Export the encrypted wallet key, then send the account activation transaction.'
-    : 'Your wallet key is already backed up. Send the account activation transaction.';
+    ? t('vault.activationExportKeyFeedback')
+    : t('vault.activationKeyBackedUpFeedback');
   let tone = 'muted';
   if (walletBalance !== null && walletBalance < fee) {
-    feedback = `Wallet GRAM is below the ${formatTonNanotons(fee)} GRAM activation transaction value. Receive GRAM first.`;
+    feedback = t('vault.activationLowBalanceFeedback', { fee: formatTonNanotons(fee) });
     tone = 'error';
   }
   // The forced key-export step (and its acknowledgement checkbox) only appears when the key has not been
@@ -20046,26 +20082,26 @@ async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = 
     fields.push({
       id: 'backupConfirmed',
       type: 'checkbox',
-      label: 'I understand this will download my encrypted wallet key backup before activation.',
+      label: t('vault.activationBackupCheckbox'),
     });
   }
   fields.push({
     id: 'activationConfirmed',
     type: 'checkbox',
-    label: 'I understand activation sends an on-chain Vault transaction and publishes the public keys needed for Platho messaging.',
+    label: t('vault.activationConfirmCheckbox'),
   });
   const result = await openActionDialog({
-    title: 'Activate Platho account',
+    title: t('vault.activateAccountTitle'),
     hint: feedback,
     tone,
-    submitLabel: needsKeyBackup ? 'Export key and activate' : 'Activate account',
+    submitLabel: needsKeyBackup ? t('vault.exportKeyAndActivate') : t('vault.activateAccount'),
     dismissOnBackdrop: false,
     fields,
     summary: [
-      { label: 'Wallet GRAM', value: walletBalance === null ? 'unknown' : `${formatTonNanotons(walletBalance)} GRAM` },
-      { label: 'Activation tx value', value: `${formatTonNanotons(fee)} GRAM` },
-      { label: 'Backup', value: needsKeyBackup ? 'encrypted wallet key JSON, protected by the local password' : 'already saved' },
-      { label: 'After activation', value: 'private/public messaging, Vault, .ath name and avatar tabs unlock' },
+      { label: t('common.walletGram'), value: walletBalance === null ? t('common.unknown') : t('common.gramAmount', { amount: formatTonNanotons(walletBalance) }) },
+      { label: t('vault.activationTxValue'), value: t('common.gramAmount', { amount: formatTonNanotons(fee) }) },
+      { label: t('vault.backupLabel'), value: needsKeyBackup ? t('vault.backupEncryptedJson') : t('vault.backupAlreadySaved') },
+      { label: t('vault.afterActivationLabel'), value: t('vault.afterActivationValue') },
     ],
   });
   if (!result) return false;
@@ -20084,7 +20120,7 @@ async function submitVaultReplaceMessagingKeys() {
   });
   const currentKeyId = BigInt(user.current_key_id ?? 0n);
   if (user.exists !== true || currentKeyId === 0n) {
-    setText(vaultRotateStatus, 'activate account first');
+    setText(vaultRotateStatus, t('vault.activateAccountFirst'));
     return null;
   }
   const requiredTon = estimateVaultAttachedValueNanotons('ReplaceMessagingKeys', localVaultDraft.message);
@@ -20092,7 +20128,7 @@ async function submitVaultReplaceMessagingKeys() {
   if (tonBalance < requiredTon) {
     throw new Error(`Vault GRAM balance is too low for key rotation; need ${formatTonNanotons(requiredTon)} GRAM`);
   }
-  setText(vaultRotateStatus, 'signing');
+  setText(vaultRotateStatus, t('vault.signing'));
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const submission = await submitVaultAuthExternalWithNonceConfirmation({
     provider,
@@ -20109,7 +20145,7 @@ async function submitVaultReplaceMessagingKeys() {
     }),
   });
   globalThis.plathoLastVaultReplaceMessagingKeysExternal = submission;
-  setText(vaultRotateStatus, submission.confirmationPending ? 'key update submitted, confirming' : 'key update sent');
+  setText(vaultRotateStatus, submission.confirmationPending ? t('vault.keyUpdateSubmittedConfirming') : t('vault.keyUpdateSent'));
   return submission;
 }
 
@@ -22746,7 +22782,7 @@ function privateMessageManualActionsElement(thread, message) {
   actions.className = 'message-actions';
   const retry = document.createElement('button');
   retry.type = 'button';
-  retry.textContent = 'Retry';
+  retry.textContent = t('common.retry');
   retry.addEventListener('click', async () => {
     retry.disabled = true;
     await retryPrivateMessageFromUi(thread, message).catch((error) => {
@@ -22758,7 +22794,7 @@ function privateMessageManualActionsElement(thread, message) {
   if (message.privateCancelAvailable === true && privateMessageCanLocalCancel(message)) {
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.textContent = 'Cancel';
+    cancel.textContent = t('common.cancel');
     cancel.addEventListener('click', () => {
       cancelPrivateMessageFromUi(thread, message);
     });
@@ -22824,7 +22860,7 @@ function cancelPrivateMessageFromUi(thread, message) {
   renderThreads();
   renderConversation();
   if (privateComposerCostStatus && thread.id === activeThreadId) {
-    privateComposerCostStatus.textContent = 'Message cancelled';
+    privateComposerCostStatus.textContent = t('composer.messageCancelled');
     privateComposerCostStatus.dataset.state = 'ready';
   }
 }
@@ -23179,7 +23215,7 @@ function retryPublicPublishFromUi(item, kind) {
 function wirePublicPublishRetryBadge(statusBadge, item, kind) {
   if (!String(item?.publishStatus ?? '').endsWith('failed') || !item?.publishState) return;
   statusBadge.classList.add('public-publish-status--retryable');
-  statusBadge.title = 'Retry publish';
+  statusBadge.title = t('public.retryPublish');
   statusBadge.setAttribute('role', 'button');
   statusBadge.tabIndex = 0;
   const retry = (event) => {
@@ -23542,14 +23578,14 @@ let prefsSyncInFlight = false;
 async function publishPrefsSnapshot() {
   if (prefsSyncInFlight) return;
   if (!plathoWallet || !localIdentity || !localRecipientKeyPair || !hasActivePlathoAccount()) {
-    setText(savePrefsStatus, 'activate first');
+    setText(savePrefsStatus, t('sync.activateFirst'));
     return;
   }
-  if (tonRpcLimited()) { setText(savePrefsStatus, 'RPC busy'); return; }
+  if (tonRpcLimited()) { setText(savePrefsStatus, t('sync.rpcBusy')); return; }
   prefsSyncInFlight = true;
   refreshPrefsSyncUi();
   refreshGlobalSyncIndicator();
-  setText(savePrefsStatus, 'saving...');
+  setText(savePrefsStatus, t('sync.saving'));
   try {
     const snapshot = buildPrefsSnapshot();
     const selfEntry = await resolveSelfPeerEntry({ suite: currentOutgoingPrivateSuite() });
@@ -23563,13 +23599,13 @@ async function publishPrefsSnapshot() {
     if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
       setPrefsLastSyncedAt(snapshot.writtenAt);
       writePrefsDirty(false);
-      setText(savePrefsStatus, 'saved');
+      setText(savePrefsStatus, t('sync.saved'));
     } else {
-      setText(savePrefsStatus, 'pending - retry');
+      setText(savePrefsStatus, t('sync.pendingRetry'));
     }
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
-    setText(savePrefsStatus, error?.code === 'PREFS_TOO_LARGE' ? 'too many channels' : (rateLimited ? 'RPC busy' : 'save failed'));
+    setText(savePrefsStatus, error?.code === 'PREFS_TOO_LARGE' ? t('sync.tooManyChannels') : (rateLimited ? t('sync.rpcBusy') : t('sync.saveFailed')));
     if (!rateLimited && error?.code !== 'PREFS_TOO_LARGE') console.error(error);
   } finally {
     prefsSyncInFlight = false;
@@ -23594,10 +23630,10 @@ function refreshPrefsSyncUi() {
   refreshPrefsSyncButton();
   if (prefsSyncInFlight || !savePrefsStatus) return;
   let label;
-  if (!plathoWallet) label = 'wallet required';
-  else if (prefsDirty) label = 'unsaved';
-  else if (prefsLastSyncedAt) label = `saved ${prefsSyncedDateLabel(prefsLastSyncedAt)}`;
-  else label = 'not saved';
+  if (!plathoWallet) label = t('common.walletRequiredStatus');
+  else if (prefsDirty) label = t('sync.unsaved');
+  else if (prefsLastSyncedAt) label = t('sync.savedAt', { date: prefsSyncedDateLabel(prefsLastSyncedAt) });
+  else label = t('sync.notSaved');
   setText(savePrefsStatus, label);
 }
 
@@ -23840,7 +23876,7 @@ async function resolveVaultChainProvider(explicitProvider) {
 
 async function refreshVaultActivationStatus(options = {}) {
   if (!plathoWallet?.address || !localVaultDraft?.message) {
-    setText(vaultRecordStatus, plathoWallet ? 'keys pending' : 'wallet required');
+    setText(vaultRecordStatus, plathoWallet ? t('vault.keysPending') : t('common.walletRequiredStatus'));
     refreshMessageActionStatuses();
     refreshComposerPublishPolicy();
     return null;
@@ -23876,7 +23912,7 @@ async function refreshVaultActivationStatus(options = {}) {
         user,
         keyRecord: null,
       };
-      setText(vaultRecordStatus, 'account activation required');
+      setText(vaultRecordStatus, t('vault.activationRequired'));
       refreshMessageActionStatuses();
       refreshMessagingControls();
       refreshComposerPublishPolicy();
@@ -23902,7 +23938,7 @@ async function refreshVaultActivationStatus(options = {}) {
         });
         if (BigInt(user.current_key_id) === expectedKeyId) {
           globalThis.plathoVaultBinding = { walletAddress: plathoWallet.address, user, keyRecord: null };
-          setText(vaultRecordStatus, 'activated');
+          setText(vaultRecordStatus, t('vault.activated'));
           refreshMessageActionStatuses();
           refreshMessagingControls();
           refreshComposerPublishPolicy();
@@ -23932,7 +23968,7 @@ async function refreshVaultActivationStatus(options = {}) {
     }
     const active = binding.active === true;
     globalThis.plathoVaultBinding = active ? { walletAddress: plathoWallet.address, user, keyRecord: record } : null;
-    setText(vaultRecordStatus, active ? 'activated' : 'record mismatch');
+    setText(vaultRecordStatus, active ? t('vault.activated') : t('vault.recordMismatch'));
     refreshMessageActionStatuses();
     refreshMessagingControls();
     refreshComposerPublishPolicy();
@@ -23942,12 +23978,12 @@ async function refreshVaultActivationStatus(options = {}) {
     const keepCurrentBinding = expectedUnavailable && hasCurrentWalletVaultBinding();
     if (!keepCurrentBinding) delete globalThis.plathoVaultBinding;
     setText(vaultRecordStatus, keepCurrentBinding
-      ? 'activated'
+      ? t('vault.activated')
       : expectedUnavailable
         ? vaultProviderStatusForError(error)
-        : 'record blocked');
+        : t('vault.recordBlocked'));
     refreshMessagingControls();
-    setText(vaultRotateStatus, keepCurrentBinding ? 'ready' : 'not available');
+    setText(vaultRotateStatus, keepCurrentBinding ? t('vault.ready') : t('vault.notAvailable'));
     refreshComposerPublishPolicy();
     if (!expectedUnavailable) console.error(error);
     return null;
@@ -23958,7 +23994,7 @@ async function bootCrypto() {
   try {
     if (!plathoWallet) {
       const hasStoredWallet = hasStoredPlathoWalletRecord();
-      const requiredStatus = hasStoredWallet ? 'unlock required' : 'wallet required';
+      const requiredStatus = hasStoredWallet ? t('wallet.unlockRequired') : t('common.walletRequiredStatus');
       await bootWalletScopedLocalStores();
       localIdentity = null;
       localVaultAuthKeyPair = null;
@@ -23972,7 +24008,7 @@ async function bootCrypto() {
       setText(keyAuthStatus, requiredStatus);
       vaultDraftStatus.textContent = requiredStatus;
       setText(vaultRecordStatus, requiredStatus);
-      setText(messageSyncStatus, requiredStatus);
+      setMessageSyncStatus(requiredStatus, hasStoredWallet ? 'unlock-required' : 'wallet-required');
       setText(vaultRotateStatus, requiredStatus);
       localProfileAvatarPointer = null;
       refreshComposerPublishPolicy();
@@ -23997,28 +24033,28 @@ async function bootCrypto() {
       authPublicKey: localVaultAuthKeyPair.publicKey,
     });
     globalThis.plathoRefreshVaultActivation = async (provider) => refreshVaultActivationStatus({ provider });
-    setText(vaultRecordStatus, 'checking');
-    setText(vaultDraftStatus, 'checking');
+    setText(vaultRecordStatus, t('common.checking'));
+    setText(vaultDraftStatus, t('common.checking'));
     await refreshVaultActivationStatus({ skipGlobal: true });
     // The crypto self-test is a DIAGNOSTIC-ONLY status indicator (~9 synchronous ML-KEM-768 ops:
     // keygen/encap/decap + tamper re-runs); it gates nothing functional. Running it inline here blocked
     // the first seconds after unlock on a slow single-thread device, compounding the post-unlock burst.
     // Show a neutral status now, run it deferred (after the first paint + sync start), and fill the real
     // verdict when it resolves — the message sync below proceeds immediately without waiting on it.
-    setText(encryptionStatus, 'checking');
-    setText(capsulePolicyStatus, 'checking');
-    setText(keyAuthStatus, verifiedBundle.signingPublicKey.length === 32 ? 'signed bundle' : 'review');
+    setText(encryptionStatus, t('common.checking'));
+    setText(capsulePolicyStatus, t('common.checking'));
+    setText(keyAuthStatus, verifiedBundle.signingPublicKey.length === 32 ? t('vault.signedBundle') : t('vault.review'));
     refreshMessagingControls();
     new Promise((resolve) => setTimeout(resolve, 0))
       .then(() => runPlathoCryptoSelfTest())
       .then((result) => {
-        setText(encryptionStatus, result.hybrid.aadTamperRejected ? 'hybrid passed' : 'review');
-        setText(capsulePolicyStatus, result.capsule.replayRejected ? 'replay guarded' : 'review');
+        setText(encryptionStatus, result.hybrid.aadTamperRejected ? t('vault.hybridPassed') : t('vault.review'));
+        setText(capsulePolicyStatus, result.capsule.replayRejected ? t('vault.replayGuarded') : t('vault.review'));
       })
       .catch((error) => {
         console.error(error);
-        setText(encryptionStatus, 'review');
-        setText(capsulePolicyStatus, 'review');
+        setText(encryptionStatus, t('vault.review'));
+        setText(capsulePolicyStatus, t('vault.review'));
       });
     // After unlock, sync private messages immediately + arm the unified background loop — regardless of the
     // active tab, so messages are there the moment you open chats (the loop keeps running on every tab).
@@ -24026,19 +24062,19 @@ async function bootCrypto() {
     const syncResult = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).catch((error) => {
       refreshMessagingControls();
       if (noteTonRpcRateLimit(error)) {
-        failMessageSyncUi('Sync delayed');
-        setText(messageSyncStatus, 'sync delayed');
+        failMessageSyncUi(t('sync.delayedLabel'));
+        setMessageSyncStatus(t('sync.delayedShort'), 'delayed');
       } else {
-        failMessageSyncUi('Sync failed');
+        failMessageSyncUi(t('sync.failedLabel'));
         console.error(error);
       }
       return null;
     });
     if (syncResult) {
       completeMessageSyncUi(syncResult);
-      setText(messageSyncStatus, privateSyncStatusText(syncResult));
-    } else if (messageSyncStatus?.textContent !== 'sync delayed') {
-      setText(messageSyncStatus, 'sync failed');
+      setMessageSyncStatus(privateSyncStatusText(syncResult), privateSyncStatusState(syncResult));
+    } else if (messageSyncStatusState() !== 'delayed') {
+      setMessageSyncStatus(t('sync.failedShort'), 'failed');
     }
     // Refresh the OWN profile avatar here — the single canonical post-unlock spot — serialized AFTER the
     // activation + private-sync reads above and BEFORE the background loop / vault auto-refresh timers are
@@ -24055,14 +24091,14 @@ async function bootCrypto() {
       scheduleVaultAutoRefresh(2_000);
     }
   } catch (error) {
-    setText(encryptionStatus, 'unavailable');
+    setText(encryptionStatus, t('vault.unavailable'));
     localVaultAuthKeyPair = null;
-    setText(keyAuthStatus, 'blocked');
-    vaultDraftStatus.textContent = 'blocked';
-    setText(capsulePolicyStatus, 'blocked');
+    setText(keyAuthStatus, t('common.blocked'));
+    vaultDraftStatus.textContent = t('common.blocked');
+    setText(capsulePolicyStatus, t('common.blocked'));
     refreshMessagingControls();
-    setText(walletAddressStatus, 'blocked');
-    setText(vaultRecordStatus, 'blocked');
+    setText(walletAddressStatus, t('common.blocked'));
+    setText(vaultRecordStatus, t('common.blocked'));
     console.error(error);
   }
 }
@@ -24203,6 +24239,44 @@ const quickStartStepTitle = document.querySelector('#quickStartStepTitle');
 const quickStartStepWhy = document.querySelector('#quickStartStepWhy');
 const quickStartStepBody = document.querySelector('#quickStartStepBody');
 const quickStartStepStatus = document.querySelector('#quickStartStepStatus');
+// ── App language (i18n) ─────────────────────────────────────────────────────────────────────
+const appLanguageSelect = document.querySelector('#appLanguageSelect');
+const quickStartLanguageSelect = document.querySelector('#quickStartLanguageSelect');
+
+function populateLanguageSelect(select) {
+  if (!select) return;
+  select.innerHTML = '';
+  for (const locale of I18N_LOCALES) {
+    const option = document.createElement('option');
+    option.value = locale.code;
+    // Endonyms on purpose: a user hunting for their language must recognize it without knowing the current one.
+    option.textContent = locale.native;
+    select.append(option);
+  }
+  select.value = currentLocale();
+}
+
+populateLanguageSelect(appLanguageSelect);
+populateLanguageSelect(quickStartLanguageSelect);
+
+// Profile switch reloads: dynamic renders bake t() output into DOM all over the app, and a reload is the only
+// switch that provably leaves no stale-language text (sends survive reloads by design — persisted publish state).
+appLanguageSelect?.addEventListener('change', () => {
+  setLocale(appLanguageSelect.value);
+  window.location.reload();
+});
+
+// Quick-start switch applies in place: pre-wallet there is nothing dynamic rendered yet, and a reload here
+// would visibly restart the dialog the user just opened.
+quickStartLanguageSelect?.addEventListener('change', () => {
+  setLocale(quickStartLanguageSelect.value);
+  applyStaticTranslations();
+  if (appLanguageSelect) appLanguageSelect.value = currentLocale();
+  // Re-render the stepper ONLY if it is actually open: renderQuickStartStep persists progress (resume-on-boot)
+  // and may auto-advance — neither is welcome while the user is still on the welcome view.
+  if (quickStartStepsView && !quickStartStepsView.hidden) renderQuickStartStep();
+});
+
 const QUICK_START_DISMISSED_KEY = 'platho.quickstart.dismissed.v1';
 const QUICK_START_DISMISSED_CLOUD_KEY = 'platho_quickstart_dismissed_v1';
 // Persisted so an in-progress quick start SURVIVES a reload or a background auto-lock (going to another wallet
@@ -24254,7 +24328,7 @@ async function restoreQuickStartDismissalFromTelegramCloud() {
 async function runQuickStartCreateWallet() {
   if (hasStoredPlathoWalletRecord()) return true;
   const walletDraft = await createPlathoWallet(plathoWalletNetworkOptions());
-  const password = await requestNewWalletStoragePassword('Encrypt new wallet', {
+  const password = await requestNewWalletStoragePassword(t('wallet.encryptNewWallet'), {
     passwordManagerUsername: walletDraft.address,
     passwordManagerNetworkGlobalId: walletDraft.networkGlobalId,
   });
@@ -24262,7 +24336,7 @@ async function runQuickStartCreateWallet() {
   await setPlathoWallet(walletDraft, { password });
   markWalletKeyBackupPending(walletDraft.address);
   await enforceTelegramSeedBackupGate(walletDraft, { force: true });
-  flashWalletIdentityStatus('Wallet ready');
+  flashWalletIdentityStatus(t('wallet.walletReady'));
   refreshMessagingControls();
   return true;
 }
@@ -24284,19 +24358,19 @@ function buildQuickStartTopUpBody() {
   const wrap = document.createElement('div');
   const addr = document.createElement('div');
   addr.className = 'quick-start-step-address';
-  addr.textContent = currentWalletReceiveAddress() || storedWalletAddressForCopy() || 'Create a wallet first';
+  addr.textContent = currentWalletReceiveAddress() || storedWalletAddressForCopy() || t('quickstart.createWalletFirst');
   const balanceLine = document.createElement('div');
   balanceLine.className = 'quick-start-balance-line';
   const check = document.createElement('button');
   check.type = 'button';
   check.className = 'secondary-button';
-  check.textContent = 'Check balance';
+  check.textContent = t('quickstart.checkBalance');
   const renderBalance = () => {
     const bal = quickStartWalletTonNanotons();
-    balanceLine.textContent = bal === null ? 'Balance: checking…' : `Wallet balance: ${formatTonNanotons(bal)} GRAM`;
+    balanceLine.textContent = bal === null ? t('quickstart.balanceChecking') : t('quickstart.walletBalance', { balance: formatTonNanotons(bal) });
   };
   const refresh = async () => {
-    balanceLine.textContent = 'Balance: checking…';
+    balanceLine.textContent = t('quickstart.balanceChecking');
     await quickStartRefreshWalletBalanceRaw();
     renderBalance();
   };
@@ -24318,21 +24392,21 @@ function buildQuickStartActivateBody() {
   const check = document.createElement('button');
   check.type = 'button';
   check.className = 'secondary-button';
-  check.textContent = 'Check balance';
+  check.textContent = t('quickstart.checkBalance');
   const backBtn = document.createElement('button');
   backBtn.type = 'button';
   backBtn.className = 'secondary-button';
-  backBtn.textContent = 'Back to Top up';
+  backBtn.textContent = t('quickstart.backToTopUp');
   backBtn.addEventListener('click', () => { quickStartGoToStepByKey('topup'); });
   const applyGate = () => {
     const bal = quickStartWalletTonNanotons();
     const fee = plathoAccountActivationFeeNanotons();
     summary.textContent = bal === null
-      ? `Activation needs ${formatTonNanotons(fee)} GRAM · balance checking…`
-      : `Wallet balance: ${formatTonNanotons(bal)} GRAM · activation needs ${formatTonNanotons(fee)} GRAM`;
+      ? t('quickstart.activationNeedsChecking', { fee: formatTonNanotons(fee) })
+      : t('quickstart.balanceActivationNeeds', { balance: formatTonNanotons(bal), fee: formatTonNanotons(fee) });
     const underfunded = bal !== null && bal < fee;
     backBtn.hidden = !underfunded;
-    hint.textContent = underfunded ? 'Not enough GRAM to activate — top up first, then check again.' : '';
+    hint.textContent = underfunded ? t('quickstart.notEnoughGramHint') : '';
     hint.classList.toggle('is-error', underfunded);
     // Block the on-chain send when we KNOW the wallet is short; leave it enabled while the balance is unknown
     // (run() double-checks and returns guidance instead of a doomed activation). renderQuickStartStep runs
@@ -24352,33 +24426,33 @@ function buildQuickStartActivateBody() {
 
 const QUICK_START_STEPS = [
   {
-    title: 'Create your wallet',
-    action: 'Create wallet',
+    title: t('quickstart.createWalletTitle'),
+    action: t('quickstart.createWalletAction'),
     optional: false,
-    why: 'Your wallet is your identity and key in Platho. It is generated on this device and encrypted with a password you choose - no server ever holds it. Everything below builds on it.',
+    why: t('quickstart.createWalletWhy'),
     autoDone: () => hasStoredPlathoWalletRecord(),
     body: () => null,
     run: () => runQuickStartCreateWallet(),
   },
   {
-    title: 'Add a TON Center key',
-    action: 'Save key',
+    title: t('quickstart.addKeyTitle'),
+    action: t('quickstart.saveKeyAction'),
     optional: true,
-    why: 'Your own free TON Center API key (10 requests/sec + the message indexer) makes Platho faster and avoids shared rate limits. Optional - without it Platho runs on the keyless toncenter path, just slower. Get one in ~10 seconds from the @toncenter Telegram bot, then paste it here.',
+    why: t('quickstart.addKeyWhy'),
     autoDone: () => false,
     body: () => {
       const wrap = document.createElement('div');
       const getKey = document.createElement('button');
       getKey.type = 'button';
       getKey.className = 'secondary-button';
-      getKey.textContent = 'Get a free key (@toncenter)';
+      getKey.textContent = t('quickstart.getFreeKey');
       getKey.addEventListener('click', () => { openToncenterBotLink(); });
       const input = document.createElement('input');
       input.type = 'text';
       input.id = 'quickStartKeyInput';
       input.autocomplete = 'off';
       input.spellcheck = false;
-      input.placeholder = 'Paste your TON Center API key';
+      input.placeholder = t('quickstart.pasteKeyPlaceholder');
       if (globalThis.plathoToncenterApiKey) input.value = globalThis.plathoToncenterApiKey;
       wrap.append(getKey, input);
       return wrap;
@@ -24388,27 +24462,27 @@ const QUICK_START_STEPS = [
       const trimmed = String(value ?? '').trim();
       if (!trimmed) return false;
       const result = await validateToncenterApiKey(trimmed);
-      if (result.reason === 'invalid') return 'That key was rejected by TON Center. Check it and retry, or Skip.';
+      if (result.reason === 'invalid') return t('quickstart.keyRejected');
       applyToncenterApiKey(trimmed);
       return true;
     },
   },
   {
     key: 'export',
-    title: 'Back up your wallet key',
-    action: 'Save wallet key',
+    title: t('quickstart.backupKeyTitle'),
+    action: t('quickstart.saveWalletKeyAction'),
     optional: false,
-    why: 'Browser storage can be cleared - especially on iPhone Safari - which would wipe your wallet from this device. Save the encrypted wallet-key file now; it is protected by your password and also carries your TON Center key, so you can restore everything on any device.',
+    why: t('quickstart.backupKeyWhy'),
     autoDone: () => false,
     body: () => null,
     run: () => exportEncryptedWalletKeyFile(),
   },
   {
     key: 'topup',
-    title: 'Top up your wallet',
-    action: 'Copy address',
+    title: t('quickstart.topUpTitle'),
+    action: t('quickstart.copyAddressAction'),
     optional: true,
-    why: 'A small amount of GRAM covers network fees and account activation. Send GRAM to the address below from any TON wallet or exchange - you can do this later. The balance below updates so you can see it arrive.',
+    why: t('quickstart.topUpWhy'),
     autoDone: () => false,
     body: () => buildQuickStartTopUpBody(),
     run: async () => {
@@ -24420,10 +24494,10 @@ const QUICK_START_STEPS = [
   },
   {
     key: 'activate',
-    title: 'Activate your Platho account',
-    action: 'Activate account',
+    title: t('quickstart.activateTitle'),
+    action: t('quickstart.activateAction'),
     optional: true,
-    why: 'Activation registers your messaging keys on-chain (a one-time fee from your wallet). After it you can send and receive private messages. It needs a funded wallet - do it now, or later from the Profile tab.',
+    why: t('quickstart.activateWhy'),
     autoDone: () => hasActivePlathoAccount(),
     body: () => buildQuickStartActivateBody(),
     run: async () => {
@@ -24431,7 +24505,7 @@ const QUICK_START_STEPS = [
       const bal = quickStartWalletTonNanotons();
       const fee = plathoAccountActivationFeeNanotons();
       if (bal !== null && bal < fee) {
-        return `Not enough GRAM (${formatTonNanotons(bal)}) — activation needs ${formatTonNanotons(fee)}. Use “Back to Top up”, fund the wallet, then check again.`;
+        return t('quickstart.notEnoughToActivate', { balance: formatTonNanotons(bal), fee: formatTonNanotons(fee) });
       }
       await submitVaultRegisterMessagingKeys();
       return true;
@@ -24459,7 +24533,7 @@ function renderQuickStartStep() {
   // A mandatory step that is already satisfied (e.g. a wallet already exists) is auto-skipped.
   if (!step.optional && step.autoDone()) { quickStartAdvance(); return; }
   renderQuickStartProgress();
-  setText(quickStartStepCounter, `Step ${quickStartStepIndex + 1} of ${QUICK_START_STEPS.length}`);
+  setText(quickStartStepCounter, t('quickstart.stepCounter', { n: quickStartStepIndex + 1, total: QUICK_START_STEPS.length }));
   setText(quickStartStepTitle, step.title);
   setText(quickStartStepWhy, step.why);
   setText(quickStartStepStatus, '');
@@ -24501,7 +24575,7 @@ function closeQuickStart() {
 function finishQuickStart() {
   clearQuickStartProgress();
   closeQuickStart();
-  flashWalletIdentityStatus('Setup complete');
+  flashWalletIdentityStatus(t('quickstart.setupComplete'));
 }
 
 // Resume the stepper at a specific step (reload / after a background auto-lock + unlock). Unlike openQuickStart,
@@ -24602,23 +24676,23 @@ quickStartActionButton?.addEventListener('click', async () => {
   const step = QUICK_START_STEPS[quickStartStepIndex];
   if (!step || !quickStartActionButton) return;
   quickStartActionButton.disabled = true;
-  setText(quickStartStepStatus, 'Working...');
+  setText(quickStartStepStatus, t('quickstart.working'));
   try {
     const ok = await step.run();
     if (typeof ok === 'string') {
       // The step supplied its own failure message (e.g. an invalid key) — show it, do not advance.
       setText(quickStartStepStatus, ok);
     } else if (ok === false) {
-      setText(quickStartStepStatus, step.optional ? 'Nothing entered - paste a key or Skip.' : 'Not completed - try again.');
+      setText(quickStartStepStatus, step.optional ? t('quickstart.nothingEntered') : t('quickstart.notCompleted'));
     } else {
-      setText(quickStartStepStatus, 'Done');
+      setText(quickStartStepStatus, t('quickstart.done'));
       quickStartAdvance();
     }
   } catch (error) {
     console.error(error);
     setText(quickStartStepStatus, step.optional
-      ? 'Could not complete - you can Skip and do this later.'
-      : `Could not complete: ${error?.message ?? 'try again'}`);
+      ? t('quickstart.couldNotCompleteLater')
+      : t('quickstart.couldNotComplete', { reason: error?.message ?? t('quickstart.tryAgain') }));
   } finally {
     quickStartActionButton.disabled = false;
   }
