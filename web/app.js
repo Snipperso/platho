@@ -172,7 +172,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=3';
+} from './i18n.mjs?v=4';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -180,7 +180,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v662';
+const PLATHO_APP_RUNTIME_VERSION = 'v663';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late

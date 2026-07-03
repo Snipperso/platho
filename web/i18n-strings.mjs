@@ -1099,7 +1099,7 @@ export const I18N_STRINGS = {
     "nav.private": "Личные",
     "nav.privateChats": "Личные чаты",
     "nav.profile": "Профиль",
-    "nav.public": "Публичное",
+    "nav.public": "Публичные",
     "nav.publicChannels": "Публичные каналы",
     "nav.vault": "Хранилище",
     "nav.vaultBalance": "Баланс хранилища",
