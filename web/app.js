@@ -166,7 +166,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v652';
+const PLATHO_APP_RUNTIME_VERSION = 'v653';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3322,7 +3322,7 @@ function hydrateThreadDisplayFromContactStore(thread) {
 function setIdentityLabel(node, thread, baseClass = 'identity-label') {
   const tone = threadDisplayTone(thread);
   // Saved display name is RENDER-ONLY (threadDisplayLabel feeds the contact store + the own public channel name).
-  node.textContent = isSavedMessagesThread(thread) ? 'Saved' : threadDisplayLabel(thread);
+  node.textContent = isSavedMessagesThread(thread) ? 'My notes' : threadDisplayLabel(thread);
   node.className = `${baseClass}${tone ? ` identity-label-${tone}` : ''}`;
 }
 
@@ -3628,7 +3628,7 @@ function showPublicChannelDisplayPopover(channel, anchor) {
 
 function renderConversationIdentity(thread) {
   const identity = threadSelectedIdentity(thread);
-  const labelText = isSavedMessagesThread(thread) ? 'Saved' : threadDisplayLabel(thread);
+  const labelText = isSavedMessagesThread(thread) ? 'My notes' : threadDisplayLabel(thread);
   if (!identity) {
     activeTitle.textContent = labelText;
     if (identityMenuButton) {

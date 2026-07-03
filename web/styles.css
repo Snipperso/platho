@@ -925,10 +925,19 @@ html[data-platho-telegram="true"] .install-header-button {
   cursor: pointer;
 }
 
-/* An outgoing bubble hugs the right screen edge — its button flips to the left corner. */
+/* v653 (owner: buttons overlapped the message text): on PRIVATE rows the hover actions sit OUTSIDE the bubble,
+   flush against its edge — never over the content. Hover survives because the buttons are DOM children of the
+   row (CSS :hover follows the tree, not the box) and flush placement leaves no dead gap; these buttons render
+   on hover-capable (desktop) viewports only, where the strip has ample side space (bubbles cap at 82%).
+   Incoming bubbles get them to the RIGHT of the bubble; outgoing (right-edge-hugging) to the LEFT. */
+.message .row-reply-button {
+  top: 0;
+  right: -26px;
+}
+
 .message.out .row-reply-button {
   right: auto;
-  left: 2px;
+  left: -26px;
 }
 
 @media (hover: hover) {
@@ -950,14 +959,20 @@ html[data-platho-telegram="true"] .install-header-button {
   text-underline-offset: 2px;
 }
 
-/* Desktop Copy button (v651): sits next to the Reply button; outgoing bubbles flip both to the left corner. */
+/* Desktop Copy button (v651): sits next to the Reply button. On comment cards both stay in the top-right corner
+   (wide cards, the meta row leaves it free); on PRIVATE rows both live outside the bubble (v653, see above). */
 .row-copy-button {
   right: 32px;
 }
 
+.message .row-copy-button {
+  top: 0;
+  right: -52px;
+}
+
 .message.out .row-copy-button {
   right: auto;
-  left: 32px;
+  left: -52px;
 }
 
 @media (hover: hover) {

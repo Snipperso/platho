@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v723';
+const CACHE_NAME = 'platho-pwa-prototype-v724';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=208',
-  './app.js?v=652',
+  './styles.css?v=209',
+  './app.js?v=653',
   './vendor/telegram-web-app.js?v=1',
   './boot-guard.js?v=3',
   './platho-config.mjs?v=98',
