@@ -144,6 +144,10 @@ describe('i18n app integration', () => {
     // The two language rows exist in the static shell.
     expect(html).toMatch(/id="appLanguageSelect"/);
     expect(html).toMatch(/id="quickStartLanguageSelect"/);
+    // The app owns its translations — opt OUT of browser / Google auto-translate so it can't double-translate
+    // and mangle the already-localized UI.
+    expect(html).toMatch(/<html lang="en" translate="no">/);
+    expect(html).toMatch(/<meta name="google" content="notranslate">/);
   });
 
   it('PWA-I18N-09: locale-sensitive formatting uses the app locale, not the browser', () => {

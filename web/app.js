@@ -180,7 +180,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v660';
+const PLATHO_APP_RUNTIME_VERSION = 'v661';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -24002,17 +24002,15 @@ async function refreshVaultActivationStatus(options = {}) {
 // swaps to the spinner and lifts once the wallet+vault core is ready (messages keep loading behind).
 const bootScreen = document.querySelector('#bootScreen');
 const bootSignalCanvas = document.querySelector('#bootSignal');
-const bootDebugLabel = document.querySelector('#bootDebug');
 let bootScreenActive = Boolean(bootScreen) && bootScreen.hidden !== true;
 let stopBootSignalField = null;
 let bootScreenSafetyTimer = null;
 let bootScreenIdleFailsafe = null;
 
-// Boot trace: a console line + a tiny on-screen label, so a stuck mobile boot can be diagnosed from a
-// screenshot (which step it stopped on). English-only (OPSEC).
+// Boot trace: a console-only [platho boot] line at each step, so a stuck boot can be diagnosed from the
+// console without any visible UI. English-only (OPSEC).
 function setBootDebug(step) {
   try { console.log('[platho boot]', step); } catch { /* ignore */ }
-  if (bootDebugLabel) { try { bootDebugLabel.textContent = step; } catch { /* ignore */ } }
 }
 
 // The signal-field backdrop (ported from about.platho.app): a living teal lattice. Runs OFF the main thread

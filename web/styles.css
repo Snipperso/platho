@@ -4003,17 +4003,6 @@ button.feed-item:hover {
   opacity: 0.82;
 }
 
-/* Temporary boot trace — shows the last boot step so a stuck mobile boot can be diagnosed from a screenshot. */
-.boot-debug {
-  margin: 6px 0 0;
-  min-height: 12px;
-  color: var(--muted-2);
-  font-family: ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.02em;
-  opacity: 0.7;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .boot-spinner-ring-outer,
   .boot-spinner-ring-inner {
