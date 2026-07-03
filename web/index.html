@@ -17,28 +17,6 @@
     <script src="./boot-guard.js?v=3"></script>
   </head>
   <body>
-    <!-- Boot screen: masks the post-unlock initial-sync "freeze" with the branded
-         signal-field backdrop. Visible from first paint; the unlock password dialog
-         (#actionDialog, z-index 60) opens on top of it, then it swaps to the spinner
-         and lifts once the wallet/vault core is ready (messages keep loading behind). -->
-    <div class="boot-screen" id="bootScreen" data-phase="idle">
-      <canvas class="boot-signal" id="bootSignal" aria-hidden="true"></canvas>
-      <div class="boot-screen-inner">
-        <div class="boot-brand" aria-hidden="true">Platho<span class="boot-brand-suffix">.app</span></div>
-        <div class="boot-center">
-          <!-- Pure-CSS spinner (transform/opacity only, no SVG filter): GPU-composited, so it keeps animating
-               smoothly even while the main thread is blocked by the synchronous post-unlock crypto. -->
-          <div class="boot-spinner" aria-hidden="true">
-            <div class="boot-spinner-ring boot-spinner-ring-outer"></div>
-            <div class="boot-spinner-ring boot-spinner-ring-inner"></div>
-            <div class="boot-spinner-core"></div>
-          </div>
-          <p class="boot-loading-label" id="bootLoadingLabel" data-i18n="boot.loading">Loading…</p>
-        </div>
-        <p class="boot-tagline" data-i18n="boot.tagline">End-to-end + post-quantum encrypted. Client-direct on TON.</p>
-        <p class="boot-debug" id="bootDebug" aria-hidden="true"></p>
-      </div>
-    </div>
     <div class="app-shell" data-view="public">
       <aside class="sidebar" aria-label="Navigation" data-i18n-aria-label="nav.navigation">
         <div class="brand">
@@ -48,7 +26,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v659</span>
+              <span class="app-version-label" id="appVersionLabel">v660</span>
             </div>
           </div>
         </div>
@@ -662,11 +640,37 @@
           </div>
         </section>
       </div>
+
+      <!-- Boot screen: masks the post-unlock initial-sync "freeze" with the branded
+           signal-field backdrop. Visible from first paint; the unlock password dialog
+           (#actionDialog, z-index 60) opens on top of it, then it swaps to the spinner
+           and lifts once the wallet/vault core is ready (messages keep loading behind).
+           Kept as the LAST child of .app-shell so it shares the dialogs' stacking
+           context on mobile — where .app-shell is position:fixed — letting the unlock
+           dialog (z-60) paint above the boot screen (z-55). -->
+      <div class="boot-screen" id="bootScreen" data-phase="idle">
+        <canvas class="boot-signal" id="bootSignal" aria-hidden="true"></canvas>
+        <div class="boot-screen-inner">
+          <div class="boot-brand" aria-hidden="true">Platho<span class="boot-brand-suffix">.app</span></div>
+          <div class="boot-center">
+            <!-- Pure-CSS spinner (transform/opacity only, no SVG filter): GPU-composited, so it keeps animating
+                 smoothly even while the main thread is blocked by the synchronous post-unlock crypto. -->
+            <div class="boot-spinner" aria-hidden="true">
+              <div class="boot-spinner-ring boot-spinner-ring-outer"></div>
+              <div class="boot-spinner-ring boot-spinner-ring-inner"></div>
+              <div class="boot-spinner-core"></div>
+            </div>
+            <p class="boot-loading-label" id="bootLoadingLabel" data-i18n="boot.loading">Loading…</p>
+          </div>
+          <p class="boot-tagline" data-i18n="boot.tagline">End-to-end + post-quantum encrypted. Client-direct on TON.</p>
+          <p class="boot-debug" id="bootDebug" aria-hidden="true"></p>
+        </div>
+      </div>
     </div>
     <!-- Telegram Mini App SDK (self-hosted to keep script-src 'self'). In an
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=659" type="module"></script>
+    <script src="./app.js?v=660" type="module"></script>
   </body>
 </html>

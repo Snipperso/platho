@@ -271,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v659<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v659'/);
+    expect(html).toMatch(/id="appVersionLabel">v660<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v660'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=659" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=660" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5786,11 +5786,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v730/);
+    expect(sw).toMatch(/platho-pwa-prototype-v731/);
     expect(sw).toMatch(/\.\/styles\.css\?v=214/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=659/);
+    expect(sw).toMatch(/\.\/app\.js\?v=660/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=3/);
@@ -5920,6 +5920,16 @@ describe('PWA runtime config guard', () => {
 
     // Markup: overlay visible from first paint (NOT hidden), signal canvas, spinner, i18n label + tagline.
     expect(html).toMatch(/<div class="boot-screen" id="bootScreen" data-phase="idle">/);
+    // The overlay MUST be nested INSIDE .app-shell (not a body-direct sibling before it): on mobile .app-shell
+    // is position:fixed → a stacking context; a sibling overlay traps the unlock dialog (#actionDialog z-60,
+    // also inside .app-shell) BENEATH the overlay (z-55) → eternal boot with no visible modal. Co-locating the
+    // overlay with the dialogs in the same stacking context lets z-index decide (55 < 60). Guard: #bootScreen
+    // appears AFTER the .app-shell opening tag, and there is NO #bootScreen before it.
+    const appShellOpenIdx = html.indexOf('<div class="app-shell"');
+    const bootIdx = html.indexOf('id="bootScreen"');
+    expect(appShellOpenIdx).toBeGreaterThan(-1);
+    expect(bootIdx).toBeGreaterThan(appShellOpenIdx);
+    expect(html.slice(0, appShellOpenIdx)).not.toMatch(/id="bootScreen"/);
     expect(html).toMatch(/<canvas class="boot-signal" id="bootSignal"/);
     expect(html).toMatch(/class="boot-spinner"/);
     // Pure-CSS div spinner (no SVG) so it composites off the main thread and never freezes under boot crypto.
