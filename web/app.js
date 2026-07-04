@@ -180,7 +180,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v663';
+const PLATHO_APP_RUNTIME_VERSION = 'v664';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6122,10 +6122,21 @@ function rebuildThreadsFromPublicSubscriptions(options = {}) {
     publicFeedCacheForCurrentWindow(),
   );
 
-  if (preserveActive && previousActive && threads.some((thread) => thread.id === previousActive)) {
-    activeThreadId = previousActive;
-  } else {
+  if (!preserveActive) {
+    // Explicit boot / wallet-reset: default to the first thread (the boot-tail view logic reads this).
     activeThreadId = threads[0]?.id ?? null;
+  } else if (previousActive && threads.some((thread) => thread.id === previousActive)) {
+    // Keep the user's current selection.
+    activeThreadId = previousActive;
+  } else if (previousActive) {
+    // The selected thread vanished — fall back to the first thread.
+    activeThreadId = threads[0]?.id ?? null;
+  } else {
+    // No selection: the user was on the dialog LIST (they never opened a chat, or backed out to the list).
+    // A preserving rebuild — e.g. a background sync or the resume-after-unlock sync — must NOT silently revive
+    // threads[0] here, or a later tab-switch to Private (setView reads activeThreadId) would open that dialog
+    // instead of the list the user was on.
+    activeThreadId = null;
   }
 
   renderPublicSurface({ anchorUnread: false });

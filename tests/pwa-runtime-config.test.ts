@@ -271,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v663<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v663'/);
+    expect(html).toMatch(/id="appVersionLabel">v664<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v664'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=663" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=664" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5728,6 +5728,20 @@ describe('PWA runtime config guard', () => {
     const pubMjs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
     // 1. Returning to the private tab restores the open conversation (data-chat-open) on mobile.
     expect(app).toMatch(/appShell\.dataset\.chatOpen = activeThreadId \? 'true' : 'false'/);
+    // 1a. A PRESERVING rebuild (background sync / resume-after-unlock) must NOT revive threads[0] when the user
+    // had NO selection (was on the dialog LIST). Otherwise activeThreadId becomes non-null and a later
+    // tab-switch to Private (setView reads activeThreadId) opens threads[0] instead of the list. Only an
+    // explicit boot/reset (preserveActive:false) defaults to the first thread.
+    const rebuildSrc = app.slice(
+      app.indexOf('function rebuildThreadsFromPublicSubscriptions('),
+      app.indexOf('function configuredCapsuleHubAddress'),
+    );
+    expect(rebuildSrc).toMatch(/if \(!preserveActive\) \{[\s\S]{0,180}?activeThreadId = threads\[0\]\?\.id \?\? null;/);
+    expect(rebuildSrc).toMatch(/else if \(previousActive && threads\.some\(\(thread\) => thread\.id === previousActive\)\) \{[\s\S]{0,80}?activeThreadId = previousActive;/);
+    // The catch-all "no prior selection" branch keeps the list (null), never threads[0].
+    expect(rebuildSrc).toMatch(/\} else \{[\s\S]{0,400}?activeThreadId = null;\s*\n\s*\}/);
+    // And the OLD buggy catch-all (unconditional threads[0] default) is gone from this function.
+    expect(rebuildSrc).not.toMatch(/\} else \{\s*\n\s*activeThreadId = threads\[0\]\?\.id \?\? null;\s*\n\s*\}/);
     // 1b. Symmetric for Public: returning to the Public tab restores the open post detail instead of forcing the
     // feed — setView must NOT close the detail on tab-return; renderPublicSurface re-renders it from the cache.
     const publicViewBranch = app.slice(app.indexOf("if (view === 'public') {", app.indexOf('function setView(view)')), app.indexOf("if (view === 'vault') {", app.indexOf('function setView(view)')));
@@ -5786,11 +5800,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v734/);
+    expect(sw).toMatch(/platho-pwa-prototype-v735/);
     expect(sw).toMatch(/\.\/styles\.css\?v=215/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=663/);
+    expect(sw).toMatch(/\.\/app\.js\?v=664/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=4/);
