@@ -728,7 +728,7 @@ describe('PWA contract transaction builders', () => {
       'base64',
     ))[0];
 
-    expect(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS).toBe(581_000_000n);
+    expect(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS).toBe(617_000_000n); // clean-11: +36M name-record endowment (signed ceiling; safe on clean-10 which still debits 581M)
     expect(ed25519.verify(
       Buffer.from(built.signature, 'hex'),
       Buffer.from(built.signedDataHash, 'hex'),

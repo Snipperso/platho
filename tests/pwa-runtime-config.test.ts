@@ -194,13 +194,13 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_avatar_version');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_username_item_address');
     expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBe(128);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQC0dTjgbUpyNlSoUJoQE1UHlh12PUrBv1Ui7bQ8izv4uB27');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQDSPk16J4ikvYd4UxUC2OIaZ0E-jjvjnjuCuFlVy9QhBkP0');
     expect(PLATHO_APP_CONFIG.vault.deploymentManifestHash).toBe(
-      '9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2',
+      '39c0115b9fec0b31c8b2a3981bb026b730df391d747e2df7bbc772f7d3118fd2',
     );
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQAjYAjfEB33-QIifsf02U3sZmAvvwJgoCZPNjGh2FmmPZRx');
-    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQBg4NGArbbjGCFR-2lZ68XCQibO5OYTA7JfVKSdViXDrY6p');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oRbF');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBz3fqicF7EFbUWo33Sr80xHKK9b3nQIhlz0Jv9ZK0vkq0p');
+    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQAfSIRK1yHY9N5HqOng5XW695RQ_ftDxoLdnczEur2WwZMm');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6NeH');
     expect(PLATHO_APP_CONFIG.tonDns.rootAddress).toBe(
       '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     );
@@ -271,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v664<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v664'/);
+    expect(html).toMatch(/id="appVersionLabel">v667<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v667'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=664" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=667" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -603,9 +603,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoTonRpcTransport/);
     expect(app).toMatch(/plathoTonRpcEndpoint/);
     expect(app).toMatch(/plathoTonSendBocEndpoint/);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQC0dTjgbUpyNlSoUJoQE1UHlh12PUrBv1Ui7bQ8izv4uB27');
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQAjYAjfEB33-QIifsf02U3sZmAvvwJgoCZPNjGh2FmmPZRx');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oRbF');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQDSPk16J4ikvYd4UxUC2OIaZ0E-jjvjnjuCuFlVy9QhBkP0');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBz3fqicF7EFbUWo33Sr80xHKK9b3nQIhlz0Jv9ZK0vkq0p');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6NeH');
     expect(app).not.toMatch(/https:\/\/testnet\.toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).not.toMatch(/https:\/\/toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).toMatch(/fetchTonWalletBalance\(address\)/);
@@ -4380,6 +4380,37 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.message-file-chip \{/);
   });
 
+  it('PWA-PROFILE-01: channel profile — PROFILE block wire, public top-level post, tolerant decode', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Wire: PROFILE=7 in the shared PDC1 registry; codec branches delegate to the unit-tested module functions.
+    expect(app).toMatch(/PROFILE: 7,/);
+    expect(app).toMatch(/content = encodeProfileBlockContent\(block\);/);
+    expect(app).toMatch(/const profile = decodeProfileBlockContent\(content\);\s*if \(profile\) blocks\.push\(\{ type: 'profile', \.\.\.profile \}\);/);
+    // Imported from the policy module (bumped ?v in lockstep with the codec change).
+    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*\} from '\.\/capsule-part-policy\.mjs\?v=6';/);
+  });
+
+  it('PWA-DISCOVERY-01: newcomer discovery — bounded head-of-log scan, described-channel cards, follow flow', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    // Scale: fixed-constant bounds (corpus-independent) — WINDOW authors, CANDIDATES profiles, shallow per-author walk.
+    expect(app).toMatch(/const PUBLIC_DISCOVERY_WINDOW = 64;/);
+    expect(app).toMatch(/const PUBLIC_DISCOVERY_MAX_CANDIDATES = 16;/);
+    expect(app).toMatch(/const PUBLIC_DISCOVERY_PROFILE_MAXSCAN = 6;/);
+    expect(app).toMatch(/async function discoverChannels\(/);
+    // Phase 1 loop is hard-bounded by both the window AND the candidate cap (never enumerates the corpus).
+    expect(app).toMatch(/i < PUBLIC_DISCOVERY_WINDOW && candidates\.length < PUBLIC_DISCOVERY_MAX_CANDIDATES/);
+    // Phase 2 resolves each candidate with the shallow discovery maxScan (cache-first, bounded).
+    expect(app).toMatch(/resolveChannelProfile\(wallet, \{ maxScan: PUBLIC_DISCOVERY_PROFILE_MAXSCAN \}\)/);
+    // Follow registers the previously-unknown channel THEN subscribes it (ensure rebuilds the registry first).
+    expect(app).toMatch(/const channelId = ensurePublicChannelForAuthorWallet\(authorWallet, \{ activate: false \}\);\s*setPublicChannelSubscribed\(channelId, true\);/);
+    // UI: header entry button + discovery panel + newcomer CTA.
+    expect(html).toMatch(/id="publicDiscoverButton"/);
+    expect(html).toMatch(/id="publicDiscovery"/);
+    expect(app).toMatch(/function buildDiscoveryCtaCard\(\)/);
+    expect(app).toMatch(/function shouldShowDiscoveryCta\(\)/);
+  });
+
   it('PWA-SAVED-01: Saved messages — self dialog exists, renders one-sided, never self-badges, name is render-only', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The self thread is keyed by the STANDARD own-wallet dm identity (chain scans route with zero changes) and
@@ -5800,31 +5831,31 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v735/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=215/);
+    expect(sw).toMatch(/platho-pwa-prototype-v738/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=217/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=664/);
+    expect(sw).toMatch(/\.\/app\.js\?v=667/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=4/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=4/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=7/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=6/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=98/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=99/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=54/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=15/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=32/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=58/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=40/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=54/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=38/);
     expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);

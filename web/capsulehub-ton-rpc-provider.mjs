@@ -1,6 +1,6 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
 import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=58';
-import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=30';
+import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=33';
 
 const CAPSULEHUB_OPS = Object.freeze({
   // VPB2 batch ingest (the live redeploy path): ONE Vault->Hub message carries N part bodies.
@@ -752,10 +752,14 @@ export function decodePrivateCapsuleKeyIndexStack(result) {
 
 export function decodePublicCapsuleEntryStack(result) {
   const stack = extractStack(result);
-  if (stack.length !== 13) {
-    throw new CapsuleHubTonRpcProviderError('CapsuleHub public entry ABI mismatch: current entry view required');
+  // clean-10 get_public_entry returns 13 stack items (header cell at index 12). clean-11 inserts profile_prev_link
+  // at index 12 and shifts the header cell to index 13 (14 items). Decode BOTH so one client build is correct
+  // against either genesis; profile_prev_link is 0n on clean-10 so callers read it uniformly.
+  if (stack.length !== 13 && stack.length !== 14) {
+    throw new CapsuleHubTonRpcProviderError('CapsuleHub public entry ABI mismatch: expected 13 (clean-10) or 14 (clean-11) stack items');
   }
-  const headerBoc = readStackCellBoc(stack, 12, 'public header cell');
+  const hasProfilePrevLink = stack.length === 14;
+  const headerBoc = readStackCellBoc(stack, hasProfilePrevLink ? 13 : 12, 'public header cell');
   return {
     exists: readStackBool(stack, 0, 'public entry exists'),
     entry_id: readStackInt(stack, 1, 'public entry id'),
@@ -770,6 +774,8 @@ export function decodePublicCapsuleEntryStack(result) {
     // parent_link == 0 -> top-level post; else parentEntryId+1 -> comment. prev_link chains the entry's index.
     parent_link: readStackInt(stack, 10, 'public parent link'),
     prev_link: readStackInt(stack, 11, 'public prev link'),
+    // clean-11: backward link in the GLOBAL profile chain (0n on clean-10 and for non-profile posts).
+    profile_prev_link: hasProfilePrevLink ? readStackInt(stack, 12, 'public profile prev link') : 0n,
     header_boc: headerBoc,
     body_boc: null,
   };
@@ -1092,6 +1098,32 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
         stack: [stackNumber(parentEntryId)],
         ...runGetCallOptions(callOptions),
       }));
+    },
+    // clean-11: latest profile entry for a channel (keyId = publicAuthorKeyId(author) = hash(storeAddress(author))).
+    // exists=false on clean-10 or a channel with no profile. The returned entry MAY be evicted -> the caller must
+    // cross-check get_public_entry(entry_id).exists (dangling-tolerant by design). Requires the clean-11 getter.
+    async getPublicProfileIndex(keyId, callOptions = {}) {
+      const transport = resolveTransport(options);
+      const address = resolveCapsuleHubAddress(options.capsuleHubAddress, callOptions);
+      return decodePublicCapsuleKeyIndexStack(await transport.runGetMethod({
+        address,
+        method: 'get_public_profile_index',
+        stack: [stackNumber(keyId)],
+        ...runGetCallOptions(callOptions),
+      }));
+    },
+    // clean-11: head entryLink of the global profile chain (0 = no profile ever). Walk newest-first via
+    // get_public_entry(link-1).profile_prev_link for COMPLETE described-channel discovery. Requires the clean-11 getter.
+    async getPublicProfileHead(callOptions = {}) {
+      const transport = resolveTransport(options);
+      const address = resolveCapsuleHubAddress(options.capsuleHubAddress, callOptions);
+      const result = await transport.runGetMethod({
+        address,
+        method: 'get_public_profile_head',
+        stack: [],
+        ...runGetCallOptions(callOptions),
+      });
+      return readStackInt(extractStack(result), 0, 'public profile head');
     },
     async resolvePublicEntryBody(entry, callOptions = {}) {
       return resolveEntryBody('public', entry, callOptions);

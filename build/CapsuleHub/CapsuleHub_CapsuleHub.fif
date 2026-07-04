@@ -2,6 +2,8 @@
 PROGRAM{
   DECLPROC __tact_context_get
   DECLPROC __tact_context_get_sender
+  DECLPROC __tact_dict_get_uint_uint
+  DECLPROC __tact_dict_set_uint_uint
   DECLPROC __tact_dict_get_uint_cell
   DECLPROC __tact_dict_set_uint_cell
   DECLPROC $DepositProtocolFee$_store
@@ -108,8 +110,10 @@ PROGRAM{
   DECLPROC $CapsuleHub$_fun_get_private_recipient_index
   DECLPROC $PublicCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count
   DECLPROC $CapsuleHub$_fun_get_public_author_index
+  DECLPROC $CapsuleHub$_fun_get_public_profile_index
+  DECLPROC $CapsuleHub$_fun_get_public_profile_head
   DECLPROC $CapsuleHub$_fun_get_public_parent_index
-  DECLPROC $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_hash_body_hash_parent_link_prev_link_header
+  DECLPROC $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_hash_body_hash_parent_link_prev_link_profile_prev_link_header
   DECLPROC $CapsuleHub$_fun_get_public_entry
   DECLPROC $CapsuleHubPageView$_constructor_exists_page_id_first_entry_id_next_entry_id_entry_count_opened_at_updated_at
   DECLPROC $CapsuleHub$_fun_get_private_page
@@ -117,7 +121,7 @@ PROGRAM{
   DECLPROC $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_private_page_count_public_page_count_page_size_index_storage_years_index_retention_seconds_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address_private_live_count_public_live_count_index_storage_reserve_ton_protected_reserve_ton_reserve_floor_ton_reserve_buffer_numerator_reserve_buffer_denominator
   DECLPROC $CapsuleHub$_fun_get_state
   DECLPROC $PrivateCapsuleEntry$_constructor_publish_id_created_at_body_hash_sender_prev_link_recipient_prev_link_header_0_header_1
-  DECLPROC $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_parent_link_prev_link_header
+  DECLPROC $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_parent_link_prev_link_profile_prev_link_header
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
   DECLPROC $CapsuleHubBatchAck$_constructor_publish_id_first_entry_id_part_count_batch_uid
   DECLPROC $DepositProtocolFee$_constructor_amount
@@ -125,6 +129,8 @@ PROGRAM{
   96196 DECLMETHOD %get_private_sender_index
   117551 DECLMETHOD %get_private_recipient_index
   72438 DECLMETHOD %get_public_author_index
+  125734 DECLMETHOD %get_public_profile_index
+  129286 DECLMETHOD %get_public_profile_head
   123347 DECLMETHOD %get_public_parent_index
   65680 DECLMETHOD %get_public_entry
   99249 DECLMETHOD %get_private_page
@@ -141,6 +147,35 @@ PROGRAM{
   }>
   __tact_context_get_sender PROCINLINE:<{
     __tact_context_sender GETGLOB
+  }>
+  __tact_dict_get_uint_uint PROCINLINE:<{
+    s1 s3 s3 XCHG3
+    DICTUGET
+    NULLSWAPIFNOT
+    IF:<{
+      SWAP
+      LDUX
+      DROP
+    }>ELSE<{
+      2DROP
+      PUSHNULL
+    }>
+  }>
+  __tact_dict_set_uint_uint PROCINLINE:<{
+    OVER
+    ISNULL
+    IF:<{
+      2DROP
+      -ROT
+      DICTUDEL
+      DROP
+    }>ELSE<{
+      NEWC
+      SWAP
+      STUX
+      s1 s3 s3 XCHG3
+      DICTUSETB
+    }>
   }>
   __tact_dict_get_uint_cell PROCINLINE:<{
     -ROT
@@ -239,19 +274,24 @@ PROGRAM{
     }>
   }>
   $PublicCapsuleEntry$_store PROCINLINE:<{
-    s6 s7 XCHG2
+    s7 s8 XCHG2
     256 STU
-    s1 s4 XCHG
+    s1 s5 XCHG
     64 STU
-    s1 s2 XCHG
+    s1 s3 XCHG
     STSLICE
     256 STU
     64 STU
     64 STU
+    SWAP
+    NEWC
+    64 STU
+    s1 s2 XCHG
     STREF
+    STBREFR
   }>
   $PublicCapsuleEntry$_store_cell PROCINLINE:<{
-    7 -ROLL
+    8 -ROLL
     $PublicCapsuleEntry$_store INLINECALLDICT
     ENDC
   }>
@@ -263,10 +303,20 @@ PROGRAM{
     64 LDU
     64 LDU
     LDREF
-    7 -ROLL
+    SWAP
+    CTOS
+    64 LDU
+    LDREF
+    DROP
+    s2 s8 XCHG
+    s2 s7 XCHG
+    s2 s6 XCHG
+    s2 s5 XCHG
+    s2 s4 XCHG
+    s2 s3 XCHG
   }>
   $PublicCapsuleEntry$_as_optional PROCINLINE:<{
-        7 TUPLE
+        8 TUPLE
   }>
   $PublicCapsuleEntry$_load_opt PROCINLINE:<{
     DUP
@@ -277,7 +327,7 @@ PROGRAM{
     }>ELSE<{
       CTOS
       $PublicCapsuleEntry$_load INLINECALLDICT
-      1 7 BLKDROP2
+      1 8 BLKDROP2
       $PublicCapsuleEntry$_as_optional INLINECALLDICT
     }>
   }>
@@ -344,33 +394,33 @@ PROGRAM{
     }>
   }>
   $CapsuleHub$_store PROCINLINE:<{
+    s1 20 s() XCHG
+    s0 21 s() XCHG
+    STSLICE
     s1 18 s() XCHG
-    s0 19 s() XCHG
     STSLICE
     s1 16 s() XCHG
-    STSLICE
+    1 STI
     s1 s14 XCHG
     1 STI
     s1 s12 XCHG
-    1 STI
-    s1 s10 XCHG
     256 STU
-    s0 s8 XCHG
+    s0 s10 XCHG
     NEWC
     STSLICE
+    s1 s9 XCHG
+    64 STU
     s1 s7 XCHG
     64 STU
     s1 s5 XCHG
     64 STU
     s1 s3 XCHG
     64 STU
-    64 STU
     128 STU
     STDICT
     STDICT
-    s1 s2 XCHG
     STDICT
-    s0 s2 XCHG
+    SWAP
     NEWC
     STDICT
     s1 s3 XCHG
@@ -381,7 +431,10 @@ PROGRAM{
     64 STU
     s1 s3 XCHG
     64 STU
-    s1 s2 XCHG
+    s1 s3 XCHG
+    STDICT
+    s1 s3 XCHG
+    64 STU
     STBREFR
     STBREFR
   }>
@@ -411,12 +464,14 @@ PROGRAM{
     LDDICT
     64 LDU
     64 LDU
+    LDDICT
+    64 LDU
     DROP
-    s14 19 s() XCHG
-    s14 18 s() XCHG
-    s14 17 s() XCHG
-    s14 16 s() XCHG
-    s14 s15 XCHG
+    16 s() 21 s() XCHG
+    16 s() 20 s() XCHG
+    16 s() 19 s() XCHG
+    16 s() 18 s() XCHG
+    16 s() 17 s() XCHG
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -430,7 +485,7 @@ PROGRAM{
         7 UNTUPLE
   }>
   $PublicCapsuleEntry$_not_null PROCINLINE:<{
-        7 UNTUPLE
+        8 UNTUPLE
   }>
   $PrivateCapsuleEntryView$_to_external PROCINLINE:<{
   }>
@@ -474,6 +529,8 @@ PROGRAM{
     PUSHNULL
     PUSHNULL
     s6 s6 PUSH2
+    PUSHNULL
+    OVER
   }>
   $CapsuleHub$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -482,7 +539,9 @@ PROGRAM{
     SWAP
     IF:<{
       $CapsuleHub$_load INLINECALLDICT
-      19 s() POP
+      21 s() POP
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -500,6 +559,8 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
+    s0 21 s() XCHG
+    s0 20 s() XCHG
     s0 19 s() XCHG
     s0 18 s() XCHG
     s0 17 s() XCHG
@@ -515,19 +576,19 @@ PROGRAM{
   }>
   $CapsuleHub$_fun_requireSealed PROCREF:<{
     12900 PUSHINT
-    16 s() PUSH
+    18 s() PUSH
     THROWANYIFNOT
   }>
   $CapsuleHub$_fun_requireUnsealed PROCREF:<{
     12901 PUSHINT
-    16 s() PUSH
+    18 s() PUSH
     NOT
     THROWANYIFNOT
   }>
   $CapsuleHub$_fun_requireGenesisController PROCREF:<{
     12930 PUSHINT
     __tact_context_get_sender INLINECALLDICT
-    s15 PUSH
+    17 s() PUSH
     SDEQ
     THROWANYIFNOT
   }>
@@ -587,53 +648,59 @@ PROGRAM{
     10400000 PUSHINT
   }>
   $CapsuleHub$_fun_indexStorageReserve PROCREF:<{
-    s10 PUSH
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    s11 19 s() XCHG
-    s10 19 s() XCHG
-    s9 19 s() XCHG
-    s0 19 s() XCHG
+    s12 PUSH
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    s13 21 s() XCHG
+    s12 21 s() XCHG
+    s11 21 s() XCHG
+    s10 21 s() XCHG
+    s9 21 s() XCHG
+    s0 21 s() XCHG
     s0 s8 XCHG
     s0 s7 XCHG
     s0 s6 XCHG
     5 -ROLL
     $CapsuleHub$_fun_privateIndexStorageReservePerEntry INLINECALLDICT
-    s1 20 s() XCHG
+    s1 22 s() XCHG
     MUL
-    s9 PUSH
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    s11 19 s() XCHG
-    s10 19 s() XCHG
-    s9 19 s() XCHG
-    s8 19 s() XCHG
-    s7 19 s() XCHG
-    s6 19 s() XCHG
-    s5 19 s() XCHG
-    s4 19 s() XCHG
-    s3 19 s() XCHG
-    s2 19 s() XCHG
-    s1 19 s() XCHG
-    s0 20 s() XCHG
-    $CapsuleHub$_fun_publicIndexStorageReservePerEntry INLINECALLDICT
+    s11 PUSH
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    s13 21 s() XCHG
+    s12 21 s() XCHG
+    s11 21 s() XCHG
+    s10 21 s() XCHG
+    s9 21 s() XCHG
+    s8 21 s() XCHG
+    s7 21 s() XCHG
+    s6 21 s() XCHG
+    s5 21 s() XCHG
+    s4 21 s() XCHG
+    s3 21 s() XCHG
+    s2 21 s() XCHG
     s1 21 s() XCHG
+    s0 22 s() XCHG
+    $CapsuleHub$_fun_publicIndexStorageReservePerEntry INLINECALLDICT
+    s1 23 s() XCHG
     MUL
-    s1 19 s() XCHG
+    s1 21 s() XCHG
     ADD
     125 MULCONST
     100 PUSHINT
     DIV
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
     17 s() 19 s() XCHG
     16 s() 18 s() XCHG
     s15 17 s() XCHG
@@ -661,34 +728,38 @@ PROGRAM{
     }>ELSE<{
       NIP
     }>
-    s9 s(-1) PUXC
+    s11 s(-1) PUXC
     ADD
   }>
   $CapsuleHub$_fun_isAllowedPrivatePair PROCREF:<{
-    19 s() 20 s() XCHG
-    18 s() 20 s() XCHG
-    17 s() 20 s() XCHG
-    16 s() 20 s() XCHG
-    s15 20 s() XCHG
-    s14 20 s() XCHG
-    s13 20 s() XCHG
-    s12 20 s() XCHG
-    s11 20 s() XCHG
-    s10 20 s() XCHG
-    s9 20 s() XCHG
-    s0 20 s() XCHG
+    21 s() 22 s() XCHG
+    20 s() 22 s() XCHG
+    19 s() 22 s() XCHG
+    18 s() 22 s() XCHG
+    17 s() 22 s() XCHG
+    16 s() 22 s() XCHG
+    s15 22 s() XCHG
+    s14 22 s() XCHG
+    s13 22 s() XCHG
+    s12 22 s() XCHG
+    s11 22 s() XCHG
+    s10 22 s() XCHG
+    s9 22 s() XCHG
+    s0 22 s() XCHG
     s0 s8 XCHG
     s0 s7 XCHG
     s0 s6 XCHG
     5 -ROLL
     $CapsuleHub$_fun_isAllowedPrivateSizeClass INLINECALLDICT
     IF:<{
-      s0 19 s() XCHG
+      s0 21 s() XCHG
       2 EQINT
     }>ELSE<{
-      19 s() POP
+      21 s() POP
       FALSE
     }>
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -715,25 +786,27 @@ PROGRAM{
       EQUAL
       THROWANYIFNOT
       s3 PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
-      24 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
+      26 s() PUSH
       c1 PUSH
       c3 PUSH
       c4 PUSH
@@ -741,7 +814,7 @@ PROGRAM{
       c7 PUSH
       <{
         2DROP
-        s0 19 s() XCHG
+        s0 21 s() XCHG
         THROWANY
       }>CONT
       c7 SETCONT
@@ -749,7 +822,7 @@ PROGRAM{
       c4 SETCONT
       c3 SETCONT
       c1 SETCONT
-      20 PUSHINT
+      22 PUSHINT
       -1 PUSHINT
       SETCONTVARARGS
       <{
@@ -766,6 +839,8 @@ PROGRAM{
         ROT
         EQUAL
         THROWANYIFNOT
+        s0 20 s() XCHG
+        s0 19 s() XCHG
         s0 18 s() XCHG
         s0 17 s() XCHG
         s0 16 s() XCHG
@@ -775,39 +850,46 @@ PROGRAM{
       COMPOSALT
       SWAP
       TRY
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
     }>
-    26 PUSHINT -1 PUSHINT CALLXVARARGS
+    28 PUSHINT -1 PUSHINT CALLXVARARGS
   }>
   $CapsuleHub$_fun_publicBodyBytes PROCREF:<{
-    17 s() 19 s() XCHG
-    5 15 REVERSE
-    s14 18 s() XCHG
-    s13 19 s() XCHG
-    s12 18 s() XCHG
-    s11 19 s() XCHG
-    s10 18 s() XCHG
-    s9 19 s() XCHG
-    s8 18 s() XCHG
-    s7 19 s() XCHG
-    s6 18 s() XCHG
-    s5 19 s() XCHG
-    s4 18 s() XCHG
-    s3 19 s() XCHG
-    s2 18 s() XCHG
-    s1 19 s() XCHG
-    s0 18 s() XCHG
-    12950 PUSHINT
-    s0 20 s() XCHG
-    19 s() PUSH
-    $CapsuleHub$_fun_isAllowedPublicSizeClass INLINECALLDICT
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 20 s() XCHG
+    s15 21 s() XCHG
+    s14 20 s() XCHG
+    s13 21 s() XCHG
+    s12 20 s() XCHG
+    s11 21 s() XCHG
+    s10 20 s() XCHG
+    s9 21 s() XCHG
+    s8 20 s() XCHG
+    s7 21 s() XCHG
+    s6 20 s() XCHG
+    s5 21 s() XCHG
+    s4 20 s() XCHG
+    s3 21 s() XCHG
+    s2 20 s() XCHG
     s1 21 s() XCHG
+    s0 20 s() XCHG
+    12950 PUSHINT
+    s0 22 s() XCHG
+    21 s() PUSH
+    $CapsuleHub$_fun_isAllowedPublicSizeClass INLINECALLDICT
+    s1 23 s() XCHG
     THROWANYIFNOT
-    s0 18 s() XCHG
+    s0 20 s() XCHG
     10 LSHIFT#
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
     17 s() 19 s() XCHG
     16 s() 18 s() XCHG
     s15 17 s() XCHG
@@ -847,25 +929,27 @@ PROGRAM{
       EQUAL
       THROWANYIFNOT
       OVER
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
-      22 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
+      24 s() PUSH
       c1 PUSH
       c3 PUSH
       c4 PUSH
@@ -873,7 +957,7 @@ PROGRAM{
       c7 PUSH
       <{
         2DROP
-        s0 19 s() XCHG
+        s0 21 s() XCHG
         THROWANY
       }>CONT
       c7 SETCONT
@@ -881,95 +965,103 @@ PROGRAM{
       c4 SETCONT
       c3 SETCONT
       c1 SETCONT
-      20 PUSHINT
+      22 PUSHINT
       -1 PUSHINT
       SETCONTVARARGS
       <{
+        20 s() 23 s() XCHG
+        19 s() 22 s() XCHG
         18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
+        17 s() 23 s() XCHG
+        16 s() 22 s() XCHG
         s15 21 s() XCHG
-        s14 20 s() XCHG
-        s13 19 s() XCHG
+        s14 23 s() XCHG
+        s13 22 s() XCHG
         s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
+        s11 23 s() XCHG
+        s10 22 s() XCHG
         s9 21 s() XCHG
-        s8 20 s() XCHG
-        s7 19 s() XCHG
+        s8 23 s() XCHG
+        s7 22 s() XCHG
         s6 21 s() XCHG
-        s5 20 s() XCHG
-        s4 19 s() XCHG
+        s5 23 s() XCHG
+        s4 22 s() XCHG
         s3 21 s() XCHG
-        s2 20 s() XCHG
-        s1 19 s() XCHG
+        s2 23 s() XCHG
+        s1 22 s() XCHG
         s0 21 s() XCHG
         21 s() PUSH
         $CapsuleHub$_fun_publicBodyCells INLINECALLDICT
-        s1 21 s() XCHG
+        s1 24 s() XCHG
             CDATASIZE
-        18 s() 20 s() XCHG
-        17 s() 19 s() XCHG
-        16 s() 20 s() XCHG
-        s15 19 s() XCHG
-        s14 20 s() XCHG
-        s13 19 s() XCHG
-        s12 20 s() XCHG
-        s11 19 s() XCHG
-        s10 20 s() XCHG
-        s9 19 s() XCHG
-        s8 20 s() XCHG
-        s7 19 s() XCHG
-        s6 20 s() XCHG
-        s5 19 s() XCHG
-        s4 20 s() XCHG
-        s3 19 s() XCHG
-        s2 20 s() XCHG
-        s1 19 s() XCHG
-        s0 22 s() XCHG
+        20 s() 22 s() XCHG
+        19 s() 21 s() XCHG
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 22 s() XCHG
+        s15 21 s() XCHG
+        s14 22 s() XCHG
+        s13 21 s() XCHG
+        s12 22 s() XCHG
+        s11 21 s() XCHG
+        s10 22 s() XCHG
+        s9 21 s() XCHG
+        s8 22 s() XCHG
+        s7 21 s() XCHG
+        s6 22 s() XCHG
+        s5 21 s() XCHG
+        s4 22 s() XCHG
+        s3 21 s() XCHG
+        s2 22 s() XCHG
+        s1 21 s() XCHG
+        s0 25 s() XCHG
         23 s() PUSH
         $CapsuleHub$_fun_publicBodyCells INLINECALLDICT
-        s1 21 s() XCHG
+        s1 23 s() XCHG
         LEQ
-        21 s() PUSH
+        24 s() PUSH
         SWAP
         THROWANYIFNOT
-        18 s() PUSH
+        20 s() PUSH
         0 GTINT
-        21 s() PUSH
+        24 s() PUSH
         SWAP
         THROWANYIFNOT
+        19 s() 20 s() XCHG
+        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
         15 ROLL
-        s0 19 s() XCHG
+        s0 21 s() XCHG
         22 s() PUSH
         $CapsuleHub$_fun_publicBodyBits INLINECALLDICT
-        20 s() PUSH
+        22 s() PUSH
         SWAP
         LEQ
-        21 s() PUSH
+        24 s() PUSH
         SWAP
         THROWANYIFNOT
-        s0 19 s() XCHG
+        s0 21 s() XCHG
         3 MODPOW2#
         0 EQINT
-        20 s() PUSH
+        23 s() PUSH
         SWAP
         THROWANYIFNOT
+        19 s() 21 s() XCHG
+        18 s() 20 s() XCHG
         17 s() 19 s() XCHG
         16 s() 18 s() XCHG
         s15 17 s() XCHG
         s14 16 s() XCHG
         s13 s15 XCHG
         2 13 BLKSWAP
-        s0 21 s() XCHG
         $CapsuleHub$_fun_publicBodyRefs INLINECALLDICT
-        s1 20 s() XCHG
+        s1 23 s() XCHG
         LEQ
-        s1 20 s() XCHG
+        s1 21 s() XCHG
         THROWANYIFNOT
+        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
@@ -979,12 +1071,14 @@ PROGRAM{
       COMPOSALT
       SWAP
       TRY
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
     }>
-    24 PUSHINT -1 PUSHINT CALLXVARARGS
+    26 PUSHINT -1 PUSHINT CALLXVARARGS
   }>
   $CapsuleHub$_fun_requirePublicHeaderCell PROCREF:<{
     CONT:<{
@@ -994,25 +1088,27 @@ PROGRAM{
       EQUAL
       THROWANYIFNOT
       DUP
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
-      21 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
       c1 PUSH
       c3 PUSH
       c4 PUSH
@@ -1020,7 +1116,7 @@ PROGRAM{
       c7 PUSH
       <{
         2DROP
-        s0 19 s() XCHG
+        s0 21 s() XCHG
         THROWANY
       }>CONT
       c7 SETCONT
@@ -1028,7 +1124,7 @@ PROGRAM{
       c4 SETCONT
       c3 SETCONT
       c1 SETCONT
-      20 PUSHINT
+      22 PUSHINT
       -1 PUSHINT
       SETCONTVARARGS
       <{
@@ -1054,6 +1150,8 @@ PROGRAM{
         THROWANYIFNOT
         1 LESSINT
         THROWANYIFNOT
+        s0 20 s() XCHG
+        s0 19 s() XCHG
         s0 18 s() XCHG
         s0 17 s() XCHG
         s0 16 s() XCHG
@@ -1063,39 +1161,46 @@ PROGRAM{
       COMPOSALT
       SWAP
       TRY
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
     }>
-    23 PUSHINT -1 PUSHINT CALLXVARARGS
+    25 PUSHINT -1 PUSHINT CALLXVARARGS
   }>
   $CapsuleHub$_fun_privateUsefulBytes PROCREF:<{
-    17 s() 19 s() XCHG
-    5 15 REVERSE
-    s14 18 s() XCHG
-    s13 19 s() XCHG
-    s12 18 s() XCHG
-    s11 19 s() XCHG
-    s10 18 s() XCHG
-    s9 19 s() XCHG
-    s8 18 s() XCHG
-    s7 19 s() XCHG
-    s6 18 s() XCHG
-    s5 19 s() XCHG
-    s4 18 s() XCHG
-    s3 19 s() XCHG
-    s2 18 s() XCHG
-    s1 19 s() XCHG
-    s0 18 s() XCHG
-    12941 PUSHINT
-    s0 20 s() XCHG
-    19 s() PUSH
-    $CapsuleHub$_fun_isAllowedPrivateSizeClass INLINECALLDICT
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 20 s() XCHG
+    s15 21 s() XCHG
+    s14 20 s() XCHG
+    s13 21 s() XCHG
+    s12 20 s() XCHG
+    s11 21 s() XCHG
+    s10 20 s() XCHG
+    s9 21 s() XCHG
+    s8 20 s() XCHG
+    s7 21 s() XCHG
+    s6 20 s() XCHG
+    s5 21 s() XCHG
+    s4 20 s() XCHG
+    s3 21 s() XCHG
+    s2 20 s() XCHG
     s1 21 s() XCHG
+    s0 20 s() XCHG
+    12941 PUSHINT
+    s0 22 s() XCHG
+    21 s() PUSH
+    $CapsuleHub$_fun_isAllowedPrivateSizeClass INLINECALLDICT
+    s1 23 s() XCHG
     THROWANYIFNOT
-    s0 18 s() XCHG
+    s0 20 s() XCHG
     10 LSHIFT#
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
     17 s() 19 s() XCHG
     16 s() 18 s() XCHG
     s15 17 s() XCHG
@@ -1121,30 +1226,34 @@ PROGRAM{
     1204 PUSHINT
   }>
   $CapsuleHub$_fun_privateBodyBytes PROCREF:<{
-    19 s() 20 s() XCHG
-    18 s() 20 s() XCHG
-    17 s() 20 s() XCHG
-    16 s() 20 s() XCHG
-    s15 20 s() XCHG
-    s14 20 s() XCHG
-    s13 20 s() XCHG
-    s12 20 s() XCHG
-    s11 20 s() XCHG
-    s10 20 s() XCHG
-    s9 20 s() XCHG
-    s8 20 s() XCHG
-    s7 20 s() XCHG
-    s6 20 s() XCHG
-    s5 20 s() XCHG
-    s4 20 s() XCHG
-    s3 20 s() XCHG
-    s2 20 s() XCHG
-    s1 20 s() XCHG
+    21 s() 22 s() XCHG
+    20 s() 22 s() XCHG
+    19 s() 22 s() XCHG
+    18 s() 22 s() XCHG
+    17 s() 22 s() XCHG
+    16 s() 22 s() XCHG
+    s15 22 s() XCHG
+    s14 22 s() XCHG
+    s13 22 s() XCHG
+    s12 22 s() XCHG
+    s11 22 s() XCHG
+    s10 22 s() XCHG
+    s9 22 s() XCHG
+    s8 22 s() XCHG
+    s7 22 s() XCHG
+    s6 22 s() XCHG
+    s5 22 s() XCHG
+    s4 22 s() XCHG
+    s3 22 s() XCHG
+    s2 22 s() XCHG
+    s1 22 s() XCHG
     $CapsuleHub$_fun_privateBodyOverheadBytes INLINECALLDICT
-    s0 20 s() XCHG
+    s0 22 s() XCHG
     $CapsuleHub$_fun_privateUsefulBytes INLINECALLDICT
-    s1 20 s() XCHG
+    s1 22 s() XCHG
     ADD
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -1197,36 +1306,42 @@ PROGRAM{
     OVER
     -1 GTINT
     IF:<{
-      19 s() 20 s() XCHG
-      18 s() 20 s() XCHG
-      17 s() 20 s() XCHG
-      16 s() 20 s() XCHG
-      s15 20 s() XCHG
-      s14 20 s() XCHG
-      s13 20 s() XCHG
-      s12 20 s() XCHG
-      s11 20 s() XCHG
-      s10 20 s() XCHG
-      s9 20 s() XCHG
-      s8 20 s() XCHG
-      s7 20 s() XCHG
-      s6 20 s() XCHG
-      s5 20 s() XCHG
-      s4 20 s() XCHG
-      s3 20 s() XCHG
-      s2 20 s() XCHG
-      s1 20 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 22 s() XCHG
+      18 s() 22 s() XCHG
+      17 s() 22 s() XCHG
+      16 s() 22 s() XCHG
+      s15 22 s() XCHG
+      s14 22 s() XCHG
+      s13 22 s() XCHG
+      s12 22 s() XCHG
+      s11 22 s() XCHG
+      s10 22 s() XCHG
+      s9 22 s() XCHG
+      s8 22 s() XCHG
+      s7 22 s() XCHG
+      s6 22 s() XCHG
+      s5 22 s() XCHG
+      s4 22 s() XCHG
+      s3 22 s() XCHG
+      s2 22 s() XCHG
+      s1 22 s() XCHG
       $CapsuleHub$_fun_pageCount INLINECALLDICT
-      s1 20 s() XCHG
+      s1 22 s() XCHG
       LESS
     }>ELSE<{
       2DROP
+      s0 20 s() XCHG
+      s0 19 s() XCHG
       s0 18 s() XCHG
       s0 17 s() XCHG
       s0 16 s() XCHG
       15 -ROLL
       FALSE
     }>
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -1260,31 +1375,35 @@ PROGRAM{
     NIP
   }>
   $CapsuleHub$_fun_pageEntryCount PROCREF:<{
-    18 s() 20 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 20 s() XCHG
-    s15 19 s() XCHG
-    s14 20 s() XCHG
-    s13 19 s() XCHG
-    s12 20 s() XCHG
-    s11 19 s() XCHG
-    s10 20 s() XCHG
-    s9 19 s() XCHG
-    s8 20 s() XCHG
-    s7 19 s() XCHG
-    s6 20 s() XCHG
-    s5 19 s() XCHG
-    s4 20 s() XCHG
-    s3 19 s() XCHG
-    s2 20 s() XCHG
-    s1 19 s() XCHG
-    s0 20 s() XCHG
-    19 s() PUSH
+    20 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 22 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 22 s() XCHG
+    s15 21 s() XCHG
+    s14 22 s() XCHG
+    s13 21 s() XCHG
+    s12 22 s() XCHG
+    s11 21 s() XCHG
+    s10 22 s() XCHG
+    s9 21 s() XCHG
+    s8 22 s() XCHG
+    s7 21 s() XCHG
+    s6 22 s() XCHG
+    s5 21 s() XCHG
+    s4 22 s() XCHG
+    s3 21 s() XCHG
+    s2 22 s() XCHG
+    s1 21 s() XCHG
+    s0 22 s() XCHG
     21 s() PUSH
+    23 s() PUSH
     $CapsuleHub$_fun_pageExists INLINECALLDICT
     IFNOTJMP:<{
-      19 s() POP
-      19 s() POP
+      21 s() POP
+      21 s() POP
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
       16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
@@ -1292,18 +1411,22 @@ PROGRAM{
       2 13 BLKSWAP
       0 PUSHINT
     }>
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
     s15 16 s() XCHG
     15 ROLL
     DUP
-    s0 21 s() XCHG
+    s0 23 s() XCHG
     $CapsuleHub$_fun_pageNextEntryId INLINECALLDICT
-    s0 20 s() XCHG
+    s0 22 s() XCHG
     $CapsuleHub$_fun_pageFirstEntryId INLINECALLDICT
-    s1 20 s() XCHG
+    s1 22 s() XCHG
     SUB
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -1347,7 +1470,7 @@ PROGRAM{
   $PrivateCapsuleKeyIndex$_constructor_latest_entry_link_entry_count PROCINLINE:<{
   }>
   $CapsuleHub$_fun_pushPrivateSenderIndex PROCREF:<{
-    s7 PUSH
+    s9 PUSH
     8 PUSHPOW2
     s3 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -1370,13 +1493,13 @@ PROGRAM{
     $PrivateCapsuleKeyIndex$_constructor_latest_entry_link_entry_count INLINECALLDICT
     NEWC
     $PrivateCapsuleKeyIndex$_store_cell INLINECALLDICT
-    s3 s9 XCHG
-    s1 s9 s0 XCHG3
+    s3 s11 XCHG
+    s1 s11 s0 XCHG3
     __tact_dict_set_uint_cell INLINECALLDICT
-    s0 s6 XCHG
+    s0 s8 XCHG
   }>
   $CapsuleHub$_fun_pushPrivateRecipientIndex PROCREF:<{
-    s6 PUSH
+    s8 PUSH
     8 PUSHPOW2
     s3 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -1399,13 +1522,13 @@ PROGRAM{
     $PrivateCapsuleKeyIndex$_constructor_latest_entry_link_entry_count INLINECALLDICT
     NEWC
     $PrivateCapsuleKeyIndex$_store_cell INLINECALLDICT
-    s3 s8 XCHG
-    s1 s8 s0 XCHG3
+    s3 s10 XCHG
+    s1 s10 s0 XCHG3
     __tact_dict_set_uint_cell INLINECALLDICT
-    s0 s5 XCHG
+    s0 s7 XCHG
   }>
   $CapsuleHub$_fun_prunePrivateSenderIndex PROCREF:<{
-    s8 PUSH
+    s10 PUSH
     8 PUSHPOW2
     s4 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -1435,6 +1558,165 @@ PROGRAM{
         s0 s2 XCHG
         NEWC
         $PrivateCapsuleKeyIndex$_store_cell INLINECALLDICT
+        s3 s10 XCHG
+        s1 s2 XCHG
+        __tact_dict_set_uint_cell INLINECALLDICT
+      }>ELSE<{
+        2DROP
+        s0 s8 XCHG2
+        8 PUSHPOW2
+            DICTUDEL
+        DROP
+      }>
+      s0 s7 XCHG
+    }>ELSE<{
+      4 BLKDROP
+    }>
+  }>
+  $CapsuleHub$_fun_prunePrivateRecipientIndex PROCREF:<{
+    s9 PUSH
+    8 PUSHPOW2
+    s4 PUSH
+    __tact_dict_get_uint_cell INLINECALLDICT
+    $PrivateCapsuleKeyIndex$_load_opt INLINECALLDICT
+    DUP
+    ISNULL
+    NOT
+    IF:<{
+      $PrivateCapsuleKeyIndex$_not_null INLINECALLDICT
+      s1 s3 PUXC
+      EQUAL
+      IF:<{
+        DROP
+      }>ELSE<{
+        NIP
+      }>
+      OVER
+      0 GTINT
+      IF:<{
+        SWAP
+        DEC
+        SWAP
+      }>
+      OVER
+      IF:<{
+        8 PUSHPOW2
+        s0 s2 XCHG
+        NEWC
+        $PrivateCapsuleKeyIndex$_store_cell INLINECALLDICT
+        s3 s9 XCHG
+        s1 s2 XCHG
+        __tact_dict_set_uint_cell INLINECALLDICT
+      }>ELSE<{
+        2DROP
+        s0 s7 XCHG2
+        8 PUSHPOW2
+            DICTUDEL
+        DROP
+      }>
+      s0 s6 XCHG
+    }>ELSE<{
+      4 BLKDROP
+    }>
+  }>
+  $CapsuleHub$_fun_publicAuthorKeyId PROCREF:<{
+        NEWC
+    SWAP
+        STSLICER
+        ENDC
+        HASHCU
+  }>
+  $PublicCapsuleKeyIndex$_constructor_latest_entry_link_entry_count PROCINLINE:<{
+  }>
+  $CapsuleHub$_fun_pushPublicAuthorIndex PROCREF:<{
+    s7 PUSH
+    8 PUSHPOW2
+    s3 PUSH
+    __tact_dict_get_uint_cell INLINECALLDICT
+    $PublicCapsuleKeyIndex$_load_opt INLINECALLDICT
+    0 PUSHINT
+    s0 s1 PUSH2
+    ISNULL
+    NOT
+    IF:<{
+      2DROP
+      $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
+      SWAP
+    }>ELSE<{
+      s2 POP
+    }>
+    8 PUSHPOW2
+    s0 s2 XCHG
+    INC
+    s1 s3 XCHG
+    $PublicCapsuleKeyIndex$_constructor_latest_entry_link_entry_count INLINECALLDICT
+    NEWC
+    $PublicCapsuleKeyIndex$_store_cell INLINECALLDICT
+    s3 s9 XCHG
+    s1 s9 s0 XCHG3
+    __tact_dict_set_uint_cell INLINECALLDICT
+    s0 s6 XCHG
+  }>
+  $CapsuleHub$_fun_pushPublicParentIndex PROCREF:<{
+    s6 PUSH
+    64 PUSHINT
+    s3 PUSH
+    __tact_dict_get_uint_cell INLINECALLDICT
+    $PublicCapsuleKeyIndex$_load_opt INLINECALLDICT
+    0 PUSHINT
+    s0 s1 PUSH2
+    ISNULL
+    NOT
+    IF:<{
+      2DROP
+      $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
+      SWAP
+    }>ELSE<{
+      s2 POP
+    }>
+    64 PUSHINT
+    s0 s2 XCHG
+    INC
+    s1 s3 XCHG
+    $PublicCapsuleKeyIndex$_constructor_latest_entry_link_entry_count INLINECALLDICT
+    NEWC
+    $PublicCapsuleKeyIndex$_store_cell INLINECALLDICT
+    s3 s8 XCHG
+    s1 s8 s0 XCHG3
+    __tact_dict_set_uint_cell INLINECALLDICT
+    s0 s5 XCHG
+  }>
+  $CapsuleHub$_fun_prunePublicAuthorIndex PROCREF:<{
+    s8 PUSH
+    8 PUSHPOW2
+    s4 PUSH
+    __tact_dict_get_uint_cell INLINECALLDICT
+    $PublicCapsuleKeyIndex$_load_opt INLINECALLDICT
+    DUP
+    ISNULL
+    NOT
+    IF:<{
+      $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
+      s1 s3 PUXC
+      EQUAL
+      IF:<{
+        DROP
+      }>ELSE<{
+        NIP
+      }>
+      OVER
+      0 GTINT
+      IF:<{
+        SWAP
+        DEC
+        SWAP
+      }>
+      OVER
+      IF:<{
+        8 PUSHPOW2
+        s0 s2 XCHG
+        NEWC
+        $PublicCapsuleKeyIndex$_store_cell INLINECALLDICT
         s3 s8 XCHG
         s1 s2 XCHG
         __tact_dict_set_uint_cell INLINECALLDICT
@@ -1450,17 +1732,17 @@ PROGRAM{
       4 BLKDROP
     }>
   }>
-  $CapsuleHub$_fun_prunePrivateRecipientIndex PROCREF:<{
+  $CapsuleHub$_fun_prunePublicParentIndex PROCREF:<{
     s7 PUSH
-    8 PUSHPOW2
+    64 PUSHINT
     s4 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
-    $PrivateCapsuleKeyIndex$_load_opt INLINECALLDICT
+    $PublicCapsuleKeyIndex$_load_opt INLINECALLDICT
     DUP
     ISNULL
     NOT
     IF:<{
-      $PrivateCapsuleKeyIndex$_not_null INLINECALLDICT
+      $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
       s1 s3 PUXC
       EQUAL
       IF:<{
@@ -1477,17 +1759,17 @@ PROGRAM{
       }>
       OVER
       IF:<{
-        8 PUSHPOW2
+        64 PUSHINT
         s0 s2 XCHG
         NEWC
-        $PrivateCapsuleKeyIndex$_store_cell INLINECALLDICT
+        $PublicCapsuleKeyIndex$_store_cell INLINECALLDICT
         s3 s7 XCHG
         s1 s2 XCHG
         __tact_dict_set_uint_cell INLINECALLDICT
       }>ELSE<{
         2DROP
         s0 s5 XCHG2
-        8 PUSHPOW2
+        64 PUSHINT
             DICTUDEL
         DROP
       }>
@@ -1496,406 +1778,8 @@ PROGRAM{
       4 BLKDROP
     }>
   }>
-  $CapsuleHub$_fun_publicAuthorKeyId PROCREF:<{
-        NEWC
-    SWAP
-        STSLICER
-        ENDC
-        HASHCU
-  }>
-  $PublicCapsuleKeyIndex$_constructor_latest_entry_link_entry_count PROCINLINE:<{
-  }>
-  $CapsuleHub$_fun_pushPublicAuthorIndex PROCREF:<{
-    s5 PUSH
-    8 PUSHPOW2
-    s3 PUSH
-    __tact_dict_get_uint_cell INLINECALLDICT
-    $PublicCapsuleKeyIndex$_load_opt INLINECALLDICT
-    0 PUSHINT
-    s0 s1 PUSH2
-    ISNULL
-    NOT
-    IF:<{
-      2DROP
-      $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
-      SWAP
-    }>ELSE<{
-      s2 POP
-    }>
-    8 PUSHPOW2
-    s0 s2 XCHG
-    INC
-    s1 s3 XCHG
-    $PublicCapsuleKeyIndex$_constructor_latest_entry_link_entry_count INLINECALLDICT
-    NEWC
-    $PublicCapsuleKeyIndex$_store_cell INLINECALLDICT
-    s3 s7 XCHG
-    s1 s7 s0 XCHG3
-    __tact_dict_set_uint_cell INLINECALLDICT
-    s0 s4 XCHG
-  }>
-  $CapsuleHub$_fun_pushPublicParentIndex PROCREF:<{
-    s4 PUSH
-    64 PUSHINT
-    s3 PUSH
-    __tact_dict_get_uint_cell INLINECALLDICT
-    $PublicCapsuleKeyIndex$_load_opt INLINECALLDICT
-    0 PUSHINT
-    s0 s1 PUSH2
-    ISNULL
-    NOT
-    IF:<{
-      2DROP
-      $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
-      SWAP
-    }>ELSE<{
-      s2 POP
-    }>
-    64 PUSHINT
-    s0 s2 XCHG
-    INC
-    s1 s3 XCHG
-    $PublicCapsuleKeyIndex$_constructor_latest_entry_link_entry_count INLINECALLDICT
-    NEWC
-    $PublicCapsuleKeyIndex$_store_cell INLINECALLDICT
-    s3 s6 XCHG
-    s1 s6 s0 XCHG3
-    __tact_dict_set_uint_cell INLINECALLDICT
-    s0 s3 XCHG
-  }>
-  $CapsuleHub$_fun_prunePublicAuthorIndex PROCREF:<{
-    s6 PUSH
-    8 PUSHPOW2
-    s4 PUSH
-    __tact_dict_get_uint_cell INLINECALLDICT
-    $PublicCapsuleKeyIndex$_load_opt INLINECALLDICT
-    DUP
-    ISNULL
-    NOT
-    IF:<{
-      $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
-      s1 s3 PUXC
-      EQUAL
-      IF:<{
-        DROP
-      }>ELSE<{
-        NIP
-      }>
-      OVER
-      0 GTINT
-      IF:<{
-        SWAP
-        DEC
-        SWAP
-      }>
-      OVER
-      IF:<{
-        8 PUSHPOW2
-        s0 s2 XCHG
-        NEWC
-        $PublicCapsuleKeyIndex$_store_cell INLINECALLDICT
-        s3 s6 XCHG
-        s1 s2 XCHG
-        __tact_dict_set_uint_cell INLINECALLDICT
-      }>ELSE<{
-        2DROP
-        s0 s4 XCHG2
-        8 PUSHPOW2
-            DICTUDEL
-        DROP
-      }>
-      s0 s3 XCHG
-    }>ELSE<{
-      4 BLKDROP
-    }>
-  }>
-  $CapsuleHub$_fun_prunePublicParentIndex PROCREF:<{
-    s5 PUSH
-    64 PUSHINT
-    s4 PUSH
-    __tact_dict_get_uint_cell INLINECALLDICT
-    $PublicCapsuleKeyIndex$_load_opt INLINECALLDICT
-    DUP
-    ISNULL
-    NOT
-    IF:<{
-      $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
-      s1 s3 PUXC
-      EQUAL
-      IF:<{
-        DROP
-      }>ELSE<{
-        NIP
-      }>
-      OVER
-      0 GTINT
-      IF:<{
-        SWAP
-        DEC
-        SWAP
-      }>
-      OVER
-      IF:<{
-        64 PUSHINT
-        s0 s2 XCHG
-        NEWC
-        $PublicCapsuleKeyIndex$_store_cell INLINECALLDICT
-        s3 s5 XCHG
-        s1 s2 XCHG
-        __tact_dict_set_uint_cell INLINECALLDICT
-      }>ELSE<{
-        2DROP
-        s0 s3 XCHG2
-        64 PUSHINT
-            DICTUDEL
-        DROP
-      }>
-      s0 s2 XCHG
-    }>ELSE<{
-      4 BLKDROP
-    }>
-  }>
   $CapsuleHub$_fun_evictExpiredPublic PROCREF:<{
-    s2 PUSH
-    0 PUSHINT
-    FALSE
-    WHILE:<{
-      DUP
-      NOT
-      IF:<{
-        s1 s3 PUSH2
-        LESS
-      }>ELSE<{
-        FALSE
-      }>
-      IF:<{
-        s2 s15 PUSH2
-        LESS
-      }>ELSE<{
-        FALSE
-      }>
-    }>DO<{
-      s10 PUSH
-      64 PUSHINT
-      s4 PUSH
-      __tact_dict_get_uint_cell INLINECALLDICT
-      $PublicCapsuleEntry$_load_opt INLINECALLDICT
-      DUP
-      ISNULL
-      IF:<{
-        DROP
-        s0 s2 XCHG
-        INC
-      }>ELSE<{
-        $PublicCapsuleEntry$_not_null INLINECALLDICT
-        DROP
-        s2 POP
-        s4 POP
-            NOW
-        s0 s3 XCHG
-        31536000 PUSHINT
-        ADD
-        s1 s3 XCHG
-        LESS
-        IF:<{
-          4 BLKDROP
-          TRUE
-        }>ELSE<{
-          18 s() 25 s() XCHG
-          17 s() 24 s() XCHG
-          16 s() 23 s() XCHG
-          s15 22 s() XCHG
-          s14 21 s() XCHG
-          s13 20 s() XCHG
-          s12 19 s() XCHG
-          s11 25 s() XCHG
-          s10 24 s() XCHG
-          s9 23 s() XCHG
-          s8 22 s() XCHG
-          s7 21 s() XCHG
-          s6 20 s() XCHG
-          s5 19 s() XCHG
-          s4 25 s() XCHG
-          s3 24 s() XCHG
-          s2 23 s() XCHG
-          s1 22 s() XCHG
-          s0 21 s() XCHG
-          19 s() PUSH
-          $CapsuleHub$_fun_entryLink INLINECALLDICT
-          24 s() PUSH
-          IF:<{
-            22 s() POP
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            19 s() 37 s() XCHG
-            18 s() 36 s() XCHG
-            17 s() 35 s() XCHG
-            16 s() 34 s() XCHG
-            s15 33 s() XCHG
-            s14 32 s() XCHG
-            s13 31 s() XCHG
-            s12 30 s() XCHG
-            s11 29 s() XCHG
-            s10 28 s() XCHG
-            s9 27 s() XCHG
-            s8 26 s() XCHG
-            s7 25 s() XCHG
-            s6 24 s() XCHG
-            s5 23 s() XCHG
-            s4 22 s() XCHG
-            s3 21 s() XCHG
-            s2 20 s() XCHG
-            s1 37 s() XCHG
-            s0 42 s() XCHG
-            $CapsuleHub$_fun_entryIdFromLink INLINECALLDICT
-            16 s() POP
-            15 BLKDROP
-            3 1 BLKDROP2
-            17 s() 21 s() XCHG
-            16 s() 20 s() XCHG
-            s15 19 s() XCHG
-            s14 18 s() XCHG
-            s13 17 s() XCHG
-            s12 16 s() XCHG
-            s11 s15 XCHG
-            s10 s14 XCHG
-            s9 s13 XCHG
-            s8 s12 XCHG
-            s7 s11 XCHG
-            s6 s10 XCHG
-            s5 s9 XCHG
-            s4 s8 XCHG
-            s3 s7 XCHG
-            s6 s5 s0 XCHG3
-            s2 s4 XCHG
-            s3 23 s() XCHG
-            s0 s2 XCHG
-            s0 22 s() XCHG
-            $CapsuleHub$_fun_prunePublicParentIndex INLINECALLDICT
-          }>ELSE<{
-            24 s() POP
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            18 s() PUSH
-            19 s() 37 s() XCHG
-            18 s() 36 s() XCHG
-            17 s() 35 s() XCHG
-            16 s() 34 s() XCHG
-            s15 33 s() XCHG
-            s14 32 s() XCHG
-            s13 31 s() XCHG
-            s12 30 s() XCHG
-            s11 29 s() XCHG
-            s10 28 s() XCHG
-            s9 27 s() XCHG
-            s8 26 s() XCHG
-            s7 25 s() XCHG
-            s6 24 s() XCHG
-            s5 23 s() XCHG
-            s4 22 s() XCHG
-            s3 21 s() XCHG
-            s2 20 s() XCHG
-            s1 37 s() XCHG
-            s0 40 s() XCHG
-            $CapsuleHub$_fun_publicAuthorKeyId INLINECALLDICT
-            16 s() POP
-            15 BLKDROP
-            3 1 BLKDROP2
-            17 s() 21 s() XCHG
-            16 s() 20 s() XCHG
-            s15 19 s() XCHG
-            s14 18 s() XCHG
-            s13 17 s() XCHG
-            s12 16 s() XCHG
-            s11 s15 XCHG
-            s10 s14 XCHG
-            s9 s13 XCHG
-            s8 s12 XCHG
-            s7 s11 XCHG
-            s6 s10 XCHG
-            s5 s9 XCHG
-            s4 s8 XCHG
-            s3 s7 XCHG
-            s0 s1 s6 XCHG3
-            s5 s4 XCHG2
-            s1 s3 XCHG
-            s1 23 s() XCHG
-            s0 22 s() XCHG
-            $CapsuleHub$_fun_prunePublicAuthorIndex INLINECALLDICT
-          }>
-          20 s() PUSH
-          s0 s7 XCHG2
-          64 PUSHINT
-              DICTUDEL
-          DROP
-          s0 s9 XCHG
-          DEC
-          s0 20 s() XCHG
-          INC
-          s0 22 s() XCHG
-          INC
-          18 s() 22 s() XCHG
-          17 s() 21 s() XCHG
-          16 s() 20 s() XCHG
-          s15 19 s() XCHG
-          s14 18 s() XCHG
-          s13 17 s() XCHG
-          s12 16 s() XCHG
-          s11 s15 XCHG
-          s10 s14 XCHG
-          s12 s13 XCHG
-          s8 s12 XCHG
-          s7 s11 XCHG
-          s9 s10 XCHG
-          s5 s9 XCHG
-          s4 s8 XCHG
-          s3 s7 XCHG
-          s6 s0 s5 XCHG3
-          s0 s1 s4 XCHG3
-        }>
-        s0 s2 XCHG
-      }>
-      s0 s2 XCHG
-    }>
-    s2 s3 XCHG
-    3 BLKDROP
-    s2 POP
-  }>
-  $CapsuleHub$_fun_evictExpiredPrivate PROCREF:<{
-    OVER
+    s4 PUSH
     0 PUSHINT
     FALSE
     WHILE:<{
@@ -1909,13 +1793,238 @@ PROGRAM{
       }>
       IF:<{
         s2 PUSH
-        17 s() PUSH
+        18 s() PUSH
         LESS
       }>ELSE<{
         FALSE
       }>
     }>DO<{
-      s11 PUSH
+      s12 PUSH
+      64 PUSHINT
+      s4 PUSH
+      __tact_dict_get_uint_cell INLINECALLDICT
+      $PublicCapsuleEntry$_load_opt INLINECALLDICT
+      DUP
+      ISNULL
+      IF:<{
+        DROP
+        s0 s2 XCHG
+        INC
+      }>ELSE<{
+        $PublicCapsuleEntry$_not_null INLINECALLDICT
+        2DROP
+        s2 POP
+        s4 POP
+            NOW
+        s0 s3 XCHG
+        31536000 PUSHINT
+        ADD
+        s1 s3 XCHG
+        LESS
+        IF:<{
+          4 BLKDROP
+          TRUE
+        }>ELSE<{
+          20 s() 27 s() XCHG
+          19 s() 26 s() XCHG
+          18 s() 25 s() XCHG
+          17 s() 24 s() XCHG
+          16 s() 23 s() XCHG
+          s15 22 s() XCHG
+          s14 21 s() XCHG
+          s13 27 s() XCHG
+          s12 26 s() XCHG
+          s11 25 s() XCHG
+          s10 24 s() XCHG
+          s9 23 s() XCHG
+          s8 22 s() XCHG
+          s7 21 s() XCHG
+          s6 27 s() XCHG
+          s5 26 s() XCHG
+          s4 25 s() XCHG
+          s3 24 s() XCHG
+          s2 23 s() XCHG
+          s1 22 s() XCHG
+          s0 21 s() XCHG
+          26 s() PUSH
+          $CapsuleHub$_fun_entryLink INLINECALLDICT
+          24 s() PUSH
+          IF:<{
+            22 s() POP
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            20 s() PUSH
+            21 s() 41 s() XCHG
+            20 s() 40 s() XCHG
+            19 s() 39 s() XCHG
+            18 s() 38 s() XCHG
+            17 s() 37 s() XCHG
+            16 s() 36 s() XCHG
+            s15 35 s() XCHG
+            s14 34 s() XCHG
+            s13 33 s() XCHG
+            s12 32 s() XCHG
+            s11 31 s() XCHG
+            s10 30 s() XCHG
+            s9 29 s() XCHG
+            s8 28 s() XCHG
+            s7 27 s() XCHG
+            s6 26 s() XCHG
+            s5 25 s() XCHG
+            s4 24 s() XCHG
+            s3 23 s() XCHG
+            s2 22 s() XCHG
+            s1 41 s() XCHG
+            s0 44 s() XCHG
+            $CapsuleHub$_fun_entryIdFromLink INLINECALLDICT
+            16 s() POP
+            15 BLKDROP
+            5 1 BLKDROP2
+            19 s() 23 s() XCHG
+            18 s() 22 s() XCHG
+            17 s() 21 s() XCHG
+            16 s() 20 s() XCHG
+            s15 19 s() XCHG
+            s14 18 s() XCHG
+            s13 17 s() XCHG
+            s12 16 s() XCHG
+            s11 s15 XCHG
+            s10 s14 XCHG
+            s9 s13 XCHG
+            s8 s12 XCHG
+            s7 s11 XCHG
+            s6 s10 XCHG
+            s5 s9 XCHG
+            s4 s8 XCHG
+            s3 s7 XCHG
+            s0 s5 s6 XCHG3
+            $CapsuleHub$_fun_prunePublicParentIndex INLINECALLDICT
+          }>ELSE<{
+            24 s() POP
+            20 s() 21 s() XCHG
+            19 s() 20 s() XCHG
+            18 s() 19 s() XCHG
+            17 s() 18 s() XCHG
+            16 s() 17 s() XCHG
+            s15 16 s() XCHG
+            15 ROLL
+            $CapsuleHub$_fun_publicAuthorKeyId INLINECALLDICT
+            DUP
+            24 s() PUSH
+            SWAP
+            s0 24 s() XCHG
+            $CapsuleHub$_fun_prunePublicAuthorIndex INLINECALLDICT
+            OVER
+            8 PUSHPOW2
+            23 s() PUSH
+            64 PUSHINT
+            __tact_dict_get_uint_uint INLINECALLDICT
+            DUP
+            ISNULL
+            NOT
+            IF:<{
+              SWAP
+              s0 23 s() XCHG
+              EQUAL
+            }>ELSE<{
+              DROP
+              22 s() POP
+              FALSE
+            }>
+            IF:<{
+              s1 20 s() XCHG
+              8 PUSHPOW2
+                  DICTUDEL
+              DROP
+              s0 19 s() XCHG
+            }>ELSE<{
+              20 s() POP
+            }>
+            18 s() 20 s() XCHG
+            17 s() 19 s() XCHG
+            16 s() 18 s() XCHG
+            s15 17 s() XCHG
+            s14 16 s() XCHG
+            2 14 BLKSWAP
+          }>
+          23 s() PUSH
+          s0 s9 XCHG2
+          64 PUSHINT
+              DICTUDEL
+          DROP
+          s0 s11 XCHG
+          DEC
+          s0 23 s() XCHG
+          INC
+          s0 22 s() XCHG
+          INC
+          20 s() 24 s() XCHG
+          19 s() 23 s() XCHG
+          18 s() 22 s() XCHG
+          17 s() 21 s() XCHG
+          16 s() 20 s() XCHG
+          s15 19 s() XCHG
+          s14 18 s() XCHG
+          s13 17 s() XCHG
+          s12 16 s() XCHG
+          s10 s14 XCHG
+          s9 s13 XCHG
+          s11 s12 XCHG
+          s7 s11 XCHG
+          s6 s10 XCHG
+          s5 s9 XCHG
+          s4 s8 XCHG
+          s3 s7 XCHG
+          s6 s0 s5 XCHG3
+        }>
+        s0 s2 XCHG
+      }>
+      s0 s2 XCHG
+    }>
+    s2 s3 XCHG
+    3 BLKDROP
+    s4 POP
+  }>
+  $CapsuleHub$_fun_evictExpiredPrivate PROCREF:<{
+    s3 PUSH
+    0 PUSHINT
+    FALSE
+    WHILE:<{
+      DUP
+      NOT
+      IF:<{
+        s1 s3 PUSH2
+        LESS
+      }>ELSE<{
+        FALSE
+      }>
+      IF:<{
+        s2 PUSH
+        19 s() PUSH
+        LESS
+      }>ELSE<{
+        FALSE
+      }>
+    }>DO<{
+      s13 PUSH
       64 PUSHINT
       s4 PUSH
       __tact_dict_get_uint_cell INLINECALLDICT
@@ -1941,46 +2050,103 @@ PROGRAM{
           4 BLKDROP
           TRUE
         }>ELSE<{
+          20 s() 27 s() XCHG
+          19 s() 26 s() XCHG
           18 s() 25 s() XCHG
           17 s() 24 s() XCHG
           16 s() 23 s() XCHG
           s15 22 s() XCHG
           s14 21 s() XCHG
-          s13 20 s() XCHG
-          s12 19 s() XCHG
+          s13 27 s() XCHG
+          s12 26 s() XCHG
           s11 25 s() XCHG
           s10 24 s() XCHG
           s9 23 s() XCHG
           s8 22 s() XCHG
           s7 21 s() XCHG
-          s6 20 s() XCHG
-          s5 19 s() XCHG
+          s6 27 s() XCHG
+          s5 26 s() XCHG
           s4 25 s() XCHG
           s3 24 s() XCHG
           s2 23 s() XCHG
           s1 22 s() XCHG
           s0 21 s() XCHG
-          19 s() PUSH
+          26 s() PUSH
           $CapsuleHub$_fun_entryLink INLINECALLDICT
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          20 s() 42 s() XCHG
+          19 s() 41 s() XCHG
+          18 s() 40 s() XCHG
+          17 s() 39 s() XCHG
+          16 s() 38 s() XCHG
+          s15 37 s() XCHG
+          s14 36 s() XCHG
+          s13 35 s() XCHG
+          s12 34 s() XCHG
+          s11 33 s() XCHG
+          s10 32 s() XCHG
+          s9 31 s() XCHG
+          s8 30 s() XCHG
+          s7 29 s() XCHG
+          s6 28 s() XCHG
+          s5 27 s() XCHG
+          s4 26 s() XCHG
+          s3 25 s() XCHG
+          s2 24 s() XCHG
+          s1 23 s() XCHG
+          s0 22 s() XCHG
+          43 s() PUSH
+          $CapsuleHub$_fun_privateHeaderSenderKeyId INLINECALLDICT
+          16 s() POP
+          15 BLKDROP
+          5 1 BLKDROP2
+          s1 s0 XCPU
+          s0 25 s() XCHG
+          $CapsuleHub$_fun_prunePrivateSenderIndex INLINECALLDICT
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          21 s() 41 s() XCHG
+          20 s() 40 s() XCHG
+          19 s() 39 s() XCHG
           18 s() 38 s() XCHG
           17 s() 37 s() XCHG
           16 s() 36 s() XCHG
@@ -1998,59 +2164,14 @@ PROGRAM{
           s4 24 s() XCHG
           s3 23 s() XCHG
           s2 22 s() XCHG
-          s1 21 s() XCHG
-          s0 20 s() XCHG
-          41 s() PUSH
-          $CapsuleHub$_fun_privateHeaderSenderKeyId INLINECALLDICT
-          16 s() POP
-          15 BLKDROP
-          3 1 BLKDROP2
-          s1 s0 XCPU
-          s0 25 s() XCHG
-          $CapsuleHub$_fun_prunePrivateSenderIndex INLINECALLDICT
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          19 s() 37 s() XCHG
-          18 s() 36 s() XCHG
-          17 s() 35 s() XCHG
-          16 s() 34 s() XCHG
-          s15 33 s() XCHG
-          s14 32 s() XCHG
-          s13 31 s() XCHG
-          s12 30 s() XCHG
-          s11 29 s() XCHG
-          s10 28 s() XCHG
-          s9 27 s() XCHG
-          s8 26 s() XCHG
-          s7 25 s() XCHG
-          s6 24 s() XCHG
-          s5 23 s() XCHG
-          s4 22 s() XCHG
-          s3 21 s() XCHG
-          s2 20 s() XCHG
-          s1 37 s() XCHG
-          s0 40 s() XCHG
+          s1 41 s() XCHG
+          s0 42 s() XCHG
           $CapsuleHub$_fun_privateHeaderRecipientKeyId INLINECALLDICT
           16 s() POP
           15 BLKDROP
-          3 1 BLKDROP2
+          5 1 BLKDROP2
+          19 s() 23 s() XCHG
+          18 s() 22 s() XCHG
           17 s() 21 s() XCHG
           16 s() 20 s() XCHG
           s15 19 s() XCHG
@@ -2066,49 +2187,49 @@ PROGRAM{
           s5 s9 XCHG
           s4 s8 XCHG
           s3 s7 XCHG
-          s0 s1 s6 XCHG3
-          s5 s4 XCHG2
-          s1 s3 XCHG
-          s1 22 s() XCHG
-          s0 23 s() XCHG
+          s0 s6 s6 XCHG3
+          s0 s5 XCHG
+          s0 s3 XCHG
           $CapsuleHub$_fun_prunePrivateRecipientIndex INLINECALLDICT
-          19 s() PUSH
-          s0 s8 XCHG2
+          23 s() PUSH
+          s0 s10 XCHG2
           64 PUSHINT
               DICTUDEL
           DROP
-          s0 s10 XCHG
+          s0 s12 XCHG
           DEC
-          s0 19 s() XCHG
+          s0 23 s() XCHG
           INC
           s0 22 s() XCHG
           INC
+          20 s() 24 s() XCHG
+          19 s() 23 s() XCHG
           18 s() 22 s() XCHG
           17 s() 21 s() XCHG
           16 s() 20 s() XCHG
           s15 19 s() XCHG
           s14 18 s() XCHG
           s13 17 s() XCHG
-          s12 16 s() XCHG
+          s15 16 s() XCHG
           s11 s15 XCHG
-          s11 s14 XCHG
-          s9 s13 XCHG
+          s10 s14 XCHG
+          s12 s13 XCHG
           s8 s12 XCHG
-          s10 s11 XCHG
+          s7 s11 XCHG
           s6 s10 XCHG
           s5 s9 XCHG
           s4 s8 XCHG
           s3 s7 XCHG
-          s6 s5 s0 XCHG3
-          s3 s4 XCHG
-          SWAP
+          s6 s0 s5 XCHG3
+          s0 s4 XCHG
         }>
         s0 s2 XCHG
       }>
       s0 s2 XCHG
     }>
-    s2 s4 XCHG
-    4 BLKDROP
+    s2 s3 XCHG
+    3 BLKDROP
+    s3 POP
   }>
   $CapsuleHub$_fun_computeVaultPrivateEntryUid PROCREF:<{
         NEWC
@@ -2121,7 +2242,7 @@ PROGRAM{
     3508077057 PUSHINT
     SWAP
     32 STU
-    21 s() PUSH
+    23 s() PUSH
         STSLICER
     s1 s2 XCHG
     256 STU
@@ -2142,7 +2263,7 @@ PROGRAM{
     3508077058 PUSHINT
     SWAP
     32 STU
-    21 s() PUSH
+    23 s() PUSH
         STSLICER
     s1 s2 XCHG
     256 STU
@@ -2189,7 +2310,7 @@ PROGRAM{
   $PrivateCapsuleEntryView$_constructor_exists_entry_id_sender_prev_link_recipient_prev_link_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_0_hash_header_1_hash_body_hash_header_0_header_1 PROCINLINE:<{
   }>
   $CapsuleHub$_fun_get_private_entry PROCREF:<{
-    s8 PUSH
+    s10 PUSH
     64 PUSHINT
     s2 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -2202,57 +2323,63 @@ PROGRAM{
       0 PUSHINT
       s0 s0 s0 PUSH3
           MYADDR
+      20 s() 27 s() XCHG
+      19 s() 26 s() XCHG
       18 s() 25 s() XCHG
       17 s() 24 s() XCHG
       16 s() 23 s() XCHG
       s15 22 s() XCHG
       s14 21 s() XCHG
-      s13 20 s() XCHG
-      s12 19 s() XCHG
+      s13 27 s() XCHG
+      s12 26 s() XCHG
       s11 25 s() XCHG
       s10 24 s() XCHG
       s9 23 s() XCHG
       s8 22 s() XCHG
       s7 21 s() XCHG
-      s6 20 s() XCHG
-      s5 19 s() XCHG
+      s6 27 s() XCHG
+      s5 26 s() XCHG
       s4 25 s() XCHG
       s3 24 s() XCHG
       s2 23 s() XCHG
       s1 22 s() XCHG
       s0 21 s() XCHG
-      20 s() PUSH
+      27 s() PUSH
       $CapsuleHub$_fun_pageId INLINECALLDICT
-      18 s() 19 s() XCHG
-      17 s() 19 s() XCHG
-      16 s() 19 s() XCHG
-      s15 19 s() XCHG
-      s14 19 s() XCHG
-      s13 19 s() XCHG
-      s12 19 s() XCHG
-      s11 19 s() XCHG
-      s10 19 s() XCHG
-      s9 19 s() XCHG
-      s0 19 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 21 s() XCHG
+      17 s() 21 s() XCHG
+      16 s() 21 s() XCHG
+      s15 21 s() XCHG
+      s14 21 s() XCHG
+      s13 21 s() XCHG
+      s12 21 s() XCHG
+      s11 21 s() XCHG
+      s10 21 s() XCHG
+      s9 21 s() XCHG
+      s0 21 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
-      21 s() PUSH
+      28 s() PUSH
       $CapsuleHub$_fun_pageOffset INLINECALLDICT
       24 s() PUSH
       s0 s0 s0 PUSH3
           <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
           <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
-      s14 27 s() XCHG
-      s13 28 s() XCHG
+      s14 34 s() XCHG
+      s13 35 s() XCHG
       s12 33 s() XCHG
       s11 32 s() XCHG
       s10 31 s() XCHG
       s9 30 s() XCHG
       s8 29 s() XCHG
-      s7 26 s() XCHG
+      s7 28 s() XCHG
       $PrivateCapsuleEntryView$_constructor_exists_entry_id_sender_prev_link_recipient_prev_link_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_0_hash_header_1_hash_body_hash_header_0_header_1 INLINECALLDICT
+      27 s() 35 s() XCHG
+      26 s() 34 s() XCHG
       25 s() 33 s() XCHG
       24 s() 32 s() XCHG
       23 s() 31 s() XCHG
@@ -2264,17 +2391,20 @@ PROGRAM{
       17 s() 25 s() XCHG
       16 s() 24 s() XCHG
       s15 23 s() XCHG
-      19 s() 22 s() XCHG
-      20 s() 21 s() XCHG
+      18 s() 22 s() XCHG
+      19 s() 21 s() XCHG
       17 s() 20 s() XCHG
       16 s() 19 s() XCHG
-      4 15 REVERSE
+      s15 18 s() XCHG
+      s15 17 s() XCHG
     }>
     $PrivateCapsuleEntry$_not_null INLINECALLDICT
     OVER
         HASHCU
     OVER
         HASHCU
+    19 s() 30 s() XCHG
+    18 s() 29 s() XCHG
     17 s() 28 s() XCHG
     16 s() 27 s() XCHG
     s15 26 s() XCHG
@@ -2284,8 +2414,8 @@ PROGRAM{
     s11 22 s() XCHG
     s10 21 s() XCHG
     s9 20 s() XCHG
-    s8 19 s() XCHG
-    s7 18 s() XCHG
+    s8 30 s() XCHG
+    s7 29 s() XCHG
     s6 28 s() XCHG
     s5 27 s() XCHG
     s4 26 s() XCHG
@@ -2296,44 +2426,48 @@ PROGRAM{
     TRUE
     s0 22 s() XCHG
     21 s() PUSH
-    21 s() PUSH
+    32 s() PUSH
     26 s() PUSH
     26 s() PUSH
     33 s() PUSH
     $CapsuleHub$_fun_computeVaultPrivateEntryUid INLINECALLDICT
-    18 s() PUSH
-    18 s() 20 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 20 s() XCHG
-    s15 19 s() XCHG
-    s14 20 s() XCHG
-    s13 19 s() XCHG
-    s12 20 s() XCHG
-    s11 19 s() XCHG
-    s10 20 s() XCHG
-    s9 19 s() XCHG
-    s8 20 s() XCHG
-    s7 19 s() XCHG
-    s6 20 s() XCHG
-    s5 19 s() XCHG
-    s4 20 s() XCHG
-    s3 19 s() XCHG
-    s2 20 s() XCHG
-    s1 19 s() XCHG
-    s0 20 s() XCHG
+    20 s() PUSH
+    20 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 22 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 22 s() XCHG
+    s15 21 s() XCHG
+    s14 22 s() XCHG
+    s13 21 s() XCHG
+    s12 22 s() XCHG
+    s11 21 s() XCHG
+    s10 22 s() XCHG
+    s9 21 s() XCHG
+    s8 22 s() XCHG
+    s7 21 s() XCHG
+    s6 22 s() XCHG
+    s5 21 s() XCHG
+    s4 22 s() XCHG
+    s3 21 s() XCHG
+    s2 22 s() XCHG
+    s1 21 s() XCHG
+    s0 22 s() XCHG
     23 s() PUSH
     $CapsuleHub$_fun_pageId INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    s11 19 s() XCHG
-    s10 19 s() XCHG
-    s9 19 s() XCHG
-    s0 19 s() XCHG
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    s13 21 s() XCHG
+    s12 21 s() XCHG
+    s11 21 s() XCHG
+    s10 21 s() XCHG
+    s9 21 s() XCHG
+    s0 21 s() XCHG
     s0 s8 XCHG
     s0 s7 XCHG
     s0 s6 XCHG
@@ -2344,18 +2478,20 @@ PROGRAM{
     s13 25 s() XCHG
     s12 32 s() XCHG
     s11 31 s() XCHG
-    s10 21 s() XCHG
-    s9 24 s() XCHG
-    s8 22 s() XCHG
-    s7 20 s() XCHG
+    s10 23 s() XCHG
+    s9 35 s() XCHG
+    s8 24 s() XCHG
+    s7 22 s() XCHG
     s0 s6 XCHG
-    s5 23 s() XCHG
+    s5 34 s() XCHG
     s4 28 s() XCHG
     s3 27 s() XCHG
     s2 33 s() XCHG
     s1 30 s() XCHG
     s0 29 s() XCHG
     $PrivateCapsuleEntryView$_constructor_exists_entry_id_sender_prev_link_recipient_prev_link_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_0_hash_header_1_hash_body_hash_header_0_header_1 INLINECALLDICT
+    21 s() 35 s() XCHG
+    20 s() 34 s() XCHG
     19 s() 33 s() XCHG
     18 s() 32 s() XCHG
     17 s() 31 s() XCHG
@@ -2365,9 +2501,9 @@ PROGRAM{
     25 s() 27 s() XCHG
     18 s() 26 s() XCHG
     17 s() 25 s() XCHG
-    21 s() 24 s() XCHG
+    23 s() 24 s() XCHG
     21 s() 23 s() XCHG
-    20 s() 21 s() XCHG
+    21 s() 22 s() XCHG
     s15 20 s() XCHG
     s15 19 s() XCHG
     s15 16 s() XCHG
@@ -2375,7 +2511,7 @@ PROGRAM{
   $PrivateCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count PROCINLINE:<{
   }>
   $CapsuleHub$_fun_get_private_sender_index PROCREF:<{
-    s6 PUSH
+    s8 PUSH
     8 PUSHPOW2
     s2 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -2391,34 +2527,38 @@ PROGRAM{
       $PrivateCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
     }>
     $PrivateCapsuleKeyIndex$_not_null INLINECALLDICT
+    19 s() 23 s() XCHG
+    18 s() 22 s() XCHG
     17 s() 21 s() XCHG
     16 s() 20 s() XCHG
-    s15 19 s() XCHG
-    s14 18 s() XCHG
+    s15 23 s() XCHG
+    s14 22 s() XCHG
     s13 21 s() XCHG
     s12 20 s() XCHG
-    s11 19 s() XCHG
-    s10 18 s() XCHG
+    s11 23 s() XCHG
+    s10 22 s() XCHG
     s9 21 s() XCHG
     s8 20 s() XCHG
-    s7 19 s() XCHG
-    s6 18 s() XCHG
+    s7 23 s() XCHG
+    s6 22 s() XCHG
     s5 21 s() XCHG
     s4 20 s() XCHG
-    s3 19 s() XCHG
-    s2 18 s() XCHG
+    s3 23 s() XCHG
+    s2 22 s() XCHG
     s1 21 s() XCHG
     s0 20 s() XCHG
     TRUE
-    s0 20 s() XCHG
+    s0 24 s() XCHG
     22 s() PUSH
     $CapsuleHub$_fun_entryIdFromLink INLINECALLDICT
-    s4 21 s() XCHG
-    s3 20 s() XCHG
+    s4 25 s() XCHG
+    s3 24 s() XCHG
     s0 s2 XCHG
     s1 23 s() XCHG
     s0 22 s() XCHG
     $PrivateCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
+    21 s() 25 s() XCHG
+    20 s() 24 s() XCHG
     19 s() 23 s() XCHG
     18 s() 22 s() XCHG
     17 s() 21 s() XCHG
@@ -2438,7 +2578,7 @@ PROGRAM{
     s5 s7 XCHG
   }>
   $CapsuleHub$_fun_get_private_recipient_index PROCREF:<{
-    s5 PUSH
+    s7 PUSH
     8 PUSHPOW2
     s2 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -2454,34 +2594,38 @@ PROGRAM{
       $PrivateCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
     }>
     $PrivateCapsuleKeyIndex$_not_null INLINECALLDICT
+    19 s() 23 s() XCHG
+    18 s() 22 s() XCHG
     17 s() 21 s() XCHG
     16 s() 20 s() XCHG
-    s15 19 s() XCHG
-    s14 18 s() XCHG
+    s15 23 s() XCHG
+    s14 22 s() XCHG
     s13 21 s() XCHG
     s12 20 s() XCHG
-    s11 19 s() XCHG
-    s10 18 s() XCHG
+    s11 23 s() XCHG
+    s10 22 s() XCHG
     s9 21 s() XCHG
     s8 20 s() XCHG
-    s7 19 s() XCHG
-    s6 18 s() XCHG
+    s7 23 s() XCHG
+    s6 22 s() XCHG
     s5 21 s() XCHG
     s4 20 s() XCHG
-    s3 19 s() XCHG
-    s2 18 s() XCHG
+    s3 23 s() XCHG
+    s2 22 s() XCHG
     s1 21 s() XCHG
     s0 20 s() XCHG
     TRUE
-    s0 20 s() XCHG
+    s0 24 s() XCHG
     22 s() PUSH
     $CapsuleHub$_fun_entryIdFromLink INLINECALLDICT
-    s4 21 s() XCHG
-    s3 20 s() XCHG
+    s4 25 s() XCHG
+    s3 24 s() XCHG
     s0 s2 XCHG
     s1 23 s() XCHG
     s0 22 s() XCHG
     $PrivateCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
+    21 s() 25 s() XCHG
+    20 s() 24 s() XCHG
     19 s() 23 s() XCHG
     18 s() 22 s() XCHG
     17 s() 21 s() XCHG
@@ -2503,7 +2647,7 @@ PROGRAM{
   $PublicCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count PROCINLINE:<{
   }>
   $CapsuleHub$_fun_get_public_author_index PROCREF:<{
-    s4 PUSH
+    s6 PUSH
     8 PUSHPOW2
     s2 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -2519,34 +2663,38 @@ PROGRAM{
       $PublicCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
     }>
     $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
+    19 s() 23 s() XCHG
+    18 s() 22 s() XCHG
     17 s() 21 s() XCHG
     16 s() 20 s() XCHG
-    s15 19 s() XCHG
-    s14 18 s() XCHG
+    s15 23 s() XCHG
+    s14 22 s() XCHG
     s13 21 s() XCHG
     s12 20 s() XCHG
-    s11 19 s() XCHG
-    s10 18 s() XCHG
+    s11 23 s() XCHG
+    s10 22 s() XCHG
     s9 21 s() XCHG
     s8 20 s() XCHG
-    s7 19 s() XCHG
-    s6 18 s() XCHG
+    s7 23 s() XCHG
+    s6 22 s() XCHG
     s5 21 s() XCHG
     s4 20 s() XCHG
-    s3 19 s() XCHG
-    s2 18 s() XCHG
+    s3 23 s() XCHG
+    s2 22 s() XCHG
     s1 21 s() XCHG
     s0 20 s() XCHG
     TRUE
-    s0 20 s() XCHG
+    s0 24 s() XCHG
     22 s() PUSH
     $CapsuleHub$_fun_entryIdFromLink INLINECALLDICT
-    s4 21 s() XCHG
-    s3 20 s() XCHG
+    s4 25 s() XCHG
+    s3 24 s() XCHG
     s0 s2 XCHG
     s1 23 s() XCHG
     s0 22 s() XCHG
     $PublicCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
+    21 s() 25 s() XCHG
+    20 s() 24 s() XCHG
     19 s() 23 s() XCHG
     18 s() 22 s() XCHG
     17 s() 21 s() XCHG
@@ -2565,8 +2713,78 @@ PROGRAM{
     s5 s8 XCHG
     s5 s7 XCHG
   }>
+  $CapsuleHub$_fun_get_public_profile_index PROCREF:<{
+    s2 PUSH
+    8 PUSHPOW2
+    s2 PUSH
+    64 PUSHINT
+    __tact_dict_get_uint_uint INLINECALLDICT
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      FALSE
+      0 PUSHINT
+      s0 s0 PUSH2
+      s3 s4 XCHG
+      $PublicCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
+    }>
+    19 s() 22 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 20 s() XCHG
+    16 s() 22 s() XCHG
+    s15 21 s() XCHG
+    s14 20 s() XCHG
+    s13 22 s() XCHG
+    s12 21 s() XCHG
+    s11 20 s() XCHG
+    s10 22 s() XCHG
+    s9 21 s() XCHG
+    s8 20 s() XCHG
+    s7 22 s() XCHG
+    s6 21 s() XCHG
+    s5 20 s() XCHG
+    s4 22 s() XCHG
+    s3 21 s() XCHG
+    s2 20 s() XCHG
+    s1 22 s() XCHG
+    s0 21 s() XCHG
+    TRUE
+    s0 21 s() XCHG
+    22 s() PUSH
+    $CapsuleHub$_fun_entryIdFromLink INLINECALLDICT
+    s3 22 s() XCHG
+    s2 24 s() XCHG
+    SWAP
+    s0 23 s() XCHG
+    1 PUSHINT
+    $PublicCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
+    22 s() 25 s() XCHG
+    21 s() 24 s() XCHG
+    20 s() 23 s() XCHG
+    19 s() 22 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 20 s() XCHG
+    16 s() 19 s() XCHG
+    s15 18 s() XCHG
+    s14 17 s() XCHG
+    s13 16 s() XCHG
+    s12 s15 XCHG
+    s11 s14 XCHG
+    s10 s13 XCHG
+    s9 s12 XCHG
+    s8 s11 XCHG
+    s7 s10 XCHG
+    s6 s9 XCHG
+    s5 s8 XCHG
+    s5 s7 XCHG
+    s5 s6 XCHG
+  }>
+  $CapsuleHub$_fun_get_public_profile_head PROCREF:<{
+    DUP
+  }>
   $CapsuleHub$_fun_get_public_parent_index PROCREF:<{
-    s3 PUSH
+    s5 PUSH
     64 PUSHINT
     s2 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -2582,34 +2800,38 @@ PROGRAM{
       $PublicCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
     }>
     $PublicCapsuleKeyIndex$_not_null INLINECALLDICT
+    19 s() 23 s() XCHG
+    18 s() 22 s() XCHG
     17 s() 21 s() XCHG
     16 s() 20 s() XCHG
-    s15 19 s() XCHG
-    s14 18 s() XCHG
+    s15 23 s() XCHG
+    s14 22 s() XCHG
     s13 21 s() XCHG
     s12 20 s() XCHG
-    s11 19 s() XCHG
-    s10 18 s() XCHG
+    s11 23 s() XCHG
+    s10 22 s() XCHG
     s9 21 s() XCHG
     s8 20 s() XCHG
-    s7 19 s() XCHG
-    s6 18 s() XCHG
+    s7 23 s() XCHG
+    s6 22 s() XCHG
     s5 21 s() XCHG
     s4 20 s() XCHG
-    s3 19 s() XCHG
-    s2 18 s() XCHG
+    s3 23 s() XCHG
+    s2 22 s() XCHG
     s1 21 s() XCHG
     s0 20 s() XCHG
     TRUE
-    s0 20 s() XCHG
+    s0 24 s() XCHG
     22 s() PUSH
     $CapsuleHub$_fun_entryIdFromLink INLINECALLDICT
-    s4 21 s() XCHG
-    s3 20 s() XCHG
+    s4 25 s() XCHG
+    s3 24 s() XCHG
     s0 s2 XCHG
     s1 23 s() XCHG
     s0 22 s() XCHG
     $PublicCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count INLINECALLDICT
+    21 s() 25 s() XCHG
+    20 s() 24 s() XCHG
     19 s() 23 s() XCHG
     18 s() 22 s() XCHG
     17 s() 21 s() XCHG
@@ -2628,10 +2850,10 @@ PROGRAM{
     s5 s8 XCHG
     s5 s7 XCHG
   }>
-  $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_hash_body_hash_parent_link_prev_link_header PROCINLINE:<{
+  $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_hash_body_hash_parent_link_prev_link_profile_prev_link_header PROCINLINE:<{
   }>
   $CapsuleHub$_fun_get_public_entry PROCREF:<{
-    s7 PUSH
+    s9 PUSH
     64 PUSHINT
     s2 PUSH
     __tact_dict_get_uint_cell INLINECALLDICT
@@ -2644,55 +2866,62 @@ PROGRAM{
       0 PUSHINT
       DUP
           MYADDR
+      20 s() 25 s() XCHG
+      19 s() 24 s() XCHG
       18 s() 23 s() XCHG
       17 s() 22 s() XCHG
       16 s() 21 s() XCHG
-      s15 20 s() XCHG
-      s14 19 s() XCHG
+      s15 25 s() XCHG
+      s14 24 s() XCHG
       s13 23 s() XCHG
       s12 22 s() XCHG
       s11 21 s() XCHG
-      s10 20 s() XCHG
-      s9 19 s() XCHG
+      s10 25 s() XCHG
+      s9 24 s() XCHG
       s8 23 s() XCHG
       s7 22 s() XCHG
       s6 21 s() XCHG
-      s5 20 s() XCHG
-      s4 19 s() XCHG
+      s5 25 s() XCHG
+      s4 24 s() XCHG
       s3 23 s() XCHG
       s2 22 s() XCHG
       s1 21 s() XCHG
-      s0 20 s() XCHG
-      19 s() PUSH
+      s0 25 s() XCHG
+      24 s() PUSH
       $CapsuleHub$_fun_pageId INLINECALLDICT
-      18 s() 19 s() XCHG
-      17 s() 19 s() XCHG
-      16 s() 19 s() XCHG
-      s15 19 s() XCHG
-      s14 19 s() XCHG
-      s13 19 s() XCHG
-      s12 19 s() XCHG
-      s11 19 s() XCHG
-      s10 19 s() XCHG
-      s9 19 s() XCHG
-      s0 19 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 21 s() XCHG
+      17 s() 21 s() XCHG
+      16 s() 21 s() XCHG
+      s15 21 s() XCHG
+      s14 21 s() XCHG
+      s13 21 s() XCHG
+      s12 21 s() XCHG
+      s11 21 s() XCHG
+      s10 21 s() XCHG
+      s9 21 s() XCHG
+      s0 21 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
-      20 s() PUSH
+      25 s() PUSH
       $CapsuleHub$_fun_pageOffset INLINECALLDICT
       23 s() PUSH
       s0 s0 s0 PUSH3
-      DUP
+      s0 s0 PUSH2
           <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
-      s12 31 s() XCHG
-      s11 27 s() XCHG
+      s13 32 s() XCHG
+      s12 33 s() XCHG
+      s11 31 s() XCHG
       s10 30 s() XCHG
-      s9 29 s() XCHG
-      s8 28 s() XCHG
-      s7 26 s() XCHG
-      $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_hash_body_hash_parent_link_prev_link_header INLINECALLDICT
+      s9 34 s() XCHG
+      s8 29 s() XCHG
+      $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_hash_body_hash_parent_link_prev_link_profile_prev_link_header INLINECALLDICT
+      28 s() 34 s() XCHG
+      27 s() 33 s() XCHG
+      26 s() 32 s() XCHG
       25 s() 31 s() XCHG
       24 s() 30 s() XCHG
       23 s() 29 s() XCHG
@@ -2705,133 +2934,142 @@ PROGRAM{
       16 s() 22 s() XCHG
       s15 21 s() XCHG
       s14 20 s() XCHG
-      s13 19 s() XCHG
-      s13 18 s() XCHG
-      s15 17 s() XCHG
-      s13 16 s() XCHG
-      s13 s14 XCHG
+      s14 19 s() XCHG
+      s15 18 s() XCHG
+      4 14 REVERSE
     }>
     $PublicCapsuleEntry$_not_null INLINECALLDICT
     DUP
         HASHCU
-    17 s() 27 s() XCHG
-    16 s() 26 s() XCHG
-    s15 25 s() XCHG
-    s14 24 s() XCHG
-    s13 23 s() XCHG
-    s12 22 s() XCHG
-    s11 21 s() XCHG
-    s10 20 s() XCHG
-    s9 19 s() XCHG
-    s8 18 s() XCHG
-    s7 27 s() XCHG
-    s6 26 s() XCHG
-    s5 25 s() XCHG
-    s4 24 s() XCHG
-    s3 23 s() XCHG
-    s2 22 s() XCHG
-    s1 21 s() XCHG
-    s0 20 s() XCHG
-    TRUE
-    s0 20 s() XCHG
-    19 s() PUSH
-    29 s() PUSH
-    28 s() PUSH
-    24 s() PUSH
-    29 s() PUSH
-    $CapsuleHub$_fun_computeVaultPublicEntryUid INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    s11 19 s() XCHG
-    s10 19 s() XCHG
-    s9 19 s() XCHG
-    s0 19 s() XCHG
-    s0 s8 XCHG
-    s0 s7 XCHG
-    s0 s6 XCHG
-    5 -ROLL
-    20 s() PUSH
-    $CapsuleHub$_fun_pageId INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    s11 19 s() XCHG
-    s10 19 s() XCHG
-    s9 19 s() XCHG
-    s0 19 s() XCHG
-    s0 s8 XCHG
-    s0 s7 XCHG
-    s0 s6 XCHG
-    5 -ROLL
-    21 s() PUSH
-    $CapsuleHub$_fun_pageOffset INLINECALLDICT
+    19 s() 30 s() XCHG
+    18 s() 29 s() XCHG
+    17 s() 28 s() XCHG
+    16 s() 27 s() XCHG
+    s15 26 s() XCHG
+    s14 25 s() XCHG
+    s13 24 s() XCHG
     s12 23 s() XCHG
     s11 22 s() XCHG
     s10 21 s() XCHG
-    s9 31 s() XCHG
-    s8 29 s() XCHG
-    s7 20 s() XCHG
-    s0 s6 XCHG
-    s5 30 s() XCHG
-    s4 24 s() XCHG
-    s3 28 s() XCHG
-    s2 27 s() XCHG
-    s1 26 s() XCHG
-    s0 25 s() XCHG
-    $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_hash_body_hash_parent_link_prev_link_header INLINECALLDICT
-    19 s() 31 s() XCHG
-    18 s() 30 s() XCHG
-    17 s() 29 s() XCHG
-    16 s() 28 s() XCHG
-    s15 27 s() XCHG
-    s14 26 s() XCHG
-    s13 25 s() XCHG
-    23 s() 24 s() XCHG
-    22 s() 23 s() XCHG
-    21 s() 22 s() XCHG
+    s9 20 s() XCHG
+    s8 30 s() XCHG
+    s7 29 s() XCHG
+    s6 28 s() XCHG
+    s5 27 s() XCHG
+    s4 26 s() XCHG
+    s3 25 s() XCHG
+    s2 24 s() XCHG
+    s1 23 s() XCHG
+    s0 22 s() XCHG
+    TRUE
+    s0 22 s() XCHG
+    21 s() PUSH
+    32 s() PUSH
+    31 s() PUSH
+    26 s() PUSH
+    32 s() PUSH
+    $CapsuleHub$_fun_computeVaultPublicEntryUid INLINECALLDICT
+    20 s() 21 s() XCHG
     19 s() 21 s() XCHG
-    17 s() 20 s() XCHG
-    17 s() 19 s() XCHG
-    s13 18 s() XCHG
-    s13 17 s() XCHG
-    s13 16 s() XCHG
-    s13 s15 XCHG
-    s13 s14 XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    s13 21 s() XCHG
+    s12 21 s() XCHG
+    s11 21 s() XCHG
+    s10 21 s() XCHG
+    s9 21 s() XCHG
+    s0 21 s() XCHG
+    s0 s8 XCHG
+    s0 s7 XCHG
+    s0 s6 XCHG
+    5 -ROLL
+    22 s() PUSH
+    $CapsuleHub$_fun_pageId INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    s13 21 s() XCHG
+    s12 21 s() XCHG
+    s11 21 s() XCHG
+    s10 21 s() XCHG
+    s9 21 s() XCHG
+    s0 21 s() XCHG
+    s0 s8 XCHG
+    s0 s7 XCHG
+    s0 s6 XCHG
+    5 -ROLL
+    23 s() PUSH
+    $CapsuleHub$_fun_pageOffset INLINECALLDICT
+    s13 25 s() XCHG
+    s12 24 s() XCHG
+    s11 23 s() XCHG
+    s10 34 s() XCHG
+    s9 32 s() XCHG
+    s8 22 s() XCHG
+    s0 s7 XCHG
+    s6 33 s() XCHG
+    s5 26 s() XCHG
+    s4 31 s() XCHG
+    s3 30 s() XCHG
+    s2 29 s() XCHG
+    s1 28 s() XCHG
+    s0 27 s() XCHG
+    $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_hash_body_hash_parent_link_prev_link_profile_prev_link_header INLINECALLDICT
+    21 s() 34 s() XCHG
+    20 s() 33 s() XCHG
+    19 s() 32 s() XCHG
+    18 s() 31 s() XCHG
+    17 s() 30 s() XCHG
+    16 s() 29 s() XCHG
+    s15 28 s() XCHG
+    s14 27 s() XCHG
+    25 s() 26 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 24 s() XCHG
+    21 s() 23 s() XCHG
+    19 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    s14 20 s() XCHG
+    s14 19 s() XCHG
+    s14 18 s() XCHG
+    s14 17 s() XCHG
+    s14 16 s() XCHG
+    s14 s15 XCHG
   }>
   $CapsuleHubPageView$_constructor_exists_page_id_first_entry_id_next_entry_id_entry_count_opened_at_updated_at PROCINLINE:<{
   }>
   $CapsuleHub$_fun_get_private_page PROCREF:<{
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    19 s() PUSH
-    13 -ROLL
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    21 s() PUSH
+    15 -ROLL
     DUP
-    s0 21 s() XCHG
+    s0 23 s() XCHG
     $CapsuleHub$_fun_pageExists INLINECALLDICT
     IFNOTJMP:<{
       FALSE
-      20 s() PUSH
+      22 s() PUSH
       8 LSHIFT#
-      21 s() PUSH
+      23 s() PUSH
       8 LSHIFT#
       0 PUSHINT
       s0 s0 PUSH2
       s5 s6 XCHG
-      s5 25 s() XCHG
+      s5 27 s() XCHG
       $CapsuleHubPageView$_constructor_exists_page_id_first_entry_id_next_entry_id_entry_count_opened_at_updated_at INLINECALLDICT
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
       24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
@@ -2851,55 +3089,59 @@ PROGRAM{
       s8 s9 XCHG
       s7 s8 XCHG
     }>
-    17 s() 18 s() XCHG
-    16 s() 18 s() XCHG
-    s15 18 s() XCHG
-    s14 18 s() XCHG
-    s13 18 s() XCHG
-    s12 18 s() XCHG
-    s11 18 s() XCHG
-    s10 18 s() XCHG
-    s9 18 s() XCHG
-    s0 18 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 20 s() XCHG
+    16 s() 20 s() XCHG
+    s15 20 s() XCHG
+    s14 20 s() XCHG
+    s13 20 s() XCHG
+    s12 20 s() XCHG
+    s11 20 s() XCHG
+    s10 20 s() XCHG
+    s9 20 s() XCHG
+    s0 20 s() XCHG
     s0 s8 XCHG
     s0 s7 XCHG
     s0 s6 XCHG
     5 -ROLL
     TRUE
-    s0 19 s() XCHG
-    20 s() PUSH
-    $CapsuleHub$_fun_pageFirstEntryId INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    19 s() PUSH
-    13 -ROLL
+    s0 21 s() XCHG
     22 s() PUSH
+    $CapsuleHub$_fun_pageFirstEntryId INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    21 s() PUSH
+    15 -ROLL
+    24 s() PUSH
     SWAP
-    s0 21 s() XCHG
+    s0 23 s() XCHG
     $CapsuleHub$_fun_pageNextEntryId INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    19 s() PUSH
-    13 -ROLL
-    23 s() PUSH
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    21 s() PUSH
+    15 -ROLL
+    25 s() PUSH
     SWAP
-    s0 21 s() XCHG
+    s0 23 s() XCHG
     $CapsuleHub$_fun_pageEntryCount INLINECALLDICT
     0 PUSHINT
     DUP
-    s6 24 s() XCHG
-    s5 25 s() XCHG
-    s4 23 s() XCHG
-    s3 22 s() XCHG
+    s6 26 s() XCHG
+    s5 27 s() XCHG
+    s4 25 s() XCHG
+    s3 24 s() XCHG
     $CapsuleHubPageView$_constructor_exists_page_id_first_entry_id_next_entry_id_entry_count_opened_at_updated_at INLINECALLDICT
+    23 s() 27 s() XCHG
+    22 s() 26 s() XCHG
     21 s() 25 s() XCHG
     20 s() 24 s() XCHG
     19 s() 23 s() XCHG
@@ -2914,33 +3156,36 @@ PROGRAM{
     s10 s14 XCHG
     s9 s13 XCHG
     s8 s12 XCHG
-    5 7 REVERSE
+    s7 s11 XCHG
+    s7 s9 XCHG
     s7 s8 XCHG
   }>
   $CapsuleHub$_fun_get_public_page PROCREF:<{
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    19 s() PUSH
-    12 -ROLL
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    21 s() PUSH
+    14 -ROLL
     DUP
-    s0 21 s() XCHG
+    s0 23 s() XCHG
     $CapsuleHub$_fun_pageExists INLINECALLDICT
     IFNOTJMP:<{
       FALSE
-      20 s() PUSH
+      22 s() PUSH
       8 LSHIFT#
-      21 s() PUSH
+      23 s() PUSH
       8 LSHIFT#
       0 PUSHINT
       s0 s0 PUSH2
       s5 s6 XCHG
-      s5 25 s() XCHG
+      s5 27 s() XCHG
       $CapsuleHubPageView$_constructor_exists_page_id_first_entry_id_next_entry_id_entry_count_opened_at_updated_at INLINECALLDICT
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
       24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
@@ -2960,57 +3205,61 @@ PROGRAM{
       s8 s9 XCHG
       s7 s8 XCHG
     }>
-    17 s() 18 s() XCHG
-    16 s() 18 s() XCHG
-    s15 18 s() XCHG
-    s14 18 s() XCHG
-    s13 18 s() XCHG
-    s12 18 s() XCHG
-    s11 18 s() XCHG
-    s10 18 s() XCHG
-    s9 18 s() XCHG
-    s0 18 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 20 s() XCHG
+    16 s() 20 s() XCHG
+    s15 20 s() XCHG
+    s14 20 s() XCHG
+    s13 20 s() XCHG
+    s12 20 s() XCHG
+    s11 20 s() XCHG
+    s10 20 s() XCHG
+    s9 20 s() XCHG
+    s0 20 s() XCHG
     s0 s8 XCHG
     s0 s7 XCHG
     s0 s6 XCHG
     5 -ROLL
     TRUE
-    s0 19 s() XCHG
-    20 s() PUSH
-    $CapsuleHub$_fun_pageFirstEntryId INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    19 s() PUSH
-    12 -ROLL
+    s0 21 s() XCHG
     22 s() PUSH
+    $CapsuleHub$_fun_pageFirstEntryId INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    21 s() PUSH
+    14 -ROLL
+    24 s() PUSH
     SWAP
-    s0 21 s() XCHG
+    s0 23 s() XCHG
     $CapsuleHub$_fun_pageNextEntryId INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    19 s() PUSH
-    12 -ROLL
-    23 s() PUSH
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    21 s() PUSH
+    14 -ROLL
+    25 s() PUSH
     SWAP
-    s0 21 s() XCHG
+    s0 23 s() XCHG
     $CapsuleHub$_fun_pageEntryCount INLINECALLDICT
     0 PUSHINT
     DUP
-    s6 24 s() XCHG
-    s5 25 s() XCHG
-    s4 23 s() XCHG
-    s3 22 s() XCHG
+    s6 26 s() XCHG
+    s5 27 s() XCHG
+    s4 25 s() XCHG
+    s3 24 s() XCHG
     $CapsuleHubPageView$_constructor_exists_page_id_first_entry_id_next_entry_id_entry_count_opened_at_updated_at INLINECALLDICT
+    23 s() 27 s() XCHG
+    22 s() 26 s() XCHG
     21 s() 25 s() XCHG
     20 s() 24 s() XCHG
     19 s() 23 s() XCHG
@@ -3025,58 +3274,64 @@ PROGRAM{
     s10 s14 XCHG
     s9 s13 XCHG
     s8 s12 XCHG
-    5 7 REVERSE
+    s7 s11 XCHG
+    s7 s9 XCHG
     s7 s8 XCHG
   }>
   $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_private_page_count_public_page_count_page_size_index_storage_years_index_retention_seconds_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address_private_live_count_public_live_count_index_storage_reserve_ton_protected_reserve_ton_reserve_floor_ton_reserve_buffer_numerator_reserve_buffer_denominator PROCINLINE:<{
   }>
   $CapsuleHub$_fun_get_state PROCREF:<{
-    s15 PUSH
     17 s() PUSH
-    16 s() PUSH
-    s15 s14 PUSH2
+    19 s() PUSH
+    18 s() PUSH
+    17 s() PUSH
+    17 s() PUSH
+    20 s() 25 s() XCHG
+    19 s() 24 s() XCHG
     18 s() 23 s() XCHG
     17 s() 22 s() XCHG
     16 s() 21 s() XCHG
-    s15 20 s() XCHG
-    s14 19 s() XCHG
+    s15 25 s() XCHG
+    24 s() PUSH
+    s0 s15 XCHG
+    s14 24 s() XCHG
     s13 23 s() XCHG
-    22 s() PUSH
-    s0 s13 XCHG
     s12 22 s() XCHG
-    s11 21 s() XCHG
-    s10 20 s() XCHG
+    s11 26 s() XCHG
+    s0 s10 XCHG
     s9 24 s() XCHG
-    s0 s8 XCHG
+    s8 23 s() XCHG
     s7 22 s() XCHG
-    s6 21 s() XCHG
-    s5 20 s() XCHG
+    s6 26 s() XCHG
+    s0 s5 XCHG
     s4 24 s() XCHG
-    s0 s3 XCHG
+    s3 23 s() XCHG
     s2 22 s() XCHG
-    s1 21 s() XCHG
-    s0 23 s() XCHG
+    s1 26 s() XCHG
+    s0 25 s() XCHG
     $CapsuleHub$_fun_pageCount INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    19 s() PUSH
-    12 -ROLL
-    s0 20 s() XCHG
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    21 s() PUSH
+    14 -ROLL
+    s0 22 s() XCHG
     $CapsuleHub$_fun_pageCount INLINECALLDICT
     8 PUSHPOW2
     1 PUSHINT
     31536000 PUSHINT
-    s12 PUSH
-    23 s() PUSH
-    23 s() PUSH
+    s14 PUSH
+    25 s() PUSH
+    25 s() PUSH
+    22 s() PUSH
     20 s() PUSH
-    18 s() PUSH
-    18 s() PUSH
+    20 s() PUSH
+    20 s() 30 s() XCHG
+    19 s() 29 s() XCHG
     18 s() 28 s() XCHG
     17 s() 27 s() XCHG
     16 s() 26 s() XCHG
@@ -3084,41 +3339,6 @@ PROGRAM{
     s14 24 s() XCHG
     s13 23 s() XCHG
     s12 22 s() XCHG
-    s11 21 s() XCHG
-    s10 20 s() XCHG
-    s9 19 s() XCHG
-    s8 28 s() XCHG
-    s7 27 s() XCHG
-    s6 26 s() XCHG
-    s5 25 s() XCHG
-    s4 24 s() XCHG
-    s3 23 s() XCHG
-    s2 22 s() XCHG
-    s1 21 s() XCHG
-    s0 20 s() XCHG
-    $CapsuleHub$_fun_indexStorageReserve INLINECALLDICT
-    18 s() 19 s() XCHG
-    17 s() 19 s() XCHG
-    16 s() 19 s() XCHG
-    s15 19 s() XCHG
-    s14 19 s() XCHG
-    s13 19 s() XCHG
-    s12 19 s() XCHG
-    s11 19 s() XCHG
-    s10 19 s() XCHG
-    s9 19 s() XCHG
-    s0 19 s() XCHG
-    s0 s8 XCHG
-    s0 s7 XCHG
-    s0 s6 XCHG
-    5 -ROLL
-    $CapsuleHub$_fun_protectedReserve INLINECALLDICT
-    17 s() 32 s() XCHG
-    16 s() 36 s() XCHG
-    s15 35 s() XCHG
-    s14 34 s() XCHG
-    s13 33 s() XCHG
-    s12 31 s() XCHG
     s11 21 s() XCHG
     s10 30 s() XCHG
     s9 29 s() XCHG
@@ -3129,32 +3349,71 @@ PROGRAM{
     s4 24 s() XCHG
     s3 23 s() XCHG
     s2 22 s() XCHG
-    s1 20 s() XCHG
+    s1 21 s() XCHG
+    s0 30 s() XCHG
+    $CapsuleHub$_fun_indexStorageReserve INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 21 s() XCHG
+    s15 21 s() XCHG
+    s14 21 s() XCHG
+    s13 21 s() XCHG
+    s12 21 s() XCHG
+    s11 21 s() XCHG
+    s10 21 s() XCHG
+    s9 21 s() XCHG
+    s0 21 s() XCHG
+    s0 s8 XCHG
+    s0 s7 XCHG
+    s0 s6 XCHG
+    5 -ROLL
+    $CapsuleHub$_fun_protectedReserve INLINECALLDICT
+    17 s() 37 s() XCHG
+    16 s() 36 s() XCHG
+    s15 35 s() XCHG
+    s14 34 s() XCHG
+    s13 38 s() XCHG
+    s12 33 s() XCHG
+    s11 31 s() XCHG
+    s10 30 s() XCHG
+    s9 29 s() XCHG
+    s8 28 s() XCHG
+    s7 27 s() XCHG
+    s6 26 s() XCHG
+    s5 25 s() XCHG
+    s4 24 s() XCHG
+    s3 23 s() XCHG
+    s2 32 s() XCHG
+    s1 22 s() XCHG
     100000000000 PUSHINT
     125 PUSHINT
     100 PUSHINT
     $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_private_page_count_public_page_count_page_size_index_storage_years_index_retention_seconds_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address_private_live_count_public_live_count_index_storage_reserve_ton_protected_reserve_ton_reserve_floor_ton_reserve_buffer_numerator_reserve_buffer_denominator INLINECALLDICT
+    24 s() 41 s() XCHG
+    23 s() 40 s() XCHG
     22 s() 39 s() XCHG
     21 s() 38 s() XCHG
-    35 s() 37 s() XCHG
+    23 s() 37 s() XCHG
     22 s() 36 s() XCHG
     21 s() 35 s() XCHG
-    21 s() 34 s() XCHG
-    22 s() 33 s() XCHG
-    21 s() 32 s() XCHG
-    24 s() 31 s() XCHG
-    22 s() 30 s() XCHG
-    21 s() 29 s() XCHG
-    24 s() 28 s() XCHG
-    22 s() 27 s() XCHG
-    21 s() 26 s() XCHG
-    24 s() 25 s() XCHG
-    22 s() 24 s() XCHG
-    21 s() 23 s() XCHG
+    23 s() 34 s() XCHG
+    24 s() 33 s() XCHG
+    22 s() 32 s() XCHG
+    23 s() 31 s() XCHG
+    24 s() 30 s() XCHG
+    22 s() 29 s() XCHG
+    23 s() 28 s() XCHG
+    24 s() 27 s() XCHG
+    22 s() 26 s() XCHG
+    23 s() 25 s() XCHG
+    22 s() 23 s() XCHG
+    21 s() 22 s() XCHG
   }>
   $PrivateCapsuleEntry$_constructor_publish_id_created_at_body_hash_sender_prev_link_recipient_prev_link_header_0_header_1 PROCINLINE:<{
   }>
-  $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_parent_link_prev_link_header PROCINLINE:<{
+  $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_parent_link_prev_link_profile_prev_link_header PROCINLINE:<{
   }>
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
@@ -3165,6 +3424,8 @@ PROGRAM{
   }>
   %get_private_entry PROC:<{
     $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -3172,11 +3433,13 @@ PROGRAM{
     15 ROLL
     $CapsuleHub$_fun_get_private_entry INLINECALLDICT
     15 15 BLKDROP2
-    4 15 BLKDROP2
+    6 15 BLKDROP2
     $PrivateCapsuleEntryView$_to_external INLINECALLDICT
   }>
   %get_private_sender_index PROC:<{
     $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -3184,11 +3447,13 @@ PROGRAM{
     15 ROLL
     $CapsuleHub$_fun_get_private_sender_index INLINECALLDICT
     15 5 BLKDROP2
-    4 5 BLKDROP2
+    6 5 BLKDROP2
     $PrivateCapsuleKeyIndexView$_to_external INLINECALLDICT
   }>
   %get_private_recipient_index PROC:<{
     $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -3196,11 +3461,13 @@ PROGRAM{
     15 ROLL
     $CapsuleHub$_fun_get_private_recipient_index INLINECALLDICT
     15 5 BLKDROP2
-    4 5 BLKDROP2
+    6 5 BLKDROP2
     $PrivateCapsuleKeyIndexView$_to_external INLINECALLDICT
   }>
   %get_public_author_index PROC:<{
     $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -3208,11 +3475,34 @@ PROGRAM{
     15 ROLL
     $CapsuleHub$_fun_get_public_author_index INLINECALLDICT
     15 5 BLKDROP2
-    4 5 BLKDROP2
+    6 5 BLKDROP2
     $PublicCapsuleKeyIndexView$_to_external INLINECALLDICT
+  }>
+  %get_public_profile_index PROC:<{
+    $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    15 ROLL
+    $CapsuleHub$_fun_get_public_profile_index INLINECALLDICT
+    15 5 BLKDROP2
+    6 5 BLKDROP2
+    $PublicCapsuleKeyIndexView$_to_external INLINECALLDICT
+  }>
+  %get_public_profile_head PROC:<{
+    $CapsuleHub$_contract_load INLINECALLDICT
+    $CapsuleHub$_fun_get_public_profile_head INLINECALLDICT
+    16 s() POP
+    15 BLKDROP
+    5 1 BLKDROP2
   }>
   %get_public_parent_index PROC:<{
     $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -3220,23 +3510,27 @@ PROGRAM{
     15 ROLL
     $CapsuleHub$_fun_get_public_parent_index INLINECALLDICT
     15 5 BLKDROP2
-    4 5 BLKDROP2
+    6 5 BLKDROP2
     $PublicCapsuleKeyIndexView$_to_external INLINECALLDICT
   }>
   %get_public_entry PROC:<{
     $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
     s15 16 s() XCHG
     15 ROLL
     $CapsuleHub$_fun_get_public_entry INLINECALLDICT
-    13 13 BLKDROP2
-    6 13 BLKDROP2
+    14 14 BLKDROP2
+    7 14 BLKDROP2
     $PublicCapsuleEntryView$_to_external INLINECALLDICT
   }>
   %get_private_page PROC:<{
     $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -3244,11 +3538,13 @@ PROGRAM{
     15 ROLL
     $CapsuleHub$_fun_get_private_page INLINECALLDICT
     14 7 BLKDROP2
-    5 7 BLKDROP2
+    7 7 BLKDROP2
     $CapsuleHubPageView$_to_external INLINECALLDICT
   }>
   %get_public_page PROC:<{
     $CapsuleHub$_contract_load INLINECALLDICT
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
     18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
@@ -3256,7 +3552,7 @@ PROGRAM{
     15 ROLL
     $CapsuleHub$_fun_get_public_page INLINECALLDICT
     14 7 BLKDROP2
-    5 7 BLKDROP2
+    7 7 BLKDROP2
     $CapsuleHubPageView$_to_external INLINECALLDICT
   }>
   %get_state PROC:<{
@@ -3281,13 +3577,8 @@ PROGRAM{
     21 s() POP
     21 s() POP
     21 s() POP
-    s1 20 s() XCHG
-    s0 19 s() XCHG
-    s1 18 s() XCHG
-    s0 17 s() XCHG
-    s1 16 s() XCHG
-    s0 s15 XCHG
-    13 2 BLKSWAP
+    21 s() POP
+    21 s() POP
     $CapsuleHubStateView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -3306,9 +3597,9 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $CapsuleHub$_contract_load INLINECALLDICT
-    s0 20 s() XCHG
+    s0 22 s() XCHG
     IFJMP:<{
-      s0 18 s() XCHG
+      s0 20 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -3325,6 +3616,8 @@ PROGRAM{
       IFJMP:<{
         $DepositProtocolFee$_load_bounced INLINECALLDICT
         NIP
+        19 s() 20 s() XCHG
+        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
@@ -3340,21 +3633,23 @@ PROGRAM{
         s5 s6 XCHG
         s4 s5 XCHG
         s3 s4 XCHG
-        s0 19 s() XCHG
+        s0 21 s() XCHG
         s1 s3 s0 XCHG3
         $CapsuleHub$_fun_requireSealed INLINECALLDICT
         13203 PUSHINT
         __tact_context_get_sender INLINECALLDICT
-        20 s() PUSH
+        22 s() PUSH
         SDEQ
         THROWANYIFNOT
         13204 PUSHINT
-        20 s() PUSH
+        22 s() PUSH
         0 GTINT
         THROWANYIFNOT
-        s0 19 s() XCHG
-        s1 s8 XCHG
+        s0 21 s() XCHG
+        s1 s10 XCHG
         ADD
+        19 s() 20 s() XCHG
+        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
@@ -3362,10 +3657,10 @@ PROGRAM{
         s13 s14 XCHG
         s12 s13 XCHG
         s11 s12 XCHG
-        s10 s11 XCHG
-        s9 s10 XCHG
-        s0 s8 XCHG
-        s0 s9 XCHG
+        s0 s10 XCHG
+        s0 s11 XCHG
+        s8 s9 XCHG
+        s7 s8 XCHG
         s6 s7 XCHG
         s5 s6 XCHG
         s4 s5 XCHG
@@ -3374,98 +3669,93 @@ PROGRAM{
         $CapsuleHub$_contract_store INLINECALLDICT
       }>
       15 BLKDROP
-      5 BLKDROP
+      7 BLKDROP
     }>
     0 PUSHINT
-    19 s() PUSH
+    21 s() PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 19 s() XCHG
+      s0 21 s() XCHG
       32 LDU
-      s0 20 s() XCHG
+      s0 22 s() XCHG
     }>
     OVER
     2430787787 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 18 s() XCHG
+      s0 20 s() XCHG
       256 LDU
       LDMSGADDR
       DROP
-      s1 19 s() XCHG
-      s0 20 s() XCHG
+      s1 21 s() XCHG
+      s0 22 s() XCHG
       $CapsuleHub$_fun_requireUnsealed INLINECALLDICT
       $CapsuleHub$_fun_requireGenesisController INLINECALLDICT
       12910 PUSHINT
-      17 s() PUSH
+      19 s() PUSH
       NOT
       THROWANYIFNOT
       12911 PUSHINT
-      20 s() PUSH
+      22 s() PUSH
       0 NEQINT
       THROWANYIFNOT
       12912 PUSHINT
-      s15 PUSH
+      17 s() PUSH
       0 EQINT
       IF:<{
         TRUE
       }>ELSE<{
-        s15 PUSH
-        21 s() PUSH
+        17 s() PUSH
+        23 s() PUSH
         EQUAL
       }>
       THROWANYIFNOT
-      17 s() 18 s() XCHG
-      16 s() 18 s() XCHG
-      s15 18 s() XCHG
-      s14 18 s() XCHG
-      s13 18 s() XCHG
-      s12 18 s() XCHG
-      s11 18 s() XCHG
-      s10 18 s() XCHG
-      s9 18 s() XCHG
-      s0 18 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 20 s() XCHG
+      16 s() 20 s() XCHG
+      s15 20 s() XCHG
+      s14 20 s() XCHG
+      s13 20 s() XCHG
+      s12 20 s() XCHG
+      s11 20 s() XCHG
+      s10 20 s() XCHG
+      s9 20 s() XCHG
+      s0 20 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       12913 PUSHINT
-      s0 19 s() XCHG
-      21 s() PUSH
+      s0 21 s() XCHG
+      23 s() PUSH
       $CapsuleHub$_fun_isBasechainAddress INLINECALLDICT
-      s15 POP
-      16 s() POP
-      16 s() POP
-      s1 17 s() XCHG
-      s0 s12 XCHG
+      17 s() POP
+      18 s() POP
+      18 s() POP
+      s1 19 s() XCHG
+      s0 s14 XCHG
       THROWANYIFNOT
       12914 PUSHINT
           MYADDR
-      19 s() PUSH
+      21 s() PUSH
       SWAP
       SDEQ
       NOT
       THROWANYIFNOT
+      16 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      TRUE
+      s0 18 s() XCHG
       s14 17 s() XCHG
       s14 16 s() XCHG
-      TRUE
-      s0 16 s() XCHG
       s12 s15 XCHG
-      s12 s14 XCHG
-      s10 s13 XCHG
-      s9 s12 XCHG
-      s8 s11 XCHG
-      s7 s10 XCHG
-      s6 s9 XCHG
-      s5 s8 XCHG
-      s4 s7 XCHG
-      s3 s6 XCHG
-      s5 s3 s3 XCHG3
-      s0 s4 XCHG
+      3 12 BLKSWAP
+      s1 s2 XCHG
       $CapsuleHub$_contract_store INLINECALLDICT
     }>
     OVER
@@ -3473,9 +3763,11 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 18 s() XCHG
+      s0 20 s() XCHG
       256 LDU
       DROP
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -3491,30 +3783,31 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 19 s() XCHG
+      s0 21 s() XCHG
       s1 s3 s0 XCHG3
       $CapsuleHub$_fun_requireUnsealed INLINECALLDICT
       $CapsuleHub$_fun_requireGenesisController INLINECALLDICT
-      s15 POP
+      17 s() POP
       12920 PUSHINT
-      19 s() PUSH
+      21 s() PUSH
       0 NEQINT
       THROWANYIFNOT
-      s13 PUSH
+      s15 PUSH
       12921 PUSHINT
-      s0 20 s() XCHG
+      s0 22 s() XCHG
       EQUAL
-      s1 19 s() XCHG
+      s1 21 s() XCHG
       THROWANYIFNOT
       12922 PUSHINT
-      s15 PUSH
+      17 s() PUSH
       THROWANYIFNOT
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
       16 s() 17 s() XCHG
-      s15 16 s() XCHG
-      s14 s15 XCHG
       TRUE
-      s0 s15 XCHG
-      14 ROLL
+      s0 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
       $CapsuleHub$_contract_store INLINECALLDICT
     }>
     OVER
@@ -3522,7 +3815,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 18 s() XCHG
+      s0 20 s() XCHG
       64 LDU
       NIP
       160 LDU
@@ -3535,29 +3828,31 @@ PROGRAM{
       LDREF
       LDOPTREF
       DROP
+      20 s() 25 s() XCHG
+      19 s() 24 s() XCHG
       18 s() 23 s() XCHG
       17 s() 22 s() XCHG
       16 s() 21 s() XCHG
-      s15 20 s() XCHG
-      s14 19 s() XCHG
+      s15 25 s() XCHG
+      s14 24 s() XCHG
       s13 23 s() XCHG
       s12 22 s() XCHG
       s11 21 s() XCHG
-      s10 20 s() XCHG
-      s9 19 s() XCHG
+      s10 25 s() XCHG
+      s9 24 s() XCHG
       s8 23 s() XCHG
       s7 22 s() XCHG
       s6 21 s() XCHG
-      s5 20 s() XCHG
-      s4 19 s() XCHG
+      s5 25 s() XCHG
+      s4 24 s() XCHG
       s3 23 s() XCHG
       s2 22 s() XCHG
-      s1 24 s() XCHG
-      s0 25 s() XCHG
+      s1 26 s() XCHG
+      s0 27 s() XCHG
       $CapsuleHub$_fun_requireSealed INLINECALLDICT
       13500 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      19 s() PUSH
+      21 s() PUSH
       SDEQ
       THROWANYIFNOT
       13501 PUSHINT
@@ -3565,54 +3860,58 @@ PROGRAM{
       0 NEQINT
       THROWANYIFNOT
       13502 PUSHINT
-      21 s() PUSH
+      26 s() PUSH
       1 EQINT
       IF:<{
         TRUE
       }>ELSE<{
-        21 s() PUSH
+        26 s() PUSH
         2 EQINT
       }>
       THROWANYIFNOT
       13503 PUSHINT
-      20 s() PUSH
+      25 s() PUSH
       0 GTINT
       IF:<{
-        20 s() PUSH
+        25 s() PUSH
         9 LESSINT
       }>ELSE<{
         FALSE
       }>
       THROWANYIFNOT
-      20 s() PUSH
+      25 s() PUSH
       1 EQINT
-      s12 PUSH
+      s14 PUSH
       10000000 PUSHINT
       s2 PUSH
       IF:<{
         2DROP
-        s13 PUSH
-        18 s() 20 s() XCHG
-        17 s() 19 s() XCHG
-        16 s() 20 s() XCHG
-        s15 19 s() XCHG
-        s14 20 s() XCHG
-        s13 19 s() XCHG
-        s12 20 s() XCHG
-        s11 19 s() XCHG
-        s10 20 s() XCHG
-        s9 19 s() XCHG
-        s8 20 s() XCHG
-        s7 19 s() XCHG
-        s6 20 s() XCHG
-        s5 19 s() XCHG
-        s4 20 s() XCHG
-        s3 19 s() XCHG
-        s2 20 s() XCHG
-        s1 19 s() XCHG
-        s0 20 s() XCHG
+        s15 PUSH
+        20 s() 22 s() XCHG
+        19 s() 21 s() XCHG
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 22 s() XCHG
+        s15 21 s() XCHG
+        s14 22 s() XCHG
+        s13 21 s() XCHG
+        s12 22 s() XCHG
+        s11 21 s() XCHG
+        s10 22 s() XCHG
+        s9 21 s() XCHG
+        s8 22 s() XCHG
+        s7 21 s() XCHG
+        s6 22 s() XCHG
+        s5 21 s() XCHG
+        s4 22 s() XCHG
+        s3 21 s() XCHG
+        s2 22 s() XCHG
+        s1 21 s() XCHG
+        s0 22 s() XCHG
         2 PUSHINT
         $CapsuleHub$_fun_privateFullFee INLINECALLDICT
+        21 s() 23 s() XCHG
+        20 s() 22 s() XCHG
         19 s() 21 s() XCHG
         18 s() 20 s() XCHG
         17 s() 19 s() XCHG
@@ -3634,12 +3933,12 @@ PROGRAM{
       }>
       13504 PUSHINT
       s2 PUSH
-      24 s() PUSH
+      29 s() PUSH
       ADD
       64 PUSHPOW2DEC
       LEQ
       THROWANYIFNOT
-      22 s() PUSH
+      27 s() PUSH
       13506 PUSHINT
       s0 s2 XCHG
       MUL
@@ -3650,26 +3949,26 @@ PROGRAM{
       OVER
       IFNOT:<{
         13507 PUSHINT
-        28 s() PUSH
+        30 s() PUSH
         ISNULL
         NOT
         THROWANYIFNOT
         13508 PUSHINT
-        s0 28 s() XCHG
+        s0 30 s() XCHG
             CTOS
         152 PUSHINT
         load_uint$not_mut INLINECALLDICT
         2573421624129493433291659589718684717235138672 PUSHINT
         EQUAL
-        s1 28 s() XCHG
+        s1 30 s() XCHG
         THROWANYIFNOT
       }>ELSE<{
-        27 s() POP
+        29 s() POP
       }>
       13509 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      22 s() PUSH
+      27 s() PUSH
       1000000 PUSHINT
       MUL
       27 s() PUSH
@@ -3679,7 +3978,7 @@ PROGRAM{
       ADD
       GEQ
       THROWANYIFNOT
-      25 s() PUSH
+      27 s() PUSH
       0 PUSHINT
       14000 PUSHINT
       FALSE
@@ -3692,32 +3991,34 @@ PROGRAM{
       OVER
       WHILE:<{
         s2 PUSH
-        25 s() PUSH
+        30 s() PUSH
         LESS
       }>DO<{
-        24 s() PUSH
+        29 s() PUSH
         DEC
         s3 s(-1) PUXC
         EQUAL
         s0 s4 XCHG
             CTOS
-        31 s() PUSH
+        33 s() PUSH
         s4 PUSH
         ADD
+        20 s() 27 s() XCHG
+        19 s() 26 s() XCHG
         18 s() 25 s() XCHG
         17 s() 24 s() XCHG
         16 s() 23 s() XCHG
         s15 22 s() XCHG
         s14 21 s() XCHG
-        s13 20 s() XCHG
-        s12 19 s() XCHG
+        s13 27 s() XCHG
+        s12 26 s() XCHG
         s11 25 s() XCHG
         s10 24 s() XCHG
         s9 23 s() XCHG
         s8 22 s() XCHG
         s7 21 s() XCHG
-        s6 20 s() XCHG
-        s5 19 s() XCHG
+        s6 27 s() XCHG
+        s5 26 s() XCHG
         s4 25 s() XCHG
         s3 24 s() XCHG
         s2 23 s() XCHG
@@ -3726,11 +4027,11 @@ PROGRAM{
         28 s() PUSH
         26 s() PUSH
         $CapsuleHub$_fun_computeEntryPublishId INLINECALLDICT
-        32 s() PUSH
-        22 s() PUSH
+        34 s() PUSH
+        29 s() PUSH
         IF:<{
           3 PUSHINT
-          22 s() PUSH
+          29 s() PUSH
           IFNOT:<{
             DROP
             4 PUSHINT
@@ -3759,17 +4060,19 @@ PROGRAM{
               LDREF
               LDREF
               LDREF
-          s0 29 s() XCHG
+          s0 36 s() XCHG
           IFNOT:<{
             31 s() POP
-            s0 27 s() XCHG
+            s0 34 s() XCHG
                 LDREF
             DROP
             s0 30 s() XCHG
-            s0 27 s() XCHG
+            s0 34 s() XCHG
           }>ELSE<{
-            28 s() POP
+            35 s() POP
           }>
+          19 s() 28 s() XCHG
+          18 s() 27 s() XCHG
           17 s() 26 s() XCHG
           16 s() 25 s() XCHG
           s15 24 s() XCHG
@@ -3777,8 +4080,8 @@ PROGRAM{
           s13 22 s() XCHG
           s12 21 s() XCHG
           s11 20 s() XCHG
-          s10 19 s() XCHG
-          s9 18 s() XCHG
+          s10 28 s() XCHG
+          s9 27 s() XCHG
           s8 26 s() XCHG
           s7 25 s() XCHG
           s6 24 s() XCHG
@@ -3786,8 +4089,8 @@ PROGRAM{
           s4 22 s() XCHG
           s3 21 s() XCHG
           s2 20 s() XCHG
-          s1 19 s() XCHG
-          s0 18 s() XCHG
+          s1 28 s() XCHG
+          s0 27 s() XCHG
           13511 PUSHINT
           s0 27 s() XCHG
           25 s() PUSH
@@ -3811,6 +4114,8 @@ PROGRAM{
             FALSE
           }>
           THROWANYIFNOT
+          19 s() 20 s() XCHG
+          18 s() 19 s() XCHG
           17 s() 18 s() XCHG
           16 s() 17 s() XCHG
           s15 16 s() XCHG
@@ -3823,15 +4128,13 @@ PROGRAM{
           s8 s9 XCHG
           s7 s8 XCHG
           s6 s7 XCHG
-          s5 s6 XCHG
-          s4 s5 XCHG
-          4 ROLL
+          6 ROLL
           s0 26 s() XCHG
           2 PUSHINT
           1120 PUSHINT
           1 PUSHINT
           13513 PUSHINT
-          23 s() PUSH
+          32 s() PUSH
           s0 s4 XCHG
           27 s() PUSH
           s4 s3 s4 XCHG3
@@ -3841,71 +4144,79 @@ PROGRAM{
           240 PUSHINT
           0 PUSHINT
           13515 PUSHINT
-          30 s() PUSH
+          31 s() PUSH
           s0 s4 XCHG
           26 s() PUSH
           s4 s3 s4 XCHG3
           13516 PUSHINT
           $CapsuleHub$_fun_requireExactPayloadCell INLINECALLDICT
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() PUSH
-          18 s() 37 s() XCHG
-          17 s() 36 s() XCHG
-          16 s() 35 s() XCHG
-          s15 34 s() XCHG
-          s14 33 s() XCHG
-          s13 32 s() XCHG
-          s12 31 s() XCHG
-          s11 30 s() XCHG
-          s10 29 s() XCHG
-          s9 28 s() XCHG
-          s8 27 s() XCHG
-          s7 26 s() XCHG
-          s6 25 s() XCHG
-          s5 24 s() XCHG
-          s4 23 s() XCHG
-          s3 22 s() XCHG
-          s2 21 s() XCHG
-          s1 20 s() XCHG
-          s0 19 s() XCHG
-          43 s() PUSH
-          43 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() PUSH
+          20 s() 41 s() XCHG
+          19 s() 40 s() XCHG
+          18 s() 39 s() XCHG
+          17 s() 38 s() XCHG
+          16 s() 37 s() XCHG
+          s15 36 s() XCHG
+          s14 35 s() XCHG
+          s13 34 s() XCHG
+          s12 33 s() XCHG
+          s11 32 s() XCHG
+          s10 31 s() XCHG
+          s9 30 s() XCHG
+          s8 29 s() XCHG
+          s7 28 s() XCHG
+          s6 27 s() XCHG
+          s5 26 s() XCHG
+          s4 25 s() XCHG
+          s3 24 s() XCHG
+          s2 23 s() XCHG
+          s1 22 s() XCHG
+          s0 21 s() XCHG
+          45 s() PUSH
+          45 s() PUSH
           $CapsuleHub$_fun_privateBodyCells INLINECALLDICT
-          18 s() 19 s() XCHG
-          17 s() 19 s() XCHG
-          16 s() 19 s() XCHG
-          s15 19 s() XCHG
-          s14 19 s() XCHG
-          s13 19 s() XCHG
-          s12 19 s() XCHG
-          s11 19 s() XCHG
-          s10 19 s() XCHG
-          s9 19 s() XCHG
-          s0 19 s() XCHG
+          20 s() 21 s() XCHG
+          19 s() 21 s() XCHG
+          18 s() 21 s() XCHG
+          17 s() 21 s() XCHG
+          16 s() 21 s() XCHG
+          s15 21 s() XCHG
+          s14 21 s() XCHG
+          s13 21 s() XCHG
+          s12 21 s() XCHG
+          s11 21 s() XCHG
+          s10 21 s() XCHG
+          s9 21 s() XCHG
+          s0 21 s() XCHG
           s0 s8 XCHG
           s0 s7 XCHG
           s0 s6 XCHG
           5 -ROLL
-          44 s() PUSH
-          44 s() PUSH
+          46 s() PUSH
+          46 s() PUSH
           $CapsuleHub$_fun_privateBodyBits INLINECALLDICT
+          21 s() 22 s() XCHG
+          20 s() 21 s() XCHG
           19 s() 20 s() XCHG
           18 s() 19 s() XCHG
           17 s() 18 s() XCHG
@@ -3924,12 +4235,14 @@ PROGRAM{
           s4 s5 XCHG
           s3 s4 XCHG
           s1 s3 s0 XCHG3
-          s1 45 s() XCHG
-          s0 44 s() XCHG
+          s1 47 s() XCHG
+          s0 46 s() XCHG
           $CapsuleHub$_fun_privateBodyRefs INLINECALLDICT
           16 s() POP
           15 BLKDROP
-          3 1 BLKDROP2
+          5 1 BLKDROP2
+          21 s() 24 s() XCHG
+          20 s() 23 s() XCHG
           19 s() 22 s() XCHG
           18 s() 21 s() XCHG
           17 s() 20 s() XCHG
@@ -3948,127 +4261,139 @@ PROGRAM{
           s4 s7 XCHG
           s3 s6 XCHG
           s5 s4 s0 XCHG3
-          s3 28 s() XCHG
-          28 s() PUSH
+          s3 35 s() XCHG
+          27 s() PUSH
           s0 s3 XCHG
           s2 26 s() XCHG
-          s0 25 s() XCHG
+          s0 36 s() XCHG
           SWAP
           13517 PUSHINT
           13518 PUSHINT
           $CapsuleHub$_fun_requireExactPayloadCell INLINECALLDICT
           26 s() PUSH
           $CapsuleHub$_fun_entryLink INLINECALLDICT
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          18 s() 38 s() XCHG
-          17 s() 37 s() XCHG
-          16 s() 36 s() XCHG
-          s15 35 s() XCHG
-          s14 34 s() XCHG
-          s13 33 s() XCHG
-          s12 32 s() XCHG
-          s11 31 s() XCHG
-          s10 30 s() XCHG
-          s9 29 s() XCHG
-          s8 28 s() XCHG
-          s7 27 s() XCHG
-          s6 26 s() XCHG
-          s5 25 s() XCHG
-          s4 24 s() XCHG
-          s3 23 s() XCHG
-          s2 22 s() XCHG
-          s1 21 s() XCHG
-          s0 20 s() XCHG
-          40 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          20 s() 42 s() XCHG
+          19 s() 41 s() XCHG
+          18 s() 40 s() XCHG
+          17 s() 39 s() XCHG
+          16 s() 38 s() XCHG
+          s15 37 s() XCHG
+          s14 36 s() XCHG
+          s13 35 s() XCHG
+          s12 34 s() XCHG
+          s11 33 s() XCHG
+          s10 32 s() XCHG
+          s9 31 s() XCHG
+          s8 30 s() XCHG
+          s7 29 s() XCHG
+          s6 28 s() XCHG
+          s5 27 s() XCHG
+          s4 26 s() XCHG
+          s3 25 s() XCHG
+          s2 24 s() XCHG
+          s1 23 s() XCHG
+          s0 22 s() XCHG
+          47 s() PUSH
           $CapsuleHub$_fun_privateHeaderSenderKeyId INLINECALLDICT
           16 s() POP
           15 BLKDROP
-          3 1 BLKDROP2
-          19 s() 20 s() XCHG
-          18 s() 20 s() XCHG
-          17 s() 20 s() XCHG
-          16 s() 20 s() XCHG
-          s15 20 s() XCHG
-          s14 20 s() XCHG
-          s13 20 s() XCHG
-          s12 20 s() XCHG
-          s11 20 s() XCHG
-          s10 20 s() XCHG
-          s9 20 s() XCHG
-          s8 20 s() XCHG
-          s7 20 s() XCHG
-          s6 20 s() XCHG
-          s5 20 s() XCHG
-          s4 20 s() XCHG
-          s3 20 s() XCHG
-          s2 20 s() XCHG
-          s1 20 s() XCHG
-          20 s() PUSH
-          $CapsuleHub$_fun_pushPrivateSenderIndex INLINECALLDICT
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          19 s() PUSH
-          18 s() 38 s() XCHG
-          17 s() 37 s() XCHG
-          16 s() 36 s() XCHG
-          s15 35 s() XCHG
-          s14 34 s() XCHG
-          s13 33 s() XCHG
-          s12 32 s() XCHG
-          s11 31 s() XCHG
-          s10 30 s() XCHG
-          s9 29 s() XCHG
-          s8 28 s() XCHG
-          s7 27 s() XCHG
-          s6 26 s() XCHG
-          s5 25 s() XCHG
-          s4 24 s() XCHG
-          s3 23 s() XCHG
+          5 1 BLKDROP2
+          21 s() 22 s() XCHG
+          20 s() 22 s() XCHG
+          19 s() 22 s() XCHG
+          18 s() 22 s() XCHG
+          17 s() 22 s() XCHG
+          16 s() 22 s() XCHG
+          s15 22 s() XCHG
+          s14 22 s() XCHG
+          s13 22 s() XCHG
+          s12 22 s() XCHG
+          s11 22 s() XCHG
+          s10 22 s() XCHG
+          s9 22 s() XCHG
+          s8 22 s() XCHG
+          s7 22 s() XCHG
+          s6 22 s() XCHG
+          s5 22 s() XCHG
+          s4 22 s() XCHG
+          s3 22 s() XCHG
           s2 22 s() XCHG
-          s1 21 s() XCHG
-          s0 20 s() XCHG
-          41 s() PUSH
+          s1 22 s() XCHG
+          22 s() PUSH
+          $CapsuleHub$_fun_pushPrivateSenderIndex INLINECALLDICT
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          21 s() PUSH
+          20 s() 42 s() XCHG
+          19 s() 41 s() XCHG
+          18 s() 40 s() XCHG
+          17 s() 39 s() XCHG
+          16 s() 38 s() XCHG
+          s15 37 s() XCHG
+          s14 36 s() XCHG
+          s13 35 s() XCHG
+          s12 34 s() XCHG
+          s11 33 s() XCHG
+          s10 32 s() XCHG
+          s9 31 s() XCHG
+          s8 30 s() XCHG
+          s7 29 s() XCHG
+          s6 28 s() XCHG
+          s5 27 s() XCHG
+          s4 26 s() XCHG
+          s3 25 s() XCHG
+          s2 24 s() XCHG
+          s1 23 s() XCHG
+          s0 22 s() XCHG
+          48 s() PUSH
           $CapsuleHub$_fun_privateHeaderRecipientKeyId INLINECALLDICT
           16 s() POP
           15 BLKDROP
-          3 1 BLKDROP2
+          5 1 BLKDROP2
           SWAP
-          s0 21 s() XCHG
+          s0 23 s() XCHG
           $CapsuleHub$_fun_pushPrivateRecipientIndex INLINECALLDICT
+          21 s() 22 s() XCHG
+          20 s() 21 s() XCHG
           19 s() 20 s() XCHG
           18 s() 19 s() XCHG
           17 s() 18 s() XCHG
@@ -4091,54 +4416,57 @@ PROGRAM{
           s0 s2 XCHG
           25 s() PUSH
           s0 s2 XCHG
-          s1 23 s() XCHG
+          s1 35 s() XCHG
           s0 25 s() XCHG
-          28 s() PUSH
+          27 s() PUSH
           $CapsuleHub$_fun_computeVaultPrivateEntryUid INLINECALLDICT
           64 PUSHINT
               NOW
           s6 25 s() XCHG
           s0 s5 XCHG
-          s4 27 s() XCHG
-          s3 22 s() XCHG
+          s4 26 s() XCHG
+          s3 34 s() XCHG
           s2 24 s() XCHG
-          s1 23 s() XCHG
-          s0 26 s() XCHG
+          s1 28 s() XCHG
+          s0 27 s() XCHG
           $PrivateCapsuleEntry$_constructor_publish_id_created_at_body_hash_sender_prev_link_recipient_prev_link_header_0_header_1 INLINECALLDICT
           NEWC
           $PrivateCapsuleEntry$_store_cell INLINECALLDICT
-          s3 s4 XCHG
-          s2 17 s() XCHG
+          s3 s6 XCHG
+          s2 22 s() XCHG
           s1 23 s() XCHG
           __tact_dict_set_uint_cell INLINECALLDICT
-          s0 s4 XCHG
+          s0 s6 XCHG
           INC
           170000 PUSHINT
           FALSE
               GETGASFEE
+          s15 20 s() XCHG
+          s14 19 s() XCHG
           s13 18 s() XCHG
           s12 17 s() XCHG
           s11 16 s() XCHG
           s10 s15 XCHG
           s9 s14 XCHG
           s8 s13 XCHG
-          s7 s12 XCHG
+          s1 s12 XCHG
           s6 s11 XCHG
-          s1 s10 XCHG
-          s4 s9 XCHG
+          s5 s10 XCHG
+          s7 s9 XCHG
           s3 s8 XCHG
-          s5 s7 XCHG
-          s6 s5 s0 XCHG3
+          s2 s7 XCHG
+          s4 s6 XCHG
           s4 21 s() XCHG
-          s3 s3 s0 XCHG3
-          s1 19 s() XCHG
-          s0 21 s() XCHG
+          s0 26 s() XCHG
+          s1 s3 XCHG
           1 PUSHINT
           $CapsuleHub$_fun_batchStorageReserveWithBuffer INLINECALLDICT
-          s1 22 s() XCHG
+          s1 27 s() XCHG
           ADD
           s1 24 s() XCHG
           ADD
+          19 s() 22 s() XCHG
+          18 s() 21 s() XCHG
           17 s() 20 s() XCHG
           16 s() 19 s() XCHG
           s15 18 s() XCHG
@@ -4156,12 +4484,12 @@ PROGRAM{
           s3 s6 XCHG
           s5 s4 s0 XCHG3
           s3 23 s() XCHG
-          s1 22 s() XCHG
-          s0 23 s() XCHG
+          s0 25 s() XCHG
+          s0 s2 XCHG
           $CapsuleHub$_fun_accumulateBatchUid INLINECALLDICT
         }>ELSE<{
           2 PUSHINT
-          22 s() PUSH
+          29 s() PUSH
           IFNOT:<{
             DROP
             3 PUSHINT
@@ -4189,248 +4517,225 @@ PROGRAM{
           256 LDU
               LDREF
               LDREF
-          s0 28 s() XCHG
+          s0 35 s() XCHG
           IFNOT:<{
             30 s() POP
-            s0 26 s() XCHG
+            s0 33 s() XCHG
                 LDREF
             DROP
             s0 29 s() XCHG
-            s0 26 s() XCHG
+            s0 33 s() XCHG
           }>ELSE<{
-            27 s() POP
+            34 s() POP
           }>
           13521 PUSHINT
-          s0 s5 XCHG
+          s5 PUSH
+          254 PUSHINT
+          AND
           0 EQINT
-          s1 s5 XCHG
           THROWANYIFNOT
-          17 s() 24 s() XCHG
-          16 s() 23 s() XCHG
-          s15 22 s() XCHG
-          s14 21 s() XCHG
-          s13 20 s() XCHG
-          s12 19 s() XCHG
-          s11 18 s() XCHG
-          s10 24 s() XCHG
-          s9 23 s() XCHG
-          s8 22 s() XCHG
-          s7 21 s() XCHG
-          s6 20 s() XCHG
-          s5 19 s() XCHG
-          s4 18 s() XCHG
-          s3 24 s() XCHG
-          s2 23 s() XCHG
-          s1 22 s() XCHG
-          s0 21 s() XCHG
+          s0 s4 XCHG
+          1 PUSHINT
+          AND
+          1 EQINT
+          19 s() 27 s() XCHG
+          18 s() 26 s() XCHG
+          17 s() 25 s() XCHG
+          16 s() 24 s() XCHG
+          s15 23 s() XCHG
+          s14 22 s() XCHG
+          s13 21 s() XCHG
+          s12 20 s() XCHG
+          s11 27 s() XCHG
+          s10 26 s() XCHG
+          s9 25 s() XCHG
+          s8 24 s() XCHG
+          s7 23 s() XCHG
+          s6 22 s() XCHG
+          s5 21 s() XCHG
+          s4 20 s() XCHG
+          s3 27 s() XCHG
+          s2 26 s() XCHG
+          s1 25 s() XCHG
+          s0 24 s() XCHG
           13522 PUSHINT
-          s0 21 s() XCHG
-          19 s() PUSH
+          s0 24 s() XCHG
+          22 s() PUSH
           $CapsuleHub$_fun_isAllowedPublicSizeClass INLINECALLDICT
-          s1 22 s() XCHG
+          s1 25 s() XCHG
           THROWANYIFNOT
           13523 PUSHINT
-          23 s() PUSH
+          27 s() PUSH
           0 NEQINT
           IF:<{
-            22 s() PUSH
+            26 s() PUSH
             0 NEQINT
           }>ELSE<{
             FALSE
           }>
           THROWANYIFNOT
+          13529 PUSHINT
+          25 s() PUSH
+          NOT
+          IF:<{
+            TRUE
+          }>ELSE<{
+            28 s() PUSH
+            0 EQINT
+          }>
+          THROWANYIFNOT
           13528 PUSHINT
-          24 s() PUSH
+          28 s() PUSH
           0 EQINT
           IF:<{
             TRUE
           }>ELSE<{
-            24 s() PUSH
-            29 s() PUSH
+            28 s() PUSH
+            30 s() PUSH
             LEQ
           }>
           THROWANYIFNOT
+          19 s() 20 s() XCHG
+          18 s() 19 s() XCHG
           17 s() 18 s() XCHG
           16 s() 17 s() XCHG
           s15 16 s() XCHG
           15 ROLL
-          s0 20 s() XCHG
+          s0 23 s() XCHG
           13524 PUSHINT
           13525 PUSHINT
-          26 s() PUSH
-          s0 s2 XCHG
           25 s() PUSH
           s0 s2 XCHG
+          29 s() PUSH
+          s0 s2 XCHG
           $CapsuleHub$_fun_requirePublicHeaderCell INLINECALLDICT
+          20 s() 22 s() XCHG
+          19 s() 21 s() XCHG
           18 s() 20 s() XCHG
           17 s() 19 s() XCHG
           16 s() 18 s() XCHG
           s15 17 s() XCHG
           s14 16 s() XCHG
           2 14 BLKSWAP
-          s1 25 s() XCHG
-          21 s() PUSH
+          s1 33 s() XCHG
+          25 s() PUSH
           SWAP
+          s0 34 s() XCHG
           13526 PUSHINT
           13527 PUSHINT
           $CapsuleHub$_fun_requirePublicPayloadCell INLINECALLDICT
+          20 s() 21 s() XCHG
+          19 s() 20 s() XCHG
           18 s() 19 s() XCHG
           17 s() 18 s() XCHG
           16 s() 17 s() XCHG
           s15 16 s() XCHG
           15 ROLL
-          25 s() PUSH
+          26 s() PUSH
           SWAP
-          24 s() PUSH
+          32 s() PUSH
           SWAP
-          35 s() PUSH
+          36 s() PUSH
           SWAP
-          s0 23 s() XCHG
-          23 s() PUSH
+          s0 27 s() XCHG
+          26 s() PUSH
           $CapsuleHub$_fun_computeVaultPublicEntryUid INLINECALLDICT
-          21 s() PUSH
+          20 s() 21 s() XCHG
+          19 s() 21 s() XCHG
+          18 s() 21 s() XCHG
+          17 s() 21 s() XCHG
+          16 s() 21 s() XCHG
+          s15 21 s() XCHG
+          s14 21 s() XCHG
+          s13 21 s() XCHG
+          s12 21 s() XCHG
+          s11 21 s() XCHG
+          s10 21 s() XCHG
+          s9 21 s() XCHG
+          s0 21 s() XCHG
+          s0 s8 XCHG
+          s0 s7 XCHG
+          s0 s6 XCHG
+          5 -ROLL
+          26 s() PUSH
+          $CapsuleHub$_fun_entryLink INLINECALLDICT
+          0 PUSHINT
+          27 s() PUSH
           IF:<{
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            18 s() 38 s() XCHG
-            17 s() 37 s() XCHG
-            16 s() 36 s() XCHG
-            s15 35 s() XCHG
-            s14 34 s() XCHG
-            s13 33 s() XCHG
-            s12 32 s() XCHG
-            s11 31 s() XCHG
-            s10 30 s() XCHG
-            s9 29 s() XCHG
-            s8 28 s() XCHG
-            s7 27 s() XCHG
-            s6 26 s() XCHG
-            s5 25 s() XCHG
-            s4 24 s() XCHG
-            s3 23 s() XCHG
-            s2 22 s() XCHG
-            s1 21 s() XCHG
-            s0 20 s() XCHG
-            40 s() PUSH
+            24 s() POP
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            21 s() PUSH
+            20 s() 42 s() XCHG
+            19 s() 41 s() XCHG
+            18 s() 40 s() XCHG
+            17 s() 39 s() XCHG
+            16 s() 38 s() XCHG
+            s15 37 s() XCHG
+            s14 36 s() XCHG
+            s13 35 s() XCHG
+            s12 34 s() XCHG
+            s11 33 s() XCHG
+            s10 32 s() XCHG
+            s9 31 s() XCHG
+            s8 30 s() XCHG
+            s7 29 s() XCHG
+            s6 28 s() XCHG
+            s5 27 s() XCHG
+            s4 26 s() XCHG
+            s3 25 s() XCHG
+            s2 24 s() XCHG
+            s1 23 s() XCHG
+            s0 22 s() XCHG
+            47 s() PUSH
             $CapsuleHub$_fun_entryIdFromLink INLINECALLDICT
-            18 s() 19 s() XCHG
-            17 s() 19 s() XCHG
-            16 s() 19 s() XCHG
-            s15 19 s() XCHG
-            s14 19 s() XCHG
-            s13 19 s() XCHG
-            s12 19 s() XCHG
-            s11 19 s() XCHG
-            s10 19 s() XCHG
-            s9 19 s() XCHG
-            s0 19 s() XCHG
-            s0 s8 XCHG
-            s0 s7 XCHG
-            s0 s6 XCHG
-            5 -ROLL
-            45 s() PUSH
-            $CapsuleHub$_fun_entryLink INLINECALLDICT
             16 s() POP
             15 BLKDROP
-            3 1 BLKDROP2
-            20 s() 21 s() XCHG
-            19 s() 21 s() XCHG
-            18 s() 21 s() XCHG
-            17 s() 21 s() XCHG
-            16 s() 21 s() XCHG
-            s15 21 s() XCHG
-            s14 21 s() XCHG
-            s13 21 s() XCHG
-            s12 21 s() XCHG
-            s11 21 s() XCHG
-            s10 21 s() XCHG
-            s9 21 s() XCHG
-            s8 21 s() XCHG
-            s7 21 s() XCHG
-            s6 21 s() XCHG
-            s5 21 s() XCHG
-            s4 21 s() XCHG
-            s3 21 s() XCHG
-            s2 21 s() XCHG
+            5 1 BLKDROP2
+            SWAP
             $CapsuleHub$_fun_pushPublicParentIndex INLINECALLDICT
           }>ELSE<{
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            19 s() PUSH
-            18 s() 38 s() XCHG
-            17 s() 37 s() XCHG
-            16 s() 36 s() XCHG
-            s15 35 s() XCHG
-            s14 34 s() XCHG
-            s13 33 s() XCHG
-            s12 32 s() XCHG
-            s11 31 s() XCHG
-            s10 30 s() XCHG
-            s9 29 s() XCHG
-            s8 28 s() XCHG
-            s7 27 s() XCHG
-            s6 26 s() XCHG
-            s5 25 s() XCHG
-            s4 24 s() XCHG
-            s3 23 s() XCHG
+            20 s() 22 s() XCHG
+            19 s() 21 s() XCHG
+            18 s() 22 s() XCHG
+            17 s() 21 s() XCHG
+            16 s() 22 s() XCHG
+            s15 21 s() XCHG
+            s14 22 s() XCHG
+            s13 21 s() XCHG
+            s12 22 s() XCHG
+            s11 21 s() XCHG
+            s10 22 s() XCHG
+            s9 21 s() XCHG
+            s8 22 s() XCHG
+            s7 21 s() XCHG
+            s6 22 s() XCHG
+            s5 21 s() XCHG
+            s4 22 s() XCHG
+            s3 21 s() XCHG
             s2 22 s() XCHG
             s1 21 s() XCHG
-            s0 20 s() XCHG
-            52 s() PUSH
+            s0 22 s() XCHG
+            36 s() PUSH
             $CapsuleHub$_fun_publicAuthorKeyId INLINECALLDICT
-            18 s() 19 s() XCHG
-            17 s() 19 s() XCHG
-            16 s() 19 s() XCHG
-            s15 19 s() XCHG
-            s14 19 s() XCHG
-            s13 19 s() XCHG
-            s12 19 s() XCHG
-            s11 19 s() XCHG
-            s10 19 s() XCHG
-            s9 19 s() XCHG
-            s0 19 s() XCHG
-            s0 s8 XCHG
-            s0 s7 XCHG
-            s0 s6 XCHG
-            5 -ROLL
-            45 s() PUSH
-            $CapsuleHub$_fun_entryLink INLINECALLDICT
-            16 s() POP
-            15 BLKDROP
-            3 1 BLKDROP2
             20 s() 21 s() XCHG
             19 s() 21 s() XCHG
             18 s() 21 s() XCHG
@@ -4443,60 +4748,89 @@ PROGRAM{
             s11 21 s() XCHG
             s10 21 s() XCHG
             s9 21 s() XCHG
-            s8 21 s() XCHG
-            s7 21 s() XCHG
-            s6 21 s() XCHG
-            s5 21 s() XCHG
-            s4 21 s() XCHG
-            s3 21 s() XCHG
-            s2 21 s() XCHG
+            s0 21 s() XCHG
+            s0 s8 XCHG
+            s0 s7 XCHG
+            s0 s6 XCHG
+            5 -ROLL
+            21 s() PUSH
+            23 s() PUSH
             $CapsuleHub$_fun_pushPublicAuthorIndex INLINECALLDICT
+            s0 26 s() XCHG
+            IF:<{
+              23 s() POP
+              8 PUSHPOW2
+              ROT
+              s0 21 s() XCHG
+              22 s() PUSH
+              64 PUSHINT
+              __tact_dict_set_uint_uint INLINECALLDICT
+              s0 20 s() XCHG
+              s0 19 s() XCHG
+            }>ELSE<{
+              21 s() POP
+              21 s() POP
+            }>
+            21 s() 23 s() XCHG
+            18 s() 21 s() XCHG
+            17 s() 20 s() XCHG
+            16 s() 19 s() XCHG
+            s15 18 s() XCHG
+            s14 17 s() XCHG
+            s13 16 s() XCHG
+            s12 s15 XCHG
+            3 12 BLKSWAP
           }>
           64 PUSHINT
               NOW
-          s5 26 s() XCHG
-          s0 s4 XCHG
-          36 s() PUSH
-          s0 s4 XCHG
-          s3 24 s() XCHG
-          s2 25 s() XCHG
-          s1 24 s() XCHG
-          s0 26 s() XCHG
-          $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_parent_link_prev_link_header INLINECALLDICT
+          s6 34 s() XCHG
+          s0 s5 XCHG
+          37 s() PUSH
+          s0 s5 XCHG
+          s4 27 s() XCHG
+          s3 29 s() XCHG
+          s2 29 s() XCHG
+          s1 26 s() XCHG
+          s0 28 s() XCHG
+          $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_parent_link_prev_link_profile_prev_link_header INLINECALLDICT
           NEWC
           $PublicCapsuleEntry$_store_cell INLINECALLDICT
-          s3 s4 XCHG
-          s2 19 s() XCHG
+          s3 s5 XCHG
+          s2 22 s() XCHG
           s1 23 s() XCHG
           __tact_dict_set_uint_cell INLINECALLDICT
-          s0 s4 XCHG
+          s0 s5 XCHG
           INC
           180000 PUSHINT
           FALSE
               GETGASFEE
-          s14 18 s() XCHG
-          s13 17 s() XCHG
-          s12 16 s() XCHG
-          s11 s15 XCHG
-          s10 s14 XCHG
-          s9 s13 XCHG
-          s8 s12 XCHG
-          s7 s11 XCHG
-          s6 s10 XCHG
-          s1 s9 XCHG
-          s4 s8 XCHG
-          s3 s7 XCHG
-          s5 s6 XCHG
-          s5 s4 s0 XCHG3
-          s3 21 s() XCHG
-          s0 19 s() XCHG
-          s0 s2 XCHG
+          s15 20 s() XCHG
+          s14 19 s() XCHG
+          s13 18 s() XCHG
+          s12 17 s() XCHG
+          s11 16 s() XCHG
+          s10 s15 XCHG
+          s9 s14 XCHG
+          s8 s13 XCHG
+          s7 s12 XCHG
+          s1 s11 XCHG
+          s5 s10 XCHG
+          s4 s9 XCHG
+          s6 s8 XCHG
+          s2 s7 XCHG
+          s3 s6 XCHG
+          s4 21 s() XCHG
+          s3 26 s() XCHG
+          s1 21 s() XCHG
+          s0 26 s() XCHG
           2 PUSHINT
           $CapsuleHub$_fun_batchStorageReserveWithBuffer INLINECALLDICT
-          s1 20 s() XCHG
+          s1 27 s() XCHG
           ADD
           s1 24 s() XCHG
           ADD
+          19 s() 22 s() XCHG
+          18 s() 21 s() XCHG
           17 s() 20 s() XCHG
           16 s() 19 s() XCHG
           s15 18 s() XCHG
@@ -4514,13 +4848,14 @@ PROGRAM{
           s3 s6 XCHG
           s5 s4 s0 XCHG3
           s3 23 s() XCHG
-          s2 23 s() XCHG
-          s1 22 s() XCHG
-          s0 23 s() XCHG
+          s0 25 s() XCHG
+          s0 s2 XCHG
           $CapsuleHub$_fun_accumulateBatchUid INLINECALLDICT
         }>
         s0 23 s() XCHG
         INC
+        21 s() 25 s() XCHG
+        20 s() 24 s() XCHG
         19 s() 23 s() XCHG
         18 s() 22 s() XCHG
         17 s() 21 s() XCHG
@@ -4538,76 +4873,78 @@ PROGRAM{
         s5 s9 XCHG
         s4 s8 XCHG
         s3 s7 XCHG
-        s0 s6 s6 XCHG3
-        s0 s5 XCHG
-        s0 s4 XCHG
-        s0 s3 XCHG
+        s0 s1 s6 XCHG3
+        s5 s3 XCHG2
+        s1 s4 XCHG
       }>
       27 s() POP
-      28 s() POP
+      30 s() POP
       2DROP
       13530 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       SWAP
-      s0 27 s() XCHG
+      s0 29 s() XCHG
       GEQ
-      s1 26 s() XCHG
+      s1 28 s() XCHG
       THROWANYIFNOT
-      24 s() PUSH
+      26 s() PUSH
       IF:<{
-        s0 s12 XCHG
-        19 s() PUSH
+        s0 s14 XCHG
+        24 s() PUSH
         ADD
       }>ELSE<{
-        s0 s11 XCHG
-        19 s() PUSH
+        s0 s13 XCHG
+        24 s() PUSH
         ADD
-        s0 s11 XCHG
-        s0 s12 XCHG
+        s0 s13 XCHG
+        s0 s14 XCHG
       }>
-      s0 s8 XCHG
+      s0 s10 XCHG
       23 s() PUSH
       ADD
-      s0 24 s() XCHG
+      s0 26 s() XCHG
       IF:<{
+        19 s() 20 s() XCHG
+        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
         s14 s15 XCHG
-        s13 s14 XCHG
+        s9 s14 XCHG
         s12 s13 XCHG
-        s7 s12 XCHG
+        s11 s12 XCHG
         s10 s11 XCHG
-        s9 s10 XCHG
-        s8 s9 XCHG
-        s8 23 s() XCHG
-        7 ROLL
-        s0 23 s() XCHG
+        s10 25 s() XCHG
+        9 ROLL
+        s0 25 s() XCHG
         23 s() PUSH
         $CapsuleHub$_fun_evictExpiredPrivate INLINECALLDICT
       }>ELSE<{
+        19 s() 20 s() XCHG
+        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
         s14 s15 XCHG
-        s13 s14 XCHG
+        s9 s14 XCHG
         s12 s13 XCHG
-        s7 s12 XCHG
+        s11 s12 XCHG
         s10 s11 XCHG
-        s9 s10 XCHG
-        s8 s9 XCHG
-        s8 23 s() XCHG
-        7 ROLL
-        s0 23 s() XCHG
+        s10 25 s() XCHG
+        9 ROLL
+        s0 25 s() XCHG
         23 s() PUSH
         $CapsuleHub$_fun_evictExpiredPublic INLINECALLDICT
       }>
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
       18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
+      s0 24 s() XCHG
       $CapsuleHub$_fun_batchStorageReserveWithBuffer INLINECALLDICT
       23 s() PUSH
       SWAP
@@ -4616,21 +4953,21 @@ PROGRAM{
       ADD
       6 PUSHINT
           RAWRESERVE
-      s0 18 s() XCHG
-      0 PUSHINT
       s0 23 s() XCHG
+      0 PUSHINT
+      s0 25 s() XCHG
       FALSE
       s0 23 s() XCHG
       7 PUSHPOW2
-      s0 22 s() XCHG
+      s0 25 s() XCHG
       $CapsuleHubBatchAck$_constructor_publish_id_first_entry_id_part_count_batch_uid INLINECALLDICT
       NEWC
       $CapsuleHubBatchAck$_store_cell INLINECALLDICT
-      16 s() PUSH
+      18 s() PUSH
       s0 s4 XCHG
-      s3 23 s() XCHG
+      s3 25 s() XCHG
       s2 22 s() XCHG
-      s0 20 s() XCHG
+      s0 23 s() XCHG
       SWAP
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
@@ -4650,6 +4987,8 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
+      s15 20 s() XCHG
+      s14 19 s() XCHG
       s13 18 s() XCHG
       s12 17 s() XCHG
       s11 16 s() XCHG
@@ -4662,6 +5001,7 @@ PROGRAM{
       s4 s9 XCHG
       s3 s8 XCHG
       s7 s1 s5 XCHG3
+      s0 s3 XCHG
       s4 s4 XCHG2
       s0 s6 XCHG
       $CapsuleHub$_contract_store INLINECALLDICT
@@ -4671,9 +5011,11 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 18 s() XCHG
+      s0 20 s() XCHG
       128 LDU
       DROP
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -4689,27 +5031,27 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 19 s() XCHG
+      s0 21 s() XCHG
       s1 s3 s0 XCHG3
       $CapsuleHub$_fun_requireSealed INLINECALLDICT
       13200 PUSHINT
-      20 s() PUSH
+      22 s() PUSH
       0 GTINT
       THROWANYIFNOT
       13201 PUSHINT
-      20 s() PUSH
-      s10 PUSH
+      22 s() PUSH
+      s12 PUSH
       LEQ
       THROWANYIFNOT
       13205 PUSHINT
-      20 s() PUSH
+      22 s() PUSH
       10000000 PUSHINT
       GEQ
       IF:<{
         TRUE
       }>ELSE<{
-        20 s() PUSH
-        s10 PUSH
+        22 s() PUSH
+        s12 PUSH
         EQUAL
       }>
       THROWANYIFNOT
@@ -4723,45 +5065,48 @@ PROGRAM{
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       SUB
-      17 s() 19 s() XCHG
-      5 15 REVERSE
-      s14 18 s() XCHG
-      s13 19 s() XCHG
-      s12 18 s() XCHG
-      s11 19 s() XCHG
-      s10 18 s() XCHG
-      s9 19 s() XCHG
-      s8 18 s() XCHG
-      s7 19 s() XCHG
-      s6 18 s() XCHG
-      s5 19 s() XCHG
-      s4 18 s() XCHG
-      s3 19 s() XCHG
-      s2 18 s() XCHG
-      s1 19 s() XCHG
-      s0 18 s() XCHG
-      13206 PUSHINT
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 21 s() XCHG
+      16 s() 20 s() XCHG
+      s15 21 s() XCHG
+      s14 20 s() XCHG
+      s13 21 s() XCHG
+      s12 20 s() XCHG
+      s11 21 s() XCHG
+      s10 20 s() XCHG
+      s9 21 s() XCHG
+      s8 20 s() XCHG
+      s7 21 s() XCHG
+      s6 20 s() XCHG
+      s5 21 s() XCHG
+      s4 20 s() XCHG
+      s3 21 s() XCHG
+      s2 20 s() XCHG
+      s1 21 s() XCHG
       s0 20 s() XCHG
+      13206 PUSHINT
+      s0 22 s() XCHG
       $CapsuleHub$_fun_protectedReserve INLINECALLDICT
-      s1 20 s() XCHG
+      s1 22 s() XCHG
       GEQ
-      s1 20 s() XCHG
+      s1 22 s() XCHG
       THROWANYIFNOT
-      s0 s6 XCHG
-      19 s() PUSH
+      s0 s8 XCHG
+      21 s() PUSH
       SUB
-      19 s() PUSH
+      21 s() PUSH
       2000000 PUSHINT
       ADD
       TRUE
       1 PUSHINT
-      s0 22 s() XCHG
+      s0 24 s() XCHG
       $DepositProtocolFee$_constructor_amount INLINECALLDICT
       NEWC
       $DepositProtocolFee$_store_cell INLINECALLDICT
-      19 s() PUSH
+      21 s() PUSH
       s0 s4 XCHG
-      s0 23 s() XCHG
+      s0 25 s() XCHG
       SWAP
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
@@ -4781,6 +5126,8 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
+      17 s() 20 s() XCHG
+      16 s() 19 s() XCHG
       s15 18 s() XCHG
       s14 17 s() XCHG
       s13 16 s() XCHG
@@ -4789,13 +5136,10 @@ PROGRAM{
       s10 s13 XCHG
       s9 s12 XCHG
       s8 s11 XCHG
-      s7 s10 XCHG
+      s8 s10 XCHG
       s6 s9 XCHG
-      s6 s8 XCHG
-      s4 s7 XCHG
-      s3 s6 XCHG
-      s5 s3 s3 XCHG3
-      s0 s4 XCHG
+      3 6 BLKSWAP
+      s1 s2 XCHG
       $CapsuleHub$_contract_store INLINECALLDICT
     }>
     OVER
@@ -4803,7 +5147,9 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      18 s() POP
+      20 s() POP
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
       16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
@@ -4815,9 +5161,11 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 18 s() XCHG
+      s0 20 s() XCHG
       128 LDU
       DROP
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -4833,15 +5181,15 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 19 s() XCHG
+      s0 21 s() XCHG
       s1 s3 s0 XCHG3
       $CapsuleHub$_fun_requireSealed INLINECALLDICT
       13220 PUSHINT
-      20 s() PUSH
+      22 s() PUSH
       0 GTINT
       THROWANYIFNOT
       13221 PUSHINT
-      20 s() PUSH
+      22 s() PUSH
       10000000 PUSHINT
       GEQ
       THROWANYIFNOT
@@ -4855,46 +5203,48 @@ PROGRAM{
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       SUB
-      18 s() 19 s() XCHG
-      17 s() 19 s() XCHG
-      16 s() 19 s() XCHG
-      s15 19 s() XCHG
-      s14 19 s() XCHG
-      s13 19 s() XCHG
-      s12 19 s() XCHG
-      s11 19 s() XCHG
-      s10 19 s() XCHG
-      s9 19 s() XCHG
-      s0 19 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 21 s() XCHG
+      17 s() 21 s() XCHG
+      16 s() 21 s() XCHG
+      s15 21 s() XCHG
+      s14 21 s() XCHG
+      s13 21 s() XCHG
+      s12 21 s() XCHG
+      s11 21 s() XCHG
+      s10 21 s() XCHG
+      s9 21 s() XCHG
+      s0 21 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       $CapsuleHub$_fun_protectedReserve INLINECALLDICT
       13223 PUSHINT
-      21 s() PUSH
+      23 s() PUSH
       s2 PUSH
       GREATER
       THROWANYIFNOT
-      s1 20 s() XCHG
+      s1 22 s() XCHG
       SUB
-      20 s() PUSH
+      22 s() PUSH
       13224 PUSHINT
       s0 s2 XCHG
       LEQ
       THROWANYIFNOT
-      19 s() PUSH
+      21 s() PUSH
       2000000 PUSHINT
       ADD
       TRUE
       1 PUSHINT
-      s0 22 s() XCHG
+      s0 24 s() XCHG
       $DepositProtocolFee$_constructor_amount INLINECALLDICT
       NEWC
       $DepositProtocolFee$_store_cell INLINECALLDICT
-      20 s() PUSH
+      22 s() PUSH
       s0 s4 XCHG
-      s0 23 s() XCHG
+      s0 25 s() XCHG
       SWAP
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
@@ -4914,6 +5264,8 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
       16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
@@ -4921,15 +5273,17 @@ PROGRAM{
       2 13 BLKSWAP
       $CapsuleHub$_contract_store INLINECALLDICT
     }>
-    20 s() POP
+    22 s() POP
     0 EQINT
-    s0 19 s() XCHG
+    s0 21 s() XCHG
     33 LESSINT
-    s1 19 s() XCHG
+    s1 21 s() XCHG
     AND
     IFJMP:<{
       13999 PUSHINT
       THROWANY
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
       16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
@@ -4937,7 +5291,7 @@ PROGRAM{
       $CapsuleHub$_contract_store INLINECALLDICT
     }>
     15 BLKDROP
-    4 BLKDROP
+    6 BLKDROP
     130 THROW
   }>
 }END>c

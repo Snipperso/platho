@@ -160,7 +160,24 @@ describe('UsernameRegistry foundation milestone', () => {
   });
 
   it('USERNAME-REG-M9-03A: collection getter exposes TEP-64 on-chain collection metadata', async () => {
-    const { registry, treasuryAthReceiver } = await deployRegistry();
+    const { registry, deployer, treasuryAthReceiver } = await deployRegistry();
+
+    // clean-11: collection metadata (description + avatar + banner data-URIs) is genesis-uploaded as COMPLETE
+    // TEP-64 snake value cells then sealed, exactly like `art`. collectionContent() throws 19360 until meta_sealed,
+    // so the getter is only conformant once the 3 parts are present and locked.
+    const snake = (s: string) => beginCell().storeUint(0, 8).storeBuffer(Buffer.from(s, 'utf8')).endCell();
+    const metaDescription = 'Platho usernames — on-chain, post-quantum identity.';
+    const metaImage = 'data:image/svg+xml;base64,PHN2Zy8+';
+    const metaCover = 'data:image/png;base64,iVBORw0KGgo=';
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'UploadCollectionMeta', key: 1n, data: snake(metaDescription) });
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'UploadCollectionMeta', key: 2n, data: snake(metaImage) });
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'UploadCollectionMeta', key: 3n, data: snake(metaCover) });
+    expect(await registry.getGetMetaCount()).toBe(3n);
+    expect(await registry.getGetMetaSealed()).toBe(false);
+    // getter must revert with 19360 until sealed (fail-closed: never expose half-built collection metadata)
+    await expect(registry.getGetCollectionData()).rejects.toThrow(/19360/);
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealCollectionMeta' });
+    expect(await registry.getGetMetaSealed()).toBe(true);
 
     const collection = await registry.getGetCollectionData();
     const content = collection.collection_content.beginParse();
@@ -170,6 +187,9 @@ describe('UsernameRegistry foundation milestone', () => {
     expect(collection.next_item_index).toBe(-1n);
     expect(collection.owner_address.equals(treasuryAthReceiver)).toBe(true);
     expect(readSnakeText(metadata.get(metadataKey('name')))).toBe('Platho usernames');
+    expect(readSnakeText(metadata.get(metadataKey('description')))).toBe(metaDescription);
+    expect(readSnakeText(metadata.get(metadataKey('image')))).toBe(metaImage);
+    expect(readSnakeText(metadata.get(metadataKey('cover_image')))).toBe(metaCover);
   });
 
   it('USERNAME-REG-M9-03B: unordered collection sentinel is not accepted as an item index', async () => {

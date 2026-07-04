@@ -40,6 +40,40 @@ function privateHeader1Bytes(createdAtSec: number) {
 }
 
 describe('CapsuleHub TON RPC provider', () => {
+  it('CAPHUB-RPC-PROFILE-01: get_public_entry decodes clean-11 14-field (profile_prev_link) AND clean-10 13-field (0n)', async () => {
+    const headerMarker = tonCell.beginCell().endCell();
+    const baseFields = () => ([
+      num(1n),  // exists
+      num(7n),  // entry_id
+      num(0n),  // entry_uid
+      num(0n),  // publish_id
+      { type: 'slice', value: encodeTonAddressSliceBoc(AUTHOR) },
+      num(0n), num(0n), num(0n), num(0n), num(0n),
+      num(0n),  // parent_link
+      num(3n),  // prev_link
+    ]);
+    const transportFor = (fieldCount: number) => ({
+      async runGetMethod() {
+        const stack = fieldCount === 14
+          ? [...baseFields(), num(42n), { type: 'cell', value: cellBoc(headerMarker) }] // profile_prev_link=42 @12, header @13
+          : [...baseFields(), { type: 'cell', value: cellBoc(headerMarker) }];          // header @12
+        return { stack };
+      },
+    });
+    const clean11 = await createCapsuleHubTonRpcProvider({ capsuleHubAddress: CAPSULE, transport: transportFor(14) }).getPublicEntry(7n, { cacheTtlMs: 0 });
+    expect(clean11.prev_link).toBe(3n);
+    expect(clean11.profile_prev_link).toBe(42n);
+    expect(typeof clean11.header_boc).toBe('string');
+    const clean10 = await createCapsuleHubTonRpcProvider({ capsuleHubAddress: CAPSULE, transport: transportFor(13) }).getPublicEntry(7n, { cacheTtlMs: 0 });
+    expect(clean10.prev_link).toBe(3n);
+    expect(clean10.profile_prev_link).toBe(0n); // clean-10 has no profile_prev_link -> uniform 0n for callers
+    expect(typeof clean10.header_boc).toBe('string');
+    // A malformed length (not 13 or 14) is rejected.
+    await expect(
+      createCapsuleHubTonRpcProvider({ capsuleHubAddress: CAPSULE, transport: { async runGetMethod() { return { stack: baseFields() }; } } }).getPublicEntry(7n, { cacheTtlMs: 0 }),
+    ).rejects.toThrow(/ABI mismatch/);
+  });
+
   it('CAPHUB-RPC-00: forwards cache, priority, and verify options to shared transport', async () => {
     const calls: any[] = [];
     const transport = {

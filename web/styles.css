@@ -2010,6 +2010,139 @@ button.feed-item:hover {
   margin: -24px -24px 0;
 }
 
+/* Discovery panel: mirrors the post-detail overlay (shown over the feed, same bleed-to-edges header). */
+.public-discovery {
+  display: none;
+  min-height: 0;
+}
+
+.public-pane[data-discover-open="true"] {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.public-pane[data-discover-open="true"] > .pane-header,
+.public-pane[data-discover-open="true"] > .public-header-actions,
+.public-pane[data-discover-open="true"] > .public-channel-search-row,
+.public-pane[data-discover-open="true"] > .public-feed,
+.public-pane[data-discover-open="true"] > .public-jump-down-button {
+  display: none;
+}
+
+.public-pane[data-discover-open="true"] > .public-discovery {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  margin: -24px -24px 0;
+}
+
+.public-post-detail-header .avatar .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.public-discovery-body {
+  overflow-y: auto;
+  padding: 16px 24px 24px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.discovery-tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.discovery-tag-filter .channel-about-tag {
+  cursor: pointer;
+  border: 1px solid rgba(48, 213, 176, 0.24);
+}
+
+.discovery-tag-filter .channel-about-tag[aria-pressed="true"] {
+  background: var(--accent);
+  color: #05201a;
+}
+
+.discovery-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.discovery-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.discovery-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.discovery-card-desc {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.discovery-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.discovery-follow-button {
+  padding: 7px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #05201a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discovery-follow-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.discovery-status {
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 12px;
+}
+
+/* Newcomer call-to-action card at the top of the feed. */
+.discovery-cta {
+  display: grid;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.discovery-cta h2 {
+  margin: 0;
+}
+
+.discovery-cta p {
+  margin: 0;
+  color: var(--muted);
+}
+
 /* The detail container bleeds to the pane edges, so this header (filling it) lines up with the private chat header.
    Give it its own column track (back + avatar + title + actions) so it renders the same at every width — the shared
    conversation-header grid assumes the Back button is hidden on desktop (the private two-pane layout), which doesn't
@@ -2127,6 +2260,76 @@ button.feed-item:hover {
   height: 30px;
   min-height: 30px;
   padding: 0;
+}
+
+/* The channel "about" (description + tags) button sits just left of the "Display as" chevron in the author row.
+   It also carries margin-left:auto so, when present, it absorbs the free space and the chevron (also auto) sits
+   flush beside it — rendering as an adjacent [about][chevron] cluster pinned to the right edge. */
+.icon-button.feed-author-about {
+  margin-left: auto;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+.feed-author-about svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Channel-description popover body (reuses the shared .identity-popover shell for position + outside-click). */
+.channel-about-popover {
+  display: grid;
+  gap: 8px;
+}
+
+.channel-about-description {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.channel-about-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.channel-about-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.channel-about-tag {
+  padding: 2px 8px;
+  border: 1px solid rgba(48, 213, 176, 0.24);
+  border-radius: 999px;
+  background: rgba(48, 213, 176, 0.08);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.channel-about-edit {
+  margin-top: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.channel-about-edit:hover {
+  border-color: rgba(48, 213, 176, 0.24);
+  background: rgba(48, 213, 176, 0.08);
 }
 
 .balance-grid {

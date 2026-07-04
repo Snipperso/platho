@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-04T08:53:26.036Z",
+  "generatedAt": "2026-07-04T20:47:27.737Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 136,
-    "totalBytes": 4443113,
-    "bundleSha256": "38ddfe2409dd06610e06dcca19f48ef45f412db140ae0a7fdab55953795a325b",
+    "totalBytes": 4524951,
+    "bundleSha256": "8cb2f704c38b0522a982fab246693d187a6b1fe6dec78c8888d9f217c72a3b15",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1136116,
-        "sha256": "f792cd16521d6bf8b9f46fedef2f00f37227359d13e2f2fb4740ba2ba15915d0"
+        "bytes": 1184432,
+        "sha256": "5822654ecfcd56ccf118f8b9d3d8c59688d2b08684a3d35046cc8d8e3e65410c"
       },
       {
         "path": "assets/icons/back.svg",
@@ -179,13 +179,13 @@
       },
       {
         "path": "capsule-part-policy.mjs",
-        "bytes": 12049,
-        "sha256": "68b73810d16db58314b6cef9d490fa995e4e95406736eede9ab9c289f682373c"
+        "bytes": 15274,
+        "sha256": "3a1d574f96008f0573f697559febb44014c9b6312c7d87b523c230a24d0a0ba4"
       },
       {
         "path": "capsulehub-ton-rpc-provider.mjs",
-        "bytes": 51820,
-        "sha256": "2ad9fc5f3776a50244c24a52ebc4a84215f2bb1e8ba7226e240cb4e2c4ed00a1"
+        "bytes": 53934,
+        "sha256": "7eb2a655aed881b146c8c908d2cbb3887095d7c27e96fcb34cae84f3f8276766"
       },
       {
         "path": "channels/platho.app/feed.json",
@@ -219,18 +219,18 @@
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 602692,
-        "sha256": "36829f0246e2534048fcf4b7d5cacc5a280bf6bb32f13dc42dd40f6d0b3490d4"
+        "bytes": 621032,
+        "sha256": "5ca44fb654779704887e2f7974be5c0f3f63b3cc853820157317f325f946e96f"
       },
       {
         "path": "i18n.mjs",
         "bytes": 4607,
-        "sha256": "0cf4b17bba104980cb306c4850c1b3d15b9d8b5373b20a2f4f8a80a75cac4817"
+        "sha256": "7a214597b26cd8faa5e0304623cf23773015e902220e808f9e902734daa676c7"
       },
       {
         "path": "index.html",
-        "bytes": 49999,
-        "sha256": "b59b5feaa831b27c4b47de26a7160928573975c047185edc2ddffa758b813619"
+        "bytes": 51971,
+        "sha256": "8285db149ed242d33c71e392f70db87bbde7250c29f8f87a791ff619f9433204"
       },
       {
         "path": "manifest.webmanifest",
@@ -244,13 +244,13 @@
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 18082,
-        "sha256": "4e992cf98b14e4f63e27ac24693798990cf438482f7fcdc16125de50bd15a910"
+        "bytes": 18570,
+        "sha256": "f5353aa807fb4031c1cfa56bef995eb20fc2ebe5211a1c9d5fa2eea2ad889d45"
       },
       {
         "path": "platho-wallet.mjs",
         "bytes": 24746,
-        "sha256": "fb8b41447ca1f7b4ac7ccb0ec18f294c5a9e1f774c53c1526068e09b149c3848"
+        "sha256": "81b1d54e75bb9a1fd6d223885c684b5943fdfc123b989a5f9fe1bd2afe23f3cc"
       },
       {
         "path": "profile-avatar-media-store.mjs",
@@ -264,18 +264,18 @@
       },
       {
         "path": "public-channel-subscriptions.mjs",
-        "bytes": 19193,
-        "sha256": "8f9b0399ac55db4bb7067c1e55524e8524d3cead432fc7158d337593f20fcb21"
+        "bytes": 21251,
+        "sha256": "36654bc107af70d29d4f6f2f2e913856ee0110453e35bf60594beefc0f3f1010"
       },
       {
         "path": "publish-batch-orchestration.mjs",
-        "bytes": 11128,
-        "sha256": "59ea3b7242b7510eaa47321e773dd9402117a07a6519d06fd12092d11fe2d6b4"
+        "bytes": 11398,
+        "sha256": "4d6bcc60ad15ba30ba1303cd8a0062de249df44784c573dacd97a887083b6e85"
       },
       {
         "path": "pwa-contract-transactions.mjs",
-        "bytes": 92609,
-        "sha256": "fba109cb868527b34a86b70a8e73063ab379a17cb3d4fe838fd0b0d26542ced9"
+        "bytes": 93573,
+        "sha256": "64fff9d3b4b1ffe83cf96e740dd7e2d1529ae0dad80217519d72fb2b6564091b"
       },
       {
         "path": "qr-code.mjs",
@@ -294,18 +294,18 @@
       },
       {
         "path": "styles.css",
-        "bytes": 84686,
-        "sha256": "4cf81ec44bedbb75f9bcdaf1b39ca1e1177f54fa9a3f801ba5efe70f3dcce58f"
+        "bytes": 88777,
+        "sha256": "1d88ac3b2f646c8b5c881712bd20cb93755989af67d8f289060b5861cf7cf5c7"
       },
       {
         "path": "sw.js",
         "bytes": 6712,
-        "sha256": "b02025c6b7df3ec747cda4266c63e50774d2e86de92e53765192e6f0a369ee9e"
+        "sha256": "483cb3b2898ca012ca87c5848b65e37b0a4046f65c90f351953605aa218197e6"
       },
       {
         "path": "ton-dns-provider.mjs",
         "bytes": 11673,
-        "sha256": "ab52f021527afcb5d973ed635041e4f9aa8abc72dff9bd7aa4e5a78c7e6b127d"
+        "sha256": "b65bc22a815f78737b1f5a1630285fa53b26058e2a512f3fd85e4119322d3396"
       },
       {
         "path": "ton-mnemonic-wordlist.mjs",
@@ -320,12 +320,12 @@
       {
         "path": "vault-chain-provider.mjs",
         "bytes": 7815,
-        "sha256": "8a20d70956372cc1ba2eccc387861cb73af9ee6315cdfa9fbec5f74c4152b3dd"
+        "sha256": "122356865aece5b33fa6ee3a8522a3ee2df01ab76d4928af53ca8662bb056eb8"
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
         "bytes": 99858,
-        "sha256": "cc7feca0a1a0f02d7246fe1dd43c11f59e4cd8ea65059bf78e4f873f5d6b90b7"
+        "sha256": "29a476462e69538b040ad8efe383ee5866046eff3703640dd02090b417aabe2a"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",
@@ -947,11 +947,18 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": true
+    "productionMarkersCleared": false
   },
   "blockers": [],
   "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION"
+    "STATIC_PACKAGE_IS_NON_PRODUCTION",
+    "MAINNET_GENESIS_NOT_VERIFIED"
   ],
-  "productionFindings": []
+  "productionFindings": [
+    {
+      "id": "MAINNET_GENESIS_NOT_VERIFIED",
+      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
+      "message": "Current release candidate has no verified final mainnet genesis evidence."
+    }
+  ]
 }

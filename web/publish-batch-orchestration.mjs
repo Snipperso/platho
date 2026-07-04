@@ -13,7 +13,7 @@ import {
   batchChargeFloor,
   buildBatchPublishExternalVariants,
   buildBatchPublishPartsRoot,
-} from './pwa-contract-transactions.mjs?v=31';
+} from './pwa-contract-transactions.mjs?v=33';
 import { batchHoldNanotons } from './message-pricing-policy.mjs?v=13';
 
 export { MAX_BATCH_PARTS };
@@ -120,6 +120,9 @@ export function publishItemToBatchPart(item, kindLabel = publishItemKindLabel(it
       // (publishPublicParentLink -> parentEntryId+1, 0 when absent), so without it EVERY comment published as a
       // top-level post (author-indexed) and get_public_parent_index stayed empty for every post since genesis.
       parent_entry_id: publish.parent_entry_id ?? publish.parentEntryId,
+      // clean-11: SAME drop-bug class — carry is_profile so buildBatchPublishPartCell sets the reserved bit0.
+      // Absent/false for normal posts; true only for a gated channel-profile publish.
+      is_profile: (publish.is_profile ?? publish.isProfile) === true,
     };
   }
   return {

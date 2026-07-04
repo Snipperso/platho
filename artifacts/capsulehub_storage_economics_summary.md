@@ -4,7 +4,7 @@ Status: **PASS**
 
 Sandbox evidence for canonical final CapsuleHub index cells. Body payload cells are validated in the publish transaction and authenticated by stored hashes, but only compact headers/indexes remain in CapsuleHub state. Pages are virtual ranges derived from entry ids. Retained margin includes accrued protocol fee because FlushFees is gated by protectedReserve(), so accrued fee cannot be drained while index storage reserve is not backed. This is not a mainnet storage-rent oracle.
 
-CapsuleHub code hash: `b7ec6e2dfa9426ebab383883c85fe47a0d126c940b41ee614ef9b2c30f84d21a`
+CapsuleHub code hash: `cbd14315cb61365039df65b48874cbf10cf31fbab9d2d4009cc08ac4b6feb344`
 Minimum retained margin gate: **1000000 nanotons**.
 
 | Case | Inbound | Fee delta | Balance delta | Retained non-fee | Required storage | Margin |

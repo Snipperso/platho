@@ -54,7 +54,7 @@ const CAPSULEHUB_ENTRY_KIND_PUBLIC: Int = 2;
 const MAX_BATCH_PARTS: Int = 8;
 const HUB_BATCH_BASE_GAS: Int = 14000;
 const HUB_PART_GAS_PRIVATE: Int = 170000; // add (2 index pushes + payload validation) + auto-evict one (2 index un-pushes + header parse + del); provisional, measured-tightened
-const HUB_PART_GAS_PUBLIC: Int = 180000;  // add (1 index push + author-key hash) + auto-evict one (1 index un-push + del); provisional, measured-tightened
+const HUB_PART_GAS_PUBLIC: Int = 180000;  // add (1 index push + author-key hash; clean-11 is_profile: +1 profile-index set + head store) + auto-evict one (1 index un-push + del; clean-11: +1 profile-index get, occasional del); provisional, measured-tightened
 const HUB_MIN_PER_PART_VALUE: Int = 1000000; // loose O(1) Phase-A lower bound (gross-underfunding early bounce)
 const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN: Int = 0x45504931; // "EPI1" per-entry publish_id derivation
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
@@ -160,6 +160,10 @@ struct PublicCapsuleEntry {
     // Backward link in whichever public index this entry lives in (author chain for posts,
     // parent chain for comments). Mirrors PrivateCapsuleEntry.recipient_prev_link.
     prev_link: Int as uint64;
+    // clean-11: backward link in the GLOBAL profile chain (0 for non-profile posts and for the first profile
+    // ever). Threaded ONLY when is_profile is set; lets a client walk EVERY described channel newest-first from
+    // public_profile_head without a global scan. Mirrors prev_link's role but across the single global profile list.
+    profile_prev_link: Int as uint64;
     header: Cell;
 }
 
@@ -207,6 +211,7 @@ struct PublicCapsuleEntryView {
     body_hash: Int;
     parent_link: Int;
     prev_link: Int;
+    profile_prev_link: Int;   // clean-11
     header: Cell;
 }
 
@@ -249,6 +254,13 @@ contract CapsuleHub {
     // ever delete a chain TAIL, so backward walks never hit a hole and entry_count stays exact.
     public_oldest_live_id: Int as uint64;
     private_oldest_live_id: Int as uint64;
+    // clean-11 channel-description discovery:
+    //  - public_profile_index: hash(author) -> entryLink of that author's LATEST profile post (O(1) "this channel's
+    //    current profile"; may dangle to an evicted entry — readers tolerate via get_public_entry(...).exists).
+    //  - public_profile_head: entryLink of the newest profile post globally (0 = none). Head of a singly-linked
+    //    global chain threaded through PublicCapsuleEntry.profile_prev_link, walked newest-first for COMPLETE discovery.
+    public_profile_index: map<Int as uint256, Int as uint64>;
+    public_profile_head: Int as uint64;
 
     init(fee_accumulator_address: Address, vault_address: Address, vault_bound: Bool, sealed: Bool, deployment_manifest_hash: Int, genesis_controller_address: Address) {
         self.fee_accumulator_address = fee_accumulator_address;
@@ -270,6 +282,8 @@ contract CapsuleHub {
         self.public_parent_index = emptyMap();
         self.public_oldest_live_id = 0;
         self.private_oldest_live_id = 0;
+        self.public_profile_index = emptyMap();   // clean-11
+        self.public_profile_head = 0;             // clean-11
     }
 
     fun requireSealed() {
@@ -644,7 +658,14 @@ contract CapsuleHub {
                 } else {
                     let entryLink: Int = self.entryLink(oid);
                     if (entry.parent_link == 0) {
-                        self.prunePublicAuthorIndex(self.publicAuthorKeyId(entry.author_wallet), entryLink, entry.prev_link);
+                        let authorKey: Int = self.publicAuthorKeyId(entry.author_wallet);
+                        self.prunePublicAuthorIndex(authorKey, entryLink, entry.prev_link);
+                        // clean-11: reclaim the per-author profile pointer if THIS evicted post was its target,
+                        // so public_profile_index stays bounded by LIVE profiles (mirrors the author-index del-at-zero).
+                        let profOpt: Int? = self.public_profile_index.get(authorKey);
+                        if ((profOpt != null) && (profOpt!! == entryLink)) {
+                            self.public_profile_index.del(authorKey);
+                        }
                     } else {
                         self.prunePublicParentIndex(self.entryIdFromLink(entry.parent_link), entryLink, entry.prev_link);
                     }
@@ -851,22 +872,36 @@ contract CapsuleHub {
                 let header: Cell = part.loadRef();
                 let body: Cell = part.loadRef();
                 if (!isLast) { nextCell = part.loadRef(); }
-                throwUnless(13521, reserved == 0);
+                // clean-11: bit0 (0x01) = is_profile (client PDC1 PROFILE=7 body signal); bits 1..7 stay reserved (0).
+                throwUnless(13521, (reserved & 254) == 0);   // 254 == 0b11111110
+                let isProfile: Bool = (reserved & 1) == 1;
                 throwUnless(13522, self.isAllowedPublicSizeClass(sizeClass));
                 throwUnless(13523, (h0 != 0) && (bh != 0));
                 // parentLink == 0 -> post; else parentLink == parentEntryId+1 and the parent must strictly precede.
                 // The parent is NOT required to still exist (it may have been evicted) nor to be a top-level post
                 // (a comment may reply to a comment) — intentional: each entry is independently funded and the
                 // thread is reassembled client-side. The only guard is that the parent id precedes this entry.
+                // clean-11: an is_profile flag is valid ONLY on a top-level post (a channel's own description).
+                // A comment (parentLink != 0) carrying it is malformed -> fail-closed.
+                throwUnless(13529, (!isProfile) || (parentLink == 0));
                 throwUnless(13528, (parentLink == 0) || (parentLink <= entryId));
                 self.requirePublicHeaderCell(header, h0, 13524, 13525);
                 self.requirePublicPayloadCell(body, bh, sizeClass, 13526, 13527);
                 let uid: Int = self.computeVaultPublicEntryUid(entryId, entryPublishId, msg.author_wallet, h0, bh);
+                let entryLink: Int = self.entryLink(entryId);
                 let publicPrevLink: Int = 0;
+                let profilePrevLink: Int = 0;                       // clean-11: 0 for non-profile posts
                 if (parentLink == 0) {
-                    publicPrevLink = self.pushPublicAuthorIndex(self.publicAuthorKeyId(msg.author_wallet), self.entryLink(entryId));
+                    let authorKey: Int = self.publicAuthorKeyId(msg.author_wallet);
+                    publicPrevLink = self.pushPublicAuthorIndex(authorKey, entryLink);
+                    if (isProfile) {
+                        // per-author pointer (latest profile for this channel) + global profile chain head-insert
+                        self.public_profile_index.set(authorKey, entryLink);
+                        profilePrevLink = self.public_profile_head;
+                        self.public_profile_head = entryLink;
+                    }
                 } else {
-                    publicPrevLink = self.pushPublicParentIndex(self.entryIdFromLink(parentLink), self.entryLink(entryId));
+                    publicPrevLink = self.pushPublicParentIndex(self.entryIdFromLink(parentLink), entryLink);
                 }
                 self.public_entries.set(entryId, PublicCapsuleEntry {
                     publish_id: entryPublishId,
@@ -875,6 +910,7 @@ contract CapsuleHub {
                     body_hash: bh,
                     parent_link: parentLink,
                     prev_link: publicPrevLink,
+                    profile_prev_link: profilePrevLink,             // clean-11
                     header: header
                 });
                 self.public_live_count += 1;
@@ -1080,6 +1116,36 @@ contract CapsuleHub {
         };
     }
 
+    // clean-11: latest profile entry link for a channel (keyId = publicAuthorKeyId(author)). exists=false /
+    // entry_link=0 when the channel never published a profile. The returned entry MAY be evicted — the client
+    // cross-checks with get_public_entry(entry_id).exists (dangling-tolerant by design).
+    get fun get_public_profile_index(keyId: Int): PublicCapsuleKeyIndexView {
+        let linkOpt: Int? = self.public_profile_index.get(keyId);
+        if (linkOpt == null) {
+            return PublicCapsuleKeyIndexView {
+                exists: false,
+                key_id: keyId,
+                latest_entry_id: 0,
+                latest_entry_link: 0,
+                entry_count: 0
+            };
+        }
+        let link: Int = linkOpt!!;
+        return PublicCapsuleKeyIndexView {
+            exists: true,
+            key_id: keyId,
+            latest_entry_id: self.entryIdFromLink(link),
+            latest_entry_link: link,
+            entry_count: 1
+        };
+    }
+
+    // clean-11: head link of the global profile chain (0 = no profile ever). The client walks it newest-first via
+    // get_public_entry(...).profile_prev_link for COMPLETE described-channel discovery.
+    get fun get_public_profile_head(): Int {
+        return self.public_profile_head;
+    }
+
     get fun get_public_parent_index(parentEntryId: Int): PublicCapsuleKeyIndexView {
         let indexOpt: PublicCapsuleKeyIndex? = self.public_parent_index.get(parentEntryId);
         if (indexOpt == null) {
@@ -1117,6 +1183,7 @@ contract CapsuleHub {
                 body_hash: 0,
                 parent_link: 0,
                 prev_link: 0,
+                profile_prev_link: 0,
                 header: emptyCell()
             };
         }
@@ -1135,6 +1202,7 @@ contract CapsuleHub {
             body_hash: entry.body_hash,
             parent_link: entry.parent_link,
             prev_link: entry.prev_link,
+            profile_prev_link: entry.profile_prev_link,
             header: entry.header
         };
     }

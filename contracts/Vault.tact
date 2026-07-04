@@ -95,11 +95,11 @@ const VAULT_PROFILE_AVATAR_EXCESS_REFUND_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRICE_4_CHARS: Int = 10000000000000;
 const USERNAME_PRICE_5_CHARS: Int = 1000000000000;
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;
-const USERNAME_NOTIFY_VALUE: Int = 532000000; // >= UsernameRegistry mint retainedValue (6M endowment + 500M NFT deploy reserve + 1M ack + 4M state-growth = 511M); the Vault forwards this to the registry via the ATH wallet to fund a username mint + its ~250yr NFT storage.
+const USERNAME_NOTIFY_VALUE: Int = 568000000; // >= UsernameRegistry mint retainedValue (6M endowment + 500M NFT deploy reserve + 1M ack + 4M state-growth + 36M clean-11 name-record endowment = 547M); the Vault forwards this to the registry via the ATH wallet to fund a username mint + its ~250yr NFT storage. 21M cushion over the floor covers the ATH-wallet->registry fwd fee.
 const USERNAME_MAX_LENGTH: Int = 16;
 const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
 const VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE: Int = 6000000;
-const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 575000000; // raised 557M->575M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M). USERNAME_NOTIFY_VALUE (532M) + ATH-wallet downstream/exec overhead (VAULT_RESPONSE_ACK 3M + SOURCE_ACK 1M + NOTIFY_EXEC 7M + STORAGE_ENDOWMENT 20M + AVATAR_FWD_FEE 2M + NOTIFY_OWNER_REQUEST_EXEC 10M = 43M) = 575M. usernameMintTonCharge = 6M local exec + this = 581M (the client mint TON charge).
+const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 611000000; // raised 575M->611M to track the clean-11 name-record endowment (USERNAME_NOTIFY_VALUE 532M->568M, +36M). USERNAME_NOTIFY_VALUE (568M) + ATH-wallet downstream/exec overhead (VAULT_RESPONSE_ACK 3M + SOURCE_ACK 1M + NOTIFY_EXEC 7M + STORAGE_ENDOWMENT 20M + AVATAR_FWD_FEE 2M + NOTIFY_OWNER_REQUEST_EXEC 10M = 43M) = 611M. usernameMintTonCharge = 6M local exec + this = 617M (the client mint TON charge).
 const VAULT_BINDING_CAPSULE_HUB: Int = 1;
 const VAULT_BINDING_PROFILE_REGISTRY: Int = 2;
 const VAULT_BINDING_USERNAME_REGISTRY: Int = 4;
@@ -2189,7 +2189,9 @@ contract Vault {
                     let header: Cell = part.loadRef();
                     let body: Cell = part.loadRef();
                     if (!isLast) { nextCell = part.loadRef(); }
-                    if (!(reserved == 0)) {
+                    // clean-11: bit0 (0x01) = is_profile (relayed to CapsuleHub); bits 1..7 MUST stay 0. The Vault
+                    // forwards partsRoot whole and does not read the flag — it only stops rejecting reserved==1.
+                    if (!((reserved & 254) == 0)) {
                         rejectCode = RJ_PART_SHAPE; failIdx = i;
                     } else if (!self.isPublishProfileValid(PUBLISH_KIND_PUBLIC, sizeClass, CRYPTO_SUITE_PUBLIC_NONE, h0, 0)) {
                         rejectCode = RJ_CLASS_OR_SUITE; failIdx = i;

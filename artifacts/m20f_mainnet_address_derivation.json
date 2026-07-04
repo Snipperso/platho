@@ -11,30 +11,30 @@
   "invalidInputs": [],
   "inputs": {
     "genesisControllerAddress": "EQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPFkC",
-    "athMasterAddress": "EQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oUsA",
+    "athMasterAddress": "EQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6IpC",
     "genesisControllerHashHex": "8f70af6ee5c5a1bcbbc018bdd7d47c26a4e448d1b6530f1b7bd7f095b795454e",
     "genesisControllerHashUint256": "64879835014064910110803405686140403317524752377565441264381767827217999807822"
   },
   "derived": {
-    "buybackBurnAddress": "EQDa5ctbOqAdb64TqNJlHAzuUozkL6rakp2l-TiR2ApTuJ_b",
-    "buybackBurnRawAddress": "0:dae5cb5b3aa01d6fae13a8d2651c0cee528ce42faada929da5f93891d80a53b8",
-    "buybackBurnStateInitHash": "dae5cb5b3aa01d6fae13a8d2651c0cee528ce42faada929da5f93891d80a53b8",
+    "buybackBurnAddress": "EQCuMd4lixt74LM6OsyIS7OLmdUqC1BpP5WAzwxpjWfvg6sP",
+    "buybackBurnRawAddress": "0:ae31de258b1b7be0b33a3acc884bb38b99d52a0b50693f9580cf0c698d67ef83",
+    "buybackBurnStateInitHash": "ae31de258b1b7be0b33a3acc884bb38b99d52a0b50693f9580cf0c698d67ef83",
     "buybackBurnCodeHash": "0c39dc79e436ad71b7b8f467a9c72fb84a7fdae7454cd25ecfbb4f8c130c832c",
-    "buybackBurnDataHash": "96fa7b9fd874e576e059e47df82b20f7c3dacdd484610d5e41c59f9a2e55b525",
-    "buybackBurnOfficialAthWalletAddress": "EQDFzu2xWPE3f09XapxtBwiC4Hc5ZfN0ZHunyF41KZep7tlW",
-    "buybackBurnOfficialAthWalletRawAddress": "0:c5ceedb158f1377f4f576a9c6d070882e0773965f374647ba7c85e352997a9ee",
-    "buybackBurnOfficialAthWalletStateInitHash": "c5ceedb158f1377f4f576a9c6d070882e0773965f374647ba7c85e352997a9ee",
+    "buybackBurnDataHash": "8ecde2baa43153890f8800e06daf8cc0bb91d185aea31f38ce33d2cddb1095e6",
+    "buybackBurnOfficialAthWalletAddress": "EQC45DhvWYd1qsy5e72J1kiGg5egpk7GxB-Fd901M_7iR8q7",
+    "buybackBurnOfficialAthWalletRawAddress": "0:b8e4386f598775aaccb97bbd89d648868397a0a64ec6c41f8577dd3533fee247",
+    "buybackBurnOfficialAthWalletStateInitHash": "b8e4386f598775aaccb97bbd89d648868397a0a64ec6c41f8577dd3533fee247",
     "buybackBurnOfficialAthWalletCodeHash": "3d0f027840bc604e1e69d19f764543372f362096e2ead3c689c83e8f00966ce4",
-    "buybackBurnOfficialAthWalletDataHash": "f640286be55b485241b306b1b103cfcec263aa47b2967f1c7d80bc9b4e218e62"
+    "buybackBurnOfficialAthWalletDataHash": "3baae30903aeb5252fe97a6f0ee9acf5036852d6609b6f11c41b9db6ed35249a"
   },
   "nextM20FInputs": {
-    "athMasterAddress": "EQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oUsA",
-    "buybackBurnAddress": "EQDa5ctbOqAdb64TqNJlHAzuUozkL6rakp2l-TiR2ApTuJ_b",
-    "buybackBurnOfficialAthWalletAddress": "EQDFzu2xWPE3f09XapxtBwiC4Hc5ZfN0ZHunyF41KZep7tlW"
+    "athMasterAddress": "EQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6IpC",
+    "buybackBurnAddress": "EQCuMd4lixt74LM6OsyIS7OLmdUqC1BpP5WAzwxpjWfvg6sP",
+    "buybackBurnOfficialAthWalletAddress": "EQC45DhvWYd1qsy5e72J1kiGg5egpk7GxB-Fd901M_7iR8q7"
   },
   "proofRefs": {
     "finalGenesisControllerProof": "artifacts/local/mainnet_final_manifest_draft.json#manifest.addresses.genesis_controller_one_shot=UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
-    "athDeploymentManifest": "artifacts/local/mainnet_final_manifest_draft.json#manifest.manifest_hash_hex=9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2",
+    "athDeploymentManifest": "artifacts/local/mainnet_final_manifest_draft.json#manifest.manifest_hash_hex=39c0115b9fec0b31c8b2a3981bb026b730df391d747e2df7bbc772f7d3118fd2",
     "buybackBurnBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#BUYBACKBURN_CODE_HASH=0c39dc79e436ad71b7b8f467a9c72fb84a7fdae7454cd25ecfbb4f8c130c832c"
   }
 }

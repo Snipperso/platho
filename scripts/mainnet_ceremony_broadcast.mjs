@@ -36,6 +36,9 @@ const GATEWAY = (process.env.PLATHO_GATEWAY || 'https://rpc.platho.app').replace
 // 429-abort the ceremony mid-flight. Read the toncenter API key (env or artifacts/local/center.txt) and add it
 // to toncenter calls via the rate-limit-tolerant tcFetch wrapper below. Transport only — signing is untouched.
 const TONCENTER_KEY = (process.env.TONCENTER_API_KEY || (existsSync('artifacts/local/center.txt') ? readFileSync('artifacts/local/center.txt', 'utf8') : '')).trim();
+// Optional tonapi key (keyless works at ceremony volume). tonapi is the ONLY transport that delivers the large
+// (40-44KB) deploy externals — toncenter/gateway silently drop them.
+const TONAPI_KEY = (process.env.TONAPI_KEY || (existsSync('artifacts/local/tonapi.txt') ? readFileSync('artifacts/local/tonapi.txt', 'utf8') : '')).trim();
 const PACKET = arg('--packet', 'artifacts/local/mainnet_tx_dry_run_packet.json');
 const PHASE = arg('--phase');
 const DO_BROADCAST = process.argv.includes('--broadcast');
@@ -84,9 +87,16 @@ async function gwSeqno(addr) {
   return 0;
 }
 async function gwSend(bocB64) {
-  // Redundant broadcast: the gateway has ACKed (200) without delivering, so also push to
-  // toncenter v2 /sendBoc (keyless). Actual delivery is confirmed by the seqno-advance poll.
+  // Redundant broadcast. CRITICAL: toncenter /sendBoc AND the gateway silently DROP large externals (the Vault
+  // 44KB / UsernameRegistry 40KB deploys ACK 200 but never deliver — proven 2026-07-04). tonapi
+  // /v2/blockchain/message delivers them, so it goes FIRST. Actual delivery is confirmed by the seqno-advance poll.
   const out = []; let anyOk = false;
+  try {
+    const headers = { 'content-type': 'application/json', accept: 'application/json' };
+    if (TONAPI_KEY) headers['Authorization'] = `Bearer ${TONAPI_KEY}`;
+    const r = await tcFetch('https://tonapi.io/v2/blockchain/message', { method: 'POST', headers, body: JSON.stringify({ boc: bocB64 }) });
+    out.push(`tonapi ${r.status}`); if (r.ok) anyOk = true;
+  } catch (e) { out.push('tonapi ERR'); }
   try { const r = await tcFetch('https://toncenter.com/api/v2/sendBoc', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); out.push(`toncenter ${r.status}`); if (r.ok) anyOk = true; } catch (e) { out.push('toncenter ERR'); }
   try { const r = await tcFetch(`${GATEWAY}/api/v3/message`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); out.push(`gateway ${r.status}`); if (r.ok) anyOk = true; } catch (e) { out.push('gateway ERR'); }
   return { ok: anyOk, status: 'multi', body: out.join(' | ') };

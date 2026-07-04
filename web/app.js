@@ -37,7 +37,7 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=98';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=99';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -62,7 +62,10 @@ import {
   writePublicChannelSubscriptions,
   publicEvictionFloor,
   prunePublicPostsBelowFloor,
-} from './public-channel-subscriptions.mjs?v=15';
+  readPublicChannelProfileCache,
+  writePublicChannelProfileCache,
+  normalizeChannelProfile,
+} from './public-channel-subscriptions.mjs?v=16';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -89,7 +92,10 @@ import {
   decodeReplyBlockContent,
   encodeFileBlockContent,
   decodeFileBlockContent,
-} from './capsule-part-policy.mjs?v=5';
+  encodeProfileBlockContent,
+  decodeProfileBlockContent,
+  normalizeProfileTags,
+} from './capsule-part-policy.mjs?v=6';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -139,7 +145,7 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=32';
+} from './pwa-contract-transactions.mjs?v=33';
 import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
@@ -150,7 +156,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=53';
+} from './capsulehub-ton-rpc-provider.mjs?v=54';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=40';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=36';
 import {
@@ -172,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=4';
+} from './i18n.mjs?v=7';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -180,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v664';
+const PLATHO_APP_RUNTIME_VERSION = 'v667';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -620,6 +626,12 @@ const publicFeed = document.querySelector('#publicFeed');
 const publicChannelSearchRow = document.querySelector('#publicChannelSearchRow');
 const publicChannelSearch = document.querySelector('#publicChannelSearch');
 const addPublicChannelButton = document.querySelector('#addPublicChannelButton');
+const editChannelProfileButton = document.querySelector('#editChannelProfileButton');
+const publicDiscoverButton = document.querySelector('#publicDiscoverButton');
+const publicDiscovery = document.querySelector('#publicDiscovery');
+const publicDiscoveryBody = document.querySelector('#publicDiscoveryBody');
+const publicDiscoveryBackButton = document.querySelector('#publicDiscoveryBackButton');
+const publicDiscoveryRefreshButton = document.querySelector('#publicDiscoveryRefreshButton');
 const publicJumpDownButton = document.querySelector('#publicJumpDownButton');
 const publicComposer = document.querySelector('#publicComposer');
 const publicMessageInput = document.querySelector('#publicMessageInput');
@@ -679,6 +691,14 @@ let publicChannelRegistry = [];
 let publicChannelThreads = [];
 let publicChannelSubscriptions = null;
 let publicChannelFeedCache = {};
+// Per-author channel PROFILE cache (description + tags), keyed by the raw channel author wallet. Loaded on boot,
+// updated latest-wins during the feed walk (diverted profile posts) and by resolveChannelProfile on cold reads.
+// DURABLE = confirmed-on-chain only (persisted to localStorage). The overlay below holds a just-edited profile that
+// is not yet confirmed — shown immediately but NEVER persisted, so a publish that never lands can't masquerade as
+// saved across a reload (the send-path heal driver either lands it → moves it to the durable cache, or terminals →
+// drops it). Keeping them separate means a persist never drops the prior confirmed entry for a key.
+let publicChannelProfileCache = {};
+const pendingChannelProfileOverlay = new Map();
 // Incremental public-sync cursor (mirrors the private chain-index cursor): the global public head id + history
 // window of the last CLEAN (non-rate-limited) full walk. While the head is unchanged we skip the whole walk.
 let lastSyncedPublicLatestId = null;
@@ -726,6 +746,10 @@ let publicCommentTarget = null;
 // Public post detail screen (per-post comments, opened from the "Comments" action). The composer is shared with
 // the feed; while the detail is open it is in comment mode (publicCommentTarget = the open post).
 let publicPostDetailOpen = false;
+let publicDiscoveryOpen = false;
+let publicDiscoveryResults = null;
+let publicDiscoveryTagFilter = null;
+let publicDiscoveryLoadToken = 0;
 let publicPostDetailItem = null;
 let publicPostDetailChainComments = [];
 let publicPostDetailLoadToken = 0;
@@ -3585,6 +3609,184 @@ function createPencilIcon() {
   return svg;
 }
 
+// Small inline info glyph for the channel-description affordance (kept inline like createPencilIcon so it needs
+// no new asset / SW-precache entry).
+function createInfoIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const circle = document.createElementNS(ns, 'circle');
+  circle.setAttribute('cx', '12');
+  circle.setAttribute('cy', '12');
+  circle.setAttribute('r', '9');
+  const stem = document.createElementNS(ns, 'path');
+  stem.setAttribute('d', 'M12 11v5');
+  const dot = document.createElementNS(ns, 'path');
+  dot.setAttribute('d', 'M12 8h.01');
+  svg.append(circle, stem, dot);
+  return svg;
+}
+
+// Anchored popover showing a channel's PROFILE (description + tags), reusing the shared identity-popover element
+// (position + outside-click-close for free). Cache-first: a warm profile renders instantly; a cold miss shows a
+// loading line and resolves via resolveChannelProfile (bounded per-author walk). For the user's OWN channel the
+// empty/filled states offer an add/edit affordance.
+async function showChannelDescriptionPopover(authorWallet, anchor, options = {}) {
+  if (!authorWallet || !anchor) return;
+  const isOwn = options.isOwn === true;
+  const popover = ensureIdentityPopover();
+  popover.setAttribute('role', 'dialog');
+  popover.replaceChildren();
+  const title = document.createElement('div');
+  title.className = 'identity-popover-title';
+  title.textContent = t('public.channelAbout');
+  const body = document.createElement('div');
+  body.className = 'channel-about-popover';
+  popover.append(title, body);
+  const renderBody = (profile) => {
+    body.replaceChildren();
+    const description = typeof profile?.description === 'string' ? profile.description.trim() : '';
+    const tags = (profile?.tags ?? []).filter(Boolean);
+    if (description) {
+      const paragraph = document.createElement('p');
+      paragraph.className = 'channel-about-description';
+      paragraph.textContent = description;
+      body.append(paragraph);
+    }
+    if (tags.length > 0) {
+      const tagRow = document.createElement('div');
+      tagRow.className = 'channel-about-tags';
+      for (const tag of tags) {
+        const chip = document.createElement('span');
+        chip.className = 'channel-about-tag';
+        chip.textContent = `#${tag}`;
+        tagRow.append(chip);
+      }
+      body.append(tagRow);
+    }
+    if (!description && tags.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'channel-about-empty';
+      empty.textContent = t('public.noDescriptionYet');
+      body.append(empty);
+    }
+    if (isOwn) {
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.className = 'ghost-button channel-about-edit';
+      editButton.textContent = (description || tags.length > 0) ? t('public.editDescription') : t('public.addDescription');
+      editButton.addEventListener('click', () => {
+        hideIdentityPopover();
+        openEditChannelProfileDialog().catch((error) => console.error(error));
+      });
+      body.append(editButton);
+    }
+  };
+  const cached = cachedChannelProfile(authorWallet);
+  if (cached && cached.fetchedAt) {
+    renderBody(cached);
+  } else {
+    const loading = document.createElement('p');
+    loading.className = 'channel-about-empty';
+    loading.textContent = t('public.loadingDescription');
+    body.append(loading);
+  }
+  const rect = anchor.getBoundingClientRect();
+  popover.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
+  popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 220)}px`;
+  popover.hidden = false;
+  if (identityPopoverAnchor && identityPopoverAnchor !== anchor) identityPopoverAnchor.setAttribute('aria-expanded', 'false');
+  identityPopoverAnchor = anchor;
+  anchor.setAttribute('aria-expanded', 'true');
+  if (!cached || !cached.fetchedAt) {
+    let resolved = null;
+    try {
+      resolved = await resolveChannelProfile(authorWallet);
+    } catch (error) {
+      resolved = cachedChannelProfile(authorWallet);
+    }
+    // Only repaint if THIS popover is still the one open for THIS anchor (the user may have moved on).
+    if (!popover.hidden && identityPopoverAnchor === anchor) renderBody(resolved);
+  }
+}
+
+// Own-channel "add / edit description" dialog: pre-fills from the cached (or freshly resolved) current profile,
+// publishes on submit via publishChannelProfile (errors surface inline, the dialog stays open), and updates the
+// local cache so the owner sees their new description immediately. Tags are entered comma/newline-separated and
+// normalized (lowercase/trim/dedupe/cap) by the wire codec.
+async function openEditChannelProfileDialog() {
+  const wallet = rawWalletAddress(plathoWallet?.address);
+  if (!wallet) { setPublicStatus('channel description needs a wallet'); return; }
+  if (!hasActivePlathoAccount()) { setPublicStatus('channel description needs an active account'); return; }
+  let current = cachedChannelProfile(wallet);
+  if (!current || !current.fetchedAt) {
+    try { current = await resolveChannelProfile(wallet); } catch { current = cachedChannelProfile(wallet); }
+  }
+  const result = await openActionDialog({
+    title: t('public.channelDescriptionTitle'),
+    hint: t('public.channelDescriptionHint'),
+    submitLabel: t('common.save'),
+    checkingHint: t('public.descriptionSaving'),
+    fields: [
+      {
+        id: 'description',
+        label: t('public.descriptionLabel'),
+        type: 'textarea',
+        placeholder: t('public.descriptionPlaceholder'),
+        value: current?.description ?? '',
+        required: false,
+      },
+      {
+        id: 'tags',
+        label: t('public.tagsLabel'),
+        placeholder: t('public.tagsPlaceholder'),
+        value: (current?.tags ?? []).join(', '),
+        required: false,
+        autocomplete: 'off',
+      },
+    ],
+    validateSubmit: async (values) => {
+      if (tonRpcLimited()) return { ok: false, error: t('sync.rpcBusy') };
+      try {
+        const description = String(values.description ?? '').trim();
+        const tags = String(values.tags ?? '').split(/[,\n]+/);
+        const published = await publishChannelProfile(description, tags);
+        const status = published?.result?.status;
+        const meta = { description: published.description, tags: published.tags };
+        const createdAtSec = published.createdAtSec;
+        const publishState = published?.result?.publishState ?? null;
+        if (status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+          // Landed already — commit to the durable cache with the real entry id.
+          finalizeChannelProfile(wallet, meta, publishStateEntryId(publishState), createdAtSec);
+          return { ok: true, result: { status } };
+        }
+        if (status === VAULT_PUBLISH_STATUS_SUBMITTED || status === VAULT_PUBLISH_STATUS_PARTIAL) {
+          // Broadcast but not yet confirmed: show it immediately (overlay, not persisted) and let the heal driver
+          // re-broadcast + confirm until it lands (→ durable cache) or terminals (→ overlay dropped, no masked failure).
+          setChannelProfileOptimistic(wallet, meta, createdAtSec);
+          if (publishState) healChannelProfilePublish(wallet, publishState, meta, createdAtSec);
+          return { ok: true, result: { status } };
+        }
+        return { ok: false, error: t('public.descriptionSaveFailed') };
+      } catch (error) {
+        if (noteTonRpcRateLimit(error)) return { ok: false, error: t('sync.rpcBusy') };
+        console.error(error);
+        return { ok: false, error: t('public.descriptionSaveFailed') };
+      }
+    },
+  });
+  if (result) {
+    setPublicStatus('channel description saved');
+    if (isPublicViewActive()) renderPublicSurface({ anchorUnread: false });
+  }
+}
+
 // Generic "Display as" popover used by BOTH the Private conversation header and the Public channel
 // detail header. The caller supplies the option list, the current selection, and what to do when an
 // option / the local-name action is picked.
@@ -5247,6 +5449,31 @@ function publicItemIdentityButton(item) {
   return identityButton;
 }
 
+// The channel-description ("about") button for the post plate: an info glyph that opens the channel's PROFILE
+// (description + tags) popover. Shown for any post with an author wallet — including the user's OWN channel and
+// the official channel — since every channel can carry a description (the popover offers edit for own channels).
+function publicItemDescriptionButton(item) {
+  const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
+  if (!authorWallet) return null;
+  const isOwn = isOwnPublicAuthor(authorWallet);
+  const aboutButton = document.createElement('button');
+  aboutButton.type = 'button';
+  aboutButton.className = 'icon-button feed-author-about';
+  aboutButton.setAttribute('aria-haspopup', 'dialog');
+  aboutButton.setAttribute('aria-expanded', 'false');
+  aboutButton.title = t('public.channelAbout');
+  aboutButton.append(createInfoIcon());
+  aboutButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (identityPopover && !identityPopover.hidden && identityPopoverAnchor === aboutButton) {
+      hideIdentityPopover();
+    } else {
+      showChannelDescriptionPopover(authorWallet, aboutButton, { isOwn }).catch((error) => console.error(error));
+    }
+  });
+  return aboutButton;
+}
+
 function appendPublicItemActions(article, item) {
   const actions = document.createElement('div');
   actions.className = 'feed-actions';
@@ -5325,6 +5552,9 @@ function renderPublicFeed(items, options = {}) {
   if (!publicFeed) return;
   publicFeed.dataset.publicMode = 'feed';
   publicFeed.replaceChildren();
+  // The discovery CTA sits at the very top for a newcomer (no channels followed) — shown ABOVE the posts, and also
+  // above the empty-state so a newcomer with a truly empty feed still gets a way in.
+  if (shouldShowDiscoveryCta()) publicFeed.append(buildDiscoveryCtaCard());
   if ((items ?? []).length === 0) {
     renderPublicEmpty(publicChannelSearchQuery ? t('public.noPostsFound') : t('public.noPosts'), publicChannelSearchQuery ? t('public.tryAnotherSearch') : t('public.followOrPublishFirst'));
     requestAnimationFrame(updatePublicJumpDownVisibility);
@@ -5362,7 +5592,11 @@ function renderPublicFeed(items, options = {}) {
       wirePublicPublishRetryBadge(statusBadge, item, 'post');
       meta.append(statusBadge);
     }
-    // The "Display as" chevron lives top-right in the author row.
+    // The channel "about" (description + tags) button and the "Display as" chevron live top-right in the author
+    // row. Both carry margin-left:auto: the first absorbs the free space (pushing the group right), the second
+    // then sits flush beside it — so they render as an adjacent [about][chevron] cluster on the right edge.
+    const feedDescriptionButton = publicItemDescriptionButton(item);
+    if (feedDescriptionButton) authorRow.append(feedDescriptionButton);
     const feedIdentityButton = publicItemIdentityButton(item);
     if (feedIdentityButton) authorRow.append(feedIdentityButton);
     article.append(authorRow);
@@ -5386,8 +5620,16 @@ function renderPublicFeed(items, options = {}) {
   }
 }
 
+// Show the "edit channel description" header button only when the user has an activatable own channel — i.e. a
+// connected wallet with an active Platho account (publishing a profile needs both). Toggled on every public render.
+function refreshEditChannelProfileButton() {
+  if (!editChannelProfileButton) return;
+  editChannelProfileButton.hidden = !(ownPublicChannel() && hasActivePlathoAccount());
+}
+
 function renderPublicSurface(options = {}) {
   updatePublicModeButtons();
+  refreshEditChannelProfileButton();
   if (publicChannelSearchRow) publicChannelSearchRow.hidden = false;
   const allItems = publicFeedItemsChronological();
   const items = allItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
@@ -5700,6 +5942,7 @@ async function warmPublicPostCommentsCache(item) {
 
 function openPublicPostDetail(item) {
   if (!item || item.entryId === undefined || item.entryId === null) return;
+  closePublicDiscovery();
   publicPostDetailItem = item;
   publicPostDetailOpen = true;
   // Stale-while-revalidate: paint the cached comments immediately (no re-download flash) if we have them, then
@@ -5741,6 +5984,186 @@ function closePublicPostDetail() {
   if (publicPane) publicPane.dataset.postOpen = 'false';
   setPublicCommentTarget(null);
   renderPublicSurface({ anchorUnread: false });
+}
+
+// --- Newcomer discovery panel (Part B) ---
+async function openPublicDiscovery() {
+  closePublicPostDetail();
+  publicDiscoveryOpen = true;
+  publicDiscoveryTagFilter = null;
+  if (publicPane) publicPane.dataset.discoverOpen = 'true';
+  const token = ++publicDiscoveryLoadToken;
+  // Paint cached results immediately (fresh cache) or a loading line, then resolve.
+  renderPublicDiscovery({ loading: !publicDiscoveryCache });
+  try {
+    const results = await discoverChannels();
+    if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
+    publicDiscoveryResults = results;
+    renderPublicDiscovery({ loading: false });
+  } catch (error) {
+    if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
+    noteTonRpcRateLimit(error);
+    publicDiscoveryResults = publicDiscoveryCache?.results ?? [];
+    renderPublicDiscovery({ loading: false, error: true });
+  }
+}
+
+function closePublicDiscovery() {
+  if (!publicDiscoveryOpen && publicPane?.dataset?.discoverOpen !== 'true') return;
+  publicDiscoveryOpen = false;
+  publicDiscoveryLoadToken += 1; // invalidate any in-flight scan so a stale result can't render
+  if (publicPane) publicPane.dataset.discoverOpen = 'false';
+}
+
+async function refreshPublicDiscovery() {
+  if (!publicDiscoveryOpen) return;
+  const token = ++publicDiscoveryLoadToken;
+  renderPublicDiscovery({ loading: true });
+  try {
+    const results = await discoverChannels({ force: true });
+    if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
+    publicDiscoveryResults = results;
+    renderPublicDiscovery({ loading: false });
+  } catch (error) {
+    if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
+    noteTonRpcRateLimit(error);
+    renderPublicDiscovery({ loading: false, error: true });
+  }
+}
+
+function renderPublicDiscovery(options = {}) {
+  if (!publicDiscoveryBody) return;
+  publicDiscoveryBody.replaceChildren();
+  if (options.loading === true) {
+    const status = document.createElement('p');
+    status.className = 'discovery-status';
+    status.textContent = t('public.discoverLoading');
+    publicDiscoveryBody.append(status);
+    return;
+  }
+  const results = publicDiscoveryResults ?? [];
+  if (results.length === 0) {
+    const status = document.createElement('p');
+    status.className = 'discovery-status';
+    status.textContent = options.error === true ? t('public.discoverError') : t('public.discoverEmpty');
+    publicDiscoveryBody.append(status);
+    return;
+  }
+  // Tag filter chips (tags present in the sampled set) — filtering narrows within the recent sample, not globally.
+  const allTags = [...new Set(results.flatMap((channel) => channel.tags))].slice(0, 24);
+  if (allTags.length > 0) {
+    const filterRow = document.createElement('div');
+    filterRow.className = 'discovery-tag-filter';
+    for (const tag of allTags) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'channel-about-tag';
+      chip.textContent = `#${tag}`;
+      chip.setAttribute('aria-pressed', publicDiscoveryTagFilter === tag ? 'true' : 'false');
+      chip.addEventListener('click', () => {
+        publicDiscoveryTagFilter = publicDiscoveryTagFilter === tag ? null : tag;
+        renderPublicDiscovery({ loading: false });
+      });
+      filterRow.append(chip);
+    }
+    publicDiscoveryBody.append(filterRow);
+  }
+  const shown = publicDiscoveryTagFilter
+    ? results.filter((channel) => channel.tags.includes(publicDiscoveryTagFilter))
+    : results;
+  if (shown.length === 0) {
+    const status = document.createElement('p');
+    status.className = 'discovery-status';
+    status.textContent = t('public.discoverEmpty');
+    publicDiscoveryBody.append(status);
+    return;
+  }
+  for (const channel of shown) publicDiscoveryBody.append(buildDiscoveryCard(channel));
+}
+
+function buildDiscoveryCard(channel) {
+  const card = document.createElement('article');
+  card.className = 'discovery-card';
+  const head = document.createElement('div');
+  head.className = 'discovery-card-head';
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar feed-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  setAvatarNode(avatar, String(channel.name ?? 'P').slice(0, 1), publicAvatarUrlForWallet(channel.authorWallet));
+  const name = document.createElement('span');
+  name.className = 'discovery-card-name';
+  name.textContent = channel.name;
+  head.append(avatar, name);
+  card.append(head);
+  if (channel.description) {
+    const desc = document.createElement('p');
+    desc.className = 'discovery-card-desc';
+    desc.textContent = channel.description;
+    card.append(desc);
+  }
+  if (channel.tags.length > 0) {
+    const tagRow = document.createElement('div');
+    tagRow.className = 'channel-about-tags';
+    for (const tag of channel.tags) {
+      const chip = document.createElement('span');
+      chip.className = 'channel-about-tag';
+      chip.textContent = `#${tag}`;
+      tagRow.append(chip);
+    }
+    card.append(tagRow);
+  }
+  const actions = document.createElement('div');
+  actions.className = 'discovery-card-actions';
+  const followButton = document.createElement('button');
+  followButton.type = 'button';
+  followButton.className = 'discovery-follow-button';
+  followButton.textContent = t('public.follow');
+  followButton.addEventListener('click', () => {
+    followButton.disabled = true;
+    followButton.textContent = t('public.following');
+    followDiscoveredChannel(channel.authorWallet);
+  });
+  actions.append(followButton);
+  card.append(actions);
+  return card;
+}
+
+function followDiscoveredChannel(authorWallet) {
+  const channelId = ensurePublicChannelForAuthorWallet(authorWallet, { activate: false });
+  setPublicChannelSubscribed(channelId, true);
+  // Drop the now-followed channel from the discovery list + cache so it isn't suggested again, then re-render.
+  const wallet = rawWalletAddress(authorWallet);
+  const drop = (list) => (list ?? []).filter((channel) => rawWalletAddress(channel.authorWallet) !== wallet);
+  publicDiscoveryResults = drop(publicDiscoveryResults);
+  if (publicDiscoveryCache) publicDiscoveryCache = { ...publicDiscoveryCache, results: drop(publicDiscoveryCache.results) };
+  renderPublicDiscovery({ loading: false });
+}
+
+// The discovery call-to-action shown at the top of the feed for a newcomer (no channels followed beyond the
+// default). One tap opens the discovery panel.
+function shouldShowDiscoveryCta() {
+  if (publicChannelSearchQuery) return false;
+  const followed = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
+    .filter((channel) => channel.id !== DEFAULT_PUBLIC_CHANNEL_ID);
+  return followed.length === 0;
+}
+
+function buildDiscoveryCtaCard() {
+  const card = document.createElement('article');
+  card.className = 'feed-item compact discovery-cta';
+  card.setAttribute('role', 'button');
+  card.tabIndex = 0;
+  const title = document.createElement('h2');
+  title.textContent = t('public.discoverCtaTitle');
+  const body = document.createElement('p');
+  body.textContent = t('public.discoverCtaBody');
+  card.append(title, body);
+  const open = () => { openPublicDiscovery().catch((error) => console.error(error)); };
+  card.addEventListener('click', open);
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); }
+  });
+  return card;
 }
 
 // On-demand comment loader for ONE post: walk the post's parent (comment) index, resolve each comment body, and
@@ -7157,6 +7580,421 @@ function assemblePublicParts(items) {
   return out;
 }
 
+// --- Channel profile cache (description + tags), keyed by the raw author wallet ---
+// Cold reads walk this many of an author's newest posts looking for a PROFILE block. Bounded on purpose (the owner
+// wants "recent, no deep scans"): a channel that publishes more than this many posts AFTER editing its description
+// sinks the profile out of the cold-read window until re-published (subscribed readers still get it warm from the
+// wider feed walk). A deeper structural fix (a profile pointer on the on-chain author index) needs a contract change.
+const PUBLIC_CHANNEL_PROFILE_WALK_LIMIT = 24;
+// A cached "no profile found" (absent) result is re-checked after this long, so a channel that ADDS a description
+// later resurfaces (in the popover and in discovery) instead of being permanently cached as description-less. A
+// cached profile WITH content stays cache-first (descriptions change rarely; the feed walk refreshes subscribed ones).
+const PUBLIC_CHANNEL_PROFILE_ABSENT_TTL_SEC = 15 * 60;
+
+function channelProfileCacheKey(authorWallet) {
+  return rawWalletAddress(authorWallet) ?? (authorWallet ? String(authorWallet) : '');
+}
+
+function cachedChannelProfile(authorWallet) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key) return null;
+  // A not-yet-confirmed optimistic edit (overlay) wins over the durable copy for immediate display.
+  return pendingChannelProfileOverlay.get(key) ?? publicChannelProfileCache[key] ?? null;
+}
+
+function persistChannelProfileCache() {
+  try { writePublicChannelProfileCache(publicChannelStorage(), publicChannelProfileCache); } catch { /* advisory */ }
+}
+
+// Latest-wins ordering: newer createdAt beats older, ties broken by the higher entryId.
+function compareProfileRecency(a, b) {
+  const ac = Number(a?.createdAtSec ?? 0) || 0;
+  const bc = Number(b?.createdAtSec ?? 0) || 0;
+  if (ac !== bc) return ac - bc;
+  let ae = 0n; let be = 0n;
+  try { ae = BigInt(a?.entryId ?? 0); } catch { ae = 0n; }
+  try { be = BigInt(b?.entryId ?? 0); } catch { be = 0n; }
+  return ae > be ? 1 : (ae < be ? -1 : 0);
+}
+
+function nowSec() { return Math.floor(Date.now() / 1000); }
+
+// Record a profile found on-chain, keeping only the newest (latest-wins). A cold fetch that finds nothing records
+// an empty profile (fetchedAt set, entryId '') so the button/discovery stop re-walking on every open.
+function setChannelProfileFromWalk(authorWallet, profileBlock, entryId, createdAtSec) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key) return;
+  const incoming = normalizeChannelProfile({
+    description: profileBlock?.description ?? '',
+    tags: profileBlock?.tags ?? [],
+    entryId: entryId === null || entryId === undefined ? '' : String(entryId),
+    createdAtSec: Number(createdAtSec) || 0,
+    fetchedAt: nowSec(),
+  });
+  const prev = publicChannelProfileCache[key] ?? null;
+  // Latest-wins by created_at (ties by entryId). Guard on recency ALONE (not entryId) so a just-published
+  // optimistic edit (entryId '', createdAt now) can't be clobbered by a STALE older profile the walk surfaces
+  // during indexer lag; a genuinely-newer edit (higher created_at, e.g. from another device) still wins.
+  if (prev && compareProfileRecency(prev, incoming) > 0) return;
+  publicChannelProfileCache = { ...publicChannelProfileCache, [key]: incoming };
+  persistChannelProfileCache();
+}
+
+function channelProfileHasContent(profile) {
+  return Boolean(profile && (profile.description || (profile.tags && profile.tags.length > 0) || profile.entryId));
+}
+
+function markChannelProfileAbsent(authorWallet) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key) return;
+  if (pendingChannelProfileOverlay.has(key)) return; // an edit is publishing — don't record "absent" over it
+  const prev = publicChannelProfileCache[key] ?? null;
+  if (channelProfileHasContent(prev)) return; // real content is cached — never overwrite with "absent"
+  publicChannelProfileCache = {
+    ...publicChannelProfileCache,
+    [key]: normalizeChannelProfile({ description: '', tags: [], entryId: '', createdAtSec: 0, fetchedAt: nowSec() }),
+  };
+  persistChannelProfileCache();
+}
+
+// Show a just-edited profile IMMEDIATELY (in-memory overlay), without persisting — a publish that never lands must
+// not survive a reload as if it saved. The heal driver moves it to the durable cache on confirmation, or drops it.
+function setChannelProfileOptimistic(authorWallet, profile, createdAtSec) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key) return;
+  pendingChannelProfileOverlay.set(key, normalizeChannelProfile({
+    description: profile?.description ?? '',
+    tags: normalizeProfileTags(profile?.tags),
+    entryId: '',
+    createdAtSec: Number(createdAtSec) || nowSec(),
+    fetchedAt: nowSec(),
+  }));
+}
+
+// Commit a CONFIRMED profile to the durable cache (unconditional — we KNOW it just landed, so it wins over any prior
+// entry regardless of the recency guard) and clear the optimistic overlay. Recording the real entryId here is what
+// completes the latest-wins reconciliation the walk path can't (its recency guard keeps the fresher optimistic copy).
+function finalizeChannelProfile(authorWallet, profile, entryId, createdAtSec) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key) return;
+  pendingChannelProfileOverlay.delete(key);
+  publicChannelProfileCache = {
+    ...publicChannelProfileCache,
+    [key]: normalizeChannelProfile({
+      description: profile?.description ?? '',
+      tags: normalizeProfileTags(profile?.tags),
+      entryId: entryId === null || entryId === undefined ? '' : String(entryId),
+      createdAtSec: Number(createdAtSec) || nowSec(),
+      fetchedAt: nowSec(),
+    }),
+  };
+  persistChannelProfileCache();
+}
+
+function publishStateEntryId(publishState) {
+  return publishState?.parts?.find((part) => part?.entryId !== undefined && part?.entryId !== null)?.entryId ?? null;
+}
+
+// Background heal for a profile publish (the send-path parity fix): a profile is channel metadata with no feed
+// record, so the feed confirm/resume driver never touches it. Without this, a SUBMITTED/PARTIAL profile whose
+// external was dropped (toncenter ACKs 200 without delivering — the documented non-delivery hazard) would silently
+// never land while the UI reported "saved". This re-broadcasts + confirms on the same cadence as the post driver,
+// until CONFIRMED (→ commit to the durable cache) or the no-progress deadline (→ drop the optimistic overlay).
+// Heal jobs keyed by author wallet. A newer edit REPLACES the in-flight job (its post has a higher entry id, so it
+// wins the on-chain walk anyway) instead of being dropped — this closes the rapid-double-edit race where the first
+// job would otherwise finalize the durable cache with the OLDER edit and discard the newer overlay.
+const channelProfileHealJobs = new Map();
+
+function scheduleChannelProfileHeal(key, delayMs) {
+  const job = channelProfileHealJobs.get(key);
+  if (!job || job.inFlight) return; // a running pass reschedules itself when it finishes — never stack timers
+  if (job.timer) clearTimeout(job.timer);
+  job.timer = setTimeout(() => {
+    runChannelProfileHealPass(key).catch((error) => { channelProfileHealJobs.delete(key); console.error(error); });
+  }, delayMs);
+}
+
+async function runChannelProfileHealPass(key) {
+  const job = channelProfileHealJobs.get(key);
+  if (!job || job.inFlight) return; // single-flight: never two concurrent passes for one key
+  job.timer = null;
+  job.inFlight = true;
+  if (job.publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+    channelProfileHealJobs.delete(key);
+    finalizeChannelProfile(key, job.profile, publishStateEntryId(job.publishState), job.createdAtSec);
+    return;
+  }
+  if (Date.now() - job.startedAt >= publishConfirmNoProgressDeadlineMs(job.publishState)) {
+    channelProfileHealJobs.delete(key);
+    console.warn('[platho] channel profile publish: no-progress terminal', { key });
+    pendingChannelProfileOverlay.delete(key); // drop the optimistic overlay — a never-landed publish is not masked
+    return;
+  }
+  // Don't fight the serial pump while a chain sync pass is in flight (same rule as the post driver).
+  if (privateChainSyncPromise) { job.inFlight = false; scheduleChannelProfileHeal(key, 2_500); return; }
+  let passError = null;
+  try {
+    await retryUnconfirmedVaultPublishBroadcasts(job.publishState, {
+      deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
+      readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
+      sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
+      queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
+    });
+    await confirmCapsuleHubPublishEntries(job.publishState, {
+      deadlineMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS,
+      requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
+      queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
+      owner: resolvePublishOwner(job.publishState),
+    });
+  } catch (error) {
+    passError = error;
+    noteTonRpcRateLimit(error);
+  }
+  // Re-read: a newer edit may have replaced the job while we awaited an RPC.
+  const current = channelProfileHealJobs.get(key);
+  if (!current) return;
+  if (current.publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+    channelProfileHealJobs.delete(key);
+    finalizeChannelProfile(key, current.profile, publishStateEntryId(current.publishState), current.createdAtSec);
+    return;
+  }
+  current.inFlight = false;
+  scheduleChannelProfileHeal(key, privatePublishConfirmDelayMs({ publishState: current.publishState, createdAtMs: current.startedAt }, passError));
+}
+
+function healChannelProfilePublish(authorWallet, publishState, profile, createdAtSec) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key || !publishState) return;
+  const existing = channelProfileHealJobs.get(key);
+  if (existing) {
+    // Supersede the in-flight/pending job IN PLACE (same object) so a running pass picks up the newer edit on its
+    // next check; scheduleChannelProfileHeal is a no-op while a pass is in flight (it reschedules itself).
+    existing.publishState = publishState;
+    existing.profile = profile;
+    existing.createdAtSec = Number(createdAtSec) || nowSec();
+    existing.startedAt = Date.now();
+    scheduleChannelProfileHeal(key, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS);
+    return;
+  }
+  channelProfileHealJobs.set(key, { publishState, profile, createdAtSec: Number(createdAtSec) || nowSec(), startedAt: Date.now(), timer: null, inFlight: false });
+  scheduleChannelProfileHeal(key, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS);
+}
+
+// Decode a resolved single-part document body and, if it carries a PROFILE block, return it plus whether the
+// document is profile-ONLY (no text/image) — that's the signal to divert it from the visible feed.
+function readProfileDocument(documentBytes) {
+  if (!documentBytes) return null;
+  let blocks;
+  try { blocks = decodeMessageDocumentBlocks(documentBytes, { tolerateUnknownBlocks: true }); } catch { return null; }
+  const profile = blocks.find((block) => block?.type === 'profile');
+  if (!profile) return null;
+  return {
+    profileBlock: { description: String(profile.description ?? ''), tags: Array.isArray(profile.tags) ? profile.tags : [] },
+    isProfileOnly: blocks.length > 0 && blocks.every((block) => block?.type === 'profile'),
+  };
+}
+
+// clean-11 capability gate: true only when the deployed genesis exposes the on-chain profile-pointer (config flag,
+// flipped at the clean-11 cutover in lockstep with the new addresses). Gates the is_profile publish bit (clean-10
+// Vault/Hub reject reserved != 0) and the global-profile-chain discovery/resolve fast-paths. false on clean-10.
+function profilePointerEnabled() {
+  return appConfig.capsuleHub?.profilePointer === true;
+}
+
+// Cold read of a channel's current profile: walk ONLY this author's on-chain post chain newest-first (no global
+// scan), bounded by maxScan, and return the first (newest) PROFILE block. Cache-first: a warm cache (populated by
+// the feed walk for subscribed channels) returns instantly with zero reads. Bounded body reads on a cold miss.
+async function resolveChannelProfile(authorWallet, options = {}) {
+  const maxScan = Number.isFinite(options.maxScan) ? Math.max(1, Math.floor(options.maxScan)) : PUBLIC_CHANNEL_PROFILE_WALK_LIMIT;
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key) return null;
+  if (options.force !== true) {
+    const cached = cachedChannelProfile(key);
+    if (cached && cached.fetchedAt) {
+      // Cache-first for a profile WITH content; an ABSENT result is only trusted until its TTL, then re-walked so a
+      // newly-added description can surface.
+      if (channelProfileHasContent(cached)) return cached;
+      if ((Date.now() / 1000 - cached.fetchedAt) < PUBLIC_CHANNEL_PROFILE_ABSENT_TTL_SEC) return cached;
+    }
+  }
+  const resolved = await resolveCapsuleHubProvider();
+  if (!resolved) return cachedChannelProfile(key);
+  const { provider, address } = resolved;
+  const readOptions = criticalCapsuleHubReadOptions(address);
+  let authorIndex;
+  try {
+    const authorKeyId = await computePublicAuthorKeyId(authorWallet);
+    // clean-11 fast-path: the per-author profile index points DIRECTLY at this channel's latest profile post (O(1),
+    // no chain walk). Dangling-tolerant — if the pointer's entry was evicted or carries no profile block, fall
+    // through to the clean-10 author-walk. Its own try so a fast-path miss/error never aborts the fallback.
+    if (profilePointerEnabled()) {
+      try {
+        const profileIndex = await provider.getPublicProfileIndex(authorKeyId, readOptions);
+        const profileLink = BigInt(profileIndex?.latest_entry_link ?? 0n);
+        if (profileIndex?.exists === true && profileLink > 0n) {
+          const profileEntry = await provider.getPublicEntry(profileLink - 1n, readOptions);
+          if (profileEntry.exists === true) {
+            let payload = null;
+            try { payload = await resolvePublicEntryPayload(provider, profileEntry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES }); } catch { payload = null; }
+            const profileDoc = payload ? readProfileDocument(payload.documentBytes ?? payload.document_bytes) : null;
+            if (profileDoc?.profileBlock) {
+              const createdAtSec = Number(payload?.createdAtSec ?? payload?.created_at_sec ?? 0) || 0;
+              setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, profileLink - 1n, createdAtSec);
+              return cachedChannelProfile(key);
+            }
+          }
+        }
+      } catch (fastPathError) { noteTonRpcRateLimit(fastPathError); }
+    }
+    authorIndex = await provider.getPublicAuthorIndex(authorKeyId, readOptions);
+  } catch (error) {
+    noteTonRpcRateLimit(error);
+    return cachedChannelProfile(key);
+  }
+  if (authorIndex.exists !== true) { markChannelProfileAbsent(key); return cachedChannelProfile(key); }
+  let link = BigInt(authorIndex.latest_entry_link ?? 0n);
+  for (let scanned = 0; link > 0n && scanned < maxScan; scanned += 1) {
+    const entryId = link - 1n;
+    let entry;
+    try { entry = await provider.getPublicEntry(entryId, readOptions); } catch (error) { noteTonRpcRateLimit(error); break; }
+    if (entry.exists !== true) break;
+    const prev = BigInt(entry.prev_link ?? 0n);
+    // A profile is always single-part; skip multipart entries WITHOUT a body read (header-only check).
+    const headerInfo = readPublicPartHeaderInfo(entry?.header_boc ?? entry?.headerBoc);
+    if (!headerInfo || headerInfo.partCount <= 1) {
+      let payload = null;
+      try { payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES }); } catch { payload = null; }
+      const profileDoc = payload ? readProfileDocument(payload.documentBytes ?? payload.document_bytes) : null;
+      if (profileDoc?.profileBlock) {
+        const createdAtSec = Number(payload?.createdAtSec ?? payload?.created_at_sec ?? 0) || 0;
+        setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, entryId, createdAtSec);
+        return cachedChannelProfile(key);
+      }
+    }
+    if (prev === link) break; // defensive: never spin on a self-referential link
+    link = prev;
+  }
+  markChannelProfileAbsent(key);
+  return cachedChannelProfile(key);
+}
+
+// --- Newcomer discovery (Part B): suggest channels WITH a description, sampled from the head of the global log ---
+// Scale-safe by construction: cost = O(WINDOW + CANDIDATES·MAXSCAN), all FIXED constants — independent of the total
+// channel count (100 or 100k cost the same). It never enumerates the corpus; it samples the newest WINDOW entries
+// for distinct recent authors (entry views only, NO body reads), then resolves at most CANDIDATES profiles with a
+// shallow per-author walk. Recency-scoped by design (the owner's "show what's found, no deep scans"): a channel
+// that has been silent longer than the window, or whose profile sits deeper than MAXSCAN posts, won't surface.
+const PUBLIC_DISCOVERY_WINDOW = 64;
+const PUBLIC_DISCOVERY_MAX_CANDIDATES = 16;
+const PUBLIC_DISCOVERY_PROFILE_MAXSCAN = 6;
+const PUBLIC_DISCOVERY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let publicDiscoveryCache = null; // { at, results: [{ authorWallet, description, tags, name }] }
+
+// clean-11 COMPLETE discovery: walk the GLOBAL profile chain newest-first (get_public_profile_head -> follow each
+// entry's profile_prev_link), surfacing EVERY described channel — not recency-scoped like the clean-10 window sample.
+// Bounded by a distinct-author cap + a scan cap (edit-churn safety: repeated profile edits by a few authors inflate
+// the chain, so we dedupe by author, latest wins). Strict-FIFO eviction means the first evicted node ends the live
+// prefix (stop). Returns null on a head-read failure so the caller falls back to the clean-10 window scan.
+async function discoverChannelsViaProfileChain(provider, address, readOptions, ownWallet, subscribedAuthors) {
+  let head;
+  try { head = BigInt((await provider.getPublicProfileHead(readOptions)) ?? 0n); }
+  catch (error) { noteTonRpcRateLimit(error); return null; }
+  if (head <= 0n) return [];
+  const results = [];
+  const seen = new Set();
+  let link = head;
+  for (let scanned = 0; link > 0n && scanned < PUBLIC_DISCOVERY_WINDOW && results.length < PUBLIC_DISCOVERY_MAX_CANDIDATES; scanned += 1) {
+    const entryId = link - 1n;
+    let entry;
+    try { entry = await provider.getPublicEntry(entryId, readOptions); } catch (error) { noteTonRpcRateLimit(error); break; }
+    if (entry.exists !== true) break; // strict-FIFO: first evicted node ends the live prefix
+    const nextLink = BigInt(entry.profile_prev_link ?? 0n);
+    const wallet = rawWalletAddress(entry.author_wallet);
+    if (wallet && !seen.has(wallet)) {
+      seen.add(wallet); // dedupe: a channel's older profile-edit nodes are ignored (latest wins, newest-first)
+      const skip = (ownWallet && sameWalletAddress(wallet, ownWallet)) || subscribedAuthors.has(wallet);
+      if (!skip) {
+        let payload = null;
+        try { payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES }); } catch { payload = null; }
+        const profileDoc = payload ? readProfileDocument(payload.documentBytes ?? payload.document_bytes) : null;
+        if (profileDoc?.profileBlock) {
+          const description = typeof profileDoc.profileBlock.description === 'string' ? profileDoc.profileBlock.description.trim() : '';
+          const tags = (profileDoc.profileBlock.tags ?? []).filter(Boolean);
+          if (description || tags.length > 0) {
+            const createdAtSec = Number(payload?.createdAtSec ?? payload?.created_at_sec ?? 0) || 0;
+            setChannelProfileFromWalk(wallet, profileDoc.profileBlock, entryId, createdAtSec); // warm the per-author cache
+            results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
+          }
+        }
+      }
+    }
+    if (nextLink === link) break; // defensive: never spin on a self-referential link
+    link = nextLink;
+  }
+  return results;
+}
+
+async function discoverChannels(options = {}) {
+  if (options.force !== true && publicDiscoveryCache && (Date.now() - publicDiscoveryCache.at) < PUBLIC_DISCOVERY_CACHE_TTL_MS) {
+    return publicDiscoveryCache.results;
+  }
+  const resolved = await resolveCapsuleHubProvider();
+  if (!resolved) return publicDiscoveryCache?.results ?? [];
+  const { provider, address } = resolved;
+  const readOptions = criticalCapsuleHubReadOptions(address);
+  const ownWalletEarly = rawWalletAddress(plathoWallet?.address);
+  const subscribedAuthorsEarly = new Set(
+    subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
+      .map((channel) => rawWalletAddress(channel.authorWallet))
+      .filter(Boolean),
+  );
+  // clean-11: prefer the COMPLETE global-profile-chain walk; fall through to the clean-10 recency window on failure.
+  if (profilePointerEnabled()) {
+    const chainResults = await discoverChannelsViaProfileChain(provider, address, readOptions, ownWalletEarly, subscribedAuthorsEarly);
+    if (chainResults) { publicDiscoveryCache = { at: Date.now(), results: chainResults }; return chainResults; }
+  }
+  const state = await provider.getState(readOptions);
+  const latestId = BigInt(state.public_latest_id ?? 0n);
+  if (latestId <= 0n) { publicDiscoveryCache = { at: Date.now(), results: [] }; return []; }
+  // Phase 1 — distinct recent authors from the head window (entry views only, no body reads). Skip own wallet and
+  // channels already subscribed (discovery is for finding NEW channels).
+  const ownWallet = rawWalletAddress(plathoWallet?.address);
+  const subscribedAuthors = new Set(
+    subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
+      .map((channel) => rawWalletAddress(channel.authorWallet))
+      .filter(Boolean),
+  );
+  const seen = new Set();
+  const candidates = [];
+  for (let i = 0; i < PUBLIC_DISCOVERY_WINDOW && candidates.length < PUBLIC_DISCOVERY_MAX_CANDIDATES; i += 1) {
+    const entryId = latestId - 1n - BigInt(i);
+    if (entryId < 0n) break;
+    let entry;
+    try { entry = await provider.getPublicEntry(entryId, readOptions); } catch (error) { noteTonRpcRateLimit(error); break; }
+    if (entry.exists !== true) continue;
+    const wallet = rawWalletAddress(entry.author_wallet);
+    if (!wallet || seen.has(wallet)) continue;
+    seen.add(wallet);
+    if (ownWallet && sameWalletAddress(wallet, ownWallet)) continue;
+    if (subscribedAuthors.has(wallet)) continue;
+    candidates.push(wallet);
+  }
+  // Phase 2 — resolve each candidate's profile (cache-first, shallow walk). Keep only channels that HAVE a
+  // description or tags — discovery suggests DESCRIBED channels.
+  const results = [];
+  for (const wallet of candidates) {
+    let profile = null;
+    try { profile = await resolveChannelProfile(wallet, { maxScan: PUBLIC_DISCOVERY_PROFILE_MAXSCAN }); } catch { profile = cachedChannelProfile(wallet); }
+    const description = typeof profile?.description === 'string' ? profile.description.trim() : '';
+    const tags = (profile?.tags ?? []).filter(Boolean);
+    if (!description && tags.length === 0) continue;
+    results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
+  }
+  publicDiscoveryCache = { at: Date.now(), results };
+  return results;
+}
+
 async function syncPublicChannelFromChain() {
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return false;
@@ -7363,6 +8201,16 @@ async function syncPublicChannelFromChain() {
     const createdMs = new Date(createdAt).getTime();
     if (!retryOnly && cutoffMs !== null && createdAtSec > 0 && !Number.isNaN(createdMs) && createdMs < cutoffMs) continue;
     const authorWallet = rawWalletAddress(payload.authorWallet ?? entry.author_wallet) ?? String(payload.authorWallet ?? entry.author_wallet ?? '');
+    // Channel PROFILE divert (v-profile): a single-part document post carrying ONLY a profile block is channel
+    // metadata, not a visible post — capture it into the per-author profile cache (free, the body was just read)
+    // and DROP it from the feed so it never renders as a blank post. Latest-wins by created_at/entryId.
+    if (payload.type === 'document' && Number(payload.partCount ?? 1) <= 1) {
+      const profileDoc = readProfileDocument(payload.documentBytes ?? payload.document_bytes);
+      if (profileDoc?.isProfileOnly) {
+        setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, entry.entry_id, createdAtSec);
+        continue;
+      }
+    }
     const base = {
       id: `chain-${entry.entry_id.toString()}`,
       entryId: entry.entry_id.toString(),
@@ -12616,7 +13464,8 @@ function privateComposerPlaceholder({ readOnly = false } = {}) {
 }
 
 function publicComposerPlaceholder() {
-  if (!plathoWallet) return t('common.walletRequired');
+  // Always the normal composer placeholder — do NOT surface "wallet required" here; the composer status line below
+  // already shows it, and duplicating it in the input placeholder is redundant.
   return publicCommentTarget ? t('composer.publicComment') : t('composer.publicMessage');
 }
 
@@ -14175,6 +15024,7 @@ document.addEventListener('keydown', (event) => {
   if (activeActionDialog?.dismissOnBackdrop !== false) closeActionDialog(null);
   closeDocsDialog();
   closeInstallDialog({ dismissed: false });
+  closePublicDiscovery();
 });
 
 actionGrid?.addEventListener('click', async (event) => {
@@ -14376,6 +15226,18 @@ syncMessagesButton?.addEventListener('click', async () => {
 publicChannelSearch?.addEventListener('input', () => {
   publicChannelSearchQuery = publicChannelSearch.value;
   renderPublicSurface();
+});
+
+editChannelProfileButton?.addEventListener('click', () => {
+  openEditChannelProfileDialog().catch((error) => console.error(error));
+});
+
+publicDiscoverButton?.addEventListener('click', () => {
+  openPublicDiscovery().catch((error) => console.error(error));
+});
+publicDiscoveryBackButton?.addEventListener('click', () => closePublicDiscovery());
+publicDiscoveryRefreshButton?.addEventListener('click', () => {
+  refreshPublicDiscovery().catch((error) => console.error(error));
 });
 
 addPublicChannelButton?.addEventListener('click', async () => {
@@ -16338,6 +17200,10 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   // Arbitrary file attachment (v652): name + mime + bytes — codec in capsule-part-policy.mjs. Old clients
   // skip it via the tolerant decode (the REPLY precedent).
   FILE: 6,
+  // Channel self-description (description + user tags) published as a normal public top-level POST so any client
+  // can read a channel's profile by walking that author's public_author_index. Codec in capsule-part-policy.mjs;
+  // old clients skip it via the tolerant public decode (the REPLY/FILE precedent).
+  PROFILE: 7,
 });
 const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
 const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\]/ig;
@@ -16445,6 +17311,9 @@ function encodeMessageDocumentBlocks(blocks, options = {}) {
     } else if (block.type === 'file') {
       type = PLATHO_DOCUMENT_BLOCK_TYPES.FILE;
       content = encodeFileBlockContent(block);
+    } else if (block.type === 'profile') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.PROFILE;
+      content = encodeProfileBlockContent(block);
     } else {
       throw new Error('Unsupported document block type');
     }
@@ -16512,6 +17381,10 @@ function decodeMessageDocumentBlocks(bytesLike, options = {}) {
       // Same null-on-malformed rule as REPLY: a bad file frame is dropped, never poisons the message.
       const file = decodeFileBlockContent(content);
       if (file) blocks.push({ type: 'file', ...file });
+    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.PROFILE) {
+      // Same null-on-malformed rule: a bad profile frame is dropped, never poisons the carrying post.
+      const profile = decodeProfileBlockContent(content);
+      if (profile) blocks.push({ type: 'profile', ...profile });
     } else if (tolerateUnknownBlocks) {
       // Skip an unrecognized block (offset already advanced past its content above) — forward-compat.
       continue;
@@ -23470,14 +24343,17 @@ function publicDocumentBytesFromDraft(text, attachments = publicImageAttachments
   return encodeMessageDocumentBlocks(blocks);
 }
 
-function publicComposerSendPlan(text, attachments = publicImageAttachments) {
+function publicSendPlanFromDocumentBytes(documentBytes) {
   const plan = [];
-  const documentBytes = publicDocumentBytesFromDraft(text, attachments);
   if (!documentBytes) return plan;
   for (const part of splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES)) {
     plan.push({ type: 'document', bytes: part.bytes, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
   }
   return plan;
+}
+
+function publicComposerSendPlan(text, attachments = publicImageAttachments) {
+  return publicSendPlanFromDocumentBytes(publicDocumentBytesFromDraft(text, attachments));
 }
 
 async function createPrivateComposerCapsules(text, attachments, recipientEntry, threadId, options = currentPrivateSenderOptions(), extras = {}) {
@@ -23672,6 +24548,10 @@ function publicPublishDraftFromPayload(payload) {
     // Carry the comment parent to the part so buildBatchPublishPartCell sets parent_link (0 for posts) and the
     // contract indexes a comment under its parent. Undefined for posts.
     parent_entry_id: payload.parent_entry_id ?? payload.parentEntryId,
+    // clean-11: carry the is_profile flag through to the part (SAME drop-bug class as parent_entry_id above) so
+    // buildBatchPublishPartCell sets the reserved bit0. Absent/false for every normal post; true only for a gated
+    // channel-profile publish. Dropping it here would silently keep the profile-pointer feature dark on clean-11.
+    is_profile: payload.is_profile === true,
   };
 }
 
@@ -23684,8 +24564,10 @@ async function publishPublicPayloadParts(payloads, idPrefix, options = {}) {
   })), { ...options, allowOwnVaultActionReadFallback: true });
 }
 
-async function createPublicPayloadParts({ type, text, attachments = publicImageAttachments, commentsAllowed = true, parent = null }) {
-  const documentParts = publicComposerSendPlan(text, attachments);
+async function createPublicPayloadParts({ type, text, attachments = publicImageAttachments, commentsAllowed = true, parent = null, documentBytes = null, isProfile = false }) {
+  // documentBytes override: publish an explicit PDC1 document (e.g. a channel PROFILE block) instead of a composer
+  // draft, while still riding the identical public part-build + broadcast path.
+  const documentParts = documentBytes ? publicSendPlanFromDocumentBytes(documentBytes) : publicComposerSendPlan(text, attachments);
   const totalParts = documentParts.length;
   if (totalParts <= 0) return [];
   // Fail-closed cap (v648, mirrors assertPrivateComposerPartLimit in createPrivateComposerCapsules): the composer
@@ -23711,6 +24593,9 @@ async function createPublicPayloadParts({ type, text, attachments = publicImageA
       partIndex: index,
       partCount: totalParts,
       createdAtSec,
+      // clean-11: mark ONLY the first part as the channel profile (a profile is single-part by design; the guard
+      // keeps exactly one global-profile-chain node even if a future profile ever spanned parts).
+      is_profile: isProfile === true && index === 0,
       ...profilePointer,
       ...commentBase,
     }, { sizeClass: part.sizeClass }));
@@ -23784,6 +24669,34 @@ async function submitPublicPostThroughVault(draft = null) {
   }
   globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, blocks, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result };
   return result;
+}
+
+// Publish/update the connected wallet's CHANNEL PROFILE (description + tags) as a normal public top-level POST whose
+// body is a single PROFILE document block. It rides the identical public part-build + broadcast path, lands on the
+// author's on-chain public_author_index, and is read back by resolveChannelProfile walking that author's chain.
+// Latest profile post per author wins — no on-chain mutation of a prior profile, each save is a fresh post. Unlike a
+// composer post, NO optimistic feed record is created: a profile is channel metadata, diverted from the visible feed.
+async function publishChannelProfile(description, tags) {
+  const desc = String(description ?? '').trim();
+  const normalizedTags = normalizeProfileTags(tags);
+  // Publish-time stamp (~the on-chain created_at baked into the header a few ms later): used as the profile's cache
+  // recency so latest-wins is consistent with the real created_at the read walk stamps — see finalizeChannelProfile.
+  const createdAtSec = Math.floor(Date.now() / 1000);
+  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags }]);
+  // clean-11: set the is_profile reserved bit so the contract threads this post into the global profile chain +
+  // per-author profile index. Gated on the genesis (clean-10 Vault/Hub reject reserved != 0 -> the profile still
+  // rides as a normal author-index post there, resolved by the author walk).
+  const payloads = await createPublicPayloadParts({ type: 'post', commentsAllowed: false, documentBytes, isProfile: profilePointerEnabled() });
+  if (payloads.length === 0) throw new Error('Channel profile produced no payload');
+  let result;
+  try {
+    result = await publishPublicPayloadParts(payloads, `channel-profile-${Date.now()}`, {});
+  } catch (error) {
+    // A partial publish still lands the external(s); surface its result rather than throwing (mirrors the submit path).
+    if (!isVaultPublishPartialError(error)) throw error;
+    result = error.publishResult;
+  }
+  return { result, description: desc, tags: normalizedTags, createdAtSec };
 }
 
 async function submitPublicCommentThroughVault(parent, bodyText = null, draftAttachments = publicImageAttachments) {
@@ -24411,6 +25324,7 @@ writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptio
 loadPrefsSyncMeta();
 refreshGlobalSyncIndicator();
 publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
+publicChannelProfileCache = readPublicChannelProfileCache(publicChannelStorage());
 // Warm per-wallet avatars from the IndexedDB media store BEFORE the first render so reloaded public feeds show
 // faces immediately (no letter-tile placeholder + chain-refetch flash). Top-level await (app.js is a module),
 // bounded by a short deadline so a slow/unavailable IndexedDB can never hang boot — past it the remaining

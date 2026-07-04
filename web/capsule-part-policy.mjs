@@ -273,3 +273,75 @@ export function decodeFileBlockContent(content) {
     bytes: bytes.slice(payloadStart),
   };
 }
+
+// --- Channel-profile content codec (document block type PROFILE) ---
+// A channel's public self-description (free-text + user-invented tags) riding inside the shared PDC1 document
+// container, published as a normal public top-level POST (parent_link==0) so it lands on the author's on-chain
+// public_author_index and ANY client can read it by walking that one author's chain — unlike PREFS, which is
+// encrypted to the owner and readable only by them. Latest profile post per author wins. Content layout:
+//   [version u8=1][descLen u16 BE][desc utf8][tagCount u8][ tagLen u8 | tag utf8 ]*
+// descLen is u16 (a cyrillic description hits 512 BYTES well before 512 chars); each tag length fits u8. Tags are
+// expected pre-normalized by the composer (lowercase/trim/dedupe), but encode defends the wire bounds anyway.
+export const PROFILE_BLOCK_CONTENT_VERSION = 1;
+export const PROFILE_DESCRIPTION_MAX_BYTES = 512;
+export const PROFILE_TAG_MAX_BYTES = 32;
+export const PROFILE_MAX_TAGS = 12;
+
+export function normalizeProfileTags(tags) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of Array.isArray(tags) ? tags : []) {
+    const tag = truncateUtf8ToBytes(String(raw ?? '').trim().toLowerCase(), PROFILE_TAG_MAX_BYTES).trim();
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+    if (out.length >= PROFILE_MAX_TAGS) break;
+  }
+  return out;
+}
+
+export function encodeProfileBlockContent(profile) {
+  const description = textEncoder.encode(truncateUtf8ToBytes(profile?.description ?? '', PROFILE_DESCRIPTION_MAX_BYTES));
+  const tags = normalizeProfileTags(profile?.tags).map((tag) => textEncoder.encode(tag));
+  let total = 1 + 2 + description.length + 1;
+  for (const tag of tags) total += 1 + tag.length;
+  const out = new Uint8Array(total);
+  out[0] = PROFILE_BLOCK_CONTENT_VERSION;
+  out[1] = (description.length >> 8) & 0xff;
+  out[2] = description.length & 0xff;
+  out.set(description, 3);
+  let offset = 3 + description.length;
+  out[offset] = tags.length;
+  offset += 1;
+  for (const tag of tags) {
+    out[offset] = tag.length;
+    offset += 1;
+    out.set(tag, offset);
+    offset += tag.length;
+  }
+  return out;
+}
+
+export function decodeProfileBlockContent(content) {
+  const bytes = content instanceof Uint8Array ? content : new Uint8Array(content ?? []);
+  // Unknown future versions / truncated frames return null — a bad profile block must never make the carrying
+  // post undecodable (the REPLY/FILE rule).
+  if (bytes.length < 4 || bytes[0] !== PROFILE_BLOCK_CONTENT_VERSION) return null;
+  const descLength = (bytes[1] << 8) | bytes[2];
+  if (3 + descLength + 1 > bytes.length) return null;
+  const decoder = new TextDecoder();
+  const description = decoder.decode(bytes.subarray(3, 3 + descLength));
+  let offset = 3 + descLength;
+  const tagCount = bytes[offset];
+  offset += 1;
+  const tags = [];
+  for (let index = 0; index < tagCount; index += 1) {
+    if (offset + 1 > bytes.length) return null;
+    const tagLength = bytes[offset];
+    offset += 1;
+    if (offset + tagLength > bytes.length) return null;
+    tags.push(decoder.decode(bytes.subarray(offset, offset + tagLength)));
+    offset += tagLength;
+  }
+  return { description, tags };
+}

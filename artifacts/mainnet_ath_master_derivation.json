@@ -11,25 +11,25 @@
   "invalidInputs": [],
   "inputs": {
     "treasuryOwnerAddress": "EQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOFkC",
-    "contentBocBase64": "te6cckECDwEAAT0AAQMAwAECAVgCCgIBIAMIAgJwBAYBQb5eFD1QUCkJihGGmfEqE02vLa33BZEJYuWGqq5MLXtTkAUAQgBwbGF0aG8tbWFpbm5ldC0yMDI2MDYyMi1jbGVhbi0xMAFBvlRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwBwAWAFBsYXRobyBBVEgBQb9u1PlCp4SM4ssGa3ehEoxqH/jEP0OKLc4kYSup/6uLAwkACABBVEgCASALDQFBv1II3vRvWh1Pnc5mqzCfSoUTBfFm+R73nZI+9Y40+aIJDABoAFV0aWxpdHkgdG9rZW4gb2YgdGhlIFBsYXRobyBjb21tdW5pY2F0aW9uIHByb3RvY29sLgFBv10B+l48BpAcRQRsay3c6lr3ZP6g7tcqENQE8jEs6yR9DgAEADnt27A4",
-    "contentHash": "5fc276fff0ea9a149774e7f9207ba42038349c727724e48bab5a303b7a4d4cf3"
+    "contentBocBase64": "te6cckECDwEAAT0AAQMAwAECAVgCCgIBIAMIAgJwBAYBQb5eFD1QUCkJihGGmfEqE02vLa33BZEJYuWGqq5MLXtTkAUAQgBwbGF0aG8tbWFpbm5ldC0yMDI2MDcwNC1jbGVhbi0xMQFBvlRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwBwAWAFBsYXRobyBBVEgBQb9u1PlCp4SM4ssGa3ehEoxqH/jEP0OKLc4kYSup/6uLAwkACABBVEgCASALDQFBv1II3vRvWh1Pnc5mqzCfSoUTBfFm+R73nZI+9Y40+aIJDABoAFV0aWxpdHkgdG9rZW4gb2YgdGhlIFBsYXRobyBjb21tdW5pY2F0aW9uIHByb3RvY29sLgFBv10B+l48BpAcRQRsay3c6lr3ZP6g7tcqENQE8jEs6yR9DgAEADln6T9F",
+    "contentHash": "8c94572cd6965d3dd2d75cf309b19d7956fe95e473cc07de442326e3866f3c94"
   },
   "derived": {
-    "athMasterAddress": "EQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oUsA",
-    "athMasterRawAddress": "0:355dae7aa8fe446dedf2a6b0044167f8460fdc737f7187020fd7cd3626a976a1",
-    "athMasterStateInitHash": "355dae7aa8fe446dedf2a6b0044167f8460fdc737f7187020fd7cd3626a976a1",
+    "athMasterAddress": "EQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6IpC",
+    "athMasterRawAddress": "0:7db98797112279e7eb671d271ae7921da1cfb4dbcce42b92a272a3e60b3ce7e8",
+    "athMasterStateInitHash": "7db98797112279e7eb671d271ae7921da1cfb4dbcce42b92a272a3e60b3ce7e8",
     "athMasterCodeHash": "b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780",
-    "athMasterDataHash": "3b4892a6045498e3f1d6a4e653ff40ce436e187095ecad84784323b528db6640",
-    "treasuryOwnerAthWalletAddress": "EQAE6J0fWanMG2RyvLW1TEdShC_7CnqBZkDIK3Yuq7nzQmuI",
-    "treasuryOwnerAthWalletRawAddress": "0:04e89d1f59a9cc1b6472bcb5b54c4752842ffb0a7a816640c82b762eabb9f342",
-    "treasuryOwnerAthWalletStateInitHash": "04e89d1f59a9cc1b6472bcb5b54c4752842ffb0a7a816640c82b762eabb9f342",
+    "athMasterDataHash": "e84c3e592b2c4f083d978033ddab2971ad2930b0f7dd00be86cb5a1de121d4b0",
+    "treasuryOwnerAthWalletAddress": "EQBQgxFVRTJDe9yIh2GWAQldgz_04b-wkcIkfc4shhARAbKe",
+    "treasuryOwnerAthWalletRawAddress": "0:508311554532437bdc8887619601095d833ff4e1bfb091c2247dce2c86101101",
+    "treasuryOwnerAthWalletStateInitHash": "508311554532437bdc8887619601095d833ff4e1bfb091c2247dce2c86101101",
     "athWalletCodeHash": "3d0f027840bc604e1e69d19f764543372f362096e2ead3c689c83e8f00966ce4"
   },
   "treasurySupplyDeployment": {
     "required": true,
     "messageType": "DeployTreasurySupply",
     "senderAddress": "EQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOFkC",
-    "recipientAthWalletAddress": "EQAE6J0fWanMG2RyvLW1TEdShC_7CnqBZkDIK3Yuq7nzQmuI",
+    "recipientAthWalletAddress": "EQBQgxFVRTJDe9yIh2GWAQldgz_04b-wkcIkfc4shhARAbKe",
     "amountAtomic": "100000000000000000",
     "requiredValueNanotons": "5000000",
     "downstreamWalletValueNanotons": "3000000",
@@ -37,13 +37,13 @@
     "proofRequired": "required: post-deploy transaction plus official treasury ATH wallet balance proof"
   },
   "nextM20FInputs": {
-    "athMasterAddress": "EQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oUsA",
+    "athMasterAddress": "EQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6IpC",
     "athMasterCodeHash": "b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780",
     "athDeploymentManifest": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780"
   },
   "proofRefs": {
     "treasuryOwnerProof": "artifacts/mainnet_genesis_verify_input.json#manifest.addresses.ath_treasury_owner=UQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOATH",
-    "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=5fc276fff0ea9a149774e7f9207ba42038349c727724e48bab5a303b7a4d4cf3",
+    "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=8c94572cd6965d3dd2d75cf309b19d7956fe95e473cc07de442326e3866f3c94",
     "athMasterBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780"
   }
 }

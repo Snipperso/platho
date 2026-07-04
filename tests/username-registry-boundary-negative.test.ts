@@ -25,6 +25,7 @@ const PENDING_MINT_STORAGE = 6_000_000n;
 const NFT_ITEM_DEPLOY_RESERVE = 500_000_000n;
 const ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
 const STATE_GROWTH_EXEC_RESERVE = 4_000_000n;
+const NAME_RECORD_STORAGE_ENDOWMENT = 36_000_000n; // clean-11: dedicated century-rent endowment folded into the mint floor
 const ATH_TRANSFER_EXEC_RESERVE = 48_000_000n;
 const ATH_BURN_EXEC_RESERVE = 5_000_000n;
 const DUE_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
@@ -252,7 +253,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       validOwner,
       'exact1',
       PRICE_6_PLUS,
-      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE - 1n,
+      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE + NAME_RECORD_STORAGE_ENDOWMENT - 1n,
       vaultAddress,
     );
     expect((await registry.getGetNameRecord(validHash)).exists).toBe(false);
@@ -264,7 +265,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       validOwner,
       'exact1',
       PRICE_6_PLUS,
-      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE,
+      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE + NAME_RECORD_STORAGE_ENDOWMENT,
       vaultAddress,
     );
     expect((await registry.getGetNameRecord(validHash)).exists).toBe(true);

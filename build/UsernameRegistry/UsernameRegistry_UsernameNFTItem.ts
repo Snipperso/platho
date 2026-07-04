@@ -4568,6 +4568,63 @@ export function dictValueParserUsernameCollectionDataView(): DictionaryValue<Use
     }
 }
 
+export type RoyaltyParamsView = {
+    $$type: 'RoyaltyParamsView';
+    numerator: bigint;
+    denominator: bigint;
+    destination: Address;
+}
+
+export function storeRoyaltyParamsView(src: RoyaltyParamsView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeInt(src.numerator, 257);
+        b_0.storeInt(src.denominator, 257);
+        b_0.storeAddress(src.destination);
+    };
+}
+
+export function loadRoyaltyParamsView(slice: Slice) {
+    const sc_0 = slice;
+    const _numerator = sc_0.loadIntBig(257);
+    const _denominator = sc_0.loadIntBig(257);
+    const _destination = sc_0.loadAddress();
+    return { $$type: 'RoyaltyParamsView' as const, numerator: _numerator, denominator: _denominator, destination: _destination };
+}
+
+export function loadTupleRoyaltyParamsView(source: TupleReader) {
+    const _numerator = source.readBigNumber();
+    const _denominator = source.readBigNumber();
+    const _destination = source.readAddress();
+    return { $$type: 'RoyaltyParamsView' as const, numerator: _numerator, denominator: _denominator, destination: _destination };
+}
+
+export function loadGetterTupleRoyaltyParamsView(source: TupleReader) {
+    const _numerator = source.readBigNumber();
+    const _denominator = source.readBigNumber();
+    const _destination = source.readAddress();
+    return { $$type: 'RoyaltyParamsView' as const, numerator: _numerator, denominator: _denominator, destination: _destination };
+}
+
+export function storeTupleRoyaltyParamsView(source: RoyaltyParamsView) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.numerator);
+    builder.writeNumber(source.denominator);
+    builder.writeAddress(source.destination);
+    return builder.build();
+}
+
+export function dictValueParserRoyaltyParamsView(): DictionaryValue<RoyaltyParamsView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeRoyaltyParamsView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadRoyaltyParamsView(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameCollectionOnchainContent = {
     $$type: 'UsernameCollectionOnchainContent';
     marker: bigint;
@@ -4713,6 +4770,100 @@ export function dictValueParserSealArt(): DictionaryValue<SealArt> {
     }
 }
 
+export type UploadCollectionMeta = {
+    $$type: 'UploadCollectionMeta';
+    key: bigint;
+    data: Cell;
+}
+
+export function storeUploadCollectionMeta(src: UploadCollectionMeta) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(3151574565, 32);
+        b_0.storeUint(src.key, 16);
+        b_0.storeRef(src.data);
+    };
+}
+
+export function loadUploadCollectionMeta(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 3151574565) { throw Error('Invalid prefix'); }
+    const _key = sc_0.loadUintBig(16);
+    const _data = sc_0.loadRef();
+    return { $$type: 'UploadCollectionMeta' as const, key: _key, data: _data };
+}
+
+export function loadTupleUploadCollectionMeta(source: TupleReader) {
+    const _key = source.readBigNumber();
+    const _data = source.readCell();
+    return { $$type: 'UploadCollectionMeta' as const, key: _key, data: _data };
+}
+
+export function loadGetterTupleUploadCollectionMeta(source: TupleReader) {
+    const _key = source.readBigNumber();
+    const _data = source.readCell();
+    return { $$type: 'UploadCollectionMeta' as const, key: _key, data: _data };
+}
+
+export function storeTupleUploadCollectionMeta(source: UploadCollectionMeta) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.key);
+    builder.writeCell(source.data);
+    return builder.build();
+}
+
+export function dictValueParserUploadCollectionMeta(): DictionaryValue<UploadCollectionMeta> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUploadCollectionMeta(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUploadCollectionMeta(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type SealCollectionMeta = {
+    $$type: 'SealCollectionMeta';
+}
+
+export function storeSealCollectionMeta(src: SealCollectionMeta) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1935875654, 32);
+    };
+}
+
+export function loadSealCollectionMeta(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1935875654) { throw Error('Invalid prefix'); }
+    return { $$type: 'SealCollectionMeta' as const };
+}
+
+export function loadTupleSealCollectionMeta(source: TupleReader) {
+    return { $$type: 'SealCollectionMeta' as const };
+}
+
+export function loadGetterTupleSealCollectionMeta(source: TupleReader) {
+    return { $$type: 'SealCollectionMeta' as const };
+}
+
+export function storeTupleSealCollectionMeta(source: SealCollectionMeta) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserSealCollectionMeta(): DictionaryValue<SealCollectionMeta> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeSealCollectionMeta(src)).endCell());
+        },
+        parse: (src) => {
+            return loadSealCollectionMeta(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameRegistry$Data = {
     $$type: 'UsernameRegistry$Data';
     official_ath_wallet_address: Address;
@@ -4739,6 +4890,9 @@ export type UsernameRegistry$Data = {
     art: Dictionary<number, Cell>;
     art_count: bigint;
     art_sealed: boolean;
+    meta: Dictionary<number, Cell>;
+    meta_count: bigint;
+    meta_sealed: boolean;
 }
 
 export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
@@ -4771,6 +4925,9 @@ export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
         b_3.storeDict(src.art, Dictionary.Keys.Uint(16), Dictionary.Values.Cell());
         b_3.storeUint(src.art_count, 16);
         b_3.storeBit(src.art_sealed);
+        b_3.storeDict(src.meta, Dictionary.Keys.Uint(16), Dictionary.Values.Cell());
+        b_3.storeUint(src.meta_count, 16);
+        b_3.storeBit(src.meta_sealed);
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
@@ -4806,7 +4963,10 @@ export function loadUsernameRegistry$Data(slice: Slice) {
     const _art = Dictionary.load(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), sc_3);
     const _art_count = sc_3.loadUintBig(16);
     const _art_sealed = sc_3.loadBit();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed };
+    const _meta = Dictionary.load(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), sc_3);
+    const _meta_count = sc_3.loadUintBig(16);
+    const _meta_sealed = sc_3.loadBit();
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
 }
 
 export function loadTupleUsernameRegistry$Data(source: TupleReader) {
@@ -4835,7 +4995,10 @@ export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _art = Dictionary.loadDirect(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), source.readCellOpt());
     const _art_count = source.readBigNumber();
     const _art_sealed = source.readBoolean();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed };
+    const _meta = Dictionary.loadDirect(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), source.readCellOpt());
+    const _meta_count = source.readBigNumber();
+    const _meta_sealed = source.readBoolean();
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
 }
 
 export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
@@ -4863,7 +5026,10 @@ export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
     const _art = Dictionary.loadDirect(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), source.readCellOpt());
     const _art_count = source.readBigNumber();
     const _art_sealed = source.readBoolean();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed };
+    const _meta = Dictionary.loadDirect(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), source.readCellOpt());
+    const _meta_count = source.readBigNumber();
+    const _meta_sealed = source.readBoolean();
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
 }
 
 export function storeTupleUsernameRegistry$Data(source: UsernameRegistry$Data) {
@@ -4892,6 +5058,9 @@ export function storeTupleUsernameRegistry$Data(source: UsernameRegistry$Data) {
     builder.writeCell(source.art.size > 0 ? beginCell().storeDictDirect(source.art, Dictionary.Keys.Uint(16), Dictionary.Values.Cell()).endCell() : null);
     builder.writeNumber(source.art_count);
     builder.writeBoolean(source.art_sealed);
+    builder.writeCell(source.meta.size > 0 ? beginCell().storeDictDirect(source.meta, Dictionary.Keys.Uint(16), Dictionary.Values.Cell()).endCell() : null);
+    builder.writeNumber(source.meta_count);
+    builder.writeBoolean(source.meta_sealed);
     return builder.build();
 }
 
@@ -5078,10 +5247,13 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"PendingAthTreasuryFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthBurnFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernameCollectionDataView","header":null,"fields":[{"name":"next_item_index","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"collection_content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"RoyaltyParamsView","header":null,"fields":[{"name":"numerator","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"denominator","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"UsernameCollectionOnchainContent","header":null,"fields":[{"name":"marker","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"metadata","type":{"kind":"dict","key":"uint","keyFormat":256,"value":"cell","valueFormat":"ref"}}]},
     {"name":"UploadArt","header":1486822296,"fields":[{"name":"key","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"data","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"SealArt","header":3513294426,"fields":[]},
-    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"art","type":{"kind":"dict","key":"uint","keyFormat":16,"value":"cell","valueFormat":"ref"}},{"name":"art_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"art_sealed","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"UploadCollectionMeta","header":3151574565,"fields":[{"name":"key","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"data","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"SealCollectionMeta","header":1935875654,"fields":[]},
+    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"art","type":{"kind":"dict","key":"uint","keyFormat":16,"value":"cell","valueFormat":"ref"}},{"name":"art_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"art_sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"meta","type":{"kind":"dict","key":"uint","keyFormat":16,"value":"cell","valueFormat":"ref"}},{"name":"meta_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"meta_sealed","type":{"kind":"simple","type":"bool","optional":false}}]},
 ]
 
 const UsernameNFTItem_opcodes = {
@@ -5127,6 +5299,8 @@ const UsernameNFTItem_opcodes = {
     "UsernameRegistryTopUpStorageReserve": 179986205,
     "UploadArt": 1486822296,
     "SealArt": 3513294426,
+    "UploadCollectionMeta": 3151574565,
+    "SealCollectionMeta": 1935875654,
 }
 
 const UsernameNFTItem_getters: ABIGetter[] = [
@@ -5186,6 +5360,7 @@ export const USERNAME_PRICE_5_CHARS = 1000000000000n;
 export const USERNAME_PRICE_6_PLUS_CHARS = 100000000000n;
 export const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = 6000000n;
 export const USERNAME_STATE_GROWTH_EXEC_RESERVE = 4000000n;
+export const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT = 36000000n;
 export const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 500000000n;
 export const USERNAME_ATH_TRANSFER_EXEC_RESERVE = 48000000n;
 export const USERNAME_ATH_BURN_EXEC_RESERVE = 5000000n;
@@ -5200,6 +5375,13 @@ export const USERNAME_TREASURY_SHARE_BPS = 5000n;
 export const USERNAME_NAME_HASH_DOMAIN = 3318512854n;
 export const USERNAME_COLLECTION_METADATA_KEY_NAME = 59089242681608890680090686026688704441792375738894456860693970539822503415433n;
 export const USERNAME_COLLECTION_METADATA_KEY_IMAGE_DATA = 98449690268711667050166283313913751402364107788915545466587557261600130787812n;
+export const USERNAME_COLLECTION_METADATA_KEY_DESCRIPTION = 90922719342317012409671596374183159143637506542604000676488204638996496437508n;
+export const USERNAME_COLLECTION_METADATA_KEY_IMAGE = 43884663033947008978309661017057008345326326811558777475113826163084742639165n;
+export const USERNAME_COLLECTION_METADATA_KEY_COVER_IMAGE = 42956871979619932309344551073564797192701919513518910325960307890830458850535n;
+export const USERNAME_META_KEY_DESCRIPTION = 1n;
+export const USERNAME_META_KEY_IMAGE = 2n;
+export const USERNAME_META_KEY_COVER_IMAGE = 3n;
+export const USERNAME_META_PART_COUNT = 3n;
 export const USERNAME_COLLECTION_UNORDERED_NEXT_INDEX = -1n;
 export const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET = 1715335229n;
 export const OP_USERNAME_BIND_VAULT = 1621496068n;

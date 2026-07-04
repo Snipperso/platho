@@ -12,6 +12,13 @@ const USERNAME_PRICE_5_CHARS: Int = 1000000000000;       // 1,000 ATH atomic uni
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;   // 100 ATH atomic units
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT: Int = 6000000;
 const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 4000000;
+// The name_records ownership entry (~2 cells) is created at finalization and NEVER evicted (a username's owner
+// record must persist for the life of the collection). This dedicated endowment stays in the registry's single
+// balance to self-fund that entry's storage rent for ~250+ yr at config-18 (~67k nanoton/cell/yr) + a thick cushion
+// against storage-price growth. Mirrors ProfileRegistry's PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT for the identical
+// never-pruned-record case, and is folded into retainedValue so the FLOOR guarantees it — century survival no longer
+// depends on client-supplied forward_ton generosity.
+const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT: Int = 36000000;
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 500000000; // 0.5 TON prepaid storage: ~250+ years at mainnet config-18 (~2M nanoton/yr for the ~30-cell item), with a thick cushion against storage-price growth. The minter funds it once; the NFT lives for centuries.
 const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 48000000; // raised 30M->48M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the official ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M.
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
@@ -26,6 +33,15 @@ const USERNAME_TREASURY_SHARE_BPS: Int = 5000;
 const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
 const USERNAME_COLLECTION_METADATA_KEY_NAME: Int = 0x82a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce89;
 const USERNAME_COLLECTION_METADATA_KEY_IMAGE_DATA: Int = 0xd9a88ccec79eef59c84b671136a20ece4cd00caaad5bc47e2c208829154ee9e4;
+// clean-11 collection-page metadata keys (sha256 of the TEP-64 key name). description+image match the mainnet-proven probe.
+const USERNAME_COLLECTION_METADATA_KEY_DESCRIPTION: Int = 0xc9046f7a37ad0ea7cee73355984fa5428982f8b37c8f7bcec91f7ac71a7cd104; // sha256("description")
+const USERNAME_COLLECTION_METADATA_KEY_IMAGE: Int       = 0x6105d6cc76af400325e94d588ce511be5bfdbb73b437dc51eca43917d7a43e3d; // sha256("image")
+const USERNAME_COLLECTION_METADATA_KEY_COVER_IMAGE: Int = 0x5ef8ba599c69728c698d4cdca2040e121acb2aa9b6d4a2c8af02dd0b91398ce7; // sha256("cover_image")
+// clean-11 meta-dict namespace (uint16 keys): 1=description, 2=image(avatar b64 data-uri), 3=cover_image(banner b64 data-uri).
+const USERNAME_META_KEY_DESCRIPTION: Int = 1;
+const USERNAME_META_KEY_IMAGE: Int = 2;
+const USERNAME_META_KEY_COVER_IMAGE: Int = 3;
+const USERNAME_META_PART_COUNT: Int = 3;
 const USERNAME_COLLECTION_UNORDERED_NEXT_INDEX: Int = -1;
 
 const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET: Int = 0x663DF03D;
@@ -153,6 +169,13 @@ struct UsernameCollectionDataView {
     owner_address: Address;
 }
 
+// clean-11: TEP-66 royalty params (numerator/denominator/destination).
+struct RoyaltyParamsView {
+    numerator: Int;
+    denominator: Int;
+    destination: Address;
+}
+
 struct UsernameCollectionOnchainContent {
     marker: Int as uint8;
     metadata: map<Int as uint256, Cell>;
@@ -163,6 +186,13 @@ message UploadArt {
     data: Cell;
 }
 message SealArt {}
+// clean-11 collection-metadata upload (mirrors UploadArt): each `data` is a COMPLETE TEP-64 snake value cell
+// (0x00 marker + snake, built client-side exactly like the mainnet-proven probe) — served verbatim, no re-wrap.
+message UploadCollectionMeta {
+    key: Int as uint16;
+    data: Cell;
+}
+message SealCollectionMeta {}
 
 contract UsernameRegistry {
     official_ath_wallet_address: Address;
@@ -193,6 +223,11 @@ contract UsernameRegistry {
     art: map<Int as uint16, Cell>;
     art_count: Int as uint16;
     art_sealed: Bool;
+    // clean-11: collection-level TEP-64 metadata (avatar/banner data-URIs + description) as COMPLETE snake value
+    // cells, uploaded at genesis like `art` (base64 data-URIs would blow the ~64KB deploy-external). meta_sealed locks it.
+    meta: map<Int as uint16, Cell>;
+    meta_count: Int as uint16;
+    meta_sealed: Bool;
 
     init(official_ath_wallet_address: Address, ath_master_address: Address, treasury_ath_receiver_address: Address, sealed: Bool, deployment_manifest_hash: Int, genesis_config_hash: Int, genesis_controller_address: Address) {
         self.official_ath_wallet_address = official_ath_wallet_address;
@@ -213,6 +248,8 @@ contract UsernameRegistry {
         self.pending_burn_flush_count = 0;
         self.art_count = 0;
         self.art_sealed = false;
+        self.meta_count = 0;      // clean-11
+        self.meta_sealed = false; // clean-11
     }
 
     fun requireUnsealed() {
@@ -285,12 +322,25 @@ contract UsernameRegistry {
     }
 
     fun collectionContent(): Cell {
+        throwUnless(19360, self.meta_sealed); // never expose half-built collection metadata
         let metadata: map<Int as uint256, Cell> = emptyMap();
         metadata.set(USERNAME_COLLECTION_METADATA_KEY_NAME, self.collectionNameCell());
+        metadata.set(USERNAME_COLLECTION_METADATA_KEY_DESCRIPTION, self.metaCell(USERNAME_META_KEY_DESCRIPTION));
+        metadata.set(USERNAME_COLLECTION_METADATA_KEY_IMAGE,       self.metaCell(USERNAME_META_KEY_IMAGE));
+        metadata.set(USERNAME_COLLECTION_METADATA_KEY_COVER_IMAGE, self.metaCell(USERNAME_META_KEY_COVER_IMAGE));
         return UsernameCollectionOnchainContent {
             marker: 0,
             metadata: metadata
         }.toCell();
+    }
+
+    // clean-11: a collection-meta part (description / avatar data-URI / banner data-URI) stored as a COMPLETE TEP-64
+    // snake value (0x00 marker + snake, built client-side like the mainnet-proven probe). Served verbatim into the
+    // collection_content dict as a ref — NO re-wrap (avoids the multi-cell asString truncation hazard for the banner).
+    fun metaCell(key: Int): Cell {
+        let c: Cell? = self.meta.get(key);
+        throwUnless(19361, c != null);
+        return c!!;
     }
 
     fun deriveItemAddress(name_hash: Int): Address {
@@ -395,7 +445,7 @@ contract UsernameRegistry {
             throw(19173);
         }
 
-        let retainedValue: Int = USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
+        let retainedValue: Int = USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE + USERNAME_NAME_RECORD_STORAGE_ENDOWMENT;
         throwUnless(19122, context().value >= retainedValue);
 
         let item_address: Address = self.deriveItemAddress(name_hash);
@@ -494,6 +544,25 @@ contract UsernameRegistry {
         self.requireGenesisController();
         throwUnless(19060, self.art_count == 56);
         self.art_sealed = true;
+    }
+
+    // clean-11: genesis controller uploads one collection-meta part (a complete TEP-64 snake value cell) until sealed.
+    // DECOUPLED from SealGenesis (like UploadArt); genesis verification asserts meta_sealed == true.
+    receive(msg: UploadCollectionMeta) {
+        self.requireGenesisController();
+        throwUnless(19071, !self.meta_sealed);
+        throwUnless(19072, (msg.key >= 1) && (msg.key <= USERNAME_META_PART_COUNT));
+        if (self.meta.get(msg.key) == null) {
+            self.meta_count += 1;
+        }
+        self.meta.set(msg.key, msg.data);
+    }
+
+    // clean-11: one-way lock once all 3 parts (description + image + cover_image) are present.
+    receive(msg: SealCollectionMeta) {
+        self.requireGenesisController();
+        throwUnless(19070, self.meta_count == USERNAME_META_PART_COUNT);
+        self.meta_sealed = true;
     }
 
     receive(msg: AthTransferNotificationVaultMintUsername) {
@@ -1118,6 +1187,19 @@ contract UsernameRegistry {
 
     get fun get_art_count(): Int { return self.art_count; }
     get fun get_art_sealed(): Bool { return self.art_sealed; }
+    get fun get_meta_count(): Int { return self.meta_count; }       // clean-11
+    get fun get_meta_sealed(): Bool { return self.meta_sealed; }    // clean-11
+
+    // clean-11: TEP-66 royalty — 5% of each secondary sale to a fixed owner-chosen wallet_v5r1.
+    // TEP-66 mandates the get-method be named exactly `royalty_params` (NOT `get_`-prefixed) — marketplaces
+    // resolve the royalty by that method id; a `get_royalty_params` name would silently hide the royalty.
+    get fun royalty_params(): RoyaltyParamsView {
+        return RoyaltyParamsView {
+            numerator: 5,
+            denominator: 100,
+            destination: address("UQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOATH")
+        };
+    }
 
     get fun get_nft_content(index: Int, individual_content: Cell): Cell {
         // Collection completes the item partial content (TEP-62): read the username from the

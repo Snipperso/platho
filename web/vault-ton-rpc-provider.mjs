@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes, tonCell, VAULT_PUBLISH_KIND } from './pwa-contract-transactions.mjs?v=30';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes, tonCell, VAULT_PUBLISH_KIND } from './pwa-contract-transactions.mjs?v=33';
 import { BATCH_SHARED_BASE_HOLD_NANOTONS, capsulePerPartHoldNanotons } from './message-pricing-policy.mjs?v=13';
 
 const { parseBocBase64 } = tonCell;

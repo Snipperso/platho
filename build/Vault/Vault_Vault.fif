@@ -1489,7 +1489,7 @@ PROGRAM{
     115000000 PUSHINT
   }>
   $Vault$_fun_usernameMintTonCharge PROCREF:<{
-    581000000 PUSHINT
+    617000000 PUSHINT
   }>
   $Vault$_fun_usernamePriceForLength PROCREF:<{
     16650 PUSHINT
@@ -10462,6 +10462,8 @@ PROGRAM{
               s8 POP
             }>
             s0 s3 XCHG
+            254 PUSHINT
+            AND
             0 EQINT
             IF:<{
               2 PUSHINT
@@ -12751,13 +12753,13 @@ PROGRAM{
       SWAP
       $Vault$_fun_incrementPendingUsernameMintPaymentCount INLINECALLDICT
           COMMIT
-      575000000 PUSHINT
+      611000000 PUSHINT
       TRUE
       1 PUSHINT
           MYADDR
       s5 31 s() XCHG
       s4 29 s() XCHG
-      532000000 PUSHINT
+      568000000 PUSHINT
       24 s() PUSH
       s4 s3 s5 XCHG3
       s2 32 s() XCHG

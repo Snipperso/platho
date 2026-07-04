@@ -206,6 +206,41 @@ describe('public comment parent_link publish wiring', () => {
     expect(parentLinkOf(draft(undefined))).toBe(0n);
   });
 
+  it('PWA-PUBLIC-PROFILE-01: the publish draft->part->cell pipeline carries is_profile into reserved bit0 (clean-11), default 0', async () => {
+    // Exercise the REAL mapper publishItemToBatchPart (NOT buildBatchPublishPartCell in isolation): the is_profile
+    // bit was dropped here (same field-drop class as parent_entry_id in PWA-PUBLIC-PARENT-01), so the profile-pointer
+    // reserved byte silently stayed 0. This pins the mapper end-to-end into the exact cell bits the contract reads.
+    const [{ buildBatchPublishPartCell, tonCell }, { publishItemToBatchPart }, { Cell }] = await Promise.all([
+      import('../web/pwa-contract-transactions.mjs'),
+      import('../web/publish-batch-orchestration.mjs'),
+      import('@ton/core'),
+    ]);
+    const headerCell = tonCell.snakeCellFromBytes(new Uint8Array([1, 2, 3]), 'header');
+    const bodyCell = tonCell.snakeCellFromBytes(new Uint8Array([4, 5, 6]), 'body');
+    const asPayload = (cell) => ({ boc: tonCell.bytesToBase64(tonCell.serializeBoc(cell)) });
+    const draft = (isProfile) => ({
+      publish: {
+        publish_kind: 1n,
+        size_class: 1n,
+        header_hash: '0x' + '11'.repeat(32),
+        body_hash: '0x' + '22'.repeat(32),
+        header_cell: asPayload(headerCell),
+        body_cell: asPayload(bodyCell),
+        ...(isProfile === undefined ? {} : { is_profile: isProfile }),
+      },
+    });
+    const reservedOf = (item) => {
+      const part = publishItemToBatchPart(item, 'public');
+      const cell = Cell.fromBoc(Buffer.from(tonCell.serializeBoc(buildBatchPublishPartCell(part))))[0];
+      const s = cell.beginParse();
+      s.loadUint(8); // size_class
+      return s.loadUint(8); // reserved — the exact byte CapsuleHub/Vault load at part.loadUint(8)
+    };
+    expect(reservedOf(draft(true))).toBe(1);       // is_profile survives the mapper -> bit0 set (clean-11 profile-chain thread)
+    expect(reservedOf(draft(false))).toBe(0);
+    expect(reservedOf(draft(undefined))).toBe(0);   // normal post — byte-identical to clean-10, no accidental flag
+  });
+
   it('PWA-PUBLIC-PARENT-02: the mapping survives the field-name variants the app draft uses', async () => {
     const { publishItemToBatchPart } = await import('../web/publish-batch-orchestration.mjs');
     const base = { size_class: 1n, header_hash: '0x11', body_hash: '0x22', header_cell: { boc: 'x' }, body_cell: { boc: 'x' } };

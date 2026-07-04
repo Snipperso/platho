@@ -90,6 +90,18 @@ async function orbsV2Base() {
   return `https://ton.access.orbs.network/${n.NodeId}/1/mainnet/toncenter-api-v2`;
 }
 async function gwSendBoc(bocB64) {
+  if (SEND_VIA === 'tonapi') {
+    // Tonkeeper infra — reliably forwards LARGE externals that toncenter /message accepts (200) but silently drops.
+    const r = await fetch('https://tonapi.io/v2/blockchain/message', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ boc: bocB64 }),
+    });
+    const text = await r.text();
+    let body; try { body = JSON.parse(text); } catch { body = { raw: text.slice(0, 400) }; }
+    console.log('  (send via tonapi /v2/blockchain/message)');
+    return { httpStatus: r.status, ok: r.status === 200 || r.status === 201, body };
+  }
   if (SEND_VIA === 'orbs') {
     const base = await orbsV2Base();
     const r = await fetch(`${base}/jsonRPC`, {
@@ -102,14 +114,20 @@ async function gwSendBoc(bocB64) {
     console.log('  (send via Orbs v2 sendBoc:', base.replace(/\/[^/]+\/1\//, '/<node>/1/'), ')');
     return { httpStatus: r.status, ok: r.ok, body };
   }
-  const r = await fetch(`${GATEWAY}/api/v3/message`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ boc: bocB64 }),
-  });
-  const text = await r.text();
-  let body; try { body = JSON.parse(text); } catch { body = { raw: text.slice(0, 400) }; }
-  return { httpStatus: r.status, ok: r.ok, body };
+  const API_KEY = process.env.TONCENTER_API_KEY || '';
+  const hdrs = { 'content-type': 'application/json', accept: 'application/json', ...(API_KEY ? { 'X-API-Key': API_KEY } : {}) };
+  // Anonymous toncenter rate-limits bursts (429). The send is idempotent vs seqno (a 429 means
+  // NOTHING landed), so retry on 429 with backoff until it's accepted.
+  let last = { httpStatus: 0, ok: false, body: {} };
+  for (let attempt = 0; attempt < 8; attempt++) {
+    if (attempt > 0) { console.log(`  (send 429 — retry ${attempt}/7 after ${attempt * 2}s)`); await sleep(attempt * 2000); }
+    const r = await fetch(`${GATEWAY}/api/v3/message`, { method: 'POST', headers: hdrs, body: JSON.stringify({ boc: bocB64 }) });
+    const text = await r.text();
+    let body; try { body = JSON.parse(text); } catch { body = { raw: text.slice(0, 400) }; }
+    last = { httpStatus: r.status, ok: r.ok, body };
+    if (r.status !== 429) return last;
+  }
+  return last;
 }
 async function gwSeqno(addr) {
   const r = await fetch(`${GATEWAY}/api/v3/runGetMethod`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method: 'seqno', stack: [] }) });

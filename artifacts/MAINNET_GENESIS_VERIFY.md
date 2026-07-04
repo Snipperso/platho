@@ -3,9 +3,9 @@
 Status: MAINNET_GENESIS_VERIFIED
 
 - mainnet_genesis_verified: true
-- checked_manifest_hash: 9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2
+- checked_manifest_hash: 39c0115b9fec0b31c8b2a3981bb026b730df391d747e2df7bbc772f7d3118fd2
 - input_source: artifacts/mainnet_genesis_verify_input.json
-- input_sha256: c32d1a01d2f19074c7333ef3e70835ae03df8c7c2925f452558be0b8aa4b73d9
+- input_sha256: cf6411ce4088a5f10903b2946045c5ba21e5cc3f5f3d5f6b59cbbe0717a81155
 
 ## Evidence refs
 

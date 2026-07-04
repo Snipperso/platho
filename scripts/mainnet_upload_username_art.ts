@@ -29,6 +29,7 @@ import { storeUploadArt, storeSealArt } from '../build/UsernameRegistry/Username
 const GATEWAY = (process.env.PLATHO_GATEWAY || 'https://toncenter.com').replace(/\/+$/, '');
 const TONCENTER_KEY = (process.env.TONCENTER_API_KEY
   || (existsSync('artifacts/local/center.txt') ? readFileSync('artifacts/local/center.txt', 'utf8') : '')).trim();
+const TONAPI_KEY = (process.env.TONAPI_KEY || (existsSync('artifacts/local/tonapi.txt') ? readFileSync('artifacts/local/tonapi.txt', 'utf8') : '')).trim();
 const KEY_Q = TONCENTER_KEY ? `api_key=${encodeURIComponent(TONCENTER_KEY)}` : '';
 const withKey = (url: string) => (KEY_Q ? `${url}${url.includes('?') ? '&' : '?'}${KEY_Q}` : url);
 const PAYLOAD_PATH = 'artifacts/username_art_v2/art_payload.json';
@@ -71,8 +72,9 @@ async function gwRunGet(addr: string, method: string): Promise<string> {
   try { const r = await fetch(withKey(`${GATEWAY}/api/v3/runGetMethod`), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method, stack: [] }) }); const j: any = await r.json(); return j?.stack?.[0]?.value ?? j?.result?.stack?.[0]?.[1] ?? '0'; } catch { return '0'; }
 }
 async function gwSendBoc(bocB64: string) {
-  // Redundant: gateway intermittently ACKs without delivering; also push to toncenter v2.
+  // tonapi FIRST: toncenter intermittently 500s (and drops large externals); tonapi is the reliable deliverer.
   const parts: string[] = []; let anyOk = false;
+  try { const headers: any = { 'content-type': 'application/json', accept: 'application/json' }; if (TONAPI_KEY) headers['Authorization'] = `Bearer ${TONAPI_KEY}`; const r = await fetch('https://tonapi.io/v2/blockchain/message', { method: 'POST', headers, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`tonapi ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('tonapi ERR'); }
   try { const r = await fetch(withKey('https://toncenter.com/api/v2/sendBoc'), { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`toncenter-v2 ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('toncenter-v2 ERR'); }
   try { const r = await fetch(withKey(`${GATEWAY}/api/v3/message`), { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`toncenter-v3 ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('toncenter-v3 ERR'); }
   return { httpStatus: 0, ok: anyOk, body: parts.join(' | ') };

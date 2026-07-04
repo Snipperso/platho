@@ -174,3 +174,34 @@ describe('file block content codec', () => {
     expect(m.decodeFileBlockContent(truncated)).toBe(null);
   });
 });
+
+// Channel-profile content codec: a channel's public self-description (free-text + user tags) rides here.
+describe('profile block content codec', () => {
+  it('PWA-PROFILE-CODEC-01: round-trips description + tags (incl. cyrillic)', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    const decoded = m.decodeProfileBlockContent(m.encodeProfileBlockContent({
+      description: 'Канал про природу и походы 🏔️', tags: ['природа', 'походы', 'ton'],
+    }));
+    expect(decoded!.description).toBe('Канал про природу и походы 🏔️');
+    expect(decoded!.tags).toEqual(['природа', 'походы', 'ton']);
+  });
+
+  it('PWA-PROFILE-CODEC-02: normalizes tags (lowercase/trim/dedupe/cap) + byte caps + null-on-malformed', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    // Tags are lowercased, trimmed, de-duplicated and capped at PROFILE_MAX_TAGS.
+    expect(m.normalizeProfileTags([' TON ', 'ton', 'Nature', 'nature', ''])).toEqual(['ton', 'nature']);
+    expect(m.normalizeProfileTags(Array.from({ length: 50 }, (_, i) => `t${i}`)).length).toBe(m.PROFILE_MAX_TAGS);
+    // Description is byte-capped unicode-safe; empty description + no tags still round-trips.
+    const capped = m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: 'я'.repeat(600), tags: [] }));
+    expect(m.utf8ByteLength(capped!.description)).toBeLessThanOrEqual(m.PROFILE_DESCRIPTION_MAX_BYTES);
+    expect(capped!.tags).toEqual([]);
+    const empty = m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: '', tags: [] }));
+    expect(empty!.description).toBe('');
+    // Decode nulls on junk / future version / truncation — a bad profile block never poisons the post.
+    expect(m.decodeProfileBlockContent(new Uint8Array())).toBe(null);
+    expect(m.decodeProfileBlockContent(new Uint8Array([9, 0, 0, 0]))).toBe(null); // future version
+    const truncated = m.encodeProfileBlockContent({ description: 'ab', tags: ['x'] });
+    truncated[1] = 0xff; truncated[2] = 0xff; // descLen points past the buffer
+    expect(m.decodeProfileBlockContent(truncated)).toBe(null);
+  });
+});

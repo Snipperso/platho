@@ -116,8 +116,8 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     },
   },
   vault: {
-    address: 'UQC0dTjgbUpyNlSoUJoQE1UHlh12PUrBv1Ui7bQ8izv4uB27',
-    deploymentManifestHash: '9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2',
+    address: 'UQDSPk16J4ikvYd4UxUC2OIaZ0E-jjvjnjuCuFlVy9QhBkP0',
+    deploymentManifestHash: '39c0115b9fec0b31c8b2a3981bb026b730df391d747e2df7bbc772f7d3118fd2',
     provider: {
       globalName: 'plathoVaultChainProvider',
       moduleUrl: './vault-ton-rpc-provider.mjs?v=58',
@@ -137,20 +137,25 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     },
   },
   capsuleHub: {
-    address: 'UQAjYAjfEB33-QIifsf02U3sZmAvvwJgoCZPNjGh2FmmPZRx',
+    address: 'UQBz3fqicF7EFbUWo33Sr80xHKK9b3nQIhlz0Jv9ZK0vkq0p',
     publicReadLimit: 128,
+    // clean-11 capability gate. false = clean-10 (current live): channel profiles ride as normal public posts,
+    // discovery walks the recency author-index. Flip to true ONLY at the clean-11 cutover (in lockstep with the
+    // new addresses): the publish path sets the is_profile reserved bit (clean-10 Vault would bounce reserved!=0),
+    // and discovery/resolve use the on-chain global profile chain (get_public_profile_head / get_public_profile_index).
+    profilePointer: true,
   },
   feeAccumulator: {
-    address: 'UQBg4NGArbbjGCFR-2lZ68XCQibO5OYTA7JfVKSdViXDrY6p',
+    address: 'UQAfSIRK1yHY9N5HqOng5XW695RQ_ftDxoLdnczEur2WwZMm',
   },
   ath: {
-    masterAddress: 'UQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oRbF',
+    masterAddress: 'UQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6NeH',
   },
   usernameRegistry: {
-    address: 'UQC-TQBTQolXC-feDjb78omYJ40B1w4qq8P4nV2JhHxLFb2u',
+    address: 'UQAfPXFYaLI8n1EpKQaqEK_HMWRLz2fAtlsA6CR-9nKMSthK',
   },
   profileRegistry: {
-    address: 'UQCKAB4WWVRhFdlVPfaSs8NEE1GzOwWa6WHf5R-bAZHay8gf',
+    address: 'UQDBX5gDaSsRG8EKND6vnm7JEPCDHwqXgkpRdKl8PvQUG9G2',
   },
   crypto: {
     signedBundlePurpose: 'pwa-production',

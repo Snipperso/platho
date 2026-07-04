@@ -1,6 +1,10 @@
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY = 'platho.publicSubscriptions.v1';
 export const PUBLIC_CHANNEL_FEED_CACHE_KEY = 'platho.publicChannelFeeds.v1';
+// Per-author channel PROFILE cache (description + tags), keyed by the channel author's wallet address. Small text
+// only (no media), so localStorage-safe. Populated opportunistically during the feed walk (profile posts are
+// diverted from the visible feed and captured here) and on-demand by resolveChannelProfile for cold channels.
+export const PUBLIC_CHANNEL_PROFILE_CACHE_KEY = 'platho.publicChannelProfiles.v1';
 
 export const DEFAULT_PUBLIC_CHANNEL_ID = 'platho.app';
 export const DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET = 'UQDU48m_nYC12oqHJnKG9nBE4ljGpUYHHLPS-owij9BEOATH';
@@ -432,6 +436,52 @@ export function publicChannelThreadsToFeedItems(threads) {
 
 export function clonePublicChannelSubscriptions(value) {
   return safeClone(value);
+}
+
+// A cached channel profile: description (may be empty = explicitly cleared) + normalized tags, plus the source
+// entryId/createdAt for latest-wins reconciliation and a fetchedAt so a cached empty ("no description yet") is
+// distinguishable from "never fetched". Returns null only for non-objects.
+export function normalizeChannelProfile(value) {
+  if (!isObject(value)) return null;
+  const description = typeof value.description === 'string' ? value.description : '';
+  const tags = (Array.isArray(value.tags) ? value.tags : [])
+    .map((tag) => nonEmptyString(tag))
+    .filter(Boolean)
+    .slice(0, 32);
+  const toInt = (n) => (Number.isSafeInteger(Number(n)) ? Number(n) : 0);
+  return {
+    description,
+    tags,
+    entryId: nonEmptyString(String(value.entryId ?? '')),
+    createdAtSec: toInt(value.createdAtSec ?? value.created_at_sec),
+    fetchedAt: toInt(value.fetchedAt),
+  };
+}
+
+export function readPublicChannelProfileCache(storage) {
+  if (!storage?.getItem) return {};
+  try {
+    const parsed = JSON.parse(storage.getItem(PUBLIC_CHANNEL_PROFILE_CACHE_KEY) ?? '{}');
+    if (!isObject(parsed)) return {};
+    const out = {};
+    for (const [wallet, profile] of Object.entries(parsed)) {
+      const normalized = normalizeChannelProfile(profile);
+      if (normalized) out[wallet] = normalized;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function writePublicChannelProfileCache(storage, cache) {
+  if (!storage?.setItem) return false;
+  try {
+    storage.setItem(PUBLIC_CHANNEL_PROFILE_CACHE_KEY, JSON.stringify(isObject(cache) ? cache : {}));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Phase 3 public eviction floor (pure, BigInt). clean-10 public eviction is strictly bottom-FIFO and gapless, and

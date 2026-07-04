@@ -110,9 +110,11 @@ export const PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS = 115_000_000n;
 // UsernameRegistry now retains 511M nanotons per mint (6M endowment + 500M NFT-item deploy reserve [0.5 TON
 // prepaid storage, ~250+ years] + 1M ack + 4M state-growth), up from the old 32M. The Vault-funded mint hold is
 // the registry retained value plus the Vault local exec reserve (6M) and ATH-wallet forwarding overhead margin.
-// Raised 563M->581M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M):
-// the Vault forwards VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE (557M->575M) + 6M local exec = 581M.
-export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 581_000_000n;
+// Raised 581M->617M for clean-11 (name-record endowment +36M: Vault forwards
+// VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE 575M->611M + 6M local exec = 617M). This is a signed max_ton_charge
+// CEILING, not the actual debit: the Vault charges its own fixed usernameMintTonCharge() (581M on clean-10, 617M on
+// clean-11) as long as it is <= this ceiling, so 617M is safe against BOTH genesis (clean-10 still debits 581M).
+export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 617_000_000n;
 const UINT128_MOD = 1n << 128n;
 
 export const VAULT_RESERVES_NANOTONS = Object.freeze({
@@ -1186,7 +1188,10 @@ export function buildBatchPublishPartCell(part) {
   const body = publishCellFromPayload(part.body_cell ?? part.bodyCell, 'part.body_cell');
   const builder = beginCell()
     .uint(normalizePublicSizeClass(part.size_class ?? part.sizeClass, 'part.size_class'), 8, 'size_class')
-    .uint(0n, 8, 'reserved')
+    // reserved byte: bit0 = is_profile (clean-11 channel-description PROFILE post), bits 1..7 stay 0. Defaults to 0
+    // (a normal public post) so this is a no-op on clean-10; callers set is_profile ONLY when the genesis supports
+    // the profile-pointer (clean-10 Vault/Hub reject reserved != 0).
+    .uint((part.is_profile ?? part.isProfile) ? 1n : 0n, 8, 'reserved')
     .uint(publishPublicParentLink(part), 64, 'parent_link')
     .uint(publishHashValue(part.header_hash ?? part.headerHash ?? part.header_0_hash, 'part.header_hash'), 256, 'header_hash')
     .uint(publishHashValue(part.body_hash ?? part.bodyHash, 'part.body_hash'), 256, 'body_hash')
@@ -1872,6 +1877,10 @@ export async function createPublicPostPayload(input, options = {}) {
     layout: PUBLIC_BODY_LAYOUT,
     kind: parsed.kind,
     type: parsed.type,
+    // clean-11: a channel-PROFILE post sets reserved bit0 (is_profile) in buildBatchPublishPartCell so the contract
+    // threads it into the global profile chain. Wire-only (not part of the header/body hash) so bodyHash-based feed
+    // merging is unaffected; baked in before signing so retries stay byte-identical. Caller gates on the genesis.
+    is_profile: input.is_profile === true,
     headerBytes: headerBytes.length,
     bodyBytes: bodyBytes.length,
     bytes: bodyBytes.length,

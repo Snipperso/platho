@@ -50,7 +50,7 @@
     },
     {
       "contract": "CapsuleHub.tact",
-      "non_comment_lines": 1054,
+      "non_comment_lines": 1101,
       "receive_handlers": 7,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -95,8 +95,8 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 1121,
-      "receive_handlers": 16,
+      "non_comment_lines": 1176,
+      "receive_handlers": 18,
       "bounced_handlers": 3,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -139,8 +139,8 @@
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "b7ec6e2dfa9426ebab383883c85fe47a0d126c940b41ee614ef9b2c30f84d21a",
-      "pinned": "b7ec6e2dfa9426ebab383883c85fe47a0d126c940b41ee614ef9b2c30f84d21a",
+      "built": "cbd14315cb61365039df65b48874cbf10cf31fbab9d2d4009cc08ac4b6feb344",
+      "pinned": "cbd14315cb61365039df65b48874cbf10cf31fbab9d2d4009cc08ac4b6feb344",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -159,13 +159,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "b496e93d3e523b564b0af826eb2d80faec38fdb9ff495cb5b35f8552d408d189",
-      "pinned": "b496e93d3e523b564b0af826eb2d80faec38fdb9ff495cb5b35f8552d408d189",
+      "built": "19e937fa7ede93b8f29525edb3ab07f4b6f722614e925d085d697c2f60badd4e",
+      "pinned": "19e937fa7ede93b8f29525edb3ab07f4b6f722614e925d085d697c2f60badd4e",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "41d0e25a72d0505c4ef16503eb5d1d1dfed92bdc622fd6edc6b202166b998e87",
-      "pinned": "41d0e25a72d0505c4ef16503eb5d1d1dfed92bdc622fd6edc6b202166b998e87",
+      "built": "0d982a990c132a8d6c932079651fb48c9657d4d0683fd4d985461e063f34e4cd",
+      "pinned": "0d982a990c132a8d6c932079651fb48c9657d4d0683fd4d985461e063f34e4cd",
       "match": true
     }
   },
@@ -173,7 +173,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "2bc9869de35239ef7f259456544fba14a22986fd1d0bab3731cee8b172bab7a0",
+    "manifest_hash_hex": "f969ecc3a82a1294bdcef265fd3b32a1a18c2e5bbc3fd374a178b7899c6d4b75",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
