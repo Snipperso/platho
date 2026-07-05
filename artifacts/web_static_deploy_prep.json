@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-05T19:10:07.583Z",
-  "mode": "preview",
+  "generatedAt": "2026-07-05T19:29:41.261Z",
+  "mode": "production",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
-  "status": "PREVIEW_STATIC_PACKAGE_READY",
-  "productionReady": false,
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
+  "status": "PRODUCTION_STATIC_PACKAGE_READY",
+  "productionReady": true,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 138,
-    "totalBytes": 4543122,
-    "bundleSha256": "f69f8a788a35b18c301db5415147348daf8eae97a1a4c7446957da592b58b56b",
+    "fileCount": 139,
+    "totalBytes": 4543442,
+    "bundleSha256": "6c6721e12cfdfe7fe0f78117acf2836d44598f63700b7c4ecd41cd1aa09b71b5",
     "files": [
       {
         "path": "app.js",
         "bytes": 1199349,
-        "sha256": "9178c4b3210a6426b31cf5b3ef191923b1fc9b35107e90f4e89041ef6ed0c631"
+        "sha256": "ef42718743c699a30d6c1525ddf758bbc8cb64a11997d74c53c3323b89bfe979"
       },
       {
         "path": "assets/icons/about.svg",
@@ -121,6 +121,11 @@
         "path": "assets/icons/search.svg",
         "bytes": 190,
         "sha256": "ed6a2bb9d9bc98392ffd80113080cb752762079d1c5cd73b46de16faf1752259"
+      },
+      {
+        "path": "assets/icons/smiley.svg",
+        "bytes": 304,
+        "sha256": "7a69feb1440e1d5e4619d0e971ad2c66e4868f34401d890a515cd70ad28ec10d"
       },
       {
         "path": "assets/icons/swap-circular.svg",
@@ -239,8 +244,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 52854,
-        "sha256": "fa4a02db18a85a16a17759d90709471acb3856d2c354e42e16c715a37ecff245"
+        "bytes": 52842,
+        "sha256": "b3fb468bf3d15fdc16a2d70e755dfe1c743dd064253109a755e4ae052a2fc343"
       },
       {
         "path": "manifest.webmanifest",
@@ -304,13 +309,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 90235,
-        "sha256": "4395447773ffa2e09290c7274fb4c2a68b9d0d10a5c3c3782e180a069fb50681"
+        "bytes": 90232,
+        "sha256": "42b92495f9b84ad9a91c379460201ac91c48ac8b849c7f33b60577b66281a89d"
       },
       {
         "path": "sw.js",
-        "bytes": 6774,
-        "sha256": "21b7af7a94b47404ffdb778ef0c6d9596fd7e80569db3c2d9078bc6d5557f5a1"
+        "bytes": 6805,
+        "sha256": "fc9d7ed87f0392745567788a717ab8ecfd803908e38f7af96750b949204bdff5"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -960,8 +965,6 @@
     "productionMarkersCleared": true
   },
   "blockers": [],
-  "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION"
-  ],
+  "warnings": [],
   "productionFindings": []
 }

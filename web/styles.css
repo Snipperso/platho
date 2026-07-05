@@ -1520,11 +1520,6 @@ html[data-platho-telegram="true"] .install-header-button {
   display: none;
 }
 
-.emoji-button-glyph {
-  font-size: 20px;
-  line-height: 1;
-}
-
 /* Emoji picker: a global fixed popover (positioned via JS relative to the trigger, so it survives pane switches),
    with a scrollable grid of self-contained unicode emojis — no external font/library (CSP style-src 'self'). */
 .emoji-picker {
@@ -3758,6 +3753,7 @@ button.feed-item:hover {
 .icon-download { --mask: url("./assets/icons/download.svg"); }
 .icon-compass { --mask: url("./assets/icons/compass.svg"); }
 .icon-about { --mask: url("./assets/icons/about.svg"); }
+.icon-smiley { --mask: url("./assets/icons/smiley.svg"); }
 
 @media (max-width: 900px) {
   :root {

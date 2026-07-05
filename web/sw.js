@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v747';
+const CACHE_NAME = 'platho-pwa-prototype-v748';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=221',
-  './app.js?v=676',
+  './styles.css?v=222',
+  './app.js?v=677',
   './i18n.mjs?v=9',
   './i18n-strings.mjs?v=9',
   './boot-signal-field.mjs?v=1',
@@ -97,6 +97,7 @@ const ASSETS = [
   './assets/icons/download.svg',
   './assets/icons/compass.svg',
   './assets/icons/about.svg',
+  './assets/icons/smiley.svg',
   './docs/about-platho.md',
   './docs/ath-whitepaper.md',
   './docs/crypto-protocol.md',
