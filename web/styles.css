@@ -3756,6 +3756,8 @@ button.feed-item:hover {
 .icon-info { --mask: url("./assets/icons/info.svg"); }
 .icon-copy { --mask: url("./assets/icons/copy.svg"); }
 .icon-download { --mask: url("./assets/icons/download.svg"); }
+.icon-compass { --mask: url("./assets/icons/compass.svg"); }
+.icon-pencil { --mask: url("./assets/icons/pencil.svg"); }
 
 @media (max-width: 900px) {
   :root {
