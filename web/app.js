@@ -186,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v673';
+const PLATHO_APP_RUNTIME_VERSION = 'v674';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -26022,7 +26022,11 @@ function setupEmojiPicker() {
     item.className = 'emoji-picker-item';
     item.textContent = emoji;
     item.setAttribute('aria-label', emoji);
-    item.addEventListener('click', () => { if (emojiPickerTargetInput) insertEmojiAtCaret(emojiPickerTargetInput, emoji); });
+    item.addEventListener('click', () => {
+      const target = emojiPickerTargetInput;
+      closeEmojiPicker(); // pick-then-close: one tap inserts and dismisses the panel
+      if (target) insertEmojiAtCaret(target, emoji);
+    });
     emojiPickerGrid.appendChild(item);
   }
   privateEmojiButton?.addEventListener('click', () => toggleEmojiPicker(privateEmojiButton, messageInput));

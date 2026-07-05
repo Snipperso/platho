@@ -1252,7 +1252,7 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .composer {
   display: grid;
-  grid-template-columns: 44px 44px minmax(0, 1fr) 52px;
+  grid-template-columns: 44px 44px 44px minmax(0, 1fr) 52px;
   align-items: end;
   column-gap: 10px;
   row-gap: 6px;
@@ -1269,7 +1269,7 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 #composer[data-publish-mode="vault-balance"] {
-  grid-template-columns: 44px 44px minmax(0, 1fr) 52px;
+  grid-template-columns: 44px 44px 44px minmax(0, 1fr) 52px;
 }
 
 .composer > .composer-add {
@@ -1282,22 +1282,27 @@ html[data-platho-telegram="true"] .install-header-button {
   grid-row: 1;
 }
 
-.composer > textarea {
+.composer > .emoji-button {
   grid-column: 3;
+  grid-row: 1;
+}
+
+.composer > textarea {
+  grid-column: 4;
   grid-row: 1;
 }
 
 #composer[data-publish-mode="vault-balance"] > textarea {
-  grid-column: 3;
+  grid-column: 4;
 }
 
 .composer > .send-button {
-  grid-column: 4;
+  grid-column: 5;
   grid-row: 1;
 }
 
 #composer[data-publish-mode="vault-balance"] > .send-button {
-  grid-column: 4;
+  grid-column: 5;
 }
 
 .composer textarea {
@@ -1463,6 +1468,7 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .composer .composer-add-button,
 .composer .private-anonymous-button,
+.composer .emoji-button,
 .public-composer > .attachment-button {
   width: 44px;
   height: 44px;
@@ -1515,7 +1521,7 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .emoji-button-glyph {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -1761,7 +1767,7 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .public-composer {
-  grid-template-columns: 44px 44px minmax(0, 1fr) 52px;
+  grid-template-columns: 44px 44px 44px minmax(0, 1fr) 52px;
   align-items: start;
   column-gap: 10px;
   margin: 0 -24px -24px;
@@ -1775,12 +1781,12 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .public-composer .composer-stack {
-  grid-column: 3;
+  grid-column: 4;
   gap: 10px;
 }
 
 .public-composer > .send-button {
-  grid-column: 4;
+  grid-column: 5;
   width: 52px;
   height: 44px;
 }
@@ -1788,15 +1794,19 @@ html[data-platho-telegram="true"] .install-header-button {
 /* Comment mode (post detail screen) hides the "allow comments" toggle (composer-post-option, column 1). Drop that
    track so the input doesn't leave an empty 44px gap where the toggle used to be: just image + input + send. */
 .public-composer[data-mode="comment"] {
-  grid-template-columns: 44px minmax(0, 1fr) 52px;
+  grid-template-columns: 44px 44px minmax(0, 1fr) 52px;
 }
 
-.public-composer[data-mode="comment"] .composer-stack {
+.public-composer[data-mode="comment"] > .emoji-button {
   grid-column: 2;
 }
 
-.public-composer[data-mode="comment"] > .send-button {
+.public-composer[data-mode="comment"] .composer-stack {
   grid-column: 3;
+}
+
+.public-composer[data-mode="comment"] > .send-button {
+  grid-column: 4;
 }
 
 .public-composer > .composer-post-option {
@@ -3973,19 +3983,20 @@ button.feed-item:hover {
   }
 
   .composer {
-    grid-template-columns: 38px 38px minmax(0, 1fr) 48px;
+    grid-template-columns: 38px 38px 38px minmax(0, 1fr) 48px;
     column-gap: 8px;
     padding: 12px 14px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
     overflow: visible;
   }
 
   #composer[data-publish-mode="vault-balance"] {
-    grid-template-columns: 38px 38px minmax(0, 1fr) 48px;
+    grid-template-columns: 38px 38px 38px minmax(0, 1fr) 48px;
   }
 
   .composer-add,
   .composer .composer-add-button,
   .composer .private-anonymous-button,
+  .composer .emoji-button,
   .public-composer > .composer-post-option,
   .public-composer > .attachment-button {
     width: 38px;
