@@ -271,12 +271,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v669<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v669'/);
+    expect(html).toMatch(/id="appVersionLabel">v670<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v670'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=669" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=670" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2472,8 +2472,15 @@ describe('PWA runtime config guard', () => {
     expect(newChatSource).toMatch(/reconcileUsernameOwnership\(identity, ownerWallet\)/);
     // v652: addressing your OWN username no longer errors — it falls through to the standard self dialog (Saved).
     expect(newChatSource).toMatch(/addressing your OWN username opens the Saved thread/);
-    // Old-owner dialog is revalidated on open (fire-and-forget).
-    expect(app).toMatch(/void revalidateThreadUsernameVariants\(thread\)/);
+    // Old-owner dialog is revalidated on open AND on receipt, and our OWN linked .ath is reconciled too — all
+    // serialized through the shared username-hygiene queue (never N concurrent resolves -> the v509 iOS freeze).
+    expect(app).toMatch(/function queueUsernameHygiene\(task\)/);
+    expect(app).toMatch(/queueUsernameHygiene\(\(\) => revalidateThreadUsernameVariants\(thread\)\)/);
+    expect(app).toMatch(/queueUsernameHygiene\(\(\) => revalidateThreadUsernameVariants\(identityThread\)\)/);
+    // The sender stops stamping a .ath it no longer owns; falls back to another owned name or none.
+    expect(app).toMatch(/async function reconcileOwnLinkedUsername\(\)/);
+    // Cardinal rule: never strip/clear a username off an unverifiable (structurally-degraded / hostile-RPC) read.
+    expect(app).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) \{ backoffOwnLinkedUsernameReconcile/);
   });
 
   it('PWA-LINK-NAME-PICKER-01: Link Platho name validates input and offers already-known profile usernames', () => {
@@ -4934,9 +4941,10 @@ describe('PWA runtime config guard', () => {
     const shared = config.match(/rateLimitKey: 'toncenter-shared'/g) ?? [];
     expect(shared.length).toBe(2);
     // Wallet teardown cancels the pending rail Vault-balance retry so it can't race the next boot's reads.
-    // Window is 1200 (was 900): the reset function legitimately grew (public confirm-job timers + the public
-    // post-comments SWR cache are cleared here too). The guard still pins that the nav-balance timer is cleared.
-    expect(app).toMatch(/function clearWalletScopedRuntimeState[\s\S]{0,1200}clearNavVaultBalanceRetryTimer\(\)/);
+    // Window is 1800 (was 1200/900): the reset function legitimately grew (public confirm-job timers, the public
+    // post-comments SWR cache, and the per-account public-feed sync cursors are cleared here too). The guard still
+    // pins that the nav-balance timer is cleared.
+    expect(app).toMatch(/function clearWalletScopedRuntimeState[\s\S]{0,1800}clearNavVaultBalanceRetryTimer\(\)/);
   });
 
   it('PWA-CANONICAL-USERNAME-01: usernames display canonically (no .ath suffix) via displayIdentityLabel + threadDisplayLabel', () => {
@@ -5831,11 +5839,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v740/);
+    expect(sw).toMatch(/platho-pwa-prototype-v741/);
     expect(sw).toMatch(/\.\/styles\.css\?v=217/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=669/);
+    expect(sw).toMatch(/\.\/app\.js\?v=670/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=7/);

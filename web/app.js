@@ -186,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v669';
+const PLATHO_APP_RUNTIME_VERSION = 'v670';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -709,6 +709,11 @@ let lastSyncedPublicSyncWindow = null;
 // changed. Committed together with lastSyncedPublicLatestId, only after a clean walk (the commit-gate), so a
 // degraded cycle never advances a head past entries a rate limit made it miss.
 const publicAuthorIndexHeads = new Map();
+// Parallel to publicAuthorIndexHeads: was the walk that established THIS exact head truncated by the read window
+// (more retained posts on-chain than the window could reach)? The ONLY honest "feed incomplete" signal — kept so
+// the cheap cached (head-unchanged) path can report it too, instead of the old `posts < entry_count` heuristic that
+// was a chronic false positive (entry_count counts the profile-pointer + comment entries the feed drops).
+const publicAuthorIndexTruncated = new Map();
 const publicParentIndexHeads = new Map();
 // Wallet (raw) -> resolved profile-avatar data URL for Public wallet channels, so a channel shows the
 // author's avatar even before/without any cached public post. `null` is a cached "no avatar" miss.
@@ -2636,6 +2641,14 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   }
   publicPublishConfirmJobs.clear();
   publicPostCommentsCache.clear();
+  // Public-feed sync cursors are per-account context (the walk reads THIS account's subscriptions + window). Reset
+  // the in-memory heads / truncation / comment cursors + the last-synced gate so the next account re-walks fresh
+  // instead of inheriting this account's cursors (which would skip the re-walk and could show a stale feed/hint).
+  publicAuthorIndexHeads.clear();
+  publicAuthorIndexTruncated.clear();
+  publicParentIndexHeads.clear();
+  lastSyncedPublicLatestId = null;
+  lastSyncedPublicSyncWindow = null;
   activeRuntimeWalletAddress = null;
   clearMessageAutoSyncTimer();
   clearMessageAutoSyncCountdownTimer();
@@ -2840,6 +2853,16 @@ function writeLinkedPlathoUsername(identity, owner = plathoWallet?.address) {
   } catch {
     // Local display attachment is cosmetic and can be re-linked.
   }
+}
+
+// Drop the local linked-.ath alias entirely so outgoing messages carry NO username (used when the reconcile below
+// finds the name was transferred away and there is no other owned name to fall back to). Clears BOTH the linked key
+// AND the legacy wallet-display fallback (readLinkedPlathoUsername reads the linked key, then falls back to the
+// display identity) — ADDRESS mode removes that key too.
+function clearLinkedPlathoUsername(owner = plathoWallet?.address) {
+  const key = linkedPlathoUsernameStorageKey(owner);
+  try { if (key) localStorageOrNull()?.removeItem(key); } catch { /* cosmetic; still works without it */ }
+  writeWalletDisplayIdentity({ mode: WALLET_DISPLAY_MODES.ADDRESS }, owner);
 }
 
 function knownPlathoUsernamesStorageKey(owner = plathoWallet?.address) {
@@ -8117,6 +8140,7 @@ async function syncPublicChannelFromChain() {
   // Walk the FEED source (subscribed + own) so the user's own confirmed posts are fetched from chain, not just
   // the subscribed authors. Adds at most one author index (the user's own).
   const pendingAuthorHeadWrites = [];
+  const pendingAuthorTruncatedWrites = [];
   for (const channel of feedSourcePublicChannels()) {
     const channelAuthor = channel.authorWallet;
     if (!channelAuthor) continue;
@@ -8131,7 +8155,6 @@ async function syncPublicChannelFromChain() {
       continue;
     }
     if (authorIndex.exists !== true) continue;
-    const liveCount = Number(authorIndex.entry_count ?? 0n) || 0;
     const authorHeadKey = authorKeyId.toString();
     const authorHead = String(authorIndex.latest_entry_link ?? 0n);
     const cachedPostIds = cachedChainPostEntryIds(channel.id);
@@ -8141,6 +8164,7 @@ async function syncPublicChannelFromChain() {
     let postsTruncated = false;
     if (publicAuthorIndexHeads.get(authorHeadKey) === authorHead) {
       postIds = cachedPostIds;
+      postsTruncated = publicAuthorIndexTruncated.get(authorHeadKey) === true; // remembered from the walk that built this head
     } else {
       const walked = await walkPublicChainIds(authorIndex.latest_entry_link, authorWalkMax);
       postsTruncated = walked.truncated;
@@ -8149,13 +8173,17 @@ async function syncPublicChannelFromChain() {
       for (const id of cachedPostIds) if (!postIdSet.has(id.toString())) postIdSet.set(id.toString(), id);
       postIds = [...postIdSet.values()];
       pendingAuthorHeadWrites.push([authorHeadKey, authorHead]);
+      pendingAuthorTruncatedWrites.push([authorHeadKey, walked.truncated]);
     }
     // Comments are no longer walked during the feed sync — they load on demand on the post detail screen
     // (loadPublicPostComments). The feed resolves posts only now: no per-post parent-index reads and no comment
     // body resolution for every subscribed channel on every cycle (the scalability fix the owner asked for).
-    // Honest incomplete: more live posts on-chain than were surfaced (cap-truncated, or fewer ids than the
-    // contract's exact live count).
-    if (postsTruncated || (liveCount > 0 && postIds.length < liveCount)) {
+    // Honest incomplete = the author's chain was TRUNCATED by the read window (more retained than we could walk).
+    // Do NOT compare postIds.length against entry_count: entry_count counts EVERY author entry — INCLUDING the
+    // profile-pointer entry (walked, then dropped as a profile not a post) and comment entries — so `posts <
+    // entry_count` was true forever for any channel that ever set a profile or got a comment (the '[public] older
+    // posts available' console spam). Truncation is the false-positive-free signal, remembered across cached cycles.
+    if (postsTruncated) {
       incompleteChannels.push(channel.id);
     }
   }
@@ -8349,6 +8377,7 @@ async function syncPublicChannelFromChain() {
     // Advance the per-index cursors only now — after the merge committed — so a head is never recorded as "seen"
     // before its (new) entries actually reached the cache. A degraded cycle skips this entirely and re-walks next.
     for (const [key, head] of pendingAuthorHeadWrites) publicAuthorIndexHeads.set(key, head);
+    for (const [key, truncated] of pendingAuthorTruncatedWrites) publicAuthorIndexTruncated.set(key, truncated);
   }
   globalThis.plathoLastPublicSync = {
     capsuleHub: address,
@@ -9480,6 +9509,9 @@ async function revalidateThreadUsernameVariants(thread) {
   const usernameVariants = threadIdentityVariants(thread)
     .filter((variant) => variant.type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT);
   if (usernameVariants.length === 0) return;
+  // Never strip a peer's .ath off an unverifiable read (single unverified provider / hostile RPC could report a
+  // wrong owner). Cheap sync predicate — no chain read; retries once verification recovers.
+  if (tonRpcVerificationStructurallyDegraded()) return;
   if (thread.usernameRevalidatedAt && (Date.now() - thread.usernameRevalidatedAt) < PLATHO_USERNAME_OWNER_CACHE_TTL_MS) return;
   thread.usernameRevalidatedAt = Date.now();
   let dropped = false;
@@ -9491,6 +9523,9 @@ async function revalidateThreadUsernameVariants(thread) {
       if (error instanceof UsernameNotRegisteredError) ownerWallet = '';
       else continue; // transient RPC — do not strip
     }
+    // Verification degraded mid-loop (was healthy at the pre-loop gate): the answer just now may be a single
+    // unverified / hostile-RPC report — do NOT strip a peer's .ath on it. Abort and retry once verification recovers.
+    if (tonRpcVerificationStructurallyDegraded()) { thread.usernameRevalidatedAt = 0; return; }
     if (!ownerWallet || !sameWalletAddress(ownerWallet, wallet)) {
       if (dropThreadIdentityVariant(thread, identityKey(variant))) {
         syncThreadDisplayToContactStore(thread);
@@ -9503,6 +9538,78 @@ async function revalidateThreadUsernameVariants(thread) {
     renderThreads();
     if (thread.id === activeThreadId) renderConversation();
   }
+}
+
+// Serialize ALL fire-and-forget username-hygiene resolves (own-linked reconcile + peer-dialog revalidate) through
+// one chain so a catch-up sync spanning many dialogs never fires N concurrent resolvePlathoUsernameOwner reads —
+// concurrent app-level toncenter reads are the v509-class iOS run-loop freeze. One resolve at a time; each task is
+// still throttled internally, so this only bounds the fan-out, it adds no latency to anything user-facing.
+let usernameHygieneChain = Promise.resolve();
+function queueUsernameHygiene(task) {
+  usernameHygieneChain = usernameHygieneChain.catch(() => {}).then(() => task()).catch(() => {});
+  return usernameHygieneChain;
+}
+
+// Sender-side mirror of revalidateThreadUsernameVariants: reconcile the wallet's OWN linked .ath against the chain.
+// After the user transfers the username NFT away, the local cache (readLinkedPlathoUsername) goes stale and would
+// keep stamping a name the wallet no longer owns onto every outgoing private message (senderUsername). Throttled via
+// the stored verified_at (same 5-min TTL) and serialized via queueUsernameHygiene, so it NEVER adds a round-trip to
+// the send hot path — the send reads the cache synchronously; this only keeps the cache honest for the NEXT send.
+// It strips the name ONLY on a DEFINITIVE, VERIFIED loss (a verified read whose authoritative owner != mine, or the
+// name is unregistered) and then falls back to another still-owned known name (each re-verified) else clears it
+// (next send carries no username). It NEVER strips on a transient RPC failure OR a structurally degraded
+// (single-unverified-provider / hostile-RPC) read: a wrong-owner answer there could destroy a name the wallet
+// legitimately still owns, and clearing is non-self-healing (only a manual re-link / mint re-writes it).
+let ownLinkedUsernameReconcileInFlight = false;
+async function reconcileOwnLinkedUsername() {
+  const owner = plathoWallet?.address;
+  if (!owner || ownLinkedUsernameReconcileInFlight) return;
+  const linked = readLinkedPlathoUsername(owner);
+  if (!linked?.label) return;
+  if (linked.verified_at && (Date.now() - linked.verified_at) < PLATHO_USERNAME_OWNER_CACHE_TTL_MS) return;
+  // Cannot verify ownership right now — do NOT reconcile off an unverifiable read; back off ~1 min so a degraded
+  // window doesn't re-resolve the own name on every dialog open (and can't repeatedly risk a wrong-owner strip).
+  if (tonRpcVerificationStructurallyDegraded()) { backoffOwnLinkedUsernameReconcile(linked, owner); return; }
+  ownLinkedUsernameReconcileInFlight = true;
+  try {
+    let ownerWallet = null;
+    try {
+      ownerWallet = (await resolvePlathoUsernameOwner(linked.label)).ownerWallet;
+    } catch (error) {
+      if (error instanceof UsernameNotRegisteredError) ownerWallet = '';
+      else { backoffOwnLinkedUsernameReconcile(linked, owner); return; } // transient RPC — leave cache intact, back off
+    }
+    // A read that COMPLETED but under degraded verification is not authoritative enough to destroy the local name.
+    if (tonRpcVerificationStructurallyDegraded()) { backoffOwnLinkedUsernameReconcile(linked, owner); return; }
+    if (ownerWallet && sameWalletAddress(ownerWallet, owner)) {
+      writeLinkedPlathoUsername({ ...linked, verified_at: Date.now() }, owner); // still owned — refresh throttle stamp
+      return;
+    }
+    // Definitively (verified) lost: drop it, then fall back to another still-owned known name.
+    const priorMode = readWalletDisplayIdentity(owner)?.mode;
+    const lostValue = plathoUsernameIdentity(linked.label)?.value ?? null;
+    clearLinkedPlathoUsername(owner);
+    for (const candidate of readKnownPlathoUsernames(owner)) {
+      if (lostValue && plathoUsernameIdentity(candidate)?.value === lostValue) continue; // skip the one we just lost
+      const identity = await verifiedPlathoUsernameIdentityForWallet(candidate, owner); // authoritative, wallet-keyed
+      if (identity) {
+        writeLinkedPlathoUsername({ ...identity, verified_at: Date.now() }, owner);
+        // clearLinkedPlathoUsername forced display=ADDRESS; if the user was showing their .ath, keep showing one.
+        if (priorMode === WALLET_DISPLAY_MODES.PLATHO_NFT) writeWalletDisplayIdentity({ mode: WALLET_DISPLAY_MODES.PLATHO_NFT }, owner);
+        break;
+      }
+    }
+    renderThreads(); // repaint own-identity surfaces (e.g. the Saved-messages self label)
+  } finally {
+    ownLinkedUsernameReconcileInFlight = false;
+  }
+}
+
+// Push the reconcile throttle ~1 min forward after an unverifiable/transient read, so an RPC-degraded window doesn't
+// re-resolve the own linked name on every dialog open. Keeps the label intact (only the verified_at stamp moves).
+function backoffOwnLinkedUsernameReconcile(linked, owner) {
+  if (!linked?.label) return;
+  writeLinkedPlathoUsername({ ...linked, verified_at: Date.now() - PLATHO_USERNAME_OWNER_CACHE_TTL_MS + 60_000 }, owner);
 }
 
 // ---- Saved messages (v652): a private dialog with your OWN wallet, like Telegram's Saved -----------------------
@@ -9568,7 +9675,15 @@ async function threadForChainCapsule(opened, entry) {
   const senderUsername = opened?.payload?.senderUsername ?? opened?.payload?.sender_username;
   const variants = await privateWalletIdentityVariantsWithUsername(senderWallet, senderUsername);
   const identityThread = findThreadByIdentityVariants(threads, variants);
-  if (identityThread) return refreshThreadIdentityFromVariants(identityThread, variants);
+  if (identityThread) {
+    // The sender may have TRANSFERRED away a .ath this dialog still wears. The fresh `variants` already exclude an
+    // unowned name (verifiedPlathoUsernameIdentityForWallet drops it), but refreshThreadIdentityFromVariants is
+    // sticky and never strips a previously-latched one — so re-check + relabel here. Throttled per-dialog (5-min)
+    // and routed through the shared username-hygiene queue so a catch-up sync across many dialogs never fires N
+    // concurrent chain reads (v509 iOS freeze); the private-scan loop never awaits it.
+    queueUsernameHygiene(() => revalidateThreadUsernameVariants(identityThread));
+    return refreshThreadIdentityFromVariants(identityThread, variants);
+  }
   const created = createInboundPeerThread({
     senderKeyId,
     keyId: senderKeyId,
@@ -14219,9 +14334,11 @@ function renderThreads() {
         markThreadRead(thread);
         renderThreads();
         renderConversation();
-        // Fire-and-forget: if a .ath this dialog wears has been transferred away from its wallet, drop+relabel it
-        // (throttled per-dialog; repaints only on an actual change).
-        void revalidateThreadUsernameVariants(thread);
+        // Re-check this dialog's .ath (has the peer transferred it away?) then reconcile OUR OWN linked .ath — both
+        // via the shared username-hygiene queue, so no two username resolves ever run concurrently (v509 iOS
+        // freeze). Each is throttled internally; repaints happen only on an actual change.
+        queueUsernameHygiene(() => revalidateThreadUsernameVariants(thread));
+        queueUsernameHygiene(() => reconcileOwnLinkedUsername());
       });
       threadList.append(item);
     });
