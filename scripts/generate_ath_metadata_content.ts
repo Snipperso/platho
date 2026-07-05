@@ -22,10 +22,11 @@ function deploymentIdFromEnv(): string {
 
 function metadataFields(deploymentId = DEFAULT_DEPLOYMENT_ID) {
   return Object.freeze({
-  name: 'Platho ATH',
+  name: 'PLATHO',
   symbol: 'ATH',
   decimals: '9',
-  description: 'Utility token of the Platho communication protocol.',
+  description: "The utility token of Platho — a fully decentralized, post-quantum encrypted messenger that lives entirely on the TON blockchain (no backend, no servers, your keys). Earn ATH as an activity bonus for using the app, and spend it to reduce messaging fees, mint .ath usernames, and attach avatars — all on-chain.\n\nhttps://platho.app",
+  image: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzBiMGQwZiIvPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAgNTEyKSBzY2FsZSgxIC0xKSI+PHBhdGggZmlsbD0iIzMwZDViMCIgZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNMTY3LjUgNDMyLjEgTDMzMC41IDQzMi4xIEwzNDYuNSA0MjkuOSBMMzY0LjUgNDI0LjggTDM4MC41IDQxNy43IEwzOTMuNSA0MDkuNiBMNDA0LjUgNDAxLjAgTDQxNi4wIDM4OS41IEw0MjUuOCAzNzYuNSBMNDM1LjkgMzU4LjUgTDQ0MS43IDM0My41IEw0NDUuOSAzMjUuNSBMNDQ2LjkgMjk2LjUgTDQ0NS44IDI4NS41IEw0NDIuOCAyNzEuNSBMNDM1LjcgMjUxLjUgTDQyNS45IDIzMy41IEw0MTYuOSAyMjEuNSBMNDAyLjUgMjA3LjEgTDM4Ny41IDE5Ni4xIEwzNjIuNSAxODQuMSBMMzQ4LjUgMTgwLjEgTDMzNC41IDE3OC4wIEwyMjEuNSAxNzcuMiBMMjIwLjUgNzkuMiBMMTM3LjUgNzkuNCBMMTM3LjIgMTM5LjUgTDE2Ni41IDE0MC4yIEwxNjYuOCAxNzQuNSBMMTM2LjUgMTc1LjEgTDEzNS42IDE3NC41IEwxMzUuNyAxNjMuNSBMMTM0LjUgMTYyLjggTDEwNC4xIDE2My41IEwxMDQuNSAxOTIuNyBMMTM0LjUgMTkyLjkgTDEzNS41IDE5My41IEwxMzUuNCAyMjAuNSBMMTM2LjIgMjIxLjUgTDE2Ni44IDIyMi41IEwxNjYuNSAyNTMuMCBMMTM1LjUgMjUzLjMgTDEzNC41IDIzNS4yIEwxMDUuNSAyMzUuMSBMMTA0LjEgMjM2LjUgTDEwNC4zIDI2NC41IEwxMzQuNSAyNjUuMyBMMTM1LjUgMjkyLjUgTDE5Ny41IDI5Mi43IEwxOTguNCAyOTMuNSBMMTk4LjAgMzIzLjUgTDE2Ni44IDMyNC41IEwxNjcuMyAzNjQuNSBMMTk4LjQgMzY1LjUgTDE5OC4zIDM5NC41IEwxNjYuOSAzOTUuNSBMMTY2LjcgNDMwLjUgTDE2Ny41IDQzMi4xIFogTTEwNC41IDQwNy42IEwxMzQuOSA0MDcuNSBMMTM0LjUgMzc3LjcgTDEwNC41IDM3Ny45IEwxMDQuNSA0MDcuNiBaIE0yMjEuNSAzNzIuMyBMMjIxLjUgMjM3LjIgTDMyMi41IDIzNy4xIEwzMjkuNSAyMzguMSBMMzQyLjUgMjQyLjEgTDM1Mi41IDI0Ny40IEwzNTkuNSAyNTIuOCBMMzY5LjYgMjYzLjUgTDM3Ny4wIDI3NS41IEwzODEuNSAyODguNSBMMzgzLjEgMjk4LjUgTDM4Mi43IDMxNi41IEwzNzkuNyAzMjcuNSBMMzc0LjggMzM4LjUgTDM2OC45IDM0Ny41IEwzNTguNSAzNTcuOSBMMzQ0LjUgMzY2LjcgTDMzMi41IDM3MC44IEwzMjIuNSAzNzIuNCBMMjIxLjUgMzcyLjMgWiBNNjUuNSAzMjQuMyBMOTMuNSAzMjQuMyBMOTMuOSAyOTQuNSBMNjQuOSAyOTQuNSBMNjQuNiAzMjIuNSBMNjUuNSAzMjQuMyBaIi8+PC9nPjwvc3ZnPg==",
     deployment_id: deploymentId,
   });
 }
@@ -39,11 +40,21 @@ function metadataKey(key: string): bigint {
 }
 
 function snakeCell(value: string): Cell {
-  const bytes = Buffer.from(value, 'utf8');
-  return beginCell()
-    .storeUint(SNAKE_PREFIX, 8)
-    .storeBuffer(bytes)
-    .endCell();
+  // TEP-64 snake: 0x00 marker + the UTF-8 bytes, chained across child cells at 127 bytes/cell so large values
+  // (e.g. the base64 logo data-URI) don't overflow the 1023-bit cell limit. Short values stay a single cell
+  // (bit-identical to the old single-cell form), so name/symbol/decimals/description hashes are unchanged.
+  const all = Buffer.concat([Buffer.from([SNAKE_PREFIX]), Buffer.from(value, 'utf8')]);
+  const CHUNK = 127;
+  const chunks: Buffer[] = [];
+  for (let i = 0; i < all.length; i += CHUNK) chunks.push(all.subarray(i, i + CHUNK));
+  if (chunks.length === 0) chunks.push(Buffer.from([]));
+  let next: Cell | null = null;
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const b = beginCell().storeBuffer(chunks[i]);
+    if (next) b.storeRef(next);
+    next = b.endCell();
+  }
+  return next!;
 }
 
 export function buildAthMetadataContent(deploymentId = DEFAULT_DEPLOYMENT_ID): Cell {

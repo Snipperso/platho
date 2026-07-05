@@ -3,10 +3,10 @@
   "network": "mainnet",
   "status": "FINAL_MAINNET_ADDRESS_INPUT",
   "genesisControllerAddress": "UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
-  "athMasterAddress": "UQDOvjnz6XUQgS0PbFNbTKSu2bR98haXDlOsAIr_5LH6GPvU",
+  "athMasterAddress": "UQADR4k12eu1jLxYHWaoDsO93GPUSuBupc-naSXquUFs46q-",
   "proofRefs": {
     "finalGenesisControllerProof": "artifacts/local/mainnet_final_manifest_draft.json#manifest.addresses.genesis_controller_one_shot=UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
-    "athDeploymentManifest": "artifacts/local/mainnet_final_manifest_draft.json#manifest.manifest_hash_hex=5956ddf3bb9876e5112687d915f4c4791e1e5f06912cd7017752d31deafd1194",
+    "athDeploymentManifest": "artifacts/local/mainnet_final_manifest_draft.json#manifest.manifest_hash_hex=ff26bda7751829e0450a9665fc2f4a619c9f9e4a7d659d45a6728deef11ece95",
     "buybackBurnBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#BUYBACKBURN_CODE_HASH=b15d02e783237e0ba986b810c45e17c969ec19a7c562cdd7e2c73d378bbf1f04"
   }
 }
