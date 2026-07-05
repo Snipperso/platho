@@ -50,7 +50,8 @@ const EXT_LIMIT = 65535;
 const DESCRIPTION =
   'Platho Usernames are your identity on Platho — a fully decentralized, post-quantum encrypted messenger that lives entirely on the TON blockchain. No backend, no central server, no platform permission.\n\n' +
   'Each NFT is a unique .ath username: a human-readable name bound to your wallet and your chats. Own it, move it, sell it — your identity travels with you, on-chain. Shorter names are scarcer: 4-letter names are the rarest, 5-letter rare, and 6+ characters common.\n\n' +
-  'Mint and use your name right inside the app at platho.app. One name, one wallet, your keys.';
+  'Mint and use your name right inside the app. One name, one wallet, your keys.\n\n' +
+  'https://platho.app';
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);

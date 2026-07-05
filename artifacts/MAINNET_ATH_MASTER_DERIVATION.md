@@ -8,24 +8,24 @@ Status: DERIVED_MAINNET_ATH_MASTER_ADDRESS
 ## Inputs
 
 - treasuryOwnerAddress: EQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOFkC
-- contentHash: 8c94572cd6965d3dd2d75cf309b19d7956fe95e473cc07de442326e3866f3c94
+- contentHash: d7bead8b433f5ee1ee2a2bd0659f01837e7761fcc48e855449dbdf7543fb52e2
 
 ## Derived ATH Master
 
-- athMasterAddress: EQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6IpC
-- athMasterStateInitHash: 7db98797112279e7eb671d271ae7921da1cfb4dbcce42b92a272a3e60b3ce7e8
-- athMasterCodeHash: b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780
-- athMasterDataHash: e84c3e592b2c4f083d978033ddab2971ad2930b0f7dd00be86cb5a1de121d4b0
-- treasuryOwnerAthWalletAddress: EQBQgxFVRTJDe9yIh2GWAQldgz_04b-wkcIkfc4shhARAbKe
-- treasuryOwnerAthWalletStateInitHash: 508311554532437bdc8887619601095d833ff4e1bfb091c2247dce2c86101101
-- athWalletCodeHash: 3d0f027840bc604e1e69d19f764543372f362096e2ead3c689c83e8f00966ce4
+- athMasterAddress: EQDOvjnz6XUQgS0PbFNbTKSu2bR98haXDlOsAIr_5LH6GKYR
+- athMasterStateInitHash: cebe39f3e97510812d0f6c535b4ca4aed9b47df216970e53ac008affe4b1fa18
+- athMasterCodeHash: 423e55fa3e47525d99734f8fc073af3f4b468937d6bf3b03a6226cc3a7ba4ede
+- athMasterDataHash: cee465385fd058d9debd29fcf84cff99c8ae3fcdb290c632890eb02ddc74c0c8
+- treasuryOwnerAthWalletAddress: EQBDmAHUxk0gaTo7prHQc5YLRFpLB4wArbddw96FMKawjxlf
+- treasuryOwnerAthWalletStateInitHash: 439801d4c64d20693a3ba6b1d073960b445a4b078c00adb75dc3de8530a6b08f
+- athWalletCodeHash: 58be31994b60678c2b36f3cc588a13c88ee670bc6930a91b8429c53a4312a1b9
 
 ## Treasury Supply Deployment
 
 - required: true
 - messageType: DeployTreasurySupply
 - senderAddress: EQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOFkC
-- recipientAthWalletAddress: EQBQgxFVRTJDe9yIh2GWAQldgz_04b-wkcIkfc4shhARAbKe
+- recipientAthWalletAddress: EQBDmAHUxk0gaTo7prHQc5YLRFpLB4wArbddw96FMKawjxlf
 - amountAtomic: 100000000000000000
 - requiredValueNanotons: 5000000
 - downstreamWalletValueNanotons: 3000000
@@ -38,6 +38,6 @@ Status: DERIVED_MAINNET_ATH_MASTER_ADDRESS
 
 ## M20F Inputs
 
-- athMasterAddress: EQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6IpC
-- athMasterCodeHash: b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780
-- athDeploymentManifest: artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780
+- athMasterAddress: EQDOvjnz6XUQgS0PbFNbTKSu2bR98haXDlOsAIr_5LH6GKYR
+- athMasterCodeHash: 423e55fa3e47525d99734f8fc073af3f4b468937d6bf3b03a6226cc3a7ba4ede
+- athDeploymentManifest: artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=423e55fa3e47525d99734f8fc073af3f4b468937d6bf3b03a6226cc3a7ba4ede

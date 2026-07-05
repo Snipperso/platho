@@ -3,10 +3,10 @@
   "network": "mainnet",
   "status": "FINAL_MAINNET_ADDRESS_INPUT",
   "genesisControllerAddress": "UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
-  "athMasterAddress": "UQB9uYeXESJ55-tnHSca55Idoc-028zkK5KicqPmCzzn6NeH",
+  "athMasterAddress": "UQDOvjnz6XUQgS0PbFNbTKSu2bR98haXDlOsAIr_5LH6GPvU",
   "proofRefs": {
     "finalGenesisControllerProof": "artifacts/local/mainnet_final_manifest_draft.json#manifest.addresses.genesis_controller_one_shot=UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
-    "athDeploymentManifest": "artifacts/local/mainnet_final_manifest_draft.json#manifest.manifest_hash_hex=39c0115b9fec0b31c8b2a3981bb026b730df391d747e2df7bbc772f7d3118fd2",
-    "buybackBurnBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#BUYBACKBURN_CODE_HASH=0c39dc79e436ad71b7b8f467a9c72fb84a7fdae7454cd25ecfbb4f8c130c832c"
+    "athDeploymentManifest": "artifacts/local/mainnet_final_manifest_draft.json#manifest.manifest_hash_hex=5956ddf3bb9876e5112687d915f4c4791e1e5f06912cd7017752d31deafd1194",
+    "buybackBurnBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#BUYBACKBURN_CODE_HASH=b15d02e783237e0ba986b810c45e17c969ec19a7c562cdd7e2c73d378bbf1f04"
   }
 }

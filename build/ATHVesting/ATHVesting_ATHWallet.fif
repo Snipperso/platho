@@ -42,6 +42,8 @@ PROGRAM{
   DECLPROC $JettonInternalTransfer$_store
   DECLPROC $JettonInternalTransfer$_store_cell
   DECLPROC $JettonInternalTransfer$_load_bounced
+  DECLPROC $JettonTransferNotification$_store
+  DECLPROC $JettonTransferNotification$_store_cell
   DECLPROC $JettonExcesses$_store
   DECLPROC $JettonExcesses$_store_cell
   DECLPROC $PendingAthTransferNotification$_store
@@ -56,6 +58,7 @@ PROGRAM{
   DECLPROC $PendingAthOutgoingTransfer$_load_opt
   DECLPROC $ATHWallet$_store
   DECLPROC $ATHWallet$_load
+  DECLPROC $StateInit$_get_code
   DECLPROC $Context$_get_value
   DECLPROC $ATHWalletDataView$_to_external
   DECLPROC $PendingAthTransferNotificationView$_to_external
@@ -92,7 +95,7 @@ PROGRAM{
   DECLPROC $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination
   DECLPROC $ATHWallet$_fun_refund_pending_notification
   DECLPROC $ATHWallet$_fun_refund_bounced_notification
-  DECLPROC $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address
+  DECLPROC $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address_jetton_wallet_code
   DECLPROC $ATHWallet$_fun_get_wallet_data
   DECLPROC $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at
   DECLPROC $ATHWallet$_fun_get_pending_notification
@@ -103,9 +106,10 @@ PROGRAM{
   DECLPROC $ATHInternalTransferVaultMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username
   DECLPROC $ATHInternalTransferVaultProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
   DECLPROC $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload
+  DECLPROC $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload
+  DECLPROC $JettonExcesses$_constructor_query_id
   DECLPROC $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at
   DECLPROC $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet
-  DECLPROC $JettonExcesses$_constructor_query_id
   DECLPROC $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username
   DECLPROC $AthTransferNotificationVaultProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
   97026 DECLMETHOD %get_wallet_data
@@ -472,6 +476,22 @@ PROGRAM{
     LDVARUINT16
     -ROT
   }>
+  $JettonTransferNotification$_store PROCINLINE:<{
+    1935855772 PUSHINT
+    s0 s5 XCHG2
+    32 STU
+    s1 s3 XCHG
+    64 STU
+    SWAP
+    STVARUINT16
+    STSLICE
+    STSLICE
+  }>
+  $JettonTransferNotification$_store_cell PROCINLINE:<{
+    4 -ROLL
+    $JettonTransferNotification$_store INLINECALLDICT
+    ENDC
+  }>
   $JettonExcesses$_store PROCINLINE:<{
     3576854235 PUSHINT
     ROT
@@ -585,6 +605,9 @@ PROGRAM{
     s2 s5 XCHG
     s2 s4 XCHG
     s2 s3 XCHG
+  }>
+  $StateInit$_get_code PROCINLINE:<{
+    DROP
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -1210,11 +1233,16 @@ PROGRAM{
     s0 s5 XCHG
     $ATHWallet$_fun_refund_pending_notification INLINECALLDICT
   }>
-  $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address PROCINLINE:<{
+  $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address_jetton_wallet_code PROCINLINE:<{
   }>
   $ATHWallet$_fun_get_wallet_data PROCREF:<{
-    s5 s4 s3 PUSH3
-    $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address INLINECALLDICT
+    0 PUSHINT
+    s5 s4 PUSH2
+    $ATHWallet$_init_child INLINECALLDICT
+    $StateInit$_get_code INLINECALLDICT
+    s6 s5 s(-2) PU2XC
+    s6 s(-1) PUXC
+    $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address_jetton_wallet_code INLINECALLDICT
   }>
   $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at PROCINLINE:<{
   }>
@@ -1257,11 +1285,13 @@ PROGRAM{
   }>
   $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload PROCINLINE:<{
   }>
+  $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload PROCINLINE:<{
+  }>
+  $JettonExcesses$_constructor_query_id PROCINLINE:<{
+  }>
   $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at PROCINLINE:<{
   }>
   $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet PROCINLINE:<{
-  }>
-  $JettonExcesses$_constructor_query_id PROCINLINE:<{
   }>
   $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username PROCINLINE:<{
   }>
@@ -1270,7 +1300,7 @@ PROGRAM{
   %get_wallet_data PROC:<{
     $ATHWallet$_contract_load INLINECALLDICT
     $ATHWallet$_fun_get_wallet_data INLINECALLDICT
-    6 3 BLKDROP2
+    6 4 BLKDROP2
     $ATHWalletDataView$_to_external INLINECALLDICT
   }>
   %get_pending_notification PROC:<{
@@ -2570,97 +2600,61 @@ PROGRAM{
       LDMSGADDR
       LDMSGADDR
       LDVARUINT16
-      DROP
       14710 PUSHINT
-      s4 PUSH
+      s5 PUSH
       0 GTINT
       THROWANYIFNOT
       14711 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s5 s10 XCHG
-      s4 s9 XCHG
-      s3 s8 XCHG
-      s7 s11 s12 XCHG3
-      s9 PUSH
+      s5 s11 XCHG
+      s4 s10 XCHG
+      s3 s9 XCHG
+      s8 s12 s13 XCHG3
+      s11 PUSH
       $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
-      s1 s13 XCHG
+      s1 s14 XCHG
       SDEQ
-      s1 s11 XCHG
-      THROWANYIFNOT
-      4 ROLL
-      s0 s9 XCHG
-      14712 PUSHINT
-      s11 s8 XCPU
-      $ATHWallet$_fun_is_basechain_address INLINECALLDICT
       s1 s12 XCHG
       THROWANYIFNOT
-      s5 PUSH
+      4 ROLL
+      s0 s10 XCHG
+      14712 PUSHINT
+      s12 s10 XCPU
+      $ATHWallet$_fun_is_basechain_address INLINECALLDICT
+      s1 s13 XCHG
+      THROWANYIFNOT
+      s7 PUSH
       0 GTINT
       IF:<{
         14713 PUSHINT
-        s6 PUSH
+        s8 PUSH
         30000000 PUSHINT
         GEQ
         THROWANYIFNOT
         14714 PUSHINT
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
-        s7 PUSH
-        1000000 PUSHINT
-        ADD
+        s9 PUSH
         1000000 PUSHINT
         ADD
         7000000 PUSHINT
         ADD
-        20000000 PUSHINT
-        ADD
         GEQ
         THROWANYIFNOT
-        5 ROLL
-        s10 s9 s7 XCPU2
-        $ATHWallet$_fun_compute_sender_key INLINECALLDICT
-        6 -ROLL
-        s10 s6 PUSH2
-        $ATHWallet$_fun_compute_pending_notification_key INLINECALLDICT
-        14715 PUSHINT
-        s4 PUSH
-        257 PUSHINT
-        s3 PUSH
-        __tact_dict_exists_int INLINECALLDICT
-        NOT
-        THROWANYIFNOT
-        14716 PUSHINT
-        s3 PUSH
-        257 PUSHINT
-        s3 PUSH
-        __tact_dict_exists_int INLINECALLDICT
-        NOT
-        THROWANYIFNOT
-        s6 s10 XCPU
+        s4 s10 XCPU
         ADD
-        257 PUSHINT
-        1000000 PUSHINT
-            NOW
-        s12 PUSH
-        s12 s2 s(-1) PUXC2
-        s15 s(-1) PUXC
-        $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at INLINECALLDICT
-        NEWC
-        $PendingAthTransferNotification$_store_cell INLINECALLDICT
-        s3 s5 XCHG
-        s1 s8 s0 XCHG3
-        __tact_dict_set_int_cell INLINECALLDICT
         1 PUSHINT
-        TRUE
-        s12 s8 s(-1) PUXC2
-        s12 s11 PUXC
-        $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet INLINECALLDICT
+        FALSE
+        s7 PUSH
+        s13 s2 s9 PUXC2
+        s1 s13 XCHG
+        $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload INLINECALLDICT
         NEWC
-        $AthTransferNotification$_store_cell INLINECALLDICT
-        s5 PUSH
-        s3 s13 XCPU
+        $JettonTransferNotification$_store_cell INLINECALLDICT
+        s4 PUSH
+        s3 s9 XCPU
         s0 s3 XCHG
-        s11 s9 s11 XCHG3
+        s12 s9 s12 XCHG3
         $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
             NEWC
             b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -2680,26 +2674,24 @@ PROGRAM{
             SWAP
             SENDRAWMSG
       }>ELSE<{
-        s7 POP
+        s6 POP
+        s8 POP
         14717 PUSHINT
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
         23000000 PUSHINT
         GEQ
         THROWANYIFNOT
-        s3 s7 XCPU
+        s2 s8 XCPU
         ADD
-        s4 s9 XCHG
-        s0 s3 XCHG
-        s0 s6 XCHG
-        s0 s4 XCHG
+        s0 s7 XCHG
+        s4 s1 s4 XCHG3
       }>
       __tact_context_get_sender INLINECALLDICT
-      s4 s7 XCHG
-      s3 s6 XCHG
-      s1 s5 s0 XCHG3
-      s9 s0 s3 PUXC2
-      s9 s9 XCHG2
+      s7 s8 XCHG
+      s6 s5 s0 XCHG3
+      s10 s4 s0 XCHG3
+      s1 s9 s9 PUXC2
       $ATHWallet$_fun_send_source_wallet_ack INLINECALLDICT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT

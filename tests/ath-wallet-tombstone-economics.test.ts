@@ -28,7 +28,7 @@ describe('ATHWallet tombstone economics', () => {
       'NORMAL_NOTIFY_ACK',
       'VAULT_USERNAME_NOTIFY_ACK',
       'VAULT_PROFILE_NOTIFY_ACK',
-      'JETTON_NOTIFY_ACK',
+      // clean-12: JETTON_NOTIFY_ACK dropped -- the standard Lane A path no longer creates a tombstone.
       'NORMAL_NOTIFY_STALE_PRUNE',
     ]);
     for (const item of report.cases) {

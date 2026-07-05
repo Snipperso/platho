@@ -7,10 +7,10 @@
     "symbol": "ATH",
     "decimals": "9",
     "description": "Utility token of the Platho communication protocol.",
-    "deployment_id": "platho-mainnet-20260704-clean-11"
+    "deployment_id": "platho-mainnet-20260705-clean-12"
   },
-  "contentBocBase64": "te6cckECDwEAAT0AAQMAwAECAVgCCgIBIAMIAgJwBAYBQb5eFD1QUCkJihGGmfEqE02vLa33BZEJYuWGqq5MLXtTkAUAQgBwbGF0aG8tbWFpbm5ldC0yMDI2MDcwNC1jbGVhbi0xMQFBvlRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwBwAWAFBsYXRobyBBVEgBQb9u1PlCp4SM4ssGa3ehEoxqH/jEP0OKLc4kYSup/6uLAwkACABBVEgCASALDQFBv1II3vRvWh1Pnc5mqzCfSoUTBfFm+R73nZI+9Y40+aIJDABoAFV0aWxpdHkgdG9rZW4gb2YgdGhlIFBsYXRobyBjb21tdW5pY2F0aW9uIHByb3RvY29sLgFBv10B+l48BpAcRQRsay3c6lr3ZP6g7tcqENQE8jEs6yR9DgAEADln6T9F",
-  "contentHashHex": "8c94572cd6965d3dd2d75cf309b19d7956fe95e473cc07de442326e3866f3c94",
-  "bocSha256Hex": "e630772ae1ac6c2f2d483bf1f2d7e7d094de8a391f4a38b77d30b2e5d39abc60",
+  "contentBocBase64": "te6cckECDwEAAT0AAQMAwAECAVgCCgIBIAMIAgJwBAYBQb5eFD1QUCkJihGGmfEqE02vLa33BZEJYuWGqq5MLXtTkAUAQgBwbGF0aG8tbWFpbm5ldC0yMDI2MDcwNS1jbGVhbi0xMgFBvlRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwBwAWAFBsYXRobyBBVEgBQb9u1PlCp4SM4ssGa3ehEoxqH/jEP0OKLc4kYSup/6uLAwkACABBVEgCASALDQFBv1II3vRvWh1Pnc5mqzCfSoUTBfFm+R73nZI+9Y40+aIJDABoAFV0aWxpdHkgdG9rZW4gb2YgdGhlIFBsYXRobyBjb21tdW5pY2F0aW9uIHByb3RvY29sLgFBv10B+l48BpAcRQRsay3c6lr3ZP6g7tcqENQE8jEs6yR9DgAEADls5oSh",
+  "contentHashHex": "d7bead8b433f5ee1ee2a2bd0659f01837e7761fcc48e855449dbdf7543fb52e2",
+  "bocSha256Hex": "4bd16e5c3bbfcb35086699e8ff441cfc3f046dff850fc37266876e9c52a0cc57",
   "note": "Final ATHMaster StateInit also depends on final treasury owner address. deployment_id intentionally separates a clean one-shot ATHMaster deployment from abandoned earlier packets using the same treasury owner."
 }

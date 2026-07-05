@@ -4,7 +4,7 @@ Status: **PASS**
 
 Sandbox evidence that username mint and item recovery paths retain enough TON against the explicit V1 endowment model. This is not a mainnet rent oracle; it is a release gate against underfunded permanent UsernameRegistry records and UsernameNFTItem state.
 
-UsernameRegistry code hash: `19e937fa7ede93b8f29525edb3ab07f4b6f722614e925d085d697c2f60badd4e`
+UsernameRegistry code hash: `66e883e39873153834b1c06fb452cc0b3e8f3c64410c1aec2c80c36776d951cf`
 UsernameNFTItem code hash: `73d19a15d46c24d0eda7047d073490b7166d01322399751108be40ae2fda2eab`
 
 | Case | Kind | Registry delta | Registry endowment | Registry margin | Item delta/balance | Item floor | Item margin |

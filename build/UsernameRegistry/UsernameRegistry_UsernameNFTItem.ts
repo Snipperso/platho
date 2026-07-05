@@ -3119,6 +3119,7 @@ export type ATHWalletDataView = {
     balance: bigint;
     owner_address: Address;
     ath_master_address: Address;
+    jetton_wallet_code: Cell;
 }
 
 export function storeATHWalletDataView(src: ATHWalletDataView) {
@@ -3127,6 +3128,7 @@ export function storeATHWalletDataView(src: ATHWalletDataView) {
         b_0.storeInt(src.balance, 257);
         b_0.storeAddress(src.owner_address);
         b_0.storeAddress(src.ath_master_address);
+        b_0.storeRef(src.jetton_wallet_code);
     };
 }
 
@@ -3135,21 +3137,24 @@ export function loadATHWalletDataView(slice: Slice) {
     const _balance = sc_0.loadIntBig(257);
     const _owner_address = sc_0.loadAddress();
     const _ath_master_address = sc_0.loadAddress();
-    return { $$type: 'ATHWalletDataView' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address };
+    const _jetton_wallet_code = sc_0.loadRef();
+    return { $$type: 'ATHWalletDataView' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, jetton_wallet_code: _jetton_wallet_code };
 }
 
 export function loadTupleATHWalletDataView(source: TupleReader) {
     const _balance = source.readBigNumber();
     const _owner_address = source.readAddress();
     const _ath_master_address = source.readAddress();
-    return { $$type: 'ATHWalletDataView' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address };
+    const _jetton_wallet_code = source.readCell();
+    return { $$type: 'ATHWalletDataView' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, jetton_wallet_code: _jetton_wallet_code };
 }
 
 export function loadGetterTupleATHWalletDataView(source: TupleReader) {
     const _balance = source.readBigNumber();
     const _owner_address = source.readAddress();
     const _ath_master_address = source.readAddress();
-    return { $$type: 'ATHWalletDataView' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address };
+    const _jetton_wallet_code = source.readCell();
+    return { $$type: 'ATHWalletDataView' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, jetton_wallet_code: _jetton_wallet_code };
 }
 
 export function storeTupleATHWalletDataView(source: ATHWalletDataView) {
@@ -3157,6 +3162,7 @@ export function storeTupleATHWalletDataView(source: ATHWalletDataView) {
     builder.writeNumber(source.balance);
     builder.writeAddress(source.owner_address);
     builder.writeAddress(source.ath_master_address);
+    builder.writeCell(source.jetton_wallet_code);
     return builder.build();
 }
 
@@ -5224,7 +5230,7 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"JettonInternalTransfer","header":395134233,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"from","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"JettonTransferNotification","header":1935855772,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"sender","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"JettonExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"jetton_wallet_code","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},

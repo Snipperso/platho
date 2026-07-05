@@ -32,7 +32,7 @@
     },
     {
       "contract": "ATHWallet.tact",
-      "non_comment_lines": 958,
+      "non_comment_lines": 949,
       "receive_handlers": 17,
       "bounced_handlers": 9,
       "forbidden_hits": [],
@@ -41,7 +41,7 @@
     },
     {
       "contract": "BuybackBurn.tact",
-      "non_comment_lines": 577,
+      "non_comment_lines": 555,
       "receive_handlers": 14,
       "bounced_handlers": 2,
       "forbidden_hits": [],
@@ -68,7 +68,7 @@
     },
     {
       "contract": "MarketStabilitySeller.tact",
-      "non_comment_lines": 468,
+      "non_comment_lines": 465,
       "receive_handlers": 12,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -114,28 +114,28 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780",
-      "pinned": "b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780",
+      "built": "423e55fa3e47525d99734f8fc073af3f4b468937d6bf3b03a6226cc3a7ba4ede",
+      "pinned": "423e55fa3e47525d99734f8fc073af3f4b468937d6bf3b03a6226cc3a7ba4ede",
       "match": true
     },
     "ATHVESTING_CODE_HASH": {
-      "built": "33367899c4d117a9a7a00811bd64c1dca51dfb0ee79fec6abf4d1f10abf049ac",
-      "pinned": "33367899c4d117a9a7a00811bd64c1dca51dfb0ee79fec6abf4d1f10abf049ac",
+      "built": "7e8ad8c312284dbd2604b167dcf6db8ffc7f96278cfa194cad07a0c92d5092a5",
+      "pinned": "7e8ad8c312284dbd2604b167dcf6db8ffc7f96278cfa194cad07a0c92d5092a5",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "3d0f027840bc604e1e69d19f764543372f362096e2ead3c689c83e8f00966ce4",
-      "pinned": "3d0f027840bc604e1e69d19f764543372f362096e2ead3c689c83e8f00966ce4",
+      "built": "58be31994b60678c2b36f3cc588a13c88ee670bc6930a91b8429c53a4312a1b9",
+      "pinned": "58be31994b60678c2b36f3cc588a13c88ee670bc6930a91b8429c53a4312a1b9",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "0c39dc79e436ad71b7b8f467a9c72fb84a7fdae7454cd25ecfbb4f8c130c832c",
-      "pinned": "0c39dc79e436ad71b7b8f467a9c72fb84a7fdae7454cd25ecfbb4f8c130c832c",
+      "built": "b15d02e783237e0ba986b810c45e17c969ec19a7c562cdd7e2c73d378bbf1f04",
+      "pinned": "b15d02e783237e0ba986b810c45e17c969ec19a7c562cdd7e2c73d378bbf1f04",
       "match": true
     },
     "MARKET_STABILITY_SELLER_CODE_HASH": {
-      "built": "b5e694860f604f3a91bfe2bb57a23b19cec1013dc467fbea3713d1ac887b5dd4",
-      "pinned": "b5e694860f604f3a91bfe2bb57a23b19cec1013dc467fbea3713d1ac887b5dd4",
+      "built": "21b954c1111fe84f35cd0701066a3b9e2fd622e3669fcf0d2f6a1b882ff977db",
+      "pinned": "21b954c1111fe84f35cd0701066a3b9e2fd622e3669fcf0d2f6a1b882ff977db",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -149,8 +149,8 @@
       "match": true
     },
     "PROFILE_REGISTRY_CODE_HASH": {
-      "built": "6a1de90ff8834d25bc34a74221a161290ab3f3e2cfdbfb2d73dd407adc7eecef",
-      "pinned": "6a1de90ff8834d25bc34a74221a161290ab3f3e2cfdbfb2d73dd407adc7eecef",
+      "built": "7fe92293fbf9afabb5cd65c3275c0f80e8fb38fcf796b7143f90b3f9187663bc",
+      "pinned": "7fe92293fbf9afabb5cd65c3275c0f80e8fb38fcf796b7143f90b3f9187663bc",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
@@ -159,13 +159,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "19e937fa7ede93b8f29525edb3ab07f4b6f722614e925d085d697c2f60badd4e",
-      "pinned": "19e937fa7ede93b8f29525edb3ab07f4b6f722614e925d085d697c2f60badd4e",
+      "built": "66e883e39873153834b1c06fb452cc0b3e8f3c64410c1aec2c80c36776d951cf",
+      "pinned": "66e883e39873153834b1c06fb452cc0b3e8f3c64410c1aec2c80c36776d951cf",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "0d982a990c132a8d6c932079651fb48c9657d4d0683fd4d985461e063f34e4cd",
-      "pinned": "0d982a990c132a8d6c932079651fb48c9657d4d0683fd4d985461e063f34e4cd",
+      "built": "ead2e625b5e219f1fcf51b4b068aa4ceb461a9ed2c5dc379fcb87abeb4f5b467",
+      "pinned": "ead2e625b5e219f1fcf51b4b068aa4ceb461a9ed2c5dc379fcb87abeb4f5b467",
       "match": true
     }
   },
@@ -173,7 +173,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "f969ecc3a82a1294bdcef265fd3b32a1a18c2e5bbc3fd374a178b7899c6d4b75",
+    "manifest_hash_hex": "7925fddcdc6e3171ea659d0bc8058fa0ad59023a8f5ebc697a0e744cc8f5ce43",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",

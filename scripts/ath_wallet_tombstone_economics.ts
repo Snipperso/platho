@@ -196,19 +196,9 @@ const caseSpecs: CaseSpec[] = [
       media_format: 1n,
     } as ATHInternalTransferVaultProfileAvatar),
   },
-  {
-    label: 'JETTON_NOTIFY_ACK',
-    terminal: 'ack',
-    message: (ctx) => ({
-      $$type: 'JettonInternalTransfer',
-      query_id: ctx.queryId,
-      amount: AMOUNT,
-      from: ctx.sourceOwner,
-      response_address: ctx.responseDestination,
-      forward_ton_amount: ATH_TRANSFER_NOTIFY_MIN_VALUE,
-      forward_payload: beginCell().endCell().beginParse(),
-    } as JettonInternalTransfer),
-  },
+  // clean-12: the standard Lane A path (JettonInternalTransfer forward_ton>0) no longer creates a pending-notification
+  // tombstone -- it emits the standard fire-and-forget 0x7362D09C JettonTransferNotification. So there is no
+  // standard-path tombstone to measure; only the Lane B custom-notify cases carry a tombstone.
   {
     label: 'NORMAL_NOTIFY_STALE_PRUNE',
     terminal: 'prune',
