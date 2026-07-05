@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=9';
+} from './i18n.mjs?v=10';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -186,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v677';
+const PLATHO_APP_RUNTIME_VERSION = 'v678';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6182,14 +6182,34 @@ function shouldShowDiscoveryCta() {
 
 function buildDiscoveryCtaCard() {
   const card = document.createElement('article');
-  card.className = 'feed-item compact discovery-cta';
+  card.className = 'feed-item discovery-cta';
   card.setAttribute('role', 'button');
   card.tabIndex = 0;
+
+  const head = document.createElement('div');
+  head.className = 'discovery-cta-head';
+  const badge = document.createElement('span');
+  badge.className = 'discovery-cta-icon';
+  const badgeIcon = document.createElement('span');
+  badgeIcon.className = 'icon icon-compass';
+  badge.append(badgeIcon);
+  const textWrap = document.createElement('div');
+  textWrap.className = 'discovery-cta-text';
   const title = document.createElement('h2');
   title.textContent = t('public.discoverCtaTitle');
   const body = document.createElement('p');
   body.textContent = t('public.discoverCtaBody');
-  card.append(title, body);
+  textWrap.append(title, body);
+  head.append(badge, textWrap);
+
+  // A styled pill (not a real <button>: the whole card is the single role="button" click target, so a nested
+  // button would be invalid a11y) that reads unmistakably as the call-to-action.
+  const action = document.createElement('span');
+  action.className = 'discovery-cta-action';
+  action.textContent = t('public.discoverCtaAction');
+
+  card.append(head, action);
+
   const open = () => { openPublicDiscovery().catch((error) => console.error(error)); };
   card.addEventListener('click', open);
   card.addEventListener('keydown', (event) => {
