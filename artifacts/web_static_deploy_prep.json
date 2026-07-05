@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-05T11:56:06.965Z",
-  "mode": "production",
+  "generatedAt": "2026-07-05T14:16:38.705Z",
+  "mode": "preview",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "BLOCKED_BY_PREPROD",
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
+  "status": "PREVIEW_STATIC_PACKAGE_READY",
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 136,
     "totalBytes": 4525397,
-    "bundleSha256": "5fd341940f271370e599199bbc2f6c0cf9e4b530417265873b9bfa9beb960864",
+    "bundleSha256": "a4a2961925472686fe960137329dff43c8f35ef436411f1031461ad5d50e88a3",
     "files": [
       {
         "path": "app.js",
         "bytes": 1184432,
-        "sha256": "5822654ecfcd56ccf118f8b9d3d8c59688d2b08684a3d35046cc8d8e3e65410c"
+        "sha256": "27b0b908cad59ca8e70d8d1f99af56c75ff8d164409728fa6e0de505032918f2"
       },
       {
         "path": "assets/icons/back.svg",
@@ -230,7 +230,7 @@
       {
         "path": "index.html",
         "bytes": 51971,
-        "sha256": "8285db149ed242d33c71e392f70db87bbde7250c29f8f87a791ff619f9433204"
+        "sha256": "f32d13f3d9f05428aeb998b5e4fcaaaf84b42966a3e89d6b100ec8f077df9e7f"
       },
       {
         "path": "manifest.webmanifest",
@@ -300,7 +300,7 @@
       {
         "path": "sw.js",
         "bytes": 6712,
-        "sha256": "483cb3b2898ca012ca87c5848b65e37b0a4046f65c90f351953605aa218197e6"
+        "sha256": "170aebb686a2a9ee6598dcce3f1d40130cf59c13236a436ec167133e7f33fcd8"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -947,17 +947,11 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": false
+    "productionMarkersCleared": true
   },
-  "blockers": [
-    "MAINNET_GENESIS_NOT_VERIFIED"
+  "blockers": [],
+  "warnings": [
+    "STATIC_PACKAGE_IS_NON_PRODUCTION"
   ],
-  "warnings": [],
-  "productionFindings": [
-    {
-      "id": "MAINNET_GENESIS_NOT_VERIFIED",
-      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
-      "message": "Current release candidate has no verified final mainnet genesis evidence."
-    }
-  ]
+  "productionFindings": []
 }

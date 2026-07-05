@@ -1,28 +1,16 @@
 {
   "document": "PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT",
-  "status": "BLOCKED_GENESIS_MISMATCH",
+  "status": "MAINNET_GENESIS_VERIFIED",
   "generated_at": "DETERMINISTIC_ARTIFACT",
-  "mainnet_genesis_verified": false,
+  "mainnet_genesis_verified": true,
   "input_source": "artifacts/mainnet_genesis_verify_input.json",
-  "input_sha256": "cf6411ce4088a5f10903b2946045c5ba21e5cc3f5f3d5f6b59cbbe0717a81155",
+  "input_sha256": "ef502bb8513c785137efef97532ce3b8843d02af5acf1124c800855e01dfcf21",
   "evidence_refs": {
-    "getterSnapshotSource": "live-rpc/platho-toncenter/2026-06-23T07:33:03.027Z",
-    "codeHashProofSource": "artifacts/CURRENT_CODE_HASHES.txt#sha256=99bab720756fed8bc4568b5cdd76c9b60f9ac548d0fe7166cac8856aefc9e609",
-    "finalManifestSource": "artifacts/local/mainnet_final_manifest_draft.json#manifest_hash_hex=9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2"
+    "getterSnapshotSource": "live-rpc/platho-toncenter/2026-07-05-clean-13-post-seal",
+    "codeHashProofSource": "artifacts/CURRENT_CODE_HASHES.txt#sha256=16a25299efe8ac5c66d43c196c0ca07b5fbebcbca27fd611ea31902ea6361bf8",
+    "finalManifestSource": "artifacts/local/mainnet_final_manifest_draft.json#manifest_hash_hex=ff26bda7751829e0450a9665fc2f4a619c9f9e4a7d659d45a6728deef11ece95"
   },
-  "issue_codes": [
-    "CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST",
-    "MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT"
-  ],
-  "issues": [
-    {
-      "code": "CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST",
-      "message": "Final genesis evidence does not belong to the current local build: ath_master: current=423e55fa3e47525d99734f8fc073af3f4b468937d6bf3b03a6226cc3a7ba4ede, manifest=b1d76721386af55046ea573e7f7d41673e8e68629fd06aef3889b121e1d66780; ath_vesting: current=7e8ad8c312284dbd2604b167dcf6db8ffc7f96278cfa194cad07a0c92d5092a5, manifest=33367899c4d117a9a7a00811bd64c1dca51dfb0ee79fec6abf4d1f10abf049ac; ath_wallet: current=58be31994b60678c2b36f3cc588a13c88ee670bc6930a91b8429c53a4312a1b9, manifest=3d0f027840bc604e1e69d19f764543372f362096e2ead3c689c83e8f00966ce4; buyback_burn: current=b15d02e783237e0ba986b810c45e17c969ec19a7c562cdd7e2c73d378bbf1f04, manifest=0c39dc79e436ad71b7b8f467a9c72fb84a7fdae7454cd25ecfbb4f8c130c832c; market_stability_seller: current=21b954c1111fe84f35cd0701066a3b9e2fd622e3669fcf0d2f6a1b882ff977db, manifest=b5e694860f604f3a91bfe2bb57a23b19cec1013dc467fbea3713d1ac887b5dd4; profile_registry: current=7fe92293fbf9afabb5cd65c3275c0f80e8fb38fcf796b7143f90b3f9187663bc, manifest=6a1de90ff8834d25bc34a74221a161290ab3f3e2cfdbfb2d73dd407adc7eecef; username_registry: current=66e883e39873153834b1c06fb452cc0b3e8f3c64410c1aec2c80c36776d951cf, manifest=19e937fa7ede93b8f29525edb3ab07f4b6f722614e925d085d697c2f60badd4e; vault: current=ead2e625b5e219f1fcf51b4b068aa4ceb461a9ed2c5dc379fcb87abeb4f5b467, manifest=0d982a990c132a8d6c932079651fb48c9657d4d0683fd4d985461e063f34e4cd."
-    },
-    {
-      "code": "MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT",
-      "message": "Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=39c0115b9fec0b31c8b2a3981bb026b730df391d747e2df7bbc772f7d3118fd2 local_draft=ff26bda7751829e0450a9665fc2f4a619c9f9e4a7d659d45a6728deef11ece95 production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification."
-    }
-  ],
-  "checked_manifest_hash": "39c0115b9fec0b31c8b2a3981bb026b730df391d747e2df7bbc772f7d3118fd2"
+  "issue_codes": [],
+  "issues": [],
+  "checked_manifest_hash": "ff26bda7751829e0450a9665fc2f4a619c9f9e4a7d659d45a6728deef11ece95"
 }
