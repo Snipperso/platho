@@ -186,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v668';
+const PLATHO_APP_RUNTIME_VERSION = 'v669';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2963,6 +2963,15 @@ function setProfileAvatarStatus(text, state = 'busy') {
     setProfileAvatarPending(false);
   }
   setProfileActionStatus(setAvatarStatus, text, state);
+}
+
+// Greppable, stable-English console marker that brackets an avatar set. An avatar rides the SHARED VPB2
+// '[platho] send timeline' for its image capsules (Stage 1) and adds a SECOND Vault->ProfileRegistry
+// pointer-registration message (Stage 2) that a normal image send never has — which is why the console reads
+// differently. These phase markers let avatar activity be told apart from a plain image send without touching
+// the shared publish path. phase is a fixed English token; the localized UI status stays on setProfileAvatarStatus.
+function logAvatarTimeline(phase, detail = {}) {
+  console.info('[platho] avatar timeline', { phase, ...detail, at: new Date().toISOString() });
 }
 
 function setUsernameMintStatus(text, state = 'busy') {
@@ -18737,6 +18746,7 @@ async function finalizeProfileAvatarUpdate({
       ? BigInt(pendingPointer.avatarStreamId)
       : bytesToBigIntValue(streamIdBytes);
   setProfileAvatarStatus(t('avatar.signingPayment'));
+  logAvatarTimeline('registering_pointer', { avatarHash, partCount });
   const result = registrySubmission ?? await submitVaultProfileAvatarRegistration({
     owner,
     avatarHash,
@@ -18766,6 +18776,7 @@ async function finalizeProfileAvatarUpdate({
     } else {
       setProfileAvatarStatus('avatar active', '');
     }
+    logAvatarTimeline('set_complete', { avatarHash, paymentPending: profilePaymentFinality?.pending === true });
   } catch (error) {
     registryError = error;
     if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) {
@@ -18809,6 +18820,7 @@ async function finalizeProfileAvatarUpdate({
 async function runProfileAvatarPublishRecovery(key) {
   const job = profileAvatarPublishRecoveryJobs.get(key);
   if (!job) return null;
+  logAvatarTimeline('recovery_tick', { avatarHash: job.avatarHash ?? null, attempts: job.attempts ?? 0 });
   if (!plathoWallet?.address || !sameWalletAddress(plathoWallet.address, job.owner)) {
     // Wallet locked or switched: PAUSE (do not re-arm). The unlock path resumes the matching owner's
     // jobs intentionally, so a recovery timer can no longer survive a lock and re-fire on its own.
@@ -20406,6 +20418,7 @@ async function submitProfileAvatarUpdate(avatar) {
     setProfileAvatarStatus(t('avatar.alreadyPublished'));
   } else {
     setProfileAvatarStatus(t('avatar.publishing'));
+    logAvatarTimeline('publishing_image', { avatarHash, partCount: parts.length });
     await capturePublishSnapshot('before-public-publish', null);
     try {
       publishResult = await publishPublicPayloadParts(payloads, `profile-avatar-${Date.now()}`);
@@ -20984,7 +20997,7 @@ async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = 
   fields.push({
     id: 'activationConfirmed',
     type: 'checkbox',
-    label: t('vault.activationConfirmCheckbox'),
+    label: t('vault.activationConfirmCheckbox', { amount: t('common.gramAmount', { amount: formatTonNanotons(fee) }) }),
   });
   const result = await openActionDialog({
     title: t('vault.activateAccountTitle'),
