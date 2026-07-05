@@ -4046,15 +4046,86 @@ button.feed-item:hover {
     padding: 16px 14px;
   }
 
+  /* Mobile composer: TWO rows so the text field is not squeezed between buttons.
+     Row 1 = emoji | wide text field | send. Row 2 = the two secondary buttons + the cost/reserve hint.
+     (The reply/attachment strips keep spanning the full width and flow below on their own rows.) */
   .composer {
-    grid-template-columns: 38px 38px 38px minmax(0, 1fr) 48px;
+    grid-template-columns: 38px 38px minmax(0, 1fr) 48px;
     column-gap: 8px;
+    row-gap: 8px;
+    align-items: center;
     padding: 12px 14px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
     overflow: visible;
   }
 
   #composer[data-publish-mode="vault-balance"] {
-    grid-template-columns: 38px 38px 38px minmax(0, 1fr) 48px;
+    grid-template-columns: 38px 38px minmax(0, 1fr) 48px;
+  }
+
+  /* Row 1: emoji + wide text field + send (both composers, all public modes). */
+  .composer > .emoji-button,
+  .public-composer[data-mode="comment"] > .emoji-button {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .composer > textarea,
+  #composer[data-publish-mode="vault-balance"] > textarea {
+    grid-column: 2 / 4;
+    grid-row: 1;
+  }
+  .public-composer .composer-stack,
+  .public-composer[data-mode="comment"] .composer-stack {
+    grid-column: 2 / 4;
+    grid-row: 1;
+  }
+  .composer > .send-button,
+  .public-composer > .send-button,
+  .public-composer[data-mode="comment"] > .send-button,
+  #composer[data-publish-mode="vault-balance"] > .send-button {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  /* Row 2: private = wallet-visibility + add(+); public = comments + image; then the cost/reserve hint. */
+  .composer > .private-anonymous-button {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .composer > .composer-add {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .public-composer > .composer-post-option {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .public-composer > .attachment-button,
+  .public-composer[data-mode="comment"] > .attachment-button {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .composer > .composer-cost-status,
+  .public-composer > .composer-cost-status {
+    grid-column: 3 / 5;
+    grid-row: 2;
+    align-self: center;
+  }
+
+  /* When a swipe-reply quote strip is active (private composer), it takes the top row and pushes the input +
+     buttons down one row, so the quote sits directly above the field instead of stranded below the cost line.
+     Scoped by :has() to the shown state, so there is no phantom empty top row when not replying. */
+  .composer:has(> .composer-reply-context:not([hidden])) > .composer-reply-context {
+    grid-row: 1;
+  }
+  .composer:has(> .composer-reply-context:not([hidden])) > .emoji-button,
+  .composer:has(> .composer-reply-context:not([hidden])) > textarea,
+  .composer:has(> .composer-reply-context:not([hidden])) > .send-button {
+    grid-row: 2;
+  }
+  .composer:has(> .composer-reply-context:not([hidden])) > .private-anonymous-button,
+  .composer:has(> .composer-reply-context:not([hidden])) > .composer-add,
+  .composer:has(> .composer-reply-context:not([hidden])) > .composer-cost-status {
+    grid-row: 3;
   }
 
   .composer-add,
