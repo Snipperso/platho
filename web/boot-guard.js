@@ -85,14 +85,24 @@
     var title = styled('div', { fontSize: '18px', fontWeight: '600', marginBottom: '12px' });
     title.textContent = midBoot
       ? 'Platho boot did not finish'
-      : 'Platho failed to start';
+      : 'Platho did not finish loading';
     overlay.appendChild(title);
 
-    var hint = styled('div', { marginBottom: '16px', color: '#b7c0c9' });
+    // A missing marker almost always means a file did not finish downloading (a transient
+    // network hiccup), which a reload fixes - NOT necessarily an old or in-app browser. Lead
+    // with the reload; demote the browser / in-app hints to a secondary "if it persists" note
+    // so this screen never misattributes a network failure to the user's browser.
+    var hint = styled('div', { marginBottom: midBoot ? '16px' : '8px', color: '#b7c0c9' });
     hint.textContent = midBoot
       ? 'Parts of the app may not respond. Please share a screenshot of this screen.'
-      : 'Update your browser to the latest version and open platho.app directly, not inside another app in-app browser.';
+      : 'A file did not finish downloading. Tap Reload to try again - this usually fixes it.';
     overlay.appendChild(hint);
+
+    if (!midBoot) {
+      var hint2 = styled('div', { marginBottom: '16px', color: '#7d8893', fontSize: '13px' });
+      hint2.textContent = 'Still stuck after a few tries? Check your connection, update your browser, or open platho.app directly if you opened this inside another app.';
+      overlay.appendChild(hint2);
+    }
 
     var appError = document.documentElement.getAttribute('data-platho-app-error');
     if (appError) rememberBootError('app: ' + appError);
