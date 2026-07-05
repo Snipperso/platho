@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=8';
+} from './i18n.mjs?v=9';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -186,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v672';
+const PLATHO_APP_RUNTIME_VERSION = 'v673';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -25948,6 +25948,94 @@ quickStartActionButton?.addEventListener('click', async () => {
     quickStartActionButton.disabled = false;
   }
 });
+
+// ---- Emoji picker ----------------------------------------------------------------------------------------------
+// A self-contained unicode-emoji picker (NO external font/library — CSP style-src 'self'). ONE global fixed popover
+// shared by the private + public composers (kept out of the panes so a tab switch never hides it), inserts at the
+// target textarea's caret and dispatches 'input' so the composer's cost/draft/auto-resize listeners fire. Positioned
+// via CSSOM left/bottom (per-property assignment is CSP-allowed, unlike setAttribute('style')).
+const PLATHO_EMOJI_LIST = [
+  '😀','😃','😄','😁','😆','😅','😂','🤣','🥲','😊','🙂','🙃','😉','😌','😍','🥰','😘','😋','😛','😜','🤪','😝','🤗','🤭','🤔','🤐','😶','😏','😒','🙄','😬','😔','😴','😷','🤒','🤢','🤮','🥵','🥶','😵',
+  '🤯','🥳','😎','🤓','🧐','🙁','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡',
+  '👍','👎','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','✋','👋','💪','🙏','🤲','👐','🙌','👏','🤝',
+  '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖',
+  '🔥','✨','⭐','🌟','💫','💥','💯','🎉','🎊','🎈','🎁','🌈','☀️','🌙','⚡','👑','💎','🥂','🍻','☕','🍕','🍑','👀','💀',
+];
+const emojiPicker = document.querySelector('#emojiPicker');
+const emojiPickerGrid = document.querySelector('#emojiPickerGrid');
+const privateEmojiButton = document.querySelector('#privateEmojiButton');
+const publicEmojiButton = document.querySelector('#publicEmojiButton');
+let emojiPickerTargetInput = null;
+let emojiPickerTargetButton = null;
+
+function insertEmojiAtCaret(input, emoji) {
+  if (!input) return;
+  const value = input.value ?? '';
+  const start = Number.isFinite(input.selectionStart) ? input.selectionStart : value.length;
+  const end = Number.isFinite(input.selectionEnd) ? input.selectionEnd : start;
+  input.value = `${value.slice(0, start)}${emoji}${value.slice(end)}`;
+  const caret = start + emoji.length;
+  input.focus?.();
+  input.setSelectionRange?.(caret, caret);
+  input.dispatchEvent(new Event('input', { bubbles: true })); // fire cost/draft/send-enable listeners
+  autoResizeComposerTextarea?.(input);
+}
+
+function positionEmojiPicker(button) {
+  if (!emojiPicker || !button) return;
+  const rect = button.getBoundingClientRect();
+  const width = emojiPicker.offsetWidth; // measured after the picker is shown (display:block)
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+  const bottom = Math.max(8, window.innerHeight - rect.top + 8); // sit just above the trigger (composer is at the bottom)
+  emojiPicker.style.left = `${left}px`;
+  emojiPicker.style.bottom = `${bottom}px`;
+}
+
+function closeEmojiPicker() {
+  if (!emojiPicker || emojiPicker.hidden) return;
+  emojiPicker.hidden = true;
+  emojiPickerTargetButton?.setAttribute('aria-expanded', 'false');
+  emojiPickerTargetInput = null;
+  emojiPickerTargetButton = null;
+}
+
+function openEmojiPicker(button, input) {
+  if (!emojiPicker || !button) return;
+  emojiPickerTargetInput = input;
+  emojiPickerTargetButton = button;
+  emojiPicker.hidden = false;
+  positionEmojiPicker(button);
+  button.setAttribute('aria-expanded', 'true');
+}
+
+function toggleEmojiPicker(button, input) {
+  if (!emojiPicker) return;
+  if (!emojiPicker.hidden && emojiPickerTargetButton === button) { closeEmojiPicker(); return; }
+  openEmojiPicker(button, input);
+}
+
+function setupEmojiPicker() {
+  if (!emojiPicker || !emojiPickerGrid) return;
+  for (const emoji of PLATHO_EMOJI_LIST) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'emoji-picker-item';
+    item.textContent = emoji;
+    item.setAttribute('aria-label', emoji);
+    item.addEventListener('click', () => { if (emojiPickerTargetInput) insertEmojiAtCaret(emojiPickerTargetInput, emoji); });
+    emojiPickerGrid.appendChild(item);
+  }
+  privateEmojiButton?.addEventListener('click', () => toggleEmojiPicker(privateEmojiButton, messageInput));
+  publicEmojiButton?.addEventListener('click', () => toggleEmojiPicker(publicEmojiButton, publicMessageInput));
+  document.addEventListener('click', (event) => {
+    if (emojiPicker.hidden) return;
+    if (emojiPicker.contains(event.target) || privateEmojiButton?.contains(event.target) || publicEmojiButton?.contains(event.target)) return;
+    closeEmojiPicker();
+  });
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !emojiPicker.hidden) closeEmojiPicker(); });
+  window.addEventListener('resize', () => { if (!emojiPicker.hidden && emojiPickerTargetButton) positionEmojiPicker(emojiPickerTargetButton); });
+}
+setupEmojiPicker();
 
 renderAthProfileStats();
 updatePublicSyncWindowUi();
