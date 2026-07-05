@@ -324,9 +324,12 @@ contract MarketStabilitySeller {
         throwUnless(23130, !self.pricing_frozen);
         if (self.sealed) {
             throwUnless(23131, self.phase == MARKET_STABILITY_PHASE_IDLE);
-            throwUnless(23132, self.reserve_due_ath == 0);
+            // clean-12 genesis-lock: the 60M reserve is funded + locked BEFORE the pricing freeze, so reserve_due_ath and
+            // reserve_funded_total_ath are already at the cap here — the old 23132/23134 "reserve == 0 at freeze" checks
+            // are intentionally dropped. Sales are gated on pricing_frozen (BuyMarketStabilityAth:388), so NO sale can
+            // occur before this freeze regardless; the remaining checks confirm no sale/treasury/tranche activity ran
+            // pre-freeze (always true pre-freeze, kept as belt-and-suspenders).
             throwUnless(23133, self.treasury_due_ton == 0);
-            throwUnless(23134, self.reserve_funded_total_ath == 0);
             throwUnless(23135, self.sold_ath_total == 0);
             throwUnless(23139, self.completed_tranche_count == 0 && self.current_tranche_sold_ath == 0);
         }
@@ -355,9 +358,17 @@ contract MarketStabilitySeller {
         self.sealed = true;
     }
 
+    // clean-12: MSS reserve funding stays on Lane B (custom AthTransferNotification) — an INTERNAL, reserve_funder-driven
+    // flow (custom ATHTransferRequestWithNotify), NOT DEX-facing, keeping the custom escrow's at-most-once/refund safety.
+    // Only BuybackBurn (external STON.fi router) is on Lane A.
+    //
+    // clean-12 GENESIS-LOCK: funding NO LONGER requires pricing_frozen. The 60M market-maker reserve is committed +
+    // locked at genesis (before the pool exists / the price is known), so it never sits under the owner's unilateral
+    // control. It is cap-bounded (23205 = MARKET_STABILITY_TOTAL_RESERVE_ATH) + reserve_funder-gated (23203), and the
+    // ONLY exit is BuyMarketStabilityAth (itself gated on pricing_frozen, :388) — there is NO owner-withdrawal path, so
+    // once funded the reserve can only ever be sold via the rising-price tranche mechanism, never dumped.
     receive(msg: AthTransferNotification) {
         self.requireSealed();
-        throwUnless(23200, self.pricing_frozen);
         throwUnless(23201, sender() == self.official_ath_wallet_address);
         throwUnless(23202, msg.amount > 0);
         throwUnless(23203, msg.sender_wallet == self.reserve_funder_address);

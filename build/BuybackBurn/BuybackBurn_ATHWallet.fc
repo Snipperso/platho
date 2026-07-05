@@ -134,6 +134,12 @@ cell $JettonInternalTransfer$_store_cell((int, int, slice, slice, int, slice) v,
 ;; $JettonInternalTransfer$_load_bounced
 (slice, ((int, int))) $JettonInternalTransfer$_load_bounced(slice sc_0) inline;
 
+;; $JettonTransferNotification$_store
+builder $JettonTransferNotification$_store(builder build_0, (int, int, slice, slice) v) inline;
+
+;; $JettonTransferNotification$_store_cell
+cell $JettonTransferNotification$_store_cell((int, int, slice, slice) v, builder b) inline;
+
 ;; $JettonExcesses$_store
 builder $JettonExcesses$_store(builder build_0, (int) v) inline;
 
@@ -176,11 +182,14 @@ builder $ATHWallet$_store(builder build_0, (int, slice, slice, cell, cell, cell)
 ;; $ATHWallet$_load
 (slice, ((int, slice, slice, cell, cell, cell))) $ATHWallet$_load(slice sc_0) inline;
 
+;; $StateInit$_get_code
+_ $StateInit$_get_code((cell, cell) v) inline;
+
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $ATHWalletDataView$_to_external
-(int, slice, slice) $ATHWalletDataView$_to_external(((int, slice, slice)) v) inline;
+(int, slice, slice, cell) $ATHWalletDataView$_to_external(((int, slice, slice, cell)) v) inline;
 
 ;; $PendingAthTransferNotificationView$_to_external
 (int, slice, slice, int, int) $PendingAthTransferNotificationView$_to_external(((int, slice, slice, int, int)) v) inline;
@@ -284,11 +293,11 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ;; $ATHWallet$_fun_refund_bounced_notification
 ((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_refund_bounced_notification((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref;
 
-;; $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address
-((int, slice, slice)) $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address(int $balance, slice $owner_address, slice $ath_master_address) inline;
+;; $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address_jetton_wallet_code
+((int, slice, slice, cell)) $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address_jetton_wallet_code(int $balance, slice $owner_address, slice $ath_master_address, cell $jetton_wallet_code) inline;
 
 ;; $ATHWallet$_fun_get_wallet_data
-((int, slice, slice, cell, cell, cell), (int, slice, slice)) $ATHWallet$_fun_get_wallet_data((int, slice, slice, cell, cell, cell) $self) impure inline_ref;
+((int, slice, slice, cell, cell, cell), (int, slice, slice, cell)) $ATHWallet$_fun_get_wallet_data((int, slice, slice, cell, cell, cell) $self) impure inline_ref;
 
 ;; $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at
 ((int, slice, slice, int, int)) $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at(int $exists, slice $sender_owner, slice $response_destination, int $amount, int $created_at) inline;
@@ -317,14 +326,17 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ;; $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload
 ((int, int, slice, slice, int, slice)) $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload(int $query_id, int $amount, slice $from, slice $response_address, int $forward_ton_amount, slice $forward_payload) inline;
 
+;; $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload
+((int, int, slice, slice)) $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload(int $query_id, int $amount, slice $sender, slice $forward_payload) inline;
+
+;; $JettonExcesses$_constructor_query_id
+((int)) $JettonExcesses$_constructor_query_id(int $query_id) inline;
+
 ;; $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at
 ((slice, slice, int, int, int)) $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at(slice $sender_owner, slice $response_destination, int $response_ack_value, int $amount, int $created_at) inline;
 
 ;; $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet
 ((int, int, int, slice)) $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet(int $query_id, int $sender_key, int $amount, slice $sender_wallet) inline;
-
-;; $JettonExcesses$_constructor_query_id
-((int)) $JettonExcesses$_constructor_query_id(int $query_id) inline;
 
 ;; $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username
 ((int, int, int, slice, slice, int, slice)) $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username(int $query_id, int $sender_key, int $amount, slice $payer_wallet, slice $owner_wallet, int $username_len, slice $username) inline;
@@ -575,6 +587,16 @@ int $Cell$_fun_hash(cell $self) impure asm """
 slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
 
 ;; BuybackBurn_ATHWallet.storage.fc
+;;
+;; Type: StateInit
+;; TLB: _ code:^cell data:^cell = StateInit
+;;
+
+_ $StateInit$_get_code((cell, cell) v) inline {
+    var (v'code, v'data) = v;
+    return v'code;
+}
+
 ;;
 ;; Type: Context
 ;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
@@ -999,6 +1021,30 @@ cell $JettonInternalTransfer$_store_cell((int, int, slice, slice, int, slice) v,
 }
 
 ;;
+;; Type: JettonTransferNotification
+;; Header: 0x7362d09c
+;; TLB: jetton_transfer_notification#7362d09c query_id:uint64 amount:coins sender:address forward_payload:remainder<slice> = JettonTransferNotification
+;;
+
+builder $JettonTransferNotification$_store(builder build_0, (int, int, slice, slice) v) inline {
+    var (v'query_id, v'amount, v'sender, v'forward_payload) = v;
+    build_0 = store_uint(build_0, 1935855772, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_varuint16(v'amount);
+    build_0 = build_0.store_slice(v'sender);
+    build_0 = build_0.store_slice(v'forward_payload);
+    return build_0;
+}
+
+cell $JettonTransferNotification$_store_cell((int, int, slice, slice) v, builder b) inline {
+    return $JettonTransferNotification$_store(b, v).end_cell();
+}
+
+((int, int, slice, slice)) $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload(int $query_id, int $amount, slice $sender, slice $forward_payload) inline {
+    return ($query_id, $amount, $sender, $forward_payload);
+}
+
+;;
 ;; Type: JettonExcesses
 ;; Header: 0xd53276db
 ;; TLB: jetton_excesses#d53276db query_id:uint64 = JettonExcesses
@@ -1021,16 +1067,16 @@ cell $JettonExcesses$_store_cell((int) v, builder b) inline {
 
 ;;
 ;; Type: ATHWalletDataView
-;; TLB: _ balance:int257 owner_address:address ath_master_address:address = ATHWalletDataView
+;; TLB: _ balance:int257 owner_address:address ath_master_address:address jetton_wallet_code:^cell = ATHWalletDataView
 ;;
 
-(int, slice, slice) $ATHWalletDataView$_to_external(((int, slice, slice)) v) inline {
-    var (v'balance, v'owner_address, v'ath_master_address) = v; 
-    return (v'balance, v'owner_address, v'ath_master_address);
+(int, slice, slice, cell) $ATHWalletDataView$_to_external(((int, slice, slice, cell)) v) inline {
+    var (v'balance, v'owner_address, v'ath_master_address, v'jetton_wallet_code) = v; 
+    return (v'balance, v'owner_address, v'ath_master_address, v'jetton_wallet_code);
 }
 
-((int, slice, slice)) $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address(int $balance, slice $owner_address, slice $ath_master_address) inline {
-    return ($balance, $owner_address, $ath_master_address);
+((int, slice, slice, cell)) $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address_jetton_wallet_code(int $balance, slice $owner_address, slice $ath_master_address, cell $jetton_wallet_code) inline {
+    return ($balance, $owner_address, $ath_master_address, $jetton_wallet_code);
 }
 
 ;;
@@ -1378,9 +1424,9 @@ builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
     return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
 }
 
-((int, slice, slice, cell, cell, cell), (int, slice, slice)) $ATHWallet$_fun_get_wallet_data((int, slice, slice, cell, cell, cell) $self) impure inline_ref {
+((int, slice, slice, cell, cell, cell), (int, slice, slice, cell)) $ATHWallet$_fun_get_wallet_data((int, slice, slice, cell, cell, cell) $self) impure inline_ref {
     var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
-    var $fresh$ret_8 = $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address($self'balance, $self'owner_address, $self'ath_master_address);
+    var $fresh$ret_8 = $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address_jetton_wallet_code($self'balance, $self'owner_address, $self'ath_master_address, $StateInit$_get_code($ATHWallet$_init_child(0, $self'owner_address, $self'ath_master_address)));
     return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_8);
 }
 
@@ -1738,14 +1784,9 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14712, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'from));
         if (($msg'forward_ton_amount > 0)) {
             throw_unless(14713, ($msg'forward_ton_amount >= 30000000));
-            throw_unless(14714, ($Context$_get_value(__tact_context_get()) >= (((($msg'forward_ton_amount + 1000000) + 1000000) + 7000000) + 20000000)));
-            int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'from);
-            int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
-            throw_unless(14715, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
-            throw_unless(14716, (~ __tact_dict_exists_int($self'processed_notifications, 257, $pending_key)));
+            throw_unless(14714, ($Context$_get_value(__tact_context_get()) >= (($msg'forward_ton_amount + 1000000) + 7000000)));
             $self'balance = $self'balance + $msg'amount;
-            $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'from, $msg'response_address, 1000000, $msg'amount, $global_now()), begin_cell()));
-            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'forward_ton_amount, 1, true, $AthTransferNotification$_store_cell($AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet($msg'query_id, $sender_key, $msg'amount, $msg'from), begin_cell())));
+            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'forward_ton_amount, 1, false, $JettonTransferNotification$_store_cell($JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload($msg'query_id, $msg'amount, $msg'from, $msg'forward_payload), begin_cell())));
         } else {
             throw_unless(14717, ($Context$_get_value(__tact_context_get()) >= 23000000));
             $self'balance = $self'balance + $msg'amount;

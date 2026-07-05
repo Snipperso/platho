@@ -1326,6 +1326,10 @@ contract Vault {
         self.users.set(sender(), user);
     }
 
+    // clean-12: Vault deposits stay on Lane B (custom AthTransferNotification). This is an INTERNAL, app-controlled
+    // top-up flow (client -> ATHTransferRequestWithNotify -> ATHInternalTransferWithNotify -> AthTransferNotification),
+    // NOT a DEX-facing flow, so it keeps the custom escrow/refund safety unchanged. Only BuybackBurn (which receives
+    // from the real external STON.fi router) is on Lane A.
     receive(msg: AthTransferNotification) {
         self.requireSealed();
         throwUnless(16013, sender() == self.vault_ath_wallet_address);

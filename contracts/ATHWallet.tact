@@ -247,10 +247,14 @@ message(0xD53276DB) JettonExcesses {
     query_id: Int as uint64;
 }
 
+// TEP-74 standard get_wallet_data shape: positional 4-tuple {int balance, slice owner, slice jetton_master,
+// cell jetton_wallet_code}. The 4th field (jetton_wallet_code) is what indexers (tonapi) + wallets (Tonkeeper)
+// require to classify this as a jetton wallet and read the balance — clean-11 omitted it (3-tuple) → invisible.
 struct ATHWalletDataView {
     balance: Int;
     owner_address: Address;
     ath_master_address: Address;
+    jetton_wallet_code: Cell;
 }
 
 struct PendingAthTransferNotificationView {
@@ -762,31 +766,24 @@ contract ATHWallet {
 
         if (msg.forward_ton_amount > 0) {
             throwUnless(14713, msg.forward_ton_amount >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-            throwUnless(14714, context().value >= msg.forward_ton_amount + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
-            let sender_key: Int = self.compute_sender_key(msg.query_id, msg.from);
-            let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
-            throwUnless(14715, !self.pending_notifications.exists(pending_key));
-            throwUnless(14716, !self.processed_notifications.exists(pending_key));
+            // clean-12 Lane A (standard TEP-74): fire-and-forget standard JettonTransferNotification, NO custom
+            // escrow/tombstone. Replay-safety now lives in each consumer's OWN idempotency map (Vault
+            // processed_ath_deposits, BuybackBurn phase+query_id, MSS supply-cap). The forward_payload passes
+            // through VERBATIM (Slice as remaining) so DEX routers' swap/LP ops inside it are bit-preserved.
+            // Guard = forwarded notify value + the source-ack (still sent below) + exec reserve.
+            throwUnless(14714, context().value >= msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE);
 
             self.balance += msg.amount;
-            self.pending_notifications.set(pending_key, PendingAthTransferNotification {
-                sender_owner: msg.from,
-                response_destination: msg.response_address,
-                response_ack_value: ATH_TRANSFER_NOTIFY_ACK_VALUE,
-                amount: msg.amount,
-                created_at: now()
-            });
-
             message(MessageParameters {
                 to: self.owner_address,
                 value: msg.forward_ton_amount,
                 mode: SendPayFwdFeesSeparately,
-                bounce: true,
-                body: AthTransferNotification {
+                bounce: false,
+                body: JettonTransferNotification {
                     query_id: msg.query_id,
-                    sender_key: sender_key,
                     amount: msg.amount,
-                    sender_wallet: msg.from
+                    sender: msg.from,
+                    forward_payload: msg.forward_payload
                 }.toCell()
             });
         } else {
@@ -1064,7 +1061,8 @@ contract ATHWallet {
         return ATHWalletDataView {
             balance: self.balance,
             owner_address: self.owner_address,
-            ath_master_address: self.ath_master_address
+            ath_master_address: self.ath_master_address,
+            jetton_wallet_code: (initOf ATHWallet(0, self.owner_address, self.ath_master_address)).code
         };
     }
 

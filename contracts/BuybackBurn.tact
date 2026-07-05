@@ -453,31 +453,24 @@ contract BuybackBurn {
         });
     }
 
-    receive(msg: AthTransferNotification) {
+    // clean-12 Lane A: STON.fi's router pays out the swapped ATH via a STANDARD jetton transfer, so our
+    // official_ath_wallet forwards the standard 0x7362D09C JettonTransferNotification (not the custom AthTransferNotification).
+    // No ack is sent back — the wallet no longer escrows a pending entry on the standard path. Replay-safety here is
+    // the phase gate (PENDING_STONFI_SWAP) + query_id match: a duplicate notification after the phase advances is rejected
+    // by throwUnless(22301). msg.sender carries the from-owner (= the STON.fi ATH source owner), replacing sender_wallet.
+    receive(msg: JettonTransferNotification) {
         self.requireSealed();
         throwUnless(22300, sender() == self.official_ath_wallet_address);
         throwUnless(22301, self.phase == BUYBACK_PHASE_PENDING_STONFI_SWAP);
         throwUnless(22302, msg.query_id == self.pending_query_id);
         throwUnless(22303, msg.amount >= self.pending_dex_min_out_atomic_ath);
-        throwUnless(22304, msg.sender_wallet == self.stonfi_ath_source_owner_address);
+        throwUnless(22304, msg.sender == self.stonfi_ath_source_owner_address);
         throwUnless(22305, context().value >= BUYBACK_ATH_NOTIFY_ACK_VALUE);
 
         if (context().value < BUYBACK_ROUTE_NOTIFY_MIN_VALUE) {
-            message(MessageParameters {
-                to: sender(),
-                value: BUYBACK_ATH_NOTIFY_ACK_VALUE,
-                bounce: false,
-                mode: SendDefaultMode,
-                body: AthTransferNotificationAck {
-                    query_id: msg.query_id,
-                    sender_key: msg.sender_key,
-                    amount: msg.amount
-                }.toCell()
-            });
-
             self.creditRouteNotifySurplus(
                 context().value,
-                BUYBACK_ATH_NOTIFY_ACK_VALUE + BUYBACK_ROUTE_REFUND_EXEC_RESERVE
+                BUYBACK_ROUTE_REFUND_EXEC_RESERVE
             );
             self.ath_burn_retry_due_atomic += msg.amount;
             self.finishPendingCycle();
@@ -487,18 +480,6 @@ contract BuybackBurn {
         self.phase = BUYBACK_PHASE_PENDING_ATH_BURN;
         self.pending_received_ath_atomic = msg.amount;
         self.creditRouteNotifySurplus(context().value, BUYBACK_ROUTE_NOTIFY_MIN_VALUE);
-
-        message(MessageParameters {
-            to: sender(),
-            value: BUYBACK_ATH_NOTIFY_ACK_VALUE,
-            bounce: false,
-            mode: SendDefaultMode,
-            body: AthTransferNotificationAck {
-                query_id: msg.query_id,
-                sender_key: msg.sender_key,
-                amount: msg.amount
-            }.toCell()
-        });
 
         self.sendAthBurn(msg.query_id, msg.amount);
     }

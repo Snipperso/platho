@@ -22,6 +22,8 @@ import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import {
   ATHTransferRequestWithNotify,
   ATHWallet,
+  JettonTransfer,
+  JettonTransferNotification,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -326,15 +328,19 @@ async function sendStonfiAthNotify(
     500_000n,
   );
 
-  await sourceWallet.send(sender, { value: toNano('0.3') }, {
-    $$type: 'ATHTransferRequestWithNotify',
+  // clean-12: STON.fi's router pays out via a STANDARD TEP-74 jetton transfer, so simulate the swap-out with a
+  // JettonTransfer to the source ATH wallet (destination = BuybackBurn). Its wallet then emits the standard
+  // 0x7362D09C JettonTransferNotification that BuybackBurn (Lane A) consumes — NOT the old custom Lane B path.
+  await sourceWallet.send(sender, { value: toNano('0.5') }, {
+    $$type: 'JettonTransfer',
     query_id: queryId,
     amount,
-    recipient: env.buyback.address,
+    destination: env.buyback.address,
     response_destination: owner,
-    notify_destination: env.buyback.address,
-    notify_value: notifyValue,
-  } as ATHTransferRequestWithNotify);
+    custom_payload: null,
+    forward_ton_amount: notifyValue,
+    forward_payload: beginCell().endCell().asSlice(),
+  } as JettonTransfer);
 }
 
 describe('BuybackBurn auth and negative matrix', () => {
@@ -507,13 +513,14 @@ describe('BuybackBurn auth and negative matrix', () => {
     await acceptReserve(env);
     await executeBuyback(env, 1n);
 
+    // forged standard notification straight from the attacker (not from BuybackBurn's official ATH wallet) -> 22300
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, {
-      $$type: 'AthTransferNotification',
+      $$type: 'JettonTransferNotification',
       query_id: 1n,
       amount: 100_000n,
-      sender_key: 0n,
-      sender_wallet: env.stonfiAthSourceOwner.address,
-    } as AthTransferNotification);
+      sender: env.stonfiAthSourceOwner.address,
+      forward_payload: beginCell().endCell().asSlice(),
+    } as JettonTransferNotification);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
     await sendStonfiAthNotify(env, env.stonfiAthSourceOwner.address, env.stonfiAthSourceOwner.getSender(), 94_999n, 1n);

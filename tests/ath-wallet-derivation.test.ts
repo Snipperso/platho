@@ -31,6 +31,39 @@ describe('ATH wallet derivation profile', () => {
     expect(wrapperWalletInit.code.hash().toString('hex')).toBe(artifactWalletCode.hash().toString('hex'));
   });
 
+  it('TEP-74: get_wallet_data returns the standard 4-tuple {balance, owner, jetton_master, jetton_wallet_code} — the clean-12 indexer/Tonkeeper-visibility fix', async () => {
+    const treasuryOwner = fixtureAddress('TREASURY_OWNER');
+    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterAddress = contractAddress(0, masterInit);
+    const owner = fixtureAddress('RANDOM_USER_WALLET');
+    const walletInit = await ATHWallet.init(1234n, owner, masterAddress);
+    const walletAddress = contractAddress(0, walletInit);
+
+    const blockchain = await Blockchain.create();
+    await blockchain.setShardAccount(
+      walletAddress,
+      createShardAccount({
+        address: walletAddress,
+        code: walletInit.code,
+        data: walletInit.data,
+        balance: toNano('1'),
+        workchain: 0,
+      }),
+    );
+    const wallet = blockchain.openContract(new ATHWallet(walletAddress, walletInit));
+    const data = await wallet.getGetWalletData();
+
+    // Positional fields 1-3 (int balance, slice owner, slice jetton_master) — unchanged from clean-11.
+    expect(data.balance).toBe(1234n);
+    expect(data.owner_address.toString()).toBe(owner.toString());
+    expect(data.ath_master_address.toString()).toBe(masterAddress.toString());
+    // Positional field 4 (cell jetton_wallet_code) — the NEW clean-12 field. Indexers (tonapi) + wallets (Tonkeeper)
+    // require exactly this 4-tuple to classify the contract as a jetton wallet and read the balance; clean-11 omitted
+    // it (3-tuple) → holders:0, invisible. It must be the wallet's OWN code cell for the master round-trip to resolve.
+    expect(data.jetton_wallet_code).toBeDefined();
+    expect(data.jetton_wallet_code.hash().toString('hex')).toBe(walletInit.code.hash().toString('hex'));
+  });
+
   it('ATH Master get_wallet_address(owner) equals local StateInit derivation', async () => {
     const treasuryOwner = fixtureAddress('TREASURY_OWNER');
     const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());

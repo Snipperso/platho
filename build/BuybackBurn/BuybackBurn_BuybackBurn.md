@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: BuybackBurn
-BoC Size: 16508 bytes
+BoC Size: 16356 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 56
@@ -150,8 +150,8 @@ TL-B: `jetton_excesses#d53276db query_id:uint64 = JettonExcesses`
 Signature: `JettonExcesses{query_id:uint64}`
 
 ### ATHWalletDataView
-TL-B: `_ balance:int257 owner_address:address ath_master_address:address = ATHWalletDataView`
-Signature: `ATHWalletDataView{balance:int257,owner_address:address,ath_master_address:address}`
+TL-B: `_ balance:int257 owner_address:address ath_master_address:address jetton_wallet_code:^cell = ATHWalletDataView`
+Signature: `ATHWalletDataView{balance:int257,owner_address:address,ath_master_address:address,jetton_wallet_code:^cell}`
 
 ### PendingAthTransferNotificationView
 TL-B: `_ exists:bool sender_owner:address response_destination:address amount:int257 created_at:int257 = PendingAthTransferNotificationView`

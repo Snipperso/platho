@@ -258,7 +258,7 @@ describe('MarketStabilitySeller', () => {
     expect(pending.exists).toBe(false);
   });
 
-  it('MSTAB-01B: can seal before pool pricing, then freeze pricing once before reserve funding', async () => {
+  it('MSTAB-01B genesis-lock: reserve funds + locks BEFORE pricing freeze, and freeze succeeds over the locked reserve', async () => {
     const env = await setup();
     await bindCore(env);
     await sealOnly(env);
@@ -269,18 +269,20 @@ describe('MarketStabilitySeller', () => {
     expect(config.pricing_frozen).toBe(false);
     expect(config.genesis_config_hash).not.toBe(0n);
 
+    // clean-12 GENESIS-LOCK: funding BEFORE the pricing freeze is now ACCEPTED. The market-maker reserve is committed +
+    // locked at genesis (before the pool/price exists), so it never sits under the owner's unilateral control.
     await fundReserve(env, TRANCHE);
-    expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(0n);
-    expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderInitialAth);
-    expect((await (await officialSellerAthWallet(env)).getGetWalletData()).balance).toBe(0n);
-    expect((await (await officialSellerAthWallet(env)).getGetPendingNotification(1n, senderKey(env.reserveFunder.address, 1n))).exists).toBe(false);
+    expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TRANCHE);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).reserve_funded_total_ath).toBe(TRANCHE);
+    // the ATH actually moved into the Seller's official wallet (custody committed) and out of the funder
+    expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderInitialAth - TRANCHE);
+    expect((await (await officialSellerAthWallet(env)).getGetWalletData()).balance).toBe(TRANCHE);
 
+    // freeze now succeeds even though the reserve is already funded (relaxed 23132/23134); reserve stays locked.
     await freezePricing(env);
     config = await env.seller.getGetMarketStabilitySellerConfig();
     expect(config.pricing_frozen).toBe(true);
     expect(config.genesis_config_hash).toBe(0n);
-
-    await fundReserve(env, TRANCHE, 2n);
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TRANCHE);
   });
 
