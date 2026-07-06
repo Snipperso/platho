@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v756';
+const CACHE_NAME = 'platho-pwa-prototype-v757';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=228',
-  './app.js?v=685',
+  './styles.css?v=229',
+  './app.js?v=686',
   './i18n.mjs?v=12',
   './i18n-strings.mjs?v=12',
   './boot-signal-field.mjs?v=1',

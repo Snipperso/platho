@@ -337,7 +337,7 @@ button:disabled,
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 14px;
-  padding: 24px;
+  padding: 11px 24px 24px;
   border-right: 1px solid var(--line-soft);
   background: rgba(17, 20, 23, 0.96);
 }
@@ -1833,7 +1833,10 @@ html[data-platho-telegram="true"] .install-header-button {
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 14px;
   overflow: hidden;
-  padding: 24px;
+  /* Top 11px (not 24): compresses the header so the title CENTRE (25.3px) and the top-right buttons (36px) land
+     at the EXACT same y as the compressed conversation/comment headers — no 1px jump when switching tabs. 11 vs
+     the conversation's 12px compensates for the taller Platho.app h1 pushing the centre down ~1px. */
+  padding: 11px 24px 24px;
 }
 
 .public-pane {
@@ -1847,7 +1850,7 @@ html[data-platho-telegram="true"] .install-header-button {
    (.public-pane is position:relative) and vertically centred on the header line (~49px from the pane top). */
 .public-pane .public-header-actions {
   position: absolute;
-  top: 49px;
+  top: 36px;
   right: 24px;
   transform: translateY(-50%);
   z-index: 3;
@@ -3967,7 +3970,7 @@ button.feed-item:hover {
   .vault-pane,
   .profile-pane,
   .list-pane {
-    padding: 24px;
+    padding: 11px 24px 24px;
   }
 
   .list-pane {
