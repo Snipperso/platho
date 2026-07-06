@@ -18,6 +18,12 @@ const KIND_PRIVATE_BYTE = 1n;
 const KIND_PUBLIC_BYTE = 2n;
 
 const CAPSULEHUB_MESSAGE_BODY_BUCKET_SECONDS = 3600;
+// F11: half-width (seconds) of a TIGHT message-history window centered on an entry's on-chain created_at, tried
+// BEFORE the wide 1-hour bucket window. At high network write volume a 1-hour window to CapsuleHub (which receives
+// EVERY publish, single global Vault) can exceed the ~8000-record page budget, pushing an older body past the last
+// scanned page; a ±5-min window holds far fewer records so the body stays reachable. The wide bucket remains the
+// fallback (robust to any created_at/message-utime skew). ~5 min >> block-time skew between the publish tx and now().
+const CAPSULEHUB_MESSAGE_BODY_NARROW_HALF_WIDTH_SECONDS = 300;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT = 1000;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_MAX_PAGES = 8;
 // toncenter /getTransactions (v2) rejects limit > 100 with an HTTP-200 {ok:false,code:422} body. Sending
@@ -600,13 +606,22 @@ function messageBucketParams(kind, entry, address, callOptions = {}, providerOpt
   }
   const createdAt = Number(BigInt(entry?.created_at ?? 0n));
   if (Number.isFinite(createdAt) && createdAt > 0) {
-    const bucketSeconds = Number(callOptions.messageBucketSeconds ?? providerOptions.messageBucketSeconds ?? CAPSULEHUB_MESSAGE_BODY_BUCKET_SECONDS);
-    const bucket = Number.isFinite(bucketSeconds) && bucketSeconds > 0
-      ? Math.floor(createdAt / bucketSeconds) * bucketSeconds
-      : createdAt;
-    params.start_utime = Math.max(0, bucket - 60);
-    params.end_utime = bucket + Math.max(1, bucketSeconds) + 120;
-    params.sort = 'asc';
+    if (Number.isFinite(options.centeredHalfWidthSeconds) && options.centeredHalfWidthSeconds > 0) {
+      // F11 narrow attempt: a tight window CENTERED on created_at (~= the publishing message's utime), so it holds
+      // far fewer than the ~8000-record page budget even at high write volume and an old body stays reachable.
+      const half = options.centeredHalfWidthSeconds;
+      params.start_utime = Math.max(0, createdAt - half);
+      params.end_utime = createdAt + half;
+      params.sort = 'asc';
+    } else {
+      const bucketSeconds = Number(callOptions.messageBucketSeconds ?? providerOptions.messageBucketSeconds ?? CAPSULEHUB_MESSAGE_BODY_BUCKET_SECONDS);
+      const bucket = Number.isFinite(bucketSeconds) && bucketSeconds > 0
+        ? Math.floor(createdAt / bucketSeconds) * bucketSeconds
+        : createdAt;
+      params.start_utime = Math.max(0, bucket - 60);
+      params.end_utime = bucket + Math.max(1, bucketSeconds) + 120;
+      params.sort = 'asc';
+    }
   }
   return params;
 }
@@ -644,8 +659,22 @@ function messageLookupParamAttempts(kind, entry, address, callOptions = {}, prov
       if (unbucketed.body_hash) attempts.push(withoutBodyHash(unbucketed));
     }
   };
-  // Legacy single-publish attempts FIRST: they keep the historical/test behaviour (exact body_hash hint, then
-  // broad, bucketed then unbucketed) and resolve any pre-redeploy single-publish body on the first hit.
+  // F11: NARROW time-window attempts FIRST — a tight window centered on created_at holds far fewer than the
+  // ~8000-record page budget even at high network write volume, so an old body stays reachable that the wide
+  // 1-hour bucket window (below) could push past the last scanned page. No unbucketed variant here (dropping the
+  // window IS the wide scan); the wide bucketed + unbucketed attempts remain the robustness fallback.
+  const narrowHalf = Number(callOptions.messageNarrowHalfWidthSeconds ?? providerOptions.messageNarrowHalfWidthSeconds ?? CAPSULEHUB_MESSAGE_BODY_NARROW_HALF_WIDTH_SECONDS);
+  const hasCreatedAt = entry?.created_at !== undefined && entry?.created_at !== null && BigInt(entry.created_at) !== 0n;
+  if (hasCreatedAt && Number.isFinite(narrowHalf) && narrowHalf > 0) {
+    const pushNarrow = (primary) => {
+      attempts.push(primary);
+      if (primary.body_hash) attempts.push(withoutBodyHash(primary));
+    };
+    pushNarrow(messageBucketParams(kind, entry, address, callOptions, providerOptions, { includeBodyHash: true, centeredHalfWidthSeconds: narrowHalf }));
+    pushNarrow(messageBucketParams(kind, entry, address, callOptions, providerOptions, { op: CAPSULEHUB_OPS.PublishBatchToHub, includeBodyHash: false, centeredHalfWidthSeconds: narrowHalf }));
+  }
+  // Legacy single-publish attempts: they keep the historical/test behaviour (exact body_hash hint, then broad,
+  // bucketed then unbucketed) and resolve any pre-redeploy single-publish body on the first hit.
   pushBucketed(messageBucketParams(kind, entry, address, callOptions, providerOptions, { includeBodyHash: true }));
   // VPB2 batch attempts AFTER: the live redeploy forwards bodies under PublishBatchToHub (0xA4F862D1) only, where
   // ONE message carries N part bodies, so we query the batch op WITHOUT the per-part body_hash filter (it can't

@@ -156,7 +156,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=54';
+} from './capsulehub-ton-rpc-provider.mjs?v=55';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=40';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=36';
 import {
@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=12';
+} from './i18n.mjs?v=13';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -715,6 +715,14 @@ const publicAuthorIndexHeads = new Map();
 // was a chronic false positive (entry_count counts the profile-pointer + comment entries the feed drops).
 const publicAuthorIndexTruncated = new Map();
 const publicParentIndexHeads = new Map();
+// F1 round-robin state (in-memory, reset on account switch): the rotating cursor into the sorted feed-channel list,
+// the set of author-index keys already READ since the current round began, and the global public head that was
+// current at ROUND START. The commit-gate advances lastSyncedPublicLatestId only to publicAuthorRoundStartHead and
+// only once every readable channel is in publicAuthorRoundCovered -- so a channel skipped by the per-cycle budget
+// can never let the global fast-path advance past that channel's not-yet-re-read new posts (strand-safe).
+let publicAuthorRoundCursor = 0;
+const publicAuthorRoundCovered = new Set();
+let publicAuthorRoundStartHead = null;
 // Wallet (raw) -> resolved profile-avatar data URL for Public wallet channels, so a channel shows the
 // author's avatar even before/without any cached public post. `null` is a cached "no avatar" miss.
 const publicChannelAvatarUrlByWallet = new Map();
@@ -747,6 +755,10 @@ let identityPopover = null;
 let identityPopoverAnchor = null;
 let activeActionDialog = null;
 let publicChannelSearchQuery = '';
+// F2: how many of the newest feed items are currently rendered. Grows by PUBLIC_FEED_RENDER_PAGE on "show older";
+// reset to the cap on a search change / account switch. Persists across background sync re-renders so the user's
+// "show older" expansion is not collapsed under them.
+let publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
 let publicCommentTarget = null;
 // Public post detail screen (per-post comments, opened from the "Comments" action). The composer is shared with
 // the feed; while the detail is open it is in comment mode (publicCommentTarget = the open post).
@@ -1066,6 +1078,18 @@ const PUBLIC_CHAIN_LONG_READ_LIMIT = 4096;
 // the per-author walk may read past its window cap to close a multipart post split by the boundary. Cheap: these
 // are header-only entry reads (no bodies); the 8-part compose cap bounds real groups far below this.
 const PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;
+// F1 (scale): max author-index reads a single public-feed sync cycle may issue. A heavy subscriber otherwise fired
+// one getPublicAuthorIndex per followed channel EVERY 30s cycle through the shared serial toncenter pump (O(subs) ~
+// 125ms each), overrunning the cycle past ~240 subs and starving send/receive. The reads are now round-robined at
+// this budget/cycle; a full sweep of N channels takes ceil(N/budget) cycles. Users with <= budget subscriptions are
+// unaffected (every channel is still read every cycle). 24*125ms = ~3s of pump/cycle leaves room for send/receive.
+const PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE = 24;
+// F2 (render scale): the public feed is chat-style (newest at the BOTTOM). Render only the NEWEST this-many items;
+// older ones sit behind a "show older" button at the TOP that reveals another page. Bounds the live DOM node count
+// (and the per-render cost) regardless of how many posts the subscribed set has accumulated (short mode caches up to
+// 128/channel, long mode 4096/channel -> tens of thousands across many channels).
+const PUBLIC_FEED_RENDER_CAP = 150;
+const PUBLIC_FEED_RENDER_PAGE = 150;
 const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
 const PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT = 48;
 const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
@@ -2653,6 +2677,10 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   publicAuthorIndexHeads.clear();
   publicAuthorIndexTruncated.clear();
   publicParentIndexHeads.clear();
+  publicAuthorRoundCursor = 0;
+  publicAuthorRoundCovered.clear();
+  publicAuthorRoundStartHead = null;
+  publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
   lastSyncedPublicLatestId = null;
   lastSyncedPublicSyncWindow = null;
   activeRuntimeWalletAddress = null;
@@ -5591,75 +5619,165 @@ function appendPublicItemActions(article, item) {
 function renderPublicFeed(items, options = {}) {
   if (!publicFeed) return;
   publicFeed.dataset.publicMode = 'feed';
-  publicFeed.replaceChildren();
-  // The discovery CTA sits at the very top for a newcomer (no channels followed) — shown ABOVE the posts, and also
-  // above the empty-state so a newcomer with a truly empty feed still gets a way in.
-  if (shouldShowDiscoveryCta()) publicFeed.append(buildDiscoveryCtaCard());
-  if ((items ?? []).length === 0) {
+  const allItems = items ?? [];
+  if (allItems.length === 0) {
+    publicFeed.replaceChildren();
+    // The discovery CTA sits at the very top for a newcomer (no channels followed) — shown ABOVE the posts, and also
+    // above the empty-state so a newcomer with a truly empty feed still gets a way in.
+    if (shouldShowDiscoveryCta()) publicFeed.append(buildDiscoveryCtaCard());
     renderPublicEmpty(publicChannelSearchQuery ? t('public.noPostsFound') : t('public.noPosts'), publicChannelSearchQuery ? t('public.tryAnotherSearch') : t('public.followOrPublishFirst'));
     requestAnimationFrame(updatePublicJumpDownVisibility);
     return;
   }
-  for (const item of items ?? []) {
-    const unread = isUnreadPublicItem(item);
-    const article = document.createElement('article');
-    article.className = `feed-item${item.compact ? ' compact' : ''}${unread ? ' is-unread' : ''}`;
-    if (unread) article.dataset.unread = 'true';
-    if (item.entryId !== undefined && item.entryId !== null) article.dataset.entryId = String(item.entryId);
-    if (item.channelId) article.dataset.channelId = item.channelId;
-    const authorRow = document.createElement('div');
-    authorRow.className = 'feed-author-row';
-    const authorAvatar = document.createElement('div');
-    authorAvatar.className = 'avatar feed-avatar';
-    authorAvatar.setAttribute('aria-hidden', 'true');
-    setAvatarNode(authorAvatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
-    const meta = document.createElement('div');
-    meta.className = 'feed-meta';
-    for (const label of [...(item.meta ?? []), unread ? t('public.unread') : null].filter(Boolean)) {
-      const span = document.createElement('span');
-      span.textContent = label;
-      meta.append(span);
+  // F2 cap (chat-style feed: newest at the BOTTOM): render only the newest publicFeedShownCap items; the rest sit
+  // behind a "show older" button at the TOP. When anchoring to an unread that is older than the cap, grow the cap so
+  // the anchor target is actually rendered (else scrollPublicToOldestUnread would find nothing).
+  if (options.anchorUnread) {
+    for (let i = 0; i < allItems.length; i += 1) {
+      if (isUnreadPublicItem(allItems[i])) { publicFeedShownCap = Math.max(publicFeedShownCap, allItems.length - i); break; }
     }
-    authorRow.append(authorAvatar, meta);
-    // Own pending publishes carry a status badge ('public publish submitted…' / 'public publish failed') —
-    // CSS classes only (prod CSP style-src 'self' silently kills inline styles).
-    if (isPendingPublicFeedItem(item) && item.publishStatus) {
-      const statusBadge = document.createElement('span');
-      statusBadge.className = `public-publish-status${String(item.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
-      // Private-style live status ('sending 2 parts' / 'submitted 1/2, confirming' / …) when a publishState is
-      // streaming; the machine-readable publishStatus marker is the fallback.
-      statusBadge.textContent = (item.publishState ? publishStateMeta(item.publishState) : null) || item.publishStatus;
-      // Patch anchor for the status-only fast path (a publish tick updates this text in place, no rebuild).
-      if (item.id) statusBadge.dataset.publishLocalId = String(item.id);
-      wirePublicPublishRetryBadge(statusBadge, item, 'post');
-      meta.append(statusBadge);
-    }
-    // The channel "about" (description + tags) button and the "Display as" chevron live top-right in the author
-    // row. Both carry margin-left:auto: the first absorbs the free space (pushing the group right), the second
-    // then sits flush beside it — so they render as an adjacent [about][chevron] cluster on the right edge.
-    const feedDescriptionButton = publicItemDescriptionButton(item);
-    if (feedDescriptionButton) authorRow.append(feedDescriptionButton);
-    const feedIdentityButton = publicItemIdentityButton(item);
-    if (feedIdentityButton) authorRow.append(feedIdentityButton);
-    article.append(authorRow);
-    if (item.title) {
-      const title = document.createElement('h2');
-      title.textContent = item.title;
-      article.append(title);
-    }
-    appendPublicItemContent(article, item);
-    // Comments are no longer rendered inline in the feed — they load on demand on the post detail screen
-    // (openPublicPostDetail). appendPublicItemComments is reused there.
-    appendPublicItemActions(article, item);
-    publicFeed.append(article);
   }
+  const hiddenOlderCount = Math.max(0, allItems.length - publicFeedShownCap);
+  const windowItems = hiddenOlderCount > 0 ? allItems.slice(hiddenOlderCount) : allItems;
+  // F2 keyed reconciliation (mirrors renderThreads): reuse each <article> whose render signature is unchanged since
+  // the last render (the common case on a background sync — post content is immutable), building only new/changed
+  // ones and removing/reordering the delta. This also keeps the scroll position stable (no replaceChildren flicker)
+  // while the user is scrolled up reading, across the frequent background re-renders.
+  const existing = new Map();
+  for (const node of Array.from(publicFeed.children)) {
+    const id = node.dataset?.itemId;
+    if (id) existing.set(id, node);
+    else node.remove(); // discovery CTA / show-older button / empty-state — rebuilt cheaply below and re-placed
+  }
+  const avatarUrlMemo = new Map();
+  const seen = new Set();
+  let prev = null;
+  // Top matter, in order at the very front: discovery CTA, then the "show older" button when items are hidden.
+  if (shouldShowDiscoveryCta()) {
+    const cta = buildDiscoveryCtaCard();
+    if (cta !== publicFeed.firstChild) publicFeed.insertBefore(cta, publicFeed.firstChild);
+    prev = cta;
+  }
+  if (hiddenOlderCount > 0) {
+    const older = buildShowOlderButton(hiddenOlderCount);
+    const anchor = prev ? prev.nextSibling : publicFeed.firstChild;
+    if (older !== anchor) publicFeed.insertBefore(older, anchor);
+    prev = older;
+  }
+  for (const item of windowItems) {
+    const key = String(item.id);
+    seen.add(key);
+    const sig = publicFeedItemRenderSignature(item, avatarUrlMemo);
+    let article = existing.get(key);
+    if (!article || article.dataset.sig !== sig) {
+      article = buildPublicFeedArticle(item, avatarUrlMemo);
+      article.dataset.itemId = key;
+      article.dataset.sig = sig;
+    }
+    const anchor = prev ? prev.nextSibling : publicFeed.firstChild;
+    if (article !== anchor) publicFeed.insertBefore(article, anchor);
+    prev = article;
+  }
+  for (const [id, node] of existing) if (!seen.has(id)) node.remove();
   if (options.anchorUnread) scrollPublicToOldestUnread();
   requestAnimationFrame(updatePublicJumpDownVisibility);
-  // Viewing the feed marks its posts read (only when the Public tab is actually on screen, so a
+  // Viewing the feed marks its (rendered) posts read (only when the Public tab is actually on screen, so a
   // background sync does not pre-clear unread). Re-render once to drop the unread badges.
-  if (isPublicViewActive() && markVisiblePublicFeedRead(items)) {
+  if (isPublicViewActive() && markVisiblePublicFeedRead(windowItems)) {
     requestAnimationFrame(() => renderPublicSurface({ anchorUnread: false }));
   }
+}
+
+// Build one feed <article> (chrome + content) for an item. Extracted so renderPublicFeed can REUSE an article whose
+// publicFeedItemRenderSignature is unchanged instead of rebuilding it every render.
+function buildPublicFeedArticle(item, avatarUrlMemo) {
+  const unread = isUnreadPublicItem(item);
+  const article = document.createElement('article');
+  article.className = `feed-item${item.compact ? ' compact' : ''}${unread ? ' is-unread' : ''}`;
+  if (unread) article.dataset.unread = 'true';
+  if (item.entryId !== undefined && item.entryId !== null) article.dataset.entryId = String(item.entryId);
+  if (item.channelId) article.dataset.channelId = item.channelId;
+  const authorRow = document.createElement('div');
+  authorRow.className = 'feed-author-row';
+  const authorAvatar = document.createElement('div');
+  authorAvatar.className = 'avatar feed-avatar';
+  authorAvatar.setAttribute('aria-hidden', 'true');
+  setAvatarNode(authorAvatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet, avatarUrlMemo));
+  const meta = document.createElement('div');
+  meta.className = 'feed-meta';
+  for (const label of [...(item.meta ?? []), unread ? t('public.unread') : null].filter(Boolean)) {
+    const span = document.createElement('span');
+    span.textContent = label;
+    meta.append(span);
+  }
+  authorRow.append(authorAvatar, meta);
+  // Own pending publishes carry a status badge ('public publish submitted…' / 'public publish failed') —
+  // CSS classes only (prod CSP style-src 'self' silently kills inline styles).
+  if (isPendingPublicFeedItem(item) && item.publishStatus) {
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `public-publish-status${String(item.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
+    // Private-style live status ('sending 2 parts' / 'submitted 1/2, confirming' / …) when a publishState is
+    // streaming; the machine-readable publishStatus marker is the fallback.
+    statusBadge.textContent = (item.publishState ? publishStateMeta(item.publishState) : null) || item.publishStatus;
+    // Patch anchor for the status-only fast path (a publish tick updates this text in place, no rebuild).
+    if (item.id) statusBadge.dataset.publishLocalId = String(item.id);
+    wirePublicPublishRetryBadge(statusBadge, item, 'post');
+    meta.append(statusBadge);
+  }
+  // The channel "about" (description + tags) button and the "Display as" chevron live top-right in the author
+  // row. Both carry margin-left:auto: the first absorbs the free space (pushing the group right), the second
+  // then sits flush beside it — so they render as an adjacent [about][chevron] cluster on the right edge.
+  const feedDescriptionButton = publicItemDescriptionButton(item);
+  if (feedDescriptionButton) authorRow.append(feedDescriptionButton);
+  const feedIdentityButton = publicItemIdentityButton(item);
+  if (feedIdentityButton) authorRow.append(feedIdentityButton);
+  article.append(authorRow);
+  if (item.title) {
+    const title = document.createElement('h2');
+    title.textContent = item.title;
+    article.append(title);
+  }
+  appendPublicItemContent(article, item);
+  // Comments are no longer rendered inline in the feed — they load on demand on the post detail screen
+  // (openPublicPostDetail). appendPublicItemComments is reused there.
+  appendPublicItemActions(article, item);
+  return article;
+}
+
+// A compact string of every MUTABLE input to buildPublicFeedArticle, so a reused article rebuilds when (and only
+// when) its appearance would change. Post CONTENT (text/image) is immutable for a chain post, so it is not part of
+// the signature. Conservative by design: including more here only costs the occasional needless rebuild (cheap under
+// the render cap); a MISSING input would instead leave a stale article. `item.author` carries the resolved
+// display-name so an identity / "display as" change reflows; rare channel-profile-only changes self-heal on the next
+// signature-changing event.
+function publicFeedItemRenderSignature(item, avatarUrlMemo) {
+  return [
+    isUnreadPublicItem(item) ? 'u' : '',
+    item.compact ? 'c' : '',
+    (item.meta ?? []).join(''),
+    item.author ?? '',
+    item.title ?? '',
+    item.publishStatus ?? '',
+    item.publishState ? publishStateMeta(item.publishState) : '',
+    (item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet, avatarUrlMemo)) ?? '',
+    item.commentsAllowed === false ? 'nc' : '',
+    isPublicChannelSubscribed(item.channelId) ? 's' : '',
+  ].join('');
+}
+
+// The "show older" affordance at the top of the chat-style feed: reveals another PUBLIC_FEED_RENDER_PAGE of older
+// posts. One button, rebuilt each render (cheap), with a fresh listener.
+function buildShowOlderButton(hiddenOlderCount) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'feed-show-older';
+  button.textContent = t('public.showOlder');
+  button.dataset.hiddenOlder = String(hiddenOlderCount);
+  button.addEventListener('click', () => {
+    publicFeedShownCap += PUBLIC_FEED_RENDER_PAGE;
+    renderPublicSurface({ anchorUnread: false });
+  });
+  return button;
 }
 
 // Show the "edit channel description" header button only when the user has an activatable own channel — i.e. a
@@ -8171,21 +8289,78 @@ async function syncPublicChannelFromChain() {
   // the subscribed authors. Adds at most one author index (the user's own).
   const pendingAuthorHeadWrites = [];
   const pendingAuthorTruncatedWrites = [];
-  for (const channel of feedSourcePublicChannels()) {
+  // F1 (scale): pick this cycle's bounded read set. Author keys are a LOCAL cell-hash (computePublicAuthorKeyId, no
+  // RPC), so compute them for every channel up front. ALWAYS read the own channel and any channel with no cached
+  // head yet (a fresh subscription must be walked once); round-robin the rest at PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE
+  // over a stable (id-sorted) order. A subscriber with <= budget readable channels reads them ALL every cycle
+  // (behavior unchanged); only heavy subscribers get the rotation, so no small-account latency is added.
+  const feedChannels = feedSourcePublicChannels();
+  const ownChannelId = ownPublicChannel()?.id ?? null;
+  const channelAuthorKeys = new Map();
+  for (const channel of feedChannels) {
+    if (!channel.authorWallet) continue;
+    try { channelAuthorKeys.set(channel.id, await computePublicAuthorKeyId(channel.authorWallet)); } catch { /* unresolvable key -> treated as not-readable this cycle */ }
+  }
+  const readableChannels = feedChannels.filter((c) => channelAuthorKeys.has(c.id));
+  // roundStartHead is captured at the START of a round (covered set empty). The commit-gate advances the global
+  // fast-path cursor only TO this head, and only once every readable channel is covered -- so a channel skipped by
+  // the budget can never let the gate advance past that channel's not-yet-re-read new posts.
+  if (publicAuthorRoundCovered.size === 0) publicAuthorRoundStartHead = latestId;
+  // Selection, HARD-capped at the per-cycle budget regardless of how many channels are headless -- so a cold-start /
+  // account-switch / sustained-rate-limit cycle (where NO per-author head is cached yet) still cannot fan out to
+  // O(subscriptions) reads and re-open the send/receive starvation F1 targets. Priority WITHIN the budget:
+  //   (1) the own channel (own posts must confirm fast),
+  //   (2) never-read (headless) channels, id-sorted -- so a fresh subscription / cold feed surfaces within a cycle
+  //       or two instead of waiting a full rotation,
+  //   (3) a stable round-robin over the already-headed channels for whatever budget remains.
+  // The round gate guarantees no strand for a channel deferred to a later cycle (every channel is covered within
+  // ceil(N/budget) cycles, and the global head advances only to roundStartHead on roundComplete).
+  const idSorted = [...readableChannels].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const isHeadless = (c) => !publicAuthorIndexHeads.has(channelAuthorKeys.get(c.id).toString());
+  const readThisCycle = new Set();
+  if (ownChannelId !== null && readableChannels.some((c) => c.id === ownChannelId)) readThisCycle.add(ownChannelId);
+  let budget = PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE - readThisCycle.size;
+  for (const c of idSorted) {
+    if (budget <= 0) break;
+    if (c.id === ownChannelId || !isHeadless(c)) continue;
+    readThisCycle.add(c.id);
+    budget -= 1;
+  }
+  const withHeads = idSorted.filter((c) => c.id !== ownChannelId && !isHeadless(c));
+  if (withHeads.length > 0 && budget > 0) {
+    if (publicAuthorRoundCursor >= withHeads.length) publicAuthorRoundCursor = 0;
+    const take = Math.min(budget, withHeads.length);
+    for (let i = 0; i < take; i += 1) readThisCycle.add(withHeads[(publicAuthorRoundCursor + i) % withHeads.length].id);
+    publicAuthorRoundCursor = (publicAuthorRoundCursor + take) % withHeads.length;
+  }
+  for (const channel of feedChannels) {
     const channelAuthor = channel.authorWallet;
     if (!channelAuthor) continue;
-    let authorKeyId;
+    const authorKeyId = channelAuthorKeys.get(channel.id);
+    if (authorKeyId === undefined) continue;
+    const authorHeadKey = authorKeyId.toString();
+    if (!readThisCycle.has(channel.id)) {
+      // Skipped by the per-cycle budget: reuse this channel's cached posts (the append-merge below preserves them)
+      // + its remembered truncation. No RPC. NOT added to publicAuthorRoundCovered, so the gate stays at
+      // roundStartHead until a later cycle re-reads this channel (strand-safe).
+      if (publicAuthorIndexTruncated.get(authorHeadKey) === true) incompleteChannels.push(channel.id);
+      continue;
+    }
     let authorIndex;
     try {
-      authorKeyId = await computePublicAuthorKeyId(channelAuthor);
       authorIndex = await provider.getPublicAuthorIndex(authorKeyId, readOptions);
     } catch (error) {
+      // A transient rate-limit degrades the whole cycle (gate held, retried next cycle). A NON-transient read error
+      // for one channel marks it covered so a permanent single-channel failure cannot wedge the round gate forever
+      // -- it degrades to the pre-F1 behavior (that channel is skipped, the rest of the feed still advances).
       if (noteTonRpcRateLimit(error)) walkDegraded = true;
+      else publicAuthorRoundCovered.add(authorHeadKey);
       console.warn('Skipping public author index read', channel.id, error);
       continue;
     }
+    // A successful read (even an empty/no-posts index) marks this channel covered for the current round.
+    publicAuthorRoundCovered.add(authorHeadKey);
     if (authorIndex.exists !== true) continue;
-    const authorHeadKey = authorKeyId.toString();
     const authorHead = String(authorIndex.latest_entry_link ?? 0n);
     const cachedPostIds = cachedChainPostEntryIds(channel.id);
     // Per-author POST cursor: an unchanged author-index head means no new posts — reuse the cached post ids
@@ -8402,12 +8577,23 @@ async function syncPublicChannelFromChain() {
   // so the next cycle re-walks and picks up whatever the rate limit made it miss, instead of the fast-path
   // skipping past it forever.
   if (!walkDegraded) {
-    lastSyncedPublicLatestId = latestId;
-    lastSyncedPublicSyncWindow = syncWindow;
     // Advance the per-index cursors only now — after the merge committed — so a head is never recorded as "seen"
     // before its (new) entries actually reached the cache. A degraded cycle skips this entirely and re-walks next.
+    // These commit for the channels READ THIS CYCLE (pendingAuthorHeadWrites), independent of the global round gate.
     for (const [key, head] of pendingAuthorHeadWrites) publicAuthorIndexHeads.set(key, head);
     for (const [key, truncated] of pendingAuthorTruncatedWrites) publicAuthorIndexTruncated.set(key, truncated);
+    // F1 round gate: the global fast-path cursor advances only to the head that was current when this round BEGAN,
+    // and only once every readable channel has been covered (read) since then. So a channel the budget skipped this
+    // cycle can never let the fast-path advance past its not-yet-re-read posts. If new posts appeared during the
+    // round (latestId > roundStartHead) the fast-path will not fire next cycle and a fresh round re-reads everyone;
+    // once the feed goes quiet and a round completes, roundStartHead == latestId and the fast-path returns to zero
+    // reads. A subscriber with <= budget channels covers all every cycle, so this reduces to the old per-cycle gate.
+    const roundComplete = readableChannels.every((c) => publicAuthorRoundCovered.has(channelAuthorKeys.get(c.id).toString()));
+    if (roundComplete && publicAuthorRoundStartHead !== null) {
+      lastSyncedPublicLatestId = publicAuthorRoundStartHead;
+      lastSyncedPublicSyncWindow = syncWindow;
+      publicAuthorRoundCovered.clear();
+    }
   }
   globalThis.plathoLastPublicSync = {
     capsuleHub: address,
@@ -8651,13 +8837,23 @@ async function hydratePublicAvatars() {
 // Resolve the avatar image for a Public wallet channel: the per-wallet profile avatar (loaded by
 // hydratePublicChannelAvatars), falling back to the avatar already loaded for that wallet's open
 // Private dialog. Lets a channel show a face even when it has no cached public posts yet.
-function publicAvatarUrlForWallet(walletAddress) {
+// `memo` (optional) is a per-render-pass Map<rawWallet, url|null> so a feed of N items across M private threads
+// resolves the O(M) findThreadByIdentityVariants scan at most ONCE per distinct author, not once per item (a
+// channel's posts all share one authorWallet). Callers on a hot render loop pass a shared memo; one-off callers omit it.
+function publicAvatarUrlForWallet(walletAddress, memo = null) {
   const raw = rawWalletAddress(walletAddress);
   if (!raw) return null;
+  if (memo && memo.has(raw)) return memo.get(raw);
   const cached = publicChannelAvatarUrlByWallet.get(raw);
-  if (cached) return cached;
-  const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(raw));
-  return thread?.avatarImageUrl ?? null;
+  let url;
+  if (cached) {
+    url = cached;
+  } else {
+    const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(raw));
+    url = thread?.avatarImageUrl ?? null;
+  }
+  if (memo) memo.set(raw, url);
+  return url;
 }
 
 // Load profile avatars for subscribed wallet channels straight from the ProfileRegistry (no public
@@ -14299,7 +14495,6 @@ function setView(view) {
 
 function renderThreads() {
   const q = search.value.trim().toLowerCase();
-  threadList.innerHTML = '';
   threads.forEach(hydrateThreadDisplayFromContactStore);
   const visibleThreads = threads
     .filter((thread) => {
@@ -14308,70 +14503,112 @@ function renderThreads() {
     });
   // My notes is PINNED first regardless of activity order — a partition at render time, so no array mutation
   // (chain sync / history restore reorder `threads` freely and must not have to know about the pin).
-  [
+  const ordered = [
     ...visibleThreads.filter((thread) => isSavedMessagesThread(thread)),
     ...visibleThreads.filter((thread) => !isSavedMessagesThread(thread)),
-  ]
-    .forEach((thread) => {
-      const unread = threadUnreadCount(thread);
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = `thread-item${thread.id === activeThreadId ? ' is-selected' : ''}${unread > 0 ? ' has-unread' : ''}`;
-      item.dataset.thread = thread.id;
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      avatar.setAttribute('aria-hidden', 'true');
-      setThreadAvatarNode(avatar, thread);
-      const main = document.createElement('div');
-      main.className = 'thread-main';
-      const top = document.createElement('div');
-      top.className = 'thread-top';
-      const name = document.createElement('div');
-      setIdentityLabel(name, thread, 'thread-name identity-label');
-      const preview = document.createElement('div');
-      preview.className = 'thread-preview';
-      preview.textContent = thread.preview;
-      const state = document.createElement('div');
-      state.className = 'thread-state';
-      state.textContent = thread.state;
-      const time = document.createElement('div');
-      time.className = 'thread-time';
-      // Real last-message time, not the old constant 'now' word (v654). Computed at render (not cached on the
-      // thread) so the today/weekday/date bucket stays correct as days roll over between re-renders.
-      const lastMessage = thread.messages?.[thread.messages.length - 1] ?? null;
-      const lastMs = lastMessage ? messageCreatedAtMs(lastMessage) : null;
-      time.textContent = lastMs !== null ? formatThreadListTimestamp(lastMs) : '';
-      const side = document.createElement('div');
-      side.className = 'thread-side';
-      side.append(time);
-      if (unread > 0) {
-        const badge = document.createElement('div');
-        badge.className = 'thread-unread-badge';
-        badge.textContent = unread > 99 ? t('chat.unreadOverflow') : tPlural('chat.unreadCount', unread);
-        side.append(badge);
-      }
-      top.append(name);
-      main.append(top, preview, state);
-      item.append(avatar, main, side);
-      item.addEventListener('click', () => {
-        // A reply quote references a message of the PREVIOUS dialog — drop it on any switch.
-        if (activeThreadId !== thread.id) setPrivateReplyDraft(null);
-        activeThreadId = thread.id;
-        appShell.dataset.chatOpen = 'true';
-        // Selecting a chat always lands at the end (even re-selecting the current one), regardless of where it was
-        // left — renderConversation() reads this and scrolls to the bottom.
-        conversationStickToBottom = true;
-        markThreadRead(thread);
-        renderThreads();
-        renderConversation();
-        // Re-check this dialog's .ath (has the peer transferred it away?) then reconcile OUR OWN linked .ath — both
-        // via the shared username-hygiene queue, so no two username resolves ever run concurrently (v509 iOS
-        // freeze). Each is throttled internally; repaints happen only on an actual change.
-        queueUsernameHygiene(() => revalidateThreadUsernameVariants(thread));
-        queueUsernameHygiene(() => reconcileOwnLinkedUsername());
-      });
-      threadList.append(item);
-    });
+  ];
+  // F3 (scale): keyed reconciliation instead of innerHTML='' + a full O(chats) teardown/rebuild. renderThreads runs
+  // on every sync tick AND every search keystroke, so a user with hundreds of chats otherwise rebuilt every row
+  // (avatar + identity label + a fresh click listener each) on each. Now existing rows are REUSED (matched by
+  // thread.id), only their mutable content is patched (applyThreadRow), and only added/removed/reordered rows touch
+  // the DOM. One-time migration: rows left by the pre-F3 build carry no _refs — drop them so they are rebuilt once.
+  if (threadList.firstElementChild && !threadList.firstElementChild._refs) threadList.replaceChildren();
+  const existingRows = new Map();
+  for (const node of Array.from(threadList.children)) {
+    const id = node.dataset?.thread;
+    if (id && node._refs) existingRows.set(id, node);
+    else node.remove();
+  }
+  const seen = new Set();
+  let prev = null;
+  for (const thread of ordered) {
+    seen.add(thread.id);
+    let item = existingRows.get(thread.id);
+    if (!item) item = buildThreadRow(thread.id);
+    applyThreadRow(item, thread);
+    const anchor = prev ? prev.nextElementSibling : threadList.firstElementChild;
+    if (item !== anchor) threadList.insertBefore(item, anchor);
+    prev = item;
+  }
+  for (const [id, node] of existingRows) if (!seen.has(id)) node.remove();
+}
+
+// Build a reusable thread-list row: the STRUCTURE + a single click listener. The listener resolves its thread by id
+// at CLICK time (rows are reused across renders keyed by thread.id, so capturing a thread object would go stale).
+function buildThreadRow(threadId) {
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.dataset.thread = threadId;
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  const main = document.createElement('div');
+  main.className = 'thread-main';
+  const top = document.createElement('div');
+  top.className = 'thread-top';
+  const name = document.createElement('div');
+  const preview = document.createElement('div');
+  preview.className = 'thread-preview';
+  const state = document.createElement('div');
+  state.className = 'thread-state';
+  const time = document.createElement('div');
+  time.className = 'thread-time';
+  const side = document.createElement('div');
+  side.className = 'thread-side';
+  side.append(time);
+  top.append(name);
+  main.append(top, preview, state);
+  item.append(avatar, main, side);
+  item._refs = { avatar, name, preview, state, time, side };
+  item.addEventListener('click', () => {
+    const thread = threads.find((t) => t.id === item.dataset.thread);
+    if (!thread) return;
+    // A reply quote references a message of the PREVIOUS dialog — drop it on any switch.
+    if (activeThreadId !== thread.id) setPrivateReplyDraft(null);
+    activeThreadId = thread.id;
+    appShell.dataset.chatOpen = 'true';
+    // Selecting a chat always lands at the end (even re-selecting the current one), regardless of where it was
+    // left — renderConversation() reads this and scrolls to the bottom.
+    conversationStickToBottom = true;
+    markThreadRead(thread);
+    renderThreads();
+    renderConversation();
+    // Re-check this dialog's .ath (has the peer transferred it away?) then reconcile OUR OWN linked .ath — both
+    // via the shared username-hygiene queue, so no two username resolves ever run concurrently (v509 iOS
+    // freeze). Each is throttled internally; repaints happen only on an actual change.
+    queueUsernameHygiene(() => revalidateThreadUsernameVariants(thread));
+    queueUsernameHygiene(() => reconcileOwnLinkedUsername());
+  });
+  return item;
+}
+
+// Patch every MUTABLE field of a (new or reused) thread row in place. One apply path for create AND update, so a
+// reused row can never diverge from a freshly-built one.
+function applyThreadRow(item, thread) {
+  const { avatar, name, preview, state, time, side } = item._refs;
+  const unread = threadUnreadCount(thread);
+  item.className = `thread-item${thread.id === activeThreadId ? ' is-selected' : ''}${unread > 0 ? ' has-unread' : ''}`;
+  setThreadAvatarNode(avatar, thread);
+  setIdentityLabel(name, thread, 'thread-name identity-label');
+  preview.textContent = thread.preview;
+  state.textContent = thread.state;
+  // Real last-message time, not the old constant 'now' word (v654). Computed at render (not cached on the
+  // thread) so the today/weekday/date bucket stays correct as days roll over between re-renders.
+  const lastMessage = thread.messages?.[thread.messages.length - 1] ?? null;
+  const lastMs = lastMessage ? messageCreatedAtMs(lastMessage) : null;
+  time.textContent = lastMs !== null ? formatThreadListTimestamp(lastMs) : '';
+  // The unread badge lives in `side` after `time`; reconcile it in place (create / update / remove).
+  let badge = side.querySelector('.thread-unread-badge');
+  if (unread > 0) {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'thread-unread-badge';
+      side.append(badge);
+    }
+    badge.textContent = unread > 99 ? t('chat.unreadOverflow') : tPlural('chat.unreadCount', unread);
+  } else if (badge) {
+    badge.remove();
+  }
 }
 
 // Conversation scroll behaviour. The view sticks to the bottom by default, so opening a chat (incl. right after a
@@ -15442,6 +15679,7 @@ syncMessagesButton?.addEventListener('click', async () => {
 
 publicChannelSearch?.addEventListener('input', () => {
   publicChannelSearchQuery = publicChannelSearch.value;
+  publicFeedShownCap = PUBLIC_FEED_RENDER_CAP; // a new query is a fresh result set — render from the newest cap again
   renderPublicSurface();
 });
 

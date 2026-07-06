@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=691" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=692" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -369,8 +369,10 @@ describe('PWA runtime config guard', () => {
 
     // Registry name overlay + per-wallet avatar resolution so feed, channels list and detail all show it.
     expect(app).toMatch(/\.map\(applyContactDisplayToRegistryChannel\)/);
-    expect(app).toMatch(/function publicAvatarUrlForWallet\(walletAddress\)/);
-    expect(app).toMatch(/item\.avatarImageUrl \?\? publicAvatarUrlForWallet\(item\.authorWallet\)/);
+    // Ф2: per-render memo (Map<rawWallet,url>) so the O(threads) findThreadByIdentityVariants scan runs at most once
+    // per distinct author in a feed render, not once per item. Signature/call carry the optional memo.
+    expect(app).toMatch(/function publicAvatarUrlForWallet\(walletAddress, memo = null\)/);
+    expect(app).toMatch(/item\.avatarImageUrl \?\? publicAvatarUrlForWallet\(item\.authorWallet, avatarUrlMemo\)/);
   });
 
   it('PWA-CONFIG-01I: opening a private chat reuses the existing dialog, and the comments toggle reads its state', () => {
@@ -401,8 +403,9 @@ describe('PWA runtime config guard', () => {
     // fallback to the channel name (the live name comes from thread.name in the feed item).
     expect(mjs).toMatch(/meta: \[post\.publishStatus, shortTime\(post\.createdAt\)/);
     expect(mjs).toMatch(/title: message\.publicPostTitle \?\? null/);
-    // (2) Posts are marked read when actually viewed (Public tab active).
-    expect(app).toMatch(/isPublicViewActive\(\) && markVisiblePublicFeedRead\(items\)/);
+    // (2) Posts are marked read when actually viewed (Public tab active). F2 render cap: only the rendered window
+    // (newest publicFeedShownCap items) is marked read -- older posts held behind "show older" are not pre-cleared.
+    expect(app).toMatch(/isPublicViewActive\(\) && markVisiblePublicFeedRead\(windowItems\)/);
     // The "Display as" chevron + Unfollow live on the feed post cards: renderPublicFeed adds the chevron, and the
     // shared post actions add Unfollow when the post's channel is subscribed (incl. the official platho channel).
     expect(app).toMatch(/const feedIdentityButton = publicItemIdentityButton\(item\)/);
@@ -4245,7 +4248,11 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).toMatch(/const nextFeedCache = \{ \.\.\.publicChannelFeedCache \}/);
     expect(syncPublicSource).toMatch(/upsertPublicChainPosts\(existingChainPosts, newChainPosts\)/);
     expect(syncPublicSource).toMatch(/latestId === lastSyncedPublicLatestId/);
-    expect(syncPublicSource).toMatch(/if \(!walkDegraded\) \{\s*lastSyncedPublicLatestId = latestId/);
+    // F1 round gate: the per-cycle author-index reads are round-robined at a budget, and the global head advances
+    // only to the ROUND-START head and only once every readable channel was covered this round (strand-safe) --
+    // NOT unconditionally to latestId. A skipped-this-cycle channel therefore never lets the fast-path skip past it.
+    expect(syncPublicSource).toMatch(/PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE/);
+    expect(syncPublicSource).toMatch(/if \(roundComplete && publicAuthorRoundStartHead !== null\) \{\s*lastSyncedPublicLatestId = publicAuthorRoundStartHead/);
     expect(app).toMatch(/function chainBackedPublicFeedOnly/);
     expect(app).toMatch(/post\?\.chainVerified === true/);
     expect(syncPublicSource).toMatch(/chainVerified: true/);
@@ -5853,7 +5860,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function feedSourcePublicChannels\(\)/);
     expect(app).toMatch(/function ownPublicChannel\(\)/);
     expect(app).toMatch(/publicChannelThreads = publicChannelsToThreads\(\s*feedSourcePublicChannels\(\)/);
-    expect(app).toMatch(/for \(const channel of feedSourcePublicChannels\(\)\)/);
+    // F1: the sync loop snapshots the feed source once (feedChannels) then iterates it (round-robin selection reads
+    // a bounded subset per cycle); the source is still subscribed + own.
+    expect(app).toMatch(/const feedChannels = feedSourcePublicChannels\(\);/);
+    expect(app).toMatch(/for \(const channel of feedChannels\)/);
     expect(pubMjs).toMatch(/export function publicChannelsToThreads\(channels, feedCache = \{\}\)/);
     // 5. "Private chat" is hidden on your own public post (no self-dialog). Ownership uses isOwnPublicAuthor,
     //    which falls back to the wallet address persisted in storage so own posts are recognised from the FIRST
@@ -5890,14 +5900,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v762/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=231/);
+    expect(sw).toMatch(/platho-pwa-prototype-v763/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=232/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=691/);
+    expect(sw).toMatch(/\.\/app\.js\?v=692/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=12/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=12/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=13/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=13/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
@@ -5905,7 +5915,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=99/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=54/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=55/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=16/);
@@ -5914,7 +5924,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=58/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=40/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=54/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=55/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=38/);
     expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);

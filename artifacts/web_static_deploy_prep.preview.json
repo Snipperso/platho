@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-06T10:49:49.099Z",
+  "generatedAt": "2026-07-06T15:55:24.413Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 139,
-    "totalBytes": 4559375,
-    "bundleSha256": "a68748a33cd3795d64aa5a8c48348005a2aa782ecc076dac45484c8263f79c13",
+    "totalBytes": 4577970,
+    "bundleSha256": "50a6e6c6985007560d345a25376d1d2ef3020c9318bae9621bd5fadff0c3d1f6",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1207730,
-        "sha256": "dfaf5029ee17eb5fcaf5835dd040f6eb4007766ead5a9379a8e063353cbb31bc"
+        "bytes": 1222755,
+        "sha256": "652979811ed739337a49e736f09947ad603816ecb591ae5dd94be54dea0b8311"
       },
       {
         "path": "assets/icons/about.svg",
@@ -199,8 +199,8 @@
       },
       {
         "path": "capsulehub-ton-rpc-provider.mjs",
-        "bytes": 53934,
-        "sha256": "7eb2a655aed881b146c8c908d2cbb3887095d7c27e96fcb34cae84f3f8276766"
+        "bytes": 56413,
+        "sha256": "b431596b0303adb207b94aae53d5f197fbe4659484320c138f9914b6b3f0311a"
       },
       {
         "path": "channels/platho.app/feed.json",
@@ -234,18 +234,18 @@
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 621513,
-        "sha256": "dfdf6cc85402ecea41a3279ac41993e8a4226144cb145ca5bfea31ab89df97d7"
+        "bytes": 622068,
+        "sha256": "e912771d9db0b3f9305f2f97a30fdeffba7d000c54299822249dbec32b3e420a"
       },
       {
         "path": "i18n.mjs",
         "bytes": 4608,
-        "sha256": "4911a5a1eca2d3eb4dd5e9d0327e7abea31cc31d7f388b9bfefcedce3650391c"
+        "sha256": "7de206c0c13babf087319542738884f46eb72f99fbe94ff6b6a5de7d8b8888ae"
       },
       {
         "path": "index.html",
         "bytes": 52842,
-        "sha256": "d28abda8209751747dc9e01a0eb55a1b027dd022612a48b303d40af080845cbc"
+        "sha256": "479cd73b5d3d2ab362643a8f7c245c07aea5750f65634bb250fc40956677a5c8"
       },
       {
         "path": "manifest.webmanifest",
@@ -309,13 +309,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 96543,
-        "sha256": "a1562c028562a572d4f940288aa3578ce4517f94471b073b01989e4edc72b4a3"
+        "bytes": 97079,
+        "sha256": "4bee904b44f9ec0e51d8be6e4fada69baf23f33beb4b3d952015b430ca9af69e"
       },
       {
         "path": "sw.js",
         "bytes": 6807,
-        "sha256": "a783b801710bfa081bfcc1e0f34ec856f87159cec80965d75f36685753be45f4"
+        "sha256": "652598079721d81400dcb79b6bfbe73fdbc8b165231fa2c723edfb44686d2d40"
       },
       {
         "path": "ton-dns-provider.mjs",
