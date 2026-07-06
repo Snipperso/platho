@@ -272,11 +272,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
     expect(html).toMatch(/id="appVersionLabel">v672<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v689'/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v690'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=689" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=690" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4998,6 +4998,28 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/padding: 0 24px 0 14px;/);
   });
 
+  it('PWA-CHAT-SCROLL-01: only the act of sending moves the dialog — status ticks patch in place, restores use the live position', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const renderSource = app.slice(app.indexOf('function renderConversation()'), app.indexOf('docsButtons.forEach'));
+    // Live scroll state is read at render entry: the debounced listener snapshot lags an active gesture (the
+    // timer resets on every scroll event), so restoring it mid-scroll jumped to a pre-gesture position.
+    expect(renderSource).toMatch(/const stripMeasurable = messageStrip\.clientHeight > 0 && messageStrip\.scrollHeight > 0;/);
+    expect(renderSource).toMatch(/messageStrip\.scrollTop = prevConversationScrollTop;/);
+    // A status-only re-render patches the existing rows in place and never touches the scroller.
+    expect(renderSource).toMatch(/!conversationThreadChanged && !conversationNewOutbound && applyConversationStatusOnlyPatch\(thread\)/);
+    expect(app).toMatch(/function applyConversationStatusOnlyPatch\(thread\)/);
+    // Anything that changes row STRUCTURE falls through to the full rebuild: a meta node appearing or
+    // disappearing, payment action buttons (derived from the meta text), the manual Retry affordance.
+    expect(app).toMatch(/if \(\(metaText !== ''\) !== row\.hasMeta\) return false;/);
+    expect(app).toMatch(/if \(message\.payment && metaText !== row\.metaText\) return false;/);
+    expect(app).toMatch(/privateMessageShouldShowManualActions\(message\)\) !== row\.showManual\) return false;/);
+    // The scroll listener tracks the bottom-pin state immediately — no debounce timer to lag behind a gesture.
+    const listenerSource = app.slice(app.indexOf('function rememberConversationScroll()'), app.indexOf('function applyConversationStatusOnlyPatch'));
+    expect(listenerSource).not.toMatch(/setTimeout/);
+    // A fresh outbound tail remains the ONLY smooth scroll-to-end.
+    expect(renderSource).toMatch(/if \(conversationNewOutbound\) \{[\s\S]*?behavior: 'smooth'/);
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -5861,11 +5883,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v760/);
+    expect(sw).toMatch(/platho-pwa-prototype-v761/);
     expect(sw).toMatch(/\.\/styles\.css\?v=231/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=689/);
+    expect(sw).toMatch(/\.\/app\.js\?v=690/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=12/);

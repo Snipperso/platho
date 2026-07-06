@@ -186,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v689';
+const PLATHO_APP_RUNTIME_VERSION = 'v690';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -14380,18 +14380,59 @@ let lastConversationThreadId = null;
 let lastConversationMsgCount = 0;
 let conversationStickToBottom = true;
 let conversationSavedScrollTop = 0;
-let conversationScrollSaveTimer = null;
+// Per-row structure fingerprint of the last full conversation render — drives the status-only fast path
+// (a status tick patches rows in place instead of rebuilding the strip, so the scroller never moves).
+let lastConversationRenderSnapshot = null;
 
+// Track the bottom-pin state and position IMMEDIATELY (no debounce): the image-load re-anchor and the
+// hidden-strip fallback read these, and a debounced value lags an active gesture — a stale "still pinned"
+// snapshot used to yank a reader who had just scrolled up back to the bottom.
 function rememberConversationScroll() {
-  if (conversationScrollSaveTimer) clearTimeout(conversationScrollSaveTimer);
-  conversationScrollSaveTimer = setTimeout(() => {
-    conversationScrollSaveTimer = null;
-    if (!messageStrip) return;
-    conversationStickToBottom = (messageStrip.scrollHeight - messageStrip.scrollTop - messageStrip.clientHeight) < 24;
-    conversationSavedScrollTop = messageStrip.scrollTop;
-  }, 150);
+  if (!messageStrip) return;
+  conversationStickToBottom = (messageStrip.scrollHeight - messageStrip.scrollTop - messageStrip.clientHeight) < 24;
+  conversationSavedScrollTop = messageStrip.scrollTop;
 }
 messageStrip?.addEventListener('scroll', rememberConversationScroll, { passive: true });
+
+// STATUS-ONLY FAST PATH: when the message list is structurally identical to the last full render (same
+// message objects, same rows — only meta text / status changed), patch the existing rows in place. The
+// owner's rule: only the act of sending may move the dialog; a status change must never budge it — and a
+// full rebuild would kill an active scroll gesture even with a perfect position restore. Anything that can
+// change row STRUCTURE (meta node appearing/disappearing, payment action buttons, the manual Retry
+// affordance — all derived from the status text) falls through to the full rebuild.
+function applyConversationStatusOnlyPatch(thread) {
+  const snapshot = lastConversationRenderSnapshot;
+  if (!snapshot || snapshot.threadId !== thread.id) return false;
+  const messages = Array.isArray(thread.messages) ? thread.messages : [];
+  if (snapshot.rows.length !== messages.length) return false;
+  if (!messageStrip || messageStrip.children.length !== messages.length) return false;
+  for (let i = 0; i < messages.length; i += 1) {
+    const row = snapshot.rows[i];
+    const message = messages[i];
+    if (row.ref !== message) return false;
+    const metaText = messageMetaText(message);
+    if ((metaText !== '') !== row.hasMeta) return false;
+    if (message.payment && metaText !== row.metaText) return false;
+    if (Boolean(privateMessageShouldShowManualActions(message)) !== row.showManual) return false;
+  }
+  for (let i = 0; i < messages.length; i += 1) {
+    const row = snapshot.rows[i];
+    const message = messages[i];
+    const node = messageStrip.children[i];
+    const metaText = messageMetaText(message);
+    if (metaText !== row.metaText) {
+      row.metaText = metaText;
+      node.dataset.status = messageStatusKey(message);
+      const metaNode = node.querySelector('.message-meta');
+      if (metaNode) metaNode.textContent = metaText;
+    }
+    // A confirming send gains its chain entry id (the swipe-reply anchor) — keep it current without a rebuild.
+    if (message.chainEntryId !== undefined && message.chainEntryId !== null) {
+      node.dataset.entryId = String(message.chainEntryId);
+    }
+  }
+  return true;
+}
 
 function renderConversation() {
   // The conversation pane only exists on the Private (chats) tab. Boot opens on Public and the background sync runs
@@ -14426,6 +14467,7 @@ function renderConversation() {
     lastConversationThreadId = null;
     lastConversationMsgCount = 0;
     conversationStickToBottom = true;
+    lastConversationRenderSnapshot = null;
     return;
   }
   setThreadAvatarNode(activeAvatar, thread);
@@ -14436,12 +14478,18 @@ function renderConversation() {
   activeSubtitle.textContent = conversationSubtitleText(thread);
   // Capture the pre-render scroll state so a background re-render can restore it instead of jumping to the bottom.
   const conversationThreadChanged = thread.id !== lastConversationThreadId;
+  // LIVE scroll state read at render entry. The scroll listener's debounced snapshot lagged an active gesture
+  // (the debounce timer reset on every scroll event), so a mid-scroll re-render restored wherever the user was
+  // BEFORE the gesture began — the live read is always exact. The saved values remain only as the fallback for
+  // renders while the strip is hidden/unmeasurable (a display:none scroller reads 0/0 and loses its position
+  // across tab switches).
+  const stripMeasurable = messageStrip.clientHeight > 0 && messageStrip.scrollHeight > 0;
+  const prevConversationScrollTop = stripMeasurable ? messageStrip.scrollTop : conversationSavedScrollTop;
+  if (stripMeasurable) {
+    conversationStickToBottom = (messageStrip.scrollHeight - prevConversationScrollTop - messageStrip.clientHeight) < 24;
+    conversationSavedScrollTop = prevConversationScrollTop;
+  }
   if (conversationThreadChanged) conversationStickToBottom = true;
-  // Capture the pre-rebuild scroll position: innerHTML='' resets scrollTop to 0, so a smooth scroll-to-end on send
-  // would otherwise animate all the way from the top ("flies to the beginning and back"). Restoring this first lets
-  // the smooth scroll cover only the short distance to the new message.
-  const prevConversationScrollTop = messageStrip.scrollTop;
-  messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
   const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
   const canSendPrivate = canAttemptPrivateSend(thread);
@@ -14470,6 +14518,11 @@ function renderConversation() {
     && conversationLastMsg?.type === 'out';
   lastConversationThreadId = thread.id;
   lastConversationMsgCount = conversationMsgCount;
+  // Status tick with identical structure -> patch in place, scroller COMPLETELY untouched (no rebuild, no
+  // scroll writes, no rAF). Only a structural change (new message, payment/manual-action flip) rebuilds.
+  if (!conversationThreadChanged && !conversationNewOutbound && applyConversationStatusOnlyPatch(thread)) return;
+  const conversationRenderSnapshotRows = [];
+  messageStrip.innerHTML = '';
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
     row.className = `message ${message.type}`;
@@ -14659,7 +14712,14 @@ function renderConversation() {
     appendRowReplyButton(row, beginPrivateReplyForRow);
     appendRowCopyButton(row, copyTextFromContent(message));
     messageStrip.append(row);
+    conversationRenderSnapshotRows.push({
+      ref: message,
+      metaText,
+      hasMeta: Boolean(metaText),
+      showManual: Boolean(manualActions),
+    });
   });
+  lastConversationRenderSnapshot = { threadId: thread.id, rows: conversationRenderSnapshotRows };
 
   requestAnimationFrame(() => {
     if (conversationNewOutbound) {
@@ -14674,8 +14734,9 @@ function renderConversation() {
       // burst on open: every render in the burst pins to the bottom, so there is no stale position to land on.
       messageStrip.scrollTop = messageStrip.scrollHeight;
     } else {
-      // The reader scrolled up to read history — a background re-render keeps them where they were.
-      messageStrip.scrollTop = conversationSavedScrollTop;
+      // The reader scrolled up to read history — a background re-render keeps them EXACTLY where they were
+      // (the live position captured at render entry, never the lagging debounced snapshot).
+      messageStrip.scrollTop = prevConversationScrollTop;
     }
   });
 }
