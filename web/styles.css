@@ -1338,10 +1338,10 @@ html[data-platho-telegram="true"] .install-header-button {
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(48, 213, 176, 0.26);
   border-radius: 8px;
-  background: var(--panel-3);
-  color: var(--muted);
+  background: rgba(48, 213, 176, 0.06);
+  color: var(--accent);
   font-size: 13px;
   cursor: pointer;
 }
@@ -1380,8 +1380,8 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .composer-post-option:has(input:checked) {
-  border-color: rgba(48, 213, 176, 0.5);
-  background: rgba(48, 213, 176, 0.18);
+  border-color: rgba(48, 213, 176, 0.42);
+  background: rgba(48, 213, 176, 0.1);
   color: var(--accent);
 }
 
@@ -1392,6 +1392,7 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .composer-post-option:hover {
   border-color: rgba(48, 213, 176, 0.42);
+  background: rgba(48, 213, 176, 0.1);
 }
 
 .composer-post-option:has(input:disabled) {
@@ -1399,7 +1400,8 @@ html[data-platho-telegram="true"] .install-header-button {
   opacity: 0.62;
 }
 
-.composer-post-option:focus-within {
+/* Keyboard focus only (matches the eye/send-privacy button): no ring on a plain mouse press. */
+.composer-post-option:has(input:focus-visible) {
   outline: 2px solid rgba(48, 213, 176, 0.28);
   outline-offset: 2px;
 }
@@ -4053,8 +4055,8 @@ button.feed-item:hover {
     grid-template-columns: 38px 38px minmax(0, 1fr) 48px;
     column-gap: 8px;
     row-gap: 8px;
-    align-items: center;
-    padding: 12px 14px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+    align-items: start;
+    padding: 8px 14px var(--app-safe-area-bottom, env(safe-area-inset-bottom));
     overflow: visible;
   }
 
@@ -4108,7 +4110,7 @@ button.feed-item:hover {
   .public-composer > .composer-cost-status {
     grid-column: 3 / 5;
     grid-row: 2;
-    align-self: center;
+    align-self: start;
   }
 
   /* When a swipe-reply quote strip is active (private composer), it takes the top row and pushes the input +
@@ -4148,7 +4150,7 @@ button.feed-item:hover {
 
   .public-composer {
     margin: 0 -24px -24px;
-    padding: 12px 14px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+    padding: 8px 14px var(--app-safe-area-bottom, env(safe-area-inset-bottom));
   }
 
   .balance-grid,

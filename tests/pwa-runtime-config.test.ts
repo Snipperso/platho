@@ -272,11 +272,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
     expect(html).toMatch(/id="appVersionLabel">v672<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v682'/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v683'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=682" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=683" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -580,7 +580,7 @@ describe('PWA runtime config guard', () => {
     expect(css).not.toMatch(/@media \(min-width: 680px\) and \(max-width: 900px\)/);
     expect(css).toMatch(/\.public-pane,\s*\.vault-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: 24px;/);
     expect(css).toMatch(/\.list-pane\s*{\s*gap: 14px;\s*border-right: 0;\s*}/);
-    expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;\s*padding: 12px 14px/);
+    expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;\s*padding: 8px 14px/);
     // Public composer is consistent with Private: full-bleed (no right gap) and its two left buttons
     // are sized exactly like the Private composer buttons at both breakpoints.
     expect(css).toMatch(/\.public-composer\s*{[\s\S]*?max-width: none;/);
@@ -929,9 +929,9 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['common.walletRequired']).toBe('Wallet required');
     expect(app).toMatch(/return publicCommentTarget \? t\('composer\.publicComment'\) : t\('composer\.publicMessage'\)/);
     expect(EN_STRINGS['composer.publicComment']).toBe('Public comment');
-    expect(EN_STRINGS['composer.publicMessage']).toBe('Public');
+    expect(EN_STRINGS['composer.publicMessage']).toBe('Public message');
     expect(app).toMatch(/return t\('composer\.privateMessage'\)/);
-    expect(EN_STRINGS['composer.privateMessage']).toBe('Private');
+    expect(EN_STRINGS['composer.privateMessage']).toBe('Private message');
     expect(html).toMatch(/id="publicComposer"/);
     expect(html).toMatch(/id="publicComposerCommentsCheckbox"/);
     expect(html).toMatch(/id="publicComposer"[\s\S]*id="publicComposerCommentsCheckbox"[\s\S]*<textarea id="publicMessageInput"/);
@@ -5839,14 +5839,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v753/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=225/);
+    expect(sw).toMatch(/platho-pwa-prototype-v754/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=226/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=682/);
+    expect(sw).toMatch(/\.\/app\.js\?v=683/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=11/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=11/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=12/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
