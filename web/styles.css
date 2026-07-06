@@ -18,6 +18,13 @@
   --green: var(--accent);
   --shadow: rgba(0, 0, 0, 0.32);
   --header-actions-width: 216px;
+  /* SINGLE SOURCE OF TRUTH for every header (pane headers, the public absolute action cluster, the
+     conversation/post-detail headers): one top offset, one bar height, one control size, one derived
+     control inset. Every header rule below MUST derive from these four — never hardcode header geometry. */
+  --header-top-offset: 11px;
+  --header-height: 50px;
+  --header-button-size: 34px;
+  --header-button-inset: calc((var(--header-height) - var(--header-button-size)) / 2);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -337,7 +344,7 @@ button:disabled,
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 14px;
-  padding: 11px 24px 24px;
+  padding: var(--header-top-offset) 24px 24px;
   border-right: 1px solid var(--line-soft);
   background: rgba(17, 20, 23, 0.96);
 }
@@ -365,6 +372,7 @@ button:disabled,
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-height: var(--header-height);
 }
 
 .conversation-header {
@@ -375,6 +383,15 @@ button:disabled,
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+}
+
+/* Header action clusters are pinned to the TOP of the header bar at the shared inset (not centered against the
+   bar's actual height), so every tab's buttons sit at exactly the same offset even when a device's font scale
+   grows a title and stretches one header taller than another. Same formula as the public absolute cluster. */
+.pane-header .header-actions,
+.conversation-header .header-actions {
+  align-self: start;
+  margin-top: var(--header-button-inset);
 }
 
 .pane-header > div:first-child,
@@ -481,27 +498,30 @@ button:disabled,
   display: none;
 }
 
-.docs-header-button {
-  width: 34px;
-  height: 34px;
+/* ONE rule for EVERY header control (docs/install/discover/edit/identity/back/refresh — anything that lives in a
+   header container): the same compact square with the same near-black fill, on desktop AND mobile. Addressed by
+   CONTAINER so a new header button can never be missed by a per-class list. Composer/send/search controls are not
+   inside header containers and keep the generic .icon-button sizing above. */
+.pane-header .icon-button,
+.public-header-actions .icon-button,
+.conversation-header .icon-button {
+  width: var(--header-button-size);
+  height: var(--header-button-size);
   background: #0d1012;
 }
 
-/* Discover + edit-description header buttons: canonical compact 34px + the same near-black fill as the docs (i)
-   button, so they don't stand out with the tinted .icon-button background next to docs/sync. */
-.discover-header-button,
-.edit-channel-profile-button {
-  width: 34px;
-  height: 34px;
-  background: #0d1012;
+.pane-header .icon-button:hover,
+.public-header-actions .icon-button:hover,
+.conversation-header .icon-button:hover {
+  background: rgba(48, 213, 176, 0.1);
 }
 
 /* Global sync indicator: a green spinner while any sync is running, a green check when synced. Sits in the header
    corner (last in .header-actions) on every tab, so the sync state is visible everywhere — replacing the private
    dialog's text subtitle. Pure CSS (reuses rail-balance-spin); no new icon asset. */
 .global-sync-indicator {
-  width: 34px;
-  height: 34px;
+  width: var(--header-button-size);
+  height: var(--header-button-size);
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
@@ -525,22 +545,6 @@ button:disabled,
   border: solid var(--accent);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
-}
-
-.install-header-button {
-  width: 34px;
-  height: 34px;
-  background: #0d1012;
-}
-
-/* The "Display as" chevron (#identityMenuButton) matches the compact 34px info/install header buttons, so the
-   conversation header stays consistent with the other tabs' headers. The 34px compact button is the canonical
-   header-button size; the chevron was the lone 40px outlier — shrink IT, don't grow the others. (Mobile ≤900px
-   keeps all three at the .icon-button 38px below.) */
-.identity-menu-button {
-  width: 34px;
-  height: 34px;
-  background: #0d1012;
 }
 
 @media (display-mode: standalone) {
@@ -756,10 +760,9 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .conversation-header {
-  min-height: 50px;
-  /* Vertical padding 0 so the header collapses to ~50px to match the compressed
-     pane headers; the desktop .chat-pane top padding lands it at the same 11px
-     top offset (buttons at 36px). The mobile rule below restores its own padding. */
+  min-height: var(--header-height);
+  /* Vertical padding 0 so the bar is exactly the shared header height; the chat-pane top padding
+     (both breakpoints) lands it at the shared top offset — identical geometry to the pane headers. */
   padding: 0 24px;
   border-bottom: 1px solid var(--line-soft);
   background: rgba(15, 18, 20, 0.94);
@@ -1837,10 +1840,9 @@ html[data-platho-telegram="true"] .install-header-button {
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 14px;
   overflow: hidden;
-  /* Top 11px (not 24): compresses the header so the title CENTRE (25.3px) and the top-right buttons (36px) land
-     at the EXACT same y as the compressed conversation/comment headers — no 1px jump when switching tabs. 11 vs
-     the conversation's 12px compensates for the taller Platho.app h1 pushing the centre down ~1px. */
-  padding: 11px 24px 24px;
+  /* Shared top offset (not 24): every pane's header bar starts at the same y as the conversation/comment
+     headers, so nothing jumps when switching tabs. */
+  padding: var(--header-top-offset) 24px 24px;
 }
 
 .public-pane {
@@ -1850,13 +1852,13 @@ html[data-platho-telegram="true"] .install-header-button {
   --public-list-col: clamp(280px, 32vw, 392px);
 }
 
-/* The info menu (.public-header-actions) is pinned top-right: absolutely positioned against the pane
-   (.public-pane is position:relative) and vertically centred on the header line (~49px from the pane top). */
+/* The public action cluster is pinned top-right: absolutely positioned against the pane (.public-pane is
+   position:relative) at the SAME derived offset as every in-flow header cluster (top offset + control inset),
+   so the buttons sit at an identical y across all tabs by construction. */
 .public-pane .public-header-actions {
   position: absolute;
-  top: 36px;
+  top: calc(var(--header-top-offset) + var(--header-button-inset));
   right: 24px;
-  transform: translateY(-50%);
   z-index: 3;
 }
 /* Pin the (title-only) pane header to row 1, column 1 (the menu is absolutely positioned and out of flow, so it
@@ -2288,7 +2290,7 @@ button.feed-item:hover {
    hold for the single-pane Public tab. The fixed 38px/44px back+avatar tracks + 10px gap MATCH the private mobile
    header exactly so the avatar lines up identically in both. */
 .public-pane .public-post-detail-header {
-  grid-template-columns: 38px 44px minmax(0, 1fr) max-content;
+  grid-template-columns: var(--header-button-size) 44px minmax(0, 1fr) max-content;
   gap: 10px;
 }
 
@@ -3961,6 +3963,8 @@ button.feed-item:hover {
 
   .app-shell[data-chat-open="true"][data-view="chats"] .chat-pane {
     display: grid;
+    /* Shared top offset so the conversation bar starts at the same y as every pane header. */
+    padding-top: var(--header-top-offset);
   }
 
   .content-pane {
@@ -3974,7 +3978,7 @@ button.feed-item:hover {
   .vault-pane,
   .profile-pane,
   .list-pane {
-    padding: 11px 24px 24px;
+    padding: var(--header-top-offset) 24px 24px;
   }
 
   .list-pane {
@@ -4007,12 +4011,12 @@ button.feed-item:hover {
 
   .conversation-header {
     display: grid;
-    grid-template-columns: 38px 44px minmax(0, 1fr) max-content;
+    grid-template-columns: var(--header-button-size) 44px minmax(0, 1fr) max-content;
     align-items: center;
-    /* Compressed header (shared with desktop: same symmetric vertical padding so the buttons don't jump across the
-       900px breakpoint). RIGHT 24 matches desktop; LEFT 14 is the mobile gutter for the back button + avatar,
+    /* Same bar as desktop (shared height, zero vertical padding); the chat-pane top padding below provides the
+       shared top offset. RIGHT 24 matches desktop; LEFT 14 is the mobile gutter for the back button + avatar,
        shared with the message area. */
-    padding: 12px 24px 12px 14px;
+    padding: 0 24px 0 14px;
     gap: 10px;
     max-width: 100vw;
     overflow: hidden;
@@ -4048,18 +4052,8 @@ button.feed-item:hover {
     display: none;
   }
 
-  /* All canonical header menu buttons stay at their compact 34px on mobile too (matching desktop) — the generic 38px
-     .icon-button touch size above is for the composer/send controls. Without this they were the lone 38px buttons,
-     oversized vs desktop when the layout went narrow: the conversation chevron + info, the Public Feed view's info,
-     the list-pane install/docs. */
-  .identity-menu-button,
-  .docs-header-button,
-  .install-header-button,
-  .discover-header-button,
-  .edit-channel-profile-button {
-    width: 34px;
-    height: 34px;
-  }
+  /* Header control sizing comes from the base container rule (var(--header-button-size)) — its specificity
+     already beats the generic 38px mobile .icon-button touch size above, so no mobile override is needed. */
 
   .message-strip {
     padding: 16px 14px;
@@ -4242,10 +4236,9 @@ button.feed-item:hover {
 @media (min-width: 901px) {
   .app-shell[data-view="chats"] .chat-pane {
     display: grid;
-    /* Match the compressed pane headers: the conversation header (now ~50px flush)
-       is nudged down 11px so its buttons sit at the same 36px top offset as every
-       other tab's header actions, with zero double-shift on the sibling list-pane. */
-    padding-top: 11px;
+    /* Shared top offset so the conversation bar starts at the same y as every pane header
+       (no double-shift on the sibling list-pane, which carries its own pane padding). */
+    padding-top: var(--header-top-offset);
   }
 
   .app-shell[data-view="chats"] .list-pane .header-actions {

@@ -272,11 +272,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
     expect(html).toMatch(/id="appVersionLabel">v672<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v687'/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v688'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=687" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=688" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -572,13 +572,20 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.message\.out\s*{[\s\S]*align-self: flex-end;/);
     expect(css).toMatch(/\.conversation-title h2,\s*\.conversation-title p\s*{\s*overflow: hidden;\s*text-overflow: ellipsis;\s*white-space: nowrap;/);
     expect(css).toMatch(/\.header-actions\s*{\s*display: flex;\s*align-items: center;\s*justify-content: flex-end;\s*gap: 8px;\s*flex: 0 0 auto;\s*min-width: max-content;/);
-    // The "Display as" chevron is the compact 34px header-button size (matching the info/install buttons and the
-    // other tabs' headers) — shrink the chevron, do NOT grow info/install to 40px (that made the tab inconsistent).
+    // Header geometry is a SINGLE SOURCE OF TRUTH: four :root variables drive every header (pane headers, the
+    // public absolute cluster, the conversation/post-detail headers) — no per-class size/offset literals allowed.
+    expect(css).toMatch(/--header-top-offset: 11px;\s*--header-height: 50px;\s*--header-button-size: 34px;\s*--header-button-inset: calc\(\(var\(--header-height\) - var\(--header-button-size\)\) \/ 2\);/);
+    // ONE container-scoped rule sizes + fills every header control (identity chevron, docs, install, discover,
+    // edit, back, refresh) — a new header button can never be missed by a per-class list.
     expect(readFileSync('web/index.html', 'utf8')).toMatch(/class="[^"]*\bidentity-menu-button\b[^"]*"[^>]*id="identityMenuButton"/);
-    expect(css).toMatch(/\.identity-menu-button\s*{\s*width: 34px;\s*height: 34px;/);
+    expect(css).toMatch(/\.pane-header \.icon-button,\s*\.public-header-actions \.icon-button,\s*\.conversation-header \.icon-button\s*{\s*width: var\(--header-button-size\);\s*height: var\(--header-button-size\);\s*background: #0d1012;/);
+    // Action clusters pin to the bar TOP at the shared inset (font-scale-proof), same formula as the public
+    // absolute cluster (top offset + inset) — so buttons sit at one y on every tab by construction.
+    expect(css).toMatch(/\.pane-header \.header-actions,\s*\.conversation-header \.header-actions\s*{\s*align-self: start;\s*margin-top: var\(--header-button-inset\);/);
+    expect(css).toMatch(/\.public-pane \.public-header-actions\s*{\s*position: absolute;\s*top: calc\(var\(--header-top-offset\) \+ var\(--header-button-inset\)\);/);
     expect(css).not.toMatch(/\.conversation-header \.docs-header-button,\s*\n?\s*\.conversation-header \.install-header-button\s*{\s*width: 40px/);
     expect(css).not.toMatch(/@media \(min-width: 680px\) and \(max-width: 900px\)/);
-    expect(css).toMatch(/\.public-pane,\s*\.vault-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: 11px 24px 24px;/);
+    expect(css).toMatch(/\.public-pane,\s*\.vault-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: var\(--header-top-offset\) 24px 24px;/);
     expect(css).toMatch(/\.list-pane\s*{\s*gap: 14px;\s*border-right: 0;\s*}/);
     expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;\s*padding: 8px 14px/);
     // Public composer is consistent with Private: full-bleed (no right gap) and its two left buttons
@@ -1008,7 +1015,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/markThreadRead\(thread\)/);
     expect(app).toMatch(/thread-unread-badge/);
     expect(css).toMatch(/\.thread-unread-badge/);
-    expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.conversation-header\s*{[\s\S]*display: grid;[\s\S]*grid-template-columns: 38px 44px minmax\(0, 1fr\) max-content;/);
+    expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.conversation-header\s*{[\s\S]*display: grid;[\s\S]*grid-template-columns: var\(--header-button-size\) 44px minmax\(0, 1fr\) max-content;/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.conversation-header \.conversation-title h2,\s*\.conversation-header \.conversation-title p,\s*\.conversation-header \.identity-title-label\s*{[\s\S]*max-width: 100%;/);
     expect(css).toMatch(/\.composer-cost-status\s*{[\s\S]*overflow-wrap: anywhere;/);
     expect(css).toMatch(/\.message\[data-status="sending"\] \.bubble/);
@@ -4977,14 +4984,18 @@ describe('PWA runtime config guard', () => {
     // Date is no longer in the header subtitle (empty, like the private header) — it moves onto the post card.
     expect(detailFn).toMatch(/setText\(publicPostDetailSubtitle, ''\)/);
     expect(detailFn).toMatch(/className = 'feed-meta public-detail-post-meta'/);
-    // The public header grid + gap match the private mobile header exactly so the avatar lines up identically.
-    expect(css).toMatch(/\.public-pane \.public-post-detail-header \{\s*grid-template-columns: 38px 44px minmax\(0, 1fr\) max-content;\s*gap: 10px;/);
-    // Both conversation headers are compressed to ~50px flush (min-height 50 / padding 0 vertical), matching
-    // every other tab's compressed pane header. A comment sits between the two declarations, so skip it.
-    expect(css).toMatch(/\.conversation-header \{\s*min-height: 50px;[\s\S]*?padding: 0 24px;/);
-    // The desktop chat-pane top padding then nudges the private conversation header down 11px so its action
-    // buttons land at the same 36px offset as every pane header (uniform header-button height across tabs).
-    expect(css).toMatch(/\.app-shell\[data-view="chats"\] \.chat-pane \{\s*display: grid;[\s\S]*?padding-top: 11px;/);
+    // The public header grid + gap match the private mobile header exactly so the avatar lines up identically
+    // (back column = the shared header-button size, avatar 44).
+    expect(css).toMatch(/\.public-pane \.public-post-detail-header \{\s*grid-template-columns: var\(--header-button-size\) 44px minmax\(0, 1fr\) max-content;\s*gap: 10px;/);
+    // Both conversation headers are exactly the shared header height, flush (zero vertical padding), matching
+    // every other tab's pane header. A comment sits between the two declarations, so skip it.
+    expect(css).toMatch(/\.conversation-header \{\s*min-height: var\(--header-height\);[\s\S]*?padding: 0 24px;/);
+    // The chat-pane top padding (BOTH breakpoints) then lands the conversation bar at the shared top offset, so
+    // its action buttons sit at the same y as every pane header (uniform header-button height across tabs).
+    expect(css).toMatch(/\.app-shell\[data-view="chats"\] \.chat-pane \{\s*display: grid;[\s\S]*?padding-top: var\(--header-top-offset\);/);
+    expect(css).toMatch(/\.app-shell\[data-chat-open="true"\]\[data-view="chats"\] \.chat-pane \{\s*display: grid;[\s\S]*?padding-top: var\(--header-top-offset\);/);
+    // The mobile conversation header carries no vertical padding of its own (the bar is the shared height).
+    expect(css).toMatch(/padding: 0 24px 0 14px;/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -5843,11 +5854,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v758/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=230/);
+    expect(sw).toMatch(/platho-pwa-prototype-v759/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=231/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=687/);
+    expect(sw).toMatch(/\.\/app\.js\?v=688/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=12/);
