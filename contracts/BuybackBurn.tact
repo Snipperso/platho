@@ -22,6 +22,11 @@ const BUYBACK_ROUTE_REFUND_RECOVERY_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_DEADLINE_MAX_AHEAD_SECONDS: Int = 900;
 const BUYBACK_ROUTE_REFUND_RECOVERY_GRACE_SECONDS: Int = 900;
 const BUYBACK_ROUTE_REFUND_RECOVERY_MIN_NANOTONS: Int = 49000000000;
+// F11 dead-man grace: a stuck PENDING_STONFI_SWAP becomes unconditionally recoverable this long PAST pending_deadline
+// (itself now()+900). ~6.25h total from execute. A real STON.fi swap notifies/bounces within seconds, so this can
+// never pre-empt a live swap; it exists only to guarantee the buyback mechanism is NEVER permanently bricked when a
+// failed-swap refund arrives from a non-whitelisted sender or nets below the 49-TON RecoverStonfiRouteRefund floor.
+const BUYBACK_STUCK_SWAP_DEADMAN_GRACE_SECONDS: Int = 21600;
 const BUYBACK_PHASE_IDLE: Int = 0;
 const BUYBACK_PHASE_PENDING_STONFI_SWAP: Int = 1;
 const BUYBACK_PHASE_PENDING_ATH_BURN: Int = 2;
@@ -79,6 +84,10 @@ message(0x42595243) RecoverStonfiRouteRefund { // "BYRC"
 }
 
 message(0x42595252) RecycleRouteRefundReserve {} // "BYRR"
+
+message(0x42595353) RecoverStuckStonfiSwap { // "BYSS" — F11 time-only dead-man recovery of a stuck PENDING_STONFI_SWAP
+    query_id: Int as uint64;
+}
 
 message(0x906182D2) TopUpStorageReserve {}
 
@@ -532,6 +541,23 @@ contract BuybackBurn {
         throwUnless(22351, msg.query_id == self.pending_query_id);
         throwUnless(22352, self.route_refund_due_ton >= self.pending_route_refund_start_ton + BUYBACK_ROUTE_REFUND_RECOVERY_MIN_NANOTONS);
         throwUnless(22353, now() > self.pending_deadline + BUYBACK_ROUTE_REFUND_RECOVERY_GRACE_SECONDS);
+        self.finishPendingCycle();
+    }
+
+    // F11 dead-man: a TIME-ONLY unconditional exit from a stuck PENDING_STONFI_SWAP. After a long grace past the swap
+    // deadline the STON.fi cycle is definitively dead (a real swap pays out ATH via JettonTransferNotification or
+    // bounces within seconds; the notification advances phase to PENDING_ATH_BURN, so the phase gate below can never
+    // pre-empt a live swap). Unlike RecoverStonfiRouteRefund it requires NO +49 TON refund proof and NO whitelisted
+    // refund, so it recovers exactly the permanent-brick cases: a failed-swap refund that arrived from a
+    // non-whitelisted actor (bounced by the empty receive() below) or a net refund under 49 TON. No funds are paid
+    // out, so it is safely permissionless; any refund that WAS credited to route_refund_due_ton is untouched and
+    // stays recyclable via RecycleRouteRefundReserve once phase returns to IDLE.
+    receive(msg: RecoverStuckStonfiSwap) {
+        self.requireSealed();
+        throwUnless(22374, context().value >= BUYBACK_ROUTE_REFUND_RECOVERY_EXEC_RESERVE);
+        throwUnless(22370, self.phase == BUYBACK_PHASE_PENDING_STONFI_SWAP);
+        throwUnless(22371, msg.query_id == self.pending_query_id);
+        throwUnless(22372, now() > self.pending_deadline + BUYBACK_STUCK_SWAP_DEADMAN_GRACE_SECONDS);
         self.finishPendingCycle();
     }
 

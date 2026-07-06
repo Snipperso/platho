@@ -13,7 +13,7 @@ const MARKET_STABILITY_START_MULTIPLIER: Int = 2;
 const MARKET_STABILITY_END_MULTIPLIER: Int = 21;
 const MARKET_STABILITY_ATH_NOTIFY_ACK_VALUE: Int = 1000000;
 const MARKET_STABILITY_LOCAL_EXEC_RESERVE: Int = 2000000;
-const MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE: Int = 48000000; // raised 30M->48M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the official ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M.
+const MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE: Int = 58000000; // F11/#3: 48M->58M (+10M) to match the ATHVesting/Vault ATH-transfer lanes' margin, widening the DOWNSTREAM recipient-hop slack (was ~20M-fwd_fee) so a multi-decade rise in config-25 forward fees cannot bounce the market-stability SELL leg. The wallet's ATHTransferRequest required_value floor stays EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M; the 58M forward satisfies it with 10M headroom. Buyers over-provide and are refunded the excess (no client lockstep; no PWA MSS-buy flow exists). Strict margin increase on an already fail-safe (bounce+refund) path.
 const MARKET_STABILITY_BUY_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_MIN_TREASURY_FLUSH_TON: Int = MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE;

@@ -13,6 +13,7 @@ import {
   FreezeBuybackRoute,
   RecycleRouteRefundReserve,
   RecoverStonfiRouteRefund,
+  RecoverStuckStonfiSwap,
   RetryAthBurnDue,
   SealBuybackBurnGenesis,
 } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
@@ -858,6 +859,49 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.pending_query_id).toBe(1n);
     expect(state.route_refund_due_ton).toBe(0n);
     expect(state.ath_burn_retry_due_atomic).toBe(0n);
+  });
+
+  it('BUYBACK-04K: F11 dead-man RecoverStuckStonfiSwap unsticks a permanently-stuck PENDING_STONFI_SWAP after the long grace (not before / not on wrong query_id), then the buyback resumes', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    await acceptReserve(env);
+    await executeBuyback(env, 1n);
+    let state = await env.buyback.getGetBuybackBurnState();
+    // No ATH notification and no whitelisted/>=49-TON refund arrive -> the cycle is permanently stuck under the old
+    // exits (this is exactly the BUYBACK-04J brick). The dead-man is the only escape.
+    expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
+    const deadline = Number(state.pending_deadline);
+
+    // BEFORE the dead-man grace (now() == deadline + 21600; the guard needs strictly >): recovery is blocked (22372).
+    env.blockchain.now = deadline + 21600;
+    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'RecoverStuckStonfiSwap',
+      query_id: 1n,
+    } as RecoverStuckStonfiSwap);
+    expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
+
+    // Past the grace but WRONG query_id: still blocked (22371) — a stale/mismatched call cannot touch this cycle.
+    env.blockchain.now = deadline + 21700;
+    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'RecoverStuckStonfiSwap',
+      query_id: 2n,
+    } as RecoverStuckStonfiSwap);
+    expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
+
+    // Past the grace with the correct query_id: permissionless recovery unsticks the cycle (no proof/whitelist).
+    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'RecoverStuckStonfiSwap',
+      query_id: 1n,
+    } as RecoverStuckStonfiSwap);
+    state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.pending_query_id).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(1n);
+
+    // Resumable: the next buyback (query_id == last_terminal + 1) executes normally — the mechanism is not dead.
+    await acceptReserve(env);
+    await executeBuyback(env, 2n);
+    expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
   });
 
   it('BUYBACK-04B: pTON transfer bounce records returned TON as route refund without restoring a retryable envelope', async () => {

@@ -21,7 +21,7 @@ noBackendRuntime=true
 - pwaScopeIsStatic: true
 - envFilesIncluded: false
 - serverRuntimeIncluded: false
-- productionMarkersCleared: true
+- productionMarkersCleared: false
 
 ## Blockers
 
@@ -30,7 +30,10 @@ None
 ## Warnings
 
 - STATIC_PACKAGE_IS_NON_PRODUCTION
+- TESTNET_ENV_PRESENT
+- MAINNET_GENESIS_NOT_VERIFIED
 
 ## Production Findings
 
-None
+- TESTNET_ENV_PRESENT: Testnet env file is present. Production deploy must not run from this workspace/config. (.env.testnet.local)
+- MAINNET_GENESIS_NOT_VERIFIED: Current release candidate has no verified final mainnet genesis evidence. (artifacts/MAINNET_GENESIS_VERIFIED.txt)

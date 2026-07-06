@@ -3114,6 +3114,47 @@ export function dictValueParserJettonExcesses(): DictionaryValue<JettonExcesses>
     }
 }
 
+export type ATHWalletTopUpStorageReserve = {
+    $$type: 'ATHWalletTopUpStorageReserve';
+}
+
+export function storeATHWalletTopUpStorageReserve(src: ATHWalletTopUpStorageReserve) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042503, 32);
+    };
+}
+
+export function loadATHWalletTopUpStorageReserve(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042503) { throw Error('Invalid prefix'); }
+    return { $$type: 'ATHWalletTopUpStorageReserve' as const };
+}
+
+export function loadTupleATHWalletTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'ATHWalletTopUpStorageReserve' as const };
+}
+
+export function loadGetterTupleATHWalletTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'ATHWalletTopUpStorageReserve' as const };
+}
+
+export function storeTupleATHWalletTopUpStorageReserve(source: ATHWalletTopUpStorageReserve) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserATHWalletTopUpStorageReserve(): DictionaryValue<ATHWalletTopUpStorageReserve> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHWalletTopUpStorageReserve(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHWalletTopUpStorageReserve(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ATHWalletDataView = {
     $$type: 'ATHWalletDataView';
     balance: bigint;
@@ -5230,6 +5271,7 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"JettonInternalTransfer","header":395134233,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"from","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"JettonTransferNotification","header":1935855772,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"sender","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"JettonExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"ATHWalletTopUpStorageReserve","header":1096042503,"fields":[]},
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"jetton_wallet_code","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
@@ -5296,6 +5338,7 @@ const UsernameNFTItem_opcodes = {
     "JettonInternalTransfer": 395134233,
     "JettonTransferNotification": 1935855772,
     "JettonExcesses": 3576854235,
+    "ATHWalletTopUpStorageReserve": 1096042503,
     "BindOfficialAthWallet": 1715335229,
     "BindUsernameVault": 1621496068,
     "SealGenesis": 974311853,

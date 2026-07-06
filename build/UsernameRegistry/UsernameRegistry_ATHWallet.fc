@@ -1959,6 +1959,13 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         return ();
     }
     
+    ;; Receive ATHWalletTopUpStorageReserve message
+    if (op == 0x41544807) {
+        var $msg = empty_tuple();
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+        return ();
+    }
+    
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(13000);

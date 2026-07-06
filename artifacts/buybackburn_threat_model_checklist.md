@@ -2,11 +2,11 @@
 
 Status: current local contract checklist after final engineering hardening pass, not an independent audit or formal proof.
 
-Date: 2026-06-01
+Date: 2026-07-06
 
 Frozen source: `contracts/BuybackBurn.tact`
 
-Current code hash: `b15d02e783237e0ba986b810c45e17c969ec19a7c562cdd7e2c73d378bbf1f04`
+Current code hash: `0bb107f3d56c001e42e99c7d0cf7b0131f42e792c31ee0728dbcd0c805972b19`
 
 Production unlock status: final genesis may seal BuybackBurn with `route_frozen=false`, but route freeze and execution remain blocked until post-pool M20F mainnet STON.fi route evidence passes. This local freeze does not set `production_buyback_burn_unlocked` or `BUYBACKBURN_IMPLEMENTATION_READY` to true.
 
@@ -18,6 +18,7 @@ Production unlock status: final genesis may seal BuybackBurn with `route_frozen=
 - Post-seal `FreezeBuybackRoute` is allowed once while BuybackBurn has no reserve, route refund, retry due, accepted reserve count, or pending phase; successful freeze clears `genesis_config_hash`.
 - Official ATH wallet is derived from the final BuybackBurn address and ATH master address.
 - STON.fi route freeze requires a positive min-out, nonzero evidence hash, referral bps bound, and ask wallet derived from the pinned ATH pool owner.
+- F11 dead-man `RecoverStuckStonfiSwap` (0x42595353): permissionless, time-only recovery of a PENDING_STONFI_SWAP that never resolves. Requires NO +49-TON refund proof and NO whitelisted refund sender; only that `now() > pending_deadline + BUYBACK_STUCK_SWAP_DEADMAN_GRACE_SECONDS` (21600s, ~24x the 900s swap deadline) and a matching pending query_id. Closes the permanent-brick class (success-but-no-notify, refund-sender migration, sub-49 net refund, silent no-refund) that the +49-gated `RecoverStonfiRouteRefund` cannot reach, without adding an owner/pause/upgrade surface.
 - Buyback execution is a fixed-floor route. `ExecuteBuybackChunk` must provide the frozen quote and frozen `dex_min_out`; it is not a dynamic best-price mechanism and does not accept caller-supplied live market quotes.
 - FeeAccumulator can fund BuybackBurn only with the exact 51.05 TON envelope.
 - BuybackBurn executes one 50 TON offer per envelope while preserving 1.05 TON route funding.

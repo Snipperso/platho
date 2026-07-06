@@ -1,11 +1,11 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-06T16:35:09.121Z",
+  "generatedAt": "2026-07-06T20:18:06.262Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "PRODUCTION_STATIC_PACKAGE_READY",
-  "productionReady": true,
+  "status": "BLOCKED_BY_PREPROD",
+  "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 139,
@@ -962,9 +962,23 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": true
+    "productionMarkersCleared": false
   },
-  "blockers": [],
+  "blockers": [
+    "TESTNET_ENV_PRESENT",
+    "MAINNET_GENESIS_NOT_VERIFIED"
+  ],
   "warnings": [],
-  "productionFindings": []
+  "productionFindings": [
+    {
+      "id": "TESTNET_ENV_PRESENT",
+      "file": ".env.testnet.local",
+      "message": "Testnet env file is present. Production deploy must not run from this workspace/config."
+    },
+    {
+      "id": "MAINNET_GENESIS_NOT_VERIFIED",
+      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
+      "message": "Current release candidate has no verified final mainnet genesis evidence."
+    }
+  ]
 }

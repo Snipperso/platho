@@ -1,6 +1,6 @@
 # Platho Static Web Deploy Prep
 
-Status: PRODUCTION_STATIC_PACKAGE_READY
+Status: BLOCKED_BY_PREPROD
 Mode: production
 Domain: platho.app
 Output: C:\platho\artifacts\platho-web-static-production
@@ -21,11 +21,12 @@ noBackendRuntime=true
 - pwaScopeIsStatic: true
 - envFilesIncluded: false
 - serverRuntimeIncluded: false
-- productionMarkersCleared: true
+- productionMarkersCleared: false
 
 ## Blockers
 
-None
+- TESTNET_ENV_PRESENT
+- MAINNET_GENESIS_NOT_VERIFIED
 
 ## Warnings
 
@@ -33,4 +34,5 @@ None
 
 ## Production Findings
 
-None
+- TESTNET_ENV_PRESENT: Testnet env file is present. Production deploy must not run from this workspace/config. (.env.testnet.local)
+- MAINNET_GENESIS_NOT_VERIFIED: Current release candidate has no verified final mainnet genesis evidence. (artifacts/MAINNET_GENESIS_VERIFIED.txt)

@@ -247,6 +247,8 @@ message(0xD53276DB) JettonExcesses {
     query_id: Int as uint64;
 }
 
+message(0x41544807) ATHWalletTopUpStorageReserve {} // "ATH"+0x07 — F11/#2: no-authority storage-reserve top-up
+
 // TEP-74 standard get_wallet_data shape: positional 4-tuple {int balance, slice owner, slice jetton_master,
 // cell jetton_wallet_code}. The 4th field (jetton_wallet_code) is what indexers (tonapi) + wallets (Tonkeeper)
 // require to classify this as a jetton wallet and read the balance — clean-11 omitted it (3-tuple) → invisible.
@@ -1086,6 +1088,15 @@ contract ATHWallet {
             amount: pending.amount,
             created_at: pending.created_at
         };
+    }
+
+    receive(msg: ATHWalletTopUpStorageReserve) {
+        // F11/#2: accept TON for storage reserve ONLY (no balance credit, no auth, no state change). Lets the
+        // monotonic processed_notifications replay-tombstone on the ECOSYSTEM wallets (Vault / treasury /
+        // UsernameRegistry / ProfileRegistry official ATH wallets, which write it) be externally funded, so a
+        // config-18 storage-price rise over the 100yr horizon cannot bleed them below the rent floor with no way to
+        // replenish. Standard user-to-user wallets never write that map, so their custody is unaffected either way.
+        // Mirrors the no-authority top-up already on CapsuleHub / ATHVesting / BuybackBurn / MarketStabilitySeller.
     }
 
     receive() {

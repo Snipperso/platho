@@ -3523,6 +3523,16 @@ PROGRAM{
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     s7 POP
+    DUP
+    1096042503 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s5 POP
+      s3 s5 XCHG
+      2 3 BLKSWAP
+      $ATHWallet$_contract_store INLINECALLDICT
+    }>
     0 EQINT
     s0 s6 XCHG
     33 LESSINT

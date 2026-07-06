@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: MarketStabilitySeller
-BoC Size: 13291 bytes
+BoC Size: 13335 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 53
+Total structures: 54
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -148,6 +148,10 @@ Signature: `JettonTransferNotification{query_id:uint64,amount:coins,sender:addre
 ### JettonExcesses
 TL-B: `jetton_excesses#d53276db query_id:uint64 = JettonExcesses`
 Signature: `JettonExcesses{query_id:uint64}`
+
+### ATHWalletTopUpStorageReserve
+TL-B: `ath_wallet_top_up_storage_reserve#41544807  = ATHWalletTopUpStorageReserve`
+Signature: `ATHWalletTopUpStorageReserve{}`
 
 ### ATHWalletDataView
 TL-B: `_ balance:int257 owner_address:address ath_master_address:address jetton_wallet_code:^cell = ATHWalletDataView`

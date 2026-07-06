@@ -3,9 +3,9 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "vault": "ead2e625b5e219f1fcf51b4b068aa4ceb461a9ed2c5dc379fcb87abeb4f5b467",
+    "vault": "b1db818389ae2be7fb429a7d5957e5eadcb3875cdef9bb956c1a40d6e56cd5f6",
     "capsulehub": "cbd14315cb61365039df65b48874cbf10cf31fbab9d2d4009cc08ac4b6feb344",
-    "ath_wallet": "58be31994b60678c2b36f3cc588a13c88ee670bc6930a91b8429c53a4312a1b9"
+    "ath_wallet": "042e3ac22f441e988a2652cb346f61f61c10263d87c688e237ec00c03fac1466"
   },
   "policy": {
     "network_fee_basis": "Measured on @ton/sandbox defaultConfig matching the audited 2026-06-02 TON mainnet basechain storage/gas/forward fee snapshot.",

@@ -4,9 +4,9 @@ Status: **PASS**
 
 Current code hashes:
 
-- Vault: `ead2e625b5e219f1fcf51b4b068aa4ceb461a9ed2c5dc379fcb87abeb4f5b467`
+- Vault: `b1db818389ae2be7fb429a7d5957e5eadcb3875cdef9bb956c1a40d6e56cd5f6`
 - CapsuleHub: `cbd14315cb61365039df65b48874cbf10cf31fbab9d2d4009cc08ac4b6feb344`
-- ATHWallet: `58be31994b60678c2b36f3cc588a13c88ee670bc6930a91b8429c53a4312a1b9`
+- ATHWallet: `042e3ac22f441e988a2652cb346f61f61c10263d87c688e237ec00c03fac1466`
 
 Policy: the canonical max charge (hold), net price, and 0.010 TON protocol fee per size class are the client message-pricing-policy tables; the measured fees are sandbox evidence from a signed VPB2 batch external driven through the bound+sealed Vault + CapsuleHub at the current code hashes. Observed fees use the bundled sandbox config matching the audited TON mainnet basechain fee snapshot. The x2 columns are reference sizing only; PASS does not require reserves to equal a 2x target.
 
