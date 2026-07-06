@@ -487,6 +487,14 @@ button:disabled,
   background: #0d1012;
 }
 
+/* Discover + edit-description header buttons share the canonical compact 34px header-button size (they were
+   the lone 38/40px outliers, standing out next to docs/install/sync). */
+.discover-header-button,
+.edit-channel-profile-button {
+  width: 34px;
+  height: 34px;
+}
+
 /* Global sync indicator: a green spinner while any sync is running, a green check when synced. Sits in the header
    corner (last in .header-actions) on every tab, so the sync state is visible everywhere — replacing the private
    dialog's text subtitle. Pure CSS (reuses rail-balance-spin); no new icon asset. */
@@ -4039,7 +4047,9 @@ button.feed-item:hover {
      the list-pane install/docs. */
   .identity-menu-button,
   .docs-header-button,
-  .install-header-button {
+  .install-header-button,
+  .discover-header-button,
+  .edit-channel-profile-button {
     width: 34px;
     height: 34px;
   }
@@ -4056,7 +4066,7 @@ button.feed-item:hover {
     column-gap: 8px;
     row-gap: 8px;
     align-items: start;
-    padding: 8px 14px var(--app-safe-area-bottom, env(safe-area-inset-bottom));
+    padding: 8px 14px calc(8px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
     overflow: visible;
   }
 
@@ -4150,7 +4160,7 @@ button.feed-item:hover {
 
   .public-composer {
     margin: 0 -24px -24px;
-    padding: 8px 14px var(--app-safe-area-bottom, env(safe-area-inset-bottom));
+    padding: 8px 14px calc(8px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
   }
 
   .balance-grid,
