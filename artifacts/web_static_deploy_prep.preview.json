@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-06T20:18:05.759Z",
+  "generatedAt": "2026-07-06T22:05:44.878Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 139,
-    "totalBytes": 4578911,
-    "bundleSha256": "66fa10cb49ae4f79f6772e497b1cf877708af4571c211efa83879757eb9bd6c7",
+    "totalBytes": 4578913,
+    "bundleSha256": "59e3dc43b6c73cc9a1ba0b9ac27c17a4bf6afbbd843f1ce20d80d3f4b0a5eed4",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1223696,
-        "sha256": "f4406bc35f6e57dab4d8cc1c687d1b2882191a663c0a9e49b3e6020fde2c56cc"
+        "bytes": 1223697,
+        "sha256": "d96cbcd1f996774de874edc6c4ddf024b64d57726e5985d0fef3d67c2a110dd0"
       },
       {
         "path": "assets/icons/about.svg",
@@ -245,7 +245,7 @@
       {
         "path": "index.html",
         "bytes": 52842,
-        "sha256": "c21643836bf61182ea4e035f2ccc63915efdd61024d6257d9f1d1f06ae1fb6d7"
+        "sha256": "076407042c825b7e89dad3c0f91bc2a88d2ee22d6a1fe3b446666dee7570a633"
       },
       {
         "path": "manifest.webmanifest",
@@ -260,7 +260,7 @@
       {
         "path": "platho-config.mjs",
         "bytes": 19016,
-        "sha256": "a009c74010b5b85e0968666308728bfc713a51d78be8d7a69ed9fdd5360504d9"
+        "sha256": "fca94a0a9bc0ee8546877898c77af463760f3c2139a232bb997a45783e6f16f4"
       },
       {
         "path": "platho-wallet.mjs",
@@ -314,8 +314,8 @@
       },
       {
         "path": "sw.js",
-        "bytes": 6807,
-        "sha256": "c1539587bb0f78c937fabd20468c37b883cec8e912fb90b1c5255fea1d2570dc"
+        "bytes": 6808,
+        "sha256": "d587ac108368679b5899e53ea0e3e2cae31ddd42e6edaf66780fa66b95a7a745"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -962,24 +962,11 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": false
+    "productionMarkersCleared": true
   },
   "blockers": [],
   "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION",
-    "TESTNET_ENV_PRESENT",
-    "MAINNET_GENESIS_NOT_VERIFIED"
+    "STATIC_PACKAGE_IS_NON_PRODUCTION"
   ],
-  "productionFindings": [
-    {
-      "id": "TESTNET_ENV_PRESENT",
-      "file": ".env.testnet.local",
-      "message": "Testnet env file is present. Production deploy must not run from this workspace/config."
-    },
-    {
-      "id": "MAINNET_GENESIS_NOT_VERIFIED",
-      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
-      "message": "Current release candidate has no verified final mainnet genesis evidence."
-    }
-  ]
+  "productionFindings": []
 }

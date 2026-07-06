@@ -100,16 +100,11 @@
     "m17_gas_report_passes": true
   },
   "manifest": {
-    "stored_hash": "1590b875c3c752b084a8540ceae72ece4ebf13d3bf3cf28b96dc1764a0bff17b",
-    "rebuilt_hash": "1590b875c3c752b084a8540ceae72ece4ebf13d3bf3cf28b96dc1764a0bff17b",
+    "stored_hash": "9e82eaa3f96d533a99a397cd71713736fda2e49cfdf84b495353d0bfda91f8ad",
+    "rebuilt_hash": "9e82eaa3f96d533a99a397cd71713736fda2e49cfdf84b495353d0bfda91f8ad",
     "match": true,
-    "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "blockers_before_final_genesis": [
-      "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
-      "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
-      "ATH_LONG_TERM_VESTING_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VESTING_ATH_WALLET_BEFORE_FINAL_GENESIS",
-      "VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS"
-    ]
+    "status": "FINAL_GENESIS",
+    "blockers_before_final_genesis": []
   },
   "stable_artifact_lock": {
     "artifacts/CURRENT_CODE_HASHES.txt": "ee24ac5af3bda421a8c31eaa34f3423f5efb205f1ef9b68ec5731300632b9dba",
@@ -130,8 +125,8 @@
     "artifacts/username_nft_item_vectors.json": "a257f1bdc24800cb94c2bea13a9be3103d7f140f89ada0cba6cf138c8a6592a4",
     "artifacts/username_registry_foundation_vectors.json": "035e0933990cea7396bba7d3fb6057660b8673082717b30b9de15ae7a972a9ca",
     "artifacts/username_registry_mint_vectors.json": "353ca014d89e55b61410e525990b8dd02e577e0beb71749d7c601e0851634018",
-    "artifacts/deployment_manifest_implemented_subset_m15.json": "85510249706ba088a9e997baaa61ea77af9b705f0c474ad4a155ee0288aee097",
-    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "f6ada885cfaf0c6e0a714d85b1fa6c1bfd98ca3a3b8bda466e21f60bfac29f3d",
+    "artifacts/deployment_manifest_implemented_subset_m15.json": "29081089c8b317d0e001db6560b633e476182229686b054fb02fae50f8311883",
+    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "e90a9e709723b51eb792078525dba37abef953f4f4c6809cad3be463de53f7f5",
     "artifacts/m16_conformance_report.json": "f377b001fd32eb2858fd50b1106b9b5aa65ac37d19b627ad9f9711338d5d09c8",
     "artifacts/m17_gas_reserve_sanity_report.json": "118de10dfaec36684ea6b08bd5f773b80aeaf2b569ee6a76355946e6d22bbc56",
     "artifacts/platho_v1_open_values_v0_18_artifact_integrity.md": "a7c1973794154e626df35e5d0100ad941ac4d83b362864840b012b74268d94bb",
@@ -200,6 +195,7 @@
     "scripts\\mainnet_upload_collection_meta.ts": "b60c801fb2050832c33681d7042e6e9eed7b89f6370a3790fb3643e614f4205b",
     "scripts\\mainnet_upload_username_art.ts": "f1ccf92f6e0f1fb67e5e496d81ad1f9edfba3ea52705b36f764d13afeb326177",
     "scripts\\market_stability_seller_readiness.ts": "4c813f4f1bac577cc69d17502c14b5d0e624d6397d983a6bdd8193bcbaf47d60",
+    "scripts\\preseal_verify.ts": "61e70444720c5f58cf181ed2fcff762ca6fd787b51676118089d7f69b2c190b6",
     "scripts\\probe_collection_deploy_input.ts": "0fc4216e0062a2c7a4efa6db6c3cdf25f089e75758da84c4cdb63bbd1d759012",
     "scripts\\probe_collection_deploy_input_round2.ts": "1d7fc88a53993608236779b4d14eef271b3f8367fce803e3f12e85240d618ba8",
     "scripts\\probe_collection_deploy_input_round3.ts": "b1c5641053aeb94f777479a704f3d55b90fd795620ec41910e33beed4843597e",
@@ -292,7 +288,7 @@
     "tests\\publish-retry-policy.test.ts": "c8b7a74ee7676be496e3b9a24084511c658fbb64930d84fc57435213b3fe9107",
     "tests\\pwa-chain-self-sufficiency.test.ts": "4766322e37b13ac41beca25922a8ef1de577473d131cc66774a89247b3b7678d",
     "tests\\pwa-contract-transactions.test.ts": "50c8f6efad0d25e9efde3e27ff4631a86a52ac0a28bee19b6a65e68b565583e1",
-    "tests\\pwa-runtime-config.test.ts": "203cf23d8c06d0f13438a479d98ed9ff8bb5d9acc3c72a1c19ffcfefe0384e96",
+    "tests\\pwa-runtime-config.test.ts": "053ff350398c44177c5a56181c0b776e8a1a8774d0fabfad29713d9aa6a1ee50",
     "tests\\quick-start-resume.test.ts": "68b93b310408ca9e60a95b33b1cb208ed8ac0b46ff06a1026c03285453f530cd",
     "tests\\recipient-identities.test.ts": "a1a0a0120f841145d878c56385ad964a6febcd93ca04b17ea18741742c576bdd",
     "tests\\release-truth-single-source.test.ts": "a522ba35da3e907cc3b04ba665ec1ecf3bbda5cca08e55c825e9c4cb093f324e",
