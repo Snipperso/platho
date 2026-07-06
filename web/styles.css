@@ -487,12 +487,13 @@ button:disabled,
   background: #0d1012;
 }
 
-/* Discover + edit-description header buttons share the canonical compact 34px header-button size (they were
-   the lone 38/40px outliers, standing out next to docs/install/sync). */
+/* Discover + edit-description header buttons: canonical compact 34px + the same near-black fill as the docs (i)
+   button, so they don't stand out with the tinted .icon-button background next to docs/sync. */
 .discover-header-button,
 .edit-channel-profile-button {
   width: 34px;
   height: 34px;
+  background: #0d1012;
 }
 
 /* Global sync indicator: a green spinner while any sync is running, a green check when synced. Sits in the header
@@ -529,8 +530,7 @@ button:disabled,
 .install-header-button {
   width: 34px;
   height: 34px;
-  background: #10201d;
-  border-color: rgba(48, 213, 176, 0.28);
+  background: #0d1012;
 }
 
 /* The "Display as" chevron (#identityMenuButton) matches the compact 34px info/install header buttons, so the
@@ -540,6 +540,7 @@ button:disabled,
 .identity-menu-button {
   width: 34px;
   height: 34px;
+  background: #0d1012;
 }
 
 @media (display-mode: standalone) {
@@ -755,8 +756,11 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .conversation-header {
-  min-height: 64px;
-  padding: 12px 24px;
+  min-height: 50px;
+  /* Vertical padding 0 so the header collapses to ~50px to match the compressed
+     pane headers; the desktop .chat-pane top padding lands it at the same 11px
+     top offset (buttons at 36px). The mobile rule below restores its own padding. */
+  padding: 0 24px;
   border-bottom: 1px solid var(--line-soft);
   background: rgba(15, 18, 20, 0.94);
 }
@@ -4238,6 +4242,10 @@ button.feed-item:hover {
 @media (min-width: 901px) {
   .app-shell[data-view="chats"] .chat-pane {
     display: grid;
+    /* Match the compressed pane headers: the conversation header (now ~50px flush)
+       is nudged down 11px so its buttons sit at the same 36px top offset as every
+       other tab's header actions, with zero double-shift on the sibling list-pane. */
+    padding-top: 11px;
   }
 
   .app-shell[data-view="chats"] .list-pane .header-actions {

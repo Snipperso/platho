@@ -272,11 +272,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
     expect(html).toMatch(/id="appVersionLabel">v672<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v686'/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v687'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=686" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=687" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4979,8 +4979,12 @@ describe('PWA runtime config guard', () => {
     expect(detailFn).toMatch(/className = 'feed-meta public-detail-post-meta'/);
     // The public header grid + gap match the private mobile header exactly so the avatar lines up identically.
     expect(css).toMatch(/\.public-pane \.public-post-detail-header \{\s*grid-template-columns: 38px 44px minmax\(0, 1fr\) max-content;\s*gap: 10px;/);
-    // Both conversation headers are compressed (was min-height 90 / padding 24px 24px 16px).
-    expect(css).toMatch(/\.conversation-header \{\s*min-height: 64px;\s*padding: 12px 24px;/);
+    // Both conversation headers are compressed to ~50px flush (min-height 50 / padding 0 vertical), matching
+    // every other tab's compressed pane header. A comment sits between the two declarations, so skip it.
+    expect(css).toMatch(/\.conversation-header \{\s*min-height: 50px;[\s\S]*?padding: 0 24px;/);
+    // The desktop chat-pane top padding then nudges the private conversation header down 11px so its action
+    // buttons land at the same 36px offset as every pane header (uniform header-button height across tabs).
+    expect(css).toMatch(/\.app-shell\[data-view="chats"\] \.chat-pane \{\s*display: grid;[\s\S]*?padding-top: 11px;/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -5839,11 +5843,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v757/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=229/);
+    expect(sw).toMatch(/platho-pwa-prototype-v758/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=230/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=686/);
+    expect(sw).toMatch(/\.\/app\.js\?v=687/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=12/);
