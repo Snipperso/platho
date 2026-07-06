@@ -186,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v690';
+const PLATHO_APP_RUNTIME_VERSION = 'v691';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5435,6 +5435,8 @@ function appendPublicItemComments(article, item) {
       const statusBadge = document.createElement('span');
       statusBadge.className = `public-publish-status${String(comment.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
       statusBadge.textContent = (comment.publishState ? publishStateMeta(comment.publishState) : null) || comment.publishStatus;
+      // Patch anchor for the status-only fast path (a publish tick updates this text in place, no rebuild).
+      if (comment.id) statusBadge.dataset.publishLocalId = String(comment.id);
       wirePublicPublishRetryBadge(statusBadge, comment, 'comment');
       commentMeta.append(statusBadge);
     }
@@ -5627,6 +5629,8 @@ function renderPublicFeed(items, options = {}) {
       // Private-style live status ('sending 2 parts' / 'submitted 1/2, confirming' / …) when a publishState is
       // streaming; the machine-readable publishStatus marker is the fallback.
       statusBadge.textContent = (item.publishState ? publishStateMeta(item.publishState) : null) || item.publishStatus;
+      // Patch anchor for the status-only fast path (a publish tick updates this text in place, no rebuild).
+      if (item.id) statusBadge.dataset.publishLocalId = String(item.id);
       wirePublicPublishRetryBadge(statusBadge, item, 'post');
       meta.append(statusBadge);
     }
@@ -24287,8 +24291,30 @@ function persistPublicPublishProgress(job, patch = {}) {
   feed.updatedAt = new Date().toISOString();
   publicChannelFeedCache = { ...publicChannelFeedCache, [job.channelId]: { feed, syncedAt: feed.updatedAt } };
   writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
-  renderPublicSurface({ anchorUnread: false });
+  // STATUS-ONLY FAST PATH (public twin of the private-dialog rule: only the act of sending may move a
+  // scroller): a publish status tick patches the badge text in place — the feed/comments DOM is NOT rebuilt,
+  // so an active scroll is never interrupted. Structural transitions (badge appearing/disappearing, the
+  // failed -> retryable wiring, the confirmed merge) fall through to the full render.
+  const patchedItem = located.kind === 'post'
+    ? feed.posts[located.postIndex]
+    : feed.posts[located.postIndex].comments[located.commentIndex];
+  if (!patchPublicPublishBadgesInPlace(job, patchedItem)) renderPublicSurface({ anchorUnread: false });
   return located;
+}
+
+// Update the live publish badge(s) for a pending record in place (feed article and/or post-detail comment —
+// both carry data-publish-local-id). Returns false when the transition is structural or no badge is mounted,
+// which sends the caller down the full renderPublicSurface path.
+function patchPublicPublishBadgesInPlace(job, item) {
+  const status = String(item?.publishStatus ?? '');
+  if (!status || status.endsWith('failed')) return false;
+  const localId = String(job?.localId ?? '');
+  if (!localId) return false;
+  const badges = document.querySelectorAll(`.public-publish-status[data-publish-local-id="${localId}"]`);
+  if (badges.length === 0) return false;
+  const text = (item.publishState ? publishStateMeta(item.publishState) : null) || status;
+  for (const badge of badges) badge.textContent = text;
+  return true;
 }
 
 // Remove an optimistic local record (user-cancelled publish: the composer restores the draft instead).

@@ -272,11 +272,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
     expect(html).toMatch(/id="appVersionLabel">v672<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v690'/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v691'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=690" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=691" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5018,6 +5018,13 @@ describe('PWA runtime config guard', () => {
     expect(listenerSource).not.toMatch(/setTimeout/);
     // A fresh outbound tail remains the ONLY smooth scroll-to-end.
     expect(renderSource).toMatch(/if \(conversationNewOutbound\) \{[\s\S]*?behavior: 'smooth'/);
+    // PUBLIC twin (the symmetric case): a publish status tick patches the badge text in place via its
+    // data-publish-local-id anchor instead of rebuilding the feed/comments through renderPublicSurface;
+    // structural transitions (no badge mounted, terminal failed -> retry wiring) fall through to the full render.
+    expect(app).toMatch(/function patchPublicPublishBadgesInPlace\(job, item\)/);
+    expect(app).toMatch(/if \(!patchPublicPublishBadgesInPlace\(job, patchedItem\)\) renderPublicSurface\(\{ anchorUnread: false \}\);/);
+    expect(app).toMatch(/if \(!status \|\| status\.endsWith\('failed'\)\) return false;/);
+    expect((app.match(/statusBadge\.dataset\.publishLocalId = /g) ?? []).length).toBe(2);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -5883,11 +5890,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v761/);
+    expect(sw).toMatch(/platho-pwa-prototype-v762/);
     expect(sw).toMatch(/\.\/styles\.css\?v=231/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=690/);
+    expect(sw).toMatch(/\.\/app\.js\?v=691/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=12/);

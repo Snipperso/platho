@@ -49,7 +49,10 @@ describe('public publish heal driver guard', () => {
   it('PWA-PUBLIC-HEAL-04: driver state is persisted back into the feed cache and stops on merge', () => {
     // Each pass write-backs the LIVE publishState (feed syncs rebuild the cache via safeClone, detaching refs).
     expect(app).toMatch(/function persistPublicPublishProgress\(job, patch = \{\}\)/);
-    expect(app).toMatch(/writePublicChannelFeedCache\(publicChannelStorage\(\), publicChannelFeedCache\);\s*renderPublicSurface\(\{ anchorUnread: false \}\);\s*return located;/);
+    // Persist always writes the cache; the repaint is the status-only fast path (patch the badge in place,
+    // scroller untouched) with the full renderPublicSurface as the structural fallback (see PWA-CHAT-SCROLL-01).
+    expect(app).toMatch(/writePublicChannelFeedCache\(publicChannelStorage\(\), publicChannelFeedCache\);/);
+    expect(app).toMatch(/if \(!patchPublicPublishBadgesInPlace\(job, patchedItem\)\) renderPublicSurface\(\{ anchorUnread: false \}\);\s*return located;/);
     // A record that merged with its on-chain twin (or vanished) stops the driver quietly.
     expect(app).toMatch(/if \(!located \|\| !isPendingPublicFeedItem\(located\.item\)\) \{\s*stopPublicPublishConfirmation\(job\);/);
     // Account switch clears public jobs like private ones.
