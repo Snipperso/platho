@@ -1253,7 +1253,7 @@ html[data-platho-telegram="true"] .install-header-button {
 .composer {
   display: grid;
   grid-template-columns: 44px 44px 44px minmax(0, 1fr) 52px;
-  align-items: end;
+  align-items: start;
   column-gap: 10px;
   row-gap: 6px;
   min-width: 0;
@@ -1272,12 +1272,12 @@ html[data-platho-telegram="true"] .install-header-button {
   grid-template-columns: 44px 44px 44px minmax(0, 1fr) 52px;
 }
 
-.composer > .composer-add {
+.composer > .private-anonymous-button {
   grid-column: 1;
   grid-row: 1;
 }
 
-.composer > .private-anonymous-button {
+.composer > .composer-add {
   grid-column: 2;
   grid-row: 1;
 }
