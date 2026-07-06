@@ -272,11 +272,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
     expect(html).toMatch(/id="appVersionLabel">v672<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v688'/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v689'/);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=688" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=689" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5552,6 +5552,13 @@ describe('PWA runtime config guard', () => {
     expect(flushSource).toMatch(/REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS/);
     expect(flushSource).toMatch(/createWalletTransaction\(messages\)/);
     expect(app).not.toMatch(/set(?:Interval|Timeout)\(\s*(?:async\s*)?\(\s*\)\s*=>\s*submitAthDueFlush/);
+    // Optimistic supply drop: submitting a flush immediately lowers "Current supply" by the flushed amount
+    // (display-only overlay set AFTER the successful send), converging to the chain read once the burn lands
+    // (supply <= baseline - amount) or on TTL expiry — a downstream failure self-corrects.
+    expect(flushSource).toMatch(/athSupplyOptimisticBurn = \{\s*baseline: athProtocolState\.total_supply,\s*amount: flushedAmount,\s*until: Date\.now\(\) \+ ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS,/);
+    expect(app).toMatch(/function athSupplyDisplayValue\(\)/);
+    expect(app).toMatch(/setText\(athSupplyStatus, formatAthProfileAmount\(athSupplyDisplayValue\(\)\)\)/);
+    expect(app).toMatch(/supply <= baseline - amount/);
   });
 
   it('PWA-CONFIG-07B: private chain sync uses key indexes without global tail scan fallback', () => {
@@ -5854,11 +5861,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v759/);
+    expect(sw).toMatch(/platho-pwa-prototype-v760/);
     expect(sw).toMatch(/\.\/styles\.css\?v=231/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=688/);
+    expect(sw).toMatch(/\.\/app\.js\?v=689/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=12/);

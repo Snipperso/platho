@@ -186,7 +186,7 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v688';
+const PLATHO_APP_RUNTIME_VERSION = 'v689';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1201,6 +1201,12 @@ let vaultProtocolState = {
 let athProtocolState = {
   total_supply: null,
 };
+// Optimistic burn overlay for the "Current supply" row: set when a burn flush is submitted so the number
+// drops IMMEDIATELY by the flushed amount instead of waiting ~15-45s for the burn chain (wallet -> registry
+// -> ATH master) to land. Display-only — never feeds a transaction; cleared as soon as the chain read
+// reflects the burn (supply <= baseline - amount) or on TTL expiry, so a downstream failure self-corrects.
+let athSupplyOptimisticBurn = null;
+const ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS = 5 * 60 * 1000;
 let athFlushState = {
   username_burn_due_ath: null,
   profile_burn_due_ath: null,
@@ -16431,8 +16437,21 @@ function formatBasisPointsPercent(bps) {
     : `${whole}.${fraction.toString().padStart(2, '0').replace(/0+$/, '')}%`;
 }
 
+function athSupplyDisplayValue() {
+  const supply = athProtocolState.total_supply;
+  if (supply === null || !athSupplyOptimisticBurn) return supply;
+  const { baseline, amount, until } = athSupplyOptimisticBurn;
+  if (Date.now() > until || supply <= baseline - amount) {
+    // The chain read now reflects the burn (or the overlay expired) — trust the chain.
+    athSupplyOptimisticBurn = null;
+    return supply;
+  }
+  const adjusted = supply - amount;
+  return adjusted < 0n ? 0n : adjusted;
+}
+
 function renderAthProfileStats() {
-  setText(athSupplyStatus, formatAthProfileAmount(athProtocolState.total_supply));
+  setText(athSupplyStatus, formatAthProfileAmount(athSupplyDisplayValue()));
   renderAthFlushStatus();
   const total = nonNegativeBigInt(
     vaultProtocolState?.airdrop_total_allocation_ath,
@@ -20423,7 +20442,18 @@ async function submitAthDueFlush() {
     error: null,
   };
   globalThis.plathoLastAthDueFlush = { state, messages, transaction, result, flushedBuckets };
-  renderAthFlushStatus();
+  // Optimistic supply drop: the flushed dues WILL be burned once the chain processes the flush; show the
+  // post-burn supply right away (display-only overlay, cleared when the chain read reflects the burn).
+  const flushedAmount = (flushedBuckets.includes('username') ? usernameDue : 0n)
+    + (flushedBuckets.includes('profile') ? profileDue : 0n);
+  if (athProtocolState.total_supply !== null && flushedAmount > 0n) {
+    athSupplyOptimisticBurn = {
+      baseline: athProtocolState.total_supply,
+      amount: flushedAmount,
+      until: Date.now() + ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS,
+    };
+  }
+  renderAthProfileStats();
   queueAthFlushPostTransactionRefresh();
   flashWalletIdentityStatus(t('wallet.athFlushSubmitted'));
   return result;
