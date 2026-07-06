@@ -756,9 +756,10 @@ let identityPopoverAnchor = null;
 let activeActionDialog = null;
 let publicChannelSearchQuery = '';
 // F2: how many of the newest feed items are currently rendered. Grows by PUBLIC_FEED_RENDER_PAGE on "show older";
-// reset to the cap on a search change / account switch. Persists across background sync re-renders so the user's
-// "show older" expansion is not collapsed under them.
-let publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
+// reset to the cap on a search change / account switch. Persists across background sync re-renders. Declared here
+// with the other public state but INITIALIZED just after PUBLIC_FEED_RENDER_CAP is declared below, so this
+// module-load statement never forward-references that const inside its temporal dead zone (boot ReferenceError).
+let publicFeedShownCap;
 let publicCommentTarget = null;
 // Public post detail screen (per-post comments, opened from the "Comments" action). The composer is shared with
 // the feed; while the detail is open it is in comment mode (publicCommentTarget = the open post).
@@ -1090,6 +1091,9 @@ const PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE = 24;
 // 128/channel, long mode 4096/channel -> tens of thousands across many channels).
 const PUBLIC_FEED_RENDER_CAP = 150;
 const PUBLIC_FEED_RENDER_PAGE = 150;
+// Initialize the module-scope publicFeedShownCap now that its const exists (it is DECLARED far above with the other
+// public state; initializing it up there would forward-reference this const in its TDZ and crash boot).
+publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
 const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
 const PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT = 48;
 const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
@@ -5646,8 +5650,10 @@ function renderPublicFeed(items, options = {}) {
   const existing = new Map();
   for (const node of Array.from(publicFeed.children)) {
     const id = node.dataset?.itemId;
-    if (id) existing.set(id, node);
-    else node.remove(); // discovery CTA / show-older button / empty-state — rebuilt cheaply below and re-placed
+    // Keep the FIRST node per item id; drop non-item nodes (discovery CTA / show-older / empty-state, rebuilt below)
+    // AND any DUPLICATE id — so a DOM a prior render left with duplicates self-heals to one node per item here.
+    if (id && !existing.has(id)) existing.set(id, node);
+    else node.remove();
   }
   const avatarUrlMemo = new Map();
   const seen = new Set();
@@ -5669,10 +5675,18 @@ function renderPublicFeed(items, options = {}) {
     seen.add(key);
     const sig = publicFeedItemRenderSignature(item, avatarUrlMemo);
     let article = existing.get(key);
-    if (!article || article.dataset.sig !== sig) {
+    if (article && article.dataset.sig !== sig) {
+      // Signature changed -> the cached article is stale. REMOVE it before rebuilding, else the old node lingers as a
+      // duplicate (the final cleanup only removes ids NOT in `seen`, and this id IS in seen for the rebuilt node).
+      article.remove();
+      existing.delete(key);
+      article = null;
+    }
+    if (!article) {
       article = buildPublicFeedArticle(item, avatarUrlMemo);
       article.dataset.itemId = key;
       article.dataset.sig = sig;
+      existing.set(key, article);
     }
     const anchor = prev ? prev.nextSibling : publicFeed.firstChild;
     if (article !== anchor) publicFeed.insertBefore(article, anchor);
