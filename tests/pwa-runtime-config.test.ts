@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=707" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=708" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2230,6 +2230,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/run: \(\) => exportEncryptedWalletKeyFile\(\)/);
     // Step 2 (TON Center key) reads the input and applies the key (after validating it — see PWA-TONCENTER-KEY-VALIDATE-01).
     expect(app).toMatch(/const value = quickStartStepBody\?\.querySelector\('#quickStartKeyInput'\)\?\.value;[\s\S]*applyToncenterApiKey\(trimmed\)/);
+    // v708 (owner): the get-a-key CTA sits BELOW the input with a clear gap and wears the shared
+    // plate-action button class (the "Add contact" look) — input first in DOM, button second.
+    expect(app).toMatch(/wrap\.className = 'quick-start-key-body';/);
+    expect(app).toMatch(/getKey\.className = 'discovery-cta-action';[\s\S]{0,220}wrap\.append\(input, getKey\);/);
+    const cssQuickKey = readFileSync('web/styles.css', 'utf8');
+    expect(cssQuickKey).toMatch(/\.quick-start-key-body \{\s*display: grid;\s*gap: 12px;/);
+    expect(cssQuickKey).toMatch(/\.quick-start-key-body > \.discovery-cta-action \{\s*justify-self: start;/);
     // Wired into the boot chain, defensively, after the wallet state is known.
     expect(app).toMatch(/try \{ quickStartShown = maybeShowQuickStartOnFirstRun\(\); \} catch \(error\) \{ console\.error\(error\); \}/);
   });
@@ -6137,11 +6144,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v778/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=239/);
+    expect(sw).toMatch(/platho-pwa-prototype-v779/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=240/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=707/);
+    expect(sw).toMatch(/\.\/app\.js\?v=708/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=18/);

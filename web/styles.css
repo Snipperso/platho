@@ -3247,6 +3247,17 @@ button.feed-item:hover {
   display: none;
 }
 
+/* Step-2 (TON Center key) body: the input stretches, the get-a-key CTA sits BELOW it on its own row with a
+   clear gap, sized to its label (the shared .discovery-cta-action class gives it the plate-button look). */
+.quick-start-key-body {
+  display: grid;
+  gap: 12px;
+}
+
+.quick-start-key-body > .discovery-cta-action {
+  justify-self: start;
+}
+
 .quick-start-step-body input[type="text"],
 .quick-start-step-body input:not([type]) {
   width: 100%;

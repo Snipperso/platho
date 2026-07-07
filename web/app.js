@@ -26500,12 +26500,11 @@ const QUICK_START_STEPS = [
     why: t('quickstart.addKeyWhy'),
     autoDone: () => false,
     body: () => {
+      // Input FIRST, the get-a-key CTA below it with a clear gap (owner: the old order glued a
+      // button-that-didn't-look-like-one on top of the field). The CTA reuses the shared plate-action
+      // button class so it reads unmistakably as a button (same look as "Add contact").
       const wrap = document.createElement('div');
-      const getKey = document.createElement('button');
-      getKey.type = 'button';
-      getKey.className = 'secondary-button';
-      getKey.textContent = t('quickstart.getFreeKey');
-      getKey.addEventListener('click', () => { openToncenterBotLink(); });
+      wrap.className = 'quick-start-key-body';
       const input = document.createElement('input');
       input.type = 'text';
       input.id = 'quickStartKeyInput';
@@ -26513,7 +26512,12 @@ const QUICK_START_STEPS = [
       input.spellcheck = false;
       input.placeholder = t('quickstart.pasteKeyPlaceholder');
       if (globalThis.plathoToncenterApiKey) input.value = globalThis.plathoToncenterApiKey;
-      wrap.append(getKey, input);
+      const getKey = document.createElement('button');
+      getKey.type = 'button';
+      getKey.className = 'discovery-cta-action';
+      getKey.textContent = t('quickstart.getFreeKey');
+      getKey.addEventListener('click', () => { openToncenterBotLink(); });
+      wrap.append(input, getKey);
       return wrap;
     },
     run: async () => {
