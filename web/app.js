@@ -1257,6 +1257,14 @@ let athProtocolState = {
 // reflects the burn (supply <= baseline - amount) or on TTL expiry, so a downstream failure self-corrects.
 let athSupplyOptimisticBurn = null;
 const ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS = 5 * 60 * 1000;
+// After a flush is SENT, the chain keeps answering the pre-flush state (due>0, pending=0) until the wallet
+// transaction lands — and the immediate post-transaction refresh used to overwrite the optimistic "flushing"
+// state with that stale read, re-arming the button mid-flight ("250 ATH ready" + active button right after a
+// tap; a second tap would send a duplicate flush). This overlay holds the flushed buckets at due=0/pending+1
+// until the chain visibly moves (pending counted or the due changed) or the TTL expires (lost transaction ->
+// the button honestly re-arms). Protocol-level counters, not wallet-scoped.
+let athFlushOptimisticFlush = null;
+const ATH_FLUSH_OPTIMISTIC_FLUSH_TTL_MS = 5 * 60 * 1000;
 let athFlushState = {
   username_burn_due_ath: null,
   profile_burn_due_ath: null,
@@ -16889,6 +16897,37 @@ function formatAthProfileAmount(value) {
   return `${groupDecimalText(formatAthAtomic(value))} ATH`;
 }
 
+// Merge the in-flight flush overlay into a fresh chain read (see athFlushOptimisticFlush). Per bucket: while
+// the chain still shows the EXACT pre-flush picture (same due, zero pending), keep displaying due=0/pending+1
+// so the button stays down and the status says "flushing"; the moment the chain moves (pending counted, due
+// changed — including a NEW accrual arriving mid-flight) that bucket trusts the chain again. Display-only:
+// nothing here signs, sends, or feeds a transaction.
+function applyAthFlushOptimisticOverlay(state) {
+  const overlay = athFlushOptimisticFlush;
+  if (!overlay) return state;
+  if (Date.now() > overlay.until) {
+    athFlushOptimisticFlush = null;
+    return state;
+  }
+  const out = { ...state };
+  for (const bucket of ['username', 'profile']) {
+    const hold = overlay[bucket];
+    if (!hold?.flushed) continue;
+    const dueKey = `${bucket}_burn_due_ath`;
+    const pendingKey = `${bucket}_pending_burn_flush_count`;
+    const chainDue = nonNegativeBigInt(state[dueKey]);
+    const chainPending = nonNegativeBigInt(state[pendingKey]);
+    if (chainPending > 0n || chainDue !== hold.baselineDue) {
+      hold.flushed = false;
+      continue;
+    }
+    out[dueKey] = 0n;
+    out[pendingKey] = chainPending + 1n;
+  }
+  if (!overlay.username?.flushed && !overlay.profile?.flushed) athFlushOptimisticFlush = null;
+  return out;
+}
+
 function athFlushReadyAmount(state = athFlushState) {
   return nonNegativeBigInt(state.username_burn_due_ath) + nonNegativeBigInt(state.profile_burn_due_ath);
 }
@@ -20062,7 +20101,9 @@ async function readAthBurnFlushState() {
 async function refreshAthFlushState() {
   renderAthFlushStatus();
   try {
-    athFlushState = await readAthBurnFlushState();
+    // The overlay keeps a just-sent flush visible (button down, "flushing") while the chain still answers
+    // the pre-flush state — a bare overwrite here used to re-arm the button mid-flight.
+    athFlushState = applyAthFlushOptimisticOverlay(await readAthBurnFlushState());
     renderAthFlushStatus();
     return athFlushState;
   } catch (error) {
@@ -20964,16 +21005,15 @@ async function submitAthDueFlush() {
   }
   const transaction = createWalletTransaction(messages);
   const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
+  // Arm the in-flight overlay FIRST, then derive the displayed state through the same merge every later
+  // refresh uses — one source for the optimistic picture (see applyAthFlushOptimisticOverlay).
+  athFlushOptimisticFlush = {
+    username: { flushed: flushedBuckets.includes('username'), baselineDue: usernameDue },
+    profile: { flushed: flushedBuckets.includes('profile'), baselineDue: profileDue },
+    until: Date.now() + ATH_FLUSH_OPTIMISTIC_FLUSH_TTL_MS,
+  };
   athFlushState = {
-    ...state,
-    username_burn_due_ath: flushedBuckets.includes('username') ? 0n : state.username_burn_due_ath,
-    profile_burn_due_ath: flushedBuckets.includes('profile') ? 0n : state.profile_burn_due_ath,
-    username_pending_burn_flush_count: flushedBuckets.includes('username')
-      ? usernamePending + 1n
-      : state.username_pending_burn_flush_count,
-    profile_pending_burn_flush_count: flushedBuckets.includes('profile')
-      ? profilePending + 1n
-      : state.profile_pending_burn_flush_count,
+    ...applyAthFlushOptimisticOverlay(state),
     busy: false,
     error: null,
   };

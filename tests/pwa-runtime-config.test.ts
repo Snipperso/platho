@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=703" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=704" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5189,6 +5189,13 @@ describe('PWA runtime config guard', () => {
     // the unified cycle); spinning taps no-op. The discovery header's separate refresh button is GONE.
     expect(html).not.toMatch(/<span class="global-sync-indicator"/);
     expect((html.match(/<button type="button" class="global-sync-indicator"/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    // v704 ATH-flush overlay integration: EVERY chain re-read of the flush state routes through the in-flight
+    // overlay merge (behavioral coverage in tests/ath-flush-overlay.test.ts), and the post-send optimistic
+    // state derives through the SAME merge — a bare overwrite is what re-armed the button mid-flight.
+    expect(app).toMatch(/athFlushState = applyAthFlushOptimisticOverlay\(await readAthBurnFlushState\(\)\)/);
+    expect(app).toMatch(/athFlushOptimisticFlush = \{\s*username: \{ flushed: flushedBuckets\.includes\('username'\), baselineDue: usernameDue \}/);
+    expect(app).toMatch(/\.\.\.applyAthFlushOptimisticOverlay\(state\),/);
+    expect(app).not.toMatch(/athFlushState = await readAthBurnFlushState\(\)/);
     expect(app).toMatch(/function syncNowForCurrentScreen\(\)/);
     expect(app).toMatch(/if \(isGlobalSyncActive\(\) \|\| messageSyncManualInFlight\) return;/);
     expect(app).toMatch(/publicPane\?\.dataset\?\.discoverOpen === 'true'\) \{\s*refreshPublicDiscovery\(\)/);
@@ -6091,11 +6098,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v774/);
+    expect(sw).toMatch(/platho-pwa-prototype-v775/);
     expect(sw).toMatch(/\.\/styles\.css\?v=237/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=703/);
+    expect(sw).toMatch(/\.\/app\.js\?v=704/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=17/);
