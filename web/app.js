@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=13';
+} from './i18n.mjs?v=14';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -317,7 +317,6 @@ const activeSubtitle = document.querySelector('#activeSubtitle');
 const backToChatsButton = document.querySelector('#backToChatsButton');
 const identityMenuButton = document.querySelector('#identityMenuButton');
 const search = document.querySelector('#threadSearch');
-const newChatButton = document.querySelector('#newChatButton');
 const newChatDialog = document.querySelector('#newChatDialog');
 const newChatForm = document.querySelector('#newChatForm');
 const recipientInput = document.querySelector('#recipientInput');
@@ -625,7 +624,6 @@ const publicPane = document.querySelector('.public-pane');
 const publicFeed = document.querySelector('#publicFeed');
 const publicChannelSearchRow = document.querySelector('#publicChannelSearchRow');
 const publicChannelSearch = document.querySelector('#publicChannelSearch');
-const addPublicChannelButton = document.querySelector('#addPublicChannelButton');
 const editChannelProfileButton = document.querySelector('#editChannelProfileButton');
 const publicDiscoverButton = document.querySelector('#publicDiscoverButton');
 const publicDiscovery = document.querySelector('#publicDiscovery');
@@ -6313,20 +6311,16 @@ function followDiscoveredChannel(authorWallet) {
   renderPublicDiscovery({ loading: false });
 }
 
-// The discovery call-to-action shown at the top of the feed for a newcomer (no channels followed beyond the
-// default). One tap opens the discovery panel.
+// The channels plate at the top of the feed. Since the search-row "+" was removed (owner: a bare plus is
+// unreadable), this plate is the ONLY entry point for discovery-by-activity AND add-channel-by-address, so it
+// shows for EVERYONE — hidden only while a channel search is filtering the feed (results must not be pushed down).
 function shouldShowDiscoveryCta() {
-  if (publicChannelSearchQuery) return false;
-  const followed = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
-    .filter((channel) => channel.id !== DEFAULT_PUBLIC_CHANNEL_ID);
-  return followed.length === 0;
+  return !publicChannelSearchQuery;
 }
 
 function buildDiscoveryCtaCard() {
   const card = document.createElement('article');
   card.className = 'feed-item discovery-cta';
-  card.setAttribute('role', 'button');
-  card.tabIndex = 0;
 
   const head = document.createElement('div');
   head.className = 'discovery-cta-head';
@@ -6338,25 +6332,34 @@ function buildDiscoveryCtaCard() {
   const textWrap = document.createElement('div');
   textWrap.className = 'discovery-cta-text';
   const title = document.createElement('h2');
+  title.setAttribute('data-i18n', 'public.discoverCtaTitle');
   title.textContent = t('public.discoverCtaTitle');
   const body = document.createElement('p');
+  body.setAttribute('data-i18n', 'public.discoverCtaBody');
   body.textContent = t('public.discoverCtaBody');
   textWrap.append(title, body);
   head.append(badge, textWrap);
 
-  // A styled pill (not a real <button>: the whole card is the single role="button" click target, so a nested
-  // button would be invalid a11y) that reads unmistakably as the call-to-action.
-  const action = document.createElement('span');
-  action.className = 'discovery-cta-action';
-  action.textContent = t('public.discoverCtaAction');
+  // Two labeled actions (real <button>s — the card itself is no longer a click target): discover channels by
+  // recent activity, or add a known channel by name/address. data-i18n keeps the card retranslatable in place
+  // by applyStaticTranslations (the quick-start language switch applies without a reload).
+  const actions = document.createElement('div');
+  actions.className = 'discovery-cta-actions';
+  const discover = document.createElement('button');
+  discover.type = 'button';
+  discover.className = 'discovery-cta-action';
+  discover.setAttribute('data-i18n', 'public.discoverCtaAction');
+  discover.textContent = t('public.discoverCtaAction');
+  discover.addEventListener('click', () => { openPublicDiscovery().catch((error) => console.error(error)); });
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'discovery-cta-action';
+  add.setAttribute('data-i18n', 'public.discoverCtaAddAction');
+  add.textContent = t('public.discoverCtaAddAction');
+  add.addEventListener('click', () => { openAddPublicChannelDialog(); });
+  actions.append(discover, add);
 
-  card.append(head, action);
-
-  const open = () => { openPublicDiscovery().catch((error) => console.error(error)); };
-  card.addEventListener('click', open);
-  card.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); }
-  });
+  card.append(head, actions);
   return card;
 }
 
@@ -14507,6 +14510,46 @@ function setView(view) {
   }
 }
 
+// "Add a contact" plate pinned at the top of the private thread list — the labeled replacement for the old
+// search-row "+" (owner: a bare plus is unreadable), and the mirror of the public feed's channels plate. ONE
+// persistent node: renderThreads re-inserts it first on every render and the row reconciliation skips it, so
+// its listener survives; data-i18n keeps it retranslatable in place (quick-start language switch, no reload).
+let privateContactCtaCard = null;
+function ensureContactCtaCard() {
+  if (privateContactCtaCard) return privateContactCtaCard;
+  const card = document.createElement('article');
+  card.className = 'feed-item discovery-cta contact-cta';
+  const head = document.createElement('div');
+  head.className = 'discovery-cta-head';
+  const badge = document.createElement('span');
+  badge.className = 'discovery-cta-icon';
+  const badgeIcon = document.createElement('span');
+  badgeIcon.className = 'icon icon-user';
+  badge.append(badgeIcon);
+  const textWrap = document.createElement('div');
+  textWrap.className = 'discovery-cta-text';
+  const title = document.createElement('h2');
+  title.setAttribute('data-i18n', 'chat.contactCtaTitle');
+  title.textContent = t('chat.contactCtaTitle');
+  const body = document.createElement('p');
+  body.setAttribute('data-i18n', 'chat.contactCtaBody');
+  body.textContent = t('chat.contactCtaBody');
+  textWrap.append(title, body);
+  head.append(badge, textWrap);
+  const actions = document.createElement('div');
+  actions.className = 'discovery-cta-actions';
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'discovery-cta-action';
+  add.setAttribute('data-i18n', 'chat.contactCtaAction');
+  add.textContent = t('chat.contactCtaAction');
+  add.addEventListener('click', openNewChatDialog);
+  actions.append(add);
+  card.append(head, actions);
+  privateContactCtaCard = card;
+  return card;
+}
+
 function renderThreads() {
   const q = search.value.trim().toLowerCase();
   threads.forEach(hydrateThreadDisplayFromContactStore);
@@ -14526,15 +14569,22 @@ function renderThreads() {
   // (avatar + identity label + a fresh click listener each) on each. Now existing rows are REUSED (matched by
   // thread.id), only their mutable content is patched (applyThreadRow), and only added/removed/reordered rows touch
   // the DOM. One-time migration: rows left by the pre-F3 build carry no _refs — drop them so they are rebuilt once.
-  if (threadList.firstElementChild && !threadList.firstElementChild._refs) threadList.replaceChildren();
+  // (Checked on the first ROW, not the first child — the contact-CTA plate legitimately carries no _refs.)
+  const firstRow = threadList.querySelector(':scope > [data-thread]');
+  if (firstRow && !firstRow._refs) threadList.replaceChildren();
   const existingRows = new Map();
   for (const node of Array.from(threadList.children)) {
     const id = node.dataset?.thread;
     if (id && node._refs) existingRows.set(id, node);
-    else node.remove();
+    else if (node !== privateContactCtaCard) node.remove();
   }
   const seen = new Set();
-  let prev = null;
+  // The add-a-contact plate stays pinned as the FIRST list entry; hidden while a search is filtering the list
+  // (results must not be pushed down — mirrors the public discovery plate's search behavior).
+  const contactCta = ensureContactCtaCard();
+  contactCta.hidden = q.length > 0;
+  if (threadList.firstElementChild !== contactCta) threadList.insertBefore(contactCta, threadList.firstElementChild);
+  let prev = contactCta;
   for (const thread of ordered) {
     seen.add(thread.id);
     let item = existingRows.get(thread.id);
@@ -15054,7 +15104,6 @@ identityMenuButton?.addEventListener('click', (event) => {
   }
 });
 
-newChatButton?.addEventListener('click', openNewChatDialog);
 closeNewChatButton?.addEventListener('click', closeNewChatDialog);
 closeOnBackdropClick(newChatDialog, closeNewChatDialog);
 function showNewChatHint(text, tone = 'error') {
@@ -15709,7 +15758,9 @@ publicDiscoveryRefreshButton?.addEventListener('click', () => {
   refreshPublicDiscovery().catch((error) => console.error(error));
 });
 
-addPublicChannelButton?.addEventListener('click', async () => {
+// Add-a-known-channel dialog (identity -> local registry row). Reached from the feed-top plate button — the
+// labeled replacement for the old search-row "+" icon button.
+async function openAddPublicChannelDialog() {
   try {
     const result = await openActionDialog({
       title: t('public.addChannelTitle'),
@@ -15759,7 +15810,7 @@ addPublicChannelButton?.addEventListener('click', async () => {
     setPublicStatus('channel blocked');
     console.error(error);
   }
-});
+}
 
 publicJumpDownButton?.addEventListener('click', () => {
   const items = publicFeedItemsChronological();

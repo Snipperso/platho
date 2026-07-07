@@ -2,16 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "about",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["web-about/serve.js"],
-      "port": 4178
-    },
-    {
-      "name": "web",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["web/static-server.js"],
-      "port": 4173
+      "name": "platho-web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8777", "--directory", "web"],
+      "port": 8777
     }
   ]
 }

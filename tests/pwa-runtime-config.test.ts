@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=694" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=695" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -3920,8 +3920,11 @@ describe('PWA runtime config guard', () => {
     const publicHeader = html.match(/<section class="content-pane public-pane[\s\S]*?<\/header>/)?.[0] ?? '';
 
     expect(html).toMatch(/id="publicChannelSearch"/);
-    expect(html).toMatch(/id="addPublicChannelButton"/);
-    expect(html).toMatch(/class="search-row action-search-row"[\s\S]*id="threadSearch"[\s\S]*id="newChatButton"/);
+    // The search rows carry NO "+" icon buttons anymore (owner: a bare plus is unreadable) — the add flows
+    // moved onto the labeled CTA plates (public channels plate / private add-a-contact plate).
+    expect(html).not.toMatch(/id="addPublicChannelButton"/);
+    expect(html).not.toMatch(/id="newChatButton"/);
+    expect(html).toMatch(/class="search-row"[\s\S]*id="threadSearch"/);
     expect(html).toMatch(/placeholder="Search public"/);
     expect(html).toMatch(/id="publicJumpDownButton"/);
     expect(html).toMatch(/class="public-jump-down-button" id="publicJumpDownButton"[\s\S]*hidden/);
@@ -4425,11 +4428,39 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/resolveChannelProfile\(wallet, \{ maxScan: PUBLIC_DISCOVERY_PROFILE_MAXSCAN \}\)/);
     // Follow registers the previously-unknown channel THEN subscribes it (ensure rebuilds the registry first).
     expect(app).toMatch(/const channelId = ensurePublicChannelForAuthorWallet\(authorWallet, \{ activate: false \}\);\s*setPublicChannelSubscribed\(channelId, true\);/);
-    // UI: header entry button + discovery panel + newcomer CTA.
+    // UI: header entry button + discovery panel + the feed-top channels plate.
     expect(html).toMatch(/id="publicDiscoverButton"/);
     expect(html).toMatch(/id="publicDiscovery"/);
     expect(app).toMatch(/function buildDiscoveryCtaCard\(\)/);
     expect(app).toMatch(/function shouldShowDiscoveryCta\(\)/);
+    // The plate is the ONLY entry point for add-channel-by-address since the search-row "+" was removed:
+    // it shows for everyone (hidden only while a channel search filters the feed) and carries BOTH actions.
+    expect(app).toMatch(/function shouldShowDiscoveryCta\(\) \{\s*return !publicChannelSearchQuery;\s*\}/);
+    expect(app).toMatch(/async function openAddPublicChannelDialog\(\)/);
+    const ctaCard = app.slice(app.indexOf('function buildDiscoveryCtaCard()'), app.indexOf('async function loadPublicPostComments'));
+    expect(ctaCard).toMatch(/t\('public\.discoverCtaAction'\)/);
+    expect(ctaCard).toMatch(/t\('public\.discoverCtaAddAction'\)/);
+    expect(ctaCard).toMatch(/openAddPublicChannelDialog\(\)/);
+    expect(EN_STRINGS['public.discoverCtaAddAction']).toBe('Add channel');
+  });
+
+  it('PWA-CONTACT-CTA-01: private add-a-contact plate replaces the search-row "+" and opens the new-chat dialog', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // One persistent plate node, pinned FIRST in the thread list; row reconciliation skips it.
+    expect(app).toMatch(/function ensureContactCtaCard\(\)/);
+    expect(app).toMatch(/add\.addEventListener\('click', openNewChatDialog\);/);
+    expect(app).toMatch(/else if \(node !== privateContactCtaCard\) node\.remove\(\);/);
+    expect(app).toMatch(/contactCta\.hidden = q\.length > 0;/);
+    expect(app).toMatch(/threadList\.insertBefore\(contactCta, threadList\.firstElementChild\)/);
+    // The pre-F3 migration probe must look at the first ROW (the plate legitimately has no _refs) —
+    // a firstElementChild probe would wipe and rebuild every row on every render.
+    expect(app).toMatch(/threadList\.querySelector\(':scope > \[data-thread\]'\)/);
+    expect(app).not.toMatch(/threadList\.firstElementChild && !threadList\.firstElementChild\._refs/);
+    // hidden must actually hide the flex card (the UA [hidden] rule loses to display:flex).
+    expect(css).toMatch(/\.discovery-cta\[hidden\]\s*\{\s*display:\s*none;/);
+    expect(EN_STRINGS['chat.contactCtaTitle']).toBe('Add a contact');
+    expect(EN_STRINGS['chat.contactCtaAction']).toBe('Add contact');
   });
 
   it('PWA-SAVED-01: Saved messages — self dialog exists, renders one-sided, never self-badges, name is render-only', () => {
@@ -5900,14 +5931,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v765/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=232/);
+    expect(sw).toMatch(/platho-pwa-prototype-v766/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=233/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=694/);
+    expect(sw).toMatch(/\.\/app\.js\?v=695/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=13/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=14/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

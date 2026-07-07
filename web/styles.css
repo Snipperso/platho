@@ -571,19 +571,8 @@ html[data-platho-telegram="true"] .install-header-button {
   background: #0d1012;
 }
 
-.action-search-row {
-  grid-template-columns: 20px minmax(0, 1fr) 44px;
-}
-
 .public-channel-search-row[hidden] {
   display: none;
-}
-
-.action-search-row .icon-button {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
-  justify-self: end;
 }
 
 .search-row input,
@@ -2224,29 +2213,24 @@ button.feed-item:hover {
   padding: 24px 12px;
 }
 
-/* Newcomer call-to-action card at the top of the feed. */
-/* Discovery CTA: an empty-state prompt shown to newcomers with no follows. A call-to-action (accent frame +
-   glow on hover + an in-app-style action button on the right), not a passive panel — the whole card is the
-   single role="button" click target. No hover lift: the card must not feel "pressed" on mere hover. */
+/* Call-to-action plates: ONE shared rule set for the channels plate at the top of the public feed AND the
+   add-a-contact plate at the top of the private thread list (the labeled replacements for the removed
+   search-row "+" buttons). The card itself is passive; the affordance lives on the real action buttons. */
 .discovery-cta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 16px;
-  cursor: pointer;
   padding: 18px;
   border-color: rgba(48, 213, 176, 0.32);
   background:
     linear-gradient(135deg, rgba(48, 213, 176, 0.1), rgba(48, 213, 176, 0) 62%),
     var(--panel-2);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.discovery-cta:hover,
-.discovery-cta:focus-visible {
-  border-color: rgba(48, 213, 176, 0.55);
-  box-shadow: 0 10px 30px rgba(48, 213, 176, 0.12);
-  outline: none;
+/* display:flex above beats the UA [hidden] rule — restore it (the private plate hides while searching). */
+.discovery-cta[hidden] {
+  display: none;
 }
 
 .discovery-cta-head {
@@ -2287,6 +2271,13 @@ button.feed-item:hover {
   color: var(--muted);
 }
 
+.discovery-cta-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .discovery-cta-action {
   flex: 0 0 auto;
   display: inline-flex;
@@ -2296,14 +2287,18 @@ button.feed-item:hover {
   background: rgba(48, 213, 176, 0.1);
   border: 1px solid rgba(48, 213, 176, 0.32);
   color: var(--accent);
+  font: inherit;
   font-weight: 700;
   font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.discovery-cta:hover .discovery-cta-action,
-.discovery-cta:focus-visible .discovery-cta-action {
+.discovery-cta-action:hover,
+.discovery-cta-action:focus-visible {
   background: rgba(48, 213, 176, 0.16);
   border-color: rgba(48, 213, 176, 0.5);
+  outline: none;
 }
 
 /* The detail container bleeds to the pane edges, so this header (filling it) lines up with the private chat header.
