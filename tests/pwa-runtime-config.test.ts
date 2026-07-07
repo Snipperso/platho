@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=697" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=698" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -3203,7 +3203,9 @@ describe('PWA runtime config guard', () => {
     expect(retrySource).toMatch(/const softVerification = isTonRpcRecoverableReadError\(error\)/);
     expect(retrySource).toMatch(/if \(!rateLimited && !softVerification\) console\.error\(error\)/);
     expect(retrySource).toMatch(/message\.privatePublishConfirmLastResult = softVerification \? 'rpc delayed' : 'error'/);
-    expect(avatarSource).toMatch(/await waitForPublishedAvatarEntries\(owner, pendingPointer\)/);
+    // v698 mobilized confirm: the avatar publish heals + reads receipts in a driver-style loop instead of
+    // sleeping in read-only waits (the 6-minute 2-capsule avatar).
+    expect(avatarSource).toMatch(/while \(!confirmed && Date\.now\(\) - mobilizedStartedAt < PROFILE_AVATAR_MOBILIZED_CONFIRM_DEADLINE_MS\)/);
     expect(avatarFinalizeSource).toMatch(/avatarEntryId: confirmed\.firstEntryId/);
   });
 
@@ -4266,7 +4268,7 @@ describe('PWA runtime config guard', () => {
     );
     const findAvatarPartsSource = app.slice(
       app.indexOf('async function findPublishedAvatarEntries'),
-      app.indexOf('async function waitForPublishedAvatarEntries'),
+      app.indexOf('async function waitForProfileAvatarRegistryUpdate'),
     );
     const syncPublicSource = app.slice(
       app.indexOf('async function syncPublicChannelFromChain'),
@@ -5213,10 +5215,6 @@ describe('PWA runtime config guard', () => {
     );
     const findAvatarPartsSource = app.slice(
       app.indexOf('async function findPublishedAvatarEntries'),
-      app.indexOf('async function waitForPublishedAvatarEntries'),
-    );
-    const waitPublishedAvatarSource = app.slice(
-      app.indexOf('async function waitForPublishedAvatarEntries'),
       app.indexOf('async function waitForProfileAvatarRegistryUpdate'),
     );
     const waitRegistrySource = app.slice(
@@ -5224,10 +5222,28 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function loadProfileAvatarImage'),
     );
 
-    expect(submitAvatarSource.indexOf('confirmed = confirmed ?? await waitForPublishedAvatarEntries')).toBeGreaterThan(-1);
-    expect(submitAvatarSource.indexOf('finality = await finalizeProfileAvatarUpdate')).toBeGreaterThan(
-      submitAvatarSource.indexOf('confirmed = confirmed ?? await waitForPublishedAvatarEntries'),
+    // v698 mobilized confirm replaces the read-only wait ladder: heal (the only sender of the deferred
+    // 2nd+ batch) runs INSIDE the loop, before the receipt read; finalize comes after the loop.
+    const mobilizedIdx = submitAvatarSource.indexOf('while (!confirmed && Date.now() - mobilizedStartedAt < PROFILE_AVATAR_MOBILIZED_CONFIRM_DEADLINE_MS)');
+    expect(mobilizedIdx).toBeGreaterThan(-1);
+    expect(submitAvatarSource.indexOf('retryUnconfirmedVaultPublishBroadcasts(publishResult.publishState, {')).toBeGreaterThan(mobilizedIdx);
+    expect(submitAvatarSource).toMatch(/receiptOnly:\s*true/);
+    expect(submitAvatarSource.indexOf('finality = await finalizeProfileAvatarUpdate')).toBeGreaterThan(mobilizedIdx);
+    expect(app).toMatch(/const PROFILE_AVATAR_MOBILIZED_CONFIRM_DEADLINE_MS = 120 \* 1000/);
+    expect(app).toMatch(/const PROFILE_AVATAR_MOBILIZED_CONFIRM_PASS_DELAY_MS = 1_500/);
+    // The pre-publish "already published?" check is capped to a NARROW recent window — the unbounded
+    // 2048-entry fallback scan before every publish was minutes of serial reads.
+    expect(app).toMatch(/const PROFILE_AVATAR_PRECHECK_FALLBACK_SCAN_LIMIT = 64/);
+    expect(submitAvatarSource).toMatch(/\{ fallbackScanLimit: PROFILE_AVATAR_PRECHECK_FALLBACK_SCAN_LIMIT \}/);
+    // Recovery ticks heal FIRST (the serial RPC pump starved the one actual fix behind wide scans).
+    const recoveryFindSource = app.slice(
+      app.indexOf('async function findProfileAvatarPublishedEntriesFromRecovery'),
+      app.indexOf('async function finalizeProfileAvatarUpdate'),
     );
+    const recoveryHealIdx = recoveryFindSource.indexOf('retryUnconfirmedVaultPublishBroadcasts');
+    expect(recoveryHealIdx).toBeGreaterThan(-1);
+    expect(recoveryHealIdx).toBeLessThan(recoveryFindSource.indexOf('findConfirmedAvatarEntriesFromPublishState'));
+    expect(recoveryHealIdx).toBeLessThan(recoveryFindSource.indexOf('findPublishedAvatarEntries'));
     expect(finalizeAvatarSource.indexOf('await submitVaultProfileAvatarRegistration')).toBeGreaterThan(-1);
     expect(finalizeAvatarSource.indexOf('registryPointer = await waitForProfileAvatarRegistryUpdate')).toBeGreaterThan(
       finalizeAvatarSource.indexOf('await submitVaultProfileAvatarRegistration'),
@@ -5260,7 +5276,7 @@ describe('PWA runtime config guard', () => {
     expect(submitAvatarSource).toMatch(/scanAvailableTransports:\s*true/);
     expect(submitAvatarSource).toMatch(/VAULT_PUBLISH_STATUS_PARTIAL/);
     expect(submitAvatarSource).toMatch(/plathoLastProfileAvatarPublish/);
-    expect(submitAvatarSource).toMatch(/if \(error\?\.code !== 'PLATHO_AVATAR_CAPSULES_NOT_VISIBLE'\) throw error/);
+    expect(submitAvatarSource).toMatch(/new Error\('Avatar capsules are not visible on-chain yet'\)/);
     expect(submitAvatarSource).toMatch(/avatarStreamId:\s*null/);
     expect(submitAvatarSource).toMatch(/PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT/);
     expect(submitAvatarSource).toMatch(/PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS/);
@@ -5310,10 +5326,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/for \(const groupParts of groups\.values\(\)\)/);
     expect(app).toMatch(/const hash = await sha256Hex\(bytes\)/);
     expect(app).toMatch(/if \(hash\.toLowerCase\(\) !== pointer\.avatarHash\.toLowerCase\(\)\) return null/);
-    expect(waitPublishedAvatarSource).toMatch(/let lastTransientError = null/);
-    expect(waitPublishedAvatarSource).toMatch(/isTonRpcRecoverableReadError\(error\)/);
-    expect(waitPublishedAvatarSource).toMatch(/noteTonRpcRateLimit\(error\)/);
-    expect(waitPublishedAvatarSource).toMatch(/error\.code = 'PLATHO_AVATAR_CAPSULES_NOT_VISIBLE'/);
     expect(app).toMatch(/if \(hash\.toLowerCase\(\) !== pointer\.avatarHash\.toLowerCase\(\)\) return null/);
     expect(waitRegistrySource).toMatch(/let lastTransientError = null/);
     expect(waitRegistrySource).toMatch(/isTonRpcRecoverableReadError\(error\)/);
@@ -5408,7 +5420,7 @@ describe('PWA runtime config guard', () => {
     );
     const findAvatarPartsSource = app.slice(
       app.indexOf('async function findPublishedAvatarEntries'),
-      app.indexOf('async function waitForPublishedAvatarEntries'),
+      app.indexOf('async function waitForProfileAvatarRegistryUpdate'),
     );
 
     expect(app).toMatch(/const PROFILE_AVATAR_ENTRY_SCAN_PADDING = 2048/);
@@ -5990,11 +6002,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v768/);
+    expect(sw).toMatch(/platho-pwa-prototype-v769/);
     expect(sw).toMatch(/\.\/styles\.css\?v=234/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=697/);
+    expect(sw).toMatch(/\.\/app\.js\?v=698/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=16/);

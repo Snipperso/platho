@@ -1121,6 +1121,16 @@ const PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS = 60;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS = 2000;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT = 512;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS = 120 * 1000;
+// Mobilized inline confirm (v698): the avatar publish confirms like a private/public send — every pass
+// heals (re-POSTs / first-POSTs the deferred 2nd+ batch) THEN reads the authoritative Vault receipt, on a
+// short cadence with an AGE-based deadline. The pass delay is physics (block time), not a read-only nap.
+const PROFILE_AVATAR_MOBILIZED_CONFIRM_DEADLINE_MS = 120 * 1000;
+const PROFILE_AVATAR_MOBILIZED_CONFIRM_PASS_DELAY_MS = 1_500;
+// The "was this exact avatar already published?" pre-check runs BEFORE every publish; without its own cap
+// it fell into the wide 2048-entry fallback scan (each entry a serial read) — minutes of reads for the
+// overwhelmingly common answer "no". A narrow recent window covers the real case (an interrupted session
+// republishing the same image moments later); older orphans are found by the recovery job's full scan.
+const PROFILE_AVATAR_PRECHECK_FALLBACK_SCAN_LIMIT = 64;
 const PROFILE_AVATAR_ROUTE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000];
 const PROFILE_AVATAR_RECOVERY_RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000, 180_000];
 const PROFILE_AVATAR_RECOVERY_LOCAL_PENDING_MS = 15 * 60 * 1000;
@@ -7213,7 +7223,7 @@ function minPublicEntryIdFromPublishState(publishState) {
   return min;
 }
 
-async function findPublishedAvatarEntries(ownerWallet, pointer) {
+async function findPublishedAvatarEntries(ownerWallet, pointer, options = {}) {
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) throw new Error('CapsuleHub provider is required to confirm avatar capsules');
   const { provider, address } = resolved;
@@ -7246,7 +7256,12 @@ async function findPublishedAvatarEntries(ownerWallet, pointer) {
   if (!avatarPartsCompleteForPointer(parts, pointer)) {
     const state = await provider.getState(readOptions);
     const latest = BigInt(state.public_latest_id ?? 0n);
-    const limit = BigInt(Math.max(PROFILE_AVATAR_FALLBACK_SCAN_LIMIT, expectedParts + PROFILE_AVATAR_ENTRY_SCAN_PADDING));
+    // options.fallbackScanLimit caps the wide latest-down sweep for callers that only care about a RECENT
+    // republish (the pre-publish "already published?" check) — the default stays the deep recovery scan.
+    const requestedFallbackLimit = Number(options.fallbackScanLimit ?? 0);
+    const limit = BigInt(requestedFallbackLimit > 0
+      ? Math.max(requestedFallbackLimit, expectedParts)
+      : Math.max(PROFILE_AVATAR_FALLBACK_SCAN_LIMIT, expectedParts + PROFILE_AVATAR_ENTRY_SCAN_PADDING));
     const floor = latest > limit ? latest - limit : 0n;
     for (let entryId = latest - 1n; entryId >= floor; entryId -= 1n) {
       const entry = await provider.getPublicEntry(entryId, readOptions);
@@ -7293,7 +7308,11 @@ async function findConfirmedAvatarEntriesFromPublishState(ownerWallet, pointer, 
     && part.entryId !== undefined
     && part.entryId !== null
   )).sort((left, right) => Number(left?.index ?? 0) - Number(right?.index ?? 0));
-  if (confirmedParts.length === 0) return null;
+  // With FEWER confirmed parts than the pointer expects the group can never assemble (the hash of a partial
+  // set cannot match) — return without chain reads. The mobilized loop calls this every ~1.5s pass, and in
+  // the window between batch confirmations the read fallback below would burn verified entry+payload reads
+  // per pass just to fail the assembly.
+  if (confirmedParts.length < expectedParts) return null;
   if (confirmedParts.length >= expectedParts) {
     const byIndex = new Map();
     for (const part of confirmedParts) {
@@ -7359,25 +7378,6 @@ async function findConfirmedAvatarEntriesFromPublishState(ownerWallet, pointer, 
     parts: assembled.parts,
     streamId: assembled.streamId,
   };
-}
-
-async function waitForPublishedAvatarEntries(ownerWallet, pointer) {
-  let lastTransientError = null;
-  for (let attempt = 0; attempt < PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS; attempt += 1) {
-    try {
-      const found = await findPublishedAvatarEntries(ownerWallet, pointer);
-      if (found) return found;
-      lastTransientError = null;
-    } catch (error) {
-      if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) throw error;
-      lastTransientError = error;
-    }
-    await delay(PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS);
-  }
-  if (lastTransientError) throw lastTransientError;
-  const error = new Error('Avatar capsules are not visible on-chain yet');
-  error.code = 'PLATHO_AVATAR_CAPSULES_NOT_VISIBLE';
-  throw error;
 }
 
 async function waitForProfileAvatarRegistryUpdate(ownerWallet, avatarHash) {
@@ -19244,6 +19244,34 @@ async function findProfileAvatarPublishedEntriesFromRecovery(job) {
   const pointer = job?.pendingPointer;
   if (!job?.owner || !pointer) return null;
   if (job.confirmed) return job.confirmed;
+  // HEAL FIRST (v698): the broadcast retry is the ONLY code that can POST a deferred/dropped external, and
+  // the RPC pump is serial — running it AFTER the wide read sweeps (the old order) starved the actual fix
+  // behind minutes of scans on every tick. The cheap receipt read right after it turns a successful heal
+  // into confirmed parts within the same tick. Tolerant like the inline loop: a hard heal error must not
+  // abort the tick BEFORE the read-side confirms — a landed avatar would terminal-park on an unrelated error.
+  if (job.publishState) {
+    try {
+      await retryUnconfirmedVaultPublishBroadcasts(job.publishState, {
+        owner: job.owner,
+        deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
+        readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
+        sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
+        queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
+      });
+      await confirmCapsuleHubPublishEntries(job.publishState, {
+        owner: job.owner,
+        hot: true,
+        receiptOnly: true,
+      });
+    } catch (error) {
+      if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
+    }
+    // Entry ids learned by the heal/receipt pass make the wide scan below targeted (shared pointer object).
+    if (pointer.avatarEntryId === undefined) {
+      const knownFirstEntryId = minPublicEntryIdFromPublishState(job.publishState);
+      if (knownFirstEntryId !== null) pointer.avatarEntryId = knownFirstEntryId.toString();
+    }
+  }
   let confirmed = await findConfirmedAvatarEntriesFromPublishState(job.owner, pointer, job.publishState)
     .catch((error) => {
       if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) throw error;
@@ -19257,13 +19285,6 @@ async function findProfileAvatarPublishedEntriesFromRecovery(job) {
     });
   if (confirmed) return confirmed;
   if (!job.publishState) return null;
-  await retryUnconfirmedVaultPublishBroadcasts(job.publishState, {
-    owner: job.owner,
-    deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
-    readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
-    sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
-    queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
-  });
   await confirmCapsuleHubPublishEntries(job.publishState, {
     scanAvailableTransports: true,
     scanLimit: PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT,
@@ -19271,13 +19292,7 @@ async function findProfileAvatarPublishedEntriesFromRecovery(job) {
     requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
     queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
   });
-  confirmed = await findConfirmedAvatarEntriesFromPublishState(job.owner, pointer, job.publishState)
-    .catch((error) => {
-      if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) throw error;
-      return null;
-    });
-  if (confirmed) return confirmed;
-  return findPublishedAvatarEntries(job.owner, pointer)
+  return findConfirmedAvatarEntriesFromPublishState(job.owner, pointer, job.publishState)
     .catch((error) => {
       if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) throw error;
       return null;
@@ -20985,10 +21000,13 @@ async function submitProfileAvatarUpdate(avatar) {
   });
   setProfileAvatarStatus(t('avatar.checkingChain'));
   let publishResult = null;
+  // Narrow pre-check: "this exact avatar was already published moments ago" (an interrupted session
+  // re-picking the same image). Without the cap this fell into the wide 2048-entry fallback scan BEFORE
+  // every publish — minutes of serial reads for the overwhelmingly common answer "no".
   let confirmed = await findPublishedAvatarEntries(owner, {
     ...pendingPointer,
     avatarStreamId: null,
-  }).catch((error) => {
+  }, { fallbackScanLimit: PROFILE_AVATAR_PRECHECK_FALLBACK_SCAN_LIMIT }).catch((error) => {
     if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
     return null;
   });
@@ -21029,53 +21047,30 @@ async function submitProfileAvatarUpdate(avatar) {
     if (publishResult?.publishState) {
       rememberProfileAvatarPublishRecovery(avatarRecoveryContext());
       setProfileAvatarStatus(t('avatar.publishSubmittedConfirming'));
-      try {
-        await confirmCapsuleHubPublishEntries(publishResult.publishState, {
-          scanAvailableTransports: true,
-          scanLimit: PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT,
-          deadlineMs: PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS,
-          requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
-          queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
-        });
-        if (publishResult.publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-          publishResult.status = CAPSULEHUB_PUBLISH_STATUS_CONFIRMED;
-        } else if (publishResult.publishState.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-          publishResult.status = VAULT_PUBLISH_STATUS_SUBMITTED;
-        }
-        confirmed = await findConfirmedAvatarEntriesFromPublishState(owner, pendingPointer, publishResult.publishState)
-          .catch((error) => {
-            if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
-            return null;
-          });
-      } catch (error) {
-        if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
-      }
-    }
-    if (
-      publishResult?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-      && publishResult?.status !== VAULT_PUBLISH_STATUS_SUBMITTED
-      && publishResult?.status !== VAULT_PUBLISH_STATUS_PARTIAL
-    ) {
-      setProfileAvatarStatus(t('avatar.publishBlocked'), 'error');
-      setProfileAvatarPending(false);
-      return publishResult;
-    }
-    // Record the assigned first entry id so confirm reads (and the recovery job, which shares this
-    // pointer object) use the cheap targeted window instead of the wide latest-down scan.
-    if (publishResult?.publishState && pendingPointer.avatarEntryId === undefined) {
-      const knownFirstEntryId = minPublicEntryIdFromPublishState(publishResult.publishState);
-      if (knownFirstEntryId !== null) pendingPointer.avatarEntryId = knownFirstEntryId.toString();
-    }
-    setProfileAvatarStatus(t('avatar.confirmingCapsules'));
-    try {
-      confirmed = confirmed ?? await waitForPublishedAvatarEntries(owner, pendingPointer);
-    } catch (error) {
-      if (error?.code !== 'PLATHO_AVATAR_CAPSULES_NOT_VISIBLE') throw error;
-      if (publishResult?.publishState) {
-        setProfileAvatarStatus(t('avatar.checkingChain'));
-        let broadcastRetries = 0;
+      // Stamp the assigned first entry id onto the shared pointer as soon as it becomes KNOWN (a part gains
+      // entryId only once a receipt/entry confirm sees it) — the recovery job shares this pointer object, and
+      // the stamp is what lets its findPublishedAvatarEntries use the cheap targeted window instead of the
+      // wide 2048-entry scan. Re-attempted after every pass below: right after publish it is usually null.
+      const stampPendingPointerEntryId = () => {
+        if (pendingPointer.avatarEntryId !== undefined) return;
+        const knownFirstEntryId = minPublicEntryIdFromPublishState(publishResult.publishState);
+        if (knownFirstEntryId !== null) pendingPointer.avatarEntryId = knownFirstEntryId.toString();
+      };
+      stampPendingPointerEntryId();
+      // MOBILIZED confirm (v698): mirrors the private/public send confirm drivers INLINE, replacing the old
+      // "120s read-only confirm -> 120s read-only wait -> ONE heal pass -> 120s -> 120s" ladder. Every pass:
+      // (1) HEAL first — retryUnconfirmedVaultPublishBroadcasts is the ONLY code that can POST the deferred
+      // 2nd+ batch external, and only on the pass AFTER the prior nonce lands, so it must run repeatedly on
+      // a short cadence (the owner's 2-capsule avatar sat 6+ minutes with a signed, never-POSTed second
+      // external while the old shape slept in read-only waits); (2) the authoritative single-read Vault
+      // receipt confirm; (3) a targeted entry check. AGE-based deadline, then one full scan sweep (the
+      // receipt-ring-eviction fallback) before parking into the recovery job.
+      const mobilizedStartedAt = Date.now();
+      let mobilizedPasses = 0;
+      while (!confirmed && Date.now() - mobilizedStartedAt < PROFILE_AVATAR_MOBILIZED_CONFIRM_DEADLINE_MS) {
+        mobilizedPasses += 1;
         try {
-          broadcastRetries = await retryUnconfirmedVaultPublishBroadcasts(publishResult.publishState, {
+          const broadcastRetries = await retryUnconfirmedVaultPublishBroadcasts(publishResult.publishState, {
             owner,
             deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
             readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
@@ -21087,11 +21082,46 @@ async function submitProfileAvatarUpdate(avatar) {
             globalThis.plathoLastProfileAvatarPublishRecovery = {
               avatarHash,
               streamId: `0x${bytesToHex(streamId)}`,
-              broadcastRetries,
+              broadcastRetries: publishResult.broadcastRetryCount,
               at: new Date().toISOString(),
             };
             setProfileAvatarStatus(t('avatar.broadcastRetrying'));
           }
+        } catch (error) {
+          if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) {
+            // A non-transient broadcast error (e.g. a hard contract reject) will not improve with more
+            // passes — surface it and fall through to the sweep + recovery park below.
+            console.error(error);
+            break;
+          }
+        }
+        try {
+          await confirmCapsuleHubPublishEntries(publishResult.publishState, {
+            owner,
+            hot: true,
+            receiptOnly: true,
+          });
+        } catch (error) {
+          if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
+        }
+        stampPendingPointerEntryId();
+        confirmed = await findConfirmedAvatarEntriesFromPublishState(owner, pendingPointer, publishResult.publishState)
+          .catch((error) => {
+            if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
+            return null;
+          });
+        if (!confirmed) await delay(PROFILE_AVATAR_MOBILIZED_CONFIRM_PASS_DELAY_MS);
+      }
+      logAvatarTimeline(confirmed ? 'mobilized_confirmed' : 'mobilized_deadline', {
+        avatarHash,
+        passes: mobilizedPasses,
+        broadcastRetries: Number(publishResult.broadcastRetryCount ?? 0) || 0,
+        elapsedMs: Date.now() - mobilizedStartedAt,
+      });
+      if (!confirmed) {
+        // Receipt-ring-eviction fallback: ONE full sweep (sender-index walk + entry scan), then re-check.
+        setProfileAvatarStatus(t('avatar.confirmingCapsules'));
+        try {
           await confirmCapsuleHubPublishEntries(publishResult.publishState, {
             scanAvailableTransports: true,
             scanLimit: PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT,
@@ -21099,51 +21129,52 @@ async function submitProfileAvatarUpdate(avatar) {
             requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
             queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
           });
+          stampPendingPointerEntryId();
           confirmed = await findConfirmedAvatarEntriesFromPublishState(owner, pendingPointer, publishResult.publishState)
-            .catch((confirmError) => {
-              if (!isTonRpcRecoverableReadError(confirmError) && !noteTonRpcRateLimit(confirmError)) console.error(confirmError);
+            .catch((error) => {
+              if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
               return null;
             });
-          if (!confirmed && broadcastRetries > 0) {
-            setProfileAvatarStatus(t('avatar.confirmingCapsules'));
-            confirmed = await waitForPublishedAvatarEntries(owner, pendingPointer)
-              .catch((confirmError) => {
-                if (!isTonRpcRecoverableReadError(confirmError) && !noteTonRpcRateLimit(confirmError)) console.error(confirmError);
-                return null;
-              });
-          }
-        } catch (confirmError) {
-          if (!isTonRpcRecoverableReadError(confirmError) && !noteTonRpcRateLimit(confirmError)) console.error(confirmError);
+          if (confirmed) logAvatarTimeline('sweep_confirmed', { avatarHash, elapsedMs: Date.now() - mobilizedStartedAt });
+        } catch (error) {
+          if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
         }
       }
-      const looseConfirmed = await findPublishedAvatarEntries(owner, {
-        ...pendingPointer,
-        avatarStreamId: null,
-      }).catch((looseError) => {
-        if (!isTonRpcRecoverableReadError(looseError) && !noteTonRpcRateLimit(looseError)) console.error(looseError);
-        return null;
-      });
-      confirmed = looseConfirmed ?? confirmed;
-      if (confirmed) {
-        if (confirmed.streamId) streamId = bigIntToFixedBytes(BigInt(confirmed.streamId), 16, 'avatar stream id');
-      } else {
-        await capturePublishSnapshot('after-avatar-not-visible', publishResult?.publishState ?? null);
-        const diagnosticStatus = profileAvatarPublishDiagnosticStatus(publishDiagnostics);
-        if (diagnosticStatus) error.avatarDiagnosticStatus = diagnosticStatus;
-        if (publishResult?.publishState) {
-          const job = scheduleProfileAvatarPublishRecovery({
-            ...avatarRecoveryContext(),
-            lastError: diagnosticStatus ?? shortUiErrorText(error, 'avatar not visible yet'),
-          });
-          setProfileAvatarStatus(t('avatar.stillConfirming'));
-          return {
-            status: VAULT_PUBLISH_STATUS_SUBMITTED,
-            publishState: publishResult.publishState,
-            recoveryJob: profileAvatarRecoveryPublicDebug(job),
-          };
-        }
-        throw error;
+      if (publishResult.publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+        publishResult.status = CAPSULEHUB_PUBLISH_STATUS_CONFIRMED;
+      } else if (publishResult.publishState.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
+        publishResult.status = VAULT_PUBLISH_STATUS_SUBMITTED;
       }
+    }
+    if (
+      publishResult?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+      && publishResult?.status !== VAULT_PUBLISH_STATUS_SUBMITTED
+      && publishResult?.status !== VAULT_PUBLISH_STATUS_PARTIAL
+    ) {
+      setProfileAvatarStatus(t('avatar.publishBlocked'), 'error');
+      setProfileAvatarPending(false);
+      return publishResult;
+    }
+    if (confirmed) {
+      if (confirmed.streamId) streamId = bigIntToFixedBytes(BigInt(confirmed.streamId), 16, 'avatar stream id');
+    } else {
+      await capturePublishSnapshot('after-avatar-not-visible', publishResult?.publishState ?? null);
+      const diagnosticStatus = profileAvatarPublishDiagnosticStatus(publishDiagnostics);
+      if (publishResult?.publishState) {
+        const job = scheduleProfileAvatarPublishRecovery({
+          ...avatarRecoveryContext(),
+          lastError: diagnosticStatus ?? 'avatar capsules not visible yet',
+        });
+        setProfileAvatarStatus(t('avatar.stillConfirming'));
+        return {
+          status: VAULT_PUBLISH_STATUS_SUBMITTED,
+          publishState: publishResult.publishState,
+          recoveryJob: profileAvatarRecoveryPublicDebug(job),
+        };
+      }
+      const error = new Error('Avatar capsules are not visible on-chain yet');
+      if (diagnosticStatus) error.avatarDiagnosticStatus = diagnosticStatus;
+      throw error;
     }
   }
 
