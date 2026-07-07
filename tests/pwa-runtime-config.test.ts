@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=695" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=696" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2624,12 +2624,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function canAttemptPrivateSend/);
     expect(app).toMatch(/function privateSendBlockReason/);
     expect(app).toMatch(/const reason = privateSendBlockReason\(thread\)/);
-    expect(app).toMatch(/sendButton\.disabled = Boolean\(reason\)/);
+    expect(app).toMatch(/const blocked = Boolean\(reason\);[\s\S]*?sendButton\.disabled = blocked/);
     expect(app).toMatch(/sendButton\.title = reason \?\? t\('send\.sendPrivateMessage'\)/);
     expect(EN_STRINGS['send.sendPrivateMessage']).toBe('Send private message');
     expect(enCopy).toMatch(/Update ready - reload app/);
     expect(app).toMatch(/pendingServiceWorkerAppShellReload !== true/);
-    expect(app).toMatch(/publicSendButton\.disabled = !plathoWallet \|\| !hasActivePlathoAccount\(\) \|\| pendingServiceWorkerAppShellReload/);
+    expect(app).toMatch(/function publicComposerSendBlocked\(\) \{\s*return !plathoWallet \|\| !hasActivePlathoAccount\(\) \|\| pendingServiceWorkerAppShellReload/);
+    expect(app).toMatch(/publicSendButton\.disabled = blocked/);
     expect(swSource).toMatch(/throw serviceWorkerUpdateReloadError\(\)/);
     expect(swSource).toMatch(/window\.location\.reload\(\)/);
     expect(swSource).toMatch(/reloadForPendingServiceWorkerAppShellUpdate\(\)/);
@@ -2798,10 +2799,58 @@ describe('PWA runtime config guard', () => {
     expect(controls).toMatch(/const canSendPrivate = canAttemptPrivateSend\(thread\)/);
     expect(controls).toMatch(/messageInput\.disabled = !canEditPrivateDraft/);
     expect(controls).toMatch(/paymentCheckButton\.disabled = !canSendPrivate/);
-    expect(controls).toMatch(/privateComposerAddButton\.disabled = !canEditPrivateDraft/);
+    // The secondary buttons ("+", image) follow the SEND state — an inactive composer (activation pending,
+    // Vault reserve short) must not show live-looking buttons (owner, v696). Only the INPUT stays draft-gated.
+    expect(controls).toMatch(/privateComposerAddButton\.disabled = !canSendPrivate/);
+    expect(controls).not.toMatch(/privateComposerAddButton\.disabled = !canEditPrivateDraft/);
     expect(render).toMatch(/messageInput\.disabled = !canEditPrivateDraft/);
     expect(render).toMatch(/sendButton\) sendButton\.disabled = !canSendPrivate/);
-    expect(addButton).toMatch(/if \(!canEditPrivateComposerDraft\(\)\)/);
+    expect(addButton).toMatch(/if \(!canAttemptPrivateSend\(\)\)/);
+  });
+
+  it('PWA-COMPOSER-INACTIVE-01: every secondary composer control follows the send-block state on both surfaces', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // PRIVATE: the canonical funnel is refreshPrivateSendButtonState (runs at the end of every
+    // refreshComposerCostStatus) — emoji, "+", menu items and payment check all dim with the send button.
+    const privateFunnel = app.slice(
+      app.indexOf('function refreshPrivateSendButtonState'),
+      app.indexOf('function refreshPublicSendButtonState'),
+    );
+    expect(privateFunnel).toMatch(/const blocked = Boolean\(reason\)/);
+    expect(privateFunnel).toMatch(/privateEmojiButton\.disabled = blocked/);
+    expect(privateFunnel).toMatch(/privateComposerAddButton\.disabled = blocked/);
+    expect(privateFunnel).toMatch(/privateComposerAddButton\.title = reason \?\? t\('composer\.addImageOrCheck'\)/);
+    expect(privateFunnel).toMatch(/if \(blocked\) hidePrivateComposerAddMenu\(\)/);
+    expect(privateFunnel).toMatch(/paymentCheckButton\.disabled = blocked/);
+    expect(privateFunnel).toMatch(/privateImageButton\.disabled = blocked/);
+    expect(privateFunnel).toMatch(/privateFileButton\.disabled = blocked/);
+    // The eye rides in the SAME funnel (else it goes stale on cost-status-only refresh paths, and a
+    // stuck-disabled button can never self-heal from its own click): the funnel passes the already-computed
+    // reason into updatePrivateSenderModeUi, whose block reason starts from it (plus the Saved-notes rule).
+    expect(privateFunnel).toMatch(/updatePrivateSenderModeUi\(reason\)/);
+    expect(app).toMatch(/function privateSenderModeToggleBlockReason\(sendBlock\) \{\s*if \(sendBlock\) return sendBlock;/);
+    // PUBLIC: ONE predicate feeds Publish + emoji + attach + the comments toggle (checkbox AND label class —
+    // the :has() dim rule no-ops on the iOS floor, so the class is the load-bearing selector).
+    const publicFunnel = app.slice(
+      app.indexOf('function publicComposerSendBlocked'),
+      app.indexOf('async function assertVaultHasPrivatePublishHold'),
+    );
+    expect(publicFunnel).toMatch(/publicEmojiButton\.disabled = blocked/);
+    expect(publicFunnel).toMatch(/publicImageButton\.disabled = blocked/);
+    expect(publicFunnel).toMatch(/publicComposerCommentsCheckbox\.disabled = blocked/);
+    expect(publicFunnel).toMatch(/publicPostCommentsToggle\?\.classList\.toggle\('is-disabled', blocked\)/);
+    // No wallet-only re-enable writes survive outside the funnels (the "some buttons stay active" bug).
+    expect(app).not.toMatch(/button\.disabled = !plathoWallet;/);
+    expect(app).not.toMatch(/control\.disabled = !canPublish/);
+    // The emoji buttons are declared with the composer controls, ABOVE first use (v692 TDZ lesson).
+    expect(app.indexOf('const privateEmojiButton')).toBeLessThan(app.indexOf('function refreshPrivateSendButtonState'));
+    // CSS: the class-based dim/recolor rules must be STANDALONE — Safari 14 drops a whole rule when any
+    // selector in its list is unsupported, so no :has() may share a selector list with them.
+    expect(css).toMatch(/\.composer-post-option\.is-disabled \{[^}]*opacity: 0\.62;/);
+    expect(css).toMatch(/\.composer-post-option\.is-disabled \{[^}]*background: var\(--panel-3\);/);
+    expect(css).not.toMatch(/:has\([^)]*\)[^{]*,[^{]*\.is-disabled[^{]*\{|\.is-disabled[^{]*,[^{]*:has\(/);
+    expect(css).not.toMatch(/\.composer \.composer-add-button:disabled,\s*\.composer \.private-anonymous-button:disabled,\s*\.composer-post-option:has/);
   });
 
   it('PWA-ACTIVATION-03: the activation row shows in-flight progress and stays non-clickable until confirmed', () => {
@@ -3395,17 +3444,22 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_SENDER_MODE_STORAGE_PREFIX = 'platho\.privateSenderMode\.v1'/);
     expect(app).toMatch(/ANONYMOUS: 'anonymous'/);
     expect(app).toMatch(/function currentPrivateSenderOptions\(\)[\s\S]*includeSenderWalletMetadata,[\s\S]*senderUsername: linkedUsername\?\.label \?\? undefined/);
-    expect(app).toMatch(/function privateSenderModeToggleBlockReason\(\)/);
+    expect(app).toMatch(/function privateSenderModeToggleBlockReason\(sendBlock\)/);
     expect(app).toMatch(/function canTogglePrivateSenderMode\(\)/);
     expect(app).toMatch(/privateAnonymousButton\.disabled = Boolean\(blockReason\)/);
     expect(app).toMatch(/privateAnonymousButton\.title = blockReason \?\? \(/);
     expect(app).toMatch(/privateAnonymousButton\?\.addEventListener\('click', \(\) => \{[\s\S]*if \(!canTogglePrivateSenderMode\(\)\)/);
     expect(enCopy).toMatch(/Pseudonymous: wallet address hidden, sender key may still link messages/);
+    // The eye's block reason ROUTES THROUGH privateSendBlockReason (v696: the whole composer row follows the
+    // send state), but updatePrivateSenderModeUi itself must not grow a direct dependency on the flickering
+    // activation read — the reason is computed once by the funnel and passed in (no per-call plan builds).
     const senderModeUiSource = app.slice(
       app.indexOf('function updatePrivateSenderModeUi'),
       app.indexOf('function normalizeLinkedPlathoUsername'),
     );
     expect(senderModeUiSource).not.toMatch(/hasActivePlathoAccount\(\)/);
+    expect(app).toMatch(/function updatePrivateSenderModeUi\(sendBlockReason = privateSendBlockReason\(\)\)/);
+    expect(app).toMatch(/privateSenderModeToggleBlockReason\(sendBlockReason\)/);
     expect(app).toMatch(/options\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
     expect(app).toMatch(/const senderUsername = privateSenderUsernameMetadataLabel\(options\)/);
     expect(app).toMatch(/senderUsername: senderUsername \?\? undefined/);
@@ -5931,14 +5985,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v766/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=233/);
+    expect(sw).toMatch(/platho-pwa-prototype-v767/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=234/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=695/);
+    expect(sw).toMatch(/\.\/app\.js\?v=696/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=14/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=14/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=15/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=15/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

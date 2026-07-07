@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=14';
+} from './i18n.mjs?v=15';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -356,6 +356,10 @@ const privateFileInput = document.querySelector('#privateFileInput');
 const privateFilePanel = document.querySelector('#privateFilePanel');
 const privateFileLabel = document.querySelector('#privateFileLabel');
 const privateClearFilesButton = document.querySelector('#privateClearFilesButton');
+// Declared HERE with the other composer controls (not down in the emoji-picker section): the composer state
+// refreshers below reference them, and a module-scope call before a later declaration is the v692 TDZ boot crash.
+const privateEmojiButton = document.querySelector('#privateEmojiButton');
+const publicEmojiButton = document.querySelector('#publicEmojiButton');
 const attachmentControls = [
   ...document.querySelectorAll('[data-requires-wallet="true"], #attachButton, .attachment-button'),
 ];
@@ -2816,19 +2820,22 @@ function currentPrivateSenderOptions() {
   };
 }
 
-function privateSenderModeToggleBlockReason() {
-  if (!plathoWallet) return t('common.walletRequired');
-  if (pendingServiceWorkerAppShellReload === true) return t('chat.blockUpdateReady');
-  if (composer?.dataset.readOnly === 'true') return t('chat.blockReadOnly');
+// The eye follows the full send-block state (owner: an inactive composer must not show live-looking
+// buttons) — wallet/thread/read-only/activation/update/reserve reasons all come from the ONE send predicate,
+// so this button dims exactly when the Send button does — plus its own extra rule: notes to yourself are
+// never anonymous (v652). `sendBlock` is passed in (the callers already computed it) so this adds no extra
+// send-plan build on the hot refresh paths.
+function privateSenderModeToggleBlockReason(sendBlock) {
+  if (sendBlock) return sendBlock;
   if (isSavedMessagesThread(activeThread())) return t('chat.blockSavedAnonymous');
   return null;
 }
 
 function canTogglePrivateSenderMode() {
-  return privateSenderModeToggleBlockReason() === null;
+  return privateSenderModeToggleBlockReason(privateSendBlockReason()) === null;
 }
 
-function updatePrivateSenderModeUi() {
+function updatePrivateSenderModeUi(sendBlockReason = privateSendBlockReason()) {
   const mode = currentPrivateSenderMode();
   const anonymous = mode === PRIVATE_SENDER_MODES.ANONYMOUS;
   if (privateSenderModeSelect) {
@@ -2837,7 +2844,7 @@ function updatePrivateSenderModeUi() {
   }
   if (privateAnonymousButton) {
     const icon = privateAnonymousButton.querySelector('.icon');
-    const blockReason = privateSenderModeToggleBlockReason();
+    const blockReason = privateSenderModeToggleBlockReason(sendBlockReason);
     privateAnonymousButton.disabled = Boolean(blockReason);
     privateAnonymousButton.setAttribute('aria-pressed', anonymous ? 'true' : 'false');
     privateAnonymousButton.setAttribute(
@@ -13388,16 +13395,50 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
 }
 
 function refreshPrivateSendButtonState() {
-  if (!sendButton) return;
   const thread = activeThread();
   const reason = privateSendBlockReason(thread);
-  sendButton.disabled = Boolean(reason);
-  sendButton.title = reason ?? t('send.sendPrivateMessage');
+  const blocked = Boolean(reason);
+  if (sendButton) {
+    sendButton.disabled = blocked;
+    sendButton.title = reason ?? t('send.sendPrivateMessage');
+  }
+  // The composer's secondary controls follow the SAME send-block state (owner: an inactive composer must not
+  // show live-looking buttons). Every enable/disable path funnels here (this runs at the end of
+  // refreshComposerCostStatus, so refreshComposerPublishPolicy / refreshMessagingControls / renderConversation
+  // all converge on it) — scattered per-site predicates were the "some buttons stay active" bug. The text
+  // INPUT deliberately stays on canEditPrivateComposerDraft: drafting while funding/activating is allowed
+  // (PWA-ACTIVATION-02).
+  if (privateEmojiButton) privateEmojiButton.disabled = blocked;
+  if (privateComposerAddButton) {
+    privateComposerAddButton.disabled = blocked;
+    privateComposerAddButton.title = reason ?? t('composer.addImageOrCheck');
+  }
+  if (blocked) hidePrivateComposerAddMenu();
+  if (paymentCheckButton) paymentCheckButton.disabled = blocked;
+  if (privateImageButton) privateImageButton.disabled = blocked;
+  if (privateFileButton) privateFileButton.disabled = blocked;
+  // The eye lives in the same funnel (else it goes stale in BOTH directions on cost-status-only refresh
+  // paths — e.g. typing past the part cap, or a Vault top-up re-read — and a stuck-disabled button can never
+  // self-heal from its own click). The already-computed reason is passed through: no extra plan build.
+  updatePrivateSenderModeUi(reason);
+}
+
+// The ONE public composer availability predicate — Publish and every secondary control read the same answer.
+function publicComposerSendBlocked() {
+  return !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || tonRpcLimited() || publicComposerKnownVaultTonShortfall();
 }
 
 function refreshPublicSendButtonState() {
+  const blocked = publicComposerSendBlocked();
   const publicSendButton = publicComposer?.querySelector?.('.send-button');
-  if (publicSendButton) publicSendButton.disabled = !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || tonRpcLimited() || publicComposerKnownVaultTonShortfall();
+  if (publicSendButton) publicSendButton.disabled = blocked;
+  // Secondary controls follow the send state (owner: an inactive composer must not show live-looking
+  // buttons) — mirrors the private composer's refreshPrivateSendButtonState. The label class mirrors the
+  // checkbox's :disabled because the dim rule via :has() silently no-ops on the iOS floor (Safari 14).
+  if (publicEmojiButton) publicEmojiButton.disabled = blocked;
+  if (publicImageButton) publicImageButton.disabled = blocked;
+  if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = blocked;
+  publicPostCommentsToggle?.classList.toggle('is-disabled', blocked);
 }
 
 async function assertVaultHasPrivatePublishHold(suite, plan, options = {}) {
@@ -13782,7 +13823,10 @@ async function setImageAttachment(kind, file, modeId) {
     console.error(error);
   } finally {
     if (input) input.value = '';
-    if (button) button.disabled = !plathoWallet;
+    // Re-resolve through the canonical per-surface send-block predicate (a bare wallet check here used to
+    // re-enable the attach button on an inactive composer). NOT refreshComposerCostStatus(): that would
+    // overwrite the error text the catch branch just put in the status line.
+    if (button) button.disabled = kind === 'public' ? publicComposerSendBlocked() : Boolean(privateSendBlockReason());
   }
 }
 
@@ -13852,10 +13896,11 @@ function refreshComposerPublishPolicy() {
     publicMessageInput.placeholder = publicComposerPlaceholder();
     autoResizeComposerTextarea(publicMessageInput);
   }
+  // Attachment/add-button DISABLED state is NOT written here: it is owned by refreshPrivateSendButtonState /
+  // refreshPublicSendButtonState (both run via refreshComposerCostStatus below), keyed to the full send-block
+  // predicate — the wallet-only writes this block used to do re-enabled buttons on an inactive composer.
   for (const control of attachmentControls) {
-    control.disabled = !canPublish;
     control.hidden = false;
-    control.setAttribute('aria-disabled', canPublish ? 'false' : 'true');
     if (control.classList?.contains('attachment-button')) {
       control.title = canPublish ? t('composer.attachImage') : t('composer.walletToAttachImages');
     }
@@ -13863,17 +13908,14 @@ function refreshComposerPublishPolicy() {
   if (paymentCheckButton) {
     paymentCheckButton.title = canPublish ? t('composer.attachPaymentCheck') : t('composer.walletToAttachPaymentCheck');
   }
-  if (privateComposerAddButton) {
-    privateComposerAddButton.disabled = !canPublish;
-    privateComposerAddButton.title = canPublish ? t('composer.addImageOrCheck') : t('composer.walletToAddAttachments');
-  }
   if (privateImageModeSelect) {
     privateImageModeSelect.disabled = !canPublish;
   }
   if (publicImageModeSelect) {
     publicImageModeSelect.disabled = !canPublish;
   }
-  updatePrivateSenderModeUi();
+  // updatePrivateSenderModeUi runs inside refreshComposerCostStatus's funnel below (with the send-block
+  // reason already computed) — no direct call here, it would just build the send plan once more.
   updateImageAttachmentUi('private');
   updateImageAttachmentUi('public');
   refreshComposerCostStatus();
@@ -14420,19 +14462,21 @@ function refreshMessagingControls() {
   if (mintUsernameButton) mintUsernameButton.disabled = false;
   if (linkUsernameButton) linkUsernameButton.disabled = false;
   if (setAvatarButton) setAvatarButton.disabled = plathoProfileAvatarPending;
+  // Secondary composer buttons follow the SEND state, not the draft state (owner: an inactive composer must
+  // not show live-looking buttons); the eye + emoji live in the refreshPrivateSendButtonState funnel below.
+  // Only the text INPUT stays on the draft predicate (drafting while funding/activating is allowed —
+  // PWA-ACTIVATION-02).
   if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
-  if (privateImageButton) privateImageButton.disabled = !canEditPrivateDraft;
-  if (privateComposerAddButton) privateComposerAddButton.disabled = !canEditPrivateDraft;
-  if (privateAnonymousButton) privateAnonymousButton.disabled = !canEditPrivateDraft;
+  if (privateImageButton) privateImageButton.disabled = !canSendPrivate;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = !canSendPrivate;
   if (privateSenderModeSelect) privateSenderModeSelect.disabled = !plathoWallet;
   if (messageInput) {
     messageInput.disabled = !canEditPrivateDraft;
   }
-  if (sendButton) {
-    refreshPrivateSendButtonState();
-  }
+  refreshPrivateSendButtonState();
   if (publicMessageInput) publicMessageInput.disabled = !plathoWallet || !signedActionsReady;
-  if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet || !signedActionsReady;
+  // The comments checkbox (and its label dim class) is owned by refreshPublicSendButtonState — one predicate
+  // for the whole public composer row, no scattered weaker writes.
   refreshPublicSendButtonState();
   renderAthFlushStatus();
   for (const button of actionGrid?.querySelectorAll('button[data-action]') ?? []) {
@@ -14446,7 +14490,6 @@ function refreshMessagingControls() {
   // account is activated.
   refreshVaultTabLock();
   refreshVaultMoveWidget();
-  updatePrivateSenderModeUi();
   refreshComposerCostStatus();
   refreshConversationSubtitle();
   refreshMessageActionStatuses({ keepSyncStatus: true });
@@ -14806,14 +14849,15 @@ function renderConversation() {
     messageInput.placeholder = privateComposerPlaceholder({ readOnly: isReadOnly });
   }
   if (sendButton) sendButton.disabled = !canSendPrivate;
+  // Secondary buttons follow the send state (the eye is owned by updatePrivateSenderModeUi below); the input
+  // above stays on the draft predicate — see refreshMessagingControls for the rationale.
   if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
-  if (privateImageButton) privateImageButton.disabled = !canEditPrivateDraft;
-  if (privateComposerAddButton) privateComposerAddButton.disabled = !canEditPrivateDraft;
-  if (privateAnonymousButton) privateAnonymousButton.disabled = !canEditPrivateDraft;
+  if (privateImageButton) privateImageButton.disabled = !canSendPrivate;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = !canSendPrivate;
   if (privateImageModeSelect) privateImageModeSelect.disabled = isReadOnly || !plathoWallet;
 
+  // refreshPrivateSendButtonState also refreshes the eye (updatePrivateSenderModeUi rides in the funnel).
   refreshPrivateSendButtonState();
-  updatePrivateSenderModeUi();
   sortThreadMessages(thread);
   // A fresh outbound message at the tail (the user just sent) is the only re-render that smooth-scrolls to the end.
   const conversationMsgCount = thread.messages.length;
@@ -15887,7 +15931,7 @@ paymentCheckButton?.addEventListener('click', async () => {
 privateComposerAddButton?.addEventListener('click', (event) => {
   event.preventDefault();
   event.stopPropagation();
-  if (!canEditPrivateComposerDraft()) {
+  if (!canAttemptPrivateSend()) {
     refreshComposerPublishPolicy();
     return;
   }
@@ -15956,7 +16000,7 @@ publicMessageInput?.addEventListener('keydown', (event) => {
 
 privateImageButton?.addEventListener('click', () => {
   hidePrivateComposerAddMenu();
-  if (!canEditPrivateComposerDraft()) {
+  if (!canAttemptPrivateSend()) {
     refreshComposerPublishPolicy();
     return;
   }
@@ -15964,7 +16008,7 @@ privateImageButton?.addEventListener('click', () => {
 });
 
 publicImageButton?.addEventListener('click', () => {
-  if (!plathoWallet) {
+  if (publicComposerSendBlocked()) {
     refreshComposerPublishPolicy();
     return;
   }
@@ -15999,7 +16043,7 @@ function updatePrivateFileAttachmentUi() {
 
 privateFileButton?.addEventListener('click', () => {
   hidePrivateComposerAddMenu();
-  if (!canEditPrivateComposerDraft()) {
+  if (!canAttemptPrivateSend()) {
     refreshComposerPublishPolicy();
     return;
   }
@@ -26410,13 +26454,13 @@ const PLATHO_EMOJI_LIST = [
 ];
 const emojiPicker = document.querySelector('#emojiPicker');
 const emojiPickerGrid = document.querySelector('#emojiPickerGrid');
-const privateEmojiButton = document.querySelector('#privateEmojiButton');
-const publicEmojiButton = document.querySelector('#publicEmojiButton');
 let emojiPickerTargetInput = null;
 let emojiPickerTargetButton = null;
 
 function insertEmojiAtCaret(input, emoji) {
-  if (!input) return;
+  // A picker opened BEFORE the composer got blocked can outlive its (now-disabled) trigger button — never
+  // write into a disabled input (programmatic .value assignment bypasses the disabled attribute).
+  if (!input || input.disabled) return;
   const value = input.value ?? '';
   const start = Number.isFinite(input.selectionStart) ? input.selectionStart : value.length;
   const end = Number.isFinite(input.selectionEnd) ? input.selectionEnd : start;

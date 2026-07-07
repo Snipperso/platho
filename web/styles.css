@@ -1399,6 +1399,14 @@ html[data-platho-telegram="true"] .install-header-button {
   background: rgba(48, 213, 176, 0.1);
 }
 
+/* Disabled dim: the .is-disabled class is the LOAD-BEARING selector (toggled by refreshPublicSendButtonState
+   in lockstep with the checkbox's disabled) — the :has() variant no-ops on the iOS floor (Safari 14). Kept as
+   a SEPARATE rule: one unsupported selector in a shared list would drop the whole rule there. */
+.composer-post-option.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .composer-post-option:has(input:disabled) {
   cursor: not-allowed;
   opacity: 0.62;
@@ -1493,8 +1501,21 @@ html[data-platho-telegram="true"] .install-header-button {
   background: rgba(48, 213, 176, 0.1);
 }
 
+/* NO :has() in this group: Safari 14 (iOS floor) drops a whole rule when ANY selector in the list is
+   unsupported — the +/eye disabled recolor must survive there. The toggle's variants live separately below. */
 .composer .composer-add-button:disabled,
-.composer .private-anonymous-button:disabled,
+.composer .private-anonymous-button:disabled {
+  background: var(--panel-3);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.composer-post-option.is-disabled {
+  background: var(--panel-3);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
 .composer-post-option:has(input:disabled) {
   background: var(--panel-3);
   border-color: var(--line);
