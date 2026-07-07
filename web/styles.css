@@ -1904,6 +1904,12 @@ html[data-platho-telegram="true"] .install-header-button {
   gap: 14px;
   min-height: 0;
   overflow-y: auto;
+  /* overflow-y:auto alone COMPUTES overflow-x to auto too, and iOS Safari lets an auto axis rubber-band
+     even with zero horizontal overflow (the "pull the list sideways and it springs back" feel). Pin the x
+     axis shut and hand horizontal gestures back to the browser via pan-y — the same cure the chat strip and
+     the feed scrollers already use. */
+  overflow-x: hidden;
+  touch-action: pan-y;
   overscroll-behavior: contain;
   padding-right: 4px;
 }

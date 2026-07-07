@@ -555,6 +555,10 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.profile-scroll-content/);
     expect(css).toMatch(/\.vault-scroll-content/);
     expect(css).toMatch(/overflow-y: auto/);
+    // v705: overflow-y:auto alone computes overflow-x to auto, and iOS rubber-bands an auto axis even with
+    // zero horizontal overflow — the Vault/Profile scrollers pin the x axis shut and hand horizontal
+    // gestures back via pan-y (the same cure the chat strip / feed scrollers use).
+    expect(css).toMatch(/\.vault-scroll-content,\s*\.profile-scroll-content \{[\s\S]*?overflow-x: hidden;[\s\S]*?touch-action: pan-y;[\s\S]*?\}/);
     expect(css).toMatch(/scrollbar-width: none/);
     expect(css).toMatch(/::-webkit-scrollbar/);
     expect(css).not.toMatch(/@media \(min-width: 901px\) and \(max-width: 1180px\)/);
@@ -6098,8 +6102,8 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v775/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=237/);
+    expect(sw).toMatch(/platho-pwa-prototype-v776/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=238/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
     expect(sw).toMatch(/\.\/app\.js\?v=704/);
