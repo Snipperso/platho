@@ -1919,6 +1919,55 @@ function telegramCloudGet(key) {
   });
 }
 
+function telegramCloudGetKeys() {
+  return new Promise((resolve) => {
+    const cs = telegramCloudStorage();
+    if (!cs || typeof cs.getKeys !== 'function') {
+      resolve([]);
+      return;
+    }
+    try {
+      cs.getKeys((error, keys) => resolve(error || !Array.isArray(keys) ? [] : keys.map(String)));
+    } catch {
+      resolve([]);
+    }
+  });
+}
+
+function telegramCloudRemoveItems(keys) {
+  return new Promise((resolve) => {
+    const cs = telegramCloudStorage();
+    if (keys.length === 0) {
+      resolve(true);
+      return;
+    }
+    if (!cs || typeof cs.removeItems !== 'function') {
+      resolve(false);
+      return;
+    }
+    try {
+      cs.removeItems(keys, (error, ok) => resolve(!error && ok !== false));
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+// Wipe EVERY CloudStorage key this app ever wrote — ENUMERATED live (getKeys), not a hardcoded list, so a
+// future cloud mirror cannot silently escape "Clear local data". Without this the Telegram Mini App
+// resurrected the encrypted wallet from the cloud mirror on the very next boot (the owner's
+// unlock-screen-right-after-clear report). Bounded by a timeout race: CloudStorage callbacks can hang on
+// mobile Telegram (see the boot-restore race note), and the clear button must not wedge forever.
+async function clearTelegramCloudAppData() {
+  if (!telegramCloudStorage()) return true;
+  const run = (async () => {
+    const keys = await telegramCloudGetKeys();
+    return telegramCloudRemoveItems(keys);
+  })();
+  const result = await Promise.race([run, delay(8_000).then(() => 'timeout')]);
+  return result === true;
+}
+
 function mirrorWalletRecordToTelegramCloud(record) {
   if (!telegramCloudStorage() || !record || record.kind !== PLATHO_WALLET_STORAGE_KIND) return;
   let json = '';
@@ -14441,6 +14490,12 @@ function clearDocumentCookies() {
 }
 
 async function clearPlathoLocalData() {
+  // The Telegram cloud mirror goes FIRST and FAIL-CLOSED: if it cannot be wiped, the boot right after the
+  // reload would silently restore the encrypted wallet from it and the "clear" would be a lie (the local
+  // state stays untouched on the throw, so the user just sees "blocked" and can retry).
+  if (!(await clearTelegramCloudAppData())) {
+    throw new Error('Telegram cloud data could not be cleared');
+  }
   localStorageOrNull()?.clear();
   globalThis.sessionStorage?.clear?.();
   clearDocumentCookies();

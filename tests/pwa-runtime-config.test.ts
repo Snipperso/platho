@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=704" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=706" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -660,6 +660,26 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function confirmClearLocalData/);
     expect(app).toMatch(/Type CLEAR/);
     expect(app).toMatch(/async function clearPlathoLocalData/);
+    // v706: "Clear local data" ALSO wipes the Telegram CloudStorage mirror, FIRST and FAIL-CLOSED — without
+    // it the Mini App boot restored the encrypted wallet from the cloud right after the clear (owner report:
+    // unlock screen straight after clearing). Keys are ENUMERATED live (getKeys -> removeItems), not a
+    // hardcoded list, and the wipe is timeout-bounded (CloudStorage callbacks can hang on mobile Telegram).
+    const clearSource = app.slice(
+      app.indexOf('async function clearPlathoLocalData'),
+      app.indexOf('function refreshVaultTabLock'),
+    );
+    expect(clearSource).toMatch(/if \(!\(await clearTelegramCloudAppData\(\)\)\) \{\s*throw new Error/);
+    const cloudClearSource = app.slice(
+      app.indexOf('async function clearTelegramCloudAppData'),
+      app.indexOf('function mirrorWalletRecordToTelegramCloud'),
+    );
+    expect(cloudClearSource).toMatch(/telegramCloudGetKeys\(\)/);
+    expect(cloudClearSource).toMatch(/telegramCloudRemoveItems\(keys\)/);
+    expect(cloudClearSource).toMatch(/Promise\.race\(\[run, delay\(8_000\)\.then\(\(\) => 'timeout'\)\]\)/);
+    expect(cloudClearSource).toMatch(/if \(!telegramCloudStorage\(\)\) return true;/);
+    // The remove helper fails CLOSED when the API is missing but keys exist (resolve(false)); an empty key
+    // list is a clean success.
+    expect(app).toMatch(/function telegramCloudRemoveItems\(keys\) \{[\s\S]*?if \(keys\.length === 0\) \{\s*resolve\(true\);/);
     expect(app).toMatch(/platho-local-message-history-v1/);
     expect(app).toMatch(/platho-local-security-v1/);
     expect(app).toMatch(/function deploymentStorageSuffix/);
@@ -6102,11 +6122,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v776/);
+    expect(sw).toMatch(/platho-pwa-prototype-v777/);
     expect(sw).toMatch(/\.\/styles\.css\?v=238/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=704/);
+    expect(sw).toMatch(/\.\/app\.js\?v=706/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=17/);
