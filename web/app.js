@@ -5893,6 +5893,9 @@ function replyStripContent(node, reply, cancelLabelNode) {
 function setPrivateReplyDraft(reply) {
   privateReplyDraft = reply ?? null;
   if (privateReplyContext) privateReplyContext.hidden = !privateReplyDraft;
+  // The mobile composer grid re-rows around the quote strip via this class — a JS-set class, not :has():
+  // :has() silently no-ops on the iOS floor (Safari 14), which left the strip stranded under the buttons.
+  composer?.classList.toggle('is-replying', Boolean(privateReplyDraft));
   if (privateReplyDraft && privateReplyContextText) {
     replyStripContent(privateReplyContextText, privateReplyDraft);
   }

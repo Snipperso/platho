@@ -1272,9 +1272,9 @@ html[data-platho-telegram="true"] .install-header-button {
   min-width: 0;
 }
 
-#composer[data-publish-mode="vault-balance"] {
-  grid-template-columns: 44px 44px 44px minmax(0, 1fr) 52px;
-}
+/* NO ID-scoped data-publish-mode layout rules: both modes share the ONE .composer grid. The old id-selector
+   duplicates carried (1,x,x) specificity that silently beat the mobile reply-row rules — with a wallet
+   present (publish-mode=vault-balance) the textarea/send stayed on row 1 and overlapped the reply quote. */
 
 .composer > .private-anonymous-button {
   grid-column: 1;
@@ -1296,17 +1296,9 @@ html[data-platho-telegram="true"] .install-header-button {
   grid-row: 1;
 }
 
-#composer[data-publish-mode="vault-balance"] > textarea {
-  grid-column: 4;
-}
-
 .composer > .send-button {
   grid-column: 5;
   grid-row: 1;
-}
-
-#composer[data-publish-mode="vault-balance"] > .send-button {
-  grid-column: 5;
 }
 
 .composer textarea {
@@ -4109,18 +4101,13 @@ button.feed-item:hover {
     overflow: visible;
   }
 
-  #composer[data-publish-mode="vault-balance"] {
-    grid-template-columns: 38px 38px minmax(0, 1fr) 48px;
-  }
-
   /* Row 1: emoji + wide text field + send (both composers, all public modes). */
   .composer > .emoji-button,
   .public-composer[data-mode="comment"] > .emoji-button {
     grid-column: 1;
     grid-row: 1;
   }
-  .composer > textarea,
-  #composer[data-publish-mode="vault-balance"] > textarea {
+  .composer > textarea {
     grid-column: 2 / 4;
     grid-row: 1;
   }
@@ -4131,8 +4118,7 @@ button.feed-item:hover {
   }
   .composer > .send-button,
   .public-composer > .send-button,
-  .public-composer[data-mode="comment"] > .send-button,
-  #composer[data-publish-mode="vault-balance"] > .send-button {
+  .public-composer[data-mode="comment"] > .send-button {
     grid-column: 4;
     grid-row: 1;
   }
@@ -4164,18 +4150,20 @@ button.feed-item:hover {
 
   /* When a swipe-reply quote strip is active (private composer), it takes the top row and pushes the input +
      buttons down one row, so the quote sits directly above the field instead of stranded below the cost line.
-     Scoped by :has() to the shown state, so there is no phantom empty top row when not replying. */
-  .composer:has(> .composer-reply-context:not([hidden])) > .composer-reply-context {
+     Keyed to the JS-set .is-replying class (setPrivateReplyDraft), NOT :has(): :has() silently no-ops on the
+     iOS floor (Safari 14), and no other selector may outrank these rows (see the no-ID-rules note at the
+     base .composer grid). */
+  .composer.is-replying > .composer-reply-context {
     grid-row: 1;
   }
-  .composer:has(> .composer-reply-context:not([hidden])) > .emoji-button,
-  .composer:has(> .composer-reply-context:not([hidden])) > textarea,
-  .composer:has(> .composer-reply-context:not([hidden])) > .send-button {
+  .composer.is-replying > .emoji-button,
+  .composer.is-replying > textarea,
+  .composer.is-replying > .send-button {
     grid-row: 2;
   }
-  .composer:has(> .composer-reply-context:not([hidden])) > .private-anonymous-button,
-  .composer:has(> .composer-reply-context:not([hidden])) > .composer-add,
-  .composer:has(> .composer-reply-context:not([hidden])) > .composer-cost-status {
+  .composer.is-replying > .private-anonymous-button,
+  .composer.is-replying > .composer-add,
+  .composer.is-replying > .composer-cost-status {
     grid-row: 3;
   }
 

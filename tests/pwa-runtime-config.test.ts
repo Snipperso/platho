@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=699" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=700" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4722,6 +4722,16 @@ describe('PWA runtime config guard', () => {
     // UI shells + gesture CSS (touch-action pan-y keeps vertical scroll native; position:relative anchors the
     // desktop hover Reply button).
     expect(html).toMatch(/id="privateReplyContext"/);
+    // v700 reply-row layout invariant: the mobile grid re-rows around the quote strip via the JS-set
+    // .is-replying class (setPrivateReplyDraft) — NOT :has() (no-op on the iOS floor) — and NO ID-scoped
+    // #composer[data-publish-mode] layout rule may exist: its (1,x,x) specificity silently beat the reply
+    // rows whenever a wallet was present (textarea/send stayed on row 1, overlapping the quote strip).
+    expect(app).toMatch(/composer\?\.classList\.toggle\('is-replying', Boolean\(privateReplyDraft\)\);/);
+    expect(css).toMatch(/\.composer\.is-replying > \.composer-reply-context \{\s*grid-row: 1;/);
+    expect(css).toMatch(/\.composer\.is-replying > \.emoji-button,\s*\.composer\.is-replying > textarea,\s*\.composer\.is-replying > \.send-button \{\s*grid-row: 2;/);
+    expect(css).toMatch(/\.composer\.is-replying > \.private-anonymous-button,\s*\.composer\.is-replying > \.composer-add,\s*\.composer\.is-replying > \.composer-cost-status \{\s*grid-row: 3;/);
+    expect(css).not.toMatch(/#composer\[data-publish-mode/);
+    expect(css).not.toMatch(/\.composer:has\(> \.composer-reply-context/);
     expect(css).toMatch(/\.message,\s*\.comment-item \{\s*position: relative;\s*touch-action: pan-y;/);
     // v648 (owner: "дёргается и возвращается"): the swipe CONTAINERS surrender horizontal touch gestures too —
     // a row-LINE swipe starts on the scroller's own space, and without pan-y there the browser claims the
@@ -6036,11 +6046,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v770/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=234/);
+    expect(sw).toMatch(/platho-pwa-prototype-v771/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=235/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=699/);
+    expect(sw).toMatch(/\.\/app\.js\?v=700/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=16/);
