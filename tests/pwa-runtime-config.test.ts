@@ -4503,6 +4503,18 @@ describe('PWA runtime config guard', () => {
     // UI: header entry button + discovery panel + the feed-top channels plate.
     expect(html).toMatch(/id="publicDiscoverButton"/);
     expect(html).toMatch(/id="publicDiscovery"/);
+    // v701 header consistency: the discovery header carries the STANDARD chrome (install + docs + sync
+    // indicator) like every other screen, and both public overlays bleed SIDES ONLY — the old -24px top
+    // margin (from a 24px-padded pane era) pushed the header 13px past the pane's 11px top offset and
+    // clipped the title.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const discoveryHeader = html.slice(html.indexOf('id="publicDiscovery"'), html.indexOf('id="publicDiscoveryBody"'));
+    expect(discoveryHeader).toMatch(/docs-header-button/);
+    expect(discoveryHeader).toMatch(/global-sync-indicator/);
+    expect(discoveryHeader).toMatch(/install-header-button/);
+    expect(css).not.toMatch(/margin: -24px -24px 0;/);
+    expect(css).toMatch(/\.public-pane\[data-post-open="true"\] > \.public-post-detail \{[\s\S]*?margin: 0 -24px;/);
+    expect(css).toMatch(/\.public-pane\[data-discover-open="true"\] > \.public-discovery \{[\s\S]*?margin: 0 -24px;/);
     expect(app).toMatch(/function buildDiscoveryCtaCard\(\)/);
     expect(app).toMatch(/function shouldShowDiscoveryCta\(\)/);
     // The plate is the ONLY entry point for add-channel-by-address since the search-row "+" was removed:
@@ -6046,8 +6058,8 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v771/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=235/);
+    expect(sw).toMatch(/platho-pwa-prototype-v772/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=236/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
     expect(sw).toMatch(/\.\/app\.js\?v=700/);

@@ -2102,11 +2102,12 @@ button.feed-item:hover {
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-  /* Bleed the whole detail to the pane edges (the pane has 24px padding) so the header lines up with the private
-     chat header. This is a DIRECT pane grid child (like the composer, which bleeds the same way), where negative
-     side margins reliably widen it — a negative margin on the nested header itself does not, on desktop. The header
-     then fills the bled detail; the body re-insets its own content with padding. */
-  margin: -24px -24px 0;
+  /* Bleed the detail to the pane's SIDE edges (24px gutters) so the header spans the pane full-width; the body
+     re-insets its own content with padding. The TOP is NOT bled: the pane's top padding is
+     var(--header-top-offset) (11px, the v688 shared header line) — the old -24px top margin dated from a
+     24px-padded pane and pushed the header 13px past the pane top, clipping the title. Zero top margin puts
+     this header on the exact same y as every other pane header. */
+  margin: 0 -24px;
 }
 
 /* Discovery panel: mirrors the post-detail overlay (shown over the feed, same bleed-to-edges header). */
@@ -2132,7 +2133,8 @@ button.feed-item:hover {
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-  margin: -24px -24px 0;
+  /* Side-only bleed for the same reason as .public-post-detail above (zero top margin = shared header line). */
+  margin: 0 -24px;
 }
 
 .public-post-detail-header .avatar .icon {
