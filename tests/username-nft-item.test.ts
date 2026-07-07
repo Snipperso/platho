@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, contractAddress, Dictionary, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, Dictionary, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
@@ -92,6 +92,24 @@ function expectRawSvgData(svg: string) {
 
 function emptySlice() {
   return beginCell().endCell().beginParse();
+}
+
+// TEP-62 transfer body after query_id: new_owner, response_destination (MsgAddress —
+// null renders addr_none$00), custom_payload (Maybe ^Cell), forward_amount, forward_payload.
+function nftTransferPayload(
+  newOwner: Address,
+  responseDestination: Address | null,
+  forwardAmount: bigint,
+  forwardPayload = emptySlice(),
+  customPayload: Cell | null = null,
+) {
+  const b = beginCell().storeAddress(newOwner);
+  if (responseDestination) b.storeAddress(responseDestination);
+  else b.storeUint(0, 2);
+  b.storeMaybeRef(customPayload);
+  b.storeCoins(forwardAmount);
+  b.storeSlice(forwardPayload);
+  return b.endCell().beginParse();
 }
 
 function inboundValue(tx: any): bigint {
@@ -278,11 +296,7 @@ describe('UsernameNFTItem v1 milestone', () => {
     await item.send(blockchain.sender(ownerWallet), { value: 14_000_000n }, {
       $$type: 'NftTransfer',
       query_id: 77n,
-      new_owner: nextOwner,
-      response_destination: responseDestination,
-      custom_payload: null,
-      forward_amount: 0n,
-      forward_payload: emptySlice(),
+      payload: nftTransferPayload(nextOwner, responseDestination, 0n),
     } as NftTransfer);
 
     const state = await item.getGetState();
@@ -301,11 +315,7 @@ describe('UsernameNFTItem v1 milestone', () => {
     const result = await item.send(blockchain.sender(ownerWallet), { value: 20_000_000n }, {
       $$type: 'NftTransfer',
       query_id: 79n,
-      new_owner: nextOwner,
-      response_destination: responseDestination,
-      custom_payload: null,
-      forward_amount: 1_000_000n,
-      forward_payload: emptySlice(),
+      payload: nftTransferPayload(nextOwner, responseDestination, 1_000_000n),
     } as NftTransfer);
 
     const notification = findTransaction(result.transactions, {
@@ -333,11 +343,7 @@ describe('UsernameNFTItem v1 milestone', () => {
     const result = await item.send(blockchain.sender(ownerWallet), { value: 22_000_000n }, {
       $$type: 'NftTransfer',
       query_id: 80n,
-      new_owner: nextOwner,
-      response_destination: responseDestination,
-      custom_payload: null,
-      forward_amount: 1_250_000n,
-      forward_payload: forwardPayload,
+      payload: nftTransferPayload(nextOwner, responseDestination, 1_250_000n, forwardPayload),
     } as NftTransfer);
 
     const notification = findTransaction(result.transactions, {
@@ -379,6 +385,145 @@ describe('UsernameNFTItem v1 milestone', () => {
     expect(metadata.get(metadataKey('image_data'))).toBeUndefined();
   });
 
+  it('USERNAME-NFT-12: addr_none response_destination is accepted (TEP-62) and suppresses excesses', async () => {
+    const { blockchain, item, ownerWallet } = await deployItem();
+    const nextOwner = fixtureAddress('USERNAME_TRANSFER_ADDR_NONE_OWNER');
+
+    const result = await item.send(blockchain.sender(ownerWallet), { value: 50_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 81n,
+      payload: nftTransferPayload(nextOwner, null, 0n),
+    } as NftTransfer);
+
+    const itemTx = findTransaction(result.transactions, { to: item.address, op: 0x5FCC3D14 });
+    expect(itemTx).toBeDefined();
+    expect((itemTx!.description as any).aborted).toBe(false);
+    expect(itemTx!.outMessagesCount).toBe(0); // no forward, no excesses — value stays on the item
+    expect((await item.getGetState()).owner_wallet.equals(nextOwner)).toBe(true);
+  });
+
+  it('USERNAME-NFT-13: excesses carry the explicit rest and the item balance never drops (GetGems shape)', async () => {
+    const { blockchain, item, itemAddress, ownerWallet } = await deployItem();
+    const nextOwner = fixtureAddress('USERNAME_TRANSFER_REST_OWNER');
+    const responseDestination = fixtureAddress('USERNAME_TRANSFER_REST_RESPONSE');
+    const balanceBefore = (await blockchain.getContract(itemAddress)).balance;
+
+    // GetGems put-on-sale shape: value 0.213, forward 0.2.
+    const value = 213_000_000n;
+    const forwardAmount = 200_000_000n;
+    const result = await item.send(blockchain.sender(ownerWallet), { value }, {
+      $$type: 'NftTransfer',
+      query_id: 82n,
+      payload: nftTransferPayload(nextOwner, responseDestination, forwardAmount),
+    } as NftTransfer);
+
+    const notification = findTransaction(result.transactions, { from: item.address, to: nextOwner, op: 0x05138D91 });
+    expect(notification).toBeDefined();
+    expect(inboundValue(notification)).toBe(forwardAmount);
+
+    // rest = value - exec reserve (2M) - forward - fwd-fee allowance (10M) = 1M exactly.
+    const excesses = findTransaction(result.transactions, { from: item.address, to: responseDestination, op: 0xD53276DB });
+    expect(excesses).toBeDefined();
+    expect(inboundValue(excesses)).toBe(value - 2_000_000n - forwardAmount - 10_000_000n);
+
+    // The v1 defect paid ~forward_amount out of the item's own balance; the fix must not.
+    const balanceAfter = (await blockchain.getContract(itemAddress)).balance;
+    expect(balanceAfter >= balanceBefore).toBe(true);
+    expect((await item.getGetState()).owner_wallet.equals(nextOwner)).toBe(true);
+  });
+
+  it('USERNAME-NFT-14: GetGems put-on-sale transfer succeeds at a ~0.05 item balance (v1 failed action phase)', async () => {
+    const { blockchain, item, itemAddress, ownerWallet } = await deployItem();
+    const nextOwner = fixtureAddress('USERNAME_TRANSFER_LOW_BALANCE_OWNER');
+    const responseDestination = fixtureAddress('USERNAME_TRANSFER_LOW_BALANCE_RESPONSE');
+
+    // The GetGems server pre-flight emulates at a synthetic ~0.0505 item balance.
+    const contract = await blockchain.getContract(itemAddress);
+    const shard = contract.account;
+    shard.account!.storage.balance.coins = 50_495_715n;
+    await blockchain.setShardAccount(itemAddress, shard);
+
+    const result = await item.send(blockchain.sender(ownerWallet), { value: 213_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 83n,
+      payload: nftTransferPayload(nextOwner, responseDestination, 200_000_000n),
+    } as NftTransfer);
+
+    const itemTx = findTransaction(result.transactions, { to: item.address, op: 0x5FCC3D14 });
+    expect(itemTx).toBeDefined();
+    expect((itemTx!.description as any).aborted).toBe(false);
+    expect((itemTx!.description as any).actionPhase?.resultCode).toBe(0);
+    expect(itemTx!.outMessagesCount).toBe(2);
+    expect((await item.getGetState()).owner_wallet.equals(nextOwner)).toBe(true);
+  });
+
+  it('USERNAME-NFT-15: ref-encoded forward_payload (Either bit 1 + ^Cell) is forwarded verbatim', async () => {
+    const { blockchain, item, ownerWallet } = await deployItem();
+    const nextOwner = fixtureAddress('USERNAME_TRANSFER_REF_PAYLOAD_OWNER');
+    const responseDestination = fixtureAddress('USERNAME_TRANSFER_REF_PAYLOAD_RESPONSE');
+    const payloadRef = beginCell().storeUint(0xdeadbeef, 32).endCell();
+    const forwardPayload = beginCell().storeBit(1).storeRef(payloadRef).endCell().beginParse();
+
+    const result = await item.send(blockchain.sender(ownerWallet), { value: 40_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 84n,
+      payload: nftTransferPayload(nextOwner, responseDestination, 5_000_000n, forwardPayload),
+    } as NftTransfer);
+
+    const notification = findTransaction(result.transactions, { from: item.address, to: nextOwner, op: 0x05138D91 });
+    expect(notification).toBeDefined();
+    const body = notification!.inMessage!.body.beginParse();
+    expect(body.loadUint(32)).toBe(0x05138D91);
+    expect(body.loadUintBig(64)).toBe(84n);
+    expect(body.loadAddress().equals(ownerWallet)).toBe(true);
+    expect(body.loadBit()).toBe(true);
+    expect(body.loadRef().hash().equals(payloadRef.hash())).toBe(true);
+    expect(body.remainingBits).toBe(0);
+    expect(body.remainingRefs).toBe(0);
+  });
+
+  it('USERNAME-NFT-17: custom_payload = Some(^Cell) is consumed and does not shift forward_amount/payload parsing', async () => {
+    const { blockchain, item, ownerWallet } = await deployItem();
+    const nextOwner = fixtureAddress('USERNAME_TRANSFER_CUSTOM_PAYLOAD_OWNER');
+    const responseDestination = fixtureAddress('USERNAME_TRANSFER_CUSTOM_PAYLOAD_RESPONSE');
+    const customPayload = beginCell().storeUint(0xc0ffee, 24).endCell();
+    const payloadRef = beginCell().storeUint(0xfeedface, 32).endCell();
+    const forwardPayload = beginCell().storeBit(1).storeRef(payloadRef).endCell().beginParse();
+
+    const result = await item.send(blockchain.sender(ownerWallet), { value: 40_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 86n,
+      payload: nftTransferPayload(nextOwner, responseDestination, 5_000_000n, forwardPayload, customPayload),
+    } as NftTransfer);
+
+    const notification = findTransaction(result.transactions, { from: item.address, to: nextOwner, op: 0x05138D91 });
+    expect(notification).toBeDefined();
+    expect(inboundValue(notification)).toBe(5_000_000n); // forward_amount read exactly despite the Maybe ref
+    const body = notification!.inMessage!.body.beginParse();
+    body.loadUint(32); body.loadUintBig(64); body.loadAddress();
+    expect(body.loadBit()).toBe(true);
+    expect(body.loadRef().hash().equals(payloadRef.hash())).toBe(true); // custom_payload ref absent from outbound body
+    expect(body.remainingRefs).toBe(0);
+    expect((await item.getGetState()).owner_wallet.equals(nextOwner)).toBe(true);
+  });
+
+  it('USERNAME-NFT-16: transfer with value below the explicit budget throws 18035 and keeps the owner', async () => {
+    const { blockchain, item, ownerWallet } = await deployItem();
+    const nextOwner = fixtureAddress('USERNAME_TRANSFER_UNDERFUNDED_OWNER');
+    const responseDestination = fixtureAddress('USERNAME_TRANSFER_UNDERFUNDED_RESPONSE');
+
+    // budget = exec 2M + forward 200M + allowance 10M = 212M; send 211M.
+    const result = await item.send(blockchain.sender(ownerWallet), { value: 211_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 85n,
+      payload: nftTransferPayload(nextOwner, responseDestination, 200_000_000n),
+    } as NftTransfer);
+
+    const itemTx = findTransaction(result.transactions, { to: item.address, op: 0x5FCC3D14 });
+    expect((itemTx!.description as any).computePhase?.exitCode).toBe(18035);
+    expect((await item.getGetState()).owner_wallet.equals(ownerWallet)).toBe(true);
+  });
+
   it('USERNAME-NFT-07: non-owner cannot transfer username NFT', async () => {
     const { blockchain, item, ownerWallet } = await deployItem();
     const attacker = fixtureAddress('USERNAME_TRANSFER_ATTACKER');
@@ -387,11 +532,7 @@ describe('UsernameNFTItem v1 milestone', () => {
     await item.send(blockchain.sender(attacker), { value: 14_000_000n }, {
       $$type: 'NftTransfer',
       query_id: 78n,
-      new_owner: nextOwner,
-      response_destination: attacker,
-      custom_payload: null,
-      forward_amount: 0n,
-      forward_payload: emptySlice(),
+      payload: nftTransferPayload(nextOwner, attacker, 0n),
     } as NftTransfer);
 
     const state = await item.getGetState();

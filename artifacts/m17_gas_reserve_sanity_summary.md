@@ -10,7 +10,7 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | ATH_BURN_SUCCESS | 1 | 1384469 | 1384469 | 8226 |
 | CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 11106914 | 5462134 | 81360 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 7 | 4114566 | 907445 | 5901 |
-| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 6 | 22415887 | 6305229 | 41572 |
+| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 6 | 22435270 | 6305229 | 41572 |
 | VAULT_BALANCE_PUBLISH | 2 | 19181146 | 10481550 | 96926 |
 
 ## Operation details
@@ -51,12 +51,12 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| valid_username_mint_with_item_ack | 4 | 6079485 | 3172928 | 41572 | 1 | 1 |
+| valid_username_mint_with_item_ack | 4 | 6088641 | 3182084 | 41572 | 1 | 1 |
 | invalid_username_rejected_notification | 2 | 1386556 | 1130822 | 16629 | 2 | 2 |
 | flush_treasury_due_ath | 6 | 6305229 | 2343136 | 20806 | 0 | 0 |
 | flush_burn_due_ath | 5 | 3600225 | 1194023 | 17380 | 0 | 0 |
-| stuck_pending_mint_creation_no_ack | 2 | 3314462 | 3172928 | 41572 | 0 | 0 |
-| prune_stale_pending_mint | 3 | 1729930 | 1424935 | 9971 | 1 | 1 |
+| stuck_pending_mint_creation_no_ack | 2 | 3323618 | 3182084 | 41572 | 0 | 0 |
+| prune_stale_pending_mint | 3 | 1731001 | 1426006 | 9971 | 1 | 1 |
 
 ### VAULT_BALANCE_PUBLISH
 

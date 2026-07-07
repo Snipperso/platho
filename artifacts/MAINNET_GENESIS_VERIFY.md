@@ -1,8 +1,8 @@
 # Mainnet Genesis Verify
 
-Status: MAINNET_GENESIS_VERIFIED
+Status: BLOCKED_GENESIS_MISMATCH
 
-- mainnet_genesis_verified: true
+- mainnet_genesis_verified: false
 - checked_manifest_hash: 9e82eaa3f96d533a99a397cd71713736fda2e49cfdf84b495353d0bfda91f8ad
 - input_source: artifacts/mainnet_genesis_verify_input.json
 - input_sha256: f1108446ab7c82f7405bc882a1e0604a46d501ec71476b77847a677f4759c56b
@@ -15,4 +15,5 @@ Status: MAINNET_GENESIS_VERIFIED
 
 ## Issues
 
-- none
+- CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST: Final genesis evidence does not belong to the current local build: username_nft_item: current=eccbea500b135059a1a46bae5c833b28ad263aae0258a146e9f98d8f7b843910, manifest=73d19a15d46c24d0eda7047d073490b7166d01322399751108be40ae2fda2eab; username_registry: current=89cf045874c3dc415409d702d51906cf6e8ce1f8ae9cf1bd64e6bf0c6b254570, manifest=f248b46c3a298f6dba28ceac051c50ee294a2dc4e6de5879d8fd3635e4cecfc2.
+- MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT: Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=9e82eaa3f96d533a99a397cd71713736fda2e49cfdf84b495353d0bfda91f8ad local_draft=d9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16 production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification.

@@ -806,11 +806,7 @@ export function dictValueParserUsernameItemDeployedAck(): DictionaryValue<Userna
 export type NftTransfer = {
     $$type: 'NftTransfer';
     query_id: bigint;
-    new_owner: Address;
-    response_destination: Address;
-    custom_payload: Cell | null;
-    forward_amount: bigint;
-    forward_payload: Slice;
+    payload: Slice;
 }
 
 export function storeNftTransfer(src: NftTransfer) {
@@ -818,11 +814,7 @@ export function storeNftTransfer(src: NftTransfer) {
         const b_0 = builder;
         b_0.storeUint(1607220500, 32);
         b_0.storeUint(src.query_id, 64);
-        b_0.storeAddress(src.new_owner);
-        b_0.storeAddress(src.response_destination);
-        if (src.custom_payload !== null && src.custom_payload !== undefined) { b_0.storeBit(true).storeRef(src.custom_payload); } else { b_0.storeBit(false); }
-        b_0.storeCoins(src.forward_amount);
-        b_0.storeBuilder(src.forward_payload.asBuilder());
+        b_0.storeBuilder(src.payload.asBuilder());
     };
 }
 
@@ -830,42 +822,26 @@ export function loadNftTransfer(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1607220500) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
-    const _new_owner = sc_0.loadAddress();
-    const _response_destination = sc_0.loadAddress();
-    const _custom_payload = sc_0.loadBit() ? sc_0.loadRef() : null;
-    const _forward_amount = sc_0.loadCoins();
-    const _forward_payload = sc_0;
-    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+    const _payload = sc_0;
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, payload: _payload };
 }
 
 export function loadTupleNftTransfer(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _new_owner = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _custom_payload = source.readCellOpt();
-    const _forward_amount = source.readBigNumber();
-    const _forward_payload = source.readCell().asSlice();
-    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+    const _payload = source.readCell().asSlice();
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, payload: _payload };
 }
 
 export function loadGetterTupleNftTransfer(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _new_owner = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _custom_payload = source.readCellOpt();
-    const _forward_amount = source.readBigNumber();
-    const _forward_payload = source.readCell().asSlice();
-    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+    const _payload = source.readCell().asSlice();
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, payload: _payload };
 }
 
 export function storeTupleNftTransfer(source: NftTransfer) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
-    builder.writeAddress(source.new_owner);
-    builder.writeAddress(source.response_destination);
-    builder.writeCell(source.custom_payload);
-    builder.writeNumber(source.forward_amount);
-    builder.writeSlice(source.forward_payload.asCell());
+    builder.writeSlice(source.payload.asCell());
     return builder.build();
 }
 
@@ -5240,7 +5216,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"ResendDeployedAck","header":1671232620,"fields":[]},
     {"name":"TopUpStorageReserve","header":665640843,"fields":[]},
     {"name":"UsernameItemDeployedAck","header":3148082201,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"NftTransfer","header":1607220500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"new_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"custom_payload","type":{"kind":"simple","type":"cell","optional":true}},{"name":"forward_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"NftTransfer","header":1607220500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"NftOwnershipAssigned","header":85167505,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"previous_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"NftExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"UsernameNFTItemStateView","header":null,"fields":[{"name":"initialized","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username","type":{"kind":"simple","type":"cell","optional":false}},{"name":"tier","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},

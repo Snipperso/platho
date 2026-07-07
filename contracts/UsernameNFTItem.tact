@@ -28,14 +28,12 @@ message(0xBBA3EC19) UsernameItemDeployedAck {
     owner_wallet: Address;
 }
 
-// TEP-62 NFT transfer surface.
+// TEP-62 NFT transfer surface. The body after query_id is parsed manually because
+// response_destination is a TL-B MsgAddress that may legally be addr_none$00, which a
+// typed Address field rejects.
 message(0x5FCC3D14) NftTransfer {
     query_id: Int as uint64;
-    new_owner: Address;
-    response_destination: Address;
-    custom_payload: Cell?;
-    forward_amount: Int as coins;
-    forward_payload: Slice as remaining;
+    payload: Slice as remaining;
 }
 
 message(0x05138D91) NftOwnershipAssigned {
@@ -216,33 +214,60 @@ contract UsernameNFTItem {
     receive(msg: NftTransfer) {
         throwUnless(18030, self.initialized);
         throwUnless(18031, sender() == self.owner_wallet);
-        throwUnless(18032, self.isBasechainAddress(msg.new_owner));
-        throwUnless(18033, self.isBasechainAddress(msg.response_destination));
-        throwUnless(18034, msg.forward_amount >= 0);
-        throwUnless(18035, context().value >= USERNAME_ITEM_TRANSFER_EXEC_RESERVE + msg.forward_amount + USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE);
+
+        let body: Slice = msg.payload;
+        let newOwner: Address = body.loadAddress();
+        throwUnless(18032, self.isBasechainAddress(newOwner));
+
+        // response_destination: MsgAddress — addr_none$00 means "no excesses response".
+        let hasResponseDestination: Bool = body.preloadUint(2) != 0;
+        let responseDestination: Address? = null;
+        if (hasResponseDestination) {
+            responseDestination = body.loadAddress();
+            throwUnless(18033, self.isBasechainAddress(responseDestination!!));
+        } else {
+            body.skipBits(2);
+        }
+
+        if (body.loadBool()) { body.loadRef(); } // custom_payload: Maybe ^Cell (unused)
+        let forwardAmount: Int = body.loadCoins();
+        // body now holds the TEP-62 forward_payload (Either bit + content), forwarded verbatim.
+
+        // Explicit budget: the inbound value alone funds execution, the ownership-assigned
+        // forward, both forward fees, and the excesses value. The item never pays from its
+        // own balance (the v1 mode-64 excesses defect double-counted forward_amount and
+        // drained ~forward_amount per transfer, failing outright when the balance was short).
+        // The fee allowance scales with the inbound forward fee (reference nft-item.fc
+        // pattern): ownership_assigned re-forwards the sender's payload, so a large payload
+        // raises the required budget instead of eating the item balance, and a future fee
+        // schedule raise widens the allowance automatically. The 10M floor keeps today's
+        // marketplace budget unchanged.
+        let fwdFeeAllowance: Int = max(USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE, context().readForwardFee() * 2);
+        let restAmount: Int = context().value - USERNAME_ITEM_TRANSFER_EXEC_RESERVE - forwardAmount - fwdFeeAllowance;
+        throwUnless(18035, restAmount >= 0);
 
         let previousOwner: Address = self.owner_wallet;
-        self.owner_wallet = msg.new_owner;
+        self.owner_wallet = newOwner;
 
-        if (msg.forward_amount > 0) {
+        if (forwardAmount > 0) {
             message(MessageParameters {
-                to: msg.new_owner,
-                value: msg.forward_amount,
+                to: newOwner,
+                value: forwardAmount,
                 mode: SendPayFwdFeesSeparately,
                 bounce: false,
                 body: NftOwnershipAssigned {
                     query_id: msg.query_id,
                     previous_owner: previousOwner,
-                    forward_payload: self.normalizedForwardPayload(msg.forward_payload)
+                    forward_payload: self.normalizedForwardPayload(body)
                 }.toCell()
             });
         }
 
-        if (context().value >= USERNAME_ITEM_TRANSFER_EXEC_RESERVE + msg.forward_amount + USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE + USERNAME_ITEM_EXCESSES_MIN_VALUE) {
+        if (hasResponseDestination && restAmount >= USERNAME_ITEM_EXCESSES_MIN_VALUE) {
             message(MessageParameters {
-                to: msg.response_destination,
-                value: 0,
-                mode: SendRemainingValue,
+                to: responseDestination!!,
+                value: restAmount,
+                mode: SendPayFwdFeesSeparately,
                 bounce: false,
                 body: NftExcesses {
                     query_id: msg.query_id

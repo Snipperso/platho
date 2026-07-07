@@ -28,6 +28,17 @@ const OP_ATH_TRANSFER_NOTIFICATION_REFUND = 0x4154481E;
 const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 500_000_000n + 1_000_000n + 4_000_000n + 36_000_000n; // + name-record endowment (clean-11)
 const USERNAME_ITEM_STORAGE_FLOOR = 15_900_000n;
 
+// TEP-62 transfer body after query_id (new NftTransfer binding carries it as one slice).
+function nftTransferPayload(newOwner: Address, responseDestination: Address | null, forwardAmount: bigint) {
+  const b = beginCell().storeAddress(newOwner);
+  if (responseDestination) b.storeAddress(responseDestination);
+  else b.storeUint(0, 2);
+  b.storeMaybeRef(null);
+  b.storeCoins(forwardAmount);
+  b.storeBit(0);
+  return b.endCell().beginParse();
+}
+
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
 }
@@ -322,11 +333,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     await item.send(blockchain.sender(ownerA), { value: 14_000_000n }, {
       $$type: 'NftTransfer',
       query_id: 901n,
-      new_owner: ownerB,
-      response_destination: ownerA,
-      custom_payload: null,
-      forward_amount: 0n,
-      forward_payload: emptySlice(),
+      payload: nftTransferPayload(ownerB, ownerA, 0n),
     } as NftTransfer);
 
     const record = await registry.getGetNameRecord(hash);
@@ -364,11 +371,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     await item.send(blockchain.sender(ownerA), { value: 14_000_000n }, {
       $$type: 'NftTransfer',
       query_id: 902n,
-      new_owner: ownerB,
-      response_destination: ownerA,
-      custom_payload: null,
-      forward_amount: 0n,
-      forward_payload: emptySlice(),
+      payload: nftTransferPayload(ownerB, ownerA, 0n),
     } as NftTransfer);
     expect((await item.getGetState()).owner_wallet.equals(ownerB)).toBe(true);
 
@@ -410,11 +413,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     await item.send(blockchain.sender(ownerA), { value: 14_000_000n }, {
       $$type: 'NftTransfer',
       query_id: 903n,
-      new_owner: ownerB,
-      response_destination: ownerA,
-      custom_payload: null,
-      forward_amount: 0n,
-      forward_payload: emptySlice(),
+      payload: nftTransferPayload(ownerB, ownerA, 0n),
     } as NftTransfer);
 
     const beforeGlobal = await registry.getGetGlobal();
