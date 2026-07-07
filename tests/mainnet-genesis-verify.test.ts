@@ -171,7 +171,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         code_hash: code_hashes.ath_wallet,
         owner_address: addresses.ath_treasury_owner,
         ath_master_address: addresses.ath_master,
-        balance_atomic: '75000000000000000',
+        balance_atomic: '15000000000000000',
       },
       ath_long_term_vesting: {
         address: addresses.ath_long_term_vesting,
@@ -211,8 +211,8 @@ function finalInput(): MainnetGenesisVerifyInput {
         ath_master_address: addresses.ath_master,
         genesis_config_hash: addressHashHex(addresses.market_stability_seller_initial_genesis_controller),
         pricing_frozen: false,
-        reserve_due_ath: '0',
-        reserve_funded_total_ath: '0',
+        reserve_due_ath: '60000000000000000',
+        reserve_funded_total_ath: '60000000000000000',
         treasury_due_ton: '0',
         sold_ath_total: '0',
         phase: '0',
@@ -229,7 +229,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         code_hash: code_hashes.ath_wallet,
         owner_address: addresses.market_stability_seller,
         ath_master_address: addresses.ath_master,
-        balance_atomic: '0',
+        balance_atomic: '60000000000000000',
       },
       capsulehub: {
         address: addresses.capsulehub,
@@ -369,10 +369,11 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
 
   it('accepts unfunded official ATH wallets that are still uninit at final genesis', () => {
     const input = finalInput();
+    // clean-15: the MSS official ATHWallet is NOT in this set — it holds the fully-capitalized
+    // 60M reserve at genesis, so it must be active+funded (covered by the funded-wallet checks).
     markOfficialWalletUninit(input, 'username_registry_official_ath_wallet');
     markOfficialWalletUninit(input, 'profile_registry_official_ath_wallet');
     markOfficialWalletUninit(input, 'buyback_burn_official_ath_wallet');
-    markOfficialWalletUninit(input, 'market_stability_seller_official_ath_wallet');
 
     const report = verifyMainnetGenesisSnapshot(input);
 
@@ -1279,8 +1280,8 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_PRICING_FROZEN_AT_GENESIS');
     expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISSING');
-    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_NOT_ZERO_AT_GENESIS');
-    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_NOT_FULLY_CAPITALIZED');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_FULLY_CAPITALIZED');
     expect(report.issue_codes).toContain('MARKET_STABILITY_TREASURY_DUE_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('MARKET_STABILITY_SOLD_TOTAL_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('MARKET_STABILITY_PHASE_NOT_IDLE_AT_GENESIS');

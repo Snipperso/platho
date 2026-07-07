@@ -9,7 +9,11 @@ export const DEFAULT_MAINNET_GENESIS_VERIFY_INPUT_PATH = join(ARTIFACTS_DIR, 'ma
 const FINAL_MANIFEST_DOMAIN = 'PLATHO.V1.FINAL_GENESIS_MANIFEST';
 const EXPECTED_ATH_TOTAL_SUPPLY_ATOMIC = '100000000000000000';
 const EXPECTED_VAULT_ACTIVITY_AIRDROP_TOTAL_ATOMIC = '15000000000000000';
-const EXPECTED_ATH_TREASURY_OWNER_REMAINING_ATOMIC = '75000000000000000';
+// clean-15 certifies the FINAL genesis state: the 60M MarketStabilitySeller reserve is capitalized
+// as part of genesis, so the treasury owner retains exactly the 15M activity-airdrop allocation
+// (100M - 15M Vault - 10M Vesting - 60M MSS reserve). clean-14 snapshotted the pre-reserve
+// checkpoint at 75M; clean-15's reserve capitalization is folded into the certified genesis.
+const EXPECTED_ATH_TREASURY_OWNER_REMAINING_ATOMIC = '15000000000000000';
 const EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC = '60000000000000000';
 const EXPECTED_ATH_LONG_TERM_VESTING_ATOMIC = '10000000000000000';
 const EXPECTED_ATH_LONG_TERM_VESTING_PERIOD_COUNT = '100';
@@ -810,7 +814,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         code_hash: 'required: current ATHWallet code hash',
         owner_address: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
-        balance_atomic: 'required: exact remaining 75M ATH genesis custody balance',
+        balance_atomic: 'required: exact remaining 15M ATH airdrop-allocation custody balance (post 60M reserve capitalization)',
       },
       ath_long_term_vesting: {
         address: 'REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS',
@@ -1244,7 +1248,7 @@ export function verifyMainnetGenesisSnapshot(
     balance_atomic: '',
   };
   if (!(s as any).ath_treasury_owner_ath_wallet) {
-    issues.push(issue('MISSING_ATH_TREASURY_OWNER_ATH_WALLET_SNAPSHOT', 'snapshot.ath_treasury_owner_ath_wallet getter data is required to prove custody of the remaining 75M ATH at final genesis.'));
+    issues.push(issue('MISSING_ATH_TREASURY_OWNER_ATH_WALLET_SNAPSHOT', 'snapshot.ath_treasury_owner_ath_wallet getter data is required to prove custody of the remaining 15M ATH airdrop allocation at final genesis.'));
   }
   checkFundedOfficialAthWallet(
     issues,
@@ -1369,8 +1373,10 @@ export function verifyMainnetGenesisSnapshot(
   addBasechainAddress(issues, 'MARKET_STABILITY_SELLER_RESERVE_FUNDER_NOT_BASECHAIN', marketSeller.reserve_funder_address, 'market_stability_seller.reserve_funder_address');
   addBasechainAddress(issues, 'MARKET_STABILITY_SELLER_TON_TREASURY_NOT_BASECHAIN', marketSeller.ton_treasury_receiver_address, 'market_stability_seller.ton_treasury_receiver_address');
   addBasechainAddress(issues, 'MARKET_STABILITY_SELLER_ATH_MASTER_NOT_BASECHAIN', marketSeller.ath_master_address, 'market_stability_seller.ath_master_address');
-  addDecimalEq(issues, 'MARKET_STABILITY_RESERVE_DUE_NOT_ZERO_AT_GENESIS', marketSeller.reserve_due_ath, '0', 'market_stability_seller.reserve_due_ath');
-  addDecimalEq(issues, 'MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_ZERO_AT_GENESIS', marketSeller.reserve_funded_total_ath, '0', 'market_stability_seller.reserve_funded_total_ath');
+  // clean-15: the reserve is fully capitalized at genesis (60M funded, none sold yet), so both
+  // reserve_due and reserve_funded_total must equal the full 60M reserve, not zero.
+  addDecimalEq(issues, 'MARKET_STABILITY_RESERVE_DUE_NOT_FULLY_CAPITALIZED', marketSeller.reserve_due_ath, EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC, 'market_stability_seller.reserve_due_ath');
+  addDecimalEq(issues, 'MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_FULLY_CAPITALIZED', marketSeller.reserve_funded_total_ath, EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC, 'market_stability_seller.reserve_funded_total_ath');
   addDecimalEq(issues, 'MARKET_STABILITY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', marketSeller.treasury_due_ton, '0', 'market_stability_seller.treasury_due_ton');
   addDecimalEq(issues, 'MARKET_STABILITY_SOLD_TOTAL_NOT_ZERO_AT_GENESIS', marketSeller.sold_ath_total, '0', 'market_stability_seller.sold_ath_total');
   addDecimalZero(issues, 'MARKET_STABILITY_PHASE_NOT_IDLE_AT_GENESIS', marketSeller.phase, 'market_stability_seller.phase');
@@ -1382,17 +1388,26 @@ export function verifyMainnetGenesisSnapshot(
   addDecimalZero(issues, 'MARKET_STABILITY_LAST_TERMINAL_QUERY_NOT_ZERO_AT_GENESIS', marketSeller.last_terminal_query_id, 'market_stability_seller.last_terminal_query_id');
   addDecimalZero(issues, 'MARKET_STABILITY_TREASURY_FLUSHED_NOT_ZERO_AT_GENESIS', marketSeller.treasury_flushed_ton_total, 'market_stability_seller.treasury_flushed_ton_total');
 
-  checkZeroOfficialAthWallet(
+  // clean-15: the MSS official ATHWallet holds the fully-capitalized 60M reserve at genesis.
+  const marketStabilitySellerOfficialAthWallet = (s as any).market_stability_seller_official_ath_wallet ?? {
+    address: '',
+    code_hash: '',
+    owner_address: '',
+    ath_master_address: '',
+    balance_atomic: '',
+  };
+  if (!(s as any).market_stability_seller_official_ath_wallet) {
+    issues.push(issue('MISSING_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.market_stability_seller_official_ath_wallet getter data is required to prove custody of the 60M reserve at final genesis.'));
+  }
+  checkFundedOfficialAthWallet(
     issues,
     manifest,
-    (s as any).market_stability_seller_official_ath_wallet,
+    marketStabilitySellerOfficialAthWallet,
     'market_stability_seller_official_ath_wallet',
     'market_stability_seller_official_ath_wallet',
-    'MISSING_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_SNAPSHOT',
-    'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_OWNER_MISMATCH',
-    'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MASTER_MISMATCH',
-    'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS',
     manifest.addresses.market_stability_seller,
+    EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC,
+    'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS',
   );
 
   checkBase(issues, manifest, s.capsulehub, 'capsulehub', 'capsulehub', 'capsulehub');
