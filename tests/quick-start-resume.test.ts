@@ -49,4 +49,27 @@ describe('quick-start resume + activation gate guard', () => {
     expect(css).toMatch(/\.quick-start-step-hint\.is-error \{/);
     expect(app).not.toMatch(/style\s*=\s*["'`][^"'`]*quick-start-balance/);
   });
+
+  it('QS-RESUME-04: balance reads the PUBLIC receive address (works when the wallet is locked) + Check-balance wears the plate-CTA look', () => {
+    // Root fix: the top-up/activate balance read the RECEIVE ADDRESS directly instead of requiring the unlocked
+    // wallet. Onboarding can resume at those steps with the wallet record stored but NOT loaded into runtime
+    // (step 1 auto-dones on the stored record), which left the balance stuck on "checking…" forever.
+    const refresh = app.slice(
+      app.indexOf('async function quickStartRefreshWalletBalanceRaw()'),
+      app.indexOf('async function quickStartRefreshWalletBalanceRaw()') + 720,
+    );
+    expect(refresh).toMatch(/const address = currentWalletReceiveAddress\(\);/);
+    expect(refresh).toMatch(/await loadConnectedTonWalletBalance\(address\)/);
+    // No longer routed through the profile refresh, which returned null early when plathoWallet was not loaded.
+    expect(refresh).not.toMatch(/refreshWalletTonBalanceForProfile/);
+    // The balance reader accepts an explicit address; the default keeps the unlocked-wallet callers unchanged.
+    expect(app).toMatch(/async function loadConnectedTonWalletBalance\(address = requirePlathoWalletAddress\(\)\)/);
+    // Top-up "Check balance" button: gapped body + the shared plate-CTA class (same look as "Add contact").
+    const topup = app.slice(
+      app.indexOf('function buildQuickStartTopUpBody()'),
+      app.indexOf('function buildQuickStartTopUpBody()') + 900,
+    );
+    expect(topup).toMatch(/wrap\.className = 'quick-start-key-body';/);
+    expect(topup).toMatch(/check\.className = 'discovery-cta-action';/);
+  });
 });

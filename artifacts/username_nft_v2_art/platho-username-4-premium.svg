@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Platho four character premium username NFT">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#050807"/>
+      <stop offset=".52" stop-color="#071716"/>
+      <stop offset="1" stop-color="#120d04"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbf2a5"/>
+      <stop offset=".42" stop-color="#16f2be"/>
+      <stop offset="1" stop-color="#f4b24d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="374" fill="none" stroke="#fbf2a5" stroke-width="12" opacity=".22"/>
+  <circle cx="512" cy="512" r="316" fill="none" stroke="#16f2be" stroke-width="3" opacity=".32"/>
+  <path d="M348 278h206c154 0 248 77 248 207 0 132-94 210-248 210h-78v123H348V278Zm128 116v186h72c76 0 121-32 121-94 0-61-45-92-121-92h-72Z" fill="url(#mark)"/>
+  <rect x="226" y="356" width="76" height="76" rx="10" fill="#16f2be"/>
+  <rect x="238" y="508" width="62" height="62" rx="9" fill="#fbf2a5"/>
+  <rect x="214" y="650" width="88" height="88" rx="12" fill="#f4b24d"/>
+  <path d="M280 168l52 60 58-60 58 60 58-60 58 60 58-60 58 60 52-60v118H280V168Z" fill="#fbf2a5" opacity=".95"/>
+  <rect x="286" y="296" width="452" height="8" fill="#fbf2a5" opacity=".72"/>
+  <text x="512" y="875" fill="#fbf2a5" font-family="Arial, sans-serif" font-size="58" font-weight="700" text-anchor="middle">4 CHAR PRIME</text>
+  <text x="512" y="930" fill="#16f2be" font-family="Arial, sans-serif" font-size="30" letter-spacing="6" text-anchor="middle">PLATHO USERNAME</text>
+</svg>

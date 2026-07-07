@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Platho standard username NFT">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1113"/>
+      <stop offset="1" stop-color="#0b0d0f"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="176" y1="0" x2="848" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1e262a"/>
+      <stop offset=".5" stop-color="#30d5b0"/>
+      <stop offset="1" stop-color="#1e262a"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="118" y1="430" x2="430" y2="82" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2be6ad"/>
+      <stop offset=".55" stop-color="#30d5b0"/>
+      <stop offset="1" stop-color="#25c99b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <path d="M128 192h768v640H128z" fill="#111417" stroke="#1e262a" stroke-width="2"/>
+  <path d="M128 192h768v4H128z" fill="url(#accent)"/>
+  <path d="M128 828h768v4H128z" fill="url(#accent)" opacity=".42"/>
+  <path d="M188 292h648M188 780h648" stroke="#1e262a" stroke-width="2"/>
+  <circle cx="512" cy="512" r="272" fill="none" stroke="#30d5b0" stroke-width="2" opacity=".1"/>
+  <circle cx="512" cy="512" r="204" fill="none" stroke="#66726d" stroke-width="2" opacity=".13"/>
+  <g opacity=".042" transform="translate(306 286) scale(.8)">
+    <path fill="#f4f7f5" fill-rule="evenodd" d="M186 96h128c94 0 165 66 165 160s-71 160-165 160H186v-88h-43v-40h43v-32h-62v-40h62v-32h-43v-40h43v-32h-43v-40h43V96Zm85 92v136h44c51 0 88-28 88-68s-37-68-88-68h-44Z"/>
+  </g>
+  <g transform="translate(134 102) scale(.13)">
+    <path fill="url(#mark)" fill-rule="evenodd" d="M186 96h128c94 0 165 66 165 160s-71 160-165 160H186v-88h-43v-40h43v-32h-62v-40h62v-32h-43v-40h43v-32h-43v-40h43V96Zm85 92v136h44c51 0 88-28 88-68s-37-68-88-68h-44Z"/>
+    <rect x="82" y="204" width="41" height="41" rx="2" fill="url(#mark)"/>
+    <rect x="122" y="125" width="41" height="41" rx="2" fill="url(#mark)"/>
+    <rect x="122" y="283" width="41" height="41" rx="2" fill="url(#mark)"/>
+    <rect x="122" y="372" width="41" height="41" rx="2" fill="url(#mark)"/>
+  </g>
+  <text x="208" y="132" fill="#96a19c" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="700">PLATHO USERNAME</text>
+  <rect x="738" y="90" width="158" height="50" rx="8" fill="#111417" stroke="#283136"/>
+  <text x="817" y="123" fill="#96a19c" font-family="Inter, system-ui, sans-serif" font-size="21" font-weight="800" text-anchor="middle">STANDARD</text>
+  <text x="512" y="474" fill="#f4f7f5" font-family="Inter, system-ui, sans-serif" font-size="86" font-weight="820" text-anchor="middle">platho.ath</text>
+  <text x="512" y="548" fill="#30d5b0" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="800" text-anchor="middle">6+ LETTER USERNAME</text>
+  <g fill="none" stroke="#283136" stroke-width="3">
+    <path d="M296 628h54v54h-54z"/>
+    <path d="M374 628h54v54h-54z"/>
+    <path d="M452 628h54v54h-54z"/>
+    <path d="M530 628h54v54h-54z"/>
+    <path d="M608 628h54v54h-54z"/>
+    <path d="M686 628h54v54h-54z"/>
+  </g>
+  <path d="M296 711h444" stroke="#30d5b0" stroke-width="3" opacity=".42"/>
+  <text x="512" y="742" fill="#66726d" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="700" text-anchor="middle">TRANSFERABLE ON-CHAIN IDENTITY</text>
+</svg>
