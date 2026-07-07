@@ -6331,6 +6331,26 @@ function buildDiscoveryCard(channel) {
   return card;
 }
 
+// Adding a contact implies interest in the person, so the add-contact dialog also follows their public
+// channel (owner request). Deliberately called ONLY from that dialog — NOT inside selectOrCreateRecipientThread,
+// which also serves the "Private chat" button on public posts (auto-(re)following there would fight a
+// deliberate unfollow). Re-adding an existing contact re-follows on purpose: addressing the person again IS
+// a fresh expression of interest. Skipped for the Saved self-thread (publishing already handles own-channel).
+function followContactPublicChannel(recipientWallet) {
+  try {
+    // rawWalletAddress (NOT the strict Vault-action address gate): the dialog hands over user-friendly
+    // UQ/EQ forms, and the channel registry keys by the parsed raw form anyway.
+    const wallet = rawWalletAddress(recipientWallet);
+    if (!wallet) return;
+    if (plathoWallet?.address && sameWalletAddress(wallet, plathoWallet.address)) return;
+    const channelId = ensurePublicChannelForAuthorWallet(wallet, { activate: false });
+    setPublicChannelSubscribed(channelId, true);
+  } catch (error) {
+    // Best effort: a follow must never block the contact add itself.
+    console.warn('[platho] contact channel follow skipped', error?.message ?? error);
+  }
+}
+
 function followDiscoveredChannel(authorWallet) {
   const channelId = ensurePublicChannelForAuthorWallet(authorWallet, { activate: false });
   setPublicChannelSubscribed(channelId, true);
@@ -7414,6 +7434,10 @@ async function waitForProfileAvatarRegistryUpdate(ownerWallet, avatarHash) {
 
 async function loadProfileAvatarImage(ownerWallet, pointer = null) {
   if (!ownerWallet) return null;
+  // Callers hand over BOTH raw and user-friendly (UQ/EQ) forms — e.g. a thread keyed by a pasted UQ address
+  // hydrating its avatar — and the profile-registry provider requires raw: normalize ONCE here (this also
+  // unifies the load-promise / media-cache key across the two spellings of the same wallet).
+  ownerWallet = rawWalletAddress(ownerWallet) ?? ownerWallet;
   const requestedPointer = pointer ? avatarPointerFromFields(pointer.profileVersion ?? pointer.profile_version, pointer.avatarHash ?? pointer.avatar_hash) : null;
   const cached = requestedPointer ? await readProfileAvatarMediaCache(requestedPointer.avatarHash) : null;
   if (cached) return cached;
@@ -15183,7 +15207,8 @@ newChatForm?.addEventListener('submit', async (event) => {
   if (!isUsername) {
     // Raw wallet address: open/create the dialog directly (the dialog IS that wallet — no resolve needed).
     const result = selectOrCreateRecipientThread(recipientInput?.value, { localLabel });
-    if (!result.ok) showNewChatHint(result.error);
+    if (!result.ok) { showNewChatHint(result.error); return; }
+    followContactPublicChannel(ownerWalletFromThread(threads.find((item) => item.id === activeThreadId)));
     return;
   }
   // Username / TON DNS: a username is a movable alias — resolve it to the CURRENT owner wallet (canonical) and
@@ -15211,6 +15236,7 @@ newChatForm?.addEventListener('submit', async (event) => {
     // Open/create the dialog BY WALLET, then display it as the addressed username (unless a local name was given).
     const result = selectOrCreateRecipientThread(ownerWallet, { localLabel });
     if (!result.ok) { showNewChatHint(result.error); return; }
+    followContactPublicChannel(ownerWallet);
     if (!localLabel) {
       const thread = threads.find((item) => item.id === activeThreadId);
       if (thread) {

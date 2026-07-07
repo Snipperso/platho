@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=700" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=702" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2482,6 +2482,21 @@ describe('PWA runtime config guard', () => {
     expect(newChatSource).toMatch(/reconcileUsernameOwnership\(identity, ownerWallet\)/);
     // v652: addressing your OWN username no longer errors — it falls through to the standard self dialog (Saved).
     expect(newChatSource).toMatch(/addressing your OWN username opens the Saved thread/);
+    // v702: adding a contact ALSO follows their public channel — from BOTH dialog branches (raw wallet +
+    // resolved username), NEVER from inside selectOrCreateRecipientThread (the "Private chat" button on
+    // public posts routes through it, and auto-(re)following there would fight a deliberate unfollow).
+    expect(app).toMatch(/function followContactPublicChannel\(recipientWallet\)/);
+    // Normalizes via rawWalletAddress (the dialog hands over UQ/EQ forms; the strict Vault-action gate
+    // rejects them) and never follows the own/Saved wallet.
+    expect(app).toMatch(/function followContactPublicChannel\(recipientWallet\) \{\s*try \{[\s\S]*?const wallet = rawWalletAddress\(recipientWallet\);/);
+    expect(app).toMatch(/if \(plathoWallet\?\.address && sameWalletAddress\(wallet, plathoWallet\.address\)\) return;/);
+    expect(newChatSource).toMatch(/followContactPublicChannel\(ownerWalletFromThread\(threads\.find\(\(item\) => item\.id === activeThreadId\)\)\)/);
+    expect(newChatSource).toMatch(/followContactPublicChannel\(ownerWallet\);/);
+    const selectOrCreateSource = app.slice(
+      app.indexOf('function selectOrCreateRecipientThread'),
+      app.indexOf('function readCustomPublicChannels'),
+    );
+    expect(selectOrCreateSource).not.toMatch(/followContactPublicChannel|setPublicChannelSubscribed/);
     // Old-owner dialog is revalidated on open AND on receipt, and our OWN linked .ath is reconciled too — all
     // serialized through the shared username-hygiene queue (never N concurrent resolves -> the v509 iOS freeze).
     expect(app).toMatch(/function queueUsernameHygiene\(task\)/);
@@ -6058,11 +6073,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v772/);
+    expect(sw).toMatch(/platho-pwa-prototype-v773/);
     expect(sw).toMatch(/\.\/styles\.css\?v=236/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=700/);
+    expect(sw).toMatch(/\.\/app\.js\?v=702/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=16/);
