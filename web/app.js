@@ -813,6 +813,17 @@ function enqueueAvatarChainRead(task) {
   return run;
 }
 const profileAvatarPublishRecoveryJobs = new Map();
+// Recovery keys whose INLINE submit phase (publish -> mobilized confirm -> finalize) is currently running:
+// a recovery tick for such a job must DEFER — a lock->unlock resume could interleave both drivers on the
+// same publishState, worst case reaching finalize twice = a duplicate paid registry submission. A DEPTH
+// counter, not a Set: a second concurrent submit for the same key (console/programmatic — the UI gates it)
+// must not release the first phase's exclusion on its own exit.
+const profileAvatarInlineSubmitKeys = new Map();
+// Tick single-flight lives in MODULE scope keyed by job key — an object-carried flag cannot guard this:
+// every re-schedule (incl. the lock->unlock resume) goes through rememberProfileAvatarPublishRecovery,
+// which SWAPS the Map entry for a fresh object, so a delay-0 timer would see a fresh flag while the
+// previous tick's async body is still running the same publishState.
+const profileAvatarRecoveryTicksInFlight = new Set();
 let profileAvatarPublishRecoverySeq = 0;
 let vaultMoveDirections = { TON: 'to-vault', ATH: 'to-vault' };
 let deferredInstallPrompt = null;
@@ -19403,6 +19414,31 @@ async function finalizeProfileAvatarUpdate({
 async function runProfileAvatarPublishRecovery(key) {
   const job = profileAvatarPublishRecoveryJobs.get(key);
   if (!job) return null;
+  // The INLINE submit phase owns this publishState right now (a lock->unlock resume can fire a tick while
+  // submitProfileAvatarUpdate's mobilized loop is still running): DEFER — two drivers interleaving on one
+  // publishState risked reaching finalize twice (a duplicate paid registry submission). Re-armed at the
+  // normal cadence WITHOUT burning an auto-retry attempt; the inline phase clears the job itself on success.
+  if (profileAvatarInlineSubmitKeys.has(key)) {
+    logAvatarTimeline('recovery_deferred_inline_active', { avatarHash: job.avatarHash ?? null });
+    job.status = 'pending';
+    scheduleProfileAvatarPublishRecovery(job);
+    return null;
+  }
+  // Single-flight per KEY: a delay-0 tick (manual re-pick, lock->unlock resume) can fire while a PREVIOUS
+  // tick's async body (potentially finalize -> a paid registry external) is still in flight — never run two
+  // bodies. Module-scope keyed state, NOT a job-object flag: every re-schedule swaps the Map entry for a
+  // fresh object, so an object flag would be reset under the running tick. A no-op here never strands the
+  // job: every in-flight tick exit reschedules, parks, or clears it.
+  if (profileAvatarRecoveryTicksInFlight.has(key)) return null;
+  profileAvatarRecoveryTicksInFlight.add(key);
+  try {
+    return await runProfileAvatarPublishRecoveryTick(job);
+  } finally {
+    profileAvatarRecoveryTicksInFlight.delete(key);
+  }
+}
+
+async function runProfileAvatarPublishRecoveryTick(job) {
   logAvatarTimeline('recovery_tick', { avatarHash: job.avatarHash ?? null, attempts: job.attempts ?? 0 });
   if (!plathoWallet?.address || !sameWalletAddress(plathoWallet.address, job.owner)) {
     // Wallet locked or switched: PAUSE (do not re-arm). The unlock path resumes the matching owner's
@@ -20890,6 +20926,21 @@ async function submitProfileAvatarUpdate(avatar) {
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   if (!avatar?.bytes?.length) return null;
   const avatarHash = await sha256Hex(avatar.bytes);
+  // Single-flight vs the recovery ticks: while this inline phase runs, a recovery tick for the same job
+  // defers (see runProfileAvatarPublishRecovery). try/finally so EVERY exit (confirmed, parked, thrown)
+  // releases the key — a stuck key would starve the recovery driver.
+  const inlineKey = profileAvatarPublishRecoveryKey(owner, avatarHash);
+  profileAvatarInlineSubmitKeys.set(inlineKey, (profileAvatarInlineSubmitKeys.get(inlineKey) ?? 0) + 1);
+  try {
+    return await runProfileAvatarSubmitPhase(owner, avatar, avatarHash);
+  } finally {
+    const inlineDepth = (profileAvatarInlineSubmitKeys.get(inlineKey) ?? 1) - 1;
+    if (inlineDepth <= 0) profileAvatarInlineSubmitKeys.delete(inlineKey);
+    else profileAvatarInlineSubmitKeys.set(inlineKey, inlineDepth);
+  }
+}
+
+async function runProfileAvatarSubmitPhase(owner, avatar, avatarHash) {
   const existingRecovery = profileAvatarPublishRecoveryFor(owner, avatarHash);
   if (existingRecovery) {
     // Manual re-pick of the same image RESUMES the parked/in-flight job (never re-publishes — the
@@ -22253,9 +22304,41 @@ async function confirmVaultBatchReceiptsFromPublishState(publishState, options =
   };
   if (options.requestTimeoutMs) readOptions.requestTimeoutMs = options.requestTimeoutMs;
   if (options.queueTimeoutMs) readOptions.queueTimeoutMs = options.queueTimeoutMs;
+  // A receipt slot for nonce N is written only AFTER the Vault consumed N. Under a FRESH successful heal
+  // nonce read (which also stamps the read VALUE), every batch with nonce >= that value is PROVEN unlanded
+  // and its verified (dual-HTTP) receipt read is guaranteed empty — skip those this pass. Mirrors the
+  // entry-scan skip in confirmCapsuleHubPublishEntriesWithReadMode; skipping only DEFERS reads (a read pool
+  // lagging the send node costs at most the proof window in latency), it can never confirm anything wrong.
+  // Two backstops keep the gate honest: (1) the proof EXPIRY is re-checked per batch (the loop's verified
+  // reads run up to ~8s each, so late batches must not skip on a stale proof); (2) a PROBE pass every 30s
+  // runs the receipt reads anyway — the heal's nonce read can degrade to a single unverified replica, and a
+  // replica persistently serving a stale-low nonce would otherwise renew the proof every pass and starve
+  // the verified receipt backstop all the way to the no-progress terminal.
+  let provenUnlandedFloorNonce = null;
+  let nonceProofExpiresAt = 0;
+  try {
+    const nonceReadOkAt = Number(publishState.lastBroadcastRetryNonceReadOkAt) || 0;
+    const nonceProofAgeMs = Date.now() - nonceReadOkAt;
+    if (
+      nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000
+      && publishState.lastBroadcastRetryNonceReadValue !== undefined
+      && publishState.lastBroadcastRetryNonceReadValue !== null
+    ) {
+      const probeAgeMs = Date.now() - (Number(publishState.lastReceiptGateProbeAt) || 0);
+      if (probeAgeMs >= 0 && probeAgeMs < 30_000) {
+        provenUnlandedFloorNonce = BigInt(publishState.lastBroadcastRetryNonceReadValue);
+        nonceProofExpiresAt = nonceReadOkAt + 10_000;
+      } else {
+        publishState.lastReceiptGateProbeAt = Date.now();
+      }
+    }
+  } catch {
+    provenUnlandedFloorNonce = null;
+  }
   let changed = 0;
   for (const batch of batches) {
     if (publishConfirmDeadlineExpired(deadlineAt)) break;
+    if (provenUnlandedFloorNonce !== null && Date.now() < nonceProofExpiresAt && batch.nonce >= provenUnlandedFloorNonce) continue;
     let interp = null;
     try {
       interp = await readBatchPublishReceipt(provider, vaultAddress, owner, batch.nonce, readOptions);
@@ -23226,7 +23309,10 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
   // Fresh SUCCESSFUL nonce read: any landed batch is flipped VAULT_SUBMITTED in the loop below, so parts still
   // SENT after this pass are PROVEN not-landed. The confirm entry-scan skip keys off this timestamp — a FAILED
   // read (the catch above returns 0 without setting it) must never suppress the scan (degraded-reads mode).
+  // The VALUE is stamped too: the receipt confirm skips the (verified, dual-HTTP) receipt read for batches
+  // whose nonce is >= this proven floor — their receipt slot cannot exist yet.
   publishState.lastBroadcastRetryNonceReadOkAt = Date.now();
+  publishState.lastBroadcastRetryNonceReadValue = String(currentNonce);
   // VPB2: every part of a batch shares ONE externalBoc + nonce. Group the retryable parts by that shared nonce
   // so each distinct in-flight external is re-broadcast at most ONCE per pass; all parts of the batch then move
   // together (the contract accepts or rejects the single external atomically).

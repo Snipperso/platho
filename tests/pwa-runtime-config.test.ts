@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=698" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=699" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -3186,6 +3186,17 @@ describe('PWA runtime config guard', () => {
     expect(receiptSource).toMatch(/const readOptions = \{\s*verify: true,/);
     expect(receiptSource).not.toMatch(/allowUnverifiedCriticalRead:\s*true/);
     expect(receiptSource).toMatch(/readBatchPublishReceipt\(provider, vaultAddress, owner, batch\.nonce, readOptions\)/);
+    // v699 receipt gate: under a FRESH heal nonce read (value stamped alongside the timestamp), batches with
+    // nonce >= the proven floor are provably unlanded — their verified 2-HTTP receipt read is skipped. The
+    // gate only DEFERS reads (fail-open when the proof is stale/absent); it can never confirm anything.
+    // Backstops: proof expiry re-checked PER BATCH, and a 30s PROBE pass reads receipts anyway (a single
+    // stale nonce replica renewing the proof forever must not starve the verified receipt backstop).
+    expect(receiptSource).toMatch(/provenUnlandedFloorNonce = BigInt\(publishState\.lastBroadcastRetryNonceReadValue\)/);
+    expect(receiptSource).toMatch(/nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000/);
+    expect(receiptSource).toMatch(/probeAgeMs >= 0 && probeAgeMs < 30_000/);
+    expect(receiptSource).toMatch(/publishState\.lastReceiptGateProbeAt = Date\.now\(\);/);
+    expect(receiptSource).toMatch(/if \(provenUnlandedFloorNonce !== null && Date\.now\(\) < nonceProofExpiresAt && batch\.nonce >= provenUnlandedFloorNonce\) continue;/);
+    expect(app).toMatch(/publishState\.lastBroadcastRetryNonceReadOkAt = Date\.now\(\);\s*publishState\.lastBroadcastRetryNonceReadValue = String\(currentNonce\);/);
     expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.CONFIRMED/);
     expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.REJECTED/);
     expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.BOUNCED/);
@@ -5244,6 +5255,29 @@ describe('PWA runtime config guard', () => {
     expect(recoveryHealIdx).toBeGreaterThan(-1);
     expect(recoveryHealIdx).toBeLessThan(recoveryFindSource.indexOf('findConfirmedAvatarEntriesFromPublishState'));
     expect(recoveryHealIdx).toBeLessThan(recoveryFindSource.indexOf('findPublishedAvatarEntries'));
+    // v699 driver exclusion: the inline submit phase and the recovery ticks can NEVER interleave on one
+    // publishState (lock->unlock resume used to run both -> risk of a duplicate paid registry submission).
+    // The inline key is held under try/finally so every exit releases it; ticks defer WITHOUT burning an
+    // auto-retry attempt; the tick body itself is single-flight (a delay-0 manual-re-pick tick cannot run
+    // while a previous tick's finalize is still in flight), and the runtime-only tickInFlight flag never
+    // survives a job-object swap or a reload.
+    // The inline exclusion is a DEPTH counter (a concurrent second submit must not release the first
+    // phase's key), held under try/finally so every exit settles it.
+    expect(submitAvatarSource).toMatch(/profileAvatarInlineSubmitKeys\.set\(inlineKey, \(profileAvatarInlineSubmitKeys\.get\(inlineKey\) \?\? 0\) \+ 1\);\s*try \{\s*return await runProfileAvatarSubmitPhase\(owner, avatar, avatarHash\);/);
+    expect(submitAvatarSource).toMatch(/if \(inlineDepth <= 0\) profileAvatarInlineSubmitKeys\.delete\(inlineKey\);/);
+    const recoveryRunSource = app.slice(
+      app.indexOf('async function runProfileAvatarPublishRecovery(key)'),
+      app.indexOf('async function runProfileAvatarPublishRecoveryTick'),
+    );
+    expect(recoveryRunSource).toMatch(/if \(profileAvatarInlineSubmitKeys\.has\(key\)\)/);
+    expect(recoveryRunSource).toMatch(/scheduleProfileAvatarPublishRecovery\(job\);\s*return null;/);
+    // Tick single-flight lives in MODULE scope keyed by job key — an object-carried flag is reset by the
+    // job swap every re-schedule performs (remember builds a fresh object), so it cannot guard anything.
+    expect(recoveryRunSource).toMatch(/if \(profileAvatarRecoveryTicksInFlight\.has\(key\)\) return null;/);
+    expect(recoveryRunSource).toMatch(/profileAvatarRecoveryTicksInFlight\.add\(key\);\s*try \{\s*return await runProfileAvatarPublishRecoveryTick\(job\);\s*\} finally \{\s*profileAvatarRecoveryTicksInFlight\.delete\(key\);/);
+    expect(app).not.toMatch(/tickInFlight/);
+    // The tick defers BEFORE the attempts increment (deferred ticks must not burn the 8-attempt budget).
+    expect(recoveryRunSource).not.toMatch(/job\.attempts =/);
     expect(finalizeAvatarSource.indexOf('await submitVaultProfileAvatarRegistration')).toBeGreaterThan(-1);
     expect(finalizeAvatarSource.indexOf('registryPointer = await waitForProfileAvatarRegistryUpdate')).toBeGreaterThan(
       finalizeAvatarSource.indexOf('await submitVaultProfileAvatarRegistration'),
@@ -6002,11 +6036,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v769/);
+    expect(sw).toMatch(/platho-pwa-prototype-v770/);
     expect(sw).toMatch(/\.\/styles\.css\?v=234/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=698/);
+    expect(sw).toMatch(/\.\/app\.js\?v=699/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=16/);
