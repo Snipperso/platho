@@ -229,6 +229,10 @@ builder $global_beginCell() impure asm """
     NEWC
 """;
 
+int $global_max(int $x, int $y) impure asm """
+    MAX
+""";
+
 () $global_message((int, cell, int, slice, int) $params) impure asm """
     NEWC
     b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -261,6 +265,22 @@ builder $Builder$_fun_storeSlice(builder $self, slice $slice) impure asm """
     STSLICER
 """;
 
+(slice, cell) $Slice$_fun_loadRef(slice $self) impure asm( -> 1 0) """
+    LDREF
+""";
+
+(slice, int) $Slice$_fun_loadBool(slice $self) impure asm( -> 1 0) """
+    1 LDI
+""";
+
+(slice, int) $Slice$_fun_loadCoins(slice $self) impure asm( -> 1 0) """
+    LDVARUINT16
+""";
+
+(slice, ()) $Slice$_fun_skipBits(slice $self, int $l) impure asm """
+    SDSKIPFIRST
+""";
+
 int $Slice$_fun_bits(slice $self) impure asm """
     SBITS
 """;
@@ -273,6 +293,10 @@ int $Slice$_fun_refsEmpty(slice $self) impure asm """
     SREMPTY
 """;
 
+(slice, slice) $Slice$_fun_loadAddress(slice $self) impure asm( -> 1 0) """
+    LDMSGADDR
+""";
+
 slice $Cell$_fun_beginParse(cell $self) impure asm """
     CTOS
 """;
@@ -282,6 +306,27 @@ int $Cell$_fun_hash(cell $self) impure asm """
 """;
 
 slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+int $Context$_fun_readForwardFee((int, slice, int, slice) $self) impure asm """
+    LDMSGADDR   // load dest:MsgAddressInt
+    LDGRAMS     // load value:CurrencyCollection
+    ONE
+    SDSKIPFIRST // skip extra currency collection
+    LDGRAMS     // load ihr_fee
+    LDGRAMS     // load fwd_fee, we'll be using this!
+    DROP        // drop remaining Slice (with created_lt and created_at)
+
+    // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+    // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+    6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+
+    ZERO              // not masterchain
+    GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                      // first_frac is a value listed in config param 25
+                      // of the blockchain: https://tonviewer.com/config#25
+                      // this instruction effectively multiplies the fwd_fee by 1.5,
+                      // at least for the current value of first_frac, which is 21845
+""";
 
 ;; UsernameNFTItem_UsernameNFTItem.constants.fc
 ;; String "Private correspondence is a right, not a privilege. This is a username NFT for Platho — the anonymous, post-quantum-encrypted, uncensorable messenger. A permanent, transferable, fully on-chain handle: the name others reach you by, held by no one but you. platho.app"
@@ -689,24 +734,34 @@ _ %get_nft_data() method_id(102351) {
     ;; Receive NftTransfer message
     if (op == 0x5fcc3d14) {
         var $msg'query_id = in_msg~load_uint(64);
-        var $msg'new_owner = in_msg~load_msg_addr();
-        var $msg'response_destination = in_msg~load_msg_addr();
-        var $msg'custom_payload = in_msg~load_maybe_ref();
-        var $msg'forward_amount = in_msg~load_varuint16();
-        var $msg'forward_payload = in_msg;
+        var $msg'payload = in_msg;
         throw_unless(18030, $self'initialized);
         throw_unless(18031, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_wallet) ));
-        throw_unless(18032, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isBasechainAddress($msg'new_owner));
-        throw_unless(18033, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isBasechainAddress($msg'response_destination));
-        throw_unless(18034, ($msg'forward_amount >= 0));
-        throw_unless(18035, ($Context$_get_value(__tact_context_get()) >= ((2000000 + $msg'forward_amount) + 10000000)));
-        slice $previousOwner = $self'owner_wallet;
-        $self'owner_wallet = $msg'new_owner;
-        if (($msg'forward_amount > 0)) {
-            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'new_owner, $msg'forward_amount, 1, false, $NftOwnershipAssigned$_store_cell($NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload($msg'query_id, $previousOwner, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_normalizedForwardPayload($msg'forward_payload)), begin_cell())));
+        slice $body = $msg'payload;
+        slice $newOwner = $body~$Slice$_fun_loadAddress();
+        throw_unless(18032, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isBasechainAddress($newOwner));
+        int $hasResponseDestination = (preload_uint($body, 2) != 0);
+        slice $responseDestination = null();
+        if ($hasResponseDestination) {
+            $responseDestination = $body~$Slice$_fun_loadAddress();
+            throw_unless(18033, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isBasechainAddress($responseDestination));
+        } else {
+            $body~$Slice$_fun_skipBits(2);
         }
-        if (($Context$_get_value(__tact_context_get()) >= (((2000000 + $msg'forward_amount) + 10000000) + 100000))) {
-            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 0, 64, false, $NftExcesses$_store_cell($NftExcesses$_constructor_query_id($msg'query_id), begin_cell())));
+        if ($body~$Slice$_fun_loadBool()) {
+            $body~$Slice$_fun_loadRef();
+        }
+        int $forwardAmount = $body~$Slice$_fun_loadCoins();
+        int $fwdFeeAllowance = $global_max(10000000, ($Context$_fun_readForwardFee(__tact_context_get()) * 2));
+        int $restAmount = ((($Context$_get_value(__tact_context_get()) - 2000000) - $forwardAmount) - $fwdFeeAllowance);
+        throw_unless(18035, ($restAmount >= 0));
+        slice $previousOwner = $self'owner_wallet;
+        $self'owner_wallet = $newOwner;
+        if (($forwardAmount > 0)) {
+            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($newOwner, $forwardAmount, 1, false, $NftOwnershipAssigned$_store_cell($NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload($msg'query_id, $previousOwner, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_normalizedForwardPayload($body)), begin_cell())));
+        }
+        if (( ($hasResponseDestination) ? (($restAmount >= 100000)) : (false) )) {
+            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($responseDestination, $restAmount, 1, false, $NftExcesses$_store_cell($NftExcesses$_constructor_query_id($msg'query_id), begin_cell())));
         }
         $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username));
         return ();

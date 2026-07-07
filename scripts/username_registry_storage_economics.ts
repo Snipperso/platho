@@ -299,14 +299,18 @@ async function itemTransferCase(label: string, value: bigint, forwardAmount: big
   const beforeItem = await balance(ctx.blockchain, itemAddress);
   const beforeRegistry = await balance(ctx.blockchain, ctx.registry.address);
 
+  const transferPayload = beginCell()
+    .storeAddress(nextOwner)
+    .storeAddress(response)
+    .storeMaybeRef(null)
+    .storeCoins(forwardAmount)
+    .storeBit(0)
+    .endCell()
+    .beginParse();
   await item.send(ctx.blockchain.sender(owner), { value }, {
     $$type: 'NftTransfer',
     query_id: 88n,
-    new_owner: nextOwner,
-    response_destination: response,
-    custom_payload: null,
-    forward_amount: forwardAmount,
-    forward_payload: emptySlice(),
+    payload: transferPayload,
   } as NftTransfer);
 
   const afterItem = await balance(ctx.blockchain, itemAddress);

@@ -1,11 +1,11 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-07T12:17:15.739Z",
+  "generatedAt": "2026-07-07T14:11:33.592Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "PRODUCTION_STATIC_PACKAGE_READY",
-  "productionReady": true,
+  "status": "BLOCKED_BY_PREPROD",
+  "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 139,
@@ -962,9 +962,17 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": true
+    "productionMarkersCleared": false
   },
-  "blockers": [],
+  "blockers": [
+    "MAINNET_GENESIS_NOT_VERIFIED"
+  ],
   "warnings": [],
-  "productionFindings": []
+  "productionFindings": [
+    {
+      "id": "MAINNET_GENESIS_NOT_VERIFIED",
+      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
+      "message": "Current release candidate has no verified final mainnet genesis evidence."
+    }
+  ]
 }

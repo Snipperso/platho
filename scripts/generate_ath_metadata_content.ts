@@ -9,7 +9,7 @@ const DRAFT_INPUT_PATH = join(ARTIFACTS_DIR, 'mainnet_ath_master_derivation_inpu
 
 const ONCHAIN_CONTENT_PREFIX = 0x00;
 const SNAKE_PREFIX = 0x00;
-const DEFAULT_DEPLOYMENT_ID = 'platho-mainnet-20260706-clean-14';
+const DEFAULT_DEPLOYMENT_ID = 'platho-mainnet-20260707-clean-15';
 
 function deploymentIdFromEnv(): string {
   const value = process.env.PLATHO_ATH_DEPLOYMENT_ID?.trim();

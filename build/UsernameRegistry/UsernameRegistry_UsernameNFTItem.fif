@@ -679,64 +679,106 @@ PROGRAM{
       2DROP
       s0 s5 XCHG
       64 LDU
-      LDMSGADDR
-      LDMSGADDR
-      LDOPTREF
-      NIP
-      LDVARUINT16
       18030 PUSHINT
-      s9 PUSH
+      s6 PUSH
       THROWANYIFNOT
       18031 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s9 PUSH
+      s6 PUSH
       SDEQ
       THROWANYIFNOT
-      s4 s8 XCHG
-      s3 s7 XCHG
-      s6 s5 s9 XCHG3
+          LDMSGADDR
+      s4 s6 XCHG
+      5 2 REVERSE
+      s5 s7 XCHG2
       18032 PUSHINT
-      s11 s8 XCPU
+      s9 s6 XCPU
       $UsernameNFTItem$_fun_isBasechainAddress INLINECALLDICT
-      s1 s12 XCHG
+      s1 s10 XCHG
       THROWANYIFNOT
-      18033 PUSHINT
-      s11 s7 XCPU
-      $UsernameNFTItem$_fun_isBasechainAddress INLINECALLDICT
-      s1 s12 XCHG
-      THROWANYIFNOT
-      18034 PUSHINT
-      s6 PUSH
-      -1 GTINT
-      THROWANYIFNOT
-      18035 PUSHINT
+      s7 PUSH
+      2 PLDU
+      0 NEQINT
+      PUSHNULL
+      OVER
+      IF:<{
+        DROP
+        s0 s8 XCHG
+            LDMSGADDR
+        s4 s6 XCHG
+        s3 s5 XCHG
+        s6 s5 s6 XCHG3
+        18033 PUSHINT
+        s11 s6 XCPU
+        $UsernameNFTItem$_fun_isBasechainAddress INLINECALLDICT
+        s1 s12 XCHG
+        THROWANYIFNOT
+      }>ELSE<{
+        s0 s9 XCHG
+        2 PUSHINT
+            SDSKIPFIRST
+        s0 s6 XCHG
+        s4 s9 s4 XCHG3
+        s1 s5 XCHG
+        s1 s3 XCHG
+      }>
+      s0 s6 XCHG
+          1 LDI
+      SWAP
+      IF:<{
+            LDREF
+        NIP
+      }>
+          LDVARUINT16
+      10000000 PUSHINT
+      __tact_context_get INLINECALLDICT
+          LDMSGADDR   // load dest:MsgAddressInt
+          LDGRAMS     // load value:CurrencyCollection
+          ONE
+          SDSKIPFIRST // skip extra currency collection
+          LDGRAMS     // load ihr_fee
+          LDGRAMS     // load fwd_fee, we'll be using this!
+          DROP        // drop remaining Slice (with created_lt and created_at)
+          // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+          // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+          6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+          ZERO              // not masterchain
+          GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                            // first_frac is a value listed in config param 25
+                            // of the blockchain: https://tonviewer.com/config#25
+                            // this instruction effectively multiplies the fwd_fee by 1.5,
+                            // at least for the current value of first_frac, which is 21845
+      1 LSHIFT#
+          MAX
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       2000000 PUSHINT
-      s8 PUSH
-      ADD
-      10000000 PUSHINT
-      ADD
-      GEQ
+      SUB
+      s3 PUSH
+      SUB
+      SWAP
+      SUB
+      18035 PUSHINT
+      OVER
+      -1 GTINT
       THROWANYIFNOT
-      s7 s5 PUSH2
+      s9 s2 PUSH2
       0 GTINT
       IF:<{
-        s4 s5 XCHG
-        s3 s1 s3 XCHG3
+        s4 s7 XCHG
+        s5 s7 s3 XCHG3
         1 PUSHINT
-        s2 s12 XCHG2
+        s10 s14 XCHG2
         FALSE
-        s0 s12 XCHG
+        s0 s7 XCHG
         $UsernameNFTItem$_fun_normalizedForwardPayload INLINECALLDICT
-        s11 s7 s7 PUXC2
+        s13 s8 s8 PUXC2
         $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload INLINECALLDICT
         NEWC
         $NftOwnershipAssigned$_store_cell INLINECALLDICT
-        s7 PUSH
-        s4 s10 XCHG
-        s13 s1 s3 XCHG3
-        s12 s12 XCHG2
+        s4 s11 XCHG
+        s3 s10 XCHG
+        s14 s6 s0 XCHG3
         $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
             NEWC
             b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -755,36 +797,31 @@ PROGRAM{
             ENDC
             SWAP
             SENDRAWMSG
-        s1 s0 s8 XCHG3
-        s0 s5 XCHG
+        s9 s1 s3 XCHG3
+        s6 s5 s6 XCHG3
       }>ELSE<{
-        s2 s10 XCHG
-        s4 POP
-        s7 POP
-        DROP
+        s6 POP
+        s9 POP
+        2DROP
       }>
-      __tact_context_get INLINECALLDICT
-      $Context$_get_value INLINECALLDICT
-      2000000 PUSHINT
-      s0 s5 XCHG2
-      ADD
-      10000000 PUSHINT
-      ADD
-      100000 PUSHINT
-      ADD
-      s1 s4 XCHG
-      GEQ
+      s0 s8 XCHG
       IF:<{
-        0 PUSHINT
-        64 PUSHINT
+        s5 PUSH
+        100000 PUSHINT
+        GEQ
+      }>ELSE<{
+        FALSE
+      }>
+      IF:<{
+        1 PUSHINT
         FALSE
         s0 s8 XCHG
         $NftExcesses$_constructor_query_id INLINECALLDICT
         NEWC
         $NftExcesses$_store_cell INLINECALLDICT
-        s4 s6 XCHG
-        s1 s3 s0 XCHG3
-        s1 s8 XCHG
+        s4 s5 XCHG
+        s3 s7 XCHG
+        s1 s8 s0 XCHG3
         $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
             NEWC
             b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -803,13 +840,15 @@ PROGRAM{
             ENDC
             SWAP
             SENDRAWMSG
-        s1 s3 XCHG
+        s0 s3 XCHG
       }>ELSE<{
+        s2 s6 XCHG
         s3 POP
         s4 POP
+        DROP
       }>
-      s0 s3 XCHG
-      s4 s4 s5 XCHG3
+      s3 s5 XCHG
+      s4 s1 s3 XCHG3
       $UsernameNFTItem$_contract_store INLINECALLDICT
     }>
     s7 POP

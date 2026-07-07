@@ -21,7 +21,7 @@ noBackendRuntime=true
 - pwaScopeIsStatic: true
 - envFilesIncluded: false
 - serverRuntimeIncluded: false
-- productionMarkersCleared: true
+- productionMarkersCleared: false
 
 ## Blockers
 
@@ -30,7 +30,8 @@ None
 ## Warnings
 
 - STATIC_PACKAGE_IS_NON_PRODUCTION
+- MAINNET_GENESIS_NOT_VERIFIED
 
 ## Production Findings
 
-None
+- MAINNET_GENESIS_NOT_VERIFIED: Current release candidate has no verified final mainnet genesis evidence. (artifacts/MAINNET_GENESIS_VERIFIED.txt)

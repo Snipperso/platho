@@ -3,8 +3,8 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "username_registry": "f248b46c3a298f6dba28ceac051c50ee294a2dc4e6de5879d8fd3635e4cecfc2",
-    "username_nft_item": "73d19a15d46c24d0eda7047d073490b7166d01322399751108be40ae2fda2eab"
+    "username_registry": "89cf045874c3dc415409d702d51906cf6e8ce1f8ae9cf1bd64e6bf0c6b254570",
+    "username_nft_item": "eccbea500b135059a1a46bae5c833b28ad263aae0258a146e9f98d8f7b843910"
   },
   "note": "Sandbox evidence that username mint and item recovery paths retain enough TON against the explicit V1 endowment model. This is not a mainnet rent oracle; it is a release gate against underfunded permanent UsernameRegistry records and UsernameNFTItem state.",
   "constants": {
@@ -22,11 +22,11 @@
     {
       "label": "SUCCESS_4_CHAR",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "132590197",
+      "raw_balance_delta_nanotons": "132562730",
       "item_balance_delta_nanotons": "496052598",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "126590197",
+      "retained_margin_vs_registry_endowment_nanotons": "126562730",
       "item_margin_vs_floor_nanotons": "480152598",
       "name_record_count": "1",
       "pending_mint_count": "0"
@@ -34,11 +34,11 @@
     {
       "label": "SUCCESS_5_CHAR",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "132526997",
+      "raw_balance_delta_nanotons": "132499531",
       "item_balance_delta_nanotons": "495997998",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "126526997",
+      "retained_margin_vs_registry_endowment_nanotons": "126499531",
       "item_margin_vs_floor_nanotons": "480097998",
       "name_record_count": "1",
       "pending_mint_count": "0"
@@ -46,11 +46,11 @@
     {
       "label": "SUCCESS_6_PLUS",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "132466730",
+      "raw_balance_delta_nanotons": "132439263",
       "item_balance_delta_nanotons": "495943398",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "126466730",
+      "retained_margin_vs_registry_endowment_nanotons": "126439263",
       "item_margin_vs_floor_nanotons": "480043398",
       "name_record_count": "1",
       "pending_mint_count": "0"
@@ -58,11 +58,11 @@
     {
       "label": "ITEM_DEPLOY_BOUNCE_REFUND_REQUEST",
       "kind": "item_bounce",
-      "raw_balance_delta_nanotons": "541376127",
+      "raw_balance_delta_nanotons": "541348660",
       "item_balance_delta_nanotons": "0",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "0",
-      "retained_margin_vs_registry_endowment_nanotons": "541376127",
+      "retained_margin_vs_registry_endowment_nanotons": "541348660",
       "item_margin_vs_floor_nanotons": "0",
       "name_record_count": "0",
       "pending_mint_count": "0"
@@ -83,11 +83,11 @@
       "label": "ITEM_TRANSFER_EXACT_MIN",
       "kind": "item_transfer",
       "raw_balance_delta_nanotons": "0",
-      "item_balance_delta_nanotons": "0",
+      "item_balance_delta_nanotons": "11409998",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "15900000",
       "retained_margin_vs_registry_endowment_nanotons": "0",
-      "item_margin_vs_floor_nanotons": "480043398",
+      "item_margin_vs_floor_nanotons": "491453396",
       "name_record_count": "1",
       "pending_mint_count": "0"
     },
@@ -95,15 +95,15 @@
       "label": "ITEM_TRANSFER_WITH_FORWARD",
       "kind": "item_transfer",
       "raw_balance_delta_nanotons": "0",
-      "item_balance_delta_nanotons": "11357798",
+      "item_balance_delta_nanotons": "11368598",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "15900000",
       "retained_margin_vs_registry_endowment_nanotons": "0",
-      "item_margin_vs_floor_nanotons": "491401196",
+      "item_margin_vs_floor_nanotons": "491411996",
       "name_record_count": "1",
       "pending_mint_count": "0"
     }
   ],
-  "worst_registry_margin_nanotons": "126466730",
+  "worst_registry_margin_nanotons": "126439263",
   "worst_item_margin_nanotons": "480043398"
 }

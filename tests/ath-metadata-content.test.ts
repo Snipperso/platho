@@ -16,14 +16,14 @@ describe('ATH metadata content artifact', () => {
     expect(artifact.fields.name).toBe('PLATHO');
     expect(artifact.fields.symbol).toBe('ATH');
     expect(artifact.fields.decimals).toBe('9');
-    expect(artifact.fields.deployment_id).toBe('platho-mainnet-20260706-clean-14');
+    expect(artifact.fields.deployment_id).toBe('platho-mainnet-20260707-clean-15');
     expect(artifact.fields.description).toContain('The utility token of Platho');
     expect(artifact.fields.description.endsWith('https://platho.app')).toBe(true);
     expect(artifact.fields.image).toMatch(/^data:image\/svg\+xml;base64,/);
     expect(parsed).toHaveLength(1);
     expect(parsed[0].equals(content)).toBe(true);
     expect(content.hash().toString('hex')).toBe(artifact.contentHashHex);
-    expect(artifact.contentHashHex).toBe('459c23c452a35c8a55bdfe3cfdf24fed7297a9e148e199fa6ed50f45f38988ef');
+    expect(artifact.contentHashHex).toBe('3ca983ee125c3b0a0bb89307eb8b24d6499017e80c1cdcab390372aa8a65426e');
 
     const slice = content.beginParse();
     expect(slice.loadUint(8)).toBe(0);

@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: UsernameNFTItem
-BoC Size: 1729 bytes
+BoC Size: 1771 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 21
@@ -62,8 +62,8 @@ TL-B: `username_item_deployed_ack#bba3ec19 name_hash:uint256 owner_wallet:addres
 Signature: `UsernameItemDeployedAck{name_hash:uint256,owner_wallet:address}`
 
 ### NftTransfer
-TL-B: `nft_transfer#5fcc3d14 query_id:uint64 new_owner:address response_destination:address custom_payload:Maybe ^cell forward_amount:coins forward_payload:remainder<slice> = NftTransfer`
-Signature: `NftTransfer{query_id:uint64,new_owner:address,response_destination:address,custom_payload:Maybe ^cell,forward_amount:coins,forward_payload:remainder<slice>}`
+TL-B: `nft_transfer#5fcc3d14 query_id:uint64 payload:remainder<slice> = NftTransfer`
+Signature: `NftTransfer{query_id:uint64,payload:remainder<slice>}`
 
 ### NftOwnershipAssigned
 TL-B: `nft_ownership_assigned#05138d91 query_id:uint64 previous_owner:address forward_payload:remainder<slice> = NftOwnershipAssigned`

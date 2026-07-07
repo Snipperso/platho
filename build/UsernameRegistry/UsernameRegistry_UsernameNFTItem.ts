@@ -806,11 +806,7 @@ export function dictValueParserUsernameItemDeployedAck(): DictionaryValue<Userna
 export type NftTransfer = {
     $$type: 'NftTransfer';
     query_id: bigint;
-    new_owner: Address;
-    response_destination: Address;
-    custom_payload: Cell | null;
-    forward_amount: bigint;
-    forward_payload: Slice;
+    payload: Slice;
 }
 
 export function storeNftTransfer(src: NftTransfer) {
@@ -818,11 +814,7 @@ export function storeNftTransfer(src: NftTransfer) {
         const b_0 = builder;
         b_0.storeUint(1607220500, 32);
         b_0.storeUint(src.query_id, 64);
-        b_0.storeAddress(src.new_owner);
-        b_0.storeAddress(src.response_destination);
-        if (src.custom_payload !== null && src.custom_payload !== undefined) { b_0.storeBit(true).storeRef(src.custom_payload); } else { b_0.storeBit(false); }
-        b_0.storeCoins(src.forward_amount);
-        b_0.storeBuilder(src.forward_payload.asBuilder());
+        b_0.storeBuilder(src.payload.asBuilder());
     };
 }
 
@@ -830,42 +822,26 @@ export function loadNftTransfer(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1607220500) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
-    const _new_owner = sc_0.loadAddress();
-    const _response_destination = sc_0.loadAddress();
-    const _custom_payload = sc_0.loadBit() ? sc_0.loadRef() : null;
-    const _forward_amount = sc_0.loadCoins();
-    const _forward_payload = sc_0;
-    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+    const _payload = sc_0;
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, payload: _payload };
 }
 
 export function loadTupleNftTransfer(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _new_owner = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _custom_payload = source.readCellOpt();
-    const _forward_amount = source.readBigNumber();
-    const _forward_payload = source.readCell().asSlice();
-    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+    const _payload = source.readCell().asSlice();
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, payload: _payload };
 }
 
 export function loadGetterTupleNftTransfer(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _new_owner = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _custom_payload = source.readCellOpt();
-    const _forward_amount = source.readBigNumber();
-    const _forward_payload = source.readCell().asSlice();
-    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+    const _payload = source.readCell().asSlice();
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, payload: _payload };
 }
 
 export function storeTupleNftTransfer(source: NftTransfer) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
-    builder.writeAddress(source.new_owner);
-    builder.writeAddress(source.response_destination);
-    builder.writeCell(source.custom_payload);
-    builder.writeNumber(source.forward_amount);
-    builder.writeSlice(source.forward_payload.asCell());
+    builder.writeSlice(source.payload.asCell());
     return builder.build();
 }
 
@@ -5137,7 +5113,7 @@ function initUsernameNFTItem_init_args(src: UsernameNFTItem_init_args) {
 }
 
 async function UsernameNFTItem_init(username_registry_address: Address, name_hash: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241021e010006b5000114ff00f4a413f4bcf2c80b01020162021003f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019fd200fa40fa40d3ffd307d455506c168e1cfa40810101d7005902d10181465121c300f2f4702270c8c910351024e207925f07e07026d74920c21f953106d31f07de218210554e494ebae302218210639cfc6cbae3022182105fcc3d14ba03080a04c05b05fa40d30781465af84226c705f2f481465b27b3f2f410465e32505781465c5197db3c1af2f481465d543968db3c1af2f481465e5198db3c355b335112ba16f2f481465ff8416f24135f0382083d0900bef2f47fc85005cf16c910451034120c04060701deeda2edfb555127db3c936c2670e126d74928aa02bd936c2670e026c702936c2670e170935308b98e3907d30721c2609321c17b9170e222c22f9322c13a9170e223c02d92337f9303c05fe20192327f9102e292317f9101e296306c2670db31e107a4e8303705c7001046103544301205001420c20392c111923070e20020c88210c5cc7cd601cb1f01cf16c9f9000130db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed540901905b3581466424f2f4814665f8416f24135f0382083d0900bef2f4814666f8416f24135f038209312d00bbf2f410355512db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed5409006a82082dc6c07f715357c8598210bba3ec195003cb1fcbffcec92755304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001b0e3023720821027acdf8bba8e1c303510355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e0c00006c12116b08e1f8146b3f2f010355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e05f06f2c0820b04fe5b05d33ffa40fa40f40431fa0081466e29f2f481466ff84229c705f2f410481037465981467051b8db3c1cf2f481467151b7db3c1cf2f481467226c2fff2f4814673f8416f24135f0382081e848028a08208989680a0bef2f45375c20095102a343730e30df8416f24135f0382081e84805005a08208989680a0820186a0a00c0c0d0f000afa4430c000018a1045431371502c700cdb3c544b88c85520821005138d915004cb1f12cb3fcecec927104a4d1350cc441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004108050e001820c700973070c8ca00c9d0e000a814be8e337080407008c8018210d53276db58cb1fcb3fc91046413018441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0013923334e2034445c87f01ca0055505056ca0013cececbffcb07ccc9ed5402012011140177be9d6f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3633c1201285475435475435555db3c106c105b104a1039487013001a21c0049171e021c0059172e0730177bc7e7f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3632c150130547523271059104810374698db3c104810374a90106a10591603f655226d8307507682f082a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce8906db3c10394870206e953059f45b30944133f417e28307507682f0c9046f7a37ad0ea7cee73355984fa5428982f8b37c8f7bcec91f7ac71a7cd10406db3c10394870206e953059f45b30944133f417e2700117181d0026c87001cb0721d0cf1682102e61746801cb1fc90242c87001cb076f00016f8c6d6f8c89db3c6f2201c993216eb396016f2259ccc9e831191c01fe5072697661746520636f72726573706f6e64656e636520697320612072696768742c206e6f7420612070726976696c6567652e2054686973206973206120757365726e616d65204e465420666f7220506c6174686f20e280942074686520616e6f6e796d6f75732c20706f73742d7175616e74756d2d656e637279707465641a01fe2c20756e63656e736f7261626c65206d657373656e6765722e2041207065726d616e656e742c207472616e7366657261626c652c2066756c6c79206f6e2d636861696e2068616e646c653a20746865206e616d65206f746865727320726561636820796f752062792c2068656c64206279206e6f206f6e652062757420796f1b001a752e20706c6174686f2e61707000b620d74a21d7499720c20022c200b18e48036f22807f22cf31ab02a105ab025155b60820c2009a20aa0215d71803ce4014de596f025341a1c20099c8016f025044a1aa028e123133c20099d430d020d74a21d749927020e2e2e85f030018c85902cb07f400c91036454017760d23');
+    const __code = Cell.fromHex('b5ee9c7241021f010006df000114ff00f4a413f4bcf2c80b01020162021103f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019fd200fa40fa40d3ffd307d455506c168e1cfa40810101d7005902d10181465121c300f2f4702270c8c910351024e207925f07e07026d74920c21f953106d31f07de218210554e494ebae302218210639cfc6cbae3022182105fcc3d14ba03080a04c05b05fa40d30781465af84226c705f2f481465b27b3f2f410465e32505781465c5197db3c1af2f481465d543968db3c1af2f481465e5198db3c355b335112ba16f2f481465ff8416f24135f0382083d0900bef2f47fc85005cf16c910451034120c04060701deeda2edfb555127db3c936c2670e126d74928aa02bd936c2670e026c702936c2670e170935308b98e3907d30721c2609321c17b9170e222c22f9322c13a9170e223c02d92337f9303c05fe20192327f9102e292317f9101e296306c2670db31e107a4e8303705c7001046103544301205001420c20392c111923070e20020c88210c5cc7cd601cb1f01cf16c9f9000130db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed540901905b3581466424f2f4814665f8416f24135f0382083d0900bef2f4814666f8416f24135f038209312d00bbf2f410355512db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed5409006a82082dc6c07f715357c8598210bba3ec195003cb1fcbffcec92755304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001b0e3023720821027acdf8bba8e1c303510355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e0c00006c12116b08e1f8146b3f2f010355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e05f06f2c0820b03fc5b05d33f81466e26f2f481466ff84226c705f2f4fa4010465e3250578146705196db3c1af2f427d70b01c3006d218e943008fa4010461035465681467151b6db3c1cf2f4990972d7210644941513e206d2000192d431defa008208989680f8416f24fa40fa0071d721fa00fa00306c6170f83aaa00b609f8416f24135f030c0c0d000afa4430c00003f282081e8480a123a101a181467321c2fff2f45392c2008ec5104745737150ae7007db3c544d99c85520821005138d915004cb1f12cb3fcecec9104b103a4e60441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00491346569336395be2089625820186a0be9170e2951026333430e30d103544130e0f10001820c700973070c8ca00c9d0e00064717008c8018210d53276db58cb1fcb3fc9104510374180441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0003002cc87f01ca0055505056ca0013cececbffcb07ccc9ed5402012012150177be9d6f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3633c1301285475435475435555db3c106c105b104a1039487014001a21c0049171e021c0059172e0730177bc7e7f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3632c160130547523271059104810374698db3c104810374a90106a10591703f655226d8307507682f082a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce8906db3c10394870206e953059f45b30944133f417e28307507682f0c9046f7a37ad0ea7cee73355984fa5428982f8b37c8f7bcec91f7ac71a7cd10406db3c10394870206e953059f45b30944133f417e2700118191e0026c87001cb0721d0cf1682102e61746801cb1fc90242c87001cb076f00016f8c6d6f8c89db3c6f2201c993216eb396016f2259ccc9e8311a1d01fe5072697661746520636f72726573706f6e64656e636520697320612072696768742c206e6f7420612070726976696c6567652e2054686973206973206120757365726e616d65204e465420666f7220506c6174686f20e280942074686520616e6f6e796d6f75732c20706f73742d7175616e74756d2d656e637279707465641b01fe2c20756e63656e736f7261626c65206d657373656e6765722e2041207065726d616e656e742c207472616e7366657261626c652c2066756c6c79206f6e2d636861696e2068616e646c653a20746865206e616d65206f746865727320726561636820796f752062792c2068656c64206279206e6f206f6e652062757420796f1c001a752e20706c6174686f2e61707000b620d74a21d7499720c20022c200b18e48036f22807f22cf31ab02a105ab025155b60820c2009a20aa0215d71803ce4014de596f025341a1c20099c8016f025044a1aa028e123133c20099d430d020d74a21d749927020e2e2e85f030018c85902cb07f400c910364540d0e05244');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initUsernameNFTItem_init_args({ $$type: 'UsernameNFTItem_init_args', username_registry_address, name_hash })(builder);
@@ -5238,7 +5214,7 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"ResendDeployedAck","header":1671232620,"fields":[]},
     {"name":"TopUpStorageReserve","header":665640843,"fields":[]},
     {"name":"UsernameItemDeployedAck","header":3148082201,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"NftTransfer","header":1607220500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"new_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"custom_payload","type":{"kind":"simple","type":"cell","optional":true}},{"name":"forward_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"NftTransfer","header":1607220500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"NftOwnershipAssigned","header":85167505,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"previous_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"NftExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"UsernameNFTItemStateView","header":null,"fields":[{"name":"initialized","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username","type":{"kind":"simple","type":"cell","optional":false}},{"name":"tier","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
