@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=16';
+} from './i18n.mjs?v=17';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -633,7 +633,6 @@ const publicDiscoverButton = document.querySelector('#publicDiscoverButton');
 const publicDiscovery = document.querySelector('#publicDiscovery');
 const publicDiscoveryBody = document.querySelector('#publicDiscoveryBody');
 const publicDiscoveryBackButton = document.querySelector('#publicDiscoveryBackButton');
-const publicDiscoveryRefreshButton = document.querySelector('#publicDiscoveryRefreshButton');
 const publicJumpDownButton = document.querySelector('#publicJumpDownButton');
 const publicComposer = document.querySelector('#publicComposer');
 const publicMessageInput = document.querySelector('#publicMessageInput');
@@ -4057,9 +4056,46 @@ function refreshGlobalSyncIndicator() {
   const active = isGlobalSyncActive();
   for (const el of globalSyncIndicators) {
     el.dataset.syncing = active ? 'true' : 'false';
-    el.setAttribute('aria-label', active ? t('sync.syncing') : t('sync.synced'));
-    el.title = active ? t('sync.syncingEllipsis') : t('sync.synced');
+    // Idle = a tappable "sync now" button (see syncNowForCurrentScreen); the tooltip says so.
+    el.setAttribute('aria-label', active ? t('sync.syncing') : t('sync.syncNow'));
+    el.title = active ? t('sync.syncingEllipsis') : t('sync.syncNow');
   }
+}
+
+// The idle sync indicator (check mode) doubles as a "sync NOW" button (owner request), and the tap is
+// CONTEXT-AWARE — it means different things on different screens: the discovery overlay wants fresh active
+// channels, the Private tab wants the full manual message walk, Vault/Profile want their balances, and the
+// public feed / post detail want the unified sync cycle. A tap while any sync is already running (spinner
+// mode) is a no-op — the work the user wants is already happening.
+function syncNowForCurrentScreen() {
+  if (isGlobalSyncActive() || messageSyncManualInFlight) return;
+  const view = appShell?.dataset.view;
+  if (view === 'public' && publicPane?.dataset?.discoverOpen === 'true') {
+    refreshPublicDiscovery().catch((error) => console.error(error));
+    return;
+  }
+  if (view === 'chats') {
+    runManualPrivateMessageSync();
+    return;
+  }
+  if (view === 'vault') {
+    refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
+      const rateLimited = noteTonRpcRateLimit(error);
+      setVaultStatus(rateLimited ? 'RPC busy, retrying' : 'sync blocked');
+      if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
+    });
+    return;
+  }
+  if (view === 'profile') {
+    refreshProfilePaneReads();
+    return;
+  }
+  // Public feed / post detail (and any future view): run the unified private+public sync cycle now
+  // (1s is the scheduler's floor delay).
+  scheduleMessageAutoSync(1_000);
+}
+for (const indicator of globalSyncIndicators) {
+  indicator.addEventListener('click', () => syncNowForCurrentScreen());
 }
 
 // Advance the public sync phase and, ONLY when it actually changes, repaint the public Feed so the live sync
@@ -14580,15 +14616,21 @@ function setView(view) {
     scheduleVaultAutoRefresh(2_000);
   }
   if (view === 'profile' && plathoWallet?.address) {
-    // Serialize the Profile chain reads (GRAM balance -> ATH stats -> own avatar). Firing them concurrently is
-    // the iOS-WebKit run-loop-stall pattern fixed for the Vault in v509: 2+ concurrent toncenter reads freeze
-    // the page (it scrolls via the compositor but taps die — the account-activation freeze). One at a time.
-    (async () => {
-      try { await refreshWalletTonBalanceForProfile(); } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
-      try { await refreshAthProtocolStats(); } catch { /* best effort */ }
-      try { await refreshOwnProfileAvatar(); } catch (error) { console.error(error); }
-    })();
+    refreshProfilePaneReads();
   }
+}
+
+// Serialize the Profile chain reads (GRAM balance -> ATH stats -> own avatar). Firing them concurrently is
+// the iOS-WebKit run-loop-stall pattern fixed for the Vault in v509: 2+ concurrent toncenter reads freeze
+// the page (it scrolls via the compositor but taps die — the account-activation freeze). One at a time.
+// Shared by the Profile tab's open path and the header sync indicator's tap-to-sync on that tab.
+function refreshProfilePaneReads() {
+  if (!plathoWallet?.address) return;
+  (async () => {
+    try { await refreshWalletTonBalanceForProfile(); } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
+    try { await refreshAthProtocolStats(); } catch { /* best effort */ }
+    try { await refreshOwnProfileAvatar(); } catch (error) { console.error(error); }
+  })();
 }
 
 // "Add a contact" plate pinned at the top of the private thread list — the labeled replacement for the old
@@ -15798,10 +15840,13 @@ replaceVaultKeysButton?.addEventListener('click', async () => {
   }
 });
 
-syncMessagesButton?.addEventListener('click', async () => {
+// The full manual private message sync (forced history retry + index rescan) — shared by the settings
+// "Sync messages" button and the header sync indicator's tap-to-sync on the Private tab.
+async function runManualPrivateMessageSync() {
+  if (messageSyncManualInFlight) return;
   try {
     messageSyncManualInFlight = true;
-    syncMessagesButton.disabled = true;
+    if (syncMessagesButton) syncMessagesButton.disabled = true;
     clearMessageAutoSyncTimer();
     beginMessageSyncUi();
     const result = await syncPrivateCapsulesFromChainOnce({
@@ -15819,10 +15864,12 @@ syncMessagesButton?.addEventListener('click', async () => {
     if (!rateLimited) console.error(error);
   } finally {
     messageSyncManualInFlight = false;
-    syncMessagesButton.disabled = false;
+    if (syncMessagesButton) syncMessagesButton.disabled = false;
     scheduleMessageAutoSync();
   }
-});
+}
+
+syncMessagesButton?.addEventListener('click', () => { runManualPrivateMessageSync(); });
 
 publicChannelSearch?.addEventListener('input', () => {
   publicChannelSearchQuery = publicChannelSearch.value;
@@ -15838,9 +15885,6 @@ publicDiscoverButton?.addEventListener('click', () => {
   openPublicDiscovery().catch((error) => console.error(error));
 });
 publicDiscoveryBackButton?.addEventListener('click', () => closePublicDiscovery());
-publicDiscoveryRefreshButton?.addEventListener('click', () => {
-  refreshPublicDiscovery().catch((error) => console.error(error));
-});
 
 // Add-a-known-channel dialog (identity -> local registry row). Reached from the feed-top plate button — the
 // labeled replacement for the old search-row "+" icon button.

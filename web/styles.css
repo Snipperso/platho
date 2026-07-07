@@ -518,13 +518,25 @@ button:disabled,
 
 /* Global sync indicator: a green spinner while any sync is running, a green check when synced. Sits in the header
    corner (last in .header-actions) on every tab, so the sync state is visible everywhere — replacing the private
-   dialog's text subtitle. Pure CSS (reuses rail-balance-spin); no new icon asset. */
+   dialog's text subtitle. Pure CSS (reuses rail-balance-spin); no new icon asset. A real <button>: in check mode
+   a tap runs a context-aware "sync now" (syncNowForCurrentScreen); while spinning the tap is a no-op, so the
+   pointer affordance shows only when idle. */
 .global-sync-indicator {
   width: var(--header-button-size);
   height: var(--header-button-size);
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+.global-sync-indicator[data-syncing="false"] {
+  cursor: pointer;
+}
+.global-sync-indicator[data-syncing="false"]:hover {
+  background: rgba(48, 213, 176, 0.1);
 }
 .global-sync-indicator::before {
   content: "";
@@ -2423,11 +2435,12 @@ button.feed-item:hover {
   border-color: var(--line-soft);
 }
 
-/* The "Display as" chevron lives in the post's author row (FEED mode), pinned to the right edge
-   (margin-left:auto). A clean square with no text padding so the 20px chevron sits dead-centre
-   (place-items:center from .icon-button), sized down to the compact author row. */
+/* The "Display as" chevron in the post's author row. A clean square with no text padding so the 20px chevron
+   sits dead-centre (place-items:center from .icon-button), sized down to the compact author row. NO
+   margin-left:auto here: flexbox splits the free space EQUALLY between auto margins, so a second auto margin
+   opened a wide gap between the [about] and [chevron] buttons — the about button (always present when this
+   one is, and first in DOM) is the ONE auto margin, and this one sits flush beside it on the row's 10px gap. */
 .icon-button.feed-author-identity {
-  margin-left: auto;
   flex: 0 0 30px;
   width: 30px;
   height: 30px;
@@ -2435,9 +2448,8 @@ button.feed-item:hover {
   padding: 0;
 }
 
-/* The channel "about" (description + tags) button sits just left of the "Display as" chevron in the author row.
-   It also carries margin-left:auto so, when present, it absorbs the free space and the chevron (also auto) sits
-   flush beside it — rendering as an adjacent [about][chevron] cluster pinned to the right edge. */
+/* The channel "about" (description + tags) button: the ONE auto margin in the author row — absorbs the free
+   space and pins the [about][chevron] cluster to the right edge. */
 .icon-button.feed-author-about {
   margin-left: auto;
   flex: 0 0 30px;

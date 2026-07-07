@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=702" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=703" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5184,6 +5184,20 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function isGlobalSyncActive\(\)/);
     expect(app).toMatch(/function refreshGlobalSyncIndicator\(\)/);
     expect(app).toMatch(/const globalSyncIndicators = \[\.\.\.document\.querySelectorAll\('\.global-sync-indicator'\)\]/);
+    // v703: the idle indicator is a real BUTTON — a tap runs a context-aware "sync now" (discovery overlay ->
+    // fresh channels, Private -> the full manual message walk, Vault/Profile -> their balances, public feed ->
+    // the unified cycle); spinning taps no-op. The discovery header's separate refresh button is GONE.
+    expect(html).not.toMatch(/<span class="global-sync-indicator"/);
+    expect((html.match(/<button type="button" class="global-sync-indicator"/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect(app).toMatch(/function syncNowForCurrentScreen\(\)/);
+    expect(app).toMatch(/if \(isGlobalSyncActive\(\) \|\| messageSyncManualInFlight\) return;/);
+    expect(app).toMatch(/publicPane\?\.dataset\?\.discoverOpen === 'true'\) \{\s*refreshPublicDiscovery\(\)/);
+    expect(app).toMatch(/indicator\.addEventListener\('click', \(\) => syncNowForCurrentScreen\(\)\)/);
+    expect(app).toMatch(/function runManualPrivateMessageSync\(\)/);
+    expect(html).not.toMatch(/publicDiscoveryRefreshButton/);
+    expect(app).not.toMatch(/publicDiscoveryRefreshButton/);
+    expect(css).toMatch(/\.global-sync-indicator\[data-syncing="false"\] \{\s*cursor: pointer;/);
+    expect(EN_STRINGS['sync.syncNow']).toBe('Synced - tap to sync now');
     // The private dialog subtitle is emptied — sync status moved to the global indicator.
     const subtitleSrc = app.slice(app.indexOf('function conversationSubtitleText()'), app.indexOf('function isGlobalSyncActive('));
     expect(subtitleSrc).toMatch(/return '';/);
@@ -5238,10 +5252,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/let messageSyncManualInFlight = false;/);
     // refreshMessagingControls must respect the in-flight flag (not re-enable the button mid-sync on a re-render).
     expect(app).toMatch(/syncMessagesButton\.disabled = !plathoWallet \|\| !signedActionsReady \|\| messageSyncManualInFlight;/);
-    // The handler sets the flag before the await and clears it in finally.
+    // The shared manual-sync body (settings button + the header indicator's tap on the Private tab) sets the
+    // flag before the await and clears it in finally.
     const handlerSource = app.slice(
+      app.indexOf('async function runManualPrivateMessageSync()'),
       app.indexOf("syncMessagesButton?.addEventListener('click'"),
-      app.indexOf("syncMessagesButton?.addEventListener('click'") + 900,
     );
     expect(handlerSource).toMatch(/messageSyncManualInFlight = true;/);
     expect(handlerSource).toMatch(/finally \{\s*messageSyncManualInFlight = false;/);
@@ -5778,7 +5793,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function bootReplayStore'),
     );
     const syncButtonSource = app.slice(
-      app.indexOf('syncMessagesButton?.addEventListener'),
+      app.indexOf('async function runManualPrivateMessageSync()'),
       app.indexOf('publicChannelSearch?.addEventListener'),
     );
 
@@ -6052,7 +6067,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/showPublicChannelDisplayPopover\(\{ authorWallet \}, identityButton\)/);
     expect(app).toMatch(/const feedIdentityButton = publicItemIdentityButton\(item\);[\s\S]*?authorRow\.append\(feedIdentityButton\)/);
     // It is pinned right in the compact author row (margin-left:auto, clean square so the chevron centres).
-    expect(css).toMatch(/\.feed-author-identity \{[\s\S]*?margin-left: auto;[\s\S]*?padding: 0;/);
+    // v703: ONE auto margin in the author row (the about button) — a second one on the chevron made flexbox
+    // split the free space between them, opening a wide gap inside the [about][chevron] cluster.
+    expect(css).toMatch(/\.feed-author-about \{[\s\S]*?margin-left: auto;[\s\S]*?padding: 0;/);
+    expect(css).toMatch(/\.feed-author-identity \{(?:(?!margin-left)[\s\S])*?padding: 0;\s*\}/);
     expect(css).not.toMatch(/\.feed-actions \.icon-button/);
     // 6B-own. The user's OWN .ath shows in their own public channel (local, no chain read). Resolved FIRST and via
     // the stored address (so it works before the wallet loads and isn't shadowed by a stray self-entry in the store).
@@ -6073,14 +6091,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v773/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=236/);
+    expect(sw).toMatch(/platho-pwa-prototype-v774/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=237/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=702/);
+    expect(sw).toMatch(/\.\/app\.js\?v=703/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=16/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=16/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=17/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
