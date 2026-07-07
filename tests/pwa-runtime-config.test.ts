@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=696" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=697" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -3400,7 +3400,12 @@ describe('PWA runtime config guard', () => {
 
     expect(app).toMatch(/const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120/);
     expect(helperSource).toMatch(/appConfig\.capsuleHub\?\.privateIndexReadLimit \?\? PRIVATE_CHAIN_INDEX_READ_LIMIT/);
-    expect(helperSource).toMatch(/Private message has \$\{parts\} capsules; split it into messages of \$\{limit\} capsules or fewer/);
+    // Localized (v697): the part-limit message is a CLDR plural key in all 10 locales, selected by the part
+    // count, with the limit as a plain param — no hardcoded-English status/tooltip text.
+    expect(helperSource).toMatch(/return tPlural\('composer\.privatePartLimit', parts, \{ limit \}\);/);
+    expect(helperSource).toMatch(/return tPlural\('composer\.publicPartLimit', parts, \{ limit: COMPOSER_MAX_MESSAGE_PARTS \}\);/);
+    expect(EN_STRINGS['composer.privatePartLimit#other']).toBe('Private message has {count} capsules (limit {limit}); split it into smaller messages');
+    expect(EN_STRINGS['composer.publicPartLimit#other']).toBe('Post has {count} capsules (limit {limit}); split it into smaller posts');
     expect(helperSource).toMatch(/function assertPrivateComposerPartLimit/);
     expect(shortfallSource).toMatch(/if \(privateComposerPartLimitMessage\(plan\.length\)\) return true/);
     expect(statusSource).toMatch(/const limitMessage = privateComposerPartLimitMessage\(privatePlan\.length\)/);
@@ -5985,14 +5990,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v767/);
+    expect(sw).toMatch(/platho-pwa-prototype-v768/);
     expect(sw).toMatch(/\.\/styles\.css\?v=234/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=696/);
+    expect(sw).toMatch(/\.\/app\.js\?v=697/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=15/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=15/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=16/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

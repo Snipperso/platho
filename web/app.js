@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=15';
+} from './i18n.mjs?v=16';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -13010,13 +13010,13 @@ function privateComposerPartLimitMessage(partCount) {
   const parts = Number(partCount ?? 0);
   const limit = Math.min(privateComposerRetrievalPartLimit(), COMPOSER_MAX_MESSAGE_PARTS);
   if (!Number.isFinite(parts) || parts <= limit) return null;
-  return `Private message has ${parts} capsules; split it into messages of ${limit} capsules or fewer`;
+  return tPlural('composer.privatePartLimit', parts, { limit });
 }
 
 function publicComposerPartLimitMessage(partCount) {
   const parts = Number(partCount ?? 0);
   if (!Number.isFinite(parts) || parts <= COMPOSER_MAX_MESSAGE_PARTS) return null;
-  return `Post has ${parts} capsules; split it into posts of ${COMPOSER_MAX_MESSAGE_PARTS} capsules or fewer`;
+  return tPlural('composer.publicPartLimit', parts, { limit: COMPOSER_MAX_MESSAGE_PARTS });
 }
 
 function assertPublicComposerPartLimit(partCount) {
