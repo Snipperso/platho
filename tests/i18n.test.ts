@@ -131,7 +131,7 @@ describe('i18n app integration', () => {
 
   it('PWA-I18N-08: app boots the engine before rendering and wires both language selects', () => {
     // Locale resolves + static HTML is translated at import time, before the shell renders.
-    expect(app).toMatch(/import \{[\s\S]*?\bt,[\s\S]*?\btPlural,[\s\S]*?\} from '\.\/i18n\.mjs\?v=17';/);
+    expect(app).toMatch(/import \{[\s\S]*?\bt,[\s\S]*?\btPlural,[\s\S]*?\} from '\.\/i18n\.mjs\?v=18';/);
     expect(app).toMatch(/initI18n\(\);\s*applyStaticTranslations\(\);/);
     // Both selects populated with endonyms and wired.
     expect(app).toMatch(/function populateLanguageSelect\(select\)/);

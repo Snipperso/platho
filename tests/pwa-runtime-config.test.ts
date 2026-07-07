@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=706" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=707" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -5213,6 +5213,21 @@ describe('PWA runtime config guard', () => {
     // the unified cycle); spinning taps no-op. The discovery header's separate refresh button is GONE.
     expect(html).not.toMatch(/<span class="global-sync-indicator"/);
     expect((html.match(/<button type="button" class="global-sync-indicator"/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    // v707: the flush is paid by the WALLET (not the Vault shown in the rail) — the submit pre-checks the
+    // wallet GRAM balance BEFORE the send (fail-open on an unreadable balance) and maps the shortfall to an
+    // actionable localized status instead of "sync delayed"; browser zoom is disabled app-wide (viewport meta
+    // + html/body touch-action + the WebKit gesture kill) while the lightbox keeps its OWN pointer/transform
+    // zoom (touch-action:none viewport).
+    expect(app).toMatch(/const walletBalanceNanotons = await loadConnectedTonWalletBalance\(\)\.catch\(\(\) => null\);/);
+    expect(app).toMatch(/if \(walletBalanceNanotons !== null && nonNegativeBigInt\(walletBalanceNanotons\) < requiredNanotons\)/);
+    expect(app).toMatch(/error\.code = 'PLATHO_WALLET_GRAM_REQUIRED';/);
+    expect(app).toMatch(/if \(state\.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED'\) return t\('profile\.flushNeedsWalletGram'\);/);
+    expect(app.indexOf("error.code = 'PLATHO_WALLET_GRAM_REQUIRED'")).toBeLessThan(app.indexOf('const transaction = createWalletTransaction(messages)'));
+    expect(EN_STRINGS['profile.flushNeedsWalletGram']).toBe('top up wallet GRAM');
+    expect(html).toMatch(/name="viewport"[^>]*maximum-scale=1, user-scalable=no/);
+    const cssZoom = readFileSync('web/styles.css', 'utf8');
+    expect(cssZoom).toMatch(/html,\s*body \{[\s\S]*?touch-action: pan-x pan-y;/);
+    expect(app).toMatch(/for \(const gestureEventType of \['gesturestart', 'gesturechange', 'gestureend'\]\)/);
     // v704 ATH-flush overlay integration: EVERY chain re-read of the flush state routes through the in-flight
     // overlay merge (behavioral coverage in tests/ath-flush-overlay.test.ts), and the post-send optimistic
     // state derives through the SAME merge — a bare overwrite is what re-armed the button mid-flight.
@@ -6122,14 +6137,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v777/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=238/);
+    expect(sw).toMatch(/platho-pwa-prototype-v778/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=239/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=706/);
+    expect(sw).toMatch(/\.\/app\.js\?v=707/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=17/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=17/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=18/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

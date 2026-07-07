@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=17';
+} from './i18n.mjs?v=18';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -1265,6 +1265,8 @@ const ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS = 5 * 60 * 1000;
 // the button honestly re-arms). Protocol-level counters, not wallet-scoped.
 let athFlushOptimisticFlush = null;
 const ATH_FLUSH_OPTIMISTIC_FLUSH_TTL_MS = 5 * 60 * 1000;
+// External-message fee headroom on top of the per-message flush values when pre-checking the WALLET balance.
+const ATH_FLUSH_WALLET_FEE_HEADROOM_NANOTONS = 10_000_000n;
 let athFlushState = {
   username_burn_due_ath: null,
   profile_burn_due_ath: null,
@@ -4725,6 +4727,14 @@ imageLightboxViewport?.addEventListener('dblclick', (event) => {
   event.preventDefault();
   toggleImageLightboxZoomAt(event.clientX, event.clientY);
 });
+
+// No NATIVE page zoom anywhere (owner request): iOS Safari ignores user-scalable=no, but its WebKit-only
+// gesture* events are cancelable — killing them kills the pinch page zoom. Unconditional on purpose: the
+// lightbox zooms via its OWN pointer/transform machinery (touch-action:none viewport), so the native page
+// zoom is unwanted even there. No-op on non-WebKit (the events never fire).
+for (const gestureEventType of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(gestureEventType, (event) => event.preventDefault(), { passive: false });
+}
 
 function imageDownloadExtension(src) {
   const match = String(src ?? '').match(/^data:image\/([a-z0-9.+-]+)[;,]/i);
@@ -15881,9 +15891,12 @@ flushAthButton?.addEventListener('click', async () => {
       ...athFlushState,
       busy: false,
       error: String(error?.message ?? error ?? 'ATH flush blocked'),
+      errorCode: error?.code ?? null,
     };
     renderAthFlushStatus();
-    flashWalletIdentityStatus(t('wallet.athFlushBlocked'));
+    flashWalletIdentityStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+      ? t('profile.flushNeedsWalletGram')
+      : t('wallet.athFlushBlocked'));
     console.error(error);
   } finally {
     renderAthFlushStatus();
@@ -16997,6 +17010,9 @@ function athFlushStateKnown(state = athFlushState) {
 
 function athFlushStatusText(state = athFlushState) {
   if (state.busy) return t('profile.flushing');
+  // The one actionable failure gets its own words: the flush is paid by the WALLET, and "sync delayed"
+  // told the user nothing about topping it up.
+  if (state.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED') return t('profile.flushNeedsWalletGram');
   if (state.error) return t('common.syncDelayed');
   if (!athFlushStateKnown(state)) return t('common.checking');
   const ready = athFlushReadyAmount(state);
@@ -20166,6 +20182,7 @@ async function refreshAthFlushState() {
       ...athFlushState,
       busy: false,
       error: String(error?.message ?? error ?? 'ATH flush state unavailable'),
+      errorCode: null,
     };
     renderAthFlushStatus();
     throw error;
@@ -21021,6 +21038,7 @@ async function submitAthDueFlush() {
     ...athFlushState,
     busy: true,
     error: null,
+    errorCode: null,
   };
   renderAthFlushStatus();
   const state = await readAthBurnFlushState();
@@ -21028,6 +21046,7 @@ async function submitAthDueFlush() {
     ...state,
     busy: true,
     error: null,
+    errorCode: null,
   };
   renderAthFlushStatus();
   const messages = [];
@@ -21057,6 +21076,19 @@ async function submitAthDueFlush() {
   if (messages.length === 0) {
     const pending = athFlushPendingCount(state);
     throw new Error(pending > 0n ? 'ATH burn flush is already pending' : 'No ATH is ready to flush');
+  }
+  // The flush messages are paid by the WALLET, not the Vault (the rail balance the user sees) — a zero-GRAM
+  // wallet broadcast never lands and the only feedback was "flush pending" until the overlay TTL re-armed
+  // (owner hit exactly this). Check the wallet balance FIRST and fail with an actionable status instead of
+  // sending into the void. Fail-open on an unreadable balance (null): a flaky read must not block a funded
+  // wallet — the send itself remains the authority.
+  const requiredNanotons = BigInt(messages.length) * REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS
+    + ATH_FLUSH_WALLET_FEE_HEADROOM_NANOTONS;
+  const walletBalanceNanotons = await loadConnectedTonWalletBalance().catch(() => null);
+  if (walletBalanceNanotons !== null && nonNegativeBigInt(walletBalanceNanotons) < requiredNanotons) {
+    const error = new Error(`Wallet needs ~${formatTonNanotons(requiredNanotons)} GRAM to flush`);
+    error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
+    throw error;
   }
   const transaction = createWalletTransaction(messages);
   const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
