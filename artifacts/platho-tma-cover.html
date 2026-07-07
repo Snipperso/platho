@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 640px; height: 360px; overflow: hidden; }
+  .cover {
+    width: 640px; height: 360px;
+    background:
+      radial-gradient(130% 120% at 16% 26%, #14201d 0%, #0b0d0f 58%),
+      #0b0d0f;
+    display: flex; align-items: center; gap: 40px;
+    padding: 0 60px;
+    font-family: "Segoe UI", -apple-system, Roboto, sans-serif;
+  }
+  .tile {
+    width: 176px; height: 176px; flex: 0 0 auto;
+    border-radius: 40px;
+    background: linear-gradient(160deg, #121a1c 0%, #0c1011 100%);
+    box-shadow: 0 0 0 1px rgba(43,230,173,.22),
+                0 18px 50px rgba(43,230,173,.16);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tile svg { width: 132px; height: 132px; display: block; }
+  .txt { display: flex; flex-direction: column; }
+  .name { font-size: 78px; font-weight: 700; letter-spacing: -1.5px; color: #eef4f3; line-height: .95; }
+  .tag  { margin-top: 16px; font-size: 24px; font-weight: 600; color: #36d6ac; }
+  .sub  { margin-top: 9px; font-size: 16.5px; font-weight: 500; color: #6c7a79; letter-spacing: .2px; }
+</style>
+</head>
+<body>
+  <div class="cover">
+    <div class="tile">
+      <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="m" x1="118" y1="430" x2="430" y2="82" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#2be6ad"/>
+            <stop offset="0.55" stop-color="#30d5b0"/>
+            <stop offset="1" stop-color="#25c99b"/>
+          </linearGradient>
+        </defs>
+        <!-- pixel-dissolve squares peeling off the stem (kept from the brand mark) -->
+        <rect x="78"  y="206" width="40" height="40" rx="3" fill="url(#m)"/>
+        <rect x="118" y="128" width="40" height="40" rx="3" fill="url(#m)"/>
+        <rect x="118" y="286" width="40" height="40" rx="3" fill="url(#m)"/>
+        <rect x="118" y="368" width="40" height="40" rx="3" fill="url(#m)"/>
+        <rect x="44"  y="272" width="26" height="26" rx="3" fill="url(#m)" opacity=".55"/>
+        <!-- proper P: full-height stem + bowl in the upper half only (counter cut out) -->
+        <path fill="url(#m)" fill-rule="evenodd"
+              d="M166 96
+                 h150
+                 c66 0 116 44 116 104
+                 s-50 104-116 104
+                 h-66
+                 v108
+                 h-84
+                 Z
+                 M250 176
+                 v56
+                 h60
+                 c24 0 40-12 40-32
+                 s-16-32-40-32
+                 Z"/>
+      </svg>
+    </div>
+    <div class="txt">
+      <div class="name">Platho</div>
+      <div class="tag">Encrypted messenger + TON wallet</div>
+      <div class="sub">No accounts. No servers. Keys stay on your device.</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -3247,8 +3247,8 @@ button.feed-item:hover {
   display: none;
 }
 
-/* Step-2 (TON Center key) body: the input stretches, the get-a-key CTA sits BELOW it on its own row with a
-   clear gap, sized to its label (the shared .discovery-cta-action class gives it the plate-button look). */
+/* Shared quick-start step body (step-2 TON Center key + step-4 top-up): content stacks with a clear gap and a
+   plate-CTA (.discovery-cta-action) sits BELOW on its own row, sized to its label — same look as "Add contact". */
 .quick-start-key-body {
   display: grid;
   gap: 12px;

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Platho common 32-character username NFT single-line fit">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1113"/>
+      <stop offset="1" stop-color="#0b0d0f"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="118" y1="430" x2="430" y2="82" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2be6ad"/>
+      <stop offset=".55" stop-color="#30d5b0"/>
+      <stop offset="1" stop-color="#25c99b"/>
+    </linearGradient>
+    <linearGradient id="common-line" x1="104" y1="0" x2="920" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b0d0f" stop-opacity="0"/>
+      <stop offset=".06" stop-color="#1e262a" stop-opacity=".62"/>
+      <stop offset=".5" stop-color="#30d5b0"/>
+      <stop offset=".94" stop-color="#1e262a" stop-opacity=".62"/>
+      <stop offset="1" stop-color="#0b0d0f" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect x="76" y="76" width="872" height="872" rx="44" fill="#111417" stroke="#283136" stroke-width="2"/>
+  <rect x="104" y="104" width="816" height="816" rx="28" fill="#0b0d0f" stroke="#1e262a" stroke-width="2"/>
+  <path d="M104 104h816" stroke="url(#common-line)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M104 920h816" stroke="url(#common-line)" stroke-width="4" stroke-linecap="round" opacity=".44"/>
+  <rect x="124" y="122" width="94" height="94" rx="22" fill="#111417" stroke="#1e262a"/>
+  <svg x="130" y="128" width="82" height="82" viewBox="0 0 512 512" overflow="visible">
+    <g transform="translate(0 512) scale(1 -1)">
+    <path fill="url(#teal)" fill-rule="evenodd" d="M167.5 432.1 L330.5 432.1 L346.5 429.9 L364.5 424.8 L380.5 417.7 L393.5 409.6 L404.5 401.0 L416.0 389.5 L425.8 376.5 L435.9 358.5 L441.7 343.5 L445.9 325.5 L446.9 296.5 L445.8 285.5 L442.8 271.5 L435.7 251.5 L425.9 233.5 L416.9 221.5 L402.5 207.1 L387.5 196.1 L362.5 184.1 L348.5 180.1 L334.5 178.0 L221.5 177.2 L220.5 79.2 L137.5 79.4 L137.2 139.5 L166.5 140.2 L166.8 174.5 L136.5 175.1 L135.6 174.5 L135.7 163.5 L134.5 162.8 L104.1 163.5 L104.5 192.7 L134.5 192.9 L135.5 193.5 L135.4 220.5 L136.2 221.5 L166.8 222.5 L166.5 253.0 L135.5 253.3 L134.5 235.2 L105.5 235.1 L104.1 236.5 L104.3 264.5 L134.5 265.3 L135.5 292.5 L197.5 292.7 L198.4 293.5 L198.0 323.5 L166.8 324.5 L167.3 364.5 L198.4 365.5 L198.3 394.5 L166.9 395.5 L166.7 430.5 L167.5 432.1 Z M104.5 407.6 L134.9 407.5 L134.5 377.7 L104.5 377.9 L104.5 407.6 Z M221.5 372.3 L221.5 237.2 L322.5 237.1 L329.5 238.1 L342.5 242.1 L352.5 247.4 L359.5 252.8 L369.6 263.5 L377.0 275.5 L381.5 288.5 L383.1 298.5 L382.7 316.5 L379.7 327.5 L374.8 338.5 L368.9 347.5 L358.5 357.9 L344.5 366.7 L332.5 370.8 L322.5 372.4 L221.5 372.3 Z M65.5 324.3 L93.5 324.3 L93.9 294.5 L64.9 294.5 L64.6 322.5 L65.5 324.3 Z"/>
+    </g>
+  </svg>
+  <text x="244" y="176" fill="#f4f7f5" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="800">Platho usernames</text>
+  <rect x="732" y="134" width="156" height="58" rx="12" fill="#111417" stroke="#283136"/>
+  <text x="810" y="173" fill="#96a19c" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="900" text-anchor="middle">COMMON</text>
+  <circle cx="512" cy="512" r="280" fill="none" stroke="#30d5b0" stroke-width="2" opacity=".09"/>
+  <circle cx="512" cy="512" r="218" fill="none" stroke="#66726d" stroke-width="2" opacity=".13"/>
+  <rect x="160" y="362" width="704" height="230" rx="30" fill="#111417" fill-opacity=".94" stroke="#283136" stroke-width="2"/>
+  <rect x="206" y="420" width="612" height="96" rx="18" fill="#151a1d" fill-opacity=".94" stroke="#1e262a" stroke-width="3"/>
+  <path d="M232 516h560" stroke="#30d5b0" stroke-width="4" stroke-linecap="round" opacity=".65"/>
+  <text x="512" y="490" fill="#f4f7f5" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="850" text-anchor="middle" textLength="586" lengthAdjust="spacingAndGlyphs">veryverybigusernamewith32symbols.ath</text>
+  <text x="512" y="575" fill="#96a19c" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="800" text-anchor="middle">32 CHARACTER USERNAME</text>
+  <text x="512" y="760" fill="#66726d" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="750" text-anchor="middle">transferable on-chain identity</text>
+</svg>

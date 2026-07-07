@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Platho standard username NFT">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#050807"/>
+      <stop offset=".6" stop-color="#071614"/>
+      <stop offset="1" stop-color="#06111a"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1=".1" x2="1" y2=".9">
+      <stop offset="0" stop-color="#6ff7d2"/>
+      <stop offset=".5" stop-color="#15d6ad"/>
+      <stop offset="1" stop-color="#4aa3ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="342" fill="none" stroke="#15d6ad" stroke-width="8" opacity=".22"/>
+  <circle cx="512" cy="512" r="274" fill="none" stroke="#4aa3ff" stroke-width="4" opacity=".22"/>
+  <path d="M356 296h194c144 0 232 72 232 194 0 124-88 197-232 197h-74v131H356V296Zm120 109v171h68c71 0 112-29 112-86 0-56-41-85-112-85h-68Z" fill="url(#mark)"/>
+  <rect x="246" y="378" width="62" height="62" rx="10" fill="#15d6ad"/>
+  <rect x="254" y="516" width="52" height="52" rx="9" fill="#6ff7d2"/>
+  <rect x="238" y="646" width="70" height="70" rx="12" fill="#4aa3ff"/>
+  <path d="M276 226h472v78H276V226Zm48 105h376v42H324v-42Z" fill="#15d6ad" opacity=".45"/>
+  <text x="512" y="875" fill="#d8fff4" font-family="Arial, sans-serif" font-size="58" font-weight="700" text-anchor="middle">6+ STANDARD</text>
+  <text x="512" y="930" fill="#15d6ad" font-family="Arial, sans-serif" font-size="30" letter-spacing="6" text-anchor="middle">PLATHO USERNAME</text>
+</svg>

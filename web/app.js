@@ -18741,8 +18741,7 @@ async function fetchTonWalletBalance(address) {
   }
 }
 
-async function loadConnectedTonWalletBalance() {
-  const address = requirePlathoWalletAddress();
+async function loadConnectedTonWalletBalance(address = requirePlathoWalletAddress()) {
   // One logical external-GRAM read (sequential provider/fetch fallbacks; calls no other wrapped Vault read), held
   // under the shared read mutex so it never overlaps a get_user/get_global on iOS.
   return withVaultReadLock(async () => {
@@ -26401,8 +26400,20 @@ async function runQuickStartCreateWallet() {
 }
 
 // Refresh the external wallet GRAM balance into vaultPocketState (no step re-render — callers update in place).
+// Reads the RECEIVE ADDRESS balance directly (public info) instead of requiring the unlocked wallet: onboarding can
+// reach the top-up/activate steps with the wallet record stored but NOT loaded into runtime (step 1 auto-dones on
+// the stored record after a resume/background-lock without unlocking), and requiring plathoWallet left the balance
+// stuck on "checking…" forever.
 async function quickStartRefreshWalletBalanceRaw() {
-  try { await refreshWalletTonBalanceForProfile(); } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
+  const address = currentWalletReceiveAddress();
+  if (!address) return;
+  try {
+    const balance = await loadConnectedTonWalletBalance(address);
+    vaultPocketState = {
+      wallet: { ton_balance: balance, ath_balance: vaultPocketState.wallet?.ath_balance ?? null },
+      vault: vaultPocketState.vault ?? { ton_balance: null, ath_balance: null },
+    };
+  } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
 }
 
 // Jump the stepper to a named step (used by "Back to Top up" on the activation step).
@@ -26415,6 +26426,7 @@ function quickStartGoToStepByKey(key) {
 // sees it arrive (auto-checked on entry + a manual "Check balance"). In-place text updates, never a re-render.
 function buildQuickStartTopUpBody() {
   const wrap = document.createElement('div');
+  wrap.className = 'quick-start-key-body';
   const addr = document.createElement('div');
   addr.className = 'quick-start-step-address';
   addr.textContent = currentWalletReceiveAddress() || storedWalletAddressForCopy() || t('quickstart.createWalletFirst');
@@ -26422,7 +26434,7 @@ function buildQuickStartTopUpBody() {
   balanceLine.className = 'quick-start-balance-line';
   const check = document.createElement('button');
   check.type = 'button';
-  check.className = 'secondary-button';
+  check.className = 'discovery-cta-action';
   check.textContent = t('quickstart.checkBalance');
   const renderBalance = () => {
     const bal = quickStartWalletTonNanotons();
