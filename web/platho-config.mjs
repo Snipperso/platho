@@ -116,8 +116,8 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     },
   },
   vault: {
-    address: 'UQCDq-S1F1hGr9mqQXTYwdWhJz_5pXLkS9_vSZILI5VwjwO4',
-    deploymentManifestHash: '9e82eaa3f96d533a99a397cd71713736fda2e49cfdf84b495353d0bfda91f8ad',
+    address: 'UQAFsNc952nbwLMDfHqXExkgn1lipVzNndbNQKBfHEIEe5Zy',
+    deploymentManifestHash: 'd9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16',
     provider: {
       globalName: 'plathoVaultChainProvider',
       moduleUrl: './vault-ton-rpc-provider.mjs?v=58',
@@ -137,7 +137,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     },
   },
   capsuleHub: {
-    address: 'UQBCYsUGnK7Ea2Pj1Aw3JToKrutAfd1DRNIBosucZW25pk-5',
+    address: 'UQD1Qj4S3F4IAMku5M_xc5IFBPhHR7DeakWZDGURjDtCGrx9',
     publicReadLimit: 128,
     // clean-11 capability gate. false = clean-10 (current live): channel profiles ride as normal public posts,
     // discovery walks the recency author-index. Flip to true ONLY at the clean-11 cutover (in lockstep with the
@@ -146,16 +146,16 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     profilePointer: true,
   },
   feeAccumulator: {
-    address: 'UQBpAwY-igkmkT5251UkyK8kF7t5wOy3bTA7TbalK0ovQ1oA',
+    address: 'UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr',
   },
   ath: {
-    masterAddress: 'UQAyC-MgeacFW5-FeqHYckzrbI06y40OmloCU5cxBIof6Z8g',
+    masterAddress: 'UQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcF6b',
   },
   usernameRegistry: {
-    address: 'UQAjTnSGShSSCMg1nrPd1c2JDRSwqrxR5xbIgxK7fY2ckilP',
+    address: 'UQBhlvF4qNpc6PLN2-X9hgVqlq-6k2DJRtxkGbrgBkZL-nMI',
   },
   profileRegistry: {
-    address: 'UQDjjcVceIpkgt7-MdOVgWk2Cq7MezUGf98HtJN4ymr8Kzex',
+    address: 'UQAkt_x_FRJxT0TevI5KTcExz1wTp412Hq47h4F3F1z2u3Jr',
   },
   crypto: {
     signedBundlePurpose: 'pwa-production',

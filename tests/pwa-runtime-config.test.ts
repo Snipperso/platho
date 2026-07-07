@@ -194,13 +194,13 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_avatar_version');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_username_item_address');
     expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBe(128);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQCDq-S1F1hGr9mqQXTYwdWhJz_5pXLkS9_vSZILI5VwjwO4');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQAFsNc952nbwLMDfHqXExkgn1lipVzNndbNQKBfHEIEe5Zy');
     expect(PLATHO_APP_CONFIG.vault.deploymentManifestHash).toBe(
-      '9e82eaa3f96d533a99a397cd71713736fda2e49cfdf84b495353d0bfda91f8ad',
+      'd9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16',
     );
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBCYsUGnK7Ea2Pj1Aw3JToKrutAfd1DRNIBosucZW25pk-5');
-    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQBpAwY-igkmkT5251UkyK8kF7t5wOy3bTA7TbalK0ovQ1oA');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQAyC-MgeacFW5-FeqHYckzrbI06y40OmloCU5cxBIof6Z8g');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQD1Qj4S3F4IAMku5M_xc5IFBPhHR7DeakWZDGURjDtCGrx9');
+    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcF6b');
     expect(PLATHO_APP_CONFIG.tonDns.rootAddress).toBe(
       '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     );
@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=708" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=709" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -617,9 +617,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoTonRpcTransport/);
     expect(app).toMatch(/plathoTonRpcEndpoint/);
     expect(app).toMatch(/plathoTonSendBocEndpoint/);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQCDq-S1F1hGr9mqQXTYwdWhJz_5pXLkS9_vSZILI5VwjwO4');
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBCYsUGnK7Ea2Pj1Aw3JToKrutAfd1DRNIBosucZW25pk-5');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQAyC-MgeacFW5-FeqHYckzrbI06y40OmloCU5cxBIof6Z8g');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQAFsNc952nbwLMDfHqXExkgn1lipVzNndbNQKBfHEIEe5Zy');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQD1Qj4S3F4IAMku5M_xc5IFBPhHR7DeakWZDGURjDtCGrx9');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcF6b');
     expect(app).not.toMatch(/https:\/\/testnet\.toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).not.toMatch(/https:\/\/toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).toMatch(/fetchTonWalletBalance\(address\)/);
@@ -6144,11 +6144,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v779/);
+    expect(sw).toMatch(/platho-pwa-prototype-v780/);
     expect(sw).toMatch(/\.\/styles\.css\?v=240/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=708/);
+    expect(sw).toMatch(/\.\/app\.js\?v=709/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=18/);
@@ -6158,7 +6158,7 @@ describe('PWA runtime config guard', () => {
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=6/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=100/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=101/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=55/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);

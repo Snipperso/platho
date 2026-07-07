@@ -120,7 +120,7 @@
       "code_hash": "required: current ATHWallet code hash",
       "owner_address": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
-      "balance_atomic": "required: exact remaining 75M ATH genesis custody balance"
+      "balance_atomic": "required: exact remaining 15M ATH airdrop-allocation custody balance (post 60M reserve capitalization)"
     },
     "ath_long_term_vesting": {
       "address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS",

@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-07T14:11:33.592Z",
+  "generatedAt": "2026-07-07T16:46:08.439Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "BLOCKED_BY_PREPROD",
-  "productionReady": false,
+  "status": "PRODUCTION_STATIC_PACKAGE_READY",
+  "productionReady": true,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 139,
     "totalBytes": 4615398,
-    "bundleSha256": "2349a83c9027e48d772ef7d6a0d16230d6d024126352ddd8346842468992238e",
+    "bundleSha256": "0f7eaa3e45225efa64fc283edd59a9e11dd2668e1d01977625f7eac175bbb42e",
     "files": [
       {
         "path": "app.js",
         "bytes": 1250643,
-        "sha256": "b3241e8a772a547115a0d21c9dd0b8892e399e41cbd0f365d58cd75ccc4988c7"
+        "sha256": "5c946009dee4dee17e7dba9b9abee620111f0d1f0fe1c74768a542e9082db45a"
       },
       {
         "path": "assets/icons/about.svg",
@@ -245,7 +245,7 @@
       {
         "path": "index.html",
         "bytes": 53027,
-        "sha256": "1a82c940ce1b4d71693db902b3f65b1c33a39ca9ac9fac6af252b09674d50bb0"
+        "sha256": "3e6555e013ecd25e8dc0149837bbd31df43f1d389d777f332c7af5446c864d27"
       },
       {
         "path": "manifest.webmanifest",
@@ -260,7 +260,7 @@
       {
         "path": "platho-config.mjs",
         "bytes": 19016,
-        "sha256": "fca94a0a9bc0ee8546877898c77af463760f3c2139a232bb997a45783e6f16f4"
+        "sha256": "ede64949fb681a47904d0edfae88e6e1fa5d5c42620c024d9778e2dfd857c433"
       },
       {
         "path": "platho-wallet.mjs",
@@ -315,7 +315,7 @@
       {
         "path": "sw.js",
         "bytes": 6808,
-        "sha256": "4e506197775c20dcf39a3dc87d6e7932939245f07f5814828cc10d83ae8ba6e8"
+        "sha256": "b0a7f1a6e7032e6732f81ba344cc5a55b255956cb0bb1898c08f97a64cdd6416"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -962,17 +962,9 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": false
+    "productionMarkersCleared": true
   },
-  "blockers": [
-    "MAINNET_GENESIS_NOT_VERIFIED"
-  ],
+  "blockers": [],
   "warnings": [],
-  "productionFindings": [
-    {
-      "id": "MAINNET_GENESIS_NOT_VERIFIED",
-      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
-      "message": "Current release candidate has no verified final mainnet genesis evidence."
-    }
-  ]
+  "productionFindings": []
 }
