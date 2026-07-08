@@ -2588,6 +2588,16 @@ function readContactDisplayPreference(counterpartyWallet) {
 function writeContactDisplayPreference(counterpartyWallet, preference) {
   const key = contactDisplayPreferenceStorageKey(counterpartyWallet);
   if (!key) return;
+  // NEVER store a "Display as" preference for your OWN wallet. The own channel / self ("My notes") thread derives
+  // its name from your own linked .ath, not a per-counterparty entry (resolveWalletChannelDisplay returns early for
+  // the own wallet). A stray own-wallet entry — e.g. leaked by a cross-wallet thread merge — would bleed a peer's
+  // name/avatar onto your own "You" channel. Refuse it at this single chokepoint AND clear any that already leaked in
+  // (self-heal for devices already poisoned before this fix).
+  const own = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  if (own && sameWalletAddress(counterpartyWallet, own)) {
+    try { localStorageOrNull()?.removeItem(key); } catch { /* cosmetic self-heal; ignore */ }
+    return;
+  }
   const normalized = normalizeContactDisplayPreference(preference);
   try {
     if (!normalized) {
@@ -2636,14 +2646,13 @@ function resolveWalletChannelDisplay(counterpartyWallet) {
   if (ownAddress && sameWalletAddress(counterpartyWallet, ownAddress)) {
     const ownLabel = readLinkedPlathoUsername(ownAddress)?.label;
     const ownIdentity = ownLabel ? plathoUsernameIdentity(ownLabel) : null;
-    if (ownIdentity) {
-      return {
-        name: displayIdentityLabel(ownIdentity),
-        tone: identityTone(ownIdentity),
-        identity: ownIdentity,
-        localLabel: null,
-      };
-    }
+    // Your OWN channel shows YOUR OWN .ath (or the bare address when you have none) — and NOTHING else. RETURN here
+    // unconditionally: never fall through to the per-counterparty store or the private-thread fallback below for your
+    // own wallet, or a stray entry / a mis-merged thread could pin a peer's name+avatar onto your "You" channel. This
+    // matters most on a brand-new wallet, which has no linked .ath to short-circuit on.
+    return ownIdentity
+      ? { name: displayIdentityLabel(ownIdentity), tone: identityTone(ownIdentity), identity: ownIdentity, localLabel: null }
+      : null;
   }
   const explicit = resolveContactDisplay(counterpartyWallet);
   if (explicit) return explicit;
@@ -3572,6 +3581,11 @@ function hydrateThreadDisplayFromContactStore(thread) {
   if (!thread || thread.contactDisplaySynced) return false;
   const wallet = ownerWalletFromThread(thread);
   if (!wallet) return false; // no wallet yet (unresolved peer): retry once it resolves
+  // The self/Saved ("My notes") thread must NEVER pull a display from the per-counterparty store: its label is always
+  // "My notes" and its name derives from your own linked .ath. Reading a (possibly leaked) own-wallet entry here
+  // would re-latch a peer's identity onto the Saved thread every session — so short-circuit for the own wallet.
+  const own = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  if (own && sameWalletAddress(wallet, own)) { thread.contactDisplaySynced = true; return false; }
   thread.contactDisplaySynced = true;
   const stored = readContactDisplayPreference(wallet);
   if (!stored) {
@@ -5175,7 +5189,12 @@ function renderMarkdownToNode(markdown, target) {
 }
 
 function activeThread() {
-  return threads.find((item) => item.id === activeThreadId) ?? threads[0] ?? null;
+  // NO threads[0] fallback: threads[0] is ALWAYS the Saved "My notes" thread, so falling back to it made an
+  // unresolved activeThreadId silently render/enable the composer on "My notes" — a message the user meant for a
+  // peer could then be echoed into My notes, and the render disagreed with the send (which never targets threads[0]).
+  // Null here = no chat selected → renderConversation shows the empty state and the composer is disabled, matching
+  // the design intent (a null activeThreadId means the user is on the dialog LIST, not silently on My notes).
+  return threads.find((item) => item.id === activeThreadId) ?? null;
 }
 
 // Find an already-open dialog for the same person as `newThread`, even when they were reached by a
@@ -7059,8 +7078,9 @@ function rebuildThreadsFromPublicSubscriptions(options = {}) {
     // Keep the user's current selection.
     activeThreadId = previousActive;
   } else if (previousActive) {
-    // The selected thread vanished — fall back to the first thread.
-    activeThreadId = threads[0]?.id ?? null;
+    // The selected thread vanished — drop the selection (show the LIST). NEVER default to threads[0] (the Saved
+    // "My notes" thread): that would silently drop the user into My notes and let a peer-intended send land there.
+    activeThreadId = null;
   } else {
     // No selection: the user was on the dialog LIST (they never opened a chat, or backed out to the list).
     // A preserving rebuild — e.g. a background sync or the resume-after-unlock sync — must NOT silently revive
@@ -10771,7 +10791,7 @@ function pruneEmptyAnonymousPeerThreads() {
     if (!isAnonymousPeerThread(thread) || (thread.messages ?? []).length > 0) continue;
     threads.splice(index, 1);
     changed = true;
-    if (activeThreadId === thread.id) activeThreadId = threads[0]?.id ?? null;
+    if (activeThreadId === thread.id) activeThreadId = null; // show the LIST, never default to threads[0] (Saved)
   }
   return changed;
 }
@@ -10793,28 +10813,35 @@ function relocateExistingCapsuleMessage(existing, targetThread) {
   // dialog. (pruneEmptyAnonymousPeerThreads below only removes no-identity peers; this also handles named ones.)
   if (existing.thread !== targetThread && (existing.thread.messages ?? []).length === 0) {
     const sourceThread = existing.thread;
-    const sourceIndex = threads.indexOf(sourceThread);
-    if (sourceIndex >= 0) {
-      // Carry the merged dialog's identity into the survivor: add its username(s) to the survivor's known identities
-      // (the "Display as" list), and — unless the survivor has a deliberate local name — adopt its display, so the
-      // user keeps seeing the username they were just talking to (e.g. a "support" dialog merging into "platho"
-      // leaves the dialog showing support AND lists support, not just platho).
-      const sourceVariants = threadIdentityVariants(sourceThread);
-      if (sourceVariants.length > 0) refreshThreadIdentityFromVariants(targetThread, sourceVariants);
-      if (sourceThread.localLabel && !targetThread.localLabel) {
-        targetThread.localLabel = sourceThread.localLabel;
-      } else if (!targetThread.localLabel) {
-        // Adopt the username the merged dialog actually represented — a NAMED identity from its variants (which now
-        // include it), not its possibly-stale/hydrated displayIdentity — so the survivor shows e.g. "support" instead
-        // of reverting to "platho".
-        const namedVariant = sourceVariants.find((variant) => variant && variant.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS);
-        if (namedVariant) targetThread.displayIdentity = namedVariant;
+    // NEVER merge away the self/Saved ("My notes") thread or lend its identity. A capsule can end up wrongly
+    // double-homed in Saved (e.g. an outgoing send while the active dialog was momentarily unresolved); its message
+    // is still relocated to the real peer above, but Saved must keep existing and its OWN-wallet identity must not
+    // graft onto the peer — that graft is what flipped the peer dialog to "My notes" (isSavedMessagesThread sees the
+    // own wallet on it) and bled the peer's avatar onto the user's own "You" channel.
+    if (!isSavedMessagesThread(sourceThread)) {
+      const sourceIndex = threads.indexOf(sourceThread);
+      if (sourceIndex >= 0) {
+        // Carry ONLY the merged dialog's USERNAME(s) into the survivor (its "Display as" list + display) — NEVER a
+        // wallet_address variant. Grafting one dialog's wallet onto another's would mis-key routing/self-detection
+        // (e.g. a support dialog and a platho dialog are the same wallet, so the username is the only useful carry;
+        // two DIFFERENT wallets must never share a wallet variant).
+        const sourceVariants = threadIdentityVariants(sourceThread)
+          .filter((variant) => variant && variant.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS);
+        if (sourceVariants.length > 0) refreshThreadIdentityFromVariants(targetThread, sourceVariants);
+        if (sourceThread.localLabel && !targetThread.localLabel) {
+          targetThread.localLabel = sourceThread.localLabel;
+        } else if (!targetThread.localLabel) {
+          // Adopt the username the merged dialog actually represented (first named variant) so the survivor shows
+          // e.g. "support" instead of reverting to "platho".
+          const namedVariant = sourceVariants[0] ?? null;
+          if (namedVariant) targetThread.displayIdentity = namedVariant;
+        }
+        applyThreadDisplayFields(targetThread);
+        syncThreadDisplayToContactStore(targetThread);
+        persistThreadDisplayPreference(targetThread);
+        threads.splice(sourceIndex, 1);
+        if (activeThreadId === sourceThread.id) activeThreadId = targetThread.id;
       }
-      applyThreadDisplayFields(targetThread);
-      syncThreadDisplayToContactStore(targetThread);
-      persistThreadDisplayPreference(targetThread);
-      threads.splice(sourceIndex, 1);
-      if (activeThreadId === sourceThread.id) activeThreadId = targetThread.id;
     }
   }
   pruneEmptyAnonymousPeerThreads();
@@ -12076,6 +12103,43 @@ async function writeMessageToEncryptedHistory(thread, message) {
   }
 }
 
+// One-time self-heal for devices poisoned BEFORE the cross-wallet identity-bleed fix. The old thread-merge in
+// relocateExistingCapsuleMessage grafted wallet variants ACROSS dialogs, so a peer dialog could carry the OWN
+// wallet variant (isSavedMessagesThread flips true → it renders as "My notes", and its avatar bleeds onto the own
+// "You" channel), and the Saved thread could symmetrically carry a PEER wallet/username variant (that peer's
+// incoming messages then route INTO "My notes"). Those variants persist inside the encrypted-history thread
+// snapshots and applyHistoryThreadSnapshot re-adds them ADDITIVELY on every load — so the live guards alone can
+// never clean an already-poisoned device. Strip them after each history restore: the OWN wallet variant may live
+// ONLY on the real Saved thread (identified by its CREATION id, dm:wallet_address:<own> — identity variants are
+// exactly what got poisoned, so they cannot be trusted for this), and the Saved thread may carry NOTHING but the
+// own wallet (a dropped own .ath re-latches on next use). Rewrite the affected snapshots + clear a leaked
+// own-wallet "Display as" entry. Idempotent no-op on a clean device.
+function healCrossWalletIdentityBleed() {
+  const own = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  if (!own) return false;
+  const ownVariants = privateWalletIdentityVariants(own);
+  const ownKeys = new Set(ownVariants.map(identityKey).filter(Boolean));
+  if (ownKeys.size === 0) return false;
+  const savedIds = new Set(ownVariants.map((variant) => `dm:${variant.type}:${encodeURIComponent(variant.value)}`));
+  let healed = false;
+  for (const thread of threads) {
+    if (thread.publicChannelId) continue;
+    const isRealSaved = savedIds.has(thread.id);
+    const dropKeys = threadIdentityVariants(thread)
+      .map(identityKey)
+      .filter((key) => key && (isRealSaved ? !ownKeys.has(key) : ownKeys.has(key)));
+    let dropped = false;
+    for (const key of dropKeys) dropped = dropThreadIdentityVariant(thread, key) || dropped;
+    if (!dropped) continue;
+    persistThreadDisplayPreference(thread);
+    healed = true;
+  }
+  // Clear a leaked own-wallet contact-display entry regardless (Fix D's write path removes it on any own write,
+  // but a poisoned device may never write again — clear it here explicitly).
+  writeContactDisplayPreference(own, null);
+  return healed;
+}
+
 async function restoreEncryptedMessageHistory() {
   if (!encryptedMessageStore) return;
   try {
@@ -12107,6 +12171,8 @@ async function restoreEncryptedMessageHistory() {
       }
         changed = true;
     }
+    // Heal AFTER the snapshots have been applied (they are what re-adds the poisoned variants).
+    if (healCrossWalletIdentityBleed()) changed = true;
     globalThis.plathoLastEncryptedHistoryRestore = {
       restored: restored.length,
       failed: failed.length,
@@ -16304,7 +16370,9 @@ publicPostBackButton?.addEventListener('click', () => {
 publicPostAuthorIdentityButton?.addEventListener('click', (event) => {
   event.stopPropagation();
   const authorWallet = publicPostDetailItem?.authorWallet ?? null;
-  if (!authorWallet) return;
+  // Own posts: the button is already hidden at render, but re-check here so the guard doesn't silently depend on
+  // that separate .hidden write staying in sync (the other two chevrons gate at construction).
+  if (!authorWallet || isOwnPublicAuthor(authorWallet)) return;
   if (identityPopover && !identityPopover.hidden) {
     hideIdentityPopover();
   } else {
@@ -16648,7 +16716,11 @@ composer?.addEventListener('submit', async (event) => {
     messageInput?.focus();
     return;
   }
-  const thread = threads.find((item) => item.id === activeThreadId) ?? threads[0];
+  // NEVER fall back to threads[0] for a SEND: threads[0] is ALWAYS the Saved self-thread (ensureSavedMessagesThread
+  // unshifts it), so a stale/unresolved activeThreadId would route the outgoing echo into "My notes" — and the later
+  // relocate of that capsule to the real peer would try to graft the own wallet onto the peer. If the active dialog
+  // can't be resolved, abort (the typed text stays in the composer); the user reopens the chat and resends.
+  const thread = threads.find((item) => item.id === activeThreadId) ?? null;
   if (!thread) return;
   if (thread.readOnly) {
     messageInput.value = '';
