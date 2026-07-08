@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-08T09:18:13.223Z",
+  "generatedAt": "2026-07-08T09:38:34.835Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 139,
-    "totalBytes": 4632343,
-    "bundleSha256": "328316d5607d6ea90c3a8c701b102c5a8d39c6a322b96dac25d9b5eb9fe779c2",
+    "totalBytes": 4632445,
+    "bundleSha256": "2f3cb30f957dcf81f1b0e6b20c22a06d806d76f7f8548e13e58f758de3056d2d",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1265183,
-        "sha256": "11398a6cd84b538f8dfae84fde07ba7d02394527caf62b707b0db073ae58e1a0"
+        "bytes": 1265187,
+        "sha256": "278c690cc0a1cd4bef3c16565763f601f0cdb827cdcbdc142d04d2ef1bfff888"
       },
       {
         "path": "assets/icons/about.svg",
@@ -234,18 +234,18 @@
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 629245,
-        "sha256": "d98b79d9c4eef5d3ca10aebb90fa405a22ae21dba7507c497c04e27fab5e65d6"
+        "bytes": 629343,
+        "sha256": "5f846c5197a8a792092b4d386841de1930f05a84d166b8e5f5d55a4970220c84"
       },
       {
         "path": "i18n.mjs",
         "bytes": 4608,
-        "sha256": "1e76538c4eb57c605bc401ad86fdd3fb1b127a8ede7c13f4d8452045205d6014"
+        "sha256": "891daa329387bbf518198cf0b7477ecdb8ca7571439c45ce3b948fc206776c0a"
       },
       {
         "path": "index.html",
         "bytes": 53027,
-        "sha256": "f68a415b63ecf70df843d46850c9a69f5f45c54e63ecc34891414372e4217c11"
+        "sha256": "d5fb25be67e79724672ad12fd13f14d47dddde26effc955601a9f47d5dbee347"
       },
       {
         "path": "manifest.webmanifest",
@@ -315,7 +315,7 @@
       {
         "path": "sw.js",
         "bytes": 6808,
-        "sha256": "6b8716eb1434655e617a271151198d0f5fbccc456861e7003e50457612434863"
+        "sha256": "dd02c9d70beb0925730c5f7e2b01840554ebc68215aece60badeb1b1462c90c3"
       },
       {
         "path": "ton-dns-provider.mjs",
