@@ -271,12 +271,19 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    expect(html).toMatch(/id="appVersionLabel">v672<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v691'/);
+    // The sidebar version badge (index.html label) and the runtime const MUST be EQUAL in any given bundle: the
+    // update-detect (handleServiceWorkerControllerChange) compares the LIVE index.html label to the running const,
+    // and the badge is the one on-device way to tell which build a device runs (TMA webviews cache hard). They had
+    // silently drifted (v672 vs v691) — pin the equality so a release bumps both or neither.
+    const versionLabel = html.match(/id="appVersionLabel">(v\d+)<\/span>/)?.[1];
+    const runtimeVersion = app.match(/const PLATHO_APP_RUNTIME_VERSION = '(v\d+)'/)?.[1];
+    expect(versionLabel).toBeTruthy();
+    expect(runtimeVersion).toBe(versionLabel);
+    expect(Number(String(versionLabel).slice(1))).toBeGreaterThanOrEqual(720);
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=719" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=720" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -6209,6 +6216,17 @@ describe('PWA runtime config guard', () => {
     expect(heal).toMatch(/isRealSaved \? !ownKeys\.has\(key\) : ownKeys\.has\(key\)/);
     expect(heal).toMatch(/persistThreadDisplayPreference\(thread\)/);
     expect(app).toMatch(/if \(healCrossWalletIdentityBleed\(\)\) changed = true;/);
+    // F2. Heal-on-touch at ROUTING time (covers the pre-restore race + any residual re-poisoning): both receive
+    // routers and the recipient-thread lookup resolve a Saved/peer conflict the moment they would hand back the
+    // wrong thread — never waiting for the next history restore.
+    expect(app).toMatch(/function healThreadWalletVariantConflict\(thread, peerWalletRaw\) \{/);
+    expect(app).toMatch(/healThreadWalletVariantConflict\(identityThread, recipientWallet\)/);
+    expect(app).toMatch(/healThreadWalletVariantConflict\(identityThread, rawWalletAddress\(senderWallet\)\)/);
+    const findExisting = app.slice(
+      app.indexOf('function findExistingRecipientThread('),
+      app.indexOf('function selectOrCreateRecipientThread('),
+    );
+    expect(findExisting).toMatch(/healThreadWalletVariantConflict\(thread, peerRaw\)/);
   });
 
   it('PWA-PUBLIC-PRIVATE-UI-01: public/private UI fixes — tab-restore, info-button, feed overflow/uid, self-post, self-dialog, display-as', () => {
@@ -6300,11 +6318,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v794/);
+    expect(sw).toMatch(/platho-pwa-prototype-v795/);
     expect(sw).toMatch(/\.\/styles\.css\?v=245/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=719/);
+    expect(sw).toMatch(/\.\/app\.js\?v=720/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);

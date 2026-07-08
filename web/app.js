@@ -186,7 +186,11 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-const PLATHO_APP_RUNTIME_VERSION = 'v691';
+// MUST equal the #appVersionLabel in index.html (PWA-CONFIG-01B pins the equality): the update-detect
+// (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
+// release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
+// renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
+const PLATHO_APP_RUNTIME_VERSION = 'v720';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5203,16 +5207,20 @@ function activeThread() {
 // any shared identity variant -> same counterparty wallet (compared as raw, so friendly/raw forms
 // match). Prevents the duplicate empty dialog reported from the Public tab.
 function findExistingRecipientThread(newThread) {
-  const byId = threads.find((thread) => thread.id === newThread.id);
-  if (byId) return byId;
-  const byVariant = findThreadByIdentityVariants(threads, threadIdentityVariants(newThread));
-  if (byVariant) return byVariant;
   const newWallet = ownerWalletFromThread(newThread);
+  const peerRaw = newWallet ? rawWalletAddress(newWallet) : null;
+  // Heal-on-touch: a PEER lookup must never hand back the Saved self-thread (and a peer dialog wearing a grafted
+  // own-wallet variant is stripped the moment it is touched) — see healThreadWalletVariantConflict.
+  const healed = (thread) => (thread ? healThreadWalletVariantConflict(thread, peerRaw) : null);
+  const byId = healed(threads.find((thread) => thread.id === newThread.id));
+  if (byId) return byId;
+  const byVariant = healed(findThreadByIdentityVariants(threads, threadIdentityVariants(newThread)));
+  if (byVariant) return byVariant;
   if (newWallet) {
-    const byWallet = threads.find((thread) => {
+    const byWallet = healed(threads.find((thread) => {
       const wallet = ownerWalletFromThread(thread);
       return wallet && sameWalletAddress(wallet, newWallet);
-    });
+    }));
     if (byWallet) return byWallet;
   }
   return null;
@@ -9974,7 +9982,13 @@ async function threadForOpenedSenderCapsule(opened) {
   const recipientWallet = rawWalletAddress(opened?.payload?.recipientWallet ?? opened?.payload?.recipient_wallet);
   if (recipientWallet) {
     const variants = privateWalletIdentityVariants(recipientWallet);
-    const identityThread = findThreadByIdentityVariants(threads, variants);
+    // Heal-on-touch: never route a peer-addressed sent capsule into the Saved self-thread (see
+    // healThreadWalletVariantConflict); after a strip, re-find — the real peer dialog (if any) now matches.
+    let identityThread = findThreadByIdentityVariants(threads, variants);
+    if (identityThread) {
+      identityThread = healThreadWalletVariantConflict(identityThread, recipientWallet)
+        ?? findThreadByIdentityVariants(threads, variants);
+    }
     if (identityThread) return refreshThreadIdentityFromVariants(identityThread, variants);
     const created = createRecipientThread(recipientWallet);
     if (created?.ok && created.thread) {
@@ -10317,6 +10331,33 @@ function ensureSavedMessagesThread() {
   return created.thread;
 }
 
+// Heal-on-touch companion to healCrossWalletIdentityBleed (the restore-time sweep): the moment ROUTING would
+// conflate a PEER dialog with the Saved self-thread, resolve the conflict right there. Covers the races the
+// sweep cannot (a sync pass landing BEFORE the history restore has healed, or any residual re-poisoning path).
+// Returns the thread to use, or null when the matched thread was the REAL Saved thread (its creation id is the
+// own-wallet dm id) wrongly carrying the peer's wallet variant — the peer variant is stripped off Saved and the
+// caller re-resolves to (or creates) the real peer dialog. A PEER dialog wrongly carrying the OWN wallet variant
+// is stripped in place and returned (it IS the peer's dialog; it just must stop looking like "My notes").
+function healThreadWalletVariantConflict(thread, peerWalletRaw) {
+  const own = ownRuntimeWalletRaw();
+  if (!thread || !own || !peerWalletRaw || peerWalletRaw === own) return thread;
+  if (!isSavedMessagesThread(thread)) return thread; // plain peer dialog — no conflict
+  const ownVariants = privateWalletIdentityVariants(own);
+  const savedIds = new Set(ownVariants.map((variant) => `dm:${variant.type}:${encodeURIComponent(variant.value)}`));
+  if (savedIds.has(thread.id)) {
+    for (const key of privateWalletIdentityVariants(peerWalletRaw).map(identityKey)) {
+      if (key) dropThreadIdentityVariant(thread, key);
+    }
+    persistThreadDisplayPreference(thread);
+    return null;
+  }
+  for (const key of ownVariants.map(identityKey)) {
+    if (key) dropThreadIdentityVariant(thread, key);
+  }
+  persistThreadDisplayPreference(thread);
+  return thread;
+}
+
 async function threadForChainCapsule(opened, entry) {
   if (opened?.openedAs === 'sender') {
     const target = await threadForOpenedSenderCapsule(opened);
@@ -10326,7 +10367,13 @@ async function threadForChainCapsule(opened, entry) {
   const senderWallet = await resolvePrivateCapsuleSenderWallet(opened, entry);
   const senderUsername = opened?.payload?.senderUsername ?? opened?.payload?.sender_username;
   const variants = await privateWalletIdentityVariantsWithUsername(senderWallet, senderUsername);
-  const identityThread = findThreadByIdentityVariants(threads, variants);
+  // Heal-on-touch: an incoming peer message must never land in the Saved self-thread (see
+  // healThreadWalletVariantConflict); after a strip, re-find — the real peer dialog (if any) now matches.
+  let identityThread = findThreadByIdentityVariants(threads, variants);
+  if (identityThread) {
+    identityThread = healThreadWalletVariantConflict(identityThread, rawWalletAddress(senderWallet))
+      ?? findThreadByIdentityVariants(threads, variants);
+  }
   if (identityThread) {
     // The sender may have TRANSFERRED away a .ath this dialog still wears. The fresh `variants` already exclude an
     // unowned name (verifiedPlathoUsernameIdentityForWallet drops it), but refreshThreadIdentityFromVariants is
