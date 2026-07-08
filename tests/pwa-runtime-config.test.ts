@@ -6248,7 +6248,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v791/);
+    expect(sw).toMatch(/platho-pwa-prototype-v792/);
     expect(sw).toMatch(/\.\/styles\.css\?v=244/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
@@ -6373,6 +6373,14 @@ describe('PWA runtime config guard', () => {
     expect(readFileSync('web/app.js', 'utf8')).toMatch(/dataset\.plathoAppJs !== 'ready'/);
     expect(bootGuard).toMatch(/addEventListener\('error'/);
     expect(bootGuard).toMatch(/unhandledrejection/);
+    // The watchdog measures EXECUTION, not DOWNLOAD: it waits for the window 'load' event
+    // (fires only after every script has downloaded AND run — a healthy app is 'ready' by
+    // then), so a slow cold load (hard reload / new visitor with no service-worker cache)
+    // never false-trips the "did not finish loading" screen. A hard cap still surfaces a
+    // load that never completes. Guard against a regression to a fixed download-timeout.
+    expect(bootGuard).toMatch(/addEventListener\('load'/);
+    expect(bootGuard).toMatch(/readyState === 'complete'/);
+    expect(bootGuard).toMatch(/HARD_CAP_MS/);
   });
 
   it('PWA-BOOT-SCREEN-01: branded boot overlay masks the post-unlock sync and lifts at the core-ready milestone', () => {

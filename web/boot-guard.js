@@ -1,9 +1,19 @@
 // Plain-script boot watchdog. Loaded before the module graph on purpose and
 // written in ES5 so it runs on any browser the app itself cannot: when the
 // module graph fails to parse or execute (old Safari, blocked resources),
-// the page would otherwise stay a silent dark shell. After a timeout this
-// shows what went wrong instead. CSP note: styles go through CSSOM property
-// assignments because style-src 'self' forbids inline style attributes.
+// the page would otherwise stay a silent dark shell. This shows what went
+// wrong instead. CSP note: styles go through CSSOM property assignments
+// because style-src 'self' forbids inline style attributes.
+//
+// It measures the app's EXECUTION, not its DOWNLOAD: on a cold load (a hard
+// reload that bypasses the service-worker cache, or a brand-new visitor) the
+// whole module graph plus crypto vendor downloads over the network, which can
+// take many seconds and must NOT trip the guard. So it waits for the window
+// 'load' event - which fires only after every script has finished downloading
+// AND executing, and a healthy app sets 'ready' during that execution - then
+// allows a short grace for any post-load work before deciding. A hard cap
+// still surfaces a page that never finishes loading (a request that hangs
+// forever, so 'load' never arrives).
 //
 // User-facing copy is English-only on purpose: this screen is served to every
 // visitor regardless of locale, so any other language hardcoded here would
@@ -12,8 +22,15 @@
 (function () {
   'use strict';
 
-  var BOOT_TIMEOUT_MS = Number(document.documentElement.getAttribute('data-platho-boot-guard-timeout-ms')) || 8000;
+  // Post-load grace for the app to reach 'ready'. Small on purpose: 'ready' is set at the
+  // end of the module's top-level execution, which completes before 'load' fires, so a
+  // healthy boot is already 'ready' here; the grace only covers minor async settling.
+  var GRACE_MS = Number(document.documentElement.getAttribute('data-platho-boot-guard-timeout-ms')) || 6000;
+  // Backstop for a load that never completes (a subresource that hangs forever): 'load'
+  // never fires, so only this absolute cap can surface the stuck page.
+  var HARD_CAP_MS = 45000;
   var bootErrors = [];
+  var guardFired = false;
 
   function rememberBootError(text) {
     if (!text) return;
@@ -52,7 +69,8 @@
     return node;
   }
 
-  setTimeout(function () {
+  function showGuard() {
+    if (guardFired) return;
     var state = document.documentElement.getAttribute('data-platho-app-js');
     // 'ready' is the terminal healthy marker set at the very end of the app
     // module, after every handler is wired; the app's own error hooks never
@@ -61,6 +79,7 @@
     // the page may render but stays partially or fully inert.
     if (state === 'ready') return;
     if (!document.body) return;
+    guardFired = true;
 
     var overlay = styled('div', {
       position: 'fixed',
@@ -162,5 +181,18 @@
     overlay.appendChild(dismiss);
 
     document.body.appendChild(overlay);
-  }, BOOT_TIMEOUT_MS);
+  }
+
+  var hardCap = setTimeout(showGuard, HARD_CAP_MS);
+
+  function afterLoad() {
+    clearTimeout(hardCap);
+    setTimeout(showGuard, GRACE_MS);
+  }
+
+  if (document.readyState === 'complete') {
+    afterLoad();
+  } else {
+    window.addEventListener('load', afterLoad);
+  }
 })();
