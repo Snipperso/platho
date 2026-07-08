@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=721" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=722" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6217,9 +6217,29 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function healCrossWalletIdentityBleed('),
       app.indexOf('async function restoreEncryptedMessageHistory('),
     );
-    expect(heal).toMatch(/isRealSaved \? !ownKeys\.has\(key\) : ownKeys\.has\(key\)/);
+    // v722: the "which thread is the real Saved" discriminator is RAW-normalized (threadPrimaryWalletRaw ===
+    // ownRuntimeWalletRaw), NOT a string-id / string-key compare — a wallet stored in a different friendly form
+    // (EQ vs UQ) silently failed the old string compare, so a poisoned Saved thread was never healed. Variant
+    // stripping is raw-normalized too (any UQ/EQ/raw form).
+    expect(app).toMatch(/function threadPrimaryWalletRaw\(thread\) \{/);
+    expect(app).toMatch(/function stripWalletVariantFromThread\(thread, walletRaw\) \{/);
+    expect(heal).toMatch(/if \(threadPrimaryWalletRaw\(thread\) === own\) \{/);
+    expect(heal).toMatch(/stripWalletVariantFromThread\(thread, walletRaw\)/);
+    expect(heal).not.toMatch(/savedIds\.has\(thread\.id\)/);
     expect(heal).toMatch(/persistThreadDisplayPreference\(thread\)/);
     expect(app).toMatch(/if \(healCrossWalletIdentityBleed\(\)\) changed = true;/);
+    // F3. Messages already stuck inside "My notes" are queued (their chain entry ids) and replayed through the
+    // next private scan so they are re-opened, re-routed to the true sender, and relocated OUT of Saved.
+    expect(heal).toMatch(/pendingSavedRelocateEntryIds\.add\(String\(message\.chainEntryId\)\)/);
+    expect(app).toMatch(/let pendingSavedRelocateEntryIds = new Set\(\)/);
+    expect(app).toMatch(/const ids = \[\.\.\.pendingSavedRelocateEntryIds\]; pendingSavedRelocateEntryIds = new Set\(\); return ids;/);
+    // The healThreadWalletVariantConflict discriminator is raw-normalized too.
+    const healTouch = app.slice(
+      app.indexOf('function healThreadWalletVariantConflict('),
+      app.indexOf('async function threadForChainCapsule('),
+    );
+    expect(healTouch).toMatch(/if \(threadPrimaryWalletRaw\(thread\) === own\) \{/);
+    expect(healTouch).not.toMatch(/savedIds\.has\(thread\.id\)/);
     // F2. Heal-on-touch at ROUTING time (covers the pre-restore race + any residual re-poisoning): both receive
     // routers and the recipient-thread lookup resolve a Saved/peer conflict the moment they would hand back the
     // wrong thread — never waiting for the next history restore.
@@ -6322,7 +6342,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v796/);
+    expect(sw).toMatch(/platho-pwa-prototype-v797/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6330,7 +6350,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=245/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=721/);
+    expect(sw).toMatch(/\.\/app\.js\?v=722/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
