@@ -31,6 +31,17 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app).toMatch(/const underfunded = bal !== null && bal < fee;/);
     expect(app).toMatch(/quickStartActionButton\.disabled = underfunded;/);
     expect(app).toMatch(/backBtn\.addEventListener\('click', \(\) => \{ quickStartGoToStepByKey\('topup'\); \}\)/);
+    // Activate-step body: same gapped stacking as Top up (quick-start-key-body) so the balance/hint/actions
+    // never glue together, and BOTH actions wear the shared plate-CTA class (the "Add contact" look) — owner
+    // reported the old secondary-button pair looked non-canonical and stuck together on iPhone.
+    const activateBody = app.slice(
+      app.indexOf('function buildQuickStartActivateBody()'),
+      app.indexOf('function buildQuickStartActivateBody()') + 900,
+    );
+    expect(activateBody).toMatch(/wrap\.className = 'quick-start-key-body';/);
+    expect(activateBody).toMatch(/check\.className = 'discovery-cta-action';/);
+    expect(activateBody).toMatch(/backBtn\.className = 'discovery-cta-action';/);
+    expect(activateBody).not.toMatch(/className = 'secondary-button'/);
     // run() double-checks funds and returns guidance instead of attempting a doomed on-chain activation.
     const activateStep = app.slice(app.indexOf("key: 'activate'"), app.indexOf("key: 'activate'") + 1200);
     expect(activateStep).toMatch(/if \(bal !== null && bal < fee\) \{\s*return t\('quickstart\.notEnoughToActivate'/);
@@ -71,5 +82,20 @@ describe('quick-start resume + activation gate guard', () => {
     );
     expect(topup).toMatch(/wrap\.className = 'quick-start-key-body';/);
     expect(topup).toMatch(/check\.className = 'discovery-cta-action';/);
+  });
+
+  it('QS-RESUME-05: the stepper fits a narrow phone/TG-Mini-App screen (no horizontal overflow)', () => {
+    // Owner reported the step-5 activation card spilling off the right edge on an iPhone. Root causes were
+    // (1) nested grid items with the default min-width:auto letting a long localized paragraph's max-content
+    // inflate the dialog past its width, and (2) a fixed `auto auto 1fr` footer that could not shrink or wrap
+    // the long primary-action label. Both are pinned here so the fit can't silently regress.
+    // (1) min-width:0 down the grid-item chain so the dialog width stays authoritative and text wraps.
+    expect(css).toMatch(/\.quick-start-dialog \{[^}]*min-width: 0;/);
+    expect(css).toMatch(/\.quick-start-view \{[^}]*min-width: 0;/);
+    expect(css).toMatch(/\.quick-start-step-body \{[^}]*min-width: 0;/);
+    // (2) footer is flex-wrap (NOT a rigid auto auto 1fr grid); the primary action can wrap to its own row.
+    expect(css).toMatch(/\.quick-start-step-actions \{[^}]*display: flex;[^}]*flex-wrap: wrap;/);
+    expect(css).not.toMatch(/\.quick-start-step-actions \{[^}]*grid-template-columns: auto auto 1fr;/);
+    expect(css).toMatch(/\.quick-start-step-actions > \.recipient-submit \{[^}]*flex: 1 1 160px;[^}]*white-space: nowrap;/);
   });
 });

@@ -3133,6 +3133,11 @@ button.feed-item:hover {
   display: grid;
   gap: 16px;
   width: min(460px, 100%);
+  /* The dialog is a grid item of the .modal-backdrop (place-items:center). Without min-width:0 its
+     automatic minimum is min-content, so a wide descendant (a long localized paragraph's max-content,
+     the footer's action button) inflates the box PAST width:min(460px,100%) and it spills off a narrow
+     screen (iPhone / TG Mini App). min-width:0 makes the width authoritative so inner text wraps instead. */
+  min-width: 0;
   max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
   overflow-y: auto;
   padding: 20px;
@@ -3152,6 +3157,9 @@ button.feed-item:hover {
 .quick-start-view {
   display: grid;
   gap: 14px;
+  /* Grid item of the dialog: min-width:0 so its own auto column clamps to the dialog width and
+     long localized text wraps instead of forcing the dialog wider than a phone viewport. */
+  min-width: 0;
 }
 
 .quick-start-view[hidden] {
@@ -3201,9 +3209,26 @@ button.feed-item:hover {
   gap: 8px;
 }
 
+/* Footer row (Back / Skip / primary action). Flex-wrap, NOT a fixed `auto auto 1fr` grid: on a wide
+   screen Back + Skip stay content-sized on the left and the primary action fills the rest on the right
+   (same as before); on a narrow screen (phone / TG Mini App) where a long localized action label +
+   Back + Skip can't share one row, the action wraps to its own full-width row instead of overflowing
+   off-screen. The action keeps a single line (nowrap) at its fixed 42px height. */
 .quick-start-step-actions {
-  grid-template-columns: auto auto 1fr;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
+}
+
+.quick-start-step-actions > .secondary-button {
+  flex: 0 0 auto;
+}
+
+.quick-start-step-actions > .recipient-submit {
+  flex: 1 1 160px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .quick-start-foot {
@@ -3253,6 +3278,7 @@ button.feed-item:hover {
 .quick-start-step-body {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .quick-start-step-body:empty {

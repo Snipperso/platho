@@ -26714,18 +26714,22 @@ function buildQuickStartTopUpBody() {
 // Activation step body: shows balance vs the activation fee and GATES on funds — an underfunded wallet cannot
 // activate, so instead of letting the on-chain send fail, disable the action and offer "Back to Top up".
 function buildQuickStartActivateBody() {
+  // Same stacking layout as the Top-up step (quick-start-key-body: grid + 12px gap) so the balance,
+  // hint and the two actions never glue together, and both actions use the shared plate-CTA class
+  // (.discovery-cta-action) so they read as buttons — the same "Add contact" look as the rest of the app.
   const wrap = document.createElement('div');
+  wrap.className = 'quick-start-key-body';
   const summary = document.createElement('div');
   summary.className = 'quick-start-balance-line';
   const hint = document.createElement('div');
   hint.className = 'quick-start-step-hint';
   const check = document.createElement('button');
   check.type = 'button';
-  check.className = 'secondary-button';
+  check.className = 'discovery-cta-action';
   check.textContent = t('quickstart.checkBalance');
   const backBtn = document.createElement('button');
   backBtn.type = 'button';
-  backBtn.className = 'secondary-button';
+  backBtn.className = 'discovery-cta-action';
   backBtn.textContent = t('quickstart.backToTopUp');
   backBtn.addEventListener('click', () => { quickStartGoToStepByKey('topup'); });
   const applyGate = () => {
