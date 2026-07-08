@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=714" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=715" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4607,6 +4607,20 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');
   });
 
+  it('PWA-DOCS-I18N-01: the docs viewer loads the current-locale doc, falling back to the English base', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // English uses the base path; other locales use the <name>.<locale>.md sibling.
+    expect(app).toMatch(/function localizedDocPath\(basePath, locale\) \{\s*if \(!locale \|\| locale === 'en'\) return basePath;\s*return basePath\.replace\(\/\\\.md\$\/, `\.\$\{locale\}\.md`\);/);
+    // Fetch the localized file first; on a missing/unfetchable localized file, fall back to the English base.
+    const fetcher = app.slice(app.indexOf('async function fetchLocalizedDocMarkdown('), app.indexOf('async function fetchLocalizedDocMarkdown(') + 700);
+    expect(fetcher).toMatch(/const localizedPath = localizedDocPath\(basePath, locale\)/);
+    expect(fetcher).toMatch(/if \(localized\.ok\) return await localized\.text\(\)/);
+    expect(fetcher).toMatch(/const response = await fetch\(basePath, \{ cache: 'no-store' \}\)/);
+    // selectDoc caches per (doc, locale) and reads currentLocale so a language switch serves the right translation.
+    expect(app).toMatch(/const locale = currentLocale\(\);\s*const cacheKey = `\$\{doc\.id\}:\$\{locale\}`;/);
+    expect(app).toMatch(/markdown = await fetchLocalizedDocMarkdown\(doc\.path, locale\)/);
+  });
+
   it('PWA-DISCOVERY-01: newcomer discovery — bounded head-of-log scan, described-channel cards, follow flow', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -6222,11 +6236,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v786/);
+    expect(sw).toMatch(/platho-pwa-prototype-v787/);
     expect(sw).toMatch(/\.\/styles\.css\?v=243/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=714/);
+    expect(sw).toMatch(/\.\/app\.js\?v=715/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
