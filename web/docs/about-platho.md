@@ -1,25 +1,17 @@
 # About Platho
 
-Platho is a communication app for people who are done depending on someone else's infrastructure for basic digital life: messages, identity, profile, history, and access to their own funds.
+Private correspondence is a right, not a privilege. So is speaking freely. Platho is built to make both real — in a place where no one can quietly take them away.
 
-The ordinary internet is built too comfortably for the people who control it. An account can be closed. Access can be limited. History can be deleted. Rules can be changed after users have already moved part of their lives into a platform. The user is not an owner there. The user is a tenant who exists for as long as the platform allows it.
+A sealed letter used to be no one's business but the two people writing it. Online, that stopped being true. Conversations moved onto other people's servers, where they can be read, handed over, throttled, or erased — and where the rules can change without asking you. Platho is built the other way around.
 
-Platho is built against that model.
+**Your words stay yours.** Private messages are end-to-end and postquantum encrypted — readable only by you and the person you are writing to. No server, no operator, and no government, court, or law can open them, because there is no central place where your conversations sit in the open, and no one but you holds the keys.
 
-Core actions in Platho are anchored by the user's wallet and executed through open smart contracts. The wallet remains the root of control, while routine app activity can run through the Vault and signed commands instead of exposing the wallet directly every time. That does not make the system perfect. It removes the central defect of ordinary platforms: the hidden ability to rewrite the rules, cut off access, or take control of what should belong to the user.
+**No one can flip a switch on you.** There is no central gateway to block, no company inbox to subpoena, no server whose policy changes next week. Platho runs directly from your device over an open public network, so no operator stands between you and the people you talk to — and there is no single point where anyone can impose censorship.
 
-Private messages are anchored on-chain as encrypted capsule entries. The heavy encrypted body is carried in the accepted TON transaction body, recovered from accepted TON transaction history, and verified against CapsuleHub hashes, so availability depends on provider history coverage and the user's local encrypted cache. Public messages, profiles, and names use verifiable contract state instead of a closed database. That reduces dependence on a server, an operator, and whatever policy happens to be convenient this week.
+**Speech that cannot be quietly erased.** Your public posts live on open, verifiable state, not in a private database that can be rewritten or wiped to make something disappear. Anything you post in public stays public — no one, not even you, can delete it or change it afterward.
 
-Platho does not hide the cost of this architecture. The blockchain is public. Operations cost money. User mistakes can be irreversible. A lost seed phrase cannot be recovered through support, and Platho is not a permanent archive: compact capsule entries can be pruned after the retention window, while old body retrieval depends on provider history or the user's local cache. This is a hard model.
+**You are the owner, not a tenant.** Your identity, your messages, your name, and your funds are anchored to your own wallet — not to an account that someone else can close, suspend, or empty. Nothing behind Platho gives anyone a hidden switch to seize your balance, freeze you, or silence you.
 
-The personal wallet and the Vault are separated. The wallet remains the root of control: it deposits and withdraws funds, and it controls keys. The Vault is a protective contract layer between the wallet and the public network. The user moves a limited amount of GRAM/ATH into the Vault, and publishing, protocol payments, and other app operations run through internal balances and signed commands. This reduces direct wallet exposure on-chain and limits how much value is exposed to routine app activity.
+This freedom comes with real responsibility. You hold your own keys: a lost recovery phrase cannot be restored by support, and actions on an open network are permanent and cost real money. Platho is a tool that returns control over your private life, your speech, and your money to the person they belong to.
 
-ATH is the protocol utility token. It is used for usernames, avatar updates, and post-airdrop protocol-fee discounts. Its role is tied to actual use inside the app.
-
-ATH is designed for system participants. A meaningful share of the supply is distributed through user activity rather than through a closed allocation to early addresses. That makes the economy less dependent on a narrow holder set and more connected to real network usage.
-
-Platho has no hidden administrative control over user balances. The contracts do not give anyone an arbitrary admin switch to seize other people's funds, rewrite balances, pause user operations, or upgrade the protocol rules. V1 still has narrow documented launch authorities: genesis binding and seal, the post-pool BuybackBurn route freeze, the post-pool MarketStabilitySeller pricing freeze, and the one-way FeeAccumulator buyback split enable after preflight.
-
-The point is simple: digital life should not depend on platform permission. Messages, username, profile, and funds should belong to the user as much as a real system can make that true.
-
-Platho is not trying to be a comfortable cage. It is trying to be a tool where control over basic digital things returns to the person using it, not to whoever controls the server, the database, or the access rules.
+Private correspondence is a right. Free speech is a right. Platho exists so that no server, no operator, and no censor gets to decide otherwise.
