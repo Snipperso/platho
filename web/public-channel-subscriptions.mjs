@@ -455,6 +455,10 @@ export function normalizeChannelProfile(value) {
     entryId: nonEmptyString(String(value.entryId ?? '')),
     createdAtSec: toInt(value.createdAtSec ?? value.created_at_sec),
     fetchedAt: toInt(value.fetchedAt),
+    // ownerUsername = the self-declared .ath CLAIM from the profile block (never displayed on its own).
+    // verifiedUsername = the claim AFTER on-chain registry proof (owner == author wallet) — the only one shown.
+    ownerUsername: typeof value.ownerUsername === 'string' ? value.ownerUsername : '',
+    verifiedUsername: typeof value.verifiedUsername === 'string' ? value.verifiedUsername : '',
   };
 }
 

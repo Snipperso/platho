@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=710" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=711" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4529,7 +4529,26 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/content = encodeProfileBlockContent\(block\);/);
     expect(app).toMatch(/const profile = decodeProfileBlockContent\(content\);\s*if \(profile\) blocks\.push\(\{ type: 'profile', \.\.\.profile \}\);/);
     // Imported from the policy module (bumped ?v in lockstep with the codec change).
-    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*\} from '\.\/capsule-part-policy\.mjs\?v=6';/);
+    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*\} from '\.\/capsule-part-policy\.mjs\?v=7';/);
+  });
+
+  it('PWA-PROFILE-USERNAME-01: channel .ath username is claimed in the profile, verified on-chain, and only the verified name is shown', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // PUBLISH: the channel embeds the wallet's OWN linked .ath (safe canonicalUsernameDisplay, never throwing normalizeUsernameInput).
+    expect(app).toMatch(/const linkedLabel = readLinkedPlathoUsername\(plathoWallet\?\.address\)\?\.label \?\? '';\s*const ownerUsername = linkedLabel \? canonicalUsernameDisplay\(linkedLabel\) : '';/);
+    expect(app).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername \}\]\)/);
+    // READ: readProfileDocument carries the claim through (the sole funnel for every chain read path).
+    expect(app).toMatch(/ownerUsername: typeof profile\.ownerUsername === 'string' \? profile\.ownerUsername : '',/);
+    // ANTI-IMPERSONATION: publicAuthorLabel shows ONLY the registry-verified name, NEVER the raw ownerUsername claim.
+    const label = app.slice(app.indexOf('function publicAuthorLabel('), app.indexOf('function publicAuthorLabel(') + 700);
+    expect(label).toMatch(/publicChannelProfileCache\[channelProfileCacheKey\(wallet\)\]\?\.verifiedUsername/);
+    expect(label).not.toMatch(/\.ownerUsername/); // the raw claim is never read by the label
+    // VERIFY: tolerant parse (no throw on hostile claims) + only strip a name on a PROVEN definitive cached-null mismatch.
+    const verify = app.slice(app.indexOf('function verifyChannelUsernameClaim('), app.indexOf('function verifyChannelUsernameClaim(') + 1700);
+    expect(verify).toMatch(/try \{ identity = plathoUsernameIdentity\(claimedName\); \} catch \{ identity = null; \}/);
+    expect(verify).not.toMatch(/normalizeUsernameInput\(/); // the throwing normalizer must not be on this untrusted path
+    expect(verify).toMatch(/verifiedPlathoUsernameOwnerCache\.get\(`\$\{identity\.value\}:\$\{rawWallet\}`\)/);
+    expect(verify).toMatch(/if \(cached && cached\.value === null\) applyVerifiedChannelUsername\(key, ''\)/);
   });
 
   it('PWA-DISCOVERY-01: newcomer discovery — bounded head-of-log scan, described-channel cards, follow flow', () => {
@@ -6144,11 +6163,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v781/);
+    expect(sw).toMatch(/platho-pwa-prototype-v782/);
     expect(sw).toMatch(/\.\/styles\.css\?v=241/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=710/);
+    expect(sw).toMatch(/\.\/app\.js\?v=711/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=18/);
@@ -6162,7 +6181,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=55/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=16/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
