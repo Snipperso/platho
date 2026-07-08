@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v721';
+const PLATHO_APP_RUNTIME_VERSION = 'v722';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -689,6 +689,31 @@ const localStateLabel = document.querySelector('#localStateLabel');
 const networkRuntimeLabel = document.querySelector('#networkRuntimeLabel');
 const appVersionLabel = document.querySelector('#appVersionLabel');
 const profileVersionLabel = document.querySelector('#profileVersionLabel');
+// Tap the build badge to copy a private-thread diagnostic to the clipboard (own wallet + every dialog's id,
+// primary/Saved flag, wallet variants, message count) — the on-device way to capture the exact routing state on
+// a webview where the console is out of reach. Read-only; the user pastes it back voluntarily.
+function copyPrivateThreadDiagnostic() {
+  try {
+    const own = ownRuntimeWalletRaw();
+    const dump = {
+      version: PLATHO_APP_RUNTIME_VERSION,
+      own,
+      threads: (threads ?? []).filter((thread) => !thread.publicChannelId).map((thread) => ({
+        id: thread.id,
+        name: thread.name ?? null,
+        isSaved: isSavedMessagesThread(thread),
+        primaryRaw: threadPrimaryWalletRaw(thread),
+        wallets: threadIdentityVariants(thread)
+          .filter((variant) => variant?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS)
+          .map((variant) => { try { return rawWalletAddress(variant.value); } catch { return String(variant.value); } }),
+        msgs: (thread.messages ?? []).length,
+      })),
+    };
+    copyTextToClipboard(JSON.stringify(dump, null, 1)).then(() => flashWalletIdentityStatus('diag copied')).catch(() => {});
+  } catch (error) { console.error(error); }
+}
+appVersionLabel?.addEventListener('click', copyPrivateThreadDiagnostic);
+profileVersionLabel?.addEventListener('click', copyPrivateThreadDiagnostic);
 
 let threads = [];
 let customPublicChannels = [];
@@ -10342,23 +10367,50 @@ function ensureSavedMessagesThread() {
 // own-wallet dm id) wrongly carrying the peer's wallet variant — the peer variant is stripped off Saved and the
 // caller re-resolves to (or creates) the real peer dialog. A PEER dialog wrongly carrying the OWN wallet variant
 // is stripped in place and returned (it IS the peer's dialog; it just must stop looking like "My notes").
+// The wallet a dialog is REALLY about = its PRIMARY (creation) identity, parsed from the immutable thread id
+// (dm:wallet_address:<value>). Compared raw-normalized so a stored EQ/UQ/raw form NEVER fools us — the earlier
+// string-id / string-key comparison silently failed when the address was stored in a different friendly form than
+// displayWalletAddress() produces, which is exactly why a poisoned Saved thread was mis-identified and never healed.
+function threadPrimaryWalletRaw(thread) {
+  const match = /^dm:wallet_address:(.+)$/.exec(String(thread?.id ?? ''));
+  if (match) {
+    try { return rawWalletAddress(decodeURIComponent(match[1])); } catch { /* fall through */ }
+  }
+  const identity = thread?.identity;
+  if (identity?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) {
+    try { return rawWalletAddress(identity.value); } catch { /* fall through */ }
+  }
+  return null;
+}
+
+// Remove EVERY wallet_address variant of `thread` whose wallet == walletRaw, in ANY friendly form (raw-normalized
+// match, not by identity-key string — a grafted variant can be UQ/EQ/raw). Never touches the id-derived PRIMARY
+// (callers only ever strip a NON-primary grafted wallet). Returns true if anything was removed.
+function stripWalletVariantFromThread(thread, walletRaw) {
+  const matches = (variant) => {
+    if (variant?.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) return false;
+    try { return rawWalletAddress(variant.value) === walletRaw; } catch { return false; }
+  };
+  const current = threadIdentityVariants(thread);
+  if (!current.some(matches)) return false;
+  thread.identityVariants = normalizeIdentityVariants(current.filter((variant) => !matches(variant)));
+  if (thread.identity && matches(thread.identity)) thread.identity = null;
+  if (thread.displayIdentity && matches(thread.displayIdentity) && !thread.localLabel) thread.displayIdentity = null;
+  applyThreadDisplayFields(thread);
+  return true;
+}
+
 function healThreadWalletVariantConflict(thread, peerWalletRaw) {
   const own = ownRuntimeWalletRaw();
   if (!thread || !own || !peerWalletRaw || peerWalletRaw === own) return thread;
-  if (!isSavedMessagesThread(thread)) return thread; // plain peer dialog — no conflict
-  const ownVariants = privateWalletIdentityVariants(own);
-  const savedIds = new Set(ownVariants.map((variant) => `dm:${variant.type}:${encodeURIComponent(variant.value)}`));
-  if (savedIds.has(thread.id)) {
-    for (const key of privateWalletIdentityVariants(peerWalletRaw).map(identityKey)) {
-      if (key) dropThreadIdentityVariant(thread, key);
-    }
-    persistThreadDisplayPreference(thread);
+  if (!isSavedMessagesThread(thread)) return thread; // no own-wallet variant present — nothing to reconcile
+  if (threadPrimaryWalletRaw(thread) === own) {
+    // Real Saved/self thread wrongly carrying the PEER wallet → strip the peer variant, re-route the caller.
+    if (stripWalletVariantFromThread(thread, peerWalletRaw)) persistThreadDisplayPreference(thread);
     return null;
   }
-  for (const key of ownVariants.map(identityKey)) {
-    if (key) dropThreadIdentityVariant(thread, key);
-  }
-  persistThreadDisplayPreference(thread);
+  // A peer dialog wrongly carrying the OWN wallet → strip the own variant in place; it IS the peer's dialog.
+  if (stripWalletVariantFromThread(thread, own)) persistThreadDisplayPreference(thread);
   return thread;
 }
 
@@ -11198,6 +11250,9 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const retryEntryIds = [...new Set([
     ...privateBodyHistoryRetryEntryIds(address, { forceHistoryRetry: options.forceHistoryRetry === true }),
     ...privateStuckEntryRetryEntryIds(address, { forceStuckRetry: options.forceHistoryRetry === true }),
+    // One-time relocation of messages the identity-bleed heal found stuck inside "My notes" (re-open -> route to
+    // the true sender -> relocate out of Saved). Snapshot + clear now so the loop below consumes them once.
+    ...(() => { const ids = [...pendingSavedRelocateEntryIds]; pendingSavedRelocateEntryIds = new Set(); return ids; })(),
   ].map((id) => id.toString()))].map((id) => BigInt(id));
   const baseLimit = privateIndexSyncReadLimit(options);
   const limit = !canPersistPrivateIndexCursor && quickSync
@@ -12165,28 +12220,48 @@ async function writeMessageToEncryptedHistory(thread, message) {
 // exactly what got poisoned, so they cannot be trusted for this), and the Saved thread may carry NOTHING but the
 // own wallet (a dropped own .ath re-latches on next use). Rewrite the affected snapshots + clear a leaked
 // own-wallet "Display as" entry. Idempotent no-op on a clean device.
+// Chain entry ids of messages found mis-filed inside "My notes" by healCrossWalletIdentityBleed — replayed through
+// the next private scan (as a history-retry source) so they are re-opened, re-routed to the true sender's dialog,
+// and relocated out of Saved. Consumed + cleared by the scan; survives only until then.
+let pendingSavedRelocateEntryIds = new Set();
+
 function healCrossWalletIdentityBleed() {
-  const own = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  const own = ownRuntimeWalletRaw();
   if (!own) return false;
-  const ownVariants = privateWalletIdentityVariants(own);
-  const ownKeys = new Set(ownVariants.map(identityKey).filter(Boolean));
-  if (ownKeys.size === 0) return false;
-  const savedIds = new Set(ownVariants.map((variant) => `dm:${variant.type}:${encodeURIComponent(variant.value)}`));
   let healed = false;
   for (const thread of threads) {
     if (thread.publicChannelId) continue;
-    const isRealSaved = savedIds.has(thread.id);
-    const dropKeys = threadIdentityVariants(thread)
-      .map(identityKey)
-      .filter((key) => key && (isRealSaved ? !ownKeys.has(key) : ownKeys.has(key)));
-    let dropped = false;
-    for (const key of dropKeys) dropped = dropThreadIdentityVariant(thread, key) || dropped;
-    if (!dropped) continue;
-    persistThreadDisplayPreference(thread);
-    healed = true;
+    if (threadPrimaryWalletRaw(thread) === own) {
+      // The REAL Saved/self dialog: it may carry NOTHING but the own wallet. Strip every FOREIGN wallet variant
+      // (raw-normalized, any form) + any foreign display name grafted onto it.
+      const foreign = new Set();
+      for (const variant of threadIdentityVariants(thread)) {
+        if (variant?.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) continue;
+        try { const raw = rawWalletAddress(variant.value); if (raw && raw !== own) foreign.add(raw); } catch { /* skip */ }
+      }
+      let dropped = false;
+      for (const walletRaw of foreign) dropped = stripWalletVariantFromThread(thread, walletRaw) || dropped;
+      if (thread.displayIdentity && !thread.localLabel) { thread.displayIdentity = null; applyThreadDisplayFields(thread); dropped = true; }
+      if (dropped) {
+        persistThreadDisplayPreference(thread);
+        healed = true;
+        // The peer messages wrongly filed into "My notes" are still physically here — queue their chain entries so
+        // the next private scan re-opens them, routes them to the real sender's dialog, and relocates them out
+        // (a genuine self-note re-routes back to Saved: a harmless no-op).
+        for (const message of thread.messages ?? []) {
+          if (message?.chainEntryId !== undefined && message?.chainEntryId !== null) {
+            pendingSavedRelocateEntryIds.add(String(message.chainEntryId));
+          }
+        }
+      }
+    } else if (stripWalletVariantFromThread(thread, own)) {
+      // A peer dialog wrongly carrying the OWN wallet variant.
+      persistThreadDisplayPreference(thread);
+      healed = true;
+    }
   }
-  // Clear a leaked own-wallet contact-display entry regardless (Fix D's write path removes it on any own write,
-  // but a poisoned device may never write again — clear it here explicitly).
+  // Clear a leaked own-wallet contact-display entry (Fix D clears it on any own write, but a poisoned device may
+  // never write again — clear it here explicitly).
   writeContactDisplayPreference(own, null);
   return healed;
 }
