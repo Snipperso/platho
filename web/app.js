@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=18';
+} from './i18n.mjs?v=19';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -17761,7 +17761,7 @@ async function requestUsernameMintName() {
       title: t('username.mintPlathoName'),
       hint: feedback,
       tone,
-      submitLabel: t('username.reviewMint'),
+      submitLabel: t('username.createUsername'),
       fields: [{
         id: 'username',
         label: t('username.usernameLabel'),
