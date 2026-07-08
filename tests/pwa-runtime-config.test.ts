@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=718" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=719" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -6159,6 +6159,58 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/isBodyHistoryUnavailableError\(error\)[\s\S]*rememberPrivateBodyHistoryUnavailable\(address, entry, entryId\)/);
   });
 
+  it('PWA-IDENTITY-BLEED-01: cross-wallet identity bleed guards — Saved thread never lends/borrows identity, sends never fall back to it', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Root bug (owner repro 2026-07-08, fresh iPhone account): the composer's threads[0] fallback echoed an
+    // outgoing message into the Saved "My notes" thread, and the later relocate of that capsule to the real peer
+    // grafted the OWN wallet variant onto the peer dialog — flipping it to "My notes" and bleeding the peer's
+    // avatar onto the user's own "You" channel.
+    // A. No threads[0] (== Saved) fallback anywhere on the active-thread path.
+    expect(app).toMatch(/function activeThread\(\) \{[\s\S]{0,700}?return threads\.find\(\(item\) => item\.id === activeThreadId\) \?\? null;\s*\n\}/);
+    expect(app).not.toMatch(/return threads\.find\(\(item\) => item\.id === activeThreadId\) \?\? threads\[0\]/);
+    // Composer submit: resolve-or-abort, never threads[0].
+    expect(app).toMatch(/const thread = threads\.find\(\(item\) => item\.id === activeThreadId\) \?\? null;\s*\n\s*if \(!thread\) return;/);
+    expect(app).not.toMatch(/const thread = threads\.find\(\(item\) => item\.id === activeThreadId\) \?\? threads\[0\];/);
+    // The "selected thread vanished" rebuild branch shows the LIST, never threads[0].
+    expect(app).toMatch(/\} else if \(previousActive\) \{[\s\S]{0,400}?activeThreadId = null;/);
+    // B. The duplicate-dialog merge never consumes the Saved thread and carries ONLY named (non-wallet) variants.
+    const relocate = app.slice(
+      app.indexOf('function relocateExistingCapsuleMessage('),
+      app.indexOf('async function appendOpenedCapsuleMessage('),
+    );
+    expect(relocate).toMatch(/if \(!isSavedMessagesThread\(sourceThread\)\) \{/);
+    expect(relocate).toMatch(/\.filter\(\(variant\) => variant && variant\.type !== RECIPIENT_IDENTITY_TYPES\.WALLET_ADDRESS\)/);
+    // C. The own public channel derives from the own linked .ath ONLY — the own-wallet branch returns
+    // unconditionally (never falls through to the contact store / private-thread fallback).
+    const ownDisplay = app.slice(
+      app.indexOf('function resolveWalletChannelDisplay('),
+      app.indexOf('const explicit = resolveContactDisplay(counterpartyWallet);'),
+    );
+    expect(ownDisplay).toMatch(/return ownIdentity\s*\n\s*\? \{ name: displayIdentityLabel\(ownIdentity\), tone: identityTone\(ownIdentity\), identity: ownIdentity, localLabel: null \}\s*\n\s*: null;/);
+    // D. No contact-display preference is ever stored for the OWN wallet (write path refuses + clears).
+    const writePref = app.slice(
+      app.indexOf('function writeContactDisplayPreference('),
+      app.indexOf('function resolveContactDisplay('),
+    );
+    expect(writePref).toMatch(/if \(own && sameWalletAddress\(counterpartyWallet, own\)\) \{[\s\S]{0,200}?removeItem\(key\)/);
+    // ...and the Saved thread never hydrates a display from the per-counterparty store.
+    const hydrate = app.slice(
+      app.indexOf('function hydrateThreadDisplayFromContactStore('),
+      app.indexOf('function setIdentityLabel('),
+    );
+    expect(hydrate).toMatch(/if \(own && sameWalletAddress\(wallet, own\)\) \{ thread\.contactDisplaySynced = true; return false; \}/);
+    // E. Devices poisoned BEFORE the fix self-heal on history restore: the own-wallet variant may live ONLY on the
+    // real Saved thread, the Saved thread carries nothing but the own wallet, and the healed snapshots are rewritten.
+    expect(app).toMatch(/function healCrossWalletIdentityBleed\(\) \{/);
+    const heal = app.slice(
+      app.indexOf('function healCrossWalletIdentityBleed('),
+      app.indexOf('async function restoreEncryptedMessageHistory('),
+    );
+    expect(heal).toMatch(/isRealSaved \? !ownKeys\.has\(key\) : ownKeys\.has\(key\)/);
+    expect(heal).toMatch(/persistThreadDisplayPreference\(thread\)/);
+    expect(app).toMatch(/if \(healCrossWalletIdentityBleed\(\)\) changed = true;/);
+  });
+
   it('PWA-PUBLIC-PRIVATE-UI-01: public/private UI fixes — tab-restore, info-button, feed overflow/uid, self-post, self-dialog, display-as', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
@@ -6248,11 +6300,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v793/);
+    expect(sw).toMatch(/platho-pwa-prototype-v794/);
     expect(sw).toMatch(/\.\/styles\.css\?v=245/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=718/);
+    expect(sw).toMatch(/\.\/app\.js\?v=719/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
