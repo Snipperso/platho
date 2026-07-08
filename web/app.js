@@ -4963,12 +4963,14 @@ async function selectDoc(docId) {
   if (docsLead) docsLead.textContent = t('docs.lead');
   setDocsStatus(t('docs.loading'));
   try {
-    let markdown = docsCache.get(doc.id);
+    // Docs are localized: cache per (doc, locale) so switching language serves the right translation. The main-app
+    // language switch reloads the whole page (appLanguageSelect), so an open doc reopens in the new locale for free.
+    const locale = currentLocale();
+    const cacheKey = `${doc.id}:${locale}`;
+    let markdown = docsCache.get(cacheKey);
     if (!markdown) {
-      const response = await fetch(doc.path, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Document fetch failed: ${response.status}`);
-      markdown = await response.text();
-      docsCache.set(doc.id, markdown);
+      markdown = await fetchLocalizedDocMarkdown(doc.path, locale);
+      docsCache.set(cacheKey, markdown);
     }
     renderMarkdownToNode(markdown, docsContent);
     docsContent.scrollTop = 0;
@@ -4976,6 +4978,28 @@ async function selectDoc(docId) {
     console.error(error);
     setDocsStatus(t('docs.unavailable'), 'error');
   }
+}
+
+// Docs ship an English base (<name>.md) plus per-locale siblings (<name>.<locale>.md). English uses the base path.
+function localizedDocPath(basePath, locale) {
+  if (!locale || locale === 'en') return basePath;
+  return basePath.replace(/\.md$/, `.${locale}.md`);
+}
+
+// Load the current locale's doc, falling back to the English base when the locale IS English or its localized file
+// is missing/unfetchable (a language without a translated doc yet degrades to English instead of erroring). The
+// English base is SW-precached, so this fallback also keeps docs available offline in any language.
+async function fetchLocalizedDocMarkdown(basePath, locale) {
+  const localizedPath = localizedDocPath(basePath, locale);
+  if (localizedPath !== basePath) {
+    try {
+      const localized = await fetch(localizedPath, { cache: 'no-store' });
+      if (localized.ok) return await localized.text();
+    } catch { /* network/missing → fall through to the English base */ }
+  }
+  const response = await fetch(basePath, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Document fetch failed: ${response.status}`);
+  return await response.text();
 }
 
 function appendInlineMarkdown(parent, text) {

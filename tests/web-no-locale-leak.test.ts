@@ -22,6 +22,14 @@ const I18N_DICTIONARY_FILE = 'i18n-strings.mjs';
 // Cyrillic + Cyrillic Supplement; the only locale we actually risk leaking.
 const CYRILLIC = /[Ѐ-ӿԀ-ԯ]/;
 
+// Localized documentation (v715): the About / ATH / Crypto docs ship an English base (`<name>.md`) plus a per-locale
+// sibling `<name>.<locale>.md` for each of the nine non-English UI languages. Like the i18n dictionary, these are
+// DELIBERATELY multilingual (Russian is one of ten equal languages), so they are exempt from the Cyrillic scan —
+// the anti-"ru is more loved" invariant moves to FILE PARITY (OPSEC-LOCALE-02): every base doc must exist in EVERY
+// locale, so no single language is more complete than another.
+const NON_EN_LOCALES = ['ru', 'zh', 'es', 'pt', 'fr', 'de', 'hi', 'id', 'ja'] as const;
+const LOCALIZED_DOC = new RegExp(`^docs/[^/]+\\.(${NON_EN_LOCALES.join('|')})\\.md$`);
+
 const toPosix = (p: string): string => p.replace(/\\/g, '/');
 
 function walk(dir: string): string[] {
@@ -42,6 +50,7 @@ describe('shipped PWA leaks no developer locale', () => {
       const rel = toPosix(relative(WEB_ROOT, abs));
       if (!shouldIncludeWebRuntimeFile(rel)) continue; // only inspect what actually ships
       if (rel === I18N_DICTIONARY_FILE) continue; // the locale dictionaries — parity-guarded instead
+      if (LOCALIZED_DOC.test(rel)) continue; // localized docs — parity-guarded (OPSEC-LOCALE-02), like the dictionary
       if (!TEXT_EXTENSIONS.has(extname(abs).toLowerCase())) continue; // skip binaries
 
       const src = readFileSync(abs, 'utf8');
@@ -54,5 +63,24 @@ describe('shipped PWA leaks no developer locale', () => {
     }
 
     expect(offenders, `Cyrillic text found in shipped runtime files:\n${offenders.join('\n')}`).toEqual([]);
+  });
+
+  it('OPSEC-LOCALE-02: every doc is translated into all locales (parity — no language more complete than another)', () => {
+    const docsDir = join(WEB_ROOT, 'docs');
+    const allMd = readdirSync(docsDir).filter((name) => name.endsWith('.md'));
+    const localeSuffix = new RegExp(`\\.(${NON_EN_LOCALES.join('|')})\\.md$`);
+    const baseDocs = allMd.filter((name) => !localeSuffix.test(name)); // the English base docs
+    expect(baseDocs.length, 'expected at least one English base doc under web/docs').toBeGreaterThan(0);
+
+    const missing: string[] = [];
+    for (const base of baseDocs) {
+      for (const locale of NON_EN_LOCALES) {
+        const localized = base.replace(/\.md$/, `.${locale}.md`);
+        let ok = false;
+        try { ok = readFileSync(join(docsDir, localized), 'utf8').trim().length > 0; } catch { ok = false; }
+        if (!ok) missing.push(`docs/${localized}`);
+      }
+    }
+    expect(missing, `missing or empty localized docs (every base doc must exist in every locale):\n${missing.join('\n')}`).toEqual([]);
   });
 });
