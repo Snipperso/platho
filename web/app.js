@@ -629,7 +629,6 @@ const publicFeed = document.querySelector('#publicFeed');
 const publicChannelSearchRow = document.querySelector('#publicChannelSearchRow');
 const publicChannelSearch = document.querySelector('#publicChannelSearch');
 const editChannelProfileButton = document.querySelector('#editChannelProfileButton');
-const publicDiscoverButton = document.querySelector('#publicDiscoverButton');
 const publicDiscovery = document.querySelector('#publicDiscovery');
 const publicDiscoveryBody = document.querySelector('#publicDiscoveryBody');
 const publicDiscoveryBackButton = document.querySelector('#publicDiscoveryBackButton');
@@ -3874,7 +3873,7 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
     if (isOwn) {
       const editButton = document.createElement('button');
       editButton.type = 'button';
-      editButton.className = 'ghost-button channel-about-edit';
+      editButton.className = 'discovery-cta-action channel-about-edit';
       editButton.textContent = (description || tags.length > 0) ? t('public.editDescription') : t('public.addDescription');
       editButton.addEventListener('click', () => {
         hideIdentityPopover();
@@ -16214,9 +16213,6 @@ editChannelProfileButton?.addEventListener('click', () => {
   openEditChannelProfileDialog().catch((error) => console.error(error));
 });
 
-publicDiscoverButton?.addEventListener('click', () => {
-  openPublicDiscovery().catch((error) => console.error(error));
-});
 publicDiscoveryBackButton?.addEventListener('click', () => closePublicDiscovery());
 
 // Add-a-known-channel dialog (identity -> local registry row). Reached from the feed-top plate button — the

@@ -14,4 +14,4 @@ Ein versiegelter Brief ging einst niemanden etwas an außer den beiden Menschen,
 
 Diese Freiheit bringt echte Verantwortung mit sich. Sie halten Ihre eigenen Schlüssel: Eine verlorene Wiederherstellungsphrase kann vom Support nicht wiederhergestellt werden, und Handlungen in einem offenen Netzwerk sind endgültig und kosten echtes Geld. Platho ist ein Werkzeug, das die Kontrolle über Ihr Privatleben, Ihre Meinungsäußerung und Ihr Geld an die Person zurückgibt, der sie gehören.
 
-Private Korrespondenz ist ein Recht. Freie Meinungsäußerung ist ein Recht. Platho existiert, damit kein Server, kein Betreiber und kein Zensor darüber entscheiden darf.
+Diese gehören Ihnen von Rechts wegen, nicht mit der Erlaubnis von irgendjemandem. Platho existiert, damit kein Server, kein Betreiber und kein Zensor anders darüber entscheiden kann.

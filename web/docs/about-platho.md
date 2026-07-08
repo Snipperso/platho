@@ -14,4 +14,4 @@ A sealed letter used to be no one's business but the two people writing it. Onli
 
 This freedom comes with real responsibility. You hold your own keys: a lost recovery phrase cannot be restored by support, and actions on an open network are permanent and cost real money. Platho is a tool that returns control over your private life, your speech, and your money to the person they belong to.
 
-Private correspondence is a right. Free speech is a right. Platho exists so that no server, no operator, and no censor gets to decide otherwise.
+These are yours by right, not by anyone's permission. Platho exists so that no server, no operator, and no censor gets to decide otherwise.

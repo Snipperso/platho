@@ -14,4 +14,4 @@ Une lettre scellée ne regardait autrefois que les deux personnes qui l'écrivai
 
 Cette liberté s'accompagne d'une véritable responsabilité. Vous détenez vos propres clés : une phrase de récupération perdue ne peut pas être restaurée par le support, et les actions sur un réseau ouvert sont permanentes et coûtent de l'argent réel. Platho est un outil qui rend le contrôle de votre vie privée, de votre parole et de votre argent à la personne à qui ils appartiennent.
 
-La correspondance privée est un droit. La liberté de parole est un droit. Platho existe pour qu'aucun serveur, aucun opérateur et aucun censeur ne puisse en décider autrement.
+Ces droits vous reviennent de plein droit, et non par la permission de quiconque. Platho existe pour qu'aucun serveur, aucun opérateur et aucun censeur ne puisse en décider autrement.

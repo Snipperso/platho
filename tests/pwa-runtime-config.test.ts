@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=715" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=716" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4592,6 +4592,12 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-CHANNEL-PROFILE-COST-01: the channel-description dialog shows the GRAM publish cost like the mint/avatar modals', () => {
     const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // The channel-about popover "Add/Edit description" button uses the shared plate-CTA (owner: same style as "Add
+    // channel"); .channel-about-edit is now only the popover top-spacing modifier, not its own ghost-button look.
+    expect(app).toMatch(/editButton\.className = 'discovery-cta-action channel-about-edit'/);
+    expect(css).toMatch(/\.channel-about-edit \{[^}]*margin-top: 8px;[^}]*\}/);
+    expect(css).not.toMatch(/\.channel-about-edit \{[^}]*background: transparent/);
     // Estimator mirrors estimatedProfileAvatarTonFeeNanotons but for the PROFILE document (no extra Vault charge — a
     // channel profile is a plain public post): encode the SAME bytes publishChannelProfile does → split → price batch.
     const est = app.slice(app.indexOf('function estimatedChannelProfileHoldNanotons('), app.indexOf('function estimatedChannelProfileHoldNanotons(') + 800);
@@ -4636,7 +4642,8 @@ describe('PWA runtime config guard', () => {
     // Follow registers the previously-unknown channel THEN subscribes it (ensure rebuilds the registry first).
     expect(app).toMatch(/const channelId = ensurePublicChannelForAuthorWallet\(authorWallet, \{ activate: false \}\);\s*setPublicChannelSubscribed\(channelId, true\);/);
     // UI: header entry button + discovery panel + the feed-top channels plate.
-    expect(html).toMatch(/id="publicDiscoverButton"/);
+    // Header compass discover button removed (owner: redundant with the feed-top CTA plate "Find channels").
+    expect(html).not.toMatch(/id="publicDiscoverButton"/);
     expect(html).toMatch(/id="publicDiscovery"/);
     // v701 header consistency: the discovery header carries the STANDARD chrome (install + docs + sync
     // indicator) like every other screen, and both public overlays bleed SIDES ONLY — the old -24px top
@@ -6236,11 +6243,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v789/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=243/);
+    expect(sw).toMatch(/platho-pwa-prototype-v790/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=244/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=715/);
+    expect(sw).toMatch(/\.\/app\.js\?v=716/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
