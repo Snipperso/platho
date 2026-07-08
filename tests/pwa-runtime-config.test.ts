@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=716" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=717" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -6224,6 +6224,11 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.feed-author-about \{[\s\S]*?margin-left: auto;[\s\S]*?padding: 0;/);
     expect(css).toMatch(/\.feed-author-identity \{(?:(?!margin-left)[\s\S])*?padding: 0;\s*\}/);
     expect(css).not.toMatch(/\.feed-actions \.icon-button/);
+    // The post-plate channel-about button uses a distinct speech-bubble glyph (createChannelAboutIcon), NOT the (i)
+    // info circle the Docs header button uses (owner: the same icon must not sit on two different buttons).
+    expect(app).toMatch(/function createChannelAboutIcon\(\)/);
+    expect(app).toMatch(/aboutButton\.append\(createChannelAboutIcon\(\)\)/);
+    expect(app).not.toMatch(/createInfoIcon/);
     // 6B-own. The user's OWN .ath shows in their own public channel (local, no chain read). Resolved FIRST and via
     // the stored address (so it works before the wallet loads and isn't shadowed by a stray self-entry in the store).
     expect(app).toMatch(/const ownAddress = plathoWallet\?\.address \?\? storedPlathoWalletRecord\(\)\?\.address \?\? null/);
@@ -6243,11 +6248,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v790/);
+    expect(sw).toMatch(/platho-pwa-prototype-v791/);
     expect(sw).toMatch(/\.\/styles\.css\?v=244/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=716/);
+    expect(sw).toMatch(/\.\/app\.js\?v=717/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
