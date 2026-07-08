@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v720';
+const PLATHO_APP_RUNTIME_VERSION = 'v721';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -688,6 +688,7 @@ const walletRuntimeLabel = document.querySelector('#walletRuntimeLabel');
 const localStateLabel = document.querySelector('#localStateLabel');
 const networkRuntimeLabel = document.querySelector('#networkRuntimeLabel');
 const appVersionLabel = document.querySelector('#appVersionLabel');
+const profileVersionLabel = document.querySelector('#profileVersionLabel');
 
 let threads = [];
 let customPublicChannels = [];
@@ -7043,6 +7044,9 @@ function renderConfiguredShell() {
   const ui = appConfig.ui ?? {};
   setText(brandNetworkLabel, ui.brandNetworkLabel ?? appConfig.network?.label ?? appConfig.mode);
   setText(appVersionLabel, PLATHO_APP_RUNTIME_VERSION);
+  // Mirror on the Profile pane: the rail (and its badge) is hidden on the narrow mobile / TG Mini App layout,
+  // and TMA webviews cache hard — the Profile badge is the on-device way to verify which build is running.
+  setText(profileVersionLabel, PLATHO_APP_RUNTIME_VERSION);
   renderPaneHeaders();
   setText(identityName, ui.identityName);
   setText(identitySubtitle, ui.identitySubtitle);

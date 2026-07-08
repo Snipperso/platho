@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v795';
+const CACHE_NAME = 'platho-pwa-prototype-v796';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=245',
-  './app.js?v=720',
+  './app.js?v=721',
   './i18n.mjs?v=19',
   './i18n-strings.mjs?v=19',
   './boot-signal-field.mjs?v=1',
@@ -160,8 +160,15 @@ async function navigationResponse(event) {
   // over a stale cached shell, but time-bounded so a slow or partially
   // filtered network cannot hang the page on a blank screen: fall back to the
   // cached shell instead of spinning forever.
+  // cache:'no-cache' is LOAD-BEARING: a plain fetch(request) is answered by the
+  // browser's HTTP cache first, and the server sends NO Cache-Control on the
+  // shell — so webviews (worst: Telegram Mini App) heuristically served a STALE
+  // index.html (old ?v= asset URLs) for hours without ever asking the network,
+  // and devices kept running old builds despite "network-first". no-cache
+  // forces a conditional revalidation (ETag -> cheap 304, or the fresh shell).
   try {
-    const response = await fetchWithTimeout(event.request, NAVIGATION_NETWORK_TIMEOUT_MS);
+    const shellRequest = new Request(event.request.url, { cache: 'no-cache', credentials: 'same-origin' });
+    const response = await fetchWithTimeout(shellRequest, NAVIGATION_NETWORK_TIMEOUT_MS);
     return await cacheSameOrigin(appShellCacheRequest(), response);
   } catch (error) {
     return await cachedAppShell() || Response.error();
