@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-08T10:33:47.490Z",
+  "generatedAt": "2026-07-08T14:12:39.251Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 166,
-    "totalBytes": 5350453,
-    "bundleSha256": "d62e48f6e080ae90dec1818f68f83b9f6393cd09a414289f526375d6fb9a0ec8",
+    "totalBytes": 5301831,
+    "bundleSha256": "edc574202b8c860aa351584de93dce991d76edb02570b732d940e941ba3d5717",
     "files": [
       {
         "path": "app.js",
@@ -214,153 +214,153 @@
       },
       {
         "path": "docs/about-platho.de.md",
-        "bytes": 4641,
-        "sha256": "b3805a8ed614cab64160d6c890a5ba51ae010ab584957e92024be9cf983837a8"
+        "bytes": 2816,
+        "sha256": "bb354b085b2a30d510eb1f7976126f5d9fe19ee7cb02c7e7538a1b071381d6a0"
       },
       {
         "path": "docs/about-platho.es.md",
-        "bytes": 4618,
-        "sha256": "4faff5b76b0a0bb88cc61492786335475409baa8da6c5dd95ac788337c384ab7"
+        "bytes": 2670,
+        "sha256": "3d22576f4dc3a0b5fcfd8f78dfa30e217494bb5a80dfed285cd0cf8f06772f51"
       },
       {
         "path": "docs/about-platho.fr.md",
-        "bytes": 4968,
-        "sha256": "c63cc5233cc429aa15eb3410e7c7292ea6fbe27b64ad5909cf0770a32aba4a2b"
+        "bytes": 2827,
+        "sha256": "e61a095f576e8059688c16e16c37a99e4f1d833c7a3c7060bdc29e870467d863"
       },
       {
         "path": "docs/about-platho.hi.md",
-        "bytes": 10430,
-        "sha256": "41d709526a7202b5670107e1445c70ee0322c5adf1db3695bc719706203af634"
+        "bytes": 6185,
+        "sha256": "401270c4da2c9fd3f3fdba0cb92f111029fa6c37169860d7ffce69472f151d59"
       },
       {
         "path": "docs/about-platho.id.md",
-        "bytes": 4230,
-        "sha256": "49b7bf903d03f161bfac1061a1adc9bf62e32747e985c638bbe2f9419939c839"
+        "bytes": 2777,
+        "sha256": "883b62c6241b3519db9204b010c8ca50f46e32d7d04c8e721f50595e6a30f66d"
       },
       {
         "path": "docs/about-platho.ja.md",
-        "bytes": 5897,
-        "sha256": "5f0e12aa0dc8cf005b080b3a9656f1de804eedf1c136bf9847622d7a6651fb7a"
+        "bytes": 3627,
+        "sha256": "040d8904c16868897081c530a1ce6830352c04b848c955de916cf6d47c4de49c"
       },
       {
         "path": "docs/about-platho.md",
-        "bytes": 3797,
-        "sha256": "83bdb0bf0858df7581c6b933a4d02e64edc72a3b0b67b14bb933c77d92f72461"
+        "bytes": 2203,
+        "sha256": "67dcec67d1e9885306cd5f8bcdd98cab4f8a2dc30d81f0235d11a972db565a5a"
       },
       {
         "path": "docs/about-platho.pt.md",
-        "bytes": 4523,
-        "sha256": "324ee2a416557f3c058606e56a4febcdfec66cc02fab8456ca771feb1cf7dcc2"
+        "bytes": 2672,
+        "sha256": "8dd388dcd0cd9ea0cbf53dca82e9b22eebddfc16173550f3db4473c450daecc7"
       },
       {
         "path": "docs/about-platho.ru.md",
-        "bytes": 7502,
-        "sha256": "090aec96cc2f918e62293f0ff05ab548dc3e60b369852cc92a42329adb73f368"
+        "bytes": 4133,
+        "sha256": "ce853616a2d5f3e61d43f4b583bd758e99b4227cf192f9ecac15fbef51f64aef"
       },
       {
         "path": "docs/about-platho.zh.md",
-        "bytes": 3637,
-        "sha256": "e9f166071bb314a52b0af2c93482eed437289dd070b17cb95ba8852f17b00010"
+        "bytes": 2509,
+        "sha256": "7ec5d6164f698a27ed029cf90bf37a2b6a1c5878a26e10482f47ba5088a0e34a"
       },
       {
         "path": "docs/ath-whitepaper.de.md",
-        "bytes": 32658,
-        "sha256": "258ec92e132d66d84164170953837fd720f5025275e55409b6436b9ca61c1153"
+        "bytes": 31562,
+        "sha256": "3659ca8c3ed5ca543a3123a63edce53a0847275092f81b99f8548940c8c3b61f"
       },
       {
         "path": "docs/ath-whitepaper.es.md",
-        "bytes": 33093,
-        "sha256": "67c14d5e9dc7e81b0d771f3ad126e020ae567a9e133b1164320f4c52aa4011c3"
+        "bytes": 32284,
+        "sha256": "d367fc548292c0aaa22fa28ac33a77a3852567ca6b1e3b75eabfe7a773e1bf60"
       },
       {
         "path": "docs/ath-whitepaper.fr.md",
-        "bytes": 34229,
-        "sha256": "2912495be75d4a8eb93100668282a3a9ebbb3141ccc3567a01b6589beb60cdc8"
+        "bytes": 32988,
+        "sha256": "ae38f0de223ac8dcb6a3e05b140b2cff9a3bd2f533780994f1b7fa80dcc649ee"
       },
       {
         "path": "docs/ath-whitepaper.hi.md",
-        "bytes": 64934,
-        "sha256": "ee0495a1cf6e958acb4004d2761dc98141c96376adfe3dfc69495c16e6b1ae11"
+        "bytes": 62283,
+        "sha256": "15df1c8bdcff59627b61c4c4109190b2a45f79d20c807bece9047ca24a410f2d"
       },
       {
         "path": "docs/ath-whitepaper.id.md",
-        "bytes": 29195,
-        "sha256": "d7c8623ca2d3f6f94fc43cf18ba7e084fdea11ecdeddc6dbc6374893c7cade6f"
+        "bytes": 28532,
+        "sha256": "1ad09b4ca54b2f582256dcd2b10d4ec646dbf3ff8e9cf9c3263a91adcffb9972"
       },
       {
         "path": "docs/ath-whitepaper.ja.md",
-        "bytes": 39831,
-        "sha256": "36671715cf82cf8765d591fa832dd2dc14fcdca03269781fd8e09b5bd9f4c3fe"
+        "bytes": 37388,
+        "sha256": "e9e6f7d47796d357aeb748fc3c50a9f1c3d57f5ec51c25e387fd80841be61a9f"
       },
       {
         "path": "docs/ath-whitepaper.md",
-        "bytes": 27632,
-        "sha256": "6c1a8bb047652bedf754de2c8575b890364c1c5740c00eb23db9d9fb1437cf8f"
+        "bytes": 26683,
+        "sha256": "9850e832bced3669b09ce222a53181c9e7a69f230c0aac4137c021eaf3652046"
       },
       {
         "path": "docs/ath-whitepaper.pt.md",
-        "bytes": 32167,
-        "sha256": "5b3dd3c3a35e8e4e6522315934e6f0d99db7c0030650c8a48d16657e96a82b1e"
+        "bytes": 31303,
+        "sha256": "10e86c7b5bef160f1b3f15af1a213745acaaef0b50e435f82bb0c7471a51913d"
       },
       {
         "path": "docs/ath-whitepaper.ru.md",
-        "bytes": 51077,
-        "sha256": "dc4ef4bcb69ef9dd797b2d00c5e613bed1918b0a8a7262c794dcd1780a36a3c0"
+        "bytes": 48699,
+        "sha256": "b8b07166cfc513a510ab6cca0c6acfcff53250700d170f8b9a4a4a59002a3dc2"
       },
       {
         "path": "docs/ath-whitepaper.zh.md",
-        "bytes": 26234,
-        "sha256": "38e74a90aaa411e479824c276647988b8e1c8c4c58fdec5235a6ca63cd5eea79"
+        "bytes": 25248,
+        "sha256": "07bc2c7e3cbf62010c6e8e2a85540ce412de97a736e3633fe03dabd9d25e84e1"
       },
       {
         "path": "docs/crypto-protocol.de.md",
-        "bytes": 30613,
-        "sha256": "91e90251792be89e64f6fb5d789dc215b26b501338cef9c168c815acc92eeb0e"
+        "bytes": 30213,
+        "sha256": "f517137a0d63dcb6c50aa40af83507a1e14bae401dc481c612ad75d139198f6e"
       },
       {
         "path": "docs/crypto-protocol.es.md",
-        "bytes": 31174,
-        "sha256": "4667b6ff4c9500a3480179c73b73cb1499d567a12496598415ace692d3bcb77f"
+        "bytes": 30202,
+        "sha256": "9e0afae5126d276ec74a0d089dc23061f59169856adfa6a0a73c2c863a2c29f2"
       },
       {
         "path": "docs/crypto-protocol.fr.md",
-        "bytes": 32226,
-        "sha256": "7c2c5ed087df236558362c2a10c5686347649f478335e859819892cd249ac879"
+        "bytes": 31614,
+        "sha256": "34d125bd7182cf773f7b73e595d18e262bd18afabf3909208a106e8a4384da4c"
       },
       {
         "path": "docs/crypto-protocol.hi.md",
-        "bytes": 58877,
-        "sha256": "a5373a0570a3726ac326353a499944940e86a1061df7addc03e58bd316bc8d90"
+        "bytes": 53709,
+        "sha256": "1e1f5e1ec71f8126979d258b2c63a9744a14d12f47462c3fd6dc75b00466ba59"
       },
       {
         "path": "docs/crypto-protocol.id.md",
-        "bytes": 27642,
-        "sha256": "97eb5bab69e452ec03bd03af761617a7b1aa1548b626673420195c6b4cb71de7"
+        "bytes": 27606,
+        "sha256": "d7afe1ffc64a66153ef87184bd2433519a72d39908801d855ba48f935d8d56ae"
       },
       {
         "path": "docs/crypto-protocol.ja.md",
-        "bytes": 37942,
-        "sha256": "51529fdcf427d80f12cbcf26867546b5f55d3225e574bcfbf2b5420b8d876ddc"
+        "bytes": 36235,
+        "sha256": "8e6993bf953197765814d6e666f248fa6dc62fb9649db330026ce3efb3e3ce0e"
       },
       {
         "path": "docs/crypto-protocol.md",
-        "bytes": 25806,
-        "sha256": "240217e1604586da594e381ee33094586796a195e4282ec15c2d00eaa0e98370"
+        "bytes": 25046,
+        "sha256": "2096ce3aa16c4b9bd2a04f32a7eeee17ab354056819e775d93a0e135525f080f"
       },
       {
         "path": "docs/crypto-protocol.pt.md",
-        "bytes": 30524,
-        "sha256": "00aa5177601bc25895870f1a4dd872984b7ae8d65d62d1b123bd86c7ce567ce8"
+        "bytes": 29597,
+        "sha256": "d22877f2d6febe883e645fe9cf58b70e5315550ef6fe262458f2f63eb0a95a77"
       },
       {
         "path": "docs/crypto-protocol.ru.md",
-        "bytes": 46712,
-        "sha256": "355bfb7615fbbacc2463dc2de3457fca4d86f6c4dba1597d90a78bfc46dccea0"
+        "bytes": 44963,
+        "sha256": "04e87e4618362b9bd758369ea71dd83d4468375a473927420d66e07b90e14040"
       },
       {
         "path": "docs/crypto-protocol.zh.md",
-        "bytes": 24665,
-        "sha256": "6437e01911e27ee38ecb809a33c888f4f739f3ca212495ab614f305545ce3336"
+        "bytes": 24278,
+        "sha256": "5bee4b6161d70f7ef32c58cab27efcc8e3b4f9857cbb6b4e05988c152834be33"
       },
       {
         "path": "encrypted-message-store.mjs",
@@ -450,7 +450,7 @@
       {
         "path": "sw.js",
         "bytes": 6808,
-        "sha256": "f6790242a8b0af1e0f4a8662c33d7989c8920aa777d18757c0f7afca9250cfa4"
+        "sha256": "3488889f1bd7692e74934da0ed1b5842f3ce77f520e2470aead2db4261af136c"
       },
       {
         "path": "ton-dns-provider.mjs",

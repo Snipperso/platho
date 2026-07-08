@@ -6,7 +6,7 @@ ATH is the utility token of Platho. It is used for activity rewards, post-airdro
 
 ATH is not an administrative token. It does not grant the ability to rewrite balances, pause operations, mint new supply, or change user ownership rules. Its role is to power the application economy and connect Platho usage with on-chain accounting.
 
-This document describes the ATH model in Platho v1.
+This document describes the ATH model in Platho.
 
 ## Core Parameters
 
@@ -14,18 +14,6 @@ ATH has a fixed total supply:
 
 ```text
 100,000,000 ATH
-```
-
-ATH uses 9 decimals:
-
-```text
-1 ATH = 1,000,000,000 atomic units
-```
-
-Total supply in atomic units:
-
-```text
-100,000,000,000,000,000
 ```
 
 The launch reference price is:
@@ -70,9 +58,9 @@ This allocation defines the economic structure of Platho:
 - 15% of supply is distributed to users through application activity before the pool launch.
 - 15% of supply is used for initial liquidity.
 - 10% of supply is locked in immutable long-term vesting.
-- 60% of supply is reserved for MarketStabilitySeller and sold in tranches above the launch price after the post-pool pricing freeze and reserve-funding readiness gate.
+- 60% of supply is funded into MarketStabilitySeller and locked at genesis, then sold in tranches above the launch price after the post-pool pricing freeze.
 
-The activity airdrop and long-term vesting reserve are backed at final genesis by the official ATH wallets of Vault and ATHVesting, and the release verifier checks those balances before production release. The `60,000,000 ATH` market-stability allocation is reserved for MarketStabilitySeller, but it is not funded into the seller at final genesis. Seller funding happens only after pool launch, the one-time evidence-bound pricing freeze, and the bound reserve-funder notify-flow; seller readiness is valid only after `reserve_due_ath`, `reserve_funded_total_ath`, and the official seller ATH wallet backing are verified.
+The activity airdrop and long-term vesting reserve are backed at final genesis by the official ATH wallets of Vault and ATHVesting, and the release verifier checks those balances before production release. The `60,000,000 ATH` market-stability reserve is funded into MarketStabilitySeller and locked at final genesis, backed by its official seller ATH wallet, and the release verifier checks that backing before production release. The reserve is capitalized from the start, but it is not sold until after pool launch, when the one-time evidence-bound pricing freeze sets the base tranche price.
 
 ## Long-Term Protocol Vesting
 
@@ -132,12 +120,11 @@ not be shown by the PWA as a deposit path.
 
 Vault ATH withdrawals are signed external Vault commands. The downstream ATHWallet deployment, transfer, storage, and
 ACK execution reserve is paid from the user's internal Vault GRAM balance. Vault credits back only authenticated
-ACK/fail/bounce value it receives, minus the local refund reserve and capped by the reserved internal value. Product
-copy must not promise a complete excess GRAM refund.
+ACK/fail/bounce value it receives, minus the local refund reserve and capped by the reserved internal value.
 
 ## Activity Price
 
-Public product copy may say messages start from the current exact public base price:
+Messages start from the current public base price:
 
 ```text
 from 0.0337 GRAM
@@ -167,14 +154,13 @@ rebate, or promise that ATH will compensate the GRAM cost of a publish. The laun
 lower than the GRAM cost of the capsule, and that is intentional: users receive early network ownership for real usage,
 not a guaranteed reimbursement.
 
-Product copy may summarize capsule pricing as messages from `0.0337 GRAM`; current exact canonical examples are 1 KiB public posts from `0.0337 GRAM` and hybrid private 1 KiB capsules from `0.0347 GRAM`. Larger public or private capsule blocks cost more because the selected 1, 2, 4, 8, 16, or 32 KiB
+Capsule pricing: 1 KiB public posts start from `0.0337 GRAM` and hybrid private 1 KiB capsules from `0.0347 GRAM`. Larger public or private capsule blocks cost more because the selected 1, 2, 4, 8, 16, or 32 KiB
 body changes the Vault/CapsuleHub execution and storage reserve. The reward remains `10 ATH` per successfully finalized
 capsule, regardless of capsule size.
 
-Private publishing uses the hybrid security profile by default: X25519 + ML-KEM-768 + AES-GCM. There is no cheaper classical private-message mode in V1.
+Private publishing uses the hybrid security profile by default: X25519 + ML-KEM-768 + AES-GCM. There is no cheaper classical private-message mode.
 
-ATH may trade above or below the launch reference price after the official pool exists. The protocol docs must not present
-the activity reward as investment return, profit expectation, or price guarantee.
+ATH may trade above or below the launch reference price after the official pool exists. The activity reward is not an investment return, a profit expectation, or a price guarantee.
 
 ## Protocol Fee and User Price
 
@@ -191,7 +177,7 @@ The user-facing price includes protocol fee, compact index/header storage endowm
 
 | Publish type | User-facing price |
 | --- | ---: |
-| Public/product label | from 0.0337 GRAM |
+| Public (from) | from 0.0337 GRAM |
 | Current public post exact example | 0.0337 GRAM |
 | Current hybrid private 1 KiB exact example | 0.0347 GRAM |
 
@@ -257,9 +243,8 @@ GRAM side at the launch price:
 15,000,000 ATH * 0.001 GRAM = 15,000 GRAM
 ```
 
-Protocol fees collected before the pool launch are not expected to fully fund the GRAM side of initial liquidity. The
-initial liquidity plan may require project/treasury funding in addition to protocol revenue. This is part of the launch
-bootstrap and does not turn activity rewards into a GRAM-denominated claim.
+Protocol fees collected before the pool launch fund the full GRAM side of the initial liquidity. This is part of the
+launch bootstrap and does not turn activity rewards into a GRAM-denominated claim.
 
 The pool launches around a token that has already been distributed through application usage. This separates ATH from an empty listing without a user base.
 
@@ -361,7 +346,7 @@ An accepted mint goes through pending state and deploys `UsernameNFTItem`. Befor
 50% -> burn_due_ath
 ```
 
-Current V1 username mint is Vault-funded. Invalid username, wrong price, or duplicate-name rejections bounce through the
+Username mint is Vault-funded. Invalid username, wrong price, or duplicate-name rejections bounce through the
 official ATH wallet notification path so Vault can restore the user's internal ATH. UsernameRegistry does not maintain a
 direct external username refund bucket in the current Vault-funded flow.
 
@@ -370,10 +355,10 @@ ATH from username mint becomes protocol revenue only after deployment of the cor
 Username authority is split deliberately: `UsernameRegistry` anchors the name to one exact `UsernameNFTItem`, and the
 item state carries the current owner. Transfers of the item transfer the username. The item exposes standard NFT data
 and TEP-64 on-chain metadata, including `name = <username>.ath`; it does not depend on a Platho server for metadata.
-V1 username bytes are literal and not display-normalized: leading, trailing, consecutive, and all-separator names are
+Username bytes are literal and not display-normalized: leading, trailing, consecutive, and all-separator names are
 valid when every byte is in the allowed `a-z`, `0-9`, `_`, `-` set and length is 4..16.
 If item deployment was attempted but the item ACK never reached the registry, `PrunePendingUsernameMint` is intentionally
-non-destructive in V1: it does not guess failure, delete pending state, or create refund due. The recovery path is a late
+non-destructive: it does not guess failure, delete pending state, or create refund due. The recovery path is a late
 `UsernameItemDeployedAck` or `UsernameNFTItem.ResendDeployedAck`, so an initialized item can still become authoritative.
 If the item deployment actually bounces, the registry asks the official ATH wallet to refund the pending notification.
 A deployed `UsernameNFTItem` without `UsernameRegistry.name_records[name_hash]` pointing to that exact item is
@@ -388,7 +373,7 @@ Profile avatar update costs:
 100 ATH
 ```
 
-Current V1 profile avatar updates are Vault-funded. The PWA sends `SetProfileAvatarFromVaultBalance` to Vault; Vault pays through its official ATH wallet notification path into the official ProfileRegistry ATH wallet. Direct user-wallet avatar payment is not a supported V1 product flow.
+Profile avatar updates are Vault-funded. The PWA sends `SetProfileAvatarFromVaultBalance` to Vault; Vault pays through its official ATH wallet notification path into the official ProfileRegistry ATH wallet. Direct user-wallet avatar payment is not supported.
 
 ProfileRegistry accepts the update only when all conditions are met:
 
@@ -444,20 +429,16 @@ The reserve is sold only after post-pool pricing freeze.
 
 Pricing freeze is a real one-time launch authority. It sets the base tranche price once from pool-launch evidence, then the launch controller hash is cleared. After that, MarketStabilitySeller cannot steal funds, pause sales, rescue balances, override buyers, or mutate the price schedule.
 
-MarketStabilitySeller readiness is a post-pool gate, not a replacement for final genesis verification. The production
-sequence is: `mainnet:genesis:verify` passes on the clean final snapshot, pricing is frozen after pool launch, the bound
-reserve funder funds the seller through notify-flow, then `market-stability:readiness` checks seller state, funding, price
-evidence, and wallet backing. Seller readiness is production-valid only after that readiness pass.
+MarketStabilitySeller is capitalized at final genesis with the full `60,000,000 ATH` reserve, funded through the
+authenticated reserve-funder flow into the official seller ATH wallet, up to the hard cap of `60,000,000 ATH`.
+`mainnet:genesis:verify` checks that the seller carries the full reserve and that its official seller ATH wallet backing
+is at least `60,000,000 ATH` before production release. An unsolicited ordinary ATH transfer into the official seller ATH
+wallet does not increase the accounted reserve, does not expand sellable supply, and can remain stuck; a wallet balance
+above `60,000,000 ATH` is treated as a warning, not as additional reserve.
 
-Funding is accepted only:
-
-- after seal;
-- after pricing freeze;
-- through the official seller ATH wallet;
-- from the bound reserve funder;
-- up to the total cap of `60,000,000 ATH`.
-
-Only authenticated reserve funding increases sellable reserve accounting. Runtime allows partial reserve funding and partial sale, but launch readiness requires the full reserve: `reserve_due_ath == 60,000,000 ATH`, `reserve_funded_total_ath == 60,000,000 ATH`, and official wallet backing of at least `60,000,000 ATH`. An unsolicited ordinary ATH transfer into the official seller ATH wallet does not increase `reserve_due_ath` or `reserve_funded_total_ath`, does not expand sellable supply, and can remain stuck. Readiness treats official wallet balance above `60,000,000 ATH` as a warning, not as additional reserve.
+Selling is a separate post-pool step. The reserve is not sold until after pool launch, when the one-time evidence-bound
+pricing freeze sets the base tranche price; from then on the tranche schedule is deterministic and cannot be manually
+changed by the team.
 
 The reserve is split into 20 tranches:
 
@@ -575,6 +556,6 @@ ATH connects four layers of Platho:
 3. **Discounts** - ATH balance reduces protocol fee after the distribution gate.
 4. **Supply reduction** - part of ATH fees and buyback output is burned through ATHMaster.
 
-The model begins with fixed supply and reference valuation of `100,000 GRAM`. The primary user distribution is tied to real paid usage: product copy may say messages start from `0.0337 GRAM`, while current exact examples are `0.0337 GRAM` for a 1 KiB public post and `0.0347 GRAM` for a hybrid private 1 KiB capsule, plus a `10 ATH` activity bonus per finalized capsule. Larger public or private size classes cost more. That bonus is not a refund, reimbursement, or profit promise. After the first 15% of supply is distributed, the pool launches, protocol-fee discounts unlock, and the buyback path opens.
+The model begins with fixed supply and reference valuation of `100,000 GRAM`. The primary user distribution is tied to real paid usage: messages start from `0.0337 GRAM` — currently `0.0337 GRAM` for a 1 KiB public post and `0.0347 GRAM` for a hybrid private 1 KiB capsule, plus a `10 ATH` activity bonus per finalized capsule. Larger public or private size classes cost more. That bonus is not a refund, reimbursement, or profit promise. After the first 15% of supply is distributed, the pool launches, protocol-fee discounts unlock, and the buyback path opens.
 
 ATH exists as a working token inside Platho: it is distributed through activity, used in paid actions, reduces protocol fee, is sold from reserve through a defined staircase, and is burned through on-chain burn. After the market-stability staircase, the future ATH price is determined by the market and protocol usage.

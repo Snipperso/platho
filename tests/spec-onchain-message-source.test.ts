@@ -68,7 +68,6 @@ describe('v1 on-chain message source of truth', () => {
   it('SPEC-MSG-SOURCE-01B: active docs do not claim CapsuleHub stores heavy message bodies in state', () => {
     const activeBodyDocs = [
       ...SPEC_FILES,
-      'web/docs/about-platho.md',
       'web/app.js',
     ];
     const forbidden = [
@@ -221,16 +220,9 @@ describe('v1 on-chain message source of truth', () => {
   });
 
   it('SPEC-MSG-SOURCE-03C: public docs do not overpromise message permanence or user-selectable RPC', () => {
-    const about = read('web/docs/about-platho.md');
-    expect(about).toMatch(/accepted TON transaction history/i);
-    expect(about).toMatch(/CapsuleHub hashes/i);
-    expect(about).toMatch(/provider history/i);
-    expect(about).toMatch(/local encrypted cache/i);
-    expect(about).toMatch(/not a permanent archive/i);
-    expect(about).toMatch(/pruned after the retention window/i);
-    expect(about).not.toMatch(/can be recovered from the blockchain/i);
-    expect(about).not.toMatch(/stays on-chain without deletion/i);
-
+    // The About doc was rewritten (owner, 2026-07-08) into a rights/freedom manifesto and no longer carries the
+    // technical permanence internals (transaction-history recovery, CapsuleHub hashes, retention pruning); those
+    // stay in crypto-protocol.md (checked by SPEC-MSG-SOURCE-01B/03) and NO_BACKEND_ARCHITECTURE.md below.
     const installHtml = read('web/index.html');
     // The install-prompt copy stays as visible fallback text in index.html, but in web/app.js it is
     // now emitted via t('install.*'); the shipped English lives in the en dictionary. Fold the en
@@ -277,15 +269,17 @@ describe('v1 on-chain message source of truth', () => {
     expect(readiness).not.toMatch(/a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd/);
   });
 
-  it('SPEC-MSG-SOURCE-03C2: public About names narrow launch authorities when describing admin limits', () => {
+  it('SPEC-MSG-SOURCE-03C2: public About states no hidden admin control, without contract-internal detail', () => {
     const about = read('web/docs/about-platho.md');
 
-    expect(about).toMatch(/no hidden administrative control over user balances/i);
-    expect(about).toMatch(/narrow documented launch authorities/i);
-    expect(about).toMatch(/genesis binding and seal/i);
-    expect(about).toMatch(/BuybackBurn route freeze/i);
-    expect(about).toMatch(/MarketStabilitySeller pricing freeze/i);
-    expect(about).toMatch(/FeeAccumulator buyback split enable/i);
+    // The About was rewritten (owner, 2026-07-08) into a rights/freedom manifesto. The "no hidden admin control over
+    // balances" guarantee stays, now in plain language.
+    expect(about).toMatch(/hidden switch to seize your balance/i);
+    // The manifesto deliberately keeps contract-internal detail (the launch-authority enumeration, contract names)
+    // OUT of the intro; those authorities remain documented in the ATH whitepaper (M16-CONF-01C). Pin their absence.
+    expect(about).not.toMatch(/narrow documented launch authorities/i);
+    expect(about).not.toMatch(/BuybackBurn|MarketStabilitySeller|FeeAccumulator/);
+    // Still no misleading "manual switch to change the rules after launch" framing.
     expect(about).not.toMatch(/manual switch[\s\S]{0,180}change the rules after launch/i);
   });
 
@@ -296,24 +290,24 @@ describe('v1 on-chain message source of truth', () => {
       whitepaper.indexOf('## Profile Avatar Fees'),
     );
 
-    expect(usernameSection).toMatch(/Current V1 username mint is Vault-funded/);
+    expect(usernameSection).toMatch(/Username mint is Vault-funded/);
     expect(usernameSection).toMatch(/Vault can restore the user's internal ATH/);
     expect(usernameSection).not.toMatch(/direct username payments/i);
     expect(usernameSection).not.toMatch(/refund due for direct username/i);
     expect(usernameSection).not.toMatch(/FlushAthRefundDue|get_refund_due/i);
   });
 
-  it('SPEC-MSG-SOURCE-03C3B: public profile avatar docs describe the supported Vault-funded V1 flow', () => {
+  it('SPEC-MSG-SOURCE-03C3B: public profile avatar docs describe the supported Vault-funded flow', () => {
     const whitepaper = read('web/docs/ath-whitepaper.md');
     const avatarSection = whitepaper.slice(
       whitepaper.indexOf('## Profile Avatar Fees'),
       whitepaper.indexOf('## Market Stability Seller'),
     );
 
-    expect(avatarSection).toMatch(/Current V1 profile avatar updates are Vault-funded/);
+    expect(avatarSection).toMatch(/Profile avatar updates are Vault-funded/);
     expect(avatarSection).toMatch(/SetProfileAvatarFromVaultBalance/);
     expect(avatarSection).toMatch(/payer wallet is the bound Vault/);
-    expect(avatarSection).toMatch(/Direct user-wallet avatar payment is not a supported V1 product flow/);
+    expect(avatarSection).toMatch(/Direct user-wallet avatar payment is not supported/);
   });
 
   it('SPEC-MSG-SOURCE-03C3C: final current spec does not resurrect stale Vault session publish wording', () => {
@@ -549,10 +543,12 @@ describe('v1 on-chain message source of truth', () => {
   });
 
   it('SPEC-MSG-SOURCE-08: MarketStabilitySeller readiness requires full reserve and notify-flow funding', () => {
+    // The user-facing ATH whitepaper was simplified (owner, 2026-07-08): it no longer carries the detailed
+    // reserve_due_ath / reserve_funded_total_ath / partial-funding readiness mechanics. Those stay in the internal
+    // release + interface docs below, which still assert the full contract semantics.
     const sellerDocs = [
       'PRODUCTION_READINESS.md',
       'DEPLOYMENT_RUNBOOK.md',
-      'web/docs/ath-whitepaper.md',
       'artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md',
       'artifacts/platho_v1_open_values_v0_50_market_stability_seller.md',
       'artifacts/MILESTONE_SUMMARY_M50_MARKET_STABILITY_SELLER.md',
@@ -575,10 +571,11 @@ describe('v1 on-chain message source of truth', () => {
   });
 
   it('SPEC-MSG-SOURCE-09: MarketStabilitySeller readiness is post-pool and does not replace final genesis verification', () => {
+    // ATH whitepaper dropped from this list — see SPEC-MSG-SOURCE-08: the user-facing whitepaper no longer carries
+    // the detailed readiness-sequence wording; the internal release + interface docs below still do.
     const readinessDocs = [
       'PRODUCTION_READINESS.md',
       'DEPLOYMENT_RUNBOOK.md',
-      'web/docs/ath-whitepaper.md',
       'artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md',
       'artifacts/platho_v1_open_values_v0_50_market_stability_seller.md',
       'artifacts/MILESTONE_SUMMARY_M50_MARKET_STABILITY_SELLER.md',
@@ -595,17 +592,24 @@ describe('v1 on-chain message source of truth', () => {
     }
   });
 
-  it('SPEC-MSG-SOURCE-09A: public whitepaper does not claim MarketStability reserve is backed at final genesis', () => {
+  it('SPEC-MSG-SOURCE-09A: public whitepaper states the MarketStability reserve is funded and locked at final genesis', () => {
+    // Owner correction (2026-07-08): the prior whitepaper wording ("not funded into the seller at final genesis /
+    // Seller funding happens only after pool launch") was INACCURATE. clean-15 funds and locks the full 60M reserve
+    // into MarketStabilitySeller at genesis, and mainnet:genesis:verify checks the official seller ATH wallet
+    // backing. Selling is the separate post-pool step (after the one-time pricing freeze). Pin the corrected framing.
     const text = read('web/docs/ath-whitepaper.md');
 
-    expect(text).not.toMatch(/activity airdrop,\s+long-term vesting reserve,\s+and market stability reserve are backed/i);
-    expect(text).not.toMatch(/market stability reserve[\s\S]{0,180}backed[\s\S]{0,180}(final launch|final genesis|production release)/i);
-    expect(text).not.toMatch(/The price is not changed manually and does not depend on discretionary team decisions/i);
+    // Activity airdrop + vesting backing statement stays.
     expect(text).toMatch(/activity airdrop and long-term vesting reserve are backed at final genesis/i);
-    expect(text).toMatch(/market-stability allocation is reserved for MarketStabilitySeller[\s\S]{0,160}not funded into the seller at final genesis/i);
-    expect(text).toMatch(/Seller funding happens only after pool launch[\s\S]{0,220}pricing freeze[\s\S]{0,220}reserve-funder notify-flow/i);
-    expect(text).toMatch(/seller readiness is valid only after `reserve_due_ath`, `reserve_funded_total_ath`, and the official seller ATH wallet backing are verified/i);
-    expect(text).toMatch(/After the one-time evidence-bound pricing freeze[\s\S]{0,160}tranche schedule is deterministic/i);
+    // The 60M reserve is FUNDED + LOCKED at genesis, backed by its official seller ATH wallet.
+    expect(text).toMatch(/market-stability reserve is funded into MarketStabilitySeller and locked at final genesis, backed by its official seller ATH wallet/i);
+    expect(text).toMatch(/MarketStabilitySeller is capitalized at final genesis with the full .60,000,000 ATH. reserve/i);
+    expect(text).toMatch(/mainnet:genesis:verify. checks that the seller carries the full reserve/i);
+    // Selling is post-pool, after the one-time evidence-bound pricing freeze; the tranche schedule is deterministic.
+    expect(text).toMatch(/not sold until after pool launch[\s\S]{0,120}pricing freeze[\s\S]{0,180}tranche schedule is deterministic/i);
+    // The corrected doc must NOT resurrect the old "not funded at genesis / funded only after pool launch" wording.
+    expect(text).not.toMatch(/not funded into the seller at final genesis/i);
+    expect(text).not.toMatch(/Seller funding happens only after pool launch/i);
   });
 
   it('SPEC-MSG-SOURCE-09B: docs pin .ath item-owner authority and permissive separator policy', () => {
