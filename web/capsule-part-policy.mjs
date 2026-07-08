@@ -286,6 +286,11 @@ export const PROFILE_BLOCK_CONTENT_VERSION = 1;
 export const PROFILE_DESCRIPTION_MAX_BYTES = 512;
 export const PROFILE_TAG_MAX_BYTES = 32;
 export const PROFILE_MAX_TAGS = 12;
+// The channel's SELF-DECLARED .ath owner username — carried the same way private messages carry senderUsername,
+// and verified the same way (against the on-chain username registry: owner == the channel's author wallet). The
+// claim is NEVER trusted on its own; only a registry-verified name is ever displayed. A profile with no linked
+// username encodes a zero-length field, so the wire is uniform. Registry names are <=16 ASCII; 20 bytes headroom.
+export const PROFILE_USERNAME_MAX_BYTES = 20;
 
 export function normalizeProfileTags(tags) {
   const seen = new Set();
@@ -303,8 +308,11 @@ export function normalizeProfileTags(tags) {
 export function encodeProfileBlockContent(profile) {
   const description = textEncoder.encode(truncateUtf8ToBytes(profile?.description ?? '', PROFILE_DESCRIPTION_MAX_BYTES));
   const tags = normalizeProfileTags(profile?.tags).map((tag) => textEncoder.encode(tag));
+  // Owner .ath username claim (bare name, no ".ath"), appended after tags — see PROFILE_USERNAME_MAX_BYTES.
+  const ownerUsername = textEncoder.encode(truncateUtf8ToBytes(String(profile?.ownerUsername ?? '').trim(), PROFILE_USERNAME_MAX_BYTES));
   let total = 1 + 2 + description.length + 1;
   for (const tag of tags) total += 1 + tag.length;
+  total += 1 + ownerUsername.length; // [usernameLen:u8][username:utf8]
   const out = new Uint8Array(total);
   out[0] = PROFILE_BLOCK_CONTENT_VERSION;
   out[1] = (description.length >> 8) & 0xff;
@@ -319,6 +327,10 @@ export function encodeProfileBlockContent(profile) {
     out.set(tag, offset);
     offset += tag.length;
   }
+  out[offset] = ownerUsername.length;
+  offset += 1;
+  out.set(ownerUsername, offset);
+  offset += ownerUsername.length;
   return out;
 }
 
@@ -343,5 +355,15 @@ export function decodeProfileBlockContent(content) {
     tags.push(decoder.decode(bytes.subarray(offset, offset + tagLength)));
     offset += tagLength;
   }
-  return { description, tags };
+  // Owner-username claim. A truncated trailer must never null the profile (description+tags already parsed) — the
+  // reader falls through with '' and simply shows the wallet address, never a half-read name.
+  let ownerUsername = '';
+  if (offset < bytes.length) {
+    const usernameLength = bytes[offset];
+    offset += 1;
+    if (usernameLength > 0 && offset + usernameLength <= bytes.length) {
+      ownerUsername = decoder.decode(bytes.subarray(offset, offset + usernameLength));
+    }
+  }
+  return { description, tags, ownerUsername };
 }

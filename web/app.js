@@ -65,7 +65,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=16';
+} from './public-channel-subscriptions.mjs?v=17';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -95,7 +95,7 @@ import {
   encodeProfileBlockContent,
   decodeProfileBlockContent,
   normalizeProfileTags,
-} from './capsule-part-policy.mjs?v=6';
+} from './capsule-part-policy.mjs?v=7';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -3912,7 +3912,7 @@ async function openEditChannelProfileDialog() {
         const tags = String(values.tags ?? '').split(/[,\n]+/);
         const published = await publishChannelProfile(description, tags);
         const status = published?.result?.status;
-        const meta = { description: published.description, tags: published.tags };
+        const meta = { description: published.description, tags: published.tags, ownerUsername: published.ownerUsername };
         const createdAtSec = published.createdAtSec;
         const publishState = published?.result?.publishState ?? null;
         if (status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
@@ -6395,10 +6395,13 @@ function buildDiscoveryCard(channel) {
   const avatar = document.createElement('div');
   avatar.className = 'avatar feed-avatar';
   avatar.setAttribute('aria-hidden', 'true');
-  setAvatarNode(avatar, String(channel.name ?? 'P').slice(0, 1), publicAvatarUrlForWallet(channel.authorWallet));
+  // Resolve the label at RENDER time so a username verified after the results were built shows on the next
+  // re-render (scheduleDiscoveryLabelRefresh) without rebuilding the discovery sample.
+  const label = publicAuthorLabel(channel.authorWallet) || channel.name;
+  setAvatarNode(avatar, String(label ?? 'P').slice(0, 1), publicAvatarUrlForWallet(channel.authorWallet));
   const name = document.createElement('span');
   name.className = 'discovery-card-name';
-  name.textContent = channel.name;
+  name.textContent = label;
   head.append(avatar, name);
   card.append(head);
   if (channel.description) {
@@ -7793,6 +7796,12 @@ function drainRestoredPrefsSnapshots() {
 
 function publicAuthorLabel(authorWallet) {
   const wallet = rawWalletAddress(authorWallet) ?? String(authorWallet ?? '').trim();
+  // Registry-VERIFIED channel username wins over everything: it is the author's own linked .ath, proven on-chain to
+  // be owned by this wallet (owner == author). Read-only, synchronous — the verification ran async at profile-resolve
+  // time (verifyChannelUsernameClaim) and only a proven name is ever written here, so this can never surface a
+  // spoofed claim. Falls back to a locally-known channel name, then the short address.
+  const verified = publicChannelProfileCache[channelProfileCacheKey(wallet)]?.verifiedUsername;
+  if (verified) return canonicalUsernameDisplay(verified);
   const channelName = publicChannelRegistry.find((channel) => publicChannelMatchesAuthorWallet(channel, wallet))?.name;
   // Author is shown canonically — never with the ".ath" suffix (the registry name may still carry it for matching).
   return channelName ? canonicalUsernameDisplay(channelName) : shortAddress(wallet);
@@ -7972,6 +7981,7 @@ function setChannelProfileFromWalk(authorWallet, profileBlock, entryId, createdA
   const incoming = normalizeChannelProfile({
     description: profileBlock?.description ?? '',
     tags: profileBlock?.tags ?? [],
+    ownerUsername: profileBlock?.ownerUsername ?? '',
     entryId: entryId === null || entryId === undefined ? '' : String(entryId),
     createdAtSec: Number(createdAtSec) || 0,
     fetchedAt: nowSec(),
@@ -7981,8 +7991,68 @@ function setChannelProfileFromWalk(authorWallet, profileBlock, entryId, createdA
   // optimistic edit (entryId '', createdAt now) can't be clobbered by a STALE older profile the walk surfaces
   // during indexer lag; a genuinely-newer edit (higher created_at, e.g. from another device) still wins.
   if (prev && compareProfileRecency(prev, incoming) > 0) return;
+  // Carry the last-known VERIFIED name across the profile update so a re-walk doesn't blank the label until the
+  // async re-verification below lands; if the claim changed (user re-linked a different .ath), re-verification
+  // corrects it. Only ever set from a registry proof — never from the raw claim.
+  if (prev?.verifiedUsername && prev.ownerUsername === incoming.ownerUsername) {
+    incoming.verifiedUsername = prev.verifiedUsername;
+  }
   publicChannelProfileCache = { ...publicChannelProfileCache, [key]: incoming };
   persistChannelProfileCache();
+  verifyChannelUsernameClaim(authorWallet, incoming.ownerUsername);
+}
+
+// Verify a channel's self-declared owner-username CLAIM against the on-chain registry and cache the VERIFIED display
+// name (never the raw claim). Reuses the exact pipeline private chats use for peer usernames
+// (verifiedPlathoUsernameIdentityForWallet → verifiedPlathoUsernameOwnerCache), so a wallet that owns several .ath
+// names only ever wears the one it LINKED and actually owns. Serialized via queueUsernameHygiene so a discovery
+// walk over many authors never fires parallel chain reads (the iOS single-serial-read rule).
+function verifyChannelUsernameClaim(authorWallet, claimedName) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key) return;
+  // plathoUsernameIdentity is TOLERANT — returns null for an empty/malformed claim (unlike normalizeUsernameInput,
+  // which THROWS). The claim is attacker-controlled on-chain data ('xx', 'a!b', emoji), so parse it defensively:
+  // a throw here (from any candidate) must NOT unwind the discovery walk / feed sync that called us.
+  let identity = null;
+  try { identity = plathoUsernameIdentity(claimedName); } catch { identity = null; }
+  const rawWallet = rawWalletAddress(authorWallet);
+  if (!identity || !rawWallet) { applyVerifiedChannelUsername(key, ''); return; }
+  queueUsernameHygiene(async () => {
+    let verified = null;
+    try { verified = await verifiedPlathoUsernameIdentityForWallet(identity.value, rawWallet); } catch { verified = null; }
+    if (verified) {
+      applyVerifiedChannelUsername(key, canonicalUsernameDisplay(verified.label ?? verified.value));
+      return;
+    }
+    // The helper returns null for BOTH a DEFINITIVE mismatch (it CACHES null) and a TRANSIENT RPC error (no cache).
+    // Only strip a name we can PROVE is not owned — a cached-null entry. On a transient/uncached miss keep the
+    // last-known-good verified name (the anti-strip rule the private path enforces by branching on the thrown error).
+    const cached = verifiedPlathoUsernameOwnerCache.get(`${identity.value}:${rawWallet}`);
+    if (cached && cached.value === null) applyVerifiedChannelUsername(key, '');
+  });
+}
+
+function applyVerifiedChannelUsername(profileKey, verifiedUsername) {
+  const prev = publicChannelProfileCache[profileKey];
+  if (!prev) return;
+  const next = verifiedUsername ?? '';
+  if ((prev.verifiedUsername ?? '') === next) return;
+  publicChannelProfileCache = { ...publicChannelProfileCache, [profileKey]: { ...prev, verifiedUsername: next } };
+  persistChannelProfileCache();
+  scheduleDiscoveryLabelRefresh();
+}
+
+// Coalesce the discovery re-render across a burst of per-author verifications (one walk verifies N channels).
+let discoveryLabelRefreshScheduled = false;
+function scheduleDiscoveryLabelRefresh() {
+  if (discoveryLabelRefreshScheduled) return;
+  discoveryLabelRefreshScheduled = true;
+  queueMicrotask(() => {
+    discoveryLabelRefreshScheduled = false;
+    // buildDiscoveryCard reads publicAuthorLabel at render, so re-rendering picks up the now-warm verified name.
+    // Feed post labels are baked at resolve time and refresh on the next sync (publicAuthorLabel reads the same cache).
+    try { if (publicDiscoveryBody && publicDiscoveryBody.childElementCount > 0) renderPublicDiscovery({ loading: false }); } catch { /* cosmetic */ }
+  });
 }
 
 function channelProfileHasContent(profile) {
@@ -8010,10 +8080,13 @@ function setChannelProfileOptimistic(authorWallet, profile, createdAtSec) {
   pendingChannelProfileOverlay.set(key, normalizeChannelProfile({
     description: profile?.description ?? '',
     tags: normalizeProfileTags(profile?.tags),
+    ownerUsername: profile?.ownerUsername ?? '',
     entryId: '',
     createdAtSec: Number(createdAtSec) || nowSec(),
     fetchedAt: nowSec(),
   }));
+  // Verify your OWN just-published username so your own channel shows it immediately (the overlay isn't walked).
+  verifyChannelUsernameClaim(authorWallet, profile?.ownerUsername);
 }
 
 // Commit a CONFIRMED profile to the durable cache (unconditional — we KNOW it just landed, so it wins over any prior
@@ -8023,17 +8096,22 @@ function finalizeChannelProfile(authorWallet, profile, entryId, createdAtSec) {
   const key = channelProfileCacheKey(authorWallet);
   if (!key) return;
   pendingChannelProfileOverlay.delete(key);
-  publicChannelProfileCache = {
-    ...publicChannelProfileCache,
-    [key]: normalizeChannelProfile({
-      description: profile?.description ?? '',
-      tags: normalizeProfileTags(profile?.tags),
-      entryId: entryId === null || entryId === undefined ? '' : String(entryId),
-      createdAtSec: Number(createdAtSec) || nowSec(),
-      fetchedAt: nowSec(),
-    }),
-  };
+  const prevVerified = publicChannelProfileCache[key]?.verifiedUsername ?? '';
+  const committed = normalizeChannelProfile({
+    description: profile?.description ?? '',
+    tags: normalizeProfileTags(profile?.tags),
+    ownerUsername: profile?.ownerUsername ?? '',
+    entryId: entryId === null || entryId === undefined ? '' : String(entryId),
+    createdAtSec: Number(createdAtSec) || nowSec(),
+    fetchedAt: nowSec(),
+  });
+  // Carry a matching prior verification forward so the label doesn't blink; re-verify to catch a re-linked name.
+  if (prevVerified && (publicChannelProfileCache[key]?.ownerUsername ?? '') === committed.ownerUsername) {
+    committed.verifiedUsername = prevVerified;
+  }
+  publicChannelProfileCache = { ...publicChannelProfileCache, [key]: committed };
   persistChannelProfileCache();
+  verifyChannelUsernameClaim(authorWallet, profile?.ownerUsername);
 }
 
 function publishStateEntryId(publishState) {
@@ -8134,7 +8212,14 @@ function readProfileDocument(documentBytes) {
   const profile = blocks.find((block) => block?.type === 'profile');
   if (!profile) return null;
   return {
-    profileBlock: { description: String(profile.description ?? ''), tags: Array.isArray(profile.tags) ? profile.tags : [] },
+    // Carry the self-declared owner-username CLAIM through — it is the SOLE funnel for every on-chain read path
+    // (author-walk, discovery-chain, feed divert), so dropping it here would make the verified-username feature dead
+    // for every channel a reader resolves from chain. It is still only DISPLAYED after registry verification.
+    profileBlock: {
+      description: String(profile.description ?? ''),
+      tags: Array.isArray(profile.tags) ? profile.tags : [],
+      ownerUsername: typeof profile.ownerUsername === 'string' ? profile.ownerUsername : '',
+    },
     isProfileOnly: blocks.length > 0 && blocks.every((block) => block?.type === 'profile'),
   };
 }
@@ -8334,6 +8419,9 @@ async function discoverChannels(options = {}) {
     const description = typeof profile?.description === 'string' ? profile.description.trim() : '';
     const tags = (profile?.tags ?? []).filter(Boolean);
     if (!description && tags.length === 0) continue;
+    // Verify the channel's declared username (queued/deduped) — a cache-first profile resolve skips the walk (and
+    // thus setChannelProfileFromWalk's verify kick), so trigger it here too. The label refreshes on the next render.
+    verifyChannelUsernameClaim(wallet, profile?.ownerUsername);
     results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
   }
   publicDiscoveryCache = { at: Date.now(), results };
@@ -25609,10 +25697,16 @@ async function submitPublicPostThroughVault(draft = null) {
 async function publishChannelProfile(description, tags) {
   const desc = String(description ?? '').trim();
   const normalizedTags = normalizeProfileTags(tags);
+  // Carry the wallet's OWN linked .ath (bare name) as the channel's self-declared owner username — consistent with
+  // how private messages carry senderUsername. Readers verify it against the registry before showing it; publishing
+  // a name you don't own is harmless (verification fails, it falls back to the address). canonicalUsernameDisplay is
+  // safe (strips ".ath", never throws) — normalizeUsernameInput would throw on an empty/odd linked label.
+  const linkedLabel = readLinkedPlathoUsername(plathoWallet?.address)?.label ?? '';
+  const ownerUsername = linkedLabel ? canonicalUsernameDisplay(linkedLabel) : '';
   // Publish-time stamp (~the on-chain created_at baked into the header a few ms later): used as the profile's cache
   // recency so latest-wins is consistent with the real created_at the read walk stamps — see finalizeChannelProfile.
   const createdAtSec = Math.floor(Date.now() / 1000);
-  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags }]);
+  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername }]);
   // clean-11: set the is_profile reserved bit so the contract threads this post into the global profile chain +
   // per-author profile index. Gated on the genesis (clean-10 Vault/Hub reject reserved != 0 -> the profile still
   // rides as a normal author-index post there, resolved by the author walk).
@@ -25626,7 +25720,7 @@ async function publishChannelProfile(description, tags) {
     if (!isVaultPublishPartialError(error)) throw error;
     result = error.publishResult;
   }
-  return { result, description: desc, tags: normalizedTags, createdAtSec };
+  return { result, description: desc, tags: normalizedTags, ownerUsername, createdAtSec };
 }
 
 async function submitPublicCommentThroughVault(parent, bodyText = null, draftAttachments = publicImageAttachments) {

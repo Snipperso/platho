@@ -204,4 +204,41 @@ describe('profile block content codec', () => {
     truncated[1] = 0xff; truncated[2] = 0xff; // descLen points past the buffer
     expect(m.decodeProfileBlockContent(truncated)).toBe(null);
   });
+
+  it('PWA-PROFILE-CODEC-03: owner-username round-trips, is byte-capped, and old-format blocks decode to "" (no crash)', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    // Round-trip WITH a username (bare name, no ".ath").
+    const withName = m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: 'hi', tags: ['a', 'b'], ownerUsername: 'glasnost' }));
+    expect(withName!.ownerUsername).toBe('glasnost');
+    expect(withName!.description).toBe('hi');
+    expect(withName!.tags).toEqual(['a', 'b']);
+    // No linked name -> zero-length username field, decodes to ''.
+    const noName = m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: 'hi', tags: ['a'], ownerUsername: '' }));
+    expect(noName!.ownerUsername).toBe('');
+    // Username is byte-capped.
+    const capped = m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: '', tags: [], ownerUsername: 'x'.repeat(200) }));
+    expect(m.utf8ByteLength(capped!.ownerUsername)).toBeLessThanOrEqual(m.PROFILE_USERNAME_MAX_BYTES);
+    // FORWARD/BACKWARD COMPAT: a pre-username (old-format) block — [version][descLen][desc][tagCount][tags] with NO
+    // trailing username — must decode cleanly (description+tags intact, ownerUsername '') and NEVER crash/null.
+    const enc = new TextEncoder();
+    const desc = enc.encode('old channel');
+    const tag = enc.encode('freespeech');
+    const old = new Uint8Array(1 + 2 + desc.length + 1 + (1 + tag.length));
+    old[0] = m.PROFILE_BLOCK_CONTENT_VERSION;
+    old[1] = (desc.length >> 8) & 0xff; old[2] = desc.length & 0xff;
+    old.set(desc, 3);
+    let o = 3 + desc.length; old[o++] = 1; old[o++] = tag.length; old.set(tag, o);
+    const decodedOld = m.decodeProfileBlockContent(old);
+    expect(decodedOld).not.toBe(null);
+    expect(decodedOld!.description).toBe('old channel');
+    expect(decodedOld!.tags).toEqual(['freespeech']);
+    expect(decodedOld!.ownerUsername).toBe('');
+    // A truncated username trailer must never null the profile — description+tags survive, username falls back to ''.
+    const full = m.encodeProfileBlockContent({ description: 'hi', tags: ['a'], ownerUsername: 'glasnost' });
+    const chopped = full.slice(0, full.length - 3);
+    const decodedChop = m.decodeProfileBlockContent(chopped);
+    expect(decodedChop).not.toBe(null);
+    expect(decodedChop!.description).toBe('hi');
+    expect(decodedChop!.ownerUsername).toBe('');
+  });
 });
