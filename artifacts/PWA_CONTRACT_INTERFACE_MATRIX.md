@@ -119,7 +119,7 @@ MarketStabilitySeller reserve policy is also intentionally narrow:
 - partial reserve funding and partial sales are valid runtime states, but they are not full-launch readiness;
 - reserve funding must use the bound reserve funder notify-flow into the official seller ATH wallet;
 - manual ordinary ATH transfer to the official seller ATH wallet is unsupported, is not tracked reserve, does not expand sellable supply, and must not be shown as a PWA deposit/funding path;
-- `market-stability:readiness` is a post-pool seller gate after `mainnet:genesis:verify`, pricing freeze, and reserve funding; it is not a standalone replacement or substitute for final genesis verification. Seller readiness is production-valid only after that readiness PASS.
+- `market-stability:readiness` is a post-pool seller-sale gate after `mainnet:genesis:verify` (which certifies the genesis-funded reserve) and the post-pool pricing freeze; it is not a standalone replacement or substitute for final genesis verification. Seller readiness is production-valid only after that readiness PASS.
 
 Authority wording policy:
 

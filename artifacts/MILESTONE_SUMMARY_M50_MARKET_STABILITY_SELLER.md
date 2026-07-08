@@ -24,12 +24,12 @@ The seller releases ATH in twenty `3,000,000 ATH` tranches at x2 through x21 fro
 
 - Reserve funder, official ATH wallet, and TON treasury receiver are bound before seal.
 - Official ATH wallet must equal deterministic `ATHWallet(owner = MarketStabilitySeller, master = ATHMaster)`.
-- Pricing may be frozen before seal or once after seal while reserve, treasury, and sale state are still zero.
+- Pricing may be frozen before seal or once after seal; treasury and sale state are still zero at freeze. The `60,000,000 ATH` reserve is funded and locked at genesis independently of the freeze (clean-12 genesis-lock), so `reserve_due_ath` and `reserve_funded_total_ath` are already at the cap (the old "reserve == 0 at freeze" checks were dropped).
 - Frozen `base_tranche_price_nanotons` must exactly equal the captured `evidence_x1_tranche_quote_nanotons`; underpriced base values are rejected.
 - Seal clears the genesis controller hash only if pricing was already frozen; otherwise the post-pool pricing freeze clears it.
 - Final genesis evidence must prove any retained post-pool launch controller hash matches the manifest controller address.
 - Pricing freeze is a real one-time launch authority: it sets the base tranche price once, then no price mutation, admin override, pause, rescue, upgrade, or governance path remains.
-- MarketStabilitySeller readiness is post-pool and supplemental. It must run only after `mainnet:genesis:verify` has passed, pricing has been frozen, and reserve funding has occurred; it is not a standalone replacement for final genesis verification.
+- MarketStabilitySeller readiness is post-pool and supplemental. It must run only after `mainnet:genesis:verify` has passed (certifying that genesis reserve funding has occurred) and pricing has been frozen post-pool; it is not a standalone replacement for final genesis verification.
 
 ## Verification
 

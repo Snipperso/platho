@@ -13,7 +13,7 @@ The canonical ATH allocation for this release is:
 | Activity airdrop | `15,000,000 ATH` | Pre-funded into the official Vault ATH wallet at final genesis. |
 | Initial ATH/TON liquidity | `15,000,000 ATH` | Used for the initial pool launch against the target `100,000 TON` reference cap. |
 | Long-term protocol vesting | `10,000,000 ATH` | Locked in immutable `ATHVesting`, `100,000 ATH` unlock per 365-day period for `100` periods. |
-| MarketStabilitySeller reserve | `60,000,000 ATH` | Funded after pricing freeze through the bound reserve-funder notify-flow. |
+| MarketStabilitySeller reserve | `60,000,000 ATH` | Funded and locked at genesis (after seal) through the bound reserve-funder notify-flow; certified by `mainnet:genesis:verify`. Does not require the pricing freeze. |
 
 MarketStabilitySeller uses `20` fixed tranches of `3,000,000 ATH`, from `x2` through `x21` of the
 initial pool price. Older lower-reserve notes are obsolete for the current archive.

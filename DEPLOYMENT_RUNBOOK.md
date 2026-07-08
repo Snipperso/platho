@@ -267,7 +267,7 @@ After clean final genesis:
 
 1. Release the production PWA only after production config, crypto review, hosting headers, and static bundle gates pass.
 2. Distribute the `15,000,000 ATH` activity airdrop through Vault.
-3. Keep BuybackBurn route freeze, MarketStabilitySeller pricing freeze, seller reserve funding, and EnableBuybackSplit blocked during this distribution phase.
+3. Keep BuybackBurn route freeze, MarketStabilitySeller pricing freeze, and EnableBuybackSplit blocked during this distribution phase (the `60,000,000 ATH` seller reserve is already funded and locked at genesis).
 4. Verify `Vault.airdrop_remaining_ath == 0` and `Vault.airdrop_distributed_ath == 15,000,000 ATH`.
 
 Do not launch the initial ATH/TON pool before the activity airdrop is fully distributed. The pool
@@ -321,9 +321,8 @@ npm.cmd run market-stability:readiness
 ```
 
 This readiness step is post-pool and supplemental. It is not a replacement for `npm.cmd run mainnet:genesis:verify`.
-The required order is: clean final genesis verifier pass, production PWA release, complete `15,000,000 ATH`
-activity airdrop distribution, initial pool launch, post-pool `FreezeMarketStabilityPricing`,
-authenticated reserve funding, then MarketStabilitySeller readiness. Do not use
+The required order is: clean final genesis verifier pass (which certifies the genesis-funded reserve via authenticated reserve funding), production PWA release, complete `15,000,000 ATH`
+activity airdrop distribution, initial pool launch, post-pool `FreezeMarketStabilityPricing`, then MarketStabilitySeller readiness. Do not use
 `market-stability:readiness` as a standalone release gate.
 
 Readiness must block:
@@ -341,7 +340,7 @@ MarketStabilitySeller is a staged distribution surface, not a core PWA screen. I
 
 Procedure:
 
-1. After pricing freeze, the reserve funder sends `60,000,000 ATH` through the production ATHWallet notify path into the official MarketStabilitySeller ATH wallet. For the full-launch ceremony, do this as one authenticated notify-flow transfer; if funding is deliberately chunked, treat the seller as partially live after the first chunk and do not announce seller readiness until the checks below pass.
+1. The `60,000,000 ATH` reserve is funded and locked into the official MarketStabilitySeller ATH wallet at genesis (right after `SealGenesis`) as one authenticated reserve-funder notify-flow transfer through the production ATHWallet notify path — funding requires only a sealed seller and does NOT require the pricing freeze, and `mainnet:genesis:verify` certifies it. If funding was deliberately chunked, treat the seller as partially live after the first chunk and do not announce seller readiness until the checks below pass.
 2. Readiness checks:
    - `reserve_due_ath == 60,000,000 ATH`;
    - `reserve_funded_total_ath == 60,000,000 ATH`;
