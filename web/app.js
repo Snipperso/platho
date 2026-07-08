@@ -3779,9 +3779,11 @@ function createPencilIcon() {
   return svg;
 }
 
-// Small inline info glyph for the channel-description affordance (kept inline like createPencilIcon so it needs
-// no new asset / SW-precache entry).
-function createInfoIcon() {
+// Small inline "channel about" glyph — an outline speech bubble with two short text lines ("what this channel says
+// about itself"). Deliberately distinct from the (i) Docs header icon AND the document-lines "edit description"
+// header icon (owner: the same icon must not sit on two different buttons), and from the filled double-bubble chat
+// nav icon. Inline like createPencilIcon so it needs no new asset / SW-precache entry.
+function createChannelAboutIcon() {
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
@@ -3791,20 +3793,18 @@ function createInfoIcon() {
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('aria-hidden', 'true');
-  const circle = document.createElementNS(ns, 'circle');
-  circle.setAttribute('cx', '12');
-  circle.setAttribute('cy', '12');
-  circle.setAttribute('r', '9');
-  const stem = document.createElementNS(ns, 'path');
-  stem.setAttribute('d', 'M12 11v5');
-  const dot = document.createElementNS(ns, 'path');
-  dot.setAttribute('d', 'M12 8h.01');
-  svg.append(circle, stem, dot);
+  const bubble = document.createElementNS(ns, 'path');
+  bubble.setAttribute('d', 'M20 14a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z');
+  const line1 = document.createElementNS(ns, 'path');
+  line1.setAttribute('d', 'M8 8h8');
+  const line2 = document.createElementNS(ns, 'path');
+  line2.setAttribute('d', 'M8 11.5h5');
+  svg.append(bubble, line1, line2);
   return svg;
 }
 
 // Small inline copy glyph (two overlapping cards) for the "copy wallet address" affordance on the address row of
-// the "Display as" popover. Inline like createPencilIcon/createInfoIcon so it needs no new asset / SW-precache entry.
+// the "Display as" popover. Inline like createPencilIcon/createChannelAboutIcon so it needs no new asset / SW-precache entry.
 function createCopyIcon() {
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
@@ -5781,7 +5781,7 @@ function publicItemDescriptionButton(item) {
   aboutButton.setAttribute('aria-haspopup', 'dialog');
   aboutButton.setAttribute('aria-expanded', 'false');
   aboutButton.title = t('public.channelAbout');
-  aboutButton.append(createInfoIcon());
+  aboutButton.append(createChannelAboutIcon());
   aboutButton.addEventListener('click', (event) => {
     event.stopPropagation();
     if (identityPopover && !identityPopover.hidden && identityPopoverAnchor === aboutButton) {
