@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=713" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=714" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4590,6 +4590,23 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['wallet.addressCopied']).toBe('Wallet address copied');
   });
 
+  it('PWA-CHANNEL-PROFILE-COST-01: the channel-description dialog shows the GRAM publish cost like the mint/avatar modals', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Estimator mirrors estimatedProfileAvatarTonFeeNanotons but for the PROFILE document (no extra Vault charge — a
+    // channel profile is a plain public post): encode the SAME bytes publishChannelProfile does → split → price batch.
+    const est = app.slice(app.indexOf('function estimatedChannelProfileHoldNanotons('), app.indexOf('function estimatedChannelProfileHoldNanotons(') + 800);
+    expect(est).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername \}\]\)/);
+    expect(est).toMatch(/splitBytesToCapsuleParts\(documentBytes, MAX_CAPSULE_USEFUL_BYTES\)/);
+    expect(est).toMatch(/composerEstimatedMaxChargeNanotons\(publicComposerPublishProfilesForPlan\(parts\), 1\)/);
+    // The edit dialog surfaces it as a live summary line reusing the mint modal's GRAM-hold wording (parity, no new i18n).
+    const dlg = app.slice(app.indexOf('async function openEditChannelProfileDialog('), app.indexOf('async function openEditChannelProfileDialog(') + 1400);
+    expect(dlg).toMatch(/summary: \(values\) =>/);
+    expect(dlg).toMatch(/estimatedChannelProfileHoldNanotons\(values\.description, values\.tags\)/);
+    expect(dlg).toMatch(/label: t\('username\.gramHold'\), value: t\('username\.gramHoldValue', \{ amount: formatTonNanotons\(hold\) \}\)/);
+    expect(EN_STRINGS['username.gramHold']).toBe('GRAM hold');
+    expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');
+  });
+
   it('PWA-DISCOVERY-01: newcomer discovery — bounded head-of-log scan, described-channel cards, follow flow', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -4732,6 +4749,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(avatar\.closest\('button, a, \[role="button"\]'\)\) return;/);
     expect(app).toMatch(/openImageLightbox\(avatar\.dataset\.avatarUrl, 'Avatar'\);/);
     expect(css).toMatch(/\.avatar\.has-image \{\s*cursor: zoom-in;/);
+    // The zoom cursor must MIRROR the JS guard: an avatar inside an interactive row (the private chat list) yields
+    // to the row's own click (opening the chat wins), so the zoom cursor there would lie — fall back to inherit.
+    expect(css).toMatch(/button \.avatar\.has-image,\s*a \.avatar\.has-image,\s*\[role="button"\] \.avatar\.has-image \{\s*cursor: inherit;/);
   });
 
   it('PWA-PUBLIC-COMMENTS-BACKGROUND-FREE: comments load ONLY on thread open — no background walker exists (owner scalability requirement 2026-07-02)', () => {
@@ -6202,11 +6222,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v784/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=242/);
+    expect(sw).toMatch(/platho-pwa-prototype-v786/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=243/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=713/);
+    expect(sw).toMatch(/\.\/app\.js\?v=714/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);

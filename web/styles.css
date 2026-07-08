@@ -1046,6 +1046,16 @@ html[data-platho-telegram="true"] .install-header-button {
   cursor: zoom-in;
 }
 
+/* ...but NOT inside an interactive row (private chat list, etc.). The avatar-lightbox click handler
+   deliberately yields to the row's own click there (`avatar.closest('button, a, [role="button"]')` →
+   opening the chat wins), so the zoom cursor would LIE. Mirror that exact guard here: fall back to the
+   row's cursor so the pointer tells the truth (single source of truth = the JS guard's boundary). */
+button .avatar.has-image,
+a .avatar.has-image,
+[role="button"] .avatar.has-image {
+  cursor: inherit;
+}
+
 /* File attachment chip (v652): name + size, tap to download. Shared by private bubbles and public surfaces. */
 .message-file-chip {
   display: flex;

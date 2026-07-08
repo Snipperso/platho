@@ -3928,6 +3928,17 @@ async function openEditChannelProfileDialog() {
     hint: t('public.channelDescriptionHint'),
     submitLabel: t('common.save'),
     checkingHint: t('public.descriptionSaving'),
+    summary: (values) => {
+      // Show the publish cost, same as the mint / avatar modals — a channel profile is a public post, so saving it
+      // holds GRAM from the Vault (the bulk is a refundable over-reserve, hence "up to"). Reuses the generic GRAM-hold
+      // strings for wording parity with the mint dialog. Best-effort: a pricing hiccup must never blank the dialog.
+      try {
+        const hold = estimatedChannelProfileHoldNanotons(values.description, values.tags);
+        return [{ label: t('username.gramHold'), value: t('username.gramHoldValue', { amount: formatTonNanotons(hold) }) }];
+      } catch {
+        return [];
+      }
+    },
     fields: [
       {
         id: 'description',
@@ -13821,6 +13832,21 @@ function profileAvatarTonFeeLabel(attachment) {
   const parts = Math.max(1, imageAttachmentPartCount(attachment));
   const capsuleLabel = tPlural('avatar.publicCapsules', parts);
   return t('avatar.feeUpTo', { amount: formatTonNanotons(estimatedProfileAvatarTonFeeNanotons(attachment)), capsules: capsuleLabel });
+}
+
+// Estimate the GRAM hold to PUBLISH a channel profile (a single public post carrying the PROFILE document block) so the
+// edit dialog can show the cost the same way the mint / avatar modals do. Mirrors estimatedProfileAvatarTonFeeNanotons
+// but for a document instead of an image: encode the SAME bytes publishChannelProfile will (incl. the owner-username
+// trailer, which affects the byte size), split into capsule parts, and price the public batch. No extra Vault charge —
+// a profile is a plain public post (createPublicPayloadParts type:'post'), unlike the avatar's ProfileRegistry write.
+function estimatedChannelProfileHoldNanotons(description, tags) {
+  const desc = String(description ?? '').trim();
+  const normalizedTags = normalizeProfileTags(tags);
+  const linkedLabel = readLinkedPlathoUsername(plathoWallet?.address)?.label ?? '';
+  const ownerUsername = linkedLabel ? canonicalUsernameDisplay(linkedLabel) : '';
+  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername }]);
+  const parts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES);
+  return composerEstimatedMaxChargeNanotons(publicComposerPublishProfilesForPlan(parts), 1);
 }
 
 function composerCostStatusText(profile, text, maxTextBytes, attachment = null, options = {}) {
