@@ -46,7 +46,7 @@ The seller may be sealed before the official pool exists. In that inert state, t
 Before reserve use:
 
 - the final official ATH/TON pool launch price must be captured;
-- `base_tranche_price_nanotons` must exactly equal `evidence_x1_tranche_quote_nanotons` and be frozen either before seal or by the one-time post-seal launch controller while seller reserve/sales state is still zero;
+- `base_tranche_price_nanotons` must exactly equal `evidence_x1_tranche_quote_nanotons` and be frozen either before seal or by the one-time post-seal launch controller while seller sales state is still zero (the `60,000,000 ATH` reserve is genesis-funded and locked, not zero, at freeze);
 - post-seal pricing freeze must clear the launch controller hash;
 - if the seller is sealed before pricing, final genesis evidence must prove the retained launch controller hash matches the manifest controller address;
 - the seller official ATH wallet must be funded with the full 60,000,000 ATH reserve through authenticated ATH notification before production readiness;
@@ -56,7 +56,7 @@ Before reserve use:
 - `npm.cmd run market-stability:readiness` must pass against the post-pool getter snapshot before the first reserve sale is treated as production-ready.
 
 `market-stability:readiness` is not a substitute for the full final genesis verifier. The intended release order is:
-`mainnet:genesis:verify` PASS, post-pool pricing freeze, authenticated reserve funding, then seller readiness PASS.
+`mainnet:genesis:verify` PASS (certifying the genesis reserve funded via authenticated reserve funding), post-pool pricing freeze, then seller readiness PASS.
 
 Pricing freeze is a real one-time launch authority. It sets the base tranche price once from pool-launch evidence and clears the launch controller hash. No post-freeze price mutation, admin sale override, pause, upgrade, rescue, or governance path exists.
 This is still an authority and must be named as such in release docs.
