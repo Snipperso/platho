@@ -14,4 +14,4 @@ Uma carta selada costumava ser assunto exclusivamente das duas pessoas que a esc
 
 Esta liberdade traz consigo uma responsabilidade real. Você detém as suas próprias chaves: uma frase de recuperação perdida não pode ser restaurada pelo suporte, e as ações numa rede aberta são permanentes e custam dinheiro real. O Platho é uma ferramenta que devolve o controlo sobre a sua vida privada, a sua expressão e o seu dinheiro à pessoa a quem pertencem.
 
-A correspondência privada é um direito. A liberdade de expressão é um direito. O Platho existe para que nenhum servidor, nenhum operador e nenhum censor possa decidir o contrário.
+Estes direitos são seus por direito próprio, não pela permissão de quem quer que seja. O Platho existe para que nenhum servidor, nenhum operador e nenhum censor possa decidir o contrário.

@@ -14,4 +14,4 @@ Dahulu, surat tersegel adalah urusan dua orang yang menulisnya saja. Di dunia da
 
 Kebebasan ini datang dengan tanggung jawab yang nyata. Anda memegang kunci Anda sendiri: frasa pemulihan yang hilang tidak dapat dipulihkan oleh dukungan pelanggan, dan tindakan pada jaringan terbuka bersifat permanen serta menghabiskan uang sungguhan. Platho adalah alat yang mengembalikan kendali atas kehidupan pribadi, ucapan, dan uang Anda kepada orang yang seharusnya memilikinya.
 
-Korespondensi pribadi adalah hak. Kebebasan berbicara adalah hak. Platho ada agar tidak ada server, tidak ada operator, dan tidak ada penyensor yang boleh memutuskan sebaliknya.
+Semua ini menjadi milik Anda berdasarkan hak, bukan atas izin siapa pun. Platho ada agar tidak ada server, tidak ada operator, dan tidak ada penyensor yang boleh memutuskan sebaliknya.

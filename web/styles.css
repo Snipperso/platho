@@ -2529,15 +2529,9 @@ button.feed-item:hover {
 }
 
 .channel-about-edit {
-  margin-top: 2px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  text-align: center;
-  cursor: pointer;
+  /* Green plate CTA (owner: same style as "Add channel") — the plate look comes from .discovery-cta-action; this
+     class only adds the popover top spacing. */
+  margin-top: 8px;
 }
 
 .channel-about-edit:hover {
