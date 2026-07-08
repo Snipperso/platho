@@ -3500,6 +3500,10 @@ function applyContactDisplaySelection(counterpartyWallet, { displayIdentity = nu
   renderThreads();
   renderConversation();
   renderPublicSurface({ anchorUnread: false });
+  // A choice made from a Discovery card's chevron (an unsubscribed channel not in the feed) must relabel that
+  // card too. renderPublicSurface only rebuilds the feed; this debounced+guarded refresh re-renders the discovery
+  // sample (no-op when discovery isn't on screen), so buildDiscoveryCard re-reads resolveWalletChannelDisplay.
+  scheduleDiscoveryLabelRefresh();
 }
 
 // Build a thread-shaped object for a wallet that has NO open Private dialog, so the Public "Display as"
@@ -3508,6 +3512,7 @@ function applyContactDisplaySelection(counterpartyWallet, { displayIdentity = nu
 // is automatic.
 function contactDisplayContextForWallet(counterpartyWallet) {
   const base = baseContactDisplayContextForWallet(counterpartyWallet);
+  const extraIdentities = [];
   // The user's OWN wallet channel must offer their OWN linked username (.ath) as a "Display as" option, the
   // same way a counterparty's channel offers theirs. A counterparty's username arrives via their received
   // posts (senderUsername); your own never does (you don't receive your own posts), so without this the own
@@ -3515,11 +3520,23 @@ function contactDisplayContextForWallet(counterpartyWallet) {
   if (plathoWallet?.address && sameWalletAddress(counterpartyWallet, plathoWallet.address)) {
     const ownUsername = readLinkedPlathoUsername(plathoWallet.address);
     const ownIdentity = ownUsername?.label ? plathoUsernameIdentity(ownUsername.label) : null;
-    if (ownIdentity) {
-      // Non-mutating: return a shallow context whose variants include the own username (base may be a live
-      // thread object; don't graft the variant onto it as a side effect of opening a popover).
-      return { ...base, identityVariants: normalizeIdentityVariants([ownIdentity, ...threadIdentityVariants(base)]) };
-    }
+    if (ownIdentity) extraIdentities.push(ownIdentity);
+  }
+  // A public channel's VERIFIED .ath username (chain-proven owner of the LINKED NFT — never the raw ownerUsername
+  // claim) is offered as a "Display as" option too. This is what surfaces e.g. "glasnost" in the Discovery card's
+  // chevron for a wallet you have no Private dialog with: contactDisplayContextForWallet only ever knew the raw
+  // address there, so the menu would otherwise list address + local name only.
+  const verifiedUsername = publicChannelProfileCache[channelProfileCacheKey(counterpartyWallet)]?.verifiedUsername;
+  if (verifiedUsername) {
+    let channelIdentity = null;
+    try { channelIdentity = plathoUsernameIdentity(verifiedUsername); } catch { channelIdentity = null; }
+    if (channelIdentity) extraIdentities.push(channelIdentity);
+  }
+  if (extraIdentities.length) {
+    // Non-mutating: return a shallow context whose variants include the extra identities (base may be a live
+    // thread object; don't graft the variant onto it as a side effect of opening a popover). uniqueDisplayIdentityVariants
+    // de-dupes downstream, so an own username that also matches the channel's verified name collapses to one row.
+    return { ...base, identityVariants: normalizeIdentityVariants([...extraIdentities, ...threadIdentityVariants(base)]) };
   }
   return base;
 }
@@ -3787,6 +3804,30 @@ function createInfoIcon() {
   return svg;
 }
 
+// Small inline copy glyph (two overlapping cards) for the "copy wallet address" affordance on the address row of
+// the "Display as" popover. Inline like createPencilIcon/createInfoIcon so it needs no new asset / SW-precache entry.
+function createCopyIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const rect = document.createElementNS(ns, 'rect');
+  rect.setAttribute('x', '9');
+  rect.setAttribute('y', '9');
+  rect.setAttribute('width', '12');
+  rect.setAttribute('height', '12');
+  rect.setAttribute('rx', '2');
+  const back = document.createElementNS(ns, 'path');
+  back.setAttribute('d', 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1');
+  svg.append(rect, back);
+  return svg;
+}
+
 // Anchored popover showing a channel's PROFILE (description + tags), reusing the shared identity-popover element
 // (position + outside-click-close for free). Cache-first: a warm profile renders instantly; a cold miss shows a
 // loading line and resolves via resolveChannelProfile (bounded per-author walk). For the user's OWN channel the
@@ -3992,6 +4033,49 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       editButton.append(createPencilIcon());
       editButton.addEventListener('click', openEdit);
       row.append(selectRow, editButton);
+      popover.append(row);
+      continue;
+    }
+    if (option.identity?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS && option.identity.value) {
+      // The raw-wallet-address option carries a copy affordance (owner request) so the full address is one tap
+      // away wherever this menu appears — Private header, public post chevron, discovery card. Mirrors the
+      // local-name row's select-row + trailing-icon-button layout. Copying is separate from selecting the
+      // display identity, so the click is stopped from bubbling and the popover stays open for a follow-up pick.
+      const row = document.createElement('div');
+      row.className = 'identity-variant-localname';
+      row.setAttribute('role', 'none');
+      const selectRow = identityVariantRow(option, option.key === selectedKey, (selected) => {
+        hideIdentityPopover();
+        onSelect(selected);
+      });
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'identity-variant-edit';
+      copyButton.setAttribute('role', 'menuitem');
+      copyButton.setAttribute('aria-label', t('profile.copyWalletAddress'));
+      copyButton.title = t('profile.copyWalletAddress');
+      copyButton.append(createCopyIcon());
+      const addressToCopy = option.identity.value;
+      copyButton.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        try {
+          await copyTextToClipboard(addressToCopy);
+          // In-place confirmation: no global toast exists, and flashWalletIdentityStatus targets the wallet
+          // screen (off-screen here). Briefly tint + relabel the button, then restore. If the popover closes
+          // first the node is detached and the restore is a harmless no-op.
+          copyButton.classList.add('identity-variant-copied');
+          copyButton.title = t('wallet.addressCopied');
+          copyButton.setAttribute('aria-label', t('wallet.addressCopied'));
+          window.setTimeout(() => {
+            copyButton.classList.remove('identity-variant-copied');
+            copyButton.title = t('profile.copyWalletAddress');
+            copyButton.setAttribute('aria-label', t('profile.copyWalletAddress'));
+          }, 1200);
+        } catch (error) {
+          console.error(error);
+        }
+      });
+      row.append(selectRow, copyButton);
       popover.append(row);
       continue;
     }
@@ -6387,6 +6471,31 @@ function renderPublicDiscovery(options = {}) {
   for (const channel of shown) publicDiscoveryBody.append(buildDiscoveryCard(channel));
 }
 
+// The discovery card's "Display as" chevron — same menu + selection semantics as a public post's chevron
+// (publicItemIdentityButton), keyed by the channel's author wallet directly. Returns null for your own channel
+// or a wallet-less entry (nothing to relabel). Toggles the shared identity popover open/closed on repeat clicks.
+function discoveryCardIdentityButton(authorWallet) {
+  if (!authorWallet || isOwnPublicAuthor(authorWallet)) return null;
+  const identityButton = document.createElement('button');
+  identityButton.type = 'button';
+  identityButton.className = 'icon-button discovery-card-identity';
+  identityButton.setAttribute('aria-haspopup', 'menu');
+  identityButton.setAttribute('aria-expanded', 'false');
+  identityButton.title = t('public.chooseDisplayName');
+  const identityIcon = document.createElement('span');
+  identityIcon.className = 'icon icon-chevron-down';
+  identityButton.append(identityIcon);
+  identityButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (identityPopover && !identityPopover.hidden && identityPopoverAnchor === identityButton) {
+      hideIdentityPopover();
+    } else {
+      showPublicChannelDisplayPopover({ authorWallet }, identityButton);
+    }
+  });
+  return identityButton;
+}
+
 function buildDiscoveryCard(channel) {
   const card = document.createElement('article');
   card.className = 'discovery-card';
@@ -6396,13 +6505,22 @@ function buildDiscoveryCard(channel) {
   avatar.className = 'avatar feed-avatar';
   avatar.setAttribute('aria-hidden', 'true');
   // Resolve the label at RENDER time so a username verified after the results were built shows on the next
-  // re-render (scheduleDiscoveryLabelRefresh) without rebuilding the discovery sample.
-  const label = publicAuthorLabel(channel.authorWallet) || channel.name;
+  // re-render (scheduleDiscoveryLabelRefresh) without rebuilding the discovery sample. An explicit "Display as"
+  // choice for this wallet (made via the chevron below, shared with the Private dialog + feed) wins over the
+  // verified channel username — same precedence as a subscribed channel (applyContactDisplayToRegistryChannel).
+  const label = resolveWalletChannelDisplay(channel.authorWallet)?.name
+    || publicAuthorLabel(channel.authorWallet)
+    || channel.name;
   setAvatarNode(avatar, String(label ?? 'P').slice(0, 1), publicAvatarUrlForWallet(channel.authorWallet));
   const name = document.createElement('span');
   name.className = 'discovery-card-name';
   name.textContent = label;
   head.append(avatar, name);
+  // "Display as" chevron — same affordance as a public post's author row: relabel this channel by its verified
+  // .ath username, wallet address (with copy), or a local name, shared per-counterparty with any Private dialog.
+  // Skipped for your own channel (nothing to relabel) or an entry with no author wallet.
+  const identityButton = discoveryCardIdentityButton(channel.authorWallet);
+  if (identityButton) head.append(identityButton);
   card.append(head);
   if (channel.description) {
     const desc = document.createElement('p');
@@ -6425,7 +6543,8 @@ function buildDiscoveryCard(channel) {
   actions.className = 'discovery-card-actions';
   const followButton = document.createElement('button');
   followButton.type = 'button';
-  followButton.className = 'discovery-follow-button';
+  // Shared plate-CTA look (same as "Add contact"/"Add channel") — owner-requested single source of truth.
+  followButton.className = 'discovery-cta-action';
   followButton.textContent = t('public.follow');
   followButton.addEventListener('click', () => {
     followButton.disabled = true;

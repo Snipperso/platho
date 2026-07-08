@@ -888,6 +888,12 @@ html[data-platho-telegram="true"] .install-header-button {
   display: block;
 }
 
+/* Transient "copied" confirmation on the address-row copy button (no global toast exists). */
+.identity-variant-edit.identity-variant-copied {
+  color: var(--accent);
+  border-color: rgba(48, 213, 176, 0.24);
+}
+
 .conversation-title h2 {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2213,6 +2219,17 @@ button.feed-item:hover {
   color: var(--text);
 }
 
+/* The "Display as" chevron sits flush at the right edge of the card head (same 30px icon-button as the feed
+   author-row chevron); margin-left:auto pushes it past the truncating name. */
+.icon-button.discovery-card-identity {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  margin-left: auto;
+}
+
 .discovery-card-desc {
   margin: 0;
   color: var(--text);
@@ -2227,18 +2244,9 @@ button.feed-item:hover {
   justify-content: flex-end;
 }
 
-.discovery-follow-button {
-  padding: 7px 16px;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  background: var(--accent);
-  color: #05201a;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.discovery-follow-button:disabled {
+/* The discovery follow button reuses the shared .discovery-cta-action plate ("Add contact" look). Its only extra
+   state is the post-click "following…" disabled look. */
+.discovery-cta-action:disabled {
   opacity: 0.55;
   cursor: default;
 }
@@ -2331,8 +2339,8 @@ button.feed-item:hover {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.discovery-cta-action:hover,
-.discovery-cta-action:focus-visible {
+.discovery-cta-action:not(:disabled):hover,
+.discovery-cta-action:not(:disabled):focus-visible {
   background: rgba(48, 213, 176, 0.16);
   border-color: rgba(48, 213, 176, 0.5);
   outline: none;

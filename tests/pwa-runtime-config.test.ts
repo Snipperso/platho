@@ -276,7 +276,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=711" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=712" type="module">/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -365,7 +365,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function baseContactDisplayContextForWallet\(counterpartyWallet\)/);
     expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, plathoWallet\.address\)/);
     expect(app).toMatch(/const ownUsername = readLinkedPlathoUsername\(plathoWallet\.address\)/);
-    expect(app).toMatch(/normalizeIdentityVariants\(\[ownIdentity, \.\.\.threadIdentityVariants\(base\)\]\)/);
+    expect(app).toMatch(/if \(ownIdentity\) extraIdentities\.push\(ownIdentity\)/);
+    expect(app).toMatch(/normalizeIdentityVariants\(\[\.\.\.extraIdentities, \.\.\.threadIdentityVariants\(base\)\]\)/);
 
     // Registry name overlay + per-wallet avatar resolution so feed, channels list and detail all show it.
     expect(app).toMatch(/\.map\(applyContactDisplayToRegistryChannel\)/);
@@ -4551,6 +4552,44 @@ describe('PWA runtime config guard', () => {
     expect(verify).toMatch(/if \(cached && cached\.value === null\) applyVerifiedChannelUsername\(key, ''\)/);
   });
 
+  it('PWA-DISCOVERY-IDENTITY-01: discovery card carries a "Display as" chevron + a copy-address button on the address row', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+
+    // A wallet's VERIFIED channel .ath (never the raw claim) is offered as a "Display as" option for ANY wallet, so
+    // the Discovery chevron surfaces e.g. "glasnost" for a channel with no Private dialog. Tolerant parse (no throw).
+    const ctx = app.slice(app.indexOf('function contactDisplayContextForWallet('), app.indexOf('function baseContactDisplayContextForWallet('));
+    expect(ctx).toMatch(/const verifiedUsername = publicChannelProfileCache\[channelProfileCacheKey\(counterpartyWallet\)\]\?\.verifiedUsername/);
+    expect(ctx).toMatch(/try \{ channelIdentity = plathoUsernameIdentity\(verifiedUsername\); \} catch \{ channelIdentity = null; \}/);
+    expect(ctx).toMatch(/if \(channelIdentity\) extraIdentities\.push\(channelIdentity\)/);
+
+    // Copy affordance on the raw-address row of the SHARED "Display as" popover (used by Private header + public
+    // post chevron + discovery chevron). Separate from selecting: click is stopped, popover stays open.
+    expect(app).toMatch(/function createCopyIcon\(\)/);
+    const pop = app.slice(app.indexOf('function renderDisplayAsPopover('), app.indexOf('function showIdentityPopover('));
+    expect(pop).toMatch(/option\.identity\?\.type === RECIPIENT_IDENTITY_TYPES\.WALLET_ADDRESS && option\.identity\.value/);
+    expect(pop).toMatch(/copyButton\.append\(createCopyIcon\(\)\)/);
+    expect(pop).toMatch(/await copyTextToClipboard\(addressToCopy\)/);
+    expect(pop).toMatch(/event\.stopPropagation\(\)/);
+    expect(pop).toMatch(/setAttribute\('aria-label', t\('profile\.copyWalletAddress'\)\)/);
+
+    // Discovery card: chevron opens the SAME public-channel display popover (skips own/wallet-less), and the card
+    // label honors an explicit "Display as" choice (resolveWalletChannelDisplay) over the verified username.
+    expect(app).toMatch(/function discoveryCardIdentityButton\(authorWallet\)/);
+    expect(app).toMatch(/if \(!authorWallet \|\| isOwnPublicAuthor\(authorWallet\)\) return null;/);
+    const card = app.slice(app.indexOf('function buildDiscoveryCard('), app.indexOf('function buildDiscoveryCard(') + 2000);
+    expect(card).toMatch(/const label = resolveWalletChannelDisplay\(channel\.authorWallet\)\?\.name/);
+    expect(card).toMatch(/const identityButton = discoveryCardIdentityButton\(channel\.authorWallet\);\s*if \(identityButton\) head\.append\(identityButton\)/);
+    // A choice made from the chevron relabels the (unsubscribed) discovery card too.
+    expect(app).toMatch(/renderPublicSurface\(\{ anchorUnread: false \}\);\s*\/\/ A choice made from a Discovery card[\s\S]*?scheduleDiscoveryLabelRefresh\(\);/);
+
+    // Styling: chevron = 30px icon-button pinned right; copied = transient accent tint. No NEW i18n keys (reused).
+    expect(css).toMatch(/\.icon-button\.discovery-card-identity \{[\s\S]*?margin-left: auto;/);
+    expect(css).toMatch(/\.identity-variant-edit\.identity-variant-copied \{[\s\S]*?color: var\(--accent\);/);
+    expect(EN_STRINGS['profile.copyWalletAddress']).toBe('Copy wallet address');
+    expect(EN_STRINGS['wallet.addressCopied']).toBe('Wallet address copied');
+  });
+
   it('PWA-DISCOVERY-01: newcomer discovery — bounded head-of-log scan, described-channel cards, follow flow', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -6163,11 +6202,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v782/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=241/);
+    expect(sw).toMatch(/platho-pwa-prototype-v783/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=242/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=711/);
+    expect(sw).toMatch(/\.\/app\.js\?v=712/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=18/);
