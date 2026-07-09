@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v728';
+const PLATHO_APP_RUNTIME_VERSION = 'v729';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -720,6 +720,11 @@ function copyPrivateThreadDiagnostic() {
         wallets: threadIdentityVariants(thread)
           .filter((variant) => variant?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS)
           .map((variant) => { try { return rawWalletAddress(variant.value); } catch { return String(variant.value); } }),
+        // ALL variants incl. usernames/DNS — the v728 dump hid the poisoned username grafts because it listed
+        // only wallet variants; a named variant on Saved is exactly what kept attracting peer messages there.
+        vars: threadIdentityVariants(thread)
+          .filter((variant) => variant?.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS)
+          .map((variant) => `${variant?.type ?? '?'}:${String(variant?.value ?? '')}`.slice(0, 60)),
         msgs: (thread.messages ?? []).length,
         // Per-message shape (last 12): direction, origin-meta (saved|published|received|sending|sent...), whether it
         // carries a chainEntryId (required to force-requeue for relocation), and a short own-text snippet. This is
@@ -10083,6 +10088,16 @@ async function threadForOpenedSenderCapsule(opened) {
       identityThread = healThreadWalletVariantConflict(identityThread, recipientWallet)
         ?? findThreadByIdentityVariants(threads, variants);
     }
+    // HARD INVARIANT (mirror of the receive path): a sent capsule addressed to a PEER may never target Saved —
+    // purge whatever stale named variant matched it there and re-resolve among the OTHER dialogs. A self note
+    // (recipient == own) still routes to Saved as always.
+    {
+      const own = ownRuntimeWalletRaw();
+      if (identityThread && own && recipientWallet !== own && isRealSavedThread(identityThread)) {
+        purgePeerVariantsFromSavedThread(identityThread);
+        identityThread = findThreadByIdentityVariants(threads.filter((thread) => !isRealSavedThread(thread)), variants);
+      }
+    }
     if (identityThread) return refreshThreadIdentityFromVariants(identityThread, variants);
     const created = createRecipientThread(recipientWallet);
     if (created?.ok && created.thread) {
@@ -10398,6 +10413,12 @@ function isSelfOpenedCapsule(opened) {
   const own = ownRuntimeWalletRaw();
   if (!own) return false;
   if (opened?.openedAs === 'recipient') {
+    // A self-note received on a 2nd device. The claimed senderWallet is SPOOFABLE (any peer can put own's address
+    // in the plaintext payload), so a bare `sender === own` would let a peer pin its message into "My notes" as if
+    // WE wrote it. Require CRYPTOGRAPHIC self-authorship: the capsule's sender signing key must BE our own messaging
+    // key. Fail closed if our key isn't loaded yet (→ treated as a peer message, never mis-pinned to Saved).
+    const ownSig = ownMessagingSignPubkeyValue();
+    if (!ownSig || senderSigningPublicKeyValue(opened) !== ownSig) return false;
     const sender = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
     return sender === own;
   }
@@ -10489,6 +10510,55 @@ function healThreadWalletVariantConflict(thread, peerWalletRaw) {
   return thread;
 }
 
+// The REAL Saved/self thread, identified STRICTLY by its immutable CREATION id (raw-normalized) — NEVER by
+// variants (variants are exactly what gets poisoned) and NEVER by the identity fallback (a named identity grafted
+// onto some other thread must not let it be mistaken for Saved). The real Saved is ALWAYS created by
+// createRecipientThread(own), so its id is always `dm:wallet_address:<own>`.
+function isRealSavedThread(thread) {
+  const own = ownRuntimeWalletRaw();
+  if (!own || !thread) return false;
+  const match = /^dm:wallet_address:(.+)$/.exec(String(thread.id ?? ''));
+  if (!match) return false;
+  try { return rawWalletAddress(decodeURIComponent(match[1])) === own; } catch { return false; }
+}
+
+// Restore the REAL Saved thread to its canonical shape: it wears ONLY the own wallet identity — never a
+// username/DNS variant, never a foreign wallet, never a named identity/displayIdentity. This is the single source
+// of Saved hygiene (routing purge + restore/heal both call it). Named grafts on "My notes" came from the pre-v729
+// add-contact bug (the owner literally saw peer usernames in Saved's "Display as" list); since
+// findThreadByIdentityVariants matches ANY variant kind, one stale grafted username kept attracting that peer's
+// messages into Saved forever, even after the sender resolved correctly.
+// IDEMPOTENT + no-op-safe: returns true ONLY when it actually changed something, so callers (esp. the per-sync
+// heal) never persist/re-encrypt Saved history on a tick when it is already clean. displayIdentity is cleared even
+// when a localLabel is set — Saved renders hardcoded as "My notes" and the label falls back to localLabel, so a
+// named displayIdentity on Saved has zero display value and is pure poison (the adversarial-review persist-storm).
+function purgeNamedIdentityFromSavedThread(savedThread) {
+  if (!savedThread) return false;
+  const own = isRealSavedThread(savedThread) ? ownRuntimeWalletRaw() : null;
+  if (!own) return false;
+  const isNamed = (variant) => Boolean(variant) && variant.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS;
+  const canonical = normalizeIdentityVariants(privateWalletIdentityVariants(own));
+  const canonicalKeys = new Set(canonical.map(identityKey));
+  const current = Array.isArray(savedThread.identityVariants) ? savedThread.identityVariants : [];
+  const variantsClean = current.length === canonical.length
+    && current.every((variant) => variant?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS && canonicalKeys.has(identityKey(variant)));
+  const changed = isNamed(savedThread.displayIdentity) || isNamed(savedThread.identity) || !variantsClean;
+  if (!changed) return false;
+  savedThread.displayIdentity = null;
+  savedThread.identity = canonical[0] ?? null;
+  savedThread.identityVariants = canonical;
+  applyThreadDisplayFields(savedThread);
+  return true;
+}
+
+// Routing-time entry point: a NON-self capsule matched the real Saved thread through a stale variant — restore
+// Saved to canonical (drops ALL named + foreign variants, not only the incoming one, so a sibling graft can't be
+// promoted to Saved's name) and persist only when it changed.
+function purgePeerVariantsFromSavedThread(savedThread) {
+  if (purgeNamedIdentityFromSavedThread(savedThread)) { persistThreadDisplayPreference(savedThread); return true; }
+  return false;
+}
+
 async function threadForChainCapsule(opened, entry) {
   if (opened?.openedAs === 'sender') {
     const target = await threadForOpenedSenderCapsule(opened);
@@ -10539,13 +10609,27 @@ async function threadForChainCapsule(opened, entry) {
     return thread;
   };
   const senderUsername = opened?.payload?.senderUsername ?? opened?.payload?.sender_username;
-  const variants = await privateWalletIdentityVariantsWithUsername(senderWallet, senderUsername);
+  // A SELF note (own->own) resolves WALLET-ONLY, exactly like threadForOpenedSenderCapsule: a note-to-self carries
+  // the owner's OWN .ath in senderUsername, and grafting that PLATHO_NFT variant onto the real Saved thread would
+  // then be stripped by the (now strict) per-sync heal on every scan — re-encrypting the WHOLE Saved history once
+  // per new self-note. Saved wears only the own wallet; the own username is never a variant on "My notes".
+  const variants = isSelfOpenedCapsule(opened)
+    ? privateWalletIdentityVariants(senderWallet)
+    : await privateWalletIdentityVariantsWithUsername(senderWallet, senderUsername);
   // Heal-on-touch: an incoming peer message must never land in the Saved self-thread (see
   // healThreadWalletVariantConflict); after a strip, re-find — the real peer dialog (if any) now matches.
   let identityThread = findThreadByIdentityVariants(threads, variants);
   if (identityThread) {
     identityThread = healThreadWalletVariantConflict(identityThread, rawWalletAddress(senderWallet))
       ?? findThreadByIdentityVariants(threads, variants);
+  }
+  // HARD INVARIANT: a NON-self capsule may NEVER target the real Saved thread, no matter WHICH stale variant
+  // matched it. Wallet grafts are stripped above, but a grafted peer USERNAME also matches (the v728 iPhone dump
+  // showed correctly-resolved peer messages still routed to Saved through exactly that) — purge the offending
+  // named variants off Saved and re-resolve among the OTHER dialogs. A self capsule still routes to Saved as always.
+  if (identityThread && !isSelfOpenedCapsule(opened) && isRealSavedThread(identityThread)) {
+    purgePeerVariantsFromSavedThread(identityThread);
+    identityThread = findThreadByIdentityVariants(threads.filter((thread) => !isRealSavedThread(thread)), variants);
   }
   if (identityThread) {
     // The sender may have TRANSFERRED away a .ath this dialog still wears. The fresh `variants` already exclude an
@@ -12427,18 +12511,15 @@ function healCrossWalletIdentityBleed({ requeueAnonymous = false, clearOwnContac
       }
       continue;
     }
-    if (threadPrimaryWalletRaw(thread) === own) {
-      // The REAL Saved/self dialog: it may carry NOTHING but the own wallet. Strip every FOREIGN wallet variant
-      // (raw-normalized, any form) + any foreign display name grafted onto it.
-      const foreign = new Set();
-      for (const variant of threadIdentityVariants(thread)) {
-        if (variant?.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) continue;
-        try { const raw = rawWalletAddress(variant.value); if (raw && raw !== own) foreign.add(raw); } catch { /* skip */ }
-      }
-      let dropped = false;
-      for (const walletRaw of foreign) dropped = stripWalletVariantFromThread(thread, walletRaw) || dropped;
-      if (thread.displayIdentity && !thread.localLabel) { thread.displayIdentity = null; applyThreadDisplayFields(thread); dropped = true; }
-      if (dropped) { persistThreadDisplayPreference(thread); healed = true; }
+    if (isRealSavedThread(thread)) {
+      // The REAL Saved/self dialog wears NOTHING but the own wallet — restore it to canonical (drops any foreign
+      // wallet AND any username/DNS graft AND a named displayIdentity, in one IDEMPOTENT step). Any named variant on
+      // "My notes" is a graft from the add-contact bug era (the owner literally saw peer usernames in Saved's
+      // "Display as" list); since routing matches ANY variant kind, one stale grafted username kept attracting that
+      // peer's messages into Saved forever — even after the sender resolved correctly (v728 iPhone dump). Idempotent:
+      // no persist/re-encrypt on a tick when Saved is already clean (the adversarial-review per-tick persist-storm).
+      // Addressing the OWN .ath still opens Saved fine: it resolves to the own WALLET first and matches by wallet.
+      if (purgeNamedIdentityFromSavedThread(thread)) { persistThreadDisplayPreference(thread); healed = true; }
       // Queue every MISFILED message's chain entry for relocation — the next private scan re-opens each, routes it to
       // its true dialog, and relocates it out of Saved. Once moved they leave Saved, so this converges; the id set
       // self-dedups. Two misfiling shapes both land here (the earlier heal handled only the first, which is why an
