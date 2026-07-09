@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v727';
+const PLATHO_APP_RUNTIME_VERSION = 'v728';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -721,6 +721,16 @@ function copyPrivateThreadDiagnostic() {
           .filter((variant) => variant?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS)
           .map((variant) => { try { return rawWalletAddress(variant.value); } catch { return String(variant.value); } }),
         msgs: (thread.messages ?? []).length,
+        // Per-message shape (last 12): direction, origin-meta (saved|published|received|sending|sent...), whether it
+        // carries a chainEntryId (required to force-requeue for relocation), and a short own-text snippet. This is
+        // what tells apart a genuine self-note (out/saved) from a misfiled own send to a peer (out/published) or a
+        // misfiled incoming peer message (in/received) stuck in "My notes".
+        m2: (thread.messages ?? []).slice(-12).map((message) => ({
+          d: message?.type ?? null,
+          m: message?.meta ?? null,
+          ce: message?.chainEntryId !== undefined && message?.chainEntryId !== null ? 'y' : 'n',
+          t: String(message?.text ?? '').slice(0, 20),
+        })),
       })),
       senderResolve: plathoSenderResolveDebug,
     };
@@ -2844,6 +2854,10 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   encryptedMessageStore = null;
   knownVaultKeyOwnerBySignPubkey.clear();
   knownVaultKeyRecordByWallet.clear();
+  // The own-raw fallback cache is wallet-scoped: it exists to survive a TRANSIENT background lock (same account),
+  // and must die with the account on a switch so the previous owner's address can never leak into the next
+  // account's routing guards (clearWalletScopedRuntimeState runs ONLY on a wallet change, never on a mere lock).
+  lastKnownOwnWalletRaw = null;
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   privateFileAttachments = [];
@@ -5493,7 +5507,13 @@ function setPublicChannelSubscribed(channelId, subscribed) {
     channels,
   };
   writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
-  rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
+  // preserveActive: TRUE. Following/unfollowing a public channel must NOT hijack the active PRIVATE dialog. With
+  // preserveActive:false this reset activeThreadId to threads[0] (always the Saved "My notes" thread), and the
+  // add-contact flow (selectOrCreateRecipientThread(peer) -> followContactPublicChannel(peer) -> here) then grafted
+  // the peer's identity onto Saved and sent the first message into "My notes" — the root of "I write to glasnost but
+  // it lands in my notes". preserveActive:true keeps the peer dialog selected (or, if the selection genuinely
+  // vanished, drops to the LIST — never silently to Saved).
+  rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: false });
   setPublicStatus(subscribed ? 'channel followed' : 'channel hidden');
   // Following a channel must pull its posts NOW (the fast-path would otherwise skip the walk until a reload).
@@ -9897,6 +9917,7 @@ function knownPrivateWalletForSigningPubkey(signPubkey) {
   if (!key) return null;
   const remembered = knownVaultKeyOwnerBySignPubkey.get(key);
   if (remembered) return remembered;
+  const ownRaw = ownRuntimeWalletRaw();
   for (const thread of threads) {
     const wallet = rawWalletAddress(ownerWalletFromThread(thread));
     if (!wallet) continue;
@@ -9907,6 +9928,15 @@ function knownPrivateWalletForSigningPubkey(signPubkey) {
         ...(message.capsules ?? []),
       ].filter(Boolean);
       if (capsules.some((capsule) => senderSigningPublicKeyValue({ capsule }) === key)) {
+        // A PEER's received message MISFILED into the Saved thread (its owner == own) must NOT teach us that the
+        // peer's signing key belongs to own. This heuristic reads "which dialog does a message with this sign key
+        // currently sit in" — but a poisoned Saved placement (stale-build era, or a transient mis-route) then caches
+        // peerSignKey -> own PERMANENTLY (the map is only cleared on lock), so resolveKnownPrivateSenderWallet returns
+        // own for every future peer message, the v723 own-guard nulls it, and it is diverted to an Anonymous thread
+        // forever — the migration "runs but never heals". Accept own-ownership ONLY from a GENUINE self-note (its sign
+        // key IS own's messaging key — e.g. a note received on a 2nd device); otherwise skip this misplaced message so
+        // the cryptographic resolveClaimedPrivateSenderWallet can bind the key to the real peer wallet.
+        if (ownRaw && sameWalletAddress(wallet, ownRaw) && key !== ownMessagingSignPubkeyValue()) continue;
         knownVaultKeyOwnerBySignPubkey.set(key, wallet);
         return wallet;
       }
@@ -10343,12 +10373,22 @@ function backoffOwnLinkedUsernameReconcile(linked, owner) {
 }
 
 // ---- Saved messages (v652): a private dialog with your OWN wallet, like Telegram's Saved -----------------------
+// Last own wallet we positively knew this session. The logged-in identity NEVER changes within a session, so this is
+// a safe fallback for the window where a background lock (Telegram/iOS suspends the webview) has nulled BOTH the
+// runtime wallet AND — on some webviews — the stored record. Without it ownRuntimeWalletRaw() briefly returns null,
+// which SKIPS every own-guard (threadForChainCapsule + privateEntryPublisherWallet): a peer capsule then resolves
+// sender==own and is filed into "My notes" as a plain 'in' message (never flagged pending, never re-routed). It is
+// only ever CONSULTED when both live sources are null; any live source overwrites it, so a wallet switch (which sets
+// a live wallet before any routing runs) can never bleed the previous account's address into the new one's routing.
+let lastKnownOwnWalletRaw = null;
 function ownRuntimeWalletRaw() {
   try {
     const address = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
-    return address ? rawWalletAddress(address) : null;
+    const raw = address ? rawWalletAddress(address) : null;
+    if (raw) { lastKnownOwnWalletRaw = raw; return raw; }
+    return lastKnownOwnWalletRaw;
   } catch {
-    return null;
+    return lastKnownOwnWalletRaw;
   }
 }
 
@@ -11005,7 +11045,7 @@ function queuePendingSenderRescan(entry, thread) {
   if (!pendingResolutionWithinGrace(thread)) return;
   try {
     const id = privateEntryIdText(entry);
-    if (id !== null && id !== undefined) pendingSavedRelocateEntryIds.add(String(id));
+    if (id !== null && id !== undefined) queueSavedRelocateEntryId(id);
   } catch { /* best-effort re-scan queue */ }
 }
 
@@ -11364,6 +11404,12 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified';
   const recipientHead = privateIndexLatestLink(recipientIndex);
   const senderHead = privateIndexLatestLink(senderIndex);
+  // Re-heal on EVERY sync, not just boot: a session poisoned mid-flight (a peer capsule filed into "My notes" while
+  // the wallet was transiently locked, or a variant grafted onto Saved) must self-correct WITHOUT waiting for a full
+  // re-unlock. This is the cheap Saved-only pass (strip foreign variants + queue Saved-stuck messages for relocation);
+  // the anonymous re-queue + own-contact-display write stay boot-only. Runs BEFORE the retry snapshot below so the
+  // queued ids are consumed in THIS pass.
+  healCrossWalletIdentityBleed();
   // Replay set: body-history gaps + cross-session stuck entries (#9), re-scanned
   // regardless of the advanced cursor. De-duped by value (an id can sit in both
   // stores). Manual "Sync messages" (forceHistoryRetry) uses the manual limits for
@@ -12346,13 +12392,41 @@ async function writeMessageToEncryptedHistory(thread, message) {
 // the next private scan (as a history-retry source) so they are re-opened, re-routed to the true sender's dialog,
 // and relocated out of Saved. Consumed + cleared by the scan; survives only until then.
 let pendingSavedRelocateEntryIds = new Set();
+// Requeue bound: the heal now also runs on EVERY sync tick, so a stuck message whose entry can never be re-opened
+// (unreadable body, sender permanently unresolvable) must not cost an RPC re-read on every tick forever. Cap the
+// requeues per entry per SESSION; a successful relocation removes the message from Saved so it stops being queued
+// naturally, and the next boot (new session) retries a capped-out entry afresh.
+const savedRelocateRequeueCounts = new Map();
+const SAVED_RELOCATE_MAX_REQUEUES_PER_SESSION = 3;
+function queueSavedRelocateEntryId(entryId) {
+  const key = String(entryId);
+  const count = savedRelocateRequeueCounts.get(key) ?? 0;
+  if (count >= SAVED_RELOCATE_MAX_REQUEUES_PER_SESSION) return;
+  savedRelocateRequeueCounts.set(key, count + 1);
+  pendingSavedRelocateEntryIds.add(key);
+}
 
-function healCrossWalletIdentityBleed() {
+// options.requeueAnonymous: also re-queue messages stuck in an ANONYMOUS / pending peer thread (a received capsule
+//   whose sender could not be resolved landed there — the flip side of the own-guard keeping it OUT of Saved). Once
+//   the sender's signing key resolves on a healthy sync, the re-opened message routes to the real wallet dialog and
+//   relocates. Bounded to the BOOT heal only (not every auto-sync) so a genuinely-anonymous sender is not re-scanned
+//   on every tick. options.clearOwnContactDisplay: run the (persisting) own-wallet contact-display cleanup — also
+//   boot-only; the per-tick auto-sync heal skips it to avoid a storage write every sync.
+function healCrossWalletIdentityBleed({ requeueAnonymous = false, clearOwnContactDisplay = false } = {}) {
   const own = ownRuntimeWalletRaw();
   if (!own) return false;
   let healed = false;
   for (const thread of threads) {
     if (thread.publicChannelId) continue;
+    if (requeueAnonymous && (isAnonymousPeerThread(thread) || thread.pendingIdentityResolution === true)) {
+      // Peer message(s) stuck without a resolved sender — re-queue for a re-route once resolution recovers.
+      for (const message of thread.messages ?? []) {
+        if (message?.chainEntryId !== undefined && message?.chainEntryId !== null) {
+          queueSavedRelocateEntryId(message.chainEntryId);
+        }
+      }
+      continue;
+    }
     if (threadPrimaryWalletRaw(thread) === own) {
       // The REAL Saved/self dialog: it may carry NOTHING but the own wallet. Strip every FOREIGN wallet variant
       // (raw-normalized, any form) + any foreign display name grafted onto it.
@@ -12365,14 +12439,23 @@ function healCrossWalletIdentityBleed() {
       for (const walletRaw of foreign) dropped = stripWalletVariantFromThread(thread, walletRaw) || dropped;
       if (thread.displayIdentity && !thread.localLabel) { thread.displayIdentity = null; applyThreadDisplayFields(thread); dropped = true; }
       if (dropped) { persistThreadDisplayPreference(thread); healed = true; }
-      // A RECEIVED ('in') message inside "My notes" is ALWAYS misfiled — a genuine self-note is stored 'out'
-      // (isSelfOpenedCapsule -> isOutgoing). Queue every such message's chain entry UNCONDITIONALLY (not only when
-      // we stripped a variant this run — the variant may have been cleaned on an earlier load while the messages
-      // stayed stuck): the next private scan re-opens each, routes it to the true sender's dialog, and relocates it
-      // out of Saved. Once moved they leave Saved, so this converges; the id set self-dedups.
+      // Queue every MISFILED message's chain entry for relocation — the next private scan re-opens each, routes it to
+      // its true dialog, and relocates it out of Saved. Once moved they leave Saved, so this converges; the id set
+      // self-dedups. Two misfiling shapes both land here (the earlier heal handled only the first, which is why an
+      // iPhone whose stuck messages were the user's OWN sends never healed):
+      //  - 'in'  message inside "My notes": ALWAYS misfiled (a genuine self-note is stored 'out', isSelfOpenedCapsule
+      //    -> isOutgoing). Queue unconditionally.
+      //  - 'out' message whose ORIGIN meta is 'published' (privateChainMessageMeta returns 'published' ONLY for an
+      //    own capsule addressed to a PEER, openedAs 'sender'; a genuine self-note is 'saved'). An own->peer send has
+      //    NO business in Saved -> it is a misfiled send (the "I write to glasnost but it lands in my notes" report).
+      //    The re-open uses the sender-recovery lane -> threadForOpenedSenderCapsule routes it to the recipient's
+      //    dialog. meta 'saved' self-notes are never matched, so this never perpetually re-scans genuine notes.
       for (const message of thread.messages ?? []) {
-        if (message?.type === 'in' && message?.chainEntryId !== undefined && message?.chainEntryId !== null) {
-          pendingSavedRelocateEntryIds.add(String(message.chainEntryId));
+        if (message?.chainEntryId === undefined || message?.chainEntryId === null) continue;
+        const misfiledIncoming = message.type === 'in';
+        const misfiledOwnSend = message.type === 'out' && /publish/i.test(String(message.meta ?? ''));
+        if (misfiledIncoming || misfiledOwnSend) {
+          queueSavedRelocateEntryId(message.chainEntryId);
         }
       }
     } else if (stripWalletVariantFromThread(thread, own)) {
@@ -12382,8 +12465,8 @@ function healCrossWalletIdentityBleed() {
     }
   }
   // Clear a leaked own-wallet contact-display entry (Fix D clears it on any own write, but a poisoned device may
-  // never write again — clear it here explicitly).
-  writeContactDisplayPreference(own, null);
+  // never write again — clear it here explicitly). Boot-only: it is a storage write, skipped on the per-tick sync.
+  if (clearOwnContactDisplay) writeContactDisplayPreference(own, null);
   return healed;
 }
 
@@ -12418,8 +12501,9 @@ async function restoreEncryptedMessageHistory() {
       }
         changed = true;
     }
-    // Heal AFTER the snapshots have been applied (they are what re-adds the poisoned variants).
-    if (healCrossWalletIdentityBleed()) changed = true;
+    // Heal AFTER the snapshots have been applied (they are what re-adds the poisoned variants). Boot run: also
+    // re-queue anonymous/pending-stuck peer messages and do the one-off own-contact-display cleanup.
+    if (healCrossWalletIdentityBleed({ requeueAnonymous: true, clearOwnContactDisplay: true })) changed = true;
     globalThis.plathoLastEncryptedHistoryRestore = {
       restored: restored.length,
       failed: failed.length,
@@ -15923,9 +16007,14 @@ newChatForm?.addEventListener('submit', async (event) => {
     // Open/create the dialog BY WALLET, then display it as the addressed username (unless a local name was given).
     const result = selectOrCreateRecipientThread(ownerWallet, { localLabel });
     if (!result.ok) { showNewChatHint(result.error); return; }
+    // Capture the just-opened peer dialog BEFORE following its channel — followContactPublicChannel rebuilds the
+    // thread list, and (pre-fix) could move activeThreadId off it. Re-pin activeThreadId to the peer afterward so the
+    // user lands in the peer dialog (never Saved) and the identity graft below targets the peer, not "My notes".
+    const openedThreadId = activeThreadId;
     followContactPublicChannel(ownerWallet);
+    if (openedThreadId && threads.some((item) => item.id === openedThreadId)) activeThreadId = openedThreadId;
     if (!localLabel) {
-      const thread = threads.find((item) => item.id === activeThreadId);
+      const thread = threads.find((item) => item.id === openedThreadId);
       if (thread) {
         refreshThreadIdentityFromVariants(thread, [identity]);
         thread.displayIdentity = identity;

@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=727" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=728" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6243,7 +6243,7 @@ describe('PWA runtime config guard', () => {
     expect(hydrate).toMatch(/if \(own && sameWalletAddress\(wallet, own\)\) \{ thread\.contactDisplaySynced = true; return false; \}/);
     // E. Devices poisoned BEFORE the fix self-heal on history restore: the own-wallet variant may live ONLY on the
     // real Saved thread, the Saved thread carries nothing but the own wallet, and the healed snapshots are rewritten.
-    expect(app).toMatch(/function healCrossWalletIdentityBleed\(\) \{/);
+    expect(app).toMatch(/function healCrossWalletIdentityBleed\(\{ requeueAnonymous = false, clearOwnContactDisplay = false \} = \{\}\) \{/);
     const heal = app.slice(
       app.indexOf('function healCrossWalletIdentityBleed('),
       app.indexOf('async function restoreEncryptedMessageHistory('),
@@ -6258,13 +6258,35 @@ describe('PWA runtime config guard', () => {
     expect(heal).toMatch(/stripWalletVariantFromThread\(thread, walletRaw\)/);
     expect(heal).not.toMatch(/savedIds\.has\(thread\.id\)/);
     expect(heal).toMatch(/persistThreadDisplayPreference\(thread\)/);
-    expect(app).toMatch(/if \(healCrossWalletIdentityBleed\(\)\) changed = true;/);
+    // The BOOT heal (restore) passes requeueAnonymous+clearOwnContactDisplay; the per-tick auto-sync heal calls the
+    // cheap Saved-only form (no args) so a session poisoned MID-flight self-corrects without a full re-unlock (F3).
+    expect(app).toMatch(/if \(healCrossWalletIdentityBleed\(\{ requeueAnonymous: true, clearOwnContactDisplay: true \}\)\) changed = true;/);
+    const sync = app.slice(app.indexOf('async function syncPrivateCapsulesFromChain('), app.indexOf('async function syncPrivateCapsulesFromChainOnce('));
+    expect(sync).toMatch(/healCrossWalletIdentityBleed\(\);/);
+    // The anonymous/pending re-queue (boot-only) relocates messages stuck in an Anonymous peer thread once their
+    // sender resolves — the flip side of the own-guard keeping a peer message OUT of Saved.
+    expect(heal).toMatch(/if \(requeueAnonymous && \(isAnonymousPeerThread\(thread\) \|\| thread\.pendingIdentityResolution === true\)\)/);
+    expect(heal).toMatch(/if \(clearOwnContactDisplay\) writeContactDisplayPreference\(own, null\)/);
     // F3. Messages already stuck inside "My notes" are queued (their chain entry ids) and replayed through the
-    // next private scan so they are re-opened, re-routed to the true sender, and relocated OUT of Saved. Only
-    // RECEIVED ('in') messages qualify (a genuine self-note is stored 'out'), and they are queued UNCONDITIONALLY
-    // (not gated on stripping a variant this run — the variant may have been cleaned earlier while messages stuck).
-    expect(heal).toMatch(/if \(message\?\.type === 'in' && message\?\.chainEntryId !== undefined/);
-    expect(heal).toMatch(/pendingSavedRelocateEntryIds\.add\(String\(message\.chainEntryId\)\)/);
+    // next private scan so they are re-opened, re-routed to their true dialog, and relocated OUT of Saved. TWO
+    // misfiling shapes qualify (both need a chainEntryId to re-scan):
+    //  - a RECEIVED ('in') message (a genuine self-note is stored 'out'); and
+    //  - an OWN SEND misfiled into Saved: type 'out' with origin meta 'published' (privateChainMessageMeta returns
+    //    'published' ONLY for an own capsule addressed to a PEER; a self-note is 'saved'). This is the "I write to
+    //    glasnost but it lands in my notes" report — the earlier heal queued only 'in', so those never relocated.
+    expect(heal).toMatch(/const misfiledIncoming = message\.type === 'in';/);
+    expect(heal).toMatch(/const misfiledOwnSend = message\.type === 'out' && \/publish\/i\.test\(String\(message\.meta \?\? ''\)\);/);
+    expect(heal).toMatch(/if \(misfiledIncoming \|\| misfiledOwnSend\)/);
+    // All requeues go through the SESSION-BOUNDED helper (max 3 per entry per session): the heal also runs on every
+    // sync tick, so a permanently-unresolvable stuck entry must not cost an RPC re-read per tick forever.
+    expect(heal).toMatch(/queueSavedRelocateEntryId\(message\.chainEntryId\)/);
+    expect(app).toMatch(/const SAVED_RELOCATE_MAX_REQUEUES_PER_SESSION = 3;/);
+    expect(app).toMatch(/if \(count >= SAVED_RELOCATE_MAX_REQUEUES_PER_SESSION\) return;/);
+    expect(app).not.toMatch(/pendingSavedRelocateEntryIds\.add\(String\(message\.chainEntryId\)\)/);
+    // The own-raw fallback cache dies with the account on a wallet switch (clearWalletScopedRuntimeState), never on
+    // a mere transient lock — the previous owner's address must not leak into the next account's routing guards.
+    const walletTeardown = app.slice(app.indexOf('function clearWalletScopedRuntimeState('), app.indexOf('function lockPlathoWallet('));
+    expect(walletTeardown).toMatch(/lastKnownOwnWalletRaw = null;/);
     expect(app).toMatch(/let pendingSavedRelocateEntryIds = new Set\(\)/);
     expect(app).toMatch(/const ids = \[\.\.\.pendingSavedRelocateEntryIds\]; pendingSavedRelocateEntryIds = new Set\(\); return ids;/);
     // The healThreadWalletVariantConflict discriminator is raw-normalized too.
@@ -6291,6 +6313,25 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function privateWalletIdentityVariants('),
     );
     expect(publisher).toMatch(/if \(own && sameWalletAddress\(wallet, own\)\) return null;/);
+    // G2. ownRuntimeWalletRaw() must NOT return null mid-session when a background lock nulled both live wallet
+    // sources — that skips every own-guard above and a peer capsule resolves sender==own -> filed into Saved. It
+    // caches the last positively-known own raw and falls back to it (own identity never changes within a session).
+    const ownRaw = app.slice(app.indexOf('function ownRuntimeWalletRaw('), app.indexOf('function isSelfOpenedCapsule('));
+    expect(app).toMatch(/let lastKnownOwnWalletRaw = null;/);
+    expect(ownRaw).toMatch(/if \(raw\) \{ lastKnownOwnWalletRaw = raw; return raw; \}\s*\n\s*return lastKnownOwnWalletRaw;/);
+    expect(ownRaw).toMatch(/catch \{\s*\n\s*return lastKnownOwnWalletRaw;/);
+    // G3. knownPrivateWalletForSigningPubkey infers a peer's wallet from the dialog a message currently sits in; a
+    // peer 'in' message MISFILED into Saved (owner==own) must NOT teach us that the peer's sign key belongs to own
+    // (that poisons the session cache -> every future peer resolve returns own -> own-guard nulls it -> Anonymous
+    // forever). Accept own-ownership only from a GENUINE self-note (its sign key IS own's messaging key).
+    const knownForSign = app.slice(app.indexOf('function knownPrivateWalletForSigningPubkey('), app.indexOf('function resolveKnownPrivateSenderWallet('));
+    expect(knownForSign).toMatch(/if \(ownRaw && sameWalletAddress\(wallet, ownRaw\) && key !== ownMessagingSignPubkeyValue\(\)\) continue;/);
+    // G4. Add-contact must NOT let followContactPublicChannel (which rebuilds threads) drop the just-opened peer
+    // dialog to Saved: the peer channel follow keeps the active PRIVATE selection (preserveActive:true), and the
+    // handler re-pins activeThreadId to the peer + grafts the username onto the PEER thread (not "My notes").
+    const setSub = app.slice(app.indexOf('function setPublicChannelSubscribed('), app.indexOf('function followContactPublicChannel('));
+    expect(setSub).toMatch(/rebuildThreadsFromPublicSubscriptions\(\{ preserveActive: true \}\);/);
+    expect(app).toMatch(/const openedThreadId = activeThreadId;\s*\n\s*followContactPublicChannel\(ownerWallet\);\s*\n\s*if \(openedThreadId && threads\.some\(\(item\) => item\.id === openedThreadId\)\) activeThreadId = openedThreadId;/);
     // F2. Heal-on-touch at ROUTING time (covers the pre-restore race + any residual re-poisoning): both receive
     // routers and the recipient-thread lookup resolve a Saved/peer conflict the moment they would hand back the
     // wrong thread — never waiting for the next history restore.
@@ -6393,7 +6434,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v802/);
+    expect(sw).toMatch(/platho-pwa-prototype-v803/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6401,7 +6442,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=247/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=727/);
+    expect(sw).toMatch(/\.\/app\.js\?v=728/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
