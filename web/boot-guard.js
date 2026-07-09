@@ -8,12 +8,13 @@
 // It measures the app's EXECUTION, not its DOWNLOAD: on a cold load (a hard
 // reload that bypasses the service-worker cache, or a brand-new visitor) the
 // whole module graph plus crypto vendor downloads over the network, which can
-// take many seconds and must NOT trip the guard. So it waits for the window
-// 'load' event - which fires only after every script has finished downloading
-// AND executing, and a healthy app sets 'ready' during that execution - then
-// allows a short grace for any post-load work before deciding. A hard cap
-// still surfaces a page that never finishes loading (a request that hangs
-// forever, so 'load' never arrives).
+// take many seconds and must NOT trip the guard. After 'load' (every script
+// downloaded AND executed; a healthy app is already 'ready') it allows a short
+// grace, then decides. BEFORE 'load' it is STALL-driven: it fires only once
+// downloads have genuinely STOPPED arriving (no subresource finished for
+// STALL_MS) - a slow-but-progressing cold load keeps resetting that and is
+// never mistaken for a stuck page - with an absolute backstop for a request
+// that hangs forever so 'load' never arrives.
 //
 // User-facing copy is English-only on purpose: this screen is served to every
 // visitor regardless of locale, so any other language hardcoded here would
@@ -26,11 +27,30 @@
   // end of the module's top-level execution, which completes before 'load' fires, so a
   // healthy boot is already 'ready' here; the grace only covers minor async settling.
   var GRACE_MS = Number(document.documentElement.getAttribute('data-platho-boot-guard-timeout-ms')) || 6000;
-  // Backstop for a load that never completes (a subresource that hangs forever): 'load'
-  // never fires, so only this absolute cap can surface the stuck page.
-  var HARD_CAP_MS = 45000;
+  // The pre-load guard is STALL-driven, not a fixed timer: it fires as soon as downloads have genuinely STOPPED
+  // (no subresource finished for STALL_MS) after a short floor -- NOT after some big fixed wait. The old fixed 45s
+  // fired MID-DOWNLOAD on a cold cache (boot-critical ~2.5MB of the ~4MB precache), showing the scary "did not
+  // load" screen while files were still arriving (Retry then loaded instantly because the cache had just warmed).
+  // A healthy-but-slow load keeps resources arriving, so the stall never trips; a genuinely hung request stops
+  // arriving and surfaces in ~STALL_MS. HARD_CAP_MS is only the ultimate backstop for a pathological slow dribble
+  // that never fully stalls yet never finishes.
+  var STALL_MS = 12000;      // no subresource finished for this long means stuck, not slow.
+  var MIN_WAIT_MS = 10000;   // never fire before this (a brief early stall while the first bytes arrive is normal).
+  var HARD_CAP_MS = 60000;   // ultimate backstop (a dribble that never stalls for STALL_MS yet never reaches ready).
   var bootErrors = [];
   var guardFired = false;
+  var lastProgressAt = Date.now();
+  // Each finished subresource (a module/vendor arriving) is DOWNLOAD PROGRESS. A slow-but-steady cold load keeps
+  // resetting this, so the cap check reschedules instead of misfiring. (buffered:true replays entries that landed
+  // before this observer attached.)
+  if (typeof PerformanceObserver !== 'undefined') {
+    try {
+      var progressObserver = new PerformanceObserver(function (list) {
+        if (list.getEntries && list.getEntries().length) lastProgressAt = Date.now();
+      });
+      progressObserver.observe({ type: 'resource', buffered: true });
+    } catch (observerError) { /* PerformanceObserver unavailable: the absolute cap still applies */ }
+  }
 
   function rememberBootError(text) {
     if (!text) return;
@@ -183,10 +203,28 @@
     document.body.appendChild(overlay);
   }
 
-  var hardCap = setTimeout(showGuard, HARD_CAP_MS);
+  // Pre-load watchdog: the module graph is still downloading/executing ('load' has not fired). Reach the cap
+  // ONLY on a genuine stall -- while resources keep arriving (lastProgressAt fresh), reschedule so a slow cold
+  // download is never mistaken for a hung page. 'ready' (set at the app module's top-level end) stops it; once
+  // 'load' fires, afterLoad's short grace owns the decision instead.
+  var startedAt = Date.now();
+  function hardCapCheck() {
+    if (guardFired) return;
+    if (document.documentElement.getAttribute('data-platho-app-js') === 'ready') return;
+    if (document.readyState === 'complete') return; // 'load' fired -> afterLoad grace path
+    var now = Date.now();
+    var elapsed = now - startedAt;
+    var stalled = (now - lastProgressAt) >= STALL_MS;
+    // Fire on a genuine STALL (past the floor) or, failing that, the ultimate backstop.
+    if ((elapsed >= MIN_WAIT_MS && stalled) || elapsed >= HARD_CAP_MS) {
+      showGuard();
+      return;
+    }
+    setTimeout(hardCapCheck, 2000);
+  }
+  setTimeout(hardCapCheck, 2000);
 
   function afterLoad() {
-    clearTimeout(hardCap);
     setTimeout(showGuard, GRACE_MS);
   }
 
