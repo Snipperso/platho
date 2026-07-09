@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=725" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=726" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1065,6 +1065,9 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.conversation-header\s*{[\s\S]*display: grid;[\s\S]*grid-template-columns: var\(--header-button-size\) 44px minmax\(0, 1fr\) max-content;/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.conversation-header \.conversation-title h2,\s*\.conversation-header \.conversation-title p,\s*\.conversation-header \.identity-title-label\s*{[\s\S]*max-width: 100%;/);
     expect(css).toMatch(/\.composer-cost-status\s*{[\s\S]*overflow-wrap: anywhere;/);
+    // v726: the cost/reserve/discount line is capped at 3 lines (line-height 1.35) and scrolls its overflow so it
+    // can't push the composer tall on a narrow screen.
+    expect(css).toMatch(/\.composer-cost-status\s*{[\s\S]*max-height: calc\(1\.35em \* 3\);\s*\n\s*overflow-y: auto;/);
     expect(css).toMatch(/\.message\[data-status="sending"\] \.bubble/);
     expect(app).toMatch(/function identityDisplayKey/);
     expect(app).toMatch(/function uniqueDisplayIdentityVariants/);
@@ -6382,15 +6385,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v800/);
+    expect(sw).toMatch(/platho-pwa-prototype-v801/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=246/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=247/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=725/);
+    expect(sw).toMatch(/\.\/app\.js\?v=726/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
