@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v732';
+const PLATHO_APP_RUNTIME_VERSION = 'v733';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -23909,9 +23909,13 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
         // the same ~1s it would have re-broadcast the bounced one anyway. Batch 0 always POSTs (its nonce IS
         // current). No double-send: retryUnconfirmedVaultPublishBroadcasts reads the chain nonce FIRST.
         lastResult = batchIndex === 0 ? await sendVaultExternalBoc(batchExternal) : null;
+        // externalBytes = the REAL serialized external BoC size (base64 -> bytes). The build guard already asserts
+        // < 65535, so a value NEAR the ceiling on a specific image is the tell for "passes emulation, dropped by
+        // validators" (diagnostic for the "one image won't send" report).
+        const externalBytes = Math.floor(((batchExternal?.boc?.length ?? 0) * 3) / 4);
         console.info('[platho] send timeline', batchIndex === 0
-          ? { event: 'external POSTed (200)', nonce: String(clientNonce), batchIndex }
-          : { event: 'signed, POST deferred until prior nonce lands', nonce: String(clientNonce), batchIndex });
+          ? { event: 'external POSTed (200)', nonce: String(clientNonce), batchIndex, externalBytes, parts: batch.items.length }
+          : { event: 'signed, POST deferred until prior nonce lands', nonce: String(clientNonce), batchIndex, externalBytes, parts: batch.items.length });
         batch.result = lastResult;
         for (const item of batch.items) item.result = lastResult;
         // The signed external is now out (or, for batchIndex > 0, will be re-broadcast the moment N is reached):
@@ -24456,6 +24460,15 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
         code: error?.code ?? null,
         detail: error?.responseBody ?? retryError,
         clientNonce: String(clientNonce),
+      });
+      // Surface the toncenter/validator REASON inline in the send timeline (same prefix the owner screenshots), so
+      // a POST-200-but-never-lands image self-reports WHY on the next attempt instead of only in a collapsed warn.
+      console.info('[platho] send timeline', {
+        event: 'broadcast POST failed',
+        nonce: String(clientNonce),
+        status: error?.status ?? null,
+        detail: String(error?.responseBody ?? retryError ?? '').slice(0, 200),
+        externalBytes: Math.floor(((head.externalBoc?.length ?? 0) * 3) / 4),
       });
       if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) continue;
       throw error;
