@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=736" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=737" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5127,7 +5127,25 @@ describe('PWA runtime config guard', () => {
     expect(pub).toMatch(/await publishCapsuleThroughVault\(capsules\[0\], publishOptions\)/);
     expect(pub).not.toMatch(/publishCapsulesThroughVault/);
     expect(pub).toMatch(/=== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\)/);
-    expect(pub).toMatch(/writePrefsDirty\(false\)/);
+    // EDIT-EPOCH GUARD (v737): a follow/unfollow during the publish/confirm window is NOT in the captured snapshot,
+    // so clearing dirty on confirm would silently discard it. The save captures the epoch at snapshot time and the
+    // CONFIRMED branches clear dirty ONLY when the epoch is unchanged (else keep dirty -> "unsaved" for a re-save).
+    expect(app).toMatch(/let prefsEditEpoch = 0;/);
+    expect(app).toMatch(/function markPrefsDirty\(\) \{\s*\n\s*prefsEditEpoch \+= 1;/);
+    expect(pub).toMatch(/const savedEditEpoch = prefsEditEpoch;/);
+    expect(pub).toMatch(/const stale = prefsEditEpoch !== savedEditEpoch;\s*\n\s*if \(!stale\) writePrefsDirty\(false\);/);
+    // A SUBMITTED publish (broadcast done, self CapsuleHub entry not confirmable inline) starts a BACKGROUND
+    // confirm — else it dead-ended on "waiting - retry" -> "not saved" even though the snapshot landed.
+    expect(pub).toMatch(/confirmPrefsPublishInBackground\(result\?\.publishState, snapshot, savedEditEpoch\)/);
+    const bg = app.slice(app.indexOf('async function confirmPrefsPublishInBackground('), app.indexOf('async function publishPrefsSnapshot('));
+    expect(bg).toMatch(/async function confirmPrefsPublishInBackground\(publishState, snapshot, savedEditEpoch\)/);
+    expect(bg).toMatch(/const generation = \+\+prefsConfirmGeneration;/);
+    expect(bg).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{\}\);/); // FULL confirm (entry-scan), not receiptOnly
+    expect(bg).toMatch(/if \(publishState\.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\) \{/);
+    expect(bg).toMatch(/const stale = prefsEditEpoch !== savedEditEpoch;\s*\n\s*if \(!stale\) writePrefsDirty\(false\);/);
+    expect(bg).toMatch(/if \(generation !== prefsConfirmGeneration\) return;/);
+    // The confirm is superseded on a wallet switch so it never stamps the new wallet's per-wallet prefs.
+    expect(app).toMatch(/prefsConfirmGeneration \+= 1;\s*\n\s*privateImageAttachments = \[\];/);
   });
 
   it('PWA-PREFS-CHAT-FILTER-01: a prefs capsule is diverted before thread routing and never becomes a chat message', () => {
@@ -6548,7 +6566,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v811/);
+    expect(sw).toMatch(/platho-pwa-prototype-v812/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6556,7 +6574,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=250/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=736/);
+    expect(sw).toMatch(/\.\/app\.js\?v=737/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
