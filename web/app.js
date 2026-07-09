@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v735';
+const PLATHO_APP_RUNTIME_VERSION = 'v736';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -884,6 +884,13 @@ const profileAvatarInlineSubmitKeys = new Map();
 const profileAvatarRecoveryTicksInFlight = new Set();
 let profileAvatarPublishRecoverySeq = 0;
 let vaultMoveDirections = { TON: 'to-vault', ATH: 'to-vault' };
+// Per-asset deposit/withdraw "processing" lock: from the tap until the moved funds actually leave the source
+// pocket (a balance change from the pre-move snapshot) or a safety timeout. The submit button shows a spinner and
+// is disabled meanwhile — so it is obvious the tap registered and a second tap can't double-submit while the
+// transaction settles. Cleared by watchVaultMoveProcessing (the queued post-transaction balance refreshes update
+// vaultMoveBalance, which the watcher polls) or on an immediate broadcast error.
+const VAULT_MOVE_PROCESSING_MAX_MS = 30000;
+const vaultMoveProcessing = { TON: null, ATH: null };
 let deferredInstallPrompt = null;
 let installedRelatedPwaDetected = false;
 let walletIdentityFlashTimer = null;
@@ -2863,6 +2870,11 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // and must die with the account on a switch so the previous owner's address can never leak into the next
   // account's routing guards (clearWalletScopedRuntimeState runs ONLY on a wallet change, never on a mere lock).
   lastKnownOwnWalletRaw = null;
+  // A vault-move button lock is scoped to the wallet that started the move — drop it on a wallet change so the NEW
+  // wallet's deposit/withdraw button never inherits a spinner for a move it never made (else it stays locked until
+  // the old 30s timeout). Sibling to plathoAccountActivationPending, which queueVaultRefreshAfterWalletChange clears.
+  vaultMoveProcessing.TON = null;
+  vaultMoveProcessing.ATH = null;
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   privateFileAttachments = [];
@@ -16498,6 +16510,15 @@ document.addEventListener('click', (event) => {
   if (identityPopover.contains(event.target)) return;
   hideIdentityPopover();
 });
+// Close the anchored identity/channel-about popover on ANY scroll (the feed, the conversation, the page): it is
+// pinned to a button's screen position, so a scroll drifts it away from its anchor -- dismiss instead. Scroll
+// events don't bubble, so capture:true catches a scroll on any nested container; skip a scroll INSIDE the popover
+// itself (a long description can scroll without closing).
+window.addEventListener('scroll', (event) => {
+  if (!identityPopover || identityPopover.hidden) return;
+  if (identityPopover.contains(event.target)) return;
+  hideIdentityPopover();
+}, { capture: true, passive: true });
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   if (imageLightboxDialog && !imageLightboxDialog.hidden) {
@@ -16557,23 +16578,35 @@ for (const card of vaultMoveCards) {
   card.form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!plathoWallet) return;
+    if (vaultMoveProcessingActive(card.asset)) return; // already in flight — ignore a double-submit
     const raw = card.input?.value ?? '';
     const direction = vaultMoveDirection(card.asset);
     try {
-      if (card.submitButton) card.submitButton.disabled = true;
+      // Lock + spinner from the tap. The lock persists AFTER the broadcast resolves (watchVaultMoveProcessing)
+      // until the moved funds actually leave the source pocket or the safety timeout — so the button stays busy
+      // "until the funds transfer" instead of re-enabling the instant the external is merely broadcast.
+      beginVaultMoveProcessing(card);
       const amount = card.asset === 'ATH' ? parseAthAmountAtomic(raw) : parseTonAmountNanotons(raw);
+      let moveResult;
       if (card.asset === 'TON' && direction === 'to-vault') {
-        await submitVaultDepositTonAmount(amount); // trap-guard confirm now lives inside submitVaultDepositTonAmount
+        moveResult = await submitVaultDepositTonAmount(amount); // trap-guard confirm lives inside; returns null on cancel
       } else if (card.asset === 'TON') {
-        await submitVaultWithdrawTonAmount(amount);
+        moveResult = await submitVaultWithdrawTonAmount(amount);
       } else if (direction === 'to-vault') {
-        await submitVaultDepositAthAmount(amount);
+        moveResult = await submitVaultDepositAthAmount(amount);
       } else {
-        await submitVaultWithdrawAthAmount(amount);
+        moveResult = await submitVaultWithdrawAthAmount(amount);
+      }
+      // null = the move never broadcast (the trap-guard confirm was declined; the sole no-op return path) — unlock
+      // now instead of sitting spinning until the timeout. A successful broadcast returns a truthy result.
+      if (moveResult === null) {
+        endVaultMoveProcessing(card.asset);
+        return;
       }
       if (card.input) card.input.value = '';
       queueVaultPostTransactionRefresh();
     } catch (error) {
+      endVaultMoveProcessing(card.asset); // the move never broadcast — unlock immediately for a retry
       const rateLimited = noteTonRpcRateLimit(error);
       setVaultStatus(rateLimited ? 'RPC busy, retrying' : vaultActionBlockedStatusText(error, 'move blocked'));
       if (!rateLimited) console.error(error);
@@ -16736,6 +16769,21 @@ async function openAddPublicChannelDialog() {
       title: t('public.addChannelTitle'),
       hint: t('public.addChannelHint'),
       submitLabel: t('public.addChannelSubmit'),
+      // Resolve the channel IN-PLACE on submit (validateSubmit): the shared form handler disables the "Add channel"
+      // button and shows the "checking" hint WHILE the lookup runs, so a double-tap can't fire a second resolve; it
+      // keeps the dialog OPEN with the error inline on failure (no close+reopen flicker) and closes with the
+      // resolved data on success — the same pattern add-contact uses.
+      validateSubmit: async (values) => {
+        try {
+          const resolved = await resolvePublicChannelIdentity(values.channelIdentity);
+          return { ok: true, result: { ...values, resolved } };
+        } catch (error) {
+          if (error instanceof UsernameNotRegisteredError) {
+            return { ok: false, error: t('chat.usernameNotRegistered', { name: canonicalUsernameDisplay(values.channelIdentity) }) };
+          }
+          return { ok: false, error: t('dialog.invalidInput') };
+        }
+      },
       fields: [
         {
           id: 'channelIdentity',
@@ -16753,8 +16801,7 @@ async function openAddPublicChannelDialog() {
       ],
     });
     if (!result) return;
-    const resolved = await resolvePublicChannelIdentity(result.channelIdentity);
-    const { identity, authorWallet } = resolved;
+    const { identity, authorWallet } = result.resolved;
     const localLabel = result.localLabel?.trim();
     const name = localLabel || (
       identity.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS
@@ -20710,6 +20757,57 @@ function refreshNavVaultBalance() {
   }
 }
 
+// TRUE while a deposit/withdraw for this asset is in flight (button locked). Self-expires when the source-pocket
+// balance changes from the pre-move snapshot (the funds moved) or the safety timeout elapses; reading it also
+// PRUNES an expired entry, so callers never see a stuck lock.
+// Watch BOTH pockets, not just the source: a DEPOSIT's source (wallet) external balance loads on the slow DEFERRED
+// read and starts null, so keying on it alone spun the spinner the whole 30s timeout even though the deposit
+// settled — but the TARGET (vault) balance is refreshed by the IMMEDIATE get_user read, so it registers the move
+// promptly. (Withdraw is the mirror: its source, the vault, is the immediate read.) A null before/after never
+// counts as "changed" (the balance simply isn't loaded yet).
+function vaultMoveBalanceChanged(before, current) {
+  return current !== null && before !== null && current !== before;
+}
+function vaultMoveProcessingActive(asset) {
+  const state = vaultMoveProcessing[asset];
+  if (!state) return false;
+  const moved = vaultMoveBalanceChanged(state.beforeSource, vaultMoveBalance(state.sourcePocket, asset))
+    || vaultMoveBalanceChanged(state.beforeTarget, vaultMoveBalance(state.targetPocket, asset));
+  if (moved || Date.now() >= state.until) {
+    vaultMoveProcessing[asset] = null;
+    return false;
+  }
+  return true;
+}
+
+function beginVaultMoveProcessing(card) {
+  const sourcePocket = vaultMoveSourcePocket(card.asset);
+  const targetPocket = vaultMoveTargetPocket(card.asset);
+  vaultMoveProcessing[card.asset] = {
+    sourcePocket,
+    targetPocket,
+    beforeSource: vaultMoveBalance(sourcePocket, card.asset),
+    beforeTarget: vaultMoveBalance(targetPocket, card.asset),
+    until: Date.now() + VAULT_MOVE_PROCESSING_MAX_MS,
+  };
+  refreshVaultMoveWidget();
+  watchVaultMoveProcessing(card.asset);
+}
+
+function endVaultMoveProcessing(asset) {
+  vaultMoveProcessing[asset] = null;
+}
+
+// Poll the lock so it lifts (re-rendering the button) the moment the moved funds land — the post-transaction
+// balance refreshes update vaultMoveBalance, which vaultMoveProcessingActive reads — or at the safety timeout.
+function watchVaultMoveProcessing(asset) {
+  if (!vaultMoveProcessingActive(asset)) {
+    refreshVaultMoveWidget();
+    return;
+  }
+  window.setTimeout(() => watchVaultMoveProcessing(asset), 1500);
+}
+
 function refreshVaultMoveWidget() {
   refreshNavVaultBalance();
   for (const card of vaultMoveCards) {
@@ -20722,22 +20820,27 @@ function refreshVaultMoveWidget() {
     setText(card.vaultBalance, vaultMoveFormattedBalance('vault', card.asset));
     setText(card.fromLabel, sourceLabel);
     setText(card.toLabel, targetLabel);
+    const processing = vaultMoveProcessingActive(card.asset);
     if (card.submitButton) {
       // card.asset is the internal key ('TON'/'ATH'); show the user-facing coin label (TON -> GRAM rebrand).
       const assetLabel = card.asset === 'ATH' ? 'ATH' : 'GRAM';
       card.submitButton.textContent = direction === 'to-vault'
         ? t('vault.moveToVault', { asset: assetLabel })
         : t('vault.moveToWallet', { asset: assetLabel });
-      card.submitButton.disabled = !plathoWallet;
+      // Processing: locked + spinner (data-processing) so the tap is obviously registered and can't double-fire.
+      card.submitButton.disabled = !plathoWallet || processing;
+      if (processing) card.submitButton.dataset.processing = 'true';
+      else delete card.submitButton.dataset.processing;
     }
     if (card.form) {
       card.form.dataset.direction = direction;
       card.form.dataset.source = source;
       card.form.dataset.target = target;
     }
-    if (card.input) card.input.disabled = !plathoWallet;
-    if (card.maxButton) card.maxButton.disabled = !plathoWallet;
-    if (card.directionButton) card.directionButton.disabled = !plathoWallet;
+    // The whole card freezes while a move settles — no changing the amount / direction mid-transaction.
+    if (card.input) card.input.disabled = !plathoWallet || processing;
+    if (card.maxButton) card.maxButton.disabled = !plathoWallet || processing;
+    if (card.directionButton) card.directionButton.disabled = !plathoWallet || processing;
     // Explain the wallet reserve while un-activated (answers "why does some GRAM stay after MAX?"): created
     // lazily, class-styled (prod CSP bans inline styles).
     if (card.asset === 'TON') {

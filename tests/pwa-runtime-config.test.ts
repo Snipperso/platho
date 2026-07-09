@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=735" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=736" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -844,6 +844,11 @@ describe('PWA runtime config guard', () => {
     const shortVp = css.slice(shortVpIdx, shortVpIdx + 420);
     expect(shortVp).toMatch(/\.modal-backdrop \{\s*align-items: start;\s*overflow-y: auto;/);
     expect(shortVp).toMatch(/\.action-dialog,\s*\n\s*\.quick-start-dialog \{\s*max-height: none;\s*overflow: visible;/);
+    // The base action-dialog scrolls as a WHOLE (like quick-start), NOT via an inner .action-fields scroller that
+    // trapped the scroll around a tall image preview and buried the quality dropdown below it (owner). So no
+    // fields-only overflow scroller, and the whole dialog is capped + scrollable.
+    expect(css).toMatch(/\.action-dialog \{\s*\n\s*max-height: calc\(var\(--app-viewport-height, 100dvh\) - 40px\);\s*\n\s*overflow-y: auto;\s*\n\s*\}/);
+    expect(css).not.toMatch(/\.action-dialog > \.action-fields \{\s*\n\s*flex: 1 1 auto;/);
     expect(css).toMatch(/icon-open-app/);
     expect(enCopy).toMatch(/On-chain size/);
     expect(app).toMatch(/requestCompressedImageFile/);
@@ -1597,6 +1602,38 @@ describe('PWA runtime config guard', () => {
     expect(helperSource).toMatch(/return t\('vault\.unlockActivateBeforeActions'\)/);
     expect(EN_STRINGS['vault.unlockActivateBeforeActions']).toBe('Unlock and activate Platho account before Vault actions');
     expect(submitSource).toMatch(/vaultActionBlockedStatusText\(error, 'move blocked'\)/);
+  });
+
+  it('PWA-VAULT-MOVE-03: the deposit/withdraw button locks with a spinner until the funds settle', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const submitSource = app.slice(
+      app.indexOf('for (const card of vaultMoveCards)'),
+      app.indexOf('publicSyncWindowSelect?.addEventListener'),
+    );
+    // The tap locks the card; a re-tap while in flight is ignored; a declined trap-guard (null) unlocks at once;
+    // a broadcast keeps the lock until the moved funds settle (watchVaultMoveProcessing) or the safety timeout.
+    expect(submitSource).toMatch(/if \(vaultMoveProcessingActive\(card\.asset\)\) return;/);
+    expect(submitSource).toMatch(/beginVaultMoveProcessing\(card\);/);
+    expect(submitSource).toMatch(/if \(moveResult === null\) \{\s*\n\s*endVaultMoveProcessing\(card\.asset\);/);
+    // The lock lifts when EITHER pocket balance changes from the pre-move snapshot (a deposit's source/wallet loads
+    // on the slow deferred read, but its target/vault is the immediate get_user read, so watching both clears it
+    // promptly), or at the timeout.
+    expect(app).toMatch(/function vaultMoveProcessingActive\(asset\) \{/);
+    expect(app).toMatch(/const moved = vaultMoveBalanceChanged\(state\.beforeSource, vaultMoveBalance\(state\.sourcePocket, asset\)\)\s*\n\s*\|\| vaultMoveBalanceChanged\(state\.beforeTarget, vaultMoveBalance\(state\.targetPocket, asset\)\);/);
+    expect(app).toMatch(/if \(moved \|\| Date\.now\(\) >= state\.until\) \{\s*\n\s*vaultMoveProcessing\[asset\] = null;/);
+    expect(app).toMatch(/beforeSource: vaultMoveBalance\(sourcePocket, card\.asset\),\s*\n\s*beforeTarget: vaultMoveBalance\(targetPocket, card\.asset\),/);
+    expect(app).toMatch(/function watchVaultMoveProcessing\(asset\) \{/);
+    // The lock is wallet-scoped: a wallet switch drops it so the new wallet never inherits a stale spinner.
+    expect(app).toMatch(/vaultMoveProcessing\.TON = null;\s*\n\s*vaultMoveProcessing\.ATH = null;/);
+    // The widget renders the lock: disabled + data-processing (spinner); the whole card freezes.
+    const widget = app.slice(app.indexOf('function refreshVaultMoveWidget()'), app.indexOf('async function refreshVaultDashboard()'));
+    expect(widget).toMatch(/const processing = vaultMoveProcessingActive\(card\.asset\);/);
+    expect(widget).toMatch(/card\.submitButton\.disabled = !plathoWallet \|\| processing;/);
+    expect(widget).toMatch(/if \(processing\) card\.submitButton\.dataset\.processing = 'true';/);
+    // The spinner overlay (class/attribute-driven; prod CSP bans inline styles).
+    expect(css).toMatch(/\.vault-move-submit\[data-processing="true"\]\s*{[\s\S]*?color: transparent;/);
+    expect(css).toMatch(/\.vault-move-submit\[data-processing="true"\]::after\s*{[\s\S]*?animation: rail-balance-spin/);
   });
 
   it('PWA-VAULT-MOVE-02: TON max from Vault leaves the withdrawal execution reserve', () => {
@@ -4665,6 +4702,18 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');
   });
 
+  it('PWA-POPOVER-SCROLL-01: the anchored identity/channel-about popover closes on scroll (not only outside-click)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The popover is pinned to a button's screen position, so a scroll drifts it off its anchor -> dismiss it.
+    // Scroll doesn't bubble, so capture:true catches a scroll on ANY nested container (the feed, the conversation,
+    // the page); a scroll INSIDE the popover (a long description) does NOT close it.
+    const scrollClose = app.slice(app.indexOf("window.addEventListener('scroll', (event) => {"), app.indexOf("window.addEventListener('scroll', (event) => {") + 360);
+    expect(scrollClose).toMatch(/if \(!identityPopover \|\| identityPopover\.hidden\) return;/);
+    expect(scrollClose).toMatch(/if \(identityPopover\.contains\(event\.target\)\) return;/);
+    expect(scrollClose).toMatch(/hideIdentityPopover\(\);/);
+    expect(scrollClose).toMatch(/\}, \{ capture: true, passive: true \}\);/);
+  });
+
   it('PWA-DOCS-I18N-01: the docs viewer loads the current-locale doc, falling back to the English base', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // English uses the base path; other locales use the <name>.<locale>.md sibling.
@@ -5173,6 +5222,15 @@ describe('PWA runtime config guard', () => {
     expect(fn).toMatch(/validateSubmit: async \(values\) =>/);
     expect(fn).toMatch(/verifyWalletDisplayIdentity\(normalizedMode, chosen, plathoWallet\)/);
     expect(fn).not.toMatch(/while \(true\)/);
+    // The submit button is DISABLED while the async gate runs (no double-submit) and the "checking" hint shows.
+    expect(submit).toMatch(/if \(actionSubmitButton\) actionSubmitButton\.disabled = true;\s*\n\s*if \(actionHint\) \{ actionHint\.textContent = dialogAtStart\.checkingHint/);
+    // Add-public-channel resolves the channel INSIDE validateSubmit, so the "Add channel" button locks while the
+    // .ath/.ton/wallet lookup runs and the dialog no longer closes-then-reopens on a bad name.
+    const addChan = app.slice(app.indexOf('async function openAddPublicChannelDialog()'), app.indexOf('async function openAddPublicChannelDialog()') + 2400);
+    expect(addChan).toMatch(/validateSubmit: async \(values\) => \{/);
+    expect(addChan).toMatch(/const resolved = await resolvePublicChannelIdentity\(values\.channelIdentity\);/);
+    expect(addChan).toMatch(/return \{ ok: true, result: \{ \.\.\.values, resolved \} \};/);
+    expect(addChan).toMatch(/const \{ identity, authorWallet \} = result\.resolved;/);
   });
 
   it('PWA-IOS-VAULT-READ-SERIAL-01: nav-balance read defers to an in-flight vault refresh (no concurrent get_user / iOS activation freeze)', () => {
@@ -6490,15 +6548,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v810/);
+    expect(sw).toMatch(/platho-pwa-prototype-v811/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=249/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=250/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=735/);
+    expect(sw).toMatch(/\.\/app\.js\?v=736/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
