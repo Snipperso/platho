@@ -4332,6 +4332,32 @@ button.feed-item:hover {
   }
 }
 
+/* Short viewport = on-screen keyboard up (or a small phone). MUST come after the max-width:900px block above so its
+   .modal-backdrop align-items:center doesn't win by source order on a phone (both media queries match). The default
+   layout pins header + summary + submit and scrolls ONLY the fields region, so a focused textarea gets squeezed into
+   a tiny scroll window and can vanish behind the keyboard (owner: "the mnemonic field collapses entirely when
+   tapped"). Instead: TOP-align the modal (so the header + focused field stay visible, not centered off-screen) and
+   scroll the WHOLE dialog — the textarea keeps its full min-height and every control is reachable by scrolling.
+   --app-viewport-height already tracks the keyboard-shrunk visual viewport. */
+@media (max-height: 620px) {
+  .modal-backdrop {
+    align-items: start;
+    overflow-y: auto;
+    padding-top: max(8px, var(--app-safe-area-top, env(safe-area-inset-top)));
+    padding-bottom: 8px;
+  }
+  .action-dialog,
+  .quick-start-dialog {
+    max-height: none;
+    overflow: visible;
+  }
+  .action-dialog > .action-fields {
+    flex: 0 0 auto;
+    overflow: visible;
+    min-height: auto;
+  }
+}
+
 @media (min-width: 901px) {
   .app-shell[data-view="chats"] .chat-pane {
     display: grid;

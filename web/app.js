@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v724';
+const PLATHO_APP_RUNTIME_VERSION = 'v725';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -689,32 +689,6 @@ const localStateLabel = document.querySelector('#localStateLabel');
 const networkRuntimeLabel = document.querySelector('#networkRuntimeLabel');
 const appVersionLabel = document.querySelector('#appVersionLabel');
 const profileVersionLabel = document.querySelector('#profileVersionLabel');
-// Tap the build badge to copy a private-thread diagnostic to the clipboard (own wallet + every dialog's id,
-// primary/Saved flag, wallet variants, message count) — the on-device way to capture the exact routing state on
-// a webview where the console is out of reach. Read-only; the user pastes it back voluntarily.
-function copyPrivateThreadDiagnostic() {
-  try {
-    const own = ownRuntimeWalletRaw();
-    const dump = {
-      version: PLATHO_APP_RUNTIME_VERSION,
-      own,
-      threads: (threads ?? []).filter((thread) => !thread.publicChannelId).map((thread) => ({
-        id: thread.id,
-        name: thread.name ?? null,
-        isSaved: isSavedMessagesThread(thread),
-        primaryRaw: threadPrimaryWalletRaw(thread),
-        wallets: threadIdentityVariants(thread)
-          .filter((variant) => variant?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS)
-          .map((variant) => { try { return rawWalletAddress(variant.value); } catch { return String(variant.value); } }),
-        msgs: (thread.messages ?? []).length,
-      })),
-      senderResolve: plathoSenderResolveDebug,
-    };
-    copyTextToClipboard(JSON.stringify(dump, null, 1)).then(() => flashWalletIdentityStatus('diag copied')).catch(() => {});
-  } catch (error) { console.error(error); }
-}
-appVersionLabel?.addEventListener('click', copyPrivateThreadDiagnostic);
-profileVersionLabel?.addEventListener('click', copyPrivateThreadDiagnostic);
 
 let threads = [];
 let customPublicChannels = [];
@@ -9768,15 +9742,23 @@ function base64UrlToBytes(value) {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
-// Diagnostics (read by the tap-the-badge dump): why the receive-side sender resolution landed where it did.
-let lastClaimedSenderResolveDebug = null;
-let plathoSenderResolveDebug = [];
-
 function senderSigningPublicKeyValue(opened) {
   try {
     const bytes = base64UrlToBytes(opened?.capsule?.header0?.senderSigningPublicKey);
     if (bytes.length !== 32) return null;
     return bytesToBigIntValue(bytes).toString();
+  } catch {
+    return null;
+  }
+}
+
+// The OWN messaging signing public key (as the same bigint-string senderSigningPublicKeyValue produces). Used to
+// prove a capsule was SIGNED BY US — the only cheap, RPC-free, sender-mode-independent self-authorship check
+// (payload.senderWallet is omitted in anonymous mode, so isSelfOpenedCapsule can't confirm self on a 2nd device).
+function ownMessagingSignPubkeyValue() {
+  try {
+    const key = localIdentity?.signingPublicKey;
+    return key && key.length === 32 ? bytesToBigIntValue(key).toString() : null;
   } catch {
     return null;
   }
@@ -9963,20 +9945,16 @@ async function resolveVaultKeyRecordForSenderWallet(walletAddress, vaultKeyId, p
 
 async function resolveClaimedPrivateSenderWallet(opened, provider, signPubkey) {
   const claimedWallet = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
-  if (!claimedWallet) { lastClaimedSenderResolveDebug = { claimed: null, reason: 'no-claimed-wallet' }; return null; }
+  if (!claimedWallet) return null;
   const senderVaultKeyId = opened?.payload?.senderVaultKeyId ?? opened?.payload?.sender_vault_key_id ?? null;
   try {
     const keyRecord = await resolveVaultKeyRecordForSenderWallet(claimedWallet, senderVaultKeyId, provider);
-    const fetched = keyRecord?.sign_pubkey ? BigInt(keyRecord.sign_pubkey).toString() : null;
-    if (fetched && fetched === signPubkey) {
-      lastClaimedSenderResolveDebug = { claimed: claimedWallet.slice(0, 12), reason: 'ok' };
+    if (keyRecord?.sign_pubkey && BigInt(keyRecord.sign_pubkey).toString() === signPubkey) {
       return rememberKnownVaultKeyOwner(claimedWallet, keyRecord);
     }
-    lastClaimedSenderResolveDebug = { claimed: claimedWallet.slice(0, 12), keyId: String(senderVaultKeyId ?? ''), reason: fetched ? 'sign-pubkey-mismatch' : 'no-key-record', fetchedSig: fetched ? fetched.slice(0, 8) : null, wantSig: signPubkey ? signPubkey.slice(0, 8) : null };
     console.warn('Private sender wallet claim did not match Vault signing key', claimedWallet);
   } catch (error) {
-    lastClaimedSenderResolveDebug = { claimed: claimedWallet.slice(0, 12), reason: noteTonRpcRateLimit(error) ? 'rpc-rate-limit' : 'rpc-error', err: String(error?.message ?? error).slice(0, 60) };
-    if (lastClaimedSenderResolveDebug.reason === 'rpc-rate-limit') return null;
+    if (noteTonRpcRateLimit(error)) return null;
     console.warn('Unable to verify private sender wallet claim', claimedWallet, error);
   }
   return null;
@@ -10434,21 +10412,7 @@ async function threadForChainCapsule(opened, entry) {
     if (target) return target;
   }
   const senderKeyId = opened?.capsule?.header0?.senderKeyId;
-  lastClaimedSenderResolveDebug = null;
   let senderWallet = await resolvePrivateCapsuleSenderWallet(opened, entry);
-  if (opened?.openedAs !== 'sender') {
-    const sig = senderSigningPublicKeyValue(opened);
-    let claimedRawDbg = null; try { claimedRawDbg = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet); } catch { claimedRawDbg = null; }
-    plathoSenderResolveDebug.unshift({
-      at: privateEntryIdText(entry) ?? null,
-      hasSig: !!sig,
-      claimed: claimedRawDbg ? claimedRawDbg.slice(0, 12) : null,
-      resolved: senderWallet ? String(senderWallet).slice(0, 12) : null,
-      keyId: senderKeyId ? String(senderKeyId).slice(-8) : null,
-      claim: lastClaimedSenderResolveDebug,
-    });
-    if (plathoSenderResolveDebug.length > 12) plathoSenderResolveDebug.length = 12;
-  }
   // Sender-wallet sanity for routing (the real, ongoing root of "peer messages land in My notes"):
   // resolvePrivateCapsuleSenderWallet falls back to the chain entry publisher when the CRYPTOGRAPHIC sender can't be
   // resolved — and on the RECIPIENT index that publisher is the OWN wallet, so a peer's message resolved sender==own
@@ -10497,15 +10461,24 @@ async function threadForChainCapsule(opened, entry) {
     identity: preferredInboundIdentity(variants),
     identityVariants: variants,
   });
+  // A CLAIMED-but-unverified sender (share mode + transient verification failure) is a resolution we should retry
+  // and keep hidden meanwhile; a genuinely anonymous sender (no claim) is shown as-is.
+  const hadClaimedSender = Boolean(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
   if (!senderWallet) {
     created.pendingIdentityResolution = true;
     created.pendingIdentityResolutionAt = new Date().toISOString();
+    created.pendingClaimedSenderResolution = hadClaimedSender;
+    if (hadClaimedSender) queuePendingSenderRescan(entry, created);
   }
   const existingById = threads.find((thread) => thread.id === created.id);
   if (existingById) {
     if (!senderWallet && isAnonymousPeerThread(existingById)) {
       existingById.pendingIdentityResolution = true;
       existingById.pendingIdentityResolutionAt = existingById.pendingIdentityResolutionAt ?? new Date().toISOString();
+      if (hadClaimedSender) {
+        existingById.pendingClaimedSenderResolution = true;
+        queuePendingSenderRescan(entry, existingById);
+      }
     }
     return refreshThreadIdentityFromVariants(existingById, variants);
   }
@@ -10713,6 +10686,13 @@ function insertThreadMessage(thread, message) {
 function prefsBytesFromOpenedCapsule(opened) {
   if (opened?.payload?.type !== 'document') return null;
   if (Number(opened.payload.partCount ?? 1) > 1) return null;
+  // SECURITY: a prefs snapshot is ALWAYS self-authored (you publish it to your OWN index). A document capsule from
+  // SOMEONE ELSE that merely contains a 'prefs' block must NEVER be treated as YOUR subscription snapshot — otherwise
+  // a peer could inject subscriptions / a linked username onto a fresh device (drainRestoredPrefsSnapshots
+  // auto-applies on a never-synced wallet). Require the capsule to be SIGNED BY OUR messaging key (works cross-device
+  // + in anonymous sender mode, unlike a payload.senderWallet check). Fail closed if our key isn't loaded yet.
+  const ownSig = ownMessagingSignPubkeyValue();
+  if (!ownSig || senderSigningPublicKeyValue(opened) !== ownSig) return null;
   try {
     const prefsBlock = decodeMessageDocumentBlocks(opened.payload.bytes).find((block) => block?.type === 'prefs');
     return prefsBlock ? prefsBlock.bytes : null;
@@ -10935,6 +10915,35 @@ function isAnonymousPeerThread(thread) {
 
 function isPendingIdentityResolutionThread(thread) {
   return isAnonymousPeerThread(thread) && thread.pendingIdentityResolution === true;
+}
+
+// A received message whose sender is NOT YET identified opens an inbound peer thread. When the sender was CLAIMED
+// (share mode) but its cryptographic verification transiently failed (cold key cache / flaky RPC), that thread is
+// about to resolve into a real dialog — so keep it HIDDEN for a short grace window and re-scan its entry each sync
+// (queuePendingSenderRescan) until it resolves and its messages relocate to the peer's real dialog. This removes the
+// "Anonymous jJrUJ8t-" flicker the owner disliked. If the grace elapses without a resolve (or the sender was
+// genuinely anonymous — no claim to retry), the thread is SHOWN so a real message is never permanently hidden.
+const PENDING_SENDER_RESOLUTION_GRACE_MS = 45000;
+
+function pendingResolutionWithinGrace(thread) {
+  const at = Date.parse(thread?.pendingIdentityResolutionAt ?? '');
+  return Number.isFinite(at) ? (Date.now() - at) < PENDING_SENDER_RESOLUTION_GRACE_MS : false;
+}
+
+// A pending dialog is hidden ONLY while it is a transient (claimed-sender) resolution within the grace window —
+// a genuinely anonymous sender (no claim) is shown immediately, and a stuck one is shown after the grace.
+function isTransientPendingResolutionThread(thread) {
+  return isPendingIdentityResolutionThread(thread)
+    && thread.pendingClaimedSenderResolution === true
+    && pendingResolutionWithinGrace(thread);
+}
+
+function queuePendingSenderRescan(entry, thread) {
+  if (!pendingResolutionWithinGrace(thread)) return;
+  try {
+    const id = privateEntryIdText(entry);
+    if (id !== null && id !== undefined) pendingSavedRelocateEntryIds.add(String(id));
+  } catch { /* best-effort re-scan queue */ }
 }
 
 function pruneEmptyAnonymousPeerThreads() {
@@ -15248,7 +15257,10 @@ function renderThreads() {
   threads.forEach(hydrateThreadDisplayFromContactStore);
   const visibleThreads = threads
     .filter((thread) => {
-      if (privateChainSyncPromise && isPendingIdentityResolutionThread(thread)) return false;
+      // Hide a dialog whose sender is still being identified (claimed but not yet cryptographically verified) so a
+      // real dialog only appears once resolved — no "Anonymous …" flicker. Shown after the grace window so a
+      // genuinely anonymous or stuck message is never permanently hidden.
+      if (isTransientPendingResolutionThread(thread)) return false;
       return `${thread.name} ${thread.preview} ${thread.state} ${threadIdentitySearchText(thread)}`.toLowerCase().includes(q);
     });
   // My notes is PINNED first regardless of activity order — a partition at render time, so no array mutation
