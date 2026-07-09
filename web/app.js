@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v722';
+const PLATHO_APP_RUNTIME_VERSION = 'v723';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -9791,6 +9791,11 @@ function privateEntryPublisherWallet(entry) {
   if (!wallet) return null;
   const vault = appConfig.vault?.address ?? null;
   if (vault && sameWalletAddress(wallet, vault)) return null;
+  // On the RECIPIENT index the entry publisher is the OWN wallet, which is NEVER the sender of a received message —
+  // returning it made peer messages resolve sender==own and file into "My notes". The own wallet is only a valid
+  // "publisher-as-sender" for the SENDER-side path, which does not use this function.
+  const own = ownRuntimeWalletRaw();
+  if (own && sameWalletAddress(wallet, own)) return null;
   return wallet;
 }
 
@@ -10420,7 +10425,29 @@ async function threadForChainCapsule(opened, entry) {
     if (target) return target;
   }
   const senderKeyId = opened?.capsule?.header0?.senderKeyId;
-  const senderWallet = await resolvePrivateCapsuleSenderWallet(opened, entry);
+  let senderWallet = await resolvePrivateCapsuleSenderWallet(opened, entry);
+  // Sender-wallet sanity for routing (the real, ongoing root of "peer messages land in My notes"):
+  // resolvePrivateCapsuleSenderWallet falls back to the chain entry publisher when the CRYPTOGRAPHIC sender can't be
+  // resolved — and on the RECIPIENT index that publisher is the OWN wallet, so a peer's message resolved sender==own
+  // and matched the Saved thread by the own-wallet variant (no graft needed).
+  {
+    const ownRaw = ownRuntimeWalletRaw();
+    if (ownRaw) {
+      if (isSelfOpenedCapsule(opened)) {
+        // A self note (own->own) ALWAYS belongs in Saved — pin the sender to the own wallet so it routes there even
+        // when key resolution fails on a degraded chain (publisher no longer supplies own).
+        senderWallet = plathoWallet?.address ?? ownRaw;
+      } else {
+        // A received PEER message can NEVER have the own wallet as its sender. The VERIFIED sender is already returned
+        // inside resolveKnown (resolveClaimedPrivateSenderWallet cryptographically binds the claimed wallet to the
+        // capsule signing key); so an own/unresolved result here is the FAILED-verification case — do NOT trust the
+        // raw, spoofable payload.senderWallet. Leave it unresolved: the message lands in an inbound peer thread keyed
+        // by the sender key id (pendingIdentityResolution, re-bound when resolution recovers), never Saved.
+        let resolvedRaw = null; try { resolvedRaw = senderWallet ? rawWalletAddress(senderWallet) : null; } catch { resolvedRaw = null; }
+        if (resolvedRaw === ownRaw) senderWallet = null;
+      }
+    }
+  }
   const senderUsername = opened?.payload?.senderUsername ?? opened?.payload?.sender_username;
   const variants = await privateWalletIdentityVariantsWithUsername(senderWallet, senderUsername);
   // Heal-on-touch: an incoming peer message must never land in the Saved self-thread (see
@@ -12242,16 +12269,15 @@ function healCrossWalletIdentityBleed() {
       let dropped = false;
       for (const walletRaw of foreign) dropped = stripWalletVariantFromThread(thread, walletRaw) || dropped;
       if (thread.displayIdentity && !thread.localLabel) { thread.displayIdentity = null; applyThreadDisplayFields(thread); dropped = true; }
-      if (dropped) {
-        persistThreadDisplayPreference(thread);
-        healed = true;
-        // The peer messages wrongly filed into "My notes" are still physically here — queue their chain entries so
-        // the next private scan re-opens them, routes them to the real sender's dialog, and relocates them out
-        // (a genuine self-note re-routes back to Saved: a harmless no-op).
-        for (const message of thread.messages ?? []) {
-          if (message?.chainEntryId !== undefined && message?.chainEntryId !== null) {
-            pendingSavedRelocateEntryIds.add(String(message.chainEntryId));
-          }
+      if (dropped) { persistThreadDisplayPreference(thread); healed = true; }
+      // A RECEIVED ('in') message inside "My notes" is ALWAYS misfiled — a genuine self-note is stored 'out'
+      // (isSelfOpenedCapsule -> isOutgoing). Queue every such message's chain entry UNCONDITIONALLY (not only when
+      // we stripped a variant this run — the variant may have been cleaned on an earlier load while the messages
+      // stayed stuck): the next private scan re-opens each, routes it to the true sender's dialog, and relocates it
+      // out of Saved. Once moved they leave Saved, so this converges; the id set self-dedups.
+      for (const message of thread.messages ?? []) {
+        if (message?.type === 'in' && message?.chainEntryId !== undefined && message?.chainEntryId !== null) {
+          pendingSavedRelocateEntryIds.add(String(message.chainEntryId));
         }
       }
     } else if (stripWalletVariantFromThread(thread, own)) {
