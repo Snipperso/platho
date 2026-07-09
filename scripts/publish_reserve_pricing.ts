@@ -44,21 +44,24 @@ const SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
 // the OBSERVED SETTLED net price (sandbox-measured after the over-hold ACK refund).
 const PROTOCOL_FEE = 10_000_000n;
 const BATCH_SHARED_BASE_HOLD = 127_800_000n;
+// v734: mirror of message-pricing-policy.mjs *_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS (SHARED_BASE + perPartHold).
+// perPartHold raised for 4/8/16/32 (priv) and 8/16/32 (pub) to >= pp_canonical so a multipart batch of large
+// capsules never underprices (RJ_UNDERPRICED). The cross-check test fails the build if this drifts from the module.
 const PUBLIC_HOLD_BY_SIZE: Record<number, bigint> = {
   1: 169_800_000n,
   2: 170_800_000n,
   4: 171_800_000n,
-  8: 172_800_000n,
-  16: 175_800_000n,
-  32: 185_300_000n,
+  8: 174_800_000n,
+  16: 179_800_000n,
+  32: 189_300_000n,
 };
 const PRIVATE_HOLD_BY_SIZE: Record<number, bigint> = {
   1: 162_600_000n,
   2: 163_200_000n,
-  4: 163_600_000n,
-  8: 164_000_000n,
-  16: 168_300_000n,
-  32: 177_800_000n,
+  4: 164_800_000n,
+  8: 167_300_000n,
+  16: 172_300_000n,
+  32: 181_800_000n,
 };
 const PUBLIC_NET_BY_SIZE: Record<number, bigint> = {
   1: 39_000_000n,

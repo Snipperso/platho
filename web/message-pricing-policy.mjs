@@ -34,27 +34,35 @@ export const SUCCESSFUL_PUBLISH_ACK_REFUND_NANOTONS = 25_800_000n;
 export const BATCH_SHARED_BASE_HOLD_NANOTONS = 127_800_000n;
 
 // Per-part marginal hold by size class (the amount each additional capsule adds to canonical_total).
-// Recalibrated 2026-06-22 (b): FIFO auto-eviction folded into the publish path raised HUB_PART_GAS_* (private
-// 75k->170k, public 90k->180k) to fund add+evict per part. Per-part holds re-derived from a sandbox binary-search
-// of the new canonical_total (x8 constraint binds for sizes 1/2/4; 1-part for the rest), monotone + ~1M margin.
+// Recalibrated 2026-07-09 (v734): the 2026-06-22 pins were derived measuring LARGE sizes (4/8/16/32) at
+// part_count=1 ONLY ("x8 binds for 1/2/4; 1-part for the rest"). But canonical_total is LINEAR
+// (canonical = base + n*pp_canonical(size)) and the client hold is SHARED_BASE + n*perPartHold(size). In a
+// 1-part batch the SHARED_BASE over-hold (127.8M vs the measured base ~124.03M = +3.77M cushion) MASKED a
+// per-part shortfall where perPartHold < pp_canonical; but that shortfall MULTIPLIES with n, so a MULTIPART
+// batch of large capsules (e.g. a photo split into two size_class-16 capsules -> a 2-part batch) fell BELOW
+// canonical_total and the Vault rejected it post-accept with RJ_UNDERPRICED (0x16) — nonce consumed, funds
+// refunded, capsule never published ("one image won't send", on-chain-confirmed on BEOATH nonces 54-69).
+// FIX: perPartHold(size) >= pp_canonical(size) for EVERY size, so hold(n) - canonical(n) =
+// (SHARED_BASE - base) + n*(perPartHold - pp_canonical) is POSITIVE for all n (both terms non-negative) —
+// never underpriced regardless of part_count. pp_canonical derived from the sandbox-measured 1/8-part table
+// (base 124.034M); each pin = pp_canonical + ~1M margin, rounded up to 0.0001 TON. 2-part shapes are now in
+// the tests/web-publish-pricing.test.ts matrix (the on-chain receipt proves result != RJ_UNDERPRICED).
 export const PRIVATE_CAPSULE_PER_PART_HOLD_NANOTONS_BY_SIZE_CLASS = Object.freeze({
-  1: 34_800_000n,
-  2: 35_400_000n,
-  4: 35_800_000n,
-  8: 36_200_000n,
-  16: 40_500_000n,
-  32: 50_000_000n,
+  1: 34_800_000n,   // pp_canonical 34.19M
+  2: 35_400_000n,   // pp_canonical 34.79M
+  4: 37_000_000n,   // pp_canonical 35.99M (was 35.8M — below pp)
+  8: 39_500_000n,   // pp_canonical 38.38M (was 36.2M — masked by base cushion at n=1)
+  16: 44_500_000n,  // pp_canonical 43.19M (was 40.5M — the photo shape: 2x size_16 -> RJ_UNDERPRICED)
+  32: 54_000_000n,  // pp_canonical 52.78M (was 50.0M)
 });
-// Recalibrated 2026-06-22 (b): public author/parent index (+storage) AND FIFO auto-eviction (HUB_PART_GAS_PUBLIC
-// 75k->180k to fund add+evict). Per-part holds re-derived from a sandbox binary-search of the new canonical_total
-// (x8 constraint binds for sizes 1/2/4), monotone + margin.
+// Same recalibration for public (symmetric; a public post with an image is likewise a multipart batch).
 export const PUBLIC_CAPSULE_PER_PART_HOLD_NANOTONS_BY_SIZE_CLASS = Object.freeze({
-  1: 42_000_000n,
-  2: 43_000_000n,
-  4: 44_000_000n,
-  8: 45_000_000n,
-  16: 48_000_000n,
-  32: 57_500_000n,
+  1: 42_000_000n,   // pp_canonical 41.65M
+  2: 43_000_000n,   // pp_canonical 42.25M
+  4: 44_000_000n,   // pp_canonical 43.45M
+  8: 47_000_000n,   // pp_canonical 45.85M (was 45.0M)
+  16: 52_000_000n,  // pp_canonical 50.65M (was 48.0M)
+  32: 61_500_000n,  // pp_canonical 60.25M (was 57.5M)
 });
 
 // SINGLE-capsule total hold = SHARED_BASE + perPartHold(size). This is the canonical_total (and thus the
