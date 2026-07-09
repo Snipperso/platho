@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v726';
+const PLATHO_APP_RUNTIME_VERSION = 'v727';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -689,6 +689,46 @@ const localStateLabel = document.querySelector('#localStateLabel');
 const networkRuntimeLabel = document.querySelector('#networkRuntimeLabel');
 const appVersionLabel = document.querySelector('#appVersionLabel');
 const profileVersionLabel = document.querySelector('#profileVersionLabel');
+
+// --- Private-routing on-device diagnostic (support tool) ---------------------------------------------------------
+// A Telegram Mini App / iOS webview has no console. Tapping the build badge copies a compact JSON snapshot of the
+// private-routing state to the clipboard so the owner can paste it back when a message lands in the wrong dialog.
+// Read-only. `plathoSenderResolveDebug` is a small ring of the most recent per-capsule sender-resolution outcomes
+// (why each incoming message routed where it did); `lastClaimedSenderResolveDebug` records the claimed-sender
+// crypto-verification result. Kept while the private-routing edge cases are still being confirmed on the device
+// fleet — this is the instrument that nails them; do not strip it again until the owner confirms the fleet is clean.
+let plathoSenderResolveDebug = [];
+let lastClaimedSenderResolveDebug = null;
+function recordSenderResolveDebug(record) {
+  try {
+    plathoSenderResolveDebug.push(record);
+    if (plathoSenderResolveDebug.length > 24) plathoSenderResolveDebug.shift();
+  } catch { /* diagnostic must never break routing */ }
+}
+function copyPrivateThreadDiagnostic() {
+  try {
+    const own = ownRuntimeWalletRaw();
+    const dump = {
+      version: PLATHO_APP_RUNTIME_VERSION,
+      own,
+      threads: (threads ?? []).filter((thread) => !thread.publicChannelId).map((thread) => ({
+        id: thread.id,
+        name: thread.name ?? null,
+        isSaved: isSavedMessagesThread(thread),
+        pending: thread.pendingIdentityResolution === true,
+        primaryRaw: threadPrimaryWalletRaw(thread),
+        wallets: threadIdentityVariants(thread)
+          .filter((variant) => variant?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS)
+          .map((variant) => { try { return rawWalletAddress(variant.value); } catch { return String(variant.value); } }),
+        msgs: (thread.messages ?? []).length,
+      })),
+      senderResolve: plathoSenderResolveDebug,
+    };
+    copyTextToClipboard(JSON.stringify(dump, null, 1)).then(() => flashWalletIdentityStatus('diag copied')).catch(() => {});
+  } catch (error) { console.error(error); }
+}
+appVersionLabel?.addEventListener('click', copyPrivateThreadDiagnostic);
+profileVersionLabel?.addEventListener('click', copyPrivateThreadDiagnostic);
 
 let threads = [];
 let customPublicChannels = [];
@@ -9950,11 +9990,14 @@ async function resolveClaimedPrivateSenderWallet(opened, provider, signPubkey) {
   try {
     const keyRecord = await resolveVaultKeyRecordForSenderWallet(claimedWallet, senderVaultKeyId, provider);
     if (keyRecord?.sign_pubkey && BigInt(keyRecord.sign_pubkey).toString() === signPubkey) {
+      lastClaimedSenderResolveDebug = { claimed: claimedWallet, outcome: 'matched' };
       return rememberKnownVaultKeyOwner(claimedWallet, keyRecord);
     }
+    lastClaimedSenderResolveDebug = { claimed: claimedWallet, outcome: 'mismatch', hadKeyRecord: Boolean(keyRecord?.sign_pubkey) };
     console.warn('Private sender wallet claim did not match Vault signing key', claimedWallet);
   } catch (error) {
-    if (noteTonRpcRateLimit(error)) return null;
+    if (noteTonRpcRateLimit(error)) { lastClaimedSenderResolveDebug = { claimed: claimedWallet, outcome: 'ratelimited' }; return null; }
+    lastClaimedSenderResolveDebug = { claimed: claimedWallet, outcome: 'error', message: String(error?.message ?? error).slice(0, 80) };
     console.warn('Unable to verify private sender wallet claim', claimedWallet, error);
   }
   return null;
@@ -10413,6 +10456,8 @@ async function threadForChainCapsule(opened, entry) {
   }
   const senderKeyId = opened?.capsule?.header0?.senderKeyId;
   let senderWallet = await resolvePrivateCapsuleSenderWallet(opened, entry);
+  // Diagnostic: snapshot the cryptographically-resolved sender BEFORE the own-guard can null it (see badge diag).
+  const resolvedSenderBeforeGuard = (() => { try { return senderWallet ? rawWalletAddress(senderWallet) : null; } catch { return null; } })();
   // Sender-wallet sanity for routing (the real, ongoing root of "peer messages land in My notes"):
   // resolvePrivateCapsuleSenderWallet falls back to the chain entry publisher when the CRYPTOGRAPHIC sender can't be
   // resolved — and on the RECIPIENT index that publisher is the OWN wallet, so a peer's message resolved sender==own
@@ -10435,6 +10480,24 @@ async function threadForChainCapsule(opened, entry) {
       }
     }
   }
+  // Diagnostic: one record per routed capsule — why it landed where it did (badge diag reads plathoSenderResolveDebug).
+  let claimedRawForDbg = null; try { claimedRawForDbg = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet); } catch { claimedRawForDbg = null; }
+  const resolveDbg = {
+    as: opened?.openedAs ?? null,
+    self: isSelfOpenedCapsule(opened),
+    claimed: claimedRawForDbg,
+    resolvedPre: resolvedSenderBeforeGuard,
+    own: ownRuntimeWalletRaw(),
+    final: (() => { try { return senderWallet ? rawWalletAddress(senderWallet) : null; } catch { return null; } })(),
+    claimVerify: lastClaimedSenderResolveDebug,
+  };
+  const finishSenderResolve = (thread) => {
+    resolveDbg.target = thread?.id ?? null;
+    resolveDbg.targetSaved = thread ? isSavedMessagesThread(thread) : null;
+    resolveDbg.targetPending = thread?.pendingIdentityResolution === true;
+    recordSenderResolveDebug(resolveDbg);
+    return thread;
+  };
   const senderUsername = opened?.payload?.senderUsername ?? opened?.payload?.sender_username;
   const variants = await privateWalletIdentityVariantsWithUsername(senderWallet, senderUsername);
   // Heal-on-touch: an incoming peer message must never land in the Saved self-thread (see
@@ -10451,7 +10514,7 @@ async function threadForChainCapsule(opened, entry) {
     // and routed through the shared username-hygiene queue so a catch-up sync across many dialogs never fires N
     // concurrent chain reads (v509 iOS freeze); the private-scan loop never awaits it.
     queueUsernameHygiene(() => revalidateThreadUsernameVariants(identityThread));
-    return refreshThreadIdentityFromVariants(identityThread, variants);
+    return finishSenderResolve(refreshThreadIdentityFromVariants(identityThread, variants));
   }
   const created = createInboundPeerThread({
     senderKeyId,
@@ -10480,10 +10543,10 @@ async function threadForChainCapsule(opened, entry) {
         queuePendingSenderRescan(entry, existingById);
       }
     }
-    return refreshThreadIdentityFromVariants(existingById, variants);
+    return finishSenderResolve(refreshThreadIdentityFromVariants(existingById, variants));
   }
   threads.push(created);
-  return created;
+  return finishSenderResolve(created);
 }
 
 function ownerWalletFromThread(thread) {

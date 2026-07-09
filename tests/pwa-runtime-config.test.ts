@@ -283,12 +283,20 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=726" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=727" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
     expect(app).toMatch(/setText\(profileVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
+    // On-device private-routing diagnostic: tapping either build badge copies a routing snapshot to the clipboard
+    // (the console-less TMA/iOS webview way to capture why a message routed to a given dialog). Keep it wired to
+    // BOTH badges and keep the per-capsule sender-resolution ring that feeds it — do not strip while the owner is
+    // still confirming the private-routing fixes across the device fleet.
+    expect(app).toMatch(/function copyPrivateThreadDiagnostic\(\)/);
+    expect(app).toMatch(/appVersionLabel\?\.addEventListener\('click', copyPrivateThreadDiagnostic\)/);
+    expect(app).toMatch(/profileVersionLabel\?\.addEventListener\('click', copyPrivateThreadDiagnostic\)/);
+    expect(app).toMatch(/recordSenderResolveDebug\(resolveDbg\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
     expect(css).toMatch(/\.message\.in \.bubble\s*\{[\s\S]*?justify-self: start;/);
@@ -6385,7 +6393,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v801/);
+    expect(sw).toMatch(/platho-pwa-prototype-v802/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6393,7 +6401,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=247/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=726/);
+    expect(sw).toMatch(/\.\/app\.js\?v=727/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
