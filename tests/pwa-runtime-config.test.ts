@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=722" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=723" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6229,7 +6229,10 @@ describe('PWA runtime config guard', () => {
     expect(heal).toMatch(/persistThreadDisplayPreference\(thread\)/);
     expect(app).toMatch(/if \(healCrossWalletIdentityBleed\(\)\) changed = true;/);
     // F3. Messages already stuck inside "My notes" are queued (their chain entry ids) and replayed through the
-    // next private scan so they are re-opened, re-routed to the true sender, and relocated OUT of Saved.
+    // next private scan so they are re-opened, re-routed to the true sender, and relocated OUT of Saved. Only
+    // RECEIVED ('in') messages qualify (a genuine self-note is stored 'out'), and they are queued UNCONDITIONALLY
+    // (not gated on stripping a variant this run — the variant may have been cleaned earlier while messages stuck).
+    expect(heal).toMatch(/if \(message\?\.type === 'in' && message\?\.chainEntryId !== undefined/);
     expect(heal).toMatch(/pendingSavedRelocateEntryIds\.add\(String\(message\.chainEntryId\)\)/);
     expect(app).toMatch(/let pendingSavedRelocateEntryIds = new Set\(\)/);
     expect(app).toMatch(/const ids = \[\.\.\.pendingSavedRelocateEntryIds\]; pendingSavedRelocateEntryIds = new Set\(\); return ids;/);
@@ -6240,6 +6243,23 @@ describe('PWA runtime config guard', () => {
     );
     expect(healTouch).toMatch(/if \(threadPrimaryWalletRaw\(thread\) === own\) \{/);
     expect(healTouch).not.toMatch(/savedIds\.has\(thread\.id\)/);
+    // G. THE ONGOING ROOT: a RECEIVED (non-self) capsule's sender must never resolve to the OWN wallet (the entry
+    // publisher on the recipient index IS the own wallet, so resolvePrivateCapsuleSenderWallet's fallback filed peer
+    // messages into "My notes" by matching Saved's own-wallet variant — no graft needed). A self note is pinned to
+    // own (stays in Saved even when key resolution fails); a peer message resolved to own is UNRESOLVED (never own,
+    // and NEVER the unverified/spoofable payload.senderWallet — the verified sender is resolveKnown's job).
+    const chainCapsule = app.slice(
+      app.indexOf('async function threadForChainCapsule('),
+      app.indexOf('function ownerWalletFromThread('),
+    );
+    expect(chainCapsule).toMatch(/if \(isSelfOpenedCapsule\(opened\)\) \{[\s\S]{0,320}?senderWallet = plathoWallet\?\.address \?\? ownRaw;/);
+    expect(chainCapsule).toMatch(/if \(resolvedRaw === ownRaw\) senderWallet = null;/);
+    expect(chainCapsule).not.toMatch(/senderWallet = \(claimedRaw/); // never route by the unverified claimed wallet
+    const publisher = app.slice(
+      app.indexOf('function privateEntryPublisherWallet('),
+      app.indexOf('function privateWalletIdentityVariants('),
+    );
+    expect(publisher).toMatch(/if \(own && sameWalletAddress\(wallet, own\)\) return null;/);
     // F2. Heal-on-touch at ROUTING time (covers the pre-restore race + any residual re-poisoning): both receive
     // routers and the recipient-thread lookup resolve a Saved/peer conflict the moment they would hand back the
     // wrong thread — never waiting for the next history restore.
@@ -6342,7 +6362,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v797/);
+    expect(sw).toMatch(/platho-pwa-prototype-v798/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6350,7 +6370,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=245/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=722/);
+    expect(sw).toMatch(/\.\/app\.js\?v=723/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
