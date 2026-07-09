@@ -209,7 +209,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=36/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=37/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=733" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=734" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6490,7 +6490,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v808/);
+    expect(sw).toMatch(/platho-pwa-prototype-v809/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6498,7 +6498,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=249/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=733/);
+    expect(sw).toMatch(/\.\/app\.js\?v=734/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
@@ -6507,21 +6507,21 @@ describe('PWA runtime config guard', () => {
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
-    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=6/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=101/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=55/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
-    expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
+    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=7/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=102/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=56/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=44/);
+    expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=58/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=40/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=55/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=38/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=36/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=59/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=41/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=56/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=39/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=37/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=44/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=8/);

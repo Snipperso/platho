@@ -14,7 +14,7 @@ import {
   buildBatchPublishExternalVariants,
   buildBatchPublishPartsRoot,
 } from './pwa-contract-transactions.mjs?v=33';
-import { batchHoldNanotons } from './message-pricing-policy.mjs?v=13';
+import { batchHoldNanotons } from './message-pricing-policy.mjs?v=14';
 
 export { MAX_BATCH_PARTS };
 

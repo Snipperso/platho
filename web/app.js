@@ -37,14 +37,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=101';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=102';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=58';
+} from './vault-ton-rpc-provider.mjs?v=59';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -111,7 +111,7 @@ import {
   networkFeeSurchargeNanotons,
   rawNetworkFeeSurchargeNanotons,
   resolveNetworkFeeEstimateNanotons,
-} from './message-pricing-policy.mjs?v=13';
+} from './message-pricing-policy.mjs?v=14';
 import {
   createProfileRegistryMessage,
   createAthWalletMessage,
@@ -151,20 +151,20 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
   MAX_BATCH_PARTS,
-} from './publish-batch-orchestration.mjs?v=6';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=38';
+} from './publish-batch-orchestration.mjs?v=7';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=39';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=55';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=40';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=36';
+} from './capsulehub-ton-rpc-provider.mjs?v=56';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=41';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=37';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=43';
+} from './username-ton-rpc-provider.mjs?v=44';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v733';
+const PLATHO_APP_RUNTIME_VERSION = 'v734';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late

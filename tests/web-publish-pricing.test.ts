@@ -41,7 +41,10 @@ import {
 const AUTH_SECRET_KEY = AUTH_KEY_PAIR.secretKey.subarray(0, 32);
 const RING = 20n;
 const SIZE_CLASSES = [1, 2, 4, 8, 16, 32] as const;
-const PART_COUNTS = [1, 8] as const;
+// v734: part_count=2 added — a photo split into two size_class capsules is a 2-part batch, the shape that the
+// 2026-06-22 pins under-priced (RJ_UNDERPRICED on-chain). size_32 x2 is omitted: it serializes past 65535 and
+// the byte-aware packer SPLITS it into two 1-part externals (WPP-SPLIT), so it is never a single 2-part batch.
+const PART_COUNTS = [1, 2, 8] as const;
 
 // canonical_total measured in the sandbox by binary-searching the RJ_UNDERPRICED -> success boundary
 // (see the throwaway harness used to derive the model). Keyed kind|size|parts.
@@ -55,18 +58,18 @@ const PART_COUNTS = [1, 8] as const;
 // private 4K (over the packer's conservative budget). Their delivery + pricing are covered by the matching
 // 1-part entries (the split yields single-part externals on the proven 1-part path) and by WPP-AMORTIZE.
 const MEASURED_CANONICAL_TOTAL: Record<string, bigint> = {
-  'private|1|1': 158_220_000n, 'private|1|8': 397_524_000n,
-  'private|2|1': 158_820_000n, 'private|2|8': 402_319_000n,
-  'private|4|1': 160_019_000n,
-  'private|8|1': 162_417_000n,
-  'private|16|1': 167_219_000n,
-  'private|32|1': 176_817_000n,
-  'public|1|1': 165_714_000n, 'public|1|8': 457_280_000n,
-  'public|2|1': 166_314_000n, 'public|2|8': 462_076_000n,
-  'public|4|1': 167_513_000n, 'public|4|8': 471_667_000n,
-  'public|8|1': 169_910_000n,
-  'public|16|1': 174_713_000n,
-  'public|32|1': 184_311_000n,
+  'private|1|1': 158_220_000n, 'private|1|2': 192_406_000n, 'private|1|8': 397_524_000n,
+  'private|2|1': 158_820_000n, 'private|2|2': 193_606_000n, 'private|2|8': 402_319_000n,
+  'private|4|1': 160_019_000n, 'private|4|2': 196_004_000n,
+  'private|8|1': 162_417_000n, 'private|8|2': 200_800_000n,
+  'private|16|1': 167_219_000n, 'private|16|2': 210_404_000n,
+  'private|32|1': 176_817_000n, // 32Kx2 splits (>65535) — never a single 2-part batch, so no |2 entry
+  'public|1|1': 165_714_000n, 'public|1|2': 207_366_000n, 'public|1|8': 457_280_000n,
+  'public|2|1': 166_314_000n, 'public|2|2': 208_566_000n, 'public|2|8': 462_076_000n,
+  'public|4|1': 167_513_000n, 'public|4|2': 210_964_000n, 'public|4|8': 471_667_000n,
+  'public|8|1': 169_910_000n, 'public|8|2': 215_758_000n,
+  'public|16|1': 174_713_000n, 'public|16|2': 225_364_000n,
+  'public|32|1': 184_311_000n, // 32Kx2 splits — no |2 entry
 };
 
 function cellPayload(cell: Cell) {

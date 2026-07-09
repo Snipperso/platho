@@ -248,7 +248,7 @@
     },
     {
       "id": "public_8k",
-      "canonical_max_charge_nanotons": "172800000",
+      "canonical_max_charge_nanotons": "174800000",
       "protocol_fee_nanotons": "10000000",
       "user_net_debit_nanotons": "47800000",
       "observed_settled_charge_nanotons": "47978674",
@@ -317,7 +317,7 @@
     },
     {
       "id": "public_16k",
-      "canonical_max_charge_nanotons": "175800000",
+      "canonical_max_charge_nanotons": "179800000",
       "protocol_fee_nanotons": "10000000",
       "user_net_debit_nanotons": "57800000",
       "observed_settled_charge_nanotons": "58025475",
@@ -386,7 +386,7 @@
     },
     {
       "id": "public_32k",
-      "canonical_max_charge_nanotons": "185300000",
+      "canonical_max_charge_nanotons": "189300000",
       "protocol_fee_nanotons": "10000000",
       "user_net_debit_nanotons": "77900000",
       "observed_settled_charge_nanotons": "78078410",
@@ -593,7 +593,7 @@
     },
     {
       "id": "private_hybrid_4k",
-      "canonical_max_charge_nanotons": "163600000",
+      "canonical_max_charge_nanotons": "164800000",
       "protocol_fee_nanotons": "10000000",
       "user_net_debit_nanotons": "37700000",
       "observed_settled_charge_nanotons": "37918740",
@@ -662,7 +662,7 @@
     },
     {
       "id": "private_hybrid_8k",
-      "canonical_max_charge_nanotons": "164000000",
+      "canonical_max_charge_nanotons": "167300000",
       "protocol_fee_nanotons": "10000000",
       "user_net_debit_nanotons": "42700000",
       "observed_settled_charge_nanotons": "42934741",
@@ -731,7 +731,7 @@
     },
     {
       "id": "private_hybrid_16k",
-      "canonical_max_charge_nanotons": "168300000",
+      "canonical_max_charge_nanotons": "172300000",
       "protocol_fee_nanotons": "10000000",
       "user_net_debit_nanotons": "52700000",
       "observed_settled_charge_nanotons": "52979808",
@@ -800,7 +800,7 @@
     },
     {
       "id": "private_hybrid_32k",
-      "canonical_max_charge_nanotons": "177800000",
+      "canonical_max_charge_nanotons": "181800000",
       "protocol_fee_nanotons": "10000000",
       "user_net_debit_nanotons": "72800000",
       "observed_settled_charge_nanotons": "73033410",

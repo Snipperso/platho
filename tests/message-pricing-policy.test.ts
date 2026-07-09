@@ -109,29 +109,32 @@ describe('PWA message pricing policy', () => {
     expect(BATCH_SHARED_BASE_HOLD_NANOTONS).toBe(127_800_000n);
     expect(publicCapsuleBaseHoldNanotons()).toBe(BATCH_SHARED_BASE_HOLD_NANOTONS + 42_000_000n);
     expect(publicCapsuleBaseNetPriceNanotons()).toBe(39_000_000n);
+    // v734: perPartHold >= pp_canonical(size) for EVERY size, so a MULTIPART batch of large capsules (a photo
+    // split into 2 size_class-16 capsules) can never fall below canonical_total (RJ_UNDERPRICED). The 2026-06-22
+    // pins for 4/8/16/32 were below pp_canonical, masked by the SHARED_BASE cushion only at part_count=1.
     expect(PRIVATE_CAPSULE_PER_PART_HOLD_NANOTONS_BY_SIZE_CLASS).toEqual({
       1: 34_800_000n,
       2: 35_400_000n,
-      4: 35_800_000n,
-      8: 36_200_000n,
-      16: 40_500_000n,
-      32: 50_000_000n,
+      4: 37_000_000n,
+      8: 39_500_000n,
+      16: 44_500_000n,
+      32: 54_000_000n,
     });
     expect(PUBLIC_CAPSULE_PER_PART_HOLD_NANOTONS_BY_SIZE_CLASS).toEqual({
       1: 42_000_000n,
       2: 43_000_000n,
       4: 44_000_000n,
-      8: 45_000_000n,
-      16: 48_000_000n,
-      32: 57_500_000n,
+      8: 47_000_000n,
+      16: 52_000_000n,
+      32: 61_500_000n,
     });
     expect(PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS).toEqual({
       1: 162_600_000n,
       2: 163_200_000n,
-      4: 163_600_000n,
-      8: 164_000_000n,
-      16: 168_300_000n,
-      32: 177_800_000n,
+      4: 164_800_000n,
+      8: 167_300_000n,
+      16: 172_300_000n,
+      32: 181_800_000n,
     });
     expect(PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS).toEqual({
       1: 33_900_000n,
