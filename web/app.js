@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v736';
+const PLATHO_APP_RUNTIME_VERSION = 'v737';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2875,6 +2875,9 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // the old 30s timeout). Sibling to plathoAccountActivationPending, which queueVaultRefreshAfterWalletChange clears.
   vaultMoveProcessing.TON = null;
   vaultMoveProcessing.ATH = null;
+  // Supersede any in-flight prefs background confirm so it can't stamp "saved"/"not saved" onto the NEW wallet's
+  // subscription state (prefs are per-wallet).
+  prefsConfirmGeneration += 1;
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   privateFileAttachments = [];
@@ -7917,6 +7920,10 @@ const PREFS_LAST_SYNCED_STORAGE_KEY = 'platho.prefs.lastSyncedAt.v1';
 let prefsDirty = false;
 let prefsLastSyncedAt = null; // unix sec of the last snapshot written or restored, or null if never
 let pendingRestoredPrefsSnapshots = [];
+// Monotonic edit counter: bumped on EVERY follow/unfollow (even while already dirty). A save captures this at
+// snapshot time; a CONFIRMED publish clears dirty ONLY if the counter is unchanged. If the user edited during the
+// (possibly ~75s) confirm window, the on-chain snapshot is stale — clearing dirty would silently discard that edit.
+let prefsEditEpoch = 0;
 
 function loadPrefsSyncMeta() {
   const storage = publicChannelStorage();
@@ -7937,6 +7944,7 @@ function writePrefsDirty(value) {
 }
 
 function markPrefsDirty() {
+  prefsEditEpoch += 1; // bump on every edit, even when already dirty, so a background confirm can detect its snapshot went stale
   if (!prefsDirty) writePrefsDirty(true);
 }
 
@@ -26289,6 +26297,51 @@ async function createPrivatePrefsCapsules(snapshotBytes, selfEntry, options = cu
 }
 
 let prefsSyncInFlight = false;
+// A monotonic token so a NEWER save (or a wallet change) supersedes a still-running background confirm from an
+// older one — the stale confirm bails instead of stamping a wrong "saved"/"not saved".
+let prefsConfirmGeneration = 0;
+const PREFS_PUBLISH_CONFIRM_POLL_MS = 4000;
+const PREFS_PUBLISH_CONFIRM_DEADLINE_MS = 75000;
+
+// The prefs publish returns SUBMITTED (broadcast done) BEFORE the self CapsuleHub entry is on chain, because the
+// inline confirm is receipt-only (the entry-scan is kept off the send's critical path to avoid the iPhone freeze).
+// The receipt itself sits at RES_PROCESSING until the Hub ACK, so receipt-only never flips to CONFIRMED. A message
+// heals this with a BACKGROUND confirm (schedulePrivatePublishConfirmationRetry) that entry-scans until the capsule
+// is on chain; "Save subscriptions" had NO such follow-up, so it was stuck on "waiting - retry" -> "not saved" even
+// though the snapshot landed. This is that follow-up: poll the FULL confirm (receipt + entry-scan) in the
+// background until the snapshot confirms (-> "saved", clear dirty) or a deadline (-> leave dirty for a manual retry).
+async function confirmPrefsPublishInBackground(publishState, snapshot, savedEditEpoch) {
+  if (!publishState) return;
+  const generation = ++prefsConfirmGeneration;
+  const deadline = Date.now() + PREFS_PUBLISH_CONFIRM_DEADLINE_MS;
+  while (Date.now() < deadline) {
+    await delay(PREFS_PUBLISH_CONFIRM_POLL_MS);
+    if (generation !== prefsConfirmGeneration) return;          // a newer save / wallet change superseded this
+    if (!plathoWallet || !hasActivePlathoAccount()) return;
+    try {
+      await confirmCapsuleHubPublishEntries(publishState, {});  // full confirm (receipt + entry-scan fallback)
+    } catch (error) {
+      if (noteTonRpcRateLimit(error)) continue;                 // transient RPC — keep polling to the deadline
+    }
+    if (generation !== prefsConfirmGeneration) return;
+    if (publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+      setPrefsLastSyncedAt(snapshot.writtenAt);
+      // The snapshot landed on chain. Clear dirty ONLY if no follow/unfollow arrived since it was captured — a
+      // mid-window edit is NOT in this snapshot, so clearing dirty would silently drop it (lost on next re-import).
+      const stale = prefsEditEpoch !== savedEditEpoch;
+      if (!stale) writePrefsDirty(false);
+      if (!prefsSyncInFlight) setText(savePrefsStatus, stale ? t('sync.unsaved') : t('sync.saved'));
+      refreshPrefsSyncUi();
+      refreshGlobalSyncIndicator();
+      return;
+    }
+  }
+  // Never confirmed within the window: leave prefs DIRTY so the user can re-save; surface the failed status.
+  if (generation === prefsConfirmGeneration && !prefsSyncInFlight) {
+    setText(savePrefsStatus, t('sync.saveFailed'));
+    refreshPrefsSyncUi();
+  }
+}
 
 // Explicit "Save subscriptions" action: publish a full snapshot as a private capsule to self via the proven publish
 // path. Only clears dirty on a CONFIRMED publish (a non-confirmed/failed one stays dirty so the user can retry).
@@ -26305,6 +26358,7 @@ async function publishPrefsSnapshot() {
   setText(savePrefsStatus, t('sync.saving'));
   try {
     const snapshot = buildPrefsSnapshot();
+    const savedEditEpoch = prefsEditEpoch; // edits after this point are NOT in `snapshot`; guards the dirty-clear
     const selfEntry = await resolveSelfPeerEntry({ suite: currentOutgoingPrivateSuite() });
     // createPrivatePrefsCapsules enforces single-part (throws PREFS_TOO_LARGE otherwise), so there is always exactly
     // one capsule here and the publish reuses the single-capsule path (with its nonce-floor / double-spend hardening).
@@ -26314,11 +26368,18 @@ async function publishPrefsSnapshot() {
     const publishOptions = { publishState, allowOwnVaultActionReadFallback: true, confirmFinalNonce: true };
     const result = await publishCapsuleThroughVault(capsules[0], publishOptions);
     if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+      prefsConfirmGeneration += 1; // this save confirmed inline — cancel any older background confirm
       setPrefsLastSyncedAt(snapshot.writtenAt);
-      writePrefsDirty(false);
-      setText(savePrefsStatus, t('sync.saved'));
+      // Same stale-edit guard as the background path: a follow/unfollow during the publish await is not in this
+      // snapshot, so clearing dirty would discard it. Keep dirty (-> "unsaved") when the epoch moved.
+      const stale = prefsEditEpoch !== savedEditEpoch;
+      if (!stale) writePrefsDirty(false);
+      setText(savePrefsStatus, stale ? t('sync.unsaved') : t('sync.saved'));
     } else {
+      // Broadcast succeeded but the self CapsuleHub entry is not confirmable inline yet — keep confirming in the
+      // background (full entry-scan) so it flips to "saved" once the snapshot lands, instead of dead-ending here.
       setText(savePrefsStatus, t('sync.pendingRetry'));
+      confirmPrefsPublishInBackground(result?.publishState, snapshot, savedEditEpoch).catch((error) => console.error(error));
     }
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
