@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v723';
+const PLATHO_APP_RUNTIME_VERSION = 'v724';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -708,6 +708,7 @@ function copyPrivateThreadDiagnostic() {
           .map((variant) => { try { return rawWalletAddress(variant.value); } catch { return String(variant.value); } }),
         msgs: (thread.messages ?? []).length,
       })),
+      senderResolve: plathoSenderResolveDebug,
     };
     copyTextToClipboard(JSON.stringify(dump, null, 1)).then(() => flashWalletIdentityStatus('diag copied')).catch(() => {});
   } catch (error) { console.error(error); }
@@ -9767,6 +9768,10 @@ function base64UrlToBytes(value) {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
+// Diagnostics (read by the tap-the-badge dump): why the receive-side sender resolution landed where it did.
+let lastClaimedSenderResolveDebug = null;
+let plathoSenderResolveDebug = [];
+
 function senderSigningPublicKeyValue(opened) {
   try {
     const bytes = base64UrlToBytes(opened?.capsule?.header0?.senderSigningPublicKey);
@@ -9958,16 +9963,20 @@ async function resolveVaultKeyRecordForSenderWallet(walletAddress, vaultKeyId, p
 
 async function resolveClaimedPrivateSenderWallet(opened, provider, signPubkey) {
   const claimedWallet = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
-  if (!claimedWallet) return null;
+  if (!claimedWallet) { lastClaimedSenderResolveDebug = { claimed: null, reason: 'no-claimed-wallet' }; return null; }
   const senderVaultKeyId = opened?.payload?.senderVaultKeyId ?? opened?.payload?.sender_vault_key_id ?? null;
   try {
     const keyRecord = await resolveVaultKeyRecordForSenderWallet(claimedWallet, senderVaultKeyId, provider);
-    if (keyRecord?.sign_pubkey && BigInt(keyRecord.sign_pubkey).toString() === signPubkey) {
+    const fetched = keyRecord?.sign_pubkey ? BigInt(keyRecord.sign_pubkey).toString() : null;
+    if (fetched && fetched === signPubkey) {
+      lastClaimedSenderResolveDebug = { claimed: claimedWallet.slice(0, 12), reason: 'ok' };
       return rememberKnownVaultKeyOwner(claimedWallet, keyRecord);
     }
+    lastClaimedSenderResolveDebug = { claimed: claimedWallet.slice(0, 12), keyId: String(senderVaultKeyId ?? ''), reason: fetched ? 'sign-pubkey-mismatch' : 'no-key-record', fetchedSig: fetched ? fetched.slice(0, 8) : null, wantSig: signPubkey ? signPubkey.slice(0, 8) : null };
     console.warn('Private sender wallet claim did not match Vault signing key', claimedWallet);
   } catch (error) {
-    if (noteTonRpcRateLimit(error)) return null;
+    lastClaimedSenderResolveDebug = { claimed: claimedWallet.slice(0, 12), reason: noteTonRpcRateLimit(error) ? 'rpc-rate-limit' : 'rpc-error', err: String(error?.message ?? error).slice(0, 60) };
+    if (lastClaimedSenderResolveDebug.reason === 'rpc-rate-limit') return null;
     console.warn('Unable to verify private sender wallet claim', claimedWallet, error);
   }
   return null;
@@ -10425,7 +10434,21 @@ async function threadForChainCapsule(opened, entry) {
     if (target) return target;
   }
   const senderKeyId = opened?.capsule?.header0?.senderKeyId;
+  lastClaimedSenderResolveDebug = null;
   let senderWallet = await resolvePrivateCapsuleSenderWallet(opened, entry);
+  if (opened?.openedAs !== 'sender') {
+    const sig = senderSigningPublicKeyValue(opened);
+    let claimedRawDbg = null; try { claimedRawDbg = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet); } catch { claimedRawDbg = null; }
+    plathoSenderResolveDebug.unshift({
+      at: privateEntryIdText(entry) ?? null,
+      hasSig: !!sig,
+      claimed: claimedRawDbg ? claimedRawDbg.slice(0, 12) : null,
+      resolved: senderWallet ? String(senderWallet).slice(0, 12) : null,
+      keyId: senderKeyId ? String(senderKeyId).slice(-8) : null,
+      claim: lastClaimedSenderResolveDebug,
+    });
+    if (plathoSenderResolveDebug.length > 12) plathoSenderResolveDebug.length = 12;
+  }
   // Sender-wallet sanity for routing (the real, ongoing root of "peer messages land in My notes"):
   // resolvePrivateCapsuleSenderWallet falls back to the chain entry publisher when the CRYPTOGRAPHIC sender can't be
   // resolved — and on the RECIPIENT index that publisher is the OWN wallet, so a peer's message resolved sender==own
