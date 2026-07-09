@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v730';
+const PLATHO_APP_RUNTIME_VERSION = 'v732';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5315,6 +5315,9 @@ function selectOrCreateRecipientThread(input, options = {}) {
     }
     activeThreadId = existing.id;
   } else {
+    // Stamp creation time: a just-added (still message-less) dialog sorts to the TOP of the recency-ordered list
+    // (threadLastActivityMs falls back to this) instead of sinking below every old chat.
+    result.thread.createdAtMs = Date.now();
     threads.push(result.thread);
     activeThreadId = result.thread.id;
   }
@@ -10867,6 +10870,20 @@ function insertThreadMessage(thread, message) {
   sortThreadMessages(thread);
 }
 
+// When this dialog was last ACTIVE = the newest message's timestamp (messages are kept ascending, so scan from the
+// end; skip entries without a resolvable time). A just-created empty dialog falls back to its creation stamp
+// (createdAtMs, set when the user opens a new chat) so it starts at the TOP of the list; with no stamp (e.g. an
+// empty dialog restored from history) it sinks — no activity is exactly what "inactive" means. Drives the
+// recency sort of the private list (renderThreads): active dialogs on top, dormant ones drift down.
+function threadLastActivityMs(thread) {
+  const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const ms = messageCreatedAtMs(messages[index]);
+    if (ms !== null) return ms;
+  }
+  return Number.isFinite(thread?.createdAtMs) ? thread.createdAtMs : 0;
+}
+
 // A self-addressed subscription snapshot (Phase 2) rides as a single PREFS document block. Detect it on an opened
 // capsule so the scan can divert it (collect for restore) BEFORE it is routed to a thread — it is never a chat
 // message. v1 prefs is single-part, so multipart documents are never prefs here.
@@ -15492,10 +15509,16 @@ function renderThreads() {
       return `${thread.name} ${thread.preview} ${thread.state} ${threadIdentitySearchText(thread)}`.toLowerCase().includes(q);
     });
   // My notes is PINNED first regardless of activity order — a partition at render time, so no array mutation
-  // (chain sync / history restore reorder `threads` freely and must not have to know about the pin).
+  // (chain sync / history restore reorder `threads` freely and must not have to know about the pin). The other
+  // dialogs sort by RECENCY (newest activity first, threadLastActivityMs): an active chat rises to the top, a
+  // dormant one quietly drifts down — instead of the old insertion order where every NEW chat appeared LAST.
+  // Display-order only (a sorted copy): the `threads` array keeps its structural invariants untouched. The sort is
+  // stable, so dialogs with equal/unknown activity keep their relative order.
   const ordered = [
     ...visibleThreads.filter((thread) => isSavedMessagesThread(thread)),
-    ...visibleThreads.filter((thread) => !isSavedMessagesThread(thread)),
+    ...visibleThreads
+      .filter((thread) => !isSavedMessagesThread(thread))
+      .sort((a, b) => threadLastActivityMs(b) - threadLastActivityMs(a)),
   ];
   // F3 (scale): keyed reconciliation instead of innerHTML='' + a full O(chats) teardown/rebuild. renderThreads runs
   // on every sync tick AND every search keystroke, so a user with hundreds of chats otherwise rebuilt every row
@@ -15602,7 +15625,11 @@ function applyThreadRow(item, thread) {
       badge.className = 'thread-unread-badge';
       side.append(badge);
     }
-    badge.textContent = unread > 99 ? t('chat.unreadOverflow') : tPlural('chat.unreadCount', unread);
+    // Count-only pill (messenger-canonical): the localized WORD ("unread" in longer languages) doesn't fit the
+    // narrow side column and wrapped the badge onto two lines. The pill + its placement already read as "unread";
+    // the full localized phrase stays for screen readers via aria-label.
+    badge.textContent = unread > 99 ? '99+' : String(unread);
+    badge.setAttribute('aria-label', unread > 99 ? t('chat.unreadOverflow') : tPlural('chat.unreadCount', unread));
   } else if (badge) {
     badge.remove();
   }

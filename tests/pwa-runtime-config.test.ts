@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=730" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=732" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1072,6 +1072,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/markThreadRead\(thread\)/);
     expect(app).toMatch(/thread-unread-badge/);
     expect(css).toMatch(/\.thread-unread-badge/);
+    // v732: the unread badge is a COUNT-ONLY pill ("3", "99+") — the localized word ("непрочитанное") wrapped it
+    // onto two lines in the narrow side column. The localized phrase stays for screen readers (aria-label).
+    expect(app).toMatch(/badge\.textContent = unread > 99 \? '99\+' : String\(unread\);/);
+    expect(app).toMatch(/badge\.setAttribute\('aria-label', unread > 99 \? t\('chat\.unreadOverflow'\) : tPlural\('chat\.unreadCount', unread\)\);/);
+    expect(css).toMatch(/\.thread-unread-badge\s*{[\s\S]{0,400}?text-align: center;\s*\n\s*white-space: nowrap;/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.conversation-header\s*{[\s\S]*display: grid;[\s\S]*grid-template-columns: var\(--header-button-size\) 44px minmax\(0, 1fr\) max-content;/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.conversation-header \.conversation-title h2,\s*\.conversation-header \.conversation-title p,\s*\.conversation-header \.identity-title-label\s*{[\s\S]*max-width: 100%;/);
     expect(css).toMatch(/\.composer-cost-status\s*{[\s\S]*overflow-wrap: anywhere;/);
@@ -4766,8 +4771,16 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
     const render = app.slice(app.indexOf('function renderThreads()'), app.indexOf('function renderConversation()'));
-    // Pinned by a render-time partition — `threads` array order stays owned by sync/restore code.
-    expect(render).toMatch(/\.\.\.visibleThreads\.filter\(\(thread\) => isSavedMessagesThread\(thread\)\),\s*\.\.\.visibleThreads\.filter\(\(thread\) => !isSavedMessagesThread\(thread\)\),/);
+    // Pinned by a render-time partition — `threads` array order stays owned by sync/restore code. v731: the
+    // non-Saved dialogs sort by RECENCY (newest activity first) — active chats on top, dormant ones drift down;
+    // a just-created empty dialog floats up via its createdAtMs stamp (threadLastActivityMs fallback).
+    expect(render).toMatch(/\.\.\.visibleThreads\.filter\(\(thread\) => isSavedMessagesThread\(thread\)\),\s*\.\.\.visibleThreads\s*\.filter\(\(thread\) => !isSavedMessagesThread\(thread\)\)\s*\.sort\(\(a, b\) => threadLastActivityMs\(b\) - threadLastActivityMs\(a\)\),/);
+    expect(app).toMatch(/function threadLastActivityMs\(thread\) \{/);
+    // Newest message wins (messages are ascending; scan from the end for a resolvable time); an empty dialog falls
+    // back to its creation stamp, unknown -> 0 (sinks).
+    expect(app).toMatch(/for \(let index = messages\.length - 1; index >= 0; index -= 1\) \{\s*\n\s*const ms = messageCreatedAtMs\(messages\[index\]\);\s*\n\s*if \(ms !== null\) return ms;/);
+    expect(app).toMatch(/return Number\.isFinite\(thread\?\.createdAtMs\) \? thread\.createdAtMs : 0;/);
+    expect(app).toMatch(/result\.thread\.createdAtMs = Date\.now\(\);/);
     // Both thread-avatar sites route through the saved-aware setter; the icon branch undoes image state and the
     // shared setter undoes the icon class (nodes are REUSED across threads).
     expect(app).toMatch(/function setThreadAvatarNode\(node, thread\)/);
@@ -6477,15 +6490,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v805/);
+    expect(sw).toMatch(/platho-pwa-prototype-v807/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=248/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=249/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=730/);
+    expect(sw).toMatch(/\.\/app\.js\?v=732/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
