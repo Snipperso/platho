@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v737';
+const PLATHO_APP_RUNTIME_VERSION = 'v738';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2876,8 +2876,11 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   vaultMoveProcessing.TON = null;
   vaultMoveProcessing.ATH = null;
   // Supersede any in-flight prefs background confirm so it can't stamp "saved"/"not saved" onto the NEW wallet's
-  // subscription state (prefs are per-wallet).
+  // subscription state (prefs are per-wallet). The bump makes the stranded confirm bail on its generation guard, but
+  // that same guard means it will NOT release the in-flight UI it was holding — so release it HERE, or a wallet switch
+  // mid-confirm would leave the Save button disabled and the global sync spinner stuck forever.
   prefsConfirmGeneration += 1;
+  prefsSyncInFlight = false;
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   privateFileAttachments = [];
@@ -26311,35 +26314,49 @@ const PREFS_PUBLISH_CONFIRM_DEADLINE_MS = 75000;
 // though the snapshot landed. This is that follow-up: poll the FULL confirm (receipt + entry-scan) in the
 // background until the snapshot confirms (-> "saved", clear dirty) or a deadline (-> leave dirty for a manual retry).
 async function confirmPrefsPublishInBackground(publishState, snapshot, savedEditEpoch) {
-  if (!publishState) return;
+  // The save HANDED the in-flight UI to us (prefsSyncInFlight stays true): the button stays disabled and the status
+  // stays a steady "saving" for the WHOLE confirm, instead of the finally flipping it back to enabled + a resting
+  // "unsaved" mid-wait (the flicker the owner saw). We release it here, on the terminal, so the resting label paints
+  // the truthful end state exactly once: "saved <date>" (landed, dirty cleared) or "unsaved" (edited meanwhile / retry).
+  if (!publishState) {
+    prefsSyncInFlight = false;
+    setText(savePrefsStatus, t('sync.saveFailed'));
+    refreshPrefsSyncButton();
+    refreshGlobalSyncIndicator();
+    return;
+  }
   const generation = ++prefsConfirmGeneration;
   const deadline = Date.now() + PREFS_PUBLISH_CONFIRM_DEADLINE_MS;
-  while (Date.now() < deadline) {
-    await delay(PREFS_PUBLISH_CONFIRM_POLL_MS);
-    if (generation !== prefsConfirmGeneration) return;          // a newer save / wallet change superseded this
-    if (!plathoWallet || !hasActivePlathoAccount()) return;
-    try {
-      await confirmCapsuleHubPublishEntries(publishState, {});  // full confirm (receipt + entry-scan fallback)
-    } catch (error) {
-      if (noteTonRpcRateLimit(error)) continue;                 // transient RPC — keep polling to the deadline
+  let timedOut = true; // stays true ONLY on a genuine 75s deadline (not on confirm / supersede) — drives the failed status
+  try {
+    while (Date.now() < deadline) {
+      await delay(PREFS_PUBLISH_CONFIRM_POLL_MS);
+      if (generation !== prefsConfirmGeneration) { timedOut = false; return; } // a newer save / wallet change owns the UI now
+      if (!plathoWallet || !hasActivePlathoAccount()) { timedOut = false; return; }
+      try {
+        await confirmCapsuleHubPublishEntries(publishState, {});  // full confirm (receipt + entry-scan fallback)
+      } catch (error) {
+        if (noteTonRpcRateLimit(error)) continue;                 // transient RPC — keep polling to the deadline
+      }
+      if (generation !== prefsConfirmGeneration) { timedOut = false; return; }
+      if (publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+        timedOut = false;
+        setPrefsLastSyncedAt(snapshot.writtenAt);
+        // The snapshot landed on chain. Clear dirty ONLY if no follow/unfollow arrived since it was captured — a
+        // mid-window edit is NOT in this snapshot, so clearing dirty would silently drop it (lost on next re-import).
+        const stale = prefsEditEpoch !== savedEditEpoch;
+        if (!stale) writePrefsDirty(false);
+        return;
+      }
     }
-    if (generation !== prefsConfirmGeneration) return;
-    if (publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-      setPrefsLastSyncedAt(snapshot.writtenAt);
-      // The snapshot landed on chain. Clear dirty ONLY if no follow/unfollow arrived since it was captured — a
-      // mid-window edit is NOT in this snapshot, so clearing dirty would silently drop it (lost on next re-import).
-      const stale = prefsEditEpoch !== savedEditEpoch;
-      if (!stale) writePrefsDirty(false);
-      if (!prefsSyncInFlight) setText(savePrefsStatus, stale ? t('sync.unsaved') : t('sync.saved'));
-      refreshPrefsSyncUi();
+  } finally {
+    // Release the in-flight UI we were handed — UNLESS a newer save/confirm has taken ownership (it releases it in turn).
+    if (generation === prefsConfirmGeneration) {
+      prefsSyncInFlight = false;
+      if (timedOut) { setText(savePrefsStatus, t('sync.saveFailed')); refreshPrefsSyncButton(); } // real deadline: keep the message
+      else refreshPrefsSyncUi(); // confirmed / wallet-gone: paint the resting label ("saved <date>" / "unsaved")
       refreshGlobalSyncIndicator();
-      return;
     }
-  }
-  // Never confirmed within the window: leave prefs DIRTY so the user can re-save; surface the failed status.
-  if (generation === prefsConfirmGeneration && !prefsSyncInFlight) {
-    setText(savePrefsStatus, t('sync.saveFailed'));
-    refreshPrefsSyncUi();
   }
 }
 
@@ -26356,6 +26373,8 @@ async function publishPrefsSnapshot() {
   refreshPrefsSyncUi();
   refreshGlobalSyncIndicator();
   setText(savePrefsStatus, t('sync.saving'));
+  let handedOff = false; // a SUBMITTED publish hands the in-flight UI to the background confirm; the finally must NOT release it
+  let settled = false;   // an inline terminal (confirmed / stale) reached: repaint the resting label ("saved <date>" / "unsaved")
   try {
     const snapshot = buildPrefsSnapshot();
     const savedEditEpoch = prefsEditEpoch; // edits after this point are NOT in `snapshot`; guards the dirty-clear
@@ -26374,11 +26393,13 @@ async function publishPrefsSnapshot() {
       // snapshot, so clearing dirty would discard it. Keep dirty (-> "unsaved") when the epoch moved.
       const stale = prefsEditEpoch !== savedEditEpoch;
       if (!stale) writePrefsDirty(false);
-      setText(savePrefsStatus, stale ? t('sync.unsaved') : t('sync.saved'));
+      settled = true; // resting label will paint "saved <date>" (clean) or "unsaved" (stale)
     } else {
       // Broadcast succeeded but the self CapsuleHub entry is not confirmable inline yet — keep confirming in the
-      // background (full entry-scan) so it flips to "saved" once the snapshot lands, instead of dead-ending here.
-      setText(savePrefsStatus, t('sync.pendingRetry'));
+      // background (full entry-scan). The background confirm OWNS the in-flight UI (button stays disabled, status stays
+      // a steady "saving") until it lands ("saved <date>") or times out, so the button never flickers back to enabled
+      // and no transient "unsaved" leaks mid-wait.
+      handedOff = true;
       confirmPrefsPublishInBackground(result?.publishState, snapshot, savedEditEpoch).catch((error) => console.error(error));
     }
   } catch (error) {
@@ -26386,9 +26407,11 @@ async function publishPrefsSnapshot() {
     setText(savePrefsStatus, error?.code === 'PREFS_TOO_LARGE' ? t('sync.tooManyChannels') : (rateLimited ? t('sync.rpcBusy') : t('sync.saveFailed')));
     if (!rateLimited && error?.code !== 'PREFS_TOO_LARGE') console.error(error);
   } finally {
-    prefsSyncInFlight = false;
-    refreshPrefsSyncButton();
-    refreshGlobalSyncIndicator();
+    if (!handedOff) {
+      prefsSyncInFlight = false;
+      if (settled) refreshPrefsSyncUi(); else refreshPrefsSyncButton(); // settled -> resting label; error -> keep the message
+      refreshGlobalSyncIndicator();
+    }
   }
 }
 
