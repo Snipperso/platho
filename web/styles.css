@@ -4175,7 +4175,12 @@ button.feed-item:hover {
     column-gap: 8px;
     row-gap: 8px;
     align-items: start;
-    padding: 8px 14px calc(8px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+    /* NO safe-area inset here: on the mobile layout the composer is NOT the bottommost element — the tab bar
+       (.sidebar) sits below it and reserves env(safe-area-inset-bottom) itself. Adding the inset here too produced
+       a dead gap between the composer and the tab bar on home-indicator iPhones (inset ~30px), while button
+       iPhones (SE2) / Android (inset 0) looked fine. Desktop keeps the base rule's inset — there the composer IS
+       the bottom edge of the viewport. */
+    padding: 8px 14px 8px;
     overflow: visible;
   }
 
@@ -4265,7 +4270,8 @@ button.feed-item:hover {
 
   .public-composer {
     margin: 0 -24px -24px;
-    padding: 8px 14px calc(8px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+    /* Same as .composer above: the tab bar below owns the safe-area inset on mobile. */
+    padding: 8px 14px 8px;
   }
 
   .balance-grid,
