@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=729" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=730" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -614,7 +614,9 @@ describe('PWA runtime config guard', () => {
     expect(css).not.toMatch(/@media \(min-width: 680px\) and \(max-width: 900px\)/);
     expect(css).toMatch(/\.public-pane,\s*\.vault-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: var\(--header-top-offset\) 24px 24px;/);
     expect(css).toMatch(/\.list-pane\s*{\s*gap: 14px;\s*border-right: 0;\s*}/);
-    expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;\s*padding: 8px 14px/);
+    // (v730: an explanatory comment now sits between margin and padding — the mobile composer padding is
+    // inset-free because the tab bar below owns the safe area; see the mobile-block pins in PWA-MSG-01.)
+    expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;[\s\S]{0,260}?padding: 8px 14px/);
     // Public composer is consistent with Private: full-bleed (no right gap) and its two left buttons
     // are sized exactly like the Private composer buttons at both breakpoints.
     expect(css).toMatch(/\.public-composer\s*{[\s\S]*?max-width: none;/);
@@ -1076,6 +1078,14 @@ describe('PWA runtime config guard', () => {
     // v726: the cost/reserve/discount line is capped at 3 lines (line-height 1.35) and scrolls its overflow so it
     // can't push the composer tall on a narrow screen.
     expect(css).toMatch(/\.composer-cost-status\s*{[\s\S]*max-height: calc\(1\.35em \* 3\);\s*\n\s*overflow-y: auto;/);
+    // v730: on the MOBILE layout the composer carries NO safe-area-inset-bottom padding — the tab bar (.sidebar)
+    // sits below it and reserves the inset itself; duplicating it here left a dead gap between the composer and
+    // the tab bar on home-indicator iPhones (inset ~30px). Desktop keeps the base rule's inset (composer IS the
+    // bottom edge there). Pin: the mobile block's composer paddings are inset-free, the sidebar reserve remains.
+    const mobileBlock = css.slice(css.indexOf('@media (max-width: 900px)'));
+    expect(mobileBlock).toMatch(/\.composer\s*{[\s\S]{0,900}?padding: 8px 14px 8px;/);
+    expect(mobileBlock).toMatch(/\.public-composer\s*{[\s\S]{0,300}?padding: 8px 14px 8px;/);
+    expect(mobileBlock).toMatch(/\.sidebar\s*{[\s\S]{0,700}?padding-bottom: max\(var\(--mobile-nav-bottom-reserve\), var\(--app-safe-area-bottom, env\(safe-area-inset-bottom, 0px\)\)\);/);
     expect(css).toMatch(/\.message\[data-status="sending"\] \.bubble/);
     expect(app).toMatch(/function identityDisplayKey/);
     expect(app).toMatch(/function uniqueDisplayIdentityVariants/);
@@ -6467,15 +6477,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v804/);
+    expect(sw).toMatch(/platho-pwa-prototype-v805/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=247/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=248/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=729/);
+    expect(sw).toMatch(/\.\/app\.js\?v=730/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
