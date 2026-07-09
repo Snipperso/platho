@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=724" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=725" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -826,6 +826,14 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.image-lightbox-actions/);
     expect(css).toMatch(/\.icon-download/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.modal-backdrop\s*{\s*align-items: center;/);
+    // v725: on a short viewport (on-screen keyboard up) a dialog TOP-aligns and the backdrop scrolls the WHOLE
+    // dialog (dialog max-height:none) so a focused textarea keeps its height instead of collapsing behind the
+    // keyboard. MUST come after the max-width:900px block so it wins by source order (both media queries match).
+    const shortVpIdx = css.indexOf('@media (max-height: 620px)');
+    expect(shortVpIdx).toBeGreaterThan(css.indexOf('@media (max-width: 900px)'));
+    const shortVp = css.slice(shortVpIdx, shortVpIdx + 420);
+    expect(shortVp).toMatch(/\.modal-backdrop \{\s*align-items: start;\s*overflow-y: auto;/);
+    expect(shortVp).toMatch(/\.action-dialog,\s*\n\s*\.quick-start-dialog \{\s*max-height: none;\s*overflow: visible;/);
     expect(css).toMatch(/icon-open-app/);
     expect(enCopy).toMatch(/On-chain size/);
     expect(app).toMatch(/requestCompressedImageFile/);
@@ -3553,7 +3561,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/knownVaultKeyOwnerBySignPubkey\.set\(key, wallet\)/);
     expect(app).toMatch(/created\.pendingIdentityResolution = true/);
     expect(app).toMatch(/function isPendingIdentityResolutionThread\(thread\)/);
-    expect(app).toMatch(/privateChainSyncPromise && isPendingIdentityResolutionThread\(thread\)/);
+    // v725: an unidentified inbound dialog whose sender was CLAIMED (share mode) but not yet verified is hidden
+    // during a grace window (and its entry re-scanned) so a real dialog only appears once resolved — no
+    // "Anonymous …" flicker. A genuinely anonymous sender (no claim) is shown; a stuck one is shown after the grace.
+    expect(app).toMatch(/if \(isTransientPendingResolutionThread\(thread\)\) return false;/);
+    expect(app).toMatch(/function isTransientPendingResolutionThread\(thread\)/);
+    expect(app).toMatch(/created\.pendingClaimedSenderResolution = hadClaimedSender;/);
+    expect(app).toMatch(/if \(hadClaimedSender\) queuePendingSenderRescan\(entry, created\);/);
+    expect(app).not.toMatch(/privateChainSyncPromise && isPendingIdentityResolutionThread\(thread\)/);
     expect(app).toMatch(/function pruneEmptyAnonymousPeerThreads\(\)/);
     expect(app).toMatch(/pruneEmptyAnonymousPeerThreads\(\)/);
   });
@@ -5037,6 +5052,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function prefsBytesFromOpenedCapsule\(opened\)/);
     const detect = app.slice(app.indexOf('function prefsBytesFromOpenedCapsule(opened)'), app.indexOf('function messageFromOpenedCapsule('));
     expect(detect).toMatch(/Number\(opened\.payload\.partCount \?\? 1\) > 1\) return null/);
+    // SECURITY (v725): a prefs snapshot is only accepted when the capsule was SIGNED BY OUR OWN messaging key — a
+    // foreign document capsule carrying a 'prefs' block can't inject subscriptions / a linked username onto a fresh
+    // device. The check is the signing key (works cross-device + anonymous mode), NOT payload.senderWallet.
+    expect(detect).toMatch(/const ownSig = ownMessagingSignPubkeyValue\(\);\s*\n\s*if \(!ownSig \|\| senderSigningPublicKeyValue\(opened\) !== ownSig\) return null;/);
+    expect(app).toMatch(/function ownMessagingSignPubkeyValue\(\) \{[\s\S]*?bytesToBigIntValue\(key\)\.toString\(\)/);
     // Scan diverts AFTER opening the capsule and BEFORE resolving a thread.
     const scanIdx = app.indexOf('const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair');
     const scanSlice = app.slice(scanIdx, scanIdx + 800);
@@ -6362,15 +6382,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v799/);
+    expect(sw).toMatch(/platho-pwa-prototype-v800/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=245/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=246/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=724/);
+    expect(sw).toMatch(/\.\/app\.js\?v=725/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);

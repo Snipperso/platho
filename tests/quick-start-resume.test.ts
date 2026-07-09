@@ -36,7 +36,7 @@ describe('quick-start resume + activation gate guard', () => {
     // reported the old secondary-button pair looked non-canonical and stuck together on iPhone.
     const activateBody = app.slice(
       app.indexOf('function buildQuickStartActivateBody()'),
-      app.indexOf('function buildQuickStartActivateBody()') + 900,
+      app.indexOf('function buildQuickStartActivateBody()') + 1200,
     );
     expect(activateBody).toMatch(/wrap\.className = 'quick-start-key-body';/);
     expect(activateBody).toMatch(/check\.className = 'discovery-cta-action';/);
