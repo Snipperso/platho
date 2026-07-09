@@ -1789,6 +1789,11 @@ a .avatar.has-image,
   min-width: 0;
   max-width: 100%;
   min-height: 18px;
+  /* On a narrow screen the cost/reserve/discount line wraps to many rows and pushes the whole composer tall
+     (owner). Cap it at 3 lines (line-height 1.35) and scroll the overflow. Harmless on wide screens where it fits
+     in one or two lines. */
+  max-height: calc(1.35em * 3);
+  overflow-y: auto;
   color: var(--accent);
   font-size: 12px;
   line-height: 1.35;
