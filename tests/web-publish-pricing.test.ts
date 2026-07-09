@@ -200,6 +200,59 @@ describe('VPB2 client publish pricing: the re-derived hold never underprices the
   });
 });
 
+// The photo that regressed was 2 parts, but a rich message (long text + SEVERAL images) batches up to the max that
+// fits under the 65535 external ceiling — the owner's exact question. perPartHold >= pp_canonical guarantees
+// hold >= canonical at EVERY n; these prove it ON-CHAIN at the realistic per-size maxima (a larger n splits into
+// multiple externals, each a proven single-part path) and for a MIXED-size batch (text + images together).
+describe('VPB2 multipart pricing above 2 parts (max fitting count + mixed sizes) never underprices', () => {
+  const MAXFIT = [
+    { kind: KIND_PRIVATE, size: 16, parts: 3, canonical: 253_589_000n },
+    { kind: KIND_PRIVATE, size: 8, parts: 5, canonical: 315_950_000n },
+    { kind: KIND_PRIVATE, size: 4, parts: 7, canonical: 375_931_000n },
+    { kind: KIND_PUBLIC, size: 16, parts: 3, canonical: 276_015_000n },
+    { kind: KIND_PUBLIC, size: 8, parts: 5, canonical: 353_302_000n },
+  ] as const;
+  for (const c of MAXFIT) {
+    const label = c.kind === KIND_PRIVATE ? 'PRIV' : 'PUB';
+    it(`WPP-MAXFIT-${label}-${c.size}K-x${c.parts}: max-fit multipart batch settles (never RJ_UNDERPRICED)`, async () => {
+      const { slot, holdSigned } = await sendClientPricedBatch(c.kind, c.size, c.parts);
+      expect(holdSigned).toBeGreaterThanOrEqual(c.canonical);
+      expect(slot, 'a receipt slot must exist (batch accepted)').toBeDefined();
+      expect(slot!.part_count).toBe(BigInt(c.parts));
+      expect(slot!.result).not.toBe(RJ_UNDERPRICED);
+      expect([RES_PROCESSING, RES_CONFIRMED]).toContain(slot!.result);
+    }, 30000);
+  }
+
+  it('WPP-MIXED: a rich message (small text + two large image capsules) in ONE batch settles', async () => {
+    const env = await deployBoundSealedPair();
+    const { blockchain, vault, vaultAddress, user } = env;
+    await registerHybrid(vault, user);
+    await depositTon(vault, user, toNano('20'));
+    // ~1K text capsule + two ~16K image capsules, all private -> one signed batch (est ~46K < 62000 budget).
+    const items = [privateItem(0, 0, 1), privateItem(1, 1, 16), privateItem(2, 2, 16)];
+    const batches = groupPublishItemsIntoBatches(items);
+    expect(batches).toHaveLength(1);
+    const holdSigned = batchMaxChargeForItems(items);
+    const nonce = (await vault.getGetUser(user.address)).publish_nonce;
+    const built = await buildBatchExternalFromPublishItems(batches[0], {
+      owner: user.address.toRawString(),
+      clientNonce: nonce,
+      vaultAddress: vaultAddress.toRawString(),
+      manifestHash: `0x${MANIFEST_HASH.toString(16).padStart(64, '0')}`,
+      authSecretKey: AUTH_SECRET_KEY,
+    });
+    expect(built.maxCharge).toBe(holdSigned);
+    const bodyCell = Cell.fromBoc(Buffer.from(tonCell.serializeBoc(built.bodyCell)))[0];
+    await blockchain.sendMessage(external({ to: vaultAddress, body: bodyCell }));
+    const slot = (await vault.getGetUserReceipts(user.address)).receipts.get(Number(nonce % RING));
+    expect(slot, 'mixed-size batch receipt slot must exist').toBeDefined();
+    expect(slot!.part_count).toBe(3n);
+    expect(slot!.result).not.toBe(RJ_UNDERPRICED);
+    expect([RES_PROCESSING, RES_CONFIRMED]).toContain(slot!.result);
+  }, 30000);
+});
+
 // Session: oversized-external split. A 64KB private image (two size_class-32 capsules) used to be packed into
 // ONE 2-part external whose serialized size (~70KB) exceeds TON's max_ext_msg_size (65535) — the network DROPS
 // it at ingest before the Vault runs, so the publish stranded at "submitted 2/2, confirming" forever and the
