@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=728" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=729" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6254,8 +6254,10 @@ describe('PWA runtime config guard', () => {
     // stripping is raw-normalized too (any UQ/EQ/raw form).
     expect(app).toMatch(/function threadPrimaryWalletRaw\(thread\) \{/);
     expect(app).toMatch(/function stripWalletVariantFromThread\(thread, walletRaw\) \{/);
-    expect(heal).toMatch(/if \(threadPrimaryWalletRaw\(thread\) === own\) \{/);
-    expect(heal).toMatch(/stripWalletVariantFromThread\(thread, walletRaw\)/);
+    // v729: the real-Saved branch is keyed on the STRICT isRealSavedThread (id-only); the peer-dialog-carrying-own
+    // branch still strips the own variant raw-normalized.
+    expect(heal).toMatch(/if \(isRealSavedThread\(thread\)\) \{/);
+    expect(heal).toMatch(/\} else if \(stripWalletVariantFromThread\(thread, own\)\) \{/);
     expect(heal).not.toMatch(/savedIds\.has\(thread\.id\)/);
     expect(heal).toMatch(/persistThreadDisplayPreference\(thread\)/);
     // The BOOT heal (restore) passes requeueAnonymous+clearOwnContactDisplay; the per-tick auto-sync heal calls the
@@ -6332,6 +6334,37 @@ describe('PWA runtime config guard', () => {
     const setSub = app.slice(app.indexOf('function setPublicChannelSubscribed('), app.indexOf('function followContactPublicChannel('));
     expect(setSub).toMatch(/rebuildThreadsFromPublicSubscriptions\(\{ preserveActive: true \}\);/);
     expect(app).toMatch(/const openedThreadId = activeThreadId;\s*\n\s*followContactPublicChannel\(ownerWallet\);\s*\n\s*if \(openedThreadId && threads\.some\(\(item\) => item\.id === openedThreadId\)\) activeThreadId = openedThreadId;/);
+    // G5 (v729). HARD ROUTING INVARIANT: a non-self capsule may NEVER target the real Saved thread, no matter
+    // which stale variant matched it. The v728 iPhone dump proved a correctly-resolved peer message still routed
+    // to Saved through a grafted peer USERNAME variant (wallet strips alone don't cover named variants — routing
+    // matches ANY variant kind). Both routers purge the offending named variants off Saved and re-resolve among
+    // the OTHER dialogs; the heal strips ALL username/DNS variants from the real Saved thread.
+    // isRealSavedThread is STRICT: the immutable id `dm:wallet_address:<own>` (raw-normalized), NO identity fallback
+    // (a named identity grafted elsewhere must not be mistaken for Saved — adversarial-review low finding).
+    expect(app).toMatch(/function isRealSavedThread\(thread\) \{[\s\S]{0,260}?\/\^dm:wallet_address:\(\.\+\)\$\/\.exec\(String\(thread\.id \?\? ''\)\)/);
+    // Saved hygiene is one IDEMPOTENT function: resets Saved to the canonical own-wallet identity (drops foreign
+    // wallet + ALL username/DNS variants + a named displayIdentity), returns true ONLY when it actually changed —
+    // so the per-sync heal never re-encrypts Saved history on a tick when it is already clean (the persist-storm).
+    expect(app).toMatch(/function purgeNamedIdentityFromSavedThread\(savedThread\) \{/);
+    expect(app).toMatch(/const changed = isNamed\(savedThread\.displayIdentity\) \|\| isNamed\(savedThread\.identity\) \|\| !variantsClean;/);
+    expect(app).toMatch(/if \(!changed\) return false;/);
+    expect(app).toMatch(/function purgePeerVariantsFromSavedThread\(savedThread\) \{/);
+    expect(chainCapsule).toMatch(/if \(identityThread && !isSelfOpenedCapsule\(opened\) && isRealSavedThread\(identityThread\)\) \{\s*\n\s*purgePeerVariantsFromSavedThread\(identityThread\);\s*\n\s*identityThread = findThreadByIdentityVariants\(threads\.filter\(\(thread\) => !isRealSavedThread\(thread\)\), variants\);/);
+    const senderCapsule = app.slice(
+      app.indexOf('async function threadForOpenedSenderCapsule('),
+      app.indexOf('function findMessageByCapsuleId('),
+    );
+    expect(senderCapsule).toMatch(/if \(identityThread && own && recipientWallet !== own && isRealSavedThread\(identityThread\)\) \{\s*\n\s*purgePeerVariantsFromSavedThread\(identityThread\);/);
+    // The heal's real-Saved branch is keyed on isRealSavedThread and delegates to the idempotent purge.
+    expect(heal).toMatch(/if \(isRealSavedThread\(thread\)\) \{/);
+    expect(heal).toMatch(/if \(purgeNamedIdentityFromSavedThread\(thread\)\) \{ persistThreadDisplayPreference\(thread\); healed = true; \}/);
+    // A self-note received on a 2nd device must be verified CRYPTOGRAPHICALLY (spoofable claimed senderWallet alone
+    // would let a peer pin its message into "My notes" as our own).
+    expect(app).toMatch(/const ownSig = ownMessagingSignPubkeyValue\(\);\s*\n\s*if \(!ownSig \|\| senderSigningPublicKeyValue\(opened\) !== ownSig\) return false;/);
+    // A SELF note resolves variants WALLET-ONLY (symmetric to threadForOpenedSenderCapsule): a note-to-self carries
+    // the owner's OWN .ath in senderUsername, and grafting it onto Saved would make the now-strict per-sync heal
+    // strip + re-encrypt the WHOLE Saved history on every new self-note. Saved wears only the own wallet.
+    expect(chainCapsule).toMatch(/const variants = isSelfOpenedCapsule\(opened\)\s*\n\s*\? privateWalletIdentityVariants\(senderWallet\)\s*\n\s*: await privateWalletIdentityVariantsWithUsername\(senderWallet, senderUsername\);/);
     // F2. Heal-on-touch at ROUTING time (covers the pre-restore race + any residual re-poisoning): both receive
     // routers and the recipient-thread lookup resolve a Saved/peer conflict the moment they would hand back the
     // wrong thread — never waiting for the next history restore.
@@ -6434,7 +6467,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v803/);
+    expect(sw).toMatch(/platho-pwa-prototype-v804/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6442,7 +6475,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=247/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=728/);
+    expect(sw).toMatch(/\.\/app\.js\?v=729/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
