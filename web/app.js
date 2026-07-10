@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=21';
+} from './i18n.mjs?v=22';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v750';
+const PLATHO_APP_RUNTIME_VERSION = 'v751';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -646,6 +646,13 @@ const publicImageModeSelect = document.querySelector('#publicImageModeSelect');
 const publicAttachmentPanel = document.querySelector('#publicAttachmentPanel');
 const publicAttachmentLabel = document.querySelector('#publicAttachmentLabel');
 const publicClearImageButton = document.querySelector('#publicClearImageButton');
+const publicComposerAddButton = document.querySelector('#publicComposerAddButton');
+const publicComposerAddMenu = document.querySelector('#publicComposerAddMenu');
+const publicFileButton = document.querySelector('#publicFileButton');
+const publicFileInput = document.querySelector('#publicFileInput');
+const publicFilePanel = document.querySelector('#publicFilePanel');
+const publicFileLabel = document.querySelector('#publicFileLabel');
+const publicClearFilesButton = document.querySelector('#publicClearFilesButton');
 const publicComposerCommentsCheckbox = document.querySelector('#publicComposerCommentsCheckbox');
 const publicPostCommentsToggle = document.querySelector('#publicPostCommentsToggle');
 const publicCommentContext = document.querySelector('#publicCommentContext');
@@ -852,6 +859,7 @@ let publicCommentReplyTo = null;
 // pattern as images/reply so plan, echo and wire agree; captured-at-submit for retries.
 let privateFileAttachments = [];
 let publicImageAttachments = [];
+let publicFileAttachments = [];
 let pendingProfileAvatarModeId = 'good';
 let localProfileAvatarPointer = null;
 let profileAvatarLoadPromises = new Map();
@@ -14907,6 +14915,9 @@ function refreshPublicSendButtonState() {
   // checkbox's :disabled because the dim rule via :has() silently no-ops on the iOS floor (Safari 14).
   if (publicEmojiButton) publicEmojiButton.disabled = blocked;
   if (publicImageButton) publicImageButton.disabled = blocked;
+  if (publicComposerAddButton) publicComposerAddButton.disabled = blocked;
+  if (publicFileButton) publicFileButton.disabled = blocked;
+  if (blocked) hidePublicComposerAddMenu();
   if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = blocked;
   publicPostCommentsToggle?.classList.toggle('is-disabled', blocked);
 }
@@ -15425,6 +15436,23 @@ function showPrivateComposerAddMenu() {
 function togglePrivateComposerAddMenu() {
   if (privateComposerAddMenuVisible()) hidePrivateComposerAddMenu();
   else showPrivateComposerAddMenu();
+}
+
+function publicComposerAddMenuVisible() {
+  return Boolean(publicComposerAddMenu && !publicComposerAddMenu.hidden);
+}
+function hidePublicComposerAddMenu() {
+  if (publicComposerAddMenu) publicComposerAddMenu.hidden = true;
+  publicComposerAddButton?.setAttribute('aria-expanded', 'false');
+}
+function showPublicComposerAddMenu() {
+  if (!publicComposerAddMenu || !publicComposerAddButton || publicComposerAddButton.disabled) return;
+  publicComposerAddMenu.hidden = false;
+  publicComposerAddButton.setAttribute('aria-expanded', 'true');
+}
+function togglePublicComposerAddMenu() {
+  if (publicComposerAddMenuVisible()) hidePublicComposerAddMenu();
+  else showPublicComposerAddMenu();
 }
 
 function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments) {
@@ -17657,8 +17685,13 @@ document.addEventListener('click', (event) => {
   if (privateComposerAddMenu?.contains(event.target) || privateComposerAddButton?.contains(event.target)) return;
   hidePrivateComposerAddMenu();
 });
+document.addEventListener('click', (event) => {
+  if (!publicComposerAddMenuVisible()) return;
+  if (publicComposerAddMenu?.contains(event.target) || publicComposerAddButton?.contains(event.target)) return;
+  hidePublicComposerAddMenu();
+});
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') hidePrivateComposerAddMenu();
+  if (event.key === 'Escape') { hidePrivateComposerAddMenu(); hidePublicComposerAddMenu(); }
 });
 
 publicMessageInput?.addEventListener('input', () => {
@@ -17681,12 +17714,36 @@ privateImageButton?.addEventListener('click', () => {
   privateImageInput?.click();
 });
 
+// Public composer "+" add-menu (v750, owner ask: fold image/file/link behind one button like the private composer).
+publicComposerAddButton?.addEventListener('click', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (publicComposerSendBlocked()) {
+    refreshComposerPublishPolicy();
+    return;
+  }
+  togglePublicComposerAddMenu();
+});
+publicComposerAddMenu?.addEventListener('click', (event) => {
+  event.stopPropagation();
+});
+
 publicImageButton?.addEventListener('click', () => {
+  hidePublicComposerAddMenu();
   if (publicComposerSendBlocked()) {
     refreshComposerPublishPolicy();
     return;
   }
   publicImageInput?.click();
+});
+
+publicFileButton?.addEventListener('click', () => {
+  hidePublicComposerAddMenu();
+  if (publicComposerSendBlocked()) {
+    refreshComposerPublishPolicy();
+    return;
+  }
+  publicFileInput?.click();
 });
 
 // Composer "Insert link" (v750): a link is just text, so — unlike image/file attachments — there is no
@@ -17696,6 +17753,7 @@ document.querySelector('#privateLinkButton')?.addEventListener('click', () => {
   openLinkComposerDialog(messageInput);
 });
 document.querySelector('#publicLinkButton')?.addEventListener('click', () => {
+  hidePublicComposerAddMenu();
   openLinkComposerDialog(publicMessageInput);
 });
 
@@ -17721,6 +17779,23 @@ function updatePrivateFileAttachmentUi() {
   }
   const total = files.reduce((sum, file) => sum + file.bytes.length, 0);
   setText(privateFileLabel, files.length === 1
+    ? `${files[0].name} - ${imageByteCountLabel(total)}`
+    : tPlural('chat.filesWithSize', files.length, { size: imageByteCountLabel(total) }));
+}
+
+// Public file panel — mirrors the private one (v750, owner ask: fold image/file/link behind a "+" menu). Files
+// ride the SAME FILE document block + publish path public images already use (publicDocumentBlocksFromDraft →
+// composerBlocksFromDraft), so the receive/render side already shows them (buildFileBlockChip).
+function updatePublicFileAttachmentUi() {
+  if (!publicFilePanel || !publicFileLabel) return;
+  const files = normalizePrivateFileAttachments(publicFileAttachments);
+  publicFilePanel.hidden = files.length === 0;
+  if (files.length === 0) {
+    setText(publicFileLabel, t('chat.noFiles'));
+    return;
+  }
+  const total = files.reduce((sum, file) => sum + file.bytes.length, 0);
+  setText(publicFileLabel, files.length === 1
     ? `${files[0].name} - ${imageByteCountLabel(total)}`
     : tPlural('chat.filesWithSize', files.length, { size: imageByteCountLabel(total) }));
 }
@@ -17759,6 +17834,34 @@ privateFileInput?.addEventListener('change', async () => {
 privateClearFilesButton?.addEventListener('click', () => {
   privateFileAttachments = [];
   updatePrivateFileAttachmentUi();
+  refreshComposerCostStatus();
+});
+
+publicFileInput?.addEventListener('change', async () => {
+  const file = publicFileInput.files?.[0];
+  publicFileInput.value = '';
+  if (!file) return;
+  if (file.size > PRIVATE_FILE_ATTACHMENT_MAX_BYTES) {
+    if (publicComposerCostStatus) {
+      publicComposerCostStatus.textContent = t('chat.fileTooLarge', { size: imageByteCountLabel(file.size), limit: imageByteCountLabel(PRIVATE_FILE_ATTACHMENT_MAX_BYTES) });
+      publicComposerCostStatus.dataset.state = 'short';
+    }
+    return;
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!bytes.length) return;
+  publicFileAttachments = [...normalizePrivateFileAttachments(publicFileAttachments), {
+    name: file.name || 'file',
+    mime: file.type || 'application/octet-stream',
+    bytes,
+  }];
+  updatePublicFileAttachmentUi();
+  refreshComposerCostStatus();
+});
+
+publicClearFilesButton?.addEventListener('click', () => {
+  publicFileAttachments = [];
+  updatePublicFileAttachmentUi();
   refreshComposerCostStatus();
 });
 
@@ -17841,10 +17944,11 @@ publicComposer?.addEventListener('submit', async (event) => {
   enforcePublicComposerByteLimit();
   const text = publicMessageInput?.value.trim() ?? '';
   const attachments = normalizePublicImageAttachments(publicImageAttachments);
+  const fileAttachments = normalizePrivateFileAttachments(publicFileAttachments); // captured BEFORE the clear below (v750)
   // Nothing real to publish (empty draft OR an orphaned "[image N]" marker whose attachment was cleared): bail BEFORE
   // the composer clears below, so a Ctrl+Enter requestSubmit() (which bypasses the disabled button) is a clean no-op
   // instead of wiping the draft. The inner submit fns also fail closed as a backstop.
-  if (publicDocumentBlocksFromDraft(text, attachments).length === 0) return;
+  if (publicDocumentBlocksFromDraft(text, attachments, fileAttachments).length === 0) return;
   if (!plathoWallet) {
     setPublicStatus('create wallet first');
     return;
@@ -17855,7 +17959,7 @@ publicComposer?.addEventListener('submit', async (event) => {
   }
   // Part-cap gate (v648): block BEFORE the composer clears/signs — the draft stays intact with the split-it
   // message in the cost status (parity with the private composer's limitMessage block).
-  if (publicComposerPartLimitMessage(publicComposerSendPlan(text, attachments).length)) {
+  if (publicComposerPartLimitMessage(publicComposerSendPlan(text, attachments, fileAttachments).length)) {
     refreshComposerCostStatus();
     setPublicStatus('message too large');
     return;
@@ -17874,16 +17978,19 @@ publicComposer?.addEventListener('submit', async (event) => {
   const draftReplyTo = publicCommentReplyTo;
   publicMessageInput.value = '';
   publicImageAttachments = [];
+  publicFileAttachments = [];
   updateImageAttachmentUi('public');
+  updatePublicFileAttachmentUi();
   autoResizeComposerTextarea(publicMessageInput);
   refreshComposerCostStatus();
   try {
     if (draftCommentTarget) {
-      await submitPublicCommentThroughVault(draftCommentTarget, text, attachments);
+      await submitPublicCommentThroughVault(draftCommentTarget, text, attachments, fileAttachments);
     } else {
       await submitPublicPostThroughVault({
         text,
         attachments,
+        fileAttachments,
         commentsAllowed,
       });
     }
@@ -17894,11 +18001,13 @@ publicComposer?.addEventListener('submit', async (event) => {
     const rateLimited = noteTonRpcRateLimit(error);
     const cancelled = isPublishPriceChangeCancelled(error);
     if (cancelled) {
-      // User-cancelled (price dialog): give the draft back instead of losing it (incl. the reply quote).
+      // User-cancelled (price dialog): give the draft back instead of losing it (incl. the reply quote + files).
       publicMessageInput.value = text;
       publicImageAttachments = attachments;
+      publicFileAttachments = fileAttachments;
       if (draftReplyTo) setPublicCommentReplyTo(draftReplyTo);
       updateImageAttachmentUi('public');
+      updatePublicFileAttachmentUi();
       autoResizeComposerTextarea(publicMessageInput);
       refreshComposerCostStatus();
     }
@@ -26964,15 +27073,18 @@ function imagePartsForSend(attachment, label = 'image') {
   return splitBytesToCapsuleParts(attachment.bytes, MAX_CAPSULE_USEFUL_BYTES);
 }
 
-function publicDocumentBlocksFromDraft(text, attachments = publicImageAttachments) {
+// fileAttachments is a PARAM (defaults to the live global) so the SEND path can capture it BEFORE the composer
+// clears and thread the exact files through — otherwise the async publish would read an already-cleared global and
+// drop the files (same capture-at-submit pattern private uses).
+function publicDocumentBlocksFromDraft(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments) {
   // Explicit replyDraft: the PUBLIC surface quotes publicCommentReplyTo (non-null only in comment-reply mode) —
   // never the private composer's draft (composerBlocksFromDraft defaults to privateReplyDraft).
-  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null, publicCommentReplyTo, [])
+  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null, publicCommentReplyTo, normalizePrivateFileAttachments(fileAttachments))
     .filter((block) => block.type !== 'payment');
 }
 
-function publicDocumentBytesFromDraft(text, attachments = publicImageAttachments) {
-  const blocks = publicDocumentBlocksFromDraft(text, attachments);
+function publicDocumentBytesFromDraft(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments) {
+  const blocks = publicDocumentBlocksFromDraft(text, attachments, fileAttachments);
   if (blocks.length <= 0) return null;
   return encodeMessageDocumentBlocks(blocks);
 }
@@ -26986,8 +27098,8 @@ function publicSendPlanFromDocumentBytes(documentBytes) {
   return plan;
 }
 
-function publicComposerSendPlan(text, attachments = publicImageAttachments) {
-  return publicSendPlanFromDocumentBytes(publicDocumentBytesFromDraft(text, attachments));
+function publicComposerSendPlan(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments) {
+  return publicSendPlanFromDocumentBytes(publicDocumentBytesFromDraft(text, attachments, fileAttachments));
 }
 
 async function createPrivateComposerCapsules(text, attachments, recipientEntry, threadId, options = currentPrivateSenderOptions(), extras = {}) {
@@ -27271,10 +27383,10 @@ async function publishPublicPayloadParts(payloads, idPrefix, options = {}) {
   })), { ...options, allowOwnVaultActionReadFallback: true });
 }
 
-async function createPublicPayloadParts({ type, text, attachments = publicImageAttachments, commentsAllowed = true, parent = null, documentBytes = null, isProfile = false }) {
+async function createPublicPayloadParts({ type, text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments, commentsAllowed = true, parent = null, documentBytes = null, isProfile = false }) {
   // documentBytes override: publish an explicit PDC1 document (e.g. a channel PROFILE block) instead of a composer
   // draft, while still riding the identical public part-build + broadcast path.
-  const documentParts = documentBytes ? publicSendPlanFromDocumentBytes(documentBytes) : publicComposerSendPlan(text, attachments);
+  const documentParts = documentBytes ? publicSendPlanFromDocumentBytes(documentBytes) : publicComposerSendPlan(text, attachments, fileAttachments);
   const totalParts = documentParts.length;
   if (totalParts <= 0) return [];
   // Fail-closed cap (v648, mirrors assertPrivateComposerPartLimit in createPrivateComposerCapsules): the composer
@@ -27314,10 +27426,12 @@ async function submitPublicPostThroughVault(draft = null) {
   const resolvedDraft = draft ?? {
     text: publicMessageInput?.value?.trim() ?? '',
     attachments: publicImageAttachments,
+    fileAttachments: publicFileAttachments,
     commentsAllowed: publicComposerCommentsCheckbox?.checked !== false,
   };
   const attachments = normalizePublicImageAttachments(resolvedDraft.attachments ?? resolvedDraft.attachment);
-  const documentBlocks = publicDocumentBlocksFromDraft(resolvedDraft.text, attachments);
+  const fileAttachments = normalizePrivateFileAttachments(resolvedDraft.fileAttachments);
+  const documentBlocks = publicDocumentBlocksFromDraft(resolvedDraft.text, attachments, fileAttachments);
   // Fail closed when nothing real resolves to send — covers an empty draft AND an orphaned "[image N]" marker whose
   // attachment was removed (its text is non-empty, so the old "!text && no attachments" gate let it through into an
   // empty publish that dead-ends on "Capsule publish payload is missing").
@@ -27328,6 +27442,7 @@ async function submitPublicPostThroughVault(draft = null) {
     type: 'post',
     text: resolvedDraft.text,
     attachments,
+    fileAttachments,
     commentsAllowed: resolvedDraft.commentsAllowed,
   });
   // Private-composer parity: the post appears in the feed IMMEDIATELY (optimistic local record with a live
@@ -27416,13 +27531,14 @@ async function publishChannelProfile(description, tags) {
   return { result, description: desc, tags: normalizedTags, ownerUsername, createdAtSec };
 }
 
-async function submitPublicCommentThroughVault(parent, bodyText = null, draftAttachments = publicImageAttachments) {
+async function submitPublicCommentThroughVault(parent, bodyText = null, draftAttachments = publicImageAttachments, draftFileAttachments = publicFileAttachments) {
   if (parent?.entryId === undefined || parent?.entryId === null) throw new Error('Public comment parent is not synced from chain');
   if (!/^0x[0-9a-fA-F]{64}$/.test(String(parent.bodyHash ?? ''))) throw new Error('Public comment parent hash is missing');
   if (parent.commentsAllowed === false) throw new Error('Comments are closed for this post');
   const text = bodyText?.trim() ?? publicMessageInput?.value?.trim() ?? '';
   const attachments = normalizePublicImageAttachments(draftAttachments);
-  const documentBlocks = publicDocumentBlocksFromDraft(text, attachments);
+  const fileAttachments = normalizePrivateFileAttachments(draftFileAttachments);
+  const documentBlocks = publicDocumentBlocksFromDraft(text, attachments, fileAttachments);
   // Fail closed on zero resolved blocks — same as submitPublicPostThroughVault. An orphaned "[image N]" marker (text
   // non-empty) would slip the old "!text && no attachments" gate into an empty publish -> "Capsule publish payload is
   // missing"; a Ctrl+Enter requestSubmit() reaches here past the (correctly) disabled button, so this is the backstop.
@@ -27433,6 +27549,7 @@ async function submitPublicCommentThroughVault(parent, bodyText = null, draftAtt
     type: 'comment',
     text,
     attachments,
+    fileAttachments,
     parent,
   });
   // Both consumers of publicCommentReplyTo (the display blocks above + the send plan inside
