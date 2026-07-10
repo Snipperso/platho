@@ -3877,6 +3877,34 @@ button.feed-item:hover {
 .external-link-open:hover {
   filter: brightness(1.06);
 }
+/* Anti-phishing line: shown when a link's visible text differs from its destination ([text](url)). */
+.external-link-shownas {
+  color: var(--muted);
+  font-size: 13px;
+}
+.external-link-shownas b {
+  color: var(--text);
+}
+/* Composer "Insert link" dialog (reuses .action-dialog + .external-link-actions). */
+.link-composer-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.link-composer-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0d1012;
+  color: var(--text);
+  font: inherit;
+}
+.link-composer-error {
+  margin: 0;
+  color: #e8b64a;
+  font-size: 13px;
+}
 
 .docs-layout {
   display: grid;
@@ -4063,6 +4091,7 @@ button.feed-item:hover {
 .icon-search { --mask: url("./assets/icons/search.svg"); }
 .icon-plus { --mask: url("./assets/icons/plus.svg"); }
 .icon-image { --mask: url("./assets/icons/image.svg"); }
+.icon-link { --mask: url("./assets/icons/link.svg"); }
 .icon-down { --mask: url("./assets/icons/down.svg"); }
 .icon-up { --mask: url("./assets/icons/up.svg"); }
 .icon-back { --mask: url("./assets/icons/back.svg"); }
