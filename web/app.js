@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=20';
+} from './i18n.mjs?v=21';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v749';
+const PLATHO_APP_RUNTIME_VERSION = 'v750';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2002,7 +2002,12 @@ function openTelegramDeepLink(href) {
 // Clicking does NOT navigate directly: it routes through an interstitial that shows the real destination and warns
 // the external site will see the reader's IP (a real deanonymization vector for a privacy messenger — a unique
 // per-recipient link is a read-receipt + IP beacon). A per-domain "don't ask again" suppresses the prompt.
-const AUTOLINK_URL_RE = /https?:\/\/[^\s<>"']+/gi;
+// Matches EITHER a labeled link `[text](url)` (groups 1=label, 2=url) OR a bare http(s) URL (group 3). The labeled
+// form is tried first at each position, so a bare-URL match never eats the url inside `(...)`. Only the composer's
+// Link button produces `[text](url)`; a hand-typed one is fine too. Safety is identical for both: the url is
+// scheme-checked (safeExternalUrl) and the visible text is textContent — a mismatched label is surfaced by the
+// interstitial (which shows the REAL destination), never silently followed.
+const LINKIFY_RE = /\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)|(https?:\/\/[^\s<>"']+)/gi;
 
 function safeExternalUrl(raw) {
   if (typeof raw !== 'string' || raw.length === 0) return null;
@@ -2025,16 +2030,24 @@ function trimTrailingUrlPunctuation(url) {
 function appendLinkifiedText(parent, text) {
   const str = String(text ?? '');
   if (!str) return;
-  AUTOLINK_URL_RE.lastIndex = 0;
+  LINKIFY_RE.lastIndex = 0;
   let lastIndex = 0;
   let match;
-  while ((match = AUTOLINK_URL_RE.exec(str)) !== null) {
+  while ((match = LINKIFY_RE.exec(str)) !== null) {
     if (match.index > lastIndex) parent.append(document.createTextNode(str.slice(lastIndex, match.index)));
-    const trimmed = trimTrailingUrlPunctuation(match[0]);
-    const safe = safeExternalUrl(trimmed);
-    parent.append(safe ? buildExternalLinkAnchor(trimmed, safe) : document.createTextNode(trimmed));
-    lastIndex = match.index + trimmed.length; // leave any trailing punctuation for the next text node
-    if (AUTOLINK_URL_RE.lastIndex <= match.index) AUTOLINK_URL_RE.lastIndex = match.index + match[0].length; // no zero-advance loop
+    if (match[1] !== undefined) {
+      // [label](url) — link ONLY if the url passes the scheme allowlist; otherwise emit the literal typed text.
+      const safe = safeExternalUrl(match[2]);
+      parent.append(safe ? buildExternalLinkAnchor(match[1], safe) : document.createTextNode(match[0]));
+      lastIndex = match.index + match[0].length;
+    } else {
+      // bare url
+      const trimmed = trimTrailingUrlPunctuation(match[3]);
+      const safe = safeExternalUrl(trimmed);
+      parent.append(safe ? buildExternalLinkAnchor(trimmed, safe) : document.createTextNode(trimmed));
+      lastIndex = match.index + trimmed.length; // leave any trailing punctuation for the next text node
+    }
+    if (LINKIFY_RE.lastIndex <= match.index) LINKIFY_RE.lastIndex = match.index + match[0].length; // no zero-advance loop
   }
   if (lastIndex < str.length) parent.append(document.createTextNode(str.slice(lastIndex)));
 }
@@ -2042,7 +2055,7 @@ function appendLinkifiedText(parent, text) {
 function buildExternalLinkAnchor(displayText, safeHref) {
   const anchor = document.createElement('a');
   anchor.className = 'msg-link';
-  anchor.textContent = displayText; // the literal URL — what you see is where you go
+  anchor.textContent = displayText; // the visible text (the literal URL, or a [text](url) label) — set via textContent
   // DELIBERATELY NO live href / target=_blank. A real href would let a MIDDLE-click (which fires 'auxclick', not
   // 'click') and the right-click "Open link in new tab" context item navigate DIRECTLY — bypassing the interstitial
   // and leaking the reader's IP to a per-recipient beacon URL (a deanonymization / read-receipt vector, the exact
@@ -2056,7 +2069,7 @@ function buildExternalLinkAnchor(displayText, safeHref) {
   const activate = (event) => {
     event.preventDefault();
     event.stopPropagation();
-    activateExternalLink(safeHref);
+    activateExternalLink(safeHref, displayText);
   };
   anchor.addEventListener('click', activate);
   anchor.addEventListener('auxclick', activate); // middle-click (belt-and-suspenders; no href already means no nav)
@@ -2091,11 +2104,11 @@ function trustExternalDomain(host) {
   } catch { /* quota/unavailable: just re-prompt next time */ }
 }
 
-function activateExternalLink(safeHref) {
+function activateExternalLink(safeHref, displayText) {
   let host = '';
   try { host = new URL(safeHref).hostname; } catch { host = ''; }
   if (externalLinkDomainTrusted(host)) { openExternalUrl(safeHref); return; }
-  showExternalLinkConfirm(safeHref, host);
+  showExternalLinkConfirm(safeHref, host, displayText);
 }
 
 let activeExternalLinkModal = null;
@@ -2107,7 +2120,7 @@ function closeExternalLinkModal() {
   activeExternalLinkModal = null;
   try { previousFocus?.focus?.(); } catch { /* focus target detached */ }
 }
-function showExternalLinkConfirm(safeHref, host) {
+function showExternalLinkConfirm(safeHref, host, displayText) {
   closeExternalLinkModal();
   const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const domainLabel = host || safeHref;
@@ -2122,6 +2135,15 @@ function showExternalLinkConfirm(safeHref, host) {
   title.textContent = t('link.confirmTitle');
   const body = document.createElement('p');
   body.textContent = t('link.confirmBody', { domain: domainLabel });
+  // ANTI-PHISHING: when the visible text is a LABEL that differs from the destination (a [text](url) link), show
+  // "shown as: <label>" so a mismatch between what the reader clicked and where it actually goes is obvious.
+  const isLabeled = typeof displayText === 'string' && displayText.length > 0 && displayText !== safeHref;
+  let shownAs = null;
+  if (isLabeled) {
+    shownAs = document.createElement('p');
+    shownAs.className = 'external-link-shownas';
+    shownAs.textContent = t('link.shownAs', { text: displayText });
+  }
   const urlPreview = document.createElement('p');
   urlPreview.className = 'external-link-url';
   urlPreview.textContent = safeHref; // the exact destination, textContent-only
@@ -2149,7 +2171,7 @@ function showExternalLinkConfirm(safeHref, host) {
   openBtn.textContent = t('link.open');
   actions.append(cancelBtn, openBtn);
 
-  card.append(title, body, urlPreview, ipWarn, dontAskRow, actions);
+  card.append(title, body, ...(shownAs ? [shownAs] : []), urlPreview, ipWarn, dontAskRow, actions);
   backdrop.append(card);
   document.body.append(backdrop);
 
@@ -2168,6 +2190,87 @@ function showExternalLinkConfirm(safeHref, host) {
   document.addEventListener('keydown', onKeydown, true);
   activeExternalLinkModal = { backdrop, onKeydown, previousFocus };
   cancelBtn.focus();
+}
+
+// ── Composer "Insert link" dialog (v750) ───────────────────────────────────────────────────
+// So people don't hand-craft [text](url) markup: a small dialog takes an optional link text + a URL and inserts
+// the correctly-formatted markup at the composer caret. The URL is scheme-checked (safeExternalUrl) exactly like
+// a rendered link, and any '(' / ')' in the URL is percent-encoded so it can't break the [text](url) parse.
+let activeLinkComposerModal = null;
+function closeLinkComposerModal() {
+  if (!activeLinkComposerModal) return;
+  const { backdrop, onKeydown, previousFocus } = activeLinkComposerModal;
+  document.removeEventListener('keydown', onKeydown, true);
+  backdrop.remove();
+  activeLinkComposerModal = null;
+  try { previousFocus?.focus?.(); } catch { /* detached */ }
+}
+function openLinkComposerDialog(targetInput) {
+  if (!targetInput || targetInput.disabled) return;
+  closeLinkComposerModal();
+  const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop link-composer-backdrop';
+  const card = document.createElement('section');
+  card.className = 'action-dialog link-composer-dialog';
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+
+  const title = document.createElement('h2');
+  title.textContent = t('composer.insertLink');
+  const textInput = document.createElement('input');
+  textInput.type = 'text';
+  textInput.className = 'link-composer-input';
+  textInput.placeholder = t('composer.linkText');
+  textInput.setAttribute('aria-label', t('composer.linkText'));
+  textInput.maxLength = 200;
+  const urlInput = document.createElement('input');
+  urlInput.type = 'url';
+  urlInput.className = 'link-composer-input';
+  urlInput.placeholder = t('composer.linkUrl');
+  urlInput.setAttribute('aria-label', t('composer.linkUrl'));
+  urlInput.inputMode = 'url';
+  const errorLine = document.createElement('p');
+  errorLine.className = 'link-composer-error';
+  errorLine.hidden = true;
+
+  const actions = document.createElement('div');
+  actions.className = 'external-link-actions';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'secondary-button';
+  cancelBtn.textContent = t('common.cancel');
+  const insertBtn = document.createElement('button');
+  insertBtn.type = 'button';
+  insertBtn.className = 'external-link-open';
+  insertBtn.textContent = t('composer.insert');
+  actions.append(cancelBtn, insertBtn);
+
+  card.append(title, textInput, urlInput, errorLine, actions);
+  backdrop.append(card);
+  document.body.append(backdrop);
+
+  const doInsert = () => {
+    let raw = String(urlInput.value ?? '').trim();
+    if (!raw) { errorLine.textContent = t('composer.linkUrlInvalid'); errorLine.hidden = false; urlInput.focus(); return; }
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) raw = `https://${raw}`; // a bare domain typed without a scheme -> assume https
+    const safe = safeExternalUrl(raw);
+    if (!safe) { errorLine.textContent = t('composer.linkUrlInvalid'); errorLine.hidden = false; urlInput.focus(); return; }
+    const label = String(textInput.value ?? '').replace(/[[\]\n]/g, ' ').trim();
+    const encodedUrl = safe.replace(/\(/g, '%28').replace(/\)/g, '%29'); // keep parens out of the [text](url) parse
+    const markup = label ? `[${label}](${encodedUrl})` : safe;
+    closeLinkComposerModal();
+    insertEmojiAtCaret(targetInput, markup); // generic caret insert: writes the markup + fires input/resize listeners
+  };
+  cancelBtn.addEventListener('click', closeLinkComposerModal);
+  insertBtn.addEventListener('click', doInsert);
+  urlInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); doInsert(); } });
+  textInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); urlInput.focus(); } });
+  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) closeLinkComposerModal(); });
+  const onKeydown = (event) => { if (event.key === 'Escape') { event.preventDefault(); closeLinkComposerModal(); } };
+  document.addEventListener('keydown', onKeydown, true);
+  activeLinkComposerModal = { backdrop, onKeydown, previousFocus };
+  textInput.focus();
 }
 
 // A bare window.open of a t.me/ link is a no-op inside the Telegram in-app WebView,
@@ -15471,7 +15574,7 @@ function removeImageMarkerForComposer(kind, removedIndex) {
   if (!textarea) return;
   const removedMarkerNum = Number(removedIndex) + 1; // markers are 1-based: [image 1] == attachment index 0
   let droppedOne = false;
-  const next = String(textarea.value ?? '').replace(/\[(?:image|img)\s+(\d+)\]/ig, (match, numStr) => {
+  const next = String(textarea.value ?? '').replace(/\[(?:image|img)\s+(\d+)\](?!\()/ig, (match, numStr) => { // (?!\() : never touch a labeled link [image N](url)
     const n = Number(numStr);
     if (!droppedOne && n === removedMarkerNum) { droppedOne = true; return ''; } // drop the removed image's marker (first match)
     if (n > removedMarkerNum) return `[image ${n - 1}]`;                          // renumber the ones after it (array shifted down)
@@ -17586,6 +17689,16 @@ publicImageButton?.addEventListener('click', () => {
   publicImageInput?.click();
 });
 
+// Composer "Insert link" (v750): a link is just text, so — unlike image/file attachments — there is no
+// send-ability gate; the dialog's insert is a no-op on a disabled input (insertEmojiAtCaret guards it).
+document.querySelector('#privateLinkButton')?.addEventListener('click', () => {
+  hidePrivateComposerAddMenu();
+  openLinkComposerDialog(messageInput);
+});
+document.querySelector('#publicLinkButton')?.addEventListener('click', () => {
+  openLinkComposerDialog(publicMessageInput);
+});
+
 privateImageInput?.addEventListener('change', async () => {
   const file = privateImageInput.files?.[0];
   if (!file) return;
@@ -19408,8 +19521,12 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   PROFILE: 7,
 });
 const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
-const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\]/ig;
-const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\]|\[(?:check|payment)\]/ig;
+// The `(?!\()` on every marker keeps a labeled LINK `[check](url)` / `[image 1](url)` (v750) from being mis-read as
+// a composer marker: a real marker is inserted standalone (newline-wrapped), NEVER immediately followed by '(',
+// whereas a labeled link always is. Without this, a link whose text happened to be "check"/"payment"/"image N" had
+// its label + brackets eaten on send (and could attach a stray payment/image block).
+const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\](?!\()/ig;
+const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[(?:check|payment)\](?!\()/ig;
 
 function concatUint8Arrays(parts) {
   const arrays = parts.map((part) => part instanceof Uint8Array ? part : new Uint8Array(part ?? []));
