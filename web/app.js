@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=23';
+} from './i18n.mjs?v=24';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v752';
+const PLATHO_APP_RUNTIME_VERSION = 'v753';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -636,6 +636,13 @@ const editChannelProfileButton = document.querySelector('#editChannelProfileButt
 const publicDiscovery = document.querySelector('#publicDiscovery');
 const publicDiscoveryBody = document.querySelector('#publicDiscoveryBody');
 const publicDiscoveryBackButton = document.querySelector('#publicDiscoveryBackButton');
+const publicChannelView = document.querySelector('#publicChannelView');
+const publicChannelViewBackButton = document.querySelector('#publicChannelViewBackButton');
+const publicChannelViewAvatar = document.querySelector('#publicChannelViewAvatar');
+const publicChannelViewTitle = document.querySelector('#publicChannelViewTitle');
+const publicChannelViewSubtitle = document.querySelector('#publicChannelViewSubtitle');
+const publicChannelViewFollowButton = document.querySelector('#publicChannelViewFollowButton');
+const publicChannelViewBody = document.querySelector('#publicChannelViewBody');
 const publicJumpDownButton = document.querySelector('#publicJumpDownButton');
 const publicComposer = document.querySelector('#publicComposer');
 const publicMessageInput = document.querySelector('#publicMessageInput');
@@ -756,6 +763,18 @@ let threads = [];
 let customPublicChannels = [];
 let publicChannelRegistry = [];
 let publicChannelThreads = [];
+// --- Channel view (v753): a single channel's posts on their own screen ---
+let publicChannelViewOpen = false;
+let publicChannelViewChannelId = null;
+let publicChannelViewWallet = null; // raw author wallet of the open channel (null for a wallet-less registry channel)
+let publicChannelViewReturnTo = null; // 'discovery' when the view was opened from a discovery card (Back returns there)
+let publicChannelViewShownCap = 150; // local newest-N render cap, reset on open; "show older" grows it
+let publicChannelViewSyncPending = false; // a preview fetch is in flight (drives the loading vs empty state)
+let publicChannelViewOpenToken = 0; // bumped on every open/close; a stale preview sync's finally must not clear the CURRENT view's pending flag
+let publicChannelViewRenderSig = ''; // cheap rebuild guard: skip the body rebuild when nothing visible changed
+// A channel open in the view but NOT followed rides along as a TRANSIENT feed source (feedSourcePublicChannels)
+// so the standard sync walk fetches its posts for the preview; the main feed filters it out until followed.
+let publicChannelPreviewChannelId = null;
 let publicChannelSubscriptions = null;
 let publicChannelFeedCache = {};
 // Per-author channel PROFILE cache (description + tags), keyed by the raw channel author wallet. Loaded on boot,
@@ -770,6 +789,17 @@ const pendingChannelProfileOverlay = new Map();
 // window of the last CLEAN (non-rate-limited) full walk. While the head is unchanged we skip the whole walk.
 let lastSyncedPublicLatestId = null;
 let lastSyncedPublicSyncWindow = null;
+// Guards the fast-path invalidation against a CONCURRENT walk's commit: syncPublicChannels has no in-flight
+// guard, so a walk started BEFORE an invalidation (its source list predates the newly-interesting channel) could
+// complete cleanly and re-commit lastSyncedPublicLatestId — the next walk would then fast-path out without ever
+// reading the new channel (a follow or a channel-view preview stuck on a false "No posts yet"). Every invalidation
+// bumps this epoch; a walk captures it at start and skips the cursor commit if it changed mid-walk.
+let publicSyncInvalidationEpoch = 0;
+
+function invalidatePublicSyncFastPath() {
+  lastSyncedPublicLatestId = null;
+  publicSyncInvalidationEpoch += 1;
+}
 // Phase 2 per-index incremental cursors (in-memory; rebuilt by a full walk after reload). Per-author POST-index
 // head and per-post COMMENT (parent) index head. An index whose head is unchanged since the last clean walk is
 // skipped without re-reading its entries — so a busy global feed re-reads only the authors/posts that actually
@@ -1911,7 +1941,9 @@ function applyTelegramSafeArea() {
 // (PWA/browser): keep exactly ONE history sentinel while an overlay is open, so a popstate (Android Back)
 // closes the overlay instead of unloading the app.
 function navOverlayIsOpen() {
-  return appShell?.dataset?.chatOpen === 'true' || publicPane?.dataset?.postOpen === 'true';
+  return appShell?.dataset?.chatOpen === 'true'
+    || publicPane?.dataset?.postOpen === 'true'
+    || publicPane?.dataset?.channelOpen === 'true';
 }
 
 let navHistorySentinel = false;
@@ -1933,6 +1965,13 @@ function closeNavOverlay() {
   // shared composer would stay pinned to the closed post and a feed "post" would publish as a comment.
   if (publicPane?.dataset?.postOpen === 'true') {
     closePublicPostDetail();
+    syncNavBackAffordance();
+    return true;
+  }
+  // Channel view -> back (to discovery when it launched the view, else the feed). Sits UNDER the post detail in
+  // the stack: a post opened from the channel screen closes first (branch above), landing back on the channel.
+  if (publicPane?.dataset?.channelOpen === 'true') {
+    closePublicChannelView();
     syncNavBackAffordance();
     return true;
   }
@@ -3287,7 +3326,7 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   publicAuthorRoundCovered.clear();
   publicAuthorRoundStartHead = null;
   publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
-  lastSyncedPublicLatestId = null;
+  invalidatePublicSyncFastPath(); // epoch bump: an in-flight walk of the OLD account must not re-commit the cursor
   lastSyncedPublicSyncWindow = null;
   activeRuntimeWalletAddress = null;
   clearMessageAutoSyncTimer();
@@ -4441,6 +4480,16 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
       empty.textContent = t('public.noDescriptionYet');
       body.append(empty);
     }
+    // Jump from the about card straight to the channel screen (this channel's posts only).
+    const openChannelButton = document.createElement('button');
+    openChannelButton.type = 'button';
+    openChannelButton.className = 'discovery-cta-action channel-about-open';
+    openChannelButton.textContent = t('public.openChannel');
+    openChannelButton.addEventListener('click', () => {
+      hideIdentityPopover();
+      openPublicChannelView({ authorWallet });
+    });
+    body.append(openChannelButton);
     if (isOwn) {
       const editButton = document.createElement('button');
       editButton.type = 'button';
@@ -5980,7 +6029,7 @@ function addCustomPublicChannel(channel) {
 // skip the whole walk) would leave the channel on "Waiting for public feed" until a page reload reset the in-memory
 // cursor. Invalidate the fast-path and kick a sync now so the new channel's posts load immediately.
 function resyncPublicForNewSubscription() {
-  lastSyncedPublicLatestId = null;
+  invalidatePublicSyncFastPath();
   syncPublicChannels().catch((error) => { noteTonRpcRateLimit(error); });
 }
 
@@ -6441,6 +6490,12 @@ function appendPublicItemActions(article, item) {
     unfollowButton.textContent = t('public.unfollow');
     unfollowButton.title = t('public.stopFollowingChannel');
     unfollowButton.addEventListener('click', () => {
+      // Unfollowing from a card INSIDE the open channel view keeps the view's posts visible (the channel becomes
+      // a transient preview source) — the same protocol as the header unfollow; without it the open screen
+      // flips to a false "No posts yet".
+      if (publicChannelViewOpen && publicChannelViewChannelId === item.channelId) {
+        publicChannelPreviewChannelId = item.channelId;
+      }
       setPublicChannelSubscribed(item.channelId, false);
     });
     actions.append(unfollowButton);
@@ -6548,8 +6603,11 @@ function renderPublicFeed(items, options = {}) {
   }
   requestAnimationFrame(updatePublicJumpDownVisibility);
   // Viewing the feed marks its (rendered) posts read (only when the Public tab is actually on screen, so a
-  // background sync does not pre-clear unread). Re-render once to drop the unread badges.
-  if (isPublicViewActive() && markVisiblePublicFeedRead(windowItems)) {
+  // background sync does not pre-clear unread). NOT while an overlay (post detail / discovery / channel view)
+  // covers the feed — it is display:none then and the user cannot see the posts being marked. Re-render once to
+  // drop the unread badges.
+  if (isPublicViewActive() && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen
+    && markVisiblePublicFeedRead(windowItems)) {
     requestAnimationFrame(() => renderPublicSurface({ anchorUnread: false }));
   }
 }
@@ -6577,6 +6635,24 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
     meta.append(span);
   }
   authorRow.append(authorAvatar, meta);
+  // Tapping the author (avatar or the name/meta block) opens the channel screen — this channel's posts only.
+  // Plain click affordance, NO role/aria-label: an aria-label would wipe the author/date/unread text from the
+  // accessibility tree, and the meta block can host interactive children (the publish-status retry chip) — a
+  // nested-button-in-button violation. The keyboard path to the channel is the about "i" button's "Open channel"
+  // action (a real button). The about "i" + "Display as" chevron stopPropagation, staying independent targets.
+  if (item.channelId) {
+    const openChannel = (event) => {
+      // A click landing on an interactive child (the publish-status/retry chip) is not a channel-open intent.
+      if (event.target instanceof Element && event.target !== event.currentTarget
+        && event.target.closest('button, .public-publish-status')) return;
+      event.stopPropagation();
+      openPublicChannelView({ channelId: item.channelId, authorWallet: item.authorWallet });
+    };
+    for (const node of [authorAvatar, meta]) {
+      node.classList.add('feed-author-link');
+      node.addEventListener('click', openChannel);
+    }
+  }
   // Own pending publishes carry a status badge ('public publish submitted…' / 'public publish failed') —
   // CSS classes only (prod CSP style-src 'self' silently kills inline styles).
   if (isPendingPublicFeedItem(item) && item.publishStatus) {
@@ -6664,12 +6740,19 @@ function renderPublicSurface(options = {}) {
   refreshEditChannelProfileButton();
   if (publicChannelSearchRow) publicChannelSearchRow.hidden = false;
   const allItems = publicFeedItemsChronological();
-  const items = allItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
+  // A transient preview channel (open in the channel view, not followed) is excluded from the MAIN feed and its
+  // unread/status counts — its posts show only inside the channel view until the user follows.
+  const surfaceItems = publicChannelPreviewChannelId
+    ? allItems.filter((item) => item.channelId !== publicChannelPreviewChannelId)
+    : allItems;
+  const items = surfaceItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
   renderPublicFeed(items, options);
   // Keep the open post detail (per-post comments) in sync with the cache too — a just-published local-pending
   // comment lands in the cache and must show on the detail screen, which is rendered separately from the feed.
   if (publicPostDetailOpen) renderPublicPostDetail();
-  const unread = allItems.filter(isUnreadPublicItem).length;
+  // Same for the open channel view — a background sync (or a preview fetch) re-renders its post list.
+  if (publicChannelViewOpen) renderPublicChannelView();
+  const unread = surfaceItems.filter(isUnreadPublicItem).length;
   setPublicStatus(publicChannelSearchQuery ? `${items.length} found` : (unread > 0 ? `${unread} unread` : 'feed'));
 }
 
@@ -7024,6 +7107,8 @@ function closePublicPostDetail() {
 // --- Newcomer discovery panel (Part B) ---
 async function openPublicDiscovery() {
   closePublicPostDetail();
+  // reopenReturnTo:false — discovery is being opened EXPLICITLY here; the close must not re-open it (loop).
+  closePublicChannelView({ reopenReturnTo: false });
   publicDiscoveryOpen = true;
   publicDiscoveryTagFilter = null;
   if (publicPane) publicPane.dataset.discoverOpen = 'true';
@@ -7048,6 +7133,229 @@ function closePublicDiscovery() {
   publicDiscoveryOpen = false;
   publicDiscoveryLoadToken += 1; // invalidate any in-flight scan so a stale result can't render
   if (publicPane) publicPane.dataset.discoverOpen = 'false';
+}
+
+// --- Channel view (v753): one channel's posts on their own screen ---
+// Opens over the feed like the post detail / discovery (data-channel-open). A FOLLOWED channel renders instantly
+// from the local cache; a NOT-followed one becomes a transient feed source (feedSourcePublicChannels) and the
+// standard sync walk pulls its posts as a preview — nothing leaks into the main feed until the user follows.
+// The post detail stacks ON TOP (open a post from the channel screen; Back returns to it).
+function publicChannelViewChannel() {
+  return publicChannelRegistry.find((channel) => channel.id === publicChannelViewChannelId) ?? null;
+}
+
+function publicChannelViewItems() {
+  if (!publicChannelViewChannelId) return [];
+  return publicFeedItemsChronological().filter((item) => (
+    item.channelId === publicChannelViewChannelId && item.emptyChannel !== true
+  ));
+}
+
+function openPublicChannelView(source = {}) {
+  const wallet = rawWalletAddress(source.authorWallet) ?? null;
+  let channelId = source.channelId ?? null;
+  // A wallet with no registry entry yet (e.g. straight from discovery) gets registered UNSUBSCRIBED — the
+  // existing "discovered while syncing" semantics, not a follow.
+  if (!channelId && wallet) channelId = ensurePublicChannelForAuthorWallet(wallet, { activate: false });
+  if (!channelId) return;
+  // A floating "Display as" popover (body-appended singleton) must not survive the tap — the entry points
+  // stopPropagation, so the document-level click closer never sees it. ABOVE the same-channel early return:
+  // an author-row tap INSIDE the open view takes that return, and the popover would otherwise float on.
+  hideIdentityPopover();
+  if (publicChannelViewOpen && publicChannelViewChannelId === channelId) { renderPublicChannelView(); return; }
+  closePublicPostDetail();
+  closePublicDiscovery();
+  publicChannelViewOpen = true;
+  publicChannelViewChannelId = channelId;
+  publicChannelViewWallet = wallet
+    ?? rawWalletAddress(publicChannelRegistry.find((channel) => channel.id === channelId)?.authorWallet)
+    ?? null;
+  publicChannelViewReturnTo = source.returnTo ?? null;
+  publicChannelViewShownCap = PUBLIC_FEED_RENDER_CAP;
+  publicChannelViewRenderSig = '';
+  const own = publicChannelViewWallet ? isOwnPublicAuthor(publicChannelViewWallet) : false;
+  const followed = own || isPublicChannelSubscribed(channelId);
+  publicChannelPreviewChannelId = followed ? null : channelId;
+  if (publicPane) {
+    publicPane.dataset.channelOpen = 'true';
+    // Foreign channel: the post composer is hidden by CSS (you publish to YOUR channel from the feed; comments
+    // live in the post detail, which re-shows the composer in comment mode when stacked on top).
+    publicPane.dataset.channelOwn = own ? 'true' : 'false';
+  }
+  syncNavBackAffordance();
+  const syncToken = ++publicChannelViewOpenToken;
+  // Raised BEFORE the first paint: a cold preview channel must open on "Loading posts…", not flash a false
+  // "No posts yet" until an incidental later render happens to repaint it.
+  publicChannelViewSyncPending = !followed;
+  renderPublicChannelView();
+  if (publicChannelViewBody) publicChannelViewBody.scrollTop = 0;
+  if (!followed) {
+    // The preview source just joined feedSourcePublicChannels — rebuild the threads around it and pull its posts
+    // now (the fast-path would otherwise skip the walk until the next global post; same invalidation the follow
+    // flow uses in resyncPublicForNewSubscription, epoch-guarded against a concurrent walk's commit).
+    rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
+    invalidatePublicSyncFastPath();
+    syncPublicChannels()
+      .catch((error) => { noteTonRpcRateLimit(error); })
+      .finally(() => {
+        // Token guard: this finally may belong to a PREVIOUS channel's preview (the user moved on) — clearing the
+        // pending flag then would flip the CURRENT channel's "Loading posts…" to a false "No posts yet".
+        if (syncToken !== publicChannelViewOpenToken) return;
+        publicChannelViewSyncPending = false;
+        if (publicChannelViewOpen) renderPublicChannelView();
+      });
+  }
+  // Header description card (and the freshest verified name) — cache-first, repaint when the cold read lands.
+  if (publicChannelViewWallet) {
+    const openedChannelId = channelId;
+    resolveChannelProfile(publicChannelViewWallet)
+      .then(() => { if (publicChannelViewOpen && publicChannelViewChannelId === openedChannelId) renderPublicChannelView(); })
+      .catch(() => {});
+  }
+}
+
+function closePublicChannelView(options = {}) {
+  if (!publicChannelViewOpen && publicPane?.dataset?.channelOpen !== 'true') return;
+  publicChannelViewOpen = false;
+  publicChannelViewOpenToken += 1; // invalidate any in-flight preview sync's finally
+  publicChannelViewSyncPending = false;
+  const hadPreview = publicChannelPreviewChannelId !== null;
+  publicChannelPreviewChannelId = null;
+  publicChannelViewChannelId = null;
+  publicChannelViewWallet = null;
+  publicChannelViewRenderSig = '';
+  const returnTo = publicChannelViewReturnTo;
+  publicChannelViewReturnTo = null;
+  if (publicPane) {
+    publicPane.dataset.channelOpen = 'false';
+    delete publicPane.dataset.channelOwn;
+  }
+  // Closing the view drops the transient preview source (its posts leave the threads; the cache entry stays for an
+  // instant re-open, bounded by the per-channel cache caps).
+  if (hadPreview) rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
+  else renderPublicSurface({ anchorUnread: false });
+  if (options.reopenReturnTo !== false && returnTo === 'discovery') openPublicDiscovery().catch(() => {});
+}
+
+function renderPublicChannelView() {
+  if (!publicChannelViewOpen || !publicChannelViewBody) return;
+  const channel = publicChannelViewChannel();
+  const wallet = publicChannelViewWallet;
+  const own = wallet ? isOwnPublicAuthor(wallet) : false;
+  // Header identity: the same precedence the feed/discovery use (explicit "Display as" choice > verified
+  // username > registry name) — see applyContactDisplayToRegistryChannel.
+  const label = (wallet ? resolveWalletChannelDisplay(wallet)?.name : null)
+    || (wallet ? publicAuthorLabel(wallet) : null)
+    || channel?.name
+    || t('public.channel');
+  if (publicChannelViewTitle) publicChannelViewTitle.textContent = label;
+  if (publicChannelViewSubtitle) {
+    publicChannelViewSubtitle.textContent = wallet ? shortAddress(wallet) : (channel?.subtitle ?? t('public.channelPosts'));
+  }
+  if (publicChannelViewAvatar) {
+    setAvatarNode(publicChannelViewAvatar, String(label ?? 'P').slice(0, 1), wallet ? publicAvatarUrlForWallet(wallet) : null);
+  }
+  const followed = isPublicChannelSubscribed(publicChannelViewChannelId);
+  if (publicChannelViewFollowButton) {
+    publicChannelViewFollowButton.hidden = own;
+    publicChannelViewFollowButton.textContent = followed ? t('public.unfollow') : t('public.follow');
+    publicChannelViewFollowButton.dataset.followed = followed ? 'true' : 'false';
+  }
+  const items = publicChannelViewItems();
+  const profile = wallet ? cachedChannelProfile(wallet) : null;
+  const description = typeof profile?.description === 'string' ? profile.description.trim() : '';
+  const tags = (profile?.tags ?? []).filter(Boolean);
+  // Rebuild guard: a background sync re-renders this view every cycle; when nothing visible changed, keep the
+  // existing DOM (and the reader's scroll position). Signature mirrors the feed's per-item reconciliation.
+  const avatarUrlMemo = new Map();
+  const capped = items.length > publicChannelViewShownCap ? items.slice(items.length - publicChannelViewShownCap) : items;
+  const sig = [
+    publicChannelViewChannelId, label, followed ? 'f' : '', own ? 'o' : '',
+    publicChannelViewSyncPending ? 'p' : '', description, tags.join(','), String(items.length),
+    ...capped.map((item) => `${item.id}:${publicFeedItemRenderSignature(item, avatarUrlMemo)}`),
+  ].join('|');
+  if (sig !== publicChannelViewRenderSig) {
+    publicChannelViewRenderSig = sig;
+    // Reading-position anchor (the v752 feed lesson): a raw scrollTop restore shifts the reader when a NEW post
+    // prepends at the top of the rebuilt list — snapshot the topmost visible article + its viewport offset and
+    // re-align it after the rebuild. Skipped at the top (scrollTop 0 → new posts simply appear).
+    const previousScrollTop = publicChannelViewBody.scrollTop;
+    let scrollAnchor = null;
+    if (previousScrollTop > 0) {
+      const bodyTop = publicChannelViewBody.getBoundingClientRect().top;
+      for (const node of publicChannelViewBody.children) {
+        if (!node.dataset?.itemId) continue;
+        const nodeTop = node.getBoundingClientRect().top - bodyTop;
+        if (nodeTop + node.offsetHeight > 0) { scrollAnchor = { id: node.dataset.itemId, offset: nodeTop }; break; }
+      }
+    }
+    publicChannelViewBody.replaceChildren();
+    if (description || tags.length > 0) {
+      const about = document.createElement('article');
+      about.className = 'discovery-card channel-view-about';
+      if (description) {
+        const paragraph = document.createElement('p');
+        paragraph.className = 'channel-about-description';
+        paragraph.textContent = description;
+        about.append(paragraph);
+      }
+      if (tags.length > 0) {
+        const tagRow = document.createElement('div');
+        tagRow.className = 'channel-about-tags';
+        for (const tag of tags) {
+          const chip = document.createElement('span');
+          chip.className = 'channel-about-tag';
+          chip.textContent = `#${tag}`;
+          tagRow.append(chip);
+        }
+        about.append(tagRow);
+      }
+      publicChannelViewBody.append(about);
+    }
+    if (capped.length === 0) {
+      const status = document.createElement('p');
+      status.className = 'discovery-status';
+      status.textContent = publicChannelViewSyncPending ? t('public.channelLoading') : t('public.channelEmpty');
+      publicChannelViewBody.append(status);
+    } else {
+      // Newest-first (the v752 feed model) with a local cap + "show older" at the bottom.
+      for (const item of capped.slice().reverse()) {
+        const node = buildPublicFeedArticle(item, avatarUrlMemo);
+        node.dataset.itemId = String(item.id); // scroll-anchor key across rebuilds
+        publicChannelViewBody.append(node);
+      }
+      const hiddenOlder = items.length - capped.length;
+      if (hiddenOlder > 0) {
+        const older = document.createElement('button');
+        older.type = 'button';
+        older.className = 'feed-show-older';
+        older.textContent = t('public.showOlder');
+        older.dataset.hiddenOlder = String(hiddenOlder);
+        older.addEventListener('click', () => {
+          publicChannelViewShownCap += PUBLIC_FEED_RENDER_PAGE;
+          renderPublicChannelView();
+        });
+        publicChannelViewBody.append(older);
+      }
+    }
+    publicChannelViewBody.scrollTop = previousScrollTop;
+    if (scrollAnchor) {
+      // Re-align the anchored article to its pre-rebuild viewport offset (content added ABOVE otherwise shoves
+      // the reader down; WebKit has no overflow-anchor). No-op when the anchor aged out of the window.
+      const bodyTop = publicChannelViewBody.getBoundingClientRect().top;
+      for (const node of publicChannelViewBody.children) {
+        if (node.dataset?.itemId !== scrollAnchor.id) continue;
+        const nodeTop = node.getBoundingClientRect().top - bodyTop;
+        publicChannelViewBody.scrollTop = Math.max(0, publicChannelViewBody.scrollTop + (nodeTop - scrollAnchor.offset));
+        break;
+      }
+    }
+  }
+  // Reading the channel marks its rendered posts read — the same rule the feed applies to its window. NOT while
+  // the post detail / discovery is stacked on top (the view is display:none then; the user never saw the posts).
+  if (isPublicViewActive() && !publicPostDetailOpen && !publicDiscoveryOpen && markVisiblePublicFeedRead(capped)) {
+    requestAnimationFrame(() => renderPublicSurface({ anchorUnread: false }));
+  }
 }
 
 async function refreshPublicDiscovery() {
@@ -7161,6 +7469,20 @@ function buildDiscoveryCard(channel) {
   name.className = 'discovery-card-name';
   name.textContent = label;
   head.append(avatar, name);
+  // The card head opens the channel screen (read the posts BEFORE deciding to follow). Plain click affordance,
+  // no role/aria-label (it would wipe the channel name from the accessibility tree and nest the chevron button
+  // inside a button role) — the keyboard path is the explicit "Open channel" action button below. The chevron
+  // stopPropagations, so relabeling stays an independent target.
+  head.classList.add('feed-author-link');
+  const openDiscoveredChannel = (event) => {
+    if (event && event.target instanceof Element && event.target !== event.currentTarget
+      && event.target.closest('button')) return;
+    // stopPropagation: the delegated document-level avatar-lightbox handler (setAvatarNode tap-to-view) must not
+    // ALSO fire when the tap lands on the card's avatar — opening the channel is this tap's one meaning.
+    event?.stopPropagation?.();
+    openPublicChannelView({ authorWallet: channel.authorWallet, returnTo: 'discovery' });
+  };
+  head.addEventListener('click', openDiscoveredChannel);
   // "Display as" chevron — same affordance as a public post's author row: relabel this channel by its verified
   // .ath username, wallet address (with copy), or a local name, shared per-counterparty with any Private dialog.
   // Skipped for your own channel (nothing to relabel) or an entry with no author wallet.
@@ -7186,6 +7508,12 @@ function buildDiscoveryCard(channel) {
   }
   const actions = document.createElement('div');
   actions.className = 'discovery-card-actions';
+  // Browse-then-commit order: open (preview) first, follow second.
+  const openButton = document.createElement('button');
+  openButton.type = 'button';
+  openButton.className = 'discovery-cta-action';
+  openButton.textContent = t('public.openChannel');
+  openButton.addEventListener('click', openDiscoveredChannel);
   const followButton = document.createElement('button');
   followButton.type = 'button';
   // Shared plate-CTA look (same as "Add contact"/"Add channel") — owner-requested single source of truth.
@@ -7196,7 +7524,7 @@ function buildDiscoveryCard(channel) {
     followButton.textContent = t('public.following');
     followDiscoveredChannel(channel.authorWallet);
   });
-  actions.append(followButton);
+  actions.append(openButton, followButton);
   card.append(actions);
   return card;
 }
@@ -8409,8 +8737,15 @@ function ownPublicChannel() {
 function feedSourcePublicChannels() {
   const subscribed = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry);
   const own = ownPublicChannel();
-  if (!own || subscribed.some((channel) => channel.id === own.id)) return subscribed;
-  return [...subscribed, own];
+  const channels = (!own || subscribed.some((channel) => channel.id === own.id)) ? subscribed : [...subscribed, own];
+  // A channel open in the CHANNEL VIEW but not followed rides along as a TRANSIENT source, so the standard sync
+  // walk (multipart, comments, eviction — one battle-tested code path) fetches its posts for the preview. The main
+  // feed render filters it out until followed (renderPublicSurface); closing the view drops it again.
+  if (publicChannelPreviewChannelId && !channels.some((channel) => channel.id === publicChannelPreviewChannelId)) {
+    const preview = publicChannelRegistry.find((channel) => channel.id === publicChannelPreviewChannelId);
+    if (preview) return [...channels, preview];
+  }
+  return channels;
 }
 
 // ---- Subscription persistence (Phase 2 v1): full snapshot stored as a private capsule to SELF -----------------
@@ -9246,6 +9581,10 @@ async function syncPublicChannelFromChain() {
   // Set when a transient read failure (rate limit) was swallowed mid-walk, so the walk produced a PARTIAL result.
   // A degraded walk must not advance the cursor (commit-gate) and must not be trusted to prune the cache.
   let walkDegraded = false;
+  // Captured AFTER the fast-path: if an invalidation (follow / channel-view preview) lands while THIS walk is in
+  // flight, its source list may predate the newly-interesting channel — the commit-gate below must then leave the
+  // cursor null so the invalidation's own walk actually runs instead of fast-pathing out.
+  const invalidationEpochAtStart = publicSyncInvalidationEpoch;
   // Per-subscribed-author walk (replaces the old global scan): fetch only posts by channels the user is
   // subscribed to, plus the comments on those posts, via the on-chain author/parent indexes. Cost scales with
   // the user's subscriptions, NOT the global feed size — the scalability fix. The walk caches each fetched
@@ -9336,6 +9675,11 @@ async function syncPublicChannelFromChain() {
   // roundStartHead is captured at the START of a round (covered set empty). The commit-gate advances the global
   // fast-path cursor only TO this head, and only once every readable channel is covered -- so a channel skipped by
   // the budget can never let the gate advance past that channel's not-yet-re-read new posts.
+  // Self-heal a wedged round: a wallet switch racing an in-flight walk can leave covered NON-empty while
+  // roundStartHead is null (the switch cleared both, the stale walk then re-added covered keys). roundStartHead is
+  // only ever set here (covered empty) and covered only cleared in the commit (roundStartHead non-null) — without
+  // this reset the gate deadlocks and every cycle re-reads the full budget for the rest of the session.
+  if (publicAuthorRoundStartHead === null && publicAuthorRoundCovered.size > 0) publicAuthorRoundCovered.clear();
   if (publicAuthorRoundCovered.size === 0) publicAuthorRoundStartHead = latestId;
   // Selection, HARD-capped at the per-cycle budget regardless of how many channels are headless -- so a cold-start /
   // account-switch / sustained-rate-limit cycle (where NO per-author head is cached yet) still cannot fan out to
@@ -9350,14 +9694,22 @@ async function syncPublicChannelFromChain() {
   const isHeadless = (c) => !publicAuthorIndexHeads.has(channelAuthorKeys.get(c.id).toString());
   const readThisCycle = new Set();
   if (ownChannelId !== null && readableChannels.some((c) => c.id === ownChannelId)) readThisCycle.add(ownChannelId);
+  // The channel-view preview channel is what the user is LOOKING AT right now — always read it this cycle. On a
+  // cold head cache (reload/account switch) with more headless channels than the budget, the id-sort could
+  // otherwise defer it for cycles and the open view would sit on a false "No posts yet".
+  if (publicChannelPreviewChannelId !== null && readableChannels.some((c) => c.id === publicChannelPreviewChannelId)) {
+    readThisCycle.add(publicChannelPreviewChannelId);
+  }
   let budget = PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE - readThisCycle.size;
   for (const c of idSorted) {
     if (budget <= 0) break;
-    if (c.id === ownChannelId || !isHeadless(c)) continue;
+    // has() (not just own): the pre-seeded preview channel is ALREADY charged against the budget above — a no-op
+    // re-add here would decrement the budget a second time and waste a read slot every cycle it is open.
+    if (readThisCycle.has(c.id) || !isHeadless(c)) continue;
     readThisCycle.add(c.id);
     budget -= 1;
   }
-  const withHeads = idSorted.filter((c) => c.id !== ownChannelId && !isHeadless(c));
+  const withHeads = idSorted.filter((c) => !readThisCycle.has(c.id) && !isHeadless(c));
   if (withHeads.length > 0 && budget > 0) {
     if (publicAuthorRoundCursor >= withHeads.length) publicAuthorRoundCursor = 0;
     const take = Math.min(budget, withHeads.length);
@@ -9620,7 +9972,9 @@ async function syncPublicChannelFromChain() {
     // once the feed goes quiet and a round completes, roundStartHead == latestId and the fast-path returns to zero
     // reads. A subscriber with <= budget channels covers all every cycle, so this reduces to the old per-cycle gate.
     const roundComplete = readableChannels.every((c) => publicAuthorRoundCovered.has(channelAuthorKeys.get(c.id).toString()));
-    if (roundComplete && publicAuthorRoundStartHead !== null) {
+    // Epoch guard: an invalidation that landed mid-walk means a channel THIS walk never read is now interesting —
+    // committing the cursor here would let the NEXT walk fast-path past it forever (false "No posts yet").
+    if (roundComplete && publicAuthorRoundStartHead !== null && publicSyncInvalidationEpoch === invalidationEpochAtStart) {
       lastSyncedPublicLatestId = publicAuthorRoundStartHead;
       lastSyncedPublicSyncWindow = syncWindow;
       publicAuthorRoundCovered.clear();
@@ -16085,8 +16439,8 @@ function setView(view) {
     // publicPostDetailItem intact, and renderPublicSurface re-renders the open detail from the cache, so the
     // user lands back on the post they were reading instead of the feed. Back (closeNavOverlay ->
     // closePublicPostDetail) clears that state, so a user who had backed out to the feed still lands on the feed.
-    // anchorUnread only applies to the feed scroll, so skip it while a detail is being restored.
-    renderPublicSurface({ anchorUnread: publicPane?.dataset?.postOpen !== 'true' });
+    // anchorUnread only applies to the feed scroll, so skip it while a detail (or a channel view) is restored.
+    renderPublicSurface({ anchorUnread: publicPane?.dataset?.postOpen !== 'true' && publicPane?.dataset?.channelOpen !== 'true' });
   }
   if (view === 'vault') {
     refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
@@ -17503,6 +17857,21 @@ editChannelProfileButton?.addEventListener('click', () => {
 });
 
 publicDiscoveryBackButton?.addEventListener('click', () => closePublicDiscovery());
+// requestNavBack (NOT a direct close): the channel view is a nav overlay — the direct close would leave the
+// Telegram BackButton shown / the non-TG history sentinel un-popped (the next hardware Back then closes nothing).
+publicChannelViewBackButton?.addEventListener('click', () => requestNavBack());
+publicChannelViewFollowButton?.addEventListener('click', () => {
+  if (!publicChannelViewChannelId) return;
+  if (isPublicChannelSubscribed(publicChannelViewChannelId)) {
+    // Unfollowing while the view is open keeps its posts visible — the channel becomes a transient preview
+    // source again (and leaves the MAIN feed immediately, same as any unfollow).
+    publicChannelPreviewChannelId = publicChannelViewChannelId;
+    setPublicChannelSubscribed(publicChannelViewChannelId, false);
+  } else {
+    publicChannelPreviewChannelId = null;
+    setPublicChannelSubscribed(publicChannelViewChannelId, true);
+  }
+});
 
 // Add-a-known-channel dialog (identity -> local registry row). Reached from the feed-top plate button — the
 // labeled replacement for the old search-row "+" icon button.

@@ -2210,6 +2210,71 @@ button.feed-item:hover {
   margin: 0 -24px;
 }
 
+/* Channel view: one channel's posts on their own screen — mirrors the post-detail/discovery overlay. */
+.public-channel-view {
+  display: none;
+  min-height: 0;
+}
+
+.public-pane[data-channel-open="true"] {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.public-pane[data-channel-open="true"] > .pane-header,
+.public-pane[data-channel-open="true"] > .public-header-actions,
+.public-pane[data-channel-open="true"] > .public-channel-search-row,
+.public-pane[data-channel-open="true"] > .public-feed,
+.public-pane[data-channel-open="true"] > .public-jump-down-button {
+  display: none;
+}
+
+.public-pane[data-channel-open="true"] > .public-channel-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  /* Side-only bleed, zero top margin = shared header line (see .public-post-detail above). */
+  margin: 0 -24px;
+}
+
+/* The post detail (and discovery) stack ON TOP of the channel view: open a post from the channel screen, Back
+   returns to it (the channel's data attribute stays set underneath). */
+.public-pane[data-post-open="true"] > .public-channel-view,
+.public-pane[data-discover-open="true"] > .public-channel-view {
+  display: none;
+}
+
+/* A foreign channel hides the post composer (you publish to YOUR OWN channel from the feed; commenting happens in
+   the post detail, which re-shows the composer in comment mode when stacked on top). The own channel keeps it. */
+.public-pane[data-channel-open="true"]:not([data-post-open="true"]):not([data-channel-own="true"]) > .public-composer {
+  display: none;
+}
+
+.public-channel-view-body {
+  overflow-y: auto;
+  padding: 16px 24px 24px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.channel-view-about {
+  border-color: rgba(48, 213, 176, 0.24);
+}
+
+/* Author avatar/name on feed cards (and discovery card heads) open the channel screen. */
+.feed-author-link {
+  cursor: pointer;
+}
+
+.feed-author-link:hover {
+  opacity: 0.85;
+}
+
+.public-channel-follow-button[data-followed="true"] {
+  color: var(--muted);
+}
+
 .public-post-detail-header .avatar .icon {
   width: 20px;
   height: 20px;

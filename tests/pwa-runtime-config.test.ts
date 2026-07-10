@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=752" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=753" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -425,7 +425,9 @@ describe('PWA runtime config guard', () => {
     expect(mjs).toMatch(/title: message\.publicPostTitle \?\? null/);
     // (2) Posts are marked read when actually viewed (Public tab active). F2 render cap: only the rendered window
     // (newest publicFeedShownCap items) is marked read -- older posts held behind "show older" are not pre-cleared.
-    expect(app).toMatch(/isPublicViewActive\(\) && markVisiblePublicFeedRead\(windowItems\)/);
+    // (v753: additionally overlay-guarded — not marked while the post detail / discovery / channel view covers
+    // the feed; the full guard is pinned in PWA-CHANNEL-VIEW-01.)
+    expect(app).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen\s*&& markVisiblePublicFeedRead\(windowItems\)/);
     // The "Display as" chevron + Unfollow live on the feed post cards: renderPublicFeed adds the chevron, and the
     // shared post actions add Unfollow when the post's channel is subscribed (incl. the official platho channel).
     expect(app).toMatch(/const feedIdentityButton = publicItemIdentityButton\(item\)/);
@@ -4465,7 +4467,9 @@ describe('PWA runtime config guard', () => {
     // only to the ROUND-START head and only once every readable channel was covered this round (strand-safe) --
     // NOT unconditionally to latestId. A skipped-this-cycle channel therefore never lets the fast-path skip past it.
     expect(syncPublicSource).toMatch(/PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE/);
-    expect(syncPublicSource).toMatch(/if \(roundComplete && publicAuthorRoundStartHead !== null\) \{\s*lastSyncedPublicLatestId = publicAuthorRoundStartHead/);
+    // v753: the commit is additionally EPOCH-guarded (see PWA-CHANNEL-VIEW-01) — an invalidation that landed
+    // mid-walk (follow / channel-view preview) blocks the cursor write so the invalidation's walk really runs.
+    expect(syncPublicSource).toMatch(/if \(roundComplete && publicAuthorRoundStartHead !== null && publicSyncInvalidationEpoch === invalidationEpochAtStart\) \{\s*lastSyncedPublicLatestId = publicAuthorRoundStartHead/);
     expect(app).toMatch(/function chainBackedPublicFeedOnly/);
     expect(app).toMatch(/post\?\.chainVerified === true/);
     expect(syncPublicSource).toMatch(/chainVerified: true/);
@@ -4668,7 +4672,7 @@ describe('PWA runtime config guard', () => {
     // label honors an explicit "Display as" choice (resolveWalletChannelDisplay) over the verified username.
     expect(app).toMatch(/function discoveryCardIdentityButton\(authorWallet\)/);
     expect(app).toMatch(/if \(!authorWallet \|\| isOwnPublicAuthor\(authorWallet\)\) return null;/);
-    const card = app.slice(app.indexOf('function buildDiscoveryCard('), app.indexOf('function buildDiscoveryCard(') + 2000);
+    const card = app.slice(app.indexOf('function buildDiscoveryCard('), app.indexOf('function buildDiscoveryCard(') + 3200);
     expect(card).toMatch(/const label = resolveWalletChannelDisplay\(channel\.authorWallet\)\?\.name/);
     expect(card).toMatch(/const identityButton = discoveryCardIdentityButton\(channel\.authorWallet\);\s*if \(identityButton\) head\.append\(identityButton\)/);
     // A choice made from the chevron relabels the (unsubscribed) discovery card too.
@@ -5745,6 +5749,92 @@ describe('PWA runtime config guard', () => {
     expect(I18N_STRINGS.en['public.down']).toBeUndefined(); // key was renamed, not duplicated
   });
 
+  it('PWA-CHANNEL-VIEW-01: a channel screen shows one channel\'s posts, previews unfollowed channels via a transient feed source, and never leaks the preview into the main feed', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // Owner ask (v753): open a channel and read ONLY its posts. The overlay mirrors post-detail/discovery.
+    expect(html).toMatch(/id="publicChannelView"[\s\S]*?id="publicChannelViewBackButton"[\s\S]*?id="publicChannelViewFollowButton"[\s\S]*?id="publicChannelViewBody"/);
+    expect(app).toMatch(/function openPublicChannelView\(source = \{\}\)/);
+    expect(app).toMatch(/function closePublicChannelView\(options = \{\}\)/);
+    expect(app).toMatch(/function renderPublicChannelView\(\)/);
+    // The view filters the SAME chronological items by channelId (one data path with the feed, no second store).
+    expect(app).toMatch(/item\.channelId === publicChannelViewChannelId && item\.emptyChannel !== true/);
+    // NOT-followed channels ride as a TRANSIENT feed source so the standard sync walk fetches the preview...
+    expect(app).toMatch(/publicChannelPreviewChannelId && !channels\.some\(\(channel\) => channel\.id === publicChannelPreviewChannelId\)/);
+    // ...the preview is EXCLUDED from the main feed render + unread counts until followed...
+    expect(app).toMatch(/allItems\.filter\(\(item\) => item\.channelId !== publicChannelPreviewChannelId\)/);
+    expect(app).toMatch(/const unread = surfaceItems\.filter\(isUnreadPublicItem\)\.length;/);
+    // ...an unregistered wallet is registered UNSUBSCRIBED (not a silent follow), and the open kicks a sync with
+    // the same fast-path invalidation the follow flow uses.
+    expect(app).toMatch(/channelId = ensurePublicChannelForAuthorWallet\(wallet, \{ activate: false \}\);/);
+    const openFn = app.slice(app.indexOf('function openPublicChannelView('), app.indexOf('function openPublicChannelView(') + 4600);
+    expect(openFn).toMatch(/invalidatePublicSyncFastPath\(\);/);
+    // Review fixes (adversarial, confirmed): (1) the fast-path invalidation is EPOCH-guarded — a walk that was
+    // already in flight when a follow/preview invalidated must not re-commit the cursor (else the preview walk
+    // fast-paths out and the view shows a permanent false "No posts yet")...
+    expect(app).toMatch(/function invalidatePublicSyncFastPath\(\)/);
+    expect(app).toMatch(/const invalidationEpochAtStart = publicSyncInvalidationEpoch;/);
+    expect(app).toMatch(/&& publicSyncInvalidationEpoch === invalidationEpochAtStart\) \{\s*lastSyncedPublicLatestId = publicAuthorRoundStartHead;/);
+    // ...(2) the preview sync's finally is TOKEN-guarded (a previous channel's slow sync must not clear the
+    // current channel's loading state)...
+    expect(openFn).toMatch(/if \(syncToken !== publicChannelViewOpenToken\) return;/);
+    // ...(3) a card-level Unfollow INSIDE the open channel view keeps its posts visible via the preview id (same
+    // protocol as the header unfollow)...
+    expect(app).toMatch(/if \(publicChannelViewOpen && publicChannelViewChannelId === item\.channelId\) \{\s*publicChannelPreviewChannelId = item\.channelId;/);
+    // ...(4) the view rebuild restores the reader's position by ARTICLE ANCHOR, not raw scrollTop (the v752 feed
+    // lesson: content prepended above otherwise shoves the reader; WebKit has no overflow-anchor)...
+    const renderFn = app.slice(app.indexOf('function renderPublicChannelView('), app.indexOf('function renderPublicChannelView(') + 7200);
+    expect(renderFn).toMatch(/scrollAnchor = \{ id: node\.dataset\.itemId, offset: nodeTop \}/);
+    expect(renderFn).toMatch(/node\.dataset\.itemId = String\(item\.id\);/);
+    // ...(5) posts are NOT marked read while the post detail / discovery is stacked over the view, and (6) the
+    // header Back routes through requestNavBack (Telegram BackButton + history sentinel stay consistent).
+    expect(renderFn).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && markVisiblePublicFeedRead\(capped\)/);
+    expect(app).toMatch(/publicChannelViewBackButton\?\.addEventListener\('click', \(\) => requestNavBack\(\)\);/);
+    // Round-2 review fixes: (7) the pending flag is raised BEFORE the first paint (a cold preview channel opens on
+    // "Loading posts…", never flashes a false "No posts yet")...
+    expect(openFn).toMatch(/publicChannelViewSyncPending = !followed;/);
+    // ...and a paint follows the raised flag within the same synchronous open (the flag is set, THEN rendered).
+    expect(openFn).toMatch(/publicChannelViewSyncPending = !followed;[\s\S]{0,220}renderPublicChannelView\(\);/);
+    // ...(8) the sync walk always reads the preview channel THIS cycle (the F1 budget id-sort could otherwise defer
+    // it for cycles on a cold head cache)...
+    expect(app).toMatch(/readThisCycle\.add\(publicChannelPreviewChannelId\);/);
+    // ...(9) a wedged F1 round (wallet switch racing an in-flight walk) self-heals instead of re-reading the full
+    // budget every cycle for the rest of the session...
+    expect(app).toMatch(/if \(publicAuthorRoundStartHead === null && publicAuthorRoundCovered\.size > 0\) publicAuthorRoundCovered\.clear\(\);/);
+    // ...(10) the FEED's own mark-read is also overlay-guarded (posts arriving while an overlay covers the feed
+    // stay unread until actually seen).
+    expect(app).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen\s*&& markVisiblePublicFeedRead\(windowItems\)/);
+    // Round-3/4 review fixes: (11) opening the view closes a floating "Display as" popover (the entry points
+    // stopPropagation, so the document click-closer never sees the opening tap) — hoisted ABOVE the same-channel
+    // early return, else an author-row tap INSIDE the open view leaves the popover floating...
+    expect(openFn).toMatch(/hideIdentityPopover\(\);/);
+    expect(openFn.indexOf('hideIdentityPopover();')).toBeLessThan(openFn.indexOf('renderPublicChannelView(); return;'));
+    // ...(12) the pre-seeded preview channel is charged against the walk budget exactly ONCE (has(), not own-only,
+    // in the headless loop + withHeads).
+    expect(app).toMatch(/if \(readThisCycle\.has\(c\.id\) \|\| !isHeadless\(c\)\) continue;/);
+    expect(app).toMatch(/const withHeads = idSorted\.filter\(\(c\) => !readThisCycle\.has\(c\.id\) && !isHeadless\(c\)\);/);
+    // Entry points: feed author row (avatar + meta), discovery card head + an "Open channel" action, about popover.
+    expect(app).toMatch(/openPublicChannelView\(\{ channelId: item\.channelId, authorWallet: item\.authorWallet \}\)/);
+    expect(app).toMatch(/openPublicChannelView\(\{ authorWallet: channel\.authorWallet, returnTo: 'discovery' \}\)/);
+    expect(app).toMatch(/openChannelButton\.className = 'discovery-cta-action channel-about-open';/);
+    // Back stack: post detail closes FIRST (it stacks on top), then the channel view; Telegram BackButton and the
+    // history sentinel both see the channel view as an open overlay.
+    expect(app).toMatch(/\|\| publicPane\?\.dataset\?\.channelOpen === 'true';/);
+    const nav = app.slice(app.indexOf('function closeNavOverlay('), app.indexOf('function closeNavOverlay(') + 1400);
+    expect(nav.indexOf("dataset?.postOpen === 'true'")).toBeGreaterThan(-1);
+    expect(nav.indexOf("dataset?.postOpen === 'true'")).toBeLessThan(nav.indexOf("dataset?.channelOpen === 'true'"));
+    // CSS: the overlay hides the feed chrome; post detail / discovery stack on top; a FOREIGN channel hides the
+    // post composer (own channel keeps it).
+    expect(css).toMatch(/\.public-pane\[data-channel-open="true"\] > \.public-channel-view \{\s*display: grid;/);
+    expect(css).toMatch(/\.public-pane\[data-post-open="true"\] > \.public-channel-view,\s*\.public-pane\[data-discover-open="true"\] > \.public-channel-view \{\s*display: none;/);
+    expect(css).toMatch(/\.public-pane\[data-channel-open="true"\]:not\(\[data-post-open="true"\]\):not\(\[data-channel-own="true"\]\) > \.public-composer \{\s*display: none;/);
+    // i18n keys exist (all-locale parity enforced by tests/i18n.test.ts).
+    expect(I18N_STRINGS.en['public.openChannel']).toBeTruthy();
+    expect(I18N_STRINGS.ru['public.channelPosts']).toBeTruthy();
+    expect(I18N_STRINGS.en['public.channelEmpty']).toBeTruthy();
+  });
+
   it('PWA-SAFE-LINK-01: URLs in user text auto-link SAFELY (scheme allowlist, textContent, noopener) and clicking routes through an external-link interstitial', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -5894,7 +5984,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function resyncPublicForNewSubscription()'),
       app.indexOf('function resyncPublicForNewSubscription()') + 260,
     );
-    expect(helper).toMatch(/lastSyncedPublicLatestId = null;/);
+    // v753: the invalidation goes through the epoch-bumping helper (guards against a concurrent walk's commit).
+    expect(helper).toMatch(/invalidatePublicSyncFastPath\(\);/);
     expect(helper).toMatch(/syncPublicChannels\(\)/);
     // Both follow paths call it (add custom channel + re-follow an existing one).
     const addSource = app.slice(app.indexOf('function addCustomPublicChannel('), app.indexOf('function resyncPublicForNewSubscription'));
@@ -6904,7 +6995,8 @@ describe('PWA runtime config guard', () => {
     // feed — setView must NOT close the detail on tab-return; renderPublicSurface re-renders it from the cache.
     const publicViewBranch = app.slice(app.indexOf("if (view === 'public') {", app.indexOf('function setView(view)')), app.indexOf("if (view === 'vault') {", app.indexOf('function setView(view)')));
     expect(publicViewBranch).not.toMatch(/closePublicPostDetail\(\)/);
-    expect(publicViewBranch).toMatch(/renderPublicSurface\(\{ anchorUnread: publicPane\?\.dataset\?\.postOpen !== 'true' \}\)/);
+    // v753: the channel view also suppresses the tab-restore feed anchor (it overlays the feed like the detail).
+    expect(publicViewBranch).toMatch(/renderPublicSurface\(\{ anchorUnread: publicPane\?\.dataset\?\.postOpen !== 'true' && publicPane\?\.dataset\?\.channelOpen !== 'true' \}\)/);
     // 2. The public header keeps its Feed/Channels toggle + info on ONE line with the title (no wrap to a
     // second line). The vestigial diagnostics-panel flex-wrap + the actions' forced min-width are gone, and
     // the install button is hidden on mobile so the toggle + info fit beside the title.
@@ -6969,18 +7061,18 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v827/);
+    expect(sw).toMatch(/platho-pwa-prototype-v828/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=256/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=752/);
+    expect(sw).toMatch(/\.\/app\.js\?v=753/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=23/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=23/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
