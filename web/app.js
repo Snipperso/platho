@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v744';
+const PLATHO_APP_RUNTIME_VERSION = 'v745';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1460,6 +1460,139 @@ async function writeCachedPublicEntryBody(entryId, bodyBoc, bodyHashHex) {
   } catch {
     /* ignore (quota / unavailable) */
   }
+}
+
+// DECODED public POST image media persists as data-urls in IndexedDB — the SAME durable-media model as author
+// avatars (platho-profile-avatar-media-v1, warmed before the first render) and post-detail comments
+// (platho-public-comments-v1). Why a decoded store on top of the per-entry BODY cache: the localStorage feed
+// cache STRIPS every image data-url on persist (omitHeavyFeedMediaForPersist — the iOS whole-store re-serialize
+// freeze), so on reload a post loads image-LESS and the image previously only came back after the full serial
+// chain re-walk (~a minute — owner-flagged "looks like it re-downloads from the blockchain every time"). The
+// body IS a cache HIT, but the durable body cache is keyed by per-PART entry_ids that are NOT persisted, and it
+// has no header_boc, so it can only be consulted from INSIDE the walk that rediscovers those ids — that walk is
+// the minute. Warming THIS store before the first render restores the image in milliseconds with zero chain
+// reads, exactly like the avatar warm. Keyed by post.id (stable, persisted, present by construction); value =
+// JSON {imageUrl, blocks} — the exact render-consumed media, overlaid onto the stripped light item (chain posts
+// are immutable, so captured media is authoritative forever). Deployment-scoped (public, pre-unlock), LRU-capped
+// (eviction just re-decodes from the body cache on the next sync).
+const publicPostMediaStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-public-post-media-v1'), cap: 400 }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+function publicPostMediaStore() {
+  return publicPostMediaStorePromise;
+}
+
+// The heavy render-consumed image media a post carries (its OWN image — the author avatar has its own store).
+// Returns null when the post has no image. Keeps the FULL blocks array so a text+image post restores the image
+// in its original position among text blocks; imageUrl covers the legacy image-only post shape.
+function publicPostRenderableImageMedia(post) {
+  if (!post || typeof post !== 'object') return null;
+  const imageUrl = typeof post.imageUrl === 'string' && post.imageUrl.length > 0 ? post.imageUrl : null;
+  const hasImageBlock = Array.isArray(post.blocks)
+    && post.blocks.some((block) => block?.type === 'image' && typeof block.url === 'string' && block.url.length > 0);
+  if (!imageUrl && !hasImageBlock) return null;
+  return { imageUrl, blocks: Array.isArray(post.blocks) ? post.blocks : null };
+}
+
+function publicPostCacheKey(post) {
+  return typeof post?.id === 'string' && post.id.length > 0 ? post.id : null;
+}
+
+// Overlay durable media back onto a stripped light item. Only fills what is MISSING so a freshly-synced post
+// that already carries its image is never churned. Returns whether anything changed.
+function applyPublicPostMediaRecord(post, media) {
+  if (!post || typeof post !== 'object' || !media || typeof media !== 'object') return false;
+  if (publicPostRenderableImageMedia(post)) return false; // already has a renderable image — leave it
+  let changed = false;
+  if (Array.isArray(media.blocks)
+    && media.blocks.some((block) => block?.type === 'image' && typeof block.url === 'string' && block.url.length > 0)) {
+    post.blocks = media.blocks;
+    changed = true;
+  }
+  if ((typeof post.imageUrl !== 'string' || post.imageUrl.length === 0)
+    && typeof media.imageUrl === 'string' && media.imageUrl.length > 0) {
+    post.imageUrl = media.imageUrl;
+    changed = true;
+  }
+  return changed;
+}
+
+function eachCachedPublicPost(callback) {
+  for (const record of Object.values(publicChannelFeedCache ?? {})) {
+    const feed = record?.feed ?? record;
+    const posts = Array.isArray(feed?.posts) ? feed.posts : (Array.isArray(feed) ? feed : []);
+    for (const post of posts) callback(post);
+  }
+}
+
+// LOAD-TIME hydration: fill post images from IndexedDB into the in-memory feed cache BEFORE the first render,
+// so a reloaded post shows its image in ms without waiting for the serial chain walk. Mutates cache posts in
+// place (rebuildThreadsFromPublicSubscriptions then reads them). Returns whether anything changed.
+async function warmPublicPostImagesFromCache() {
+  try {
+    const pending = [];
+    eachCachedPublicPost((post) => {
+      if (publicPostRenderableImageMedia(post)) return; // already carries its image
+      const key = publicPostCacheKey(post);
+      if (key) pending.push({ post, key });
+    });
+    if (pending.length === 0) return false;
+    const store = await publicPostMediaStore();
+    if (!store) return false;
+    const raws = await store.getMany(pending.map((entry) => entry.key));
+    let changed = false;
+    for (const { post, key } of pending) {
+      const raw = raws.get(key);
+      if (!raw) continue;
+      let media = null;
+      try { media = JSON.parse(raw); } catch { media = null; }
+      if (applyPublicPostMediaRecord(post, media)) changed = true;
+    }
+    return changed;
+  } catch {
+    return false;
+  }
+}
+
+// Media is immutable per post → persist a given post.id's media at most once per session.
+const persistedPublicPostMediaKeys = new Set();
+function schedulePublicPostImageMediaPersist() {
+  setTimeout(() => { void persistPublicPostImageMedia(); }, 0);
+}
+async function persistPublicPostImageMedia() {
+  try {
+    let store = null;
+    const targets = [];
+    eachCachedPublicPost((post) => {
+      const key = publicPostCacheKey(post);
+      if (!key || persistedPublicPostMediaKeys.has(key)) return;
+      const media = publicPostRenderableImageMedia(post);
+      if (!media) return; // no image yet — leave the key unmarked so a later sync persists it
+      targets.push({ key, media });
+    });
+    if (targets.length === 0) return;
+    store = await publicPostMediaStore();
+    if (!store) return;
+    for (const { key, media } of targets) {
+      if (persistedPublicPostMediaKeys.has(key)) continue;
+      await store.put(key, JSON.stringify(media));
+      persistedPublicPostMediaKeys.add(key);
+    }
+  } catch {
+    /* best effort (quota / unavailable) */
+  }
+}
+
+// Single choke point for persisting the public feed cache: the light text/metadata goes to localStorage (image
+// data-urls stripped to dodge the iOS freeze) and — SYMMETRICALLY — the heavy decoded image media goes to
+// IndexedDB, so the strip never costs a chain re-walk on reload. Every feed-cache write goes through here.
+function commitPublicChannelFeedCache() {
+  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  schedulePublicPostImageMediaPersist();
 }
 
 function walletIndexedDbSuffix(walletAddress = plathoWallet?.address) {
@@ -9287,7 +9420,7 @@ async function syncPublicChannelsRun() {
       () => syncPublicChannelFromChain(),
     );
     if (syncedFromChain) {
-      writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+      commitPublicChannelFeedCache();
       rebuildThreadsFromPublicSubscriptions();
       renderThreads();
       renderConversation();
@@ -9352,7 +9485,7 @@ async function syncPublicChannelsRun() {
     }
   }
   if (!changed) return;
-  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  commitPublicChannelFeedCache();
   rebuildThreadsFromPublicSubscriptions();
   renderThreads();
   renderConversation();
@@ -9395,7 +9528,7 @@ async function hydratePublicAvatars() {
     changed = attachAvatarUrlToPublicFeedCache(request.ownerWallet, request.pointer, imageUrl) || changed;
   }
   if (!changed) return false;
-  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  commitPublicChannelFeedCache();
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: false });
   renderThreads();
@@ -26205,7 +26338,7 @@ function persistPublicPublishProgress(job, patch = {}) {
   }
   feed.updatedAt = new Date().toISOString();
   publicChannelFeedCache = { ...publicChannelFeedCache, [job.channelId]: { feed, syncedAt: feed.updatedAt } };
-  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  commitPublicChannelFeedCache();
   // STATUS-ONLY FAST PATH (public twin of the private-dialog rule: only the act of sending may move a
   // scroller): a publish status tick patches the badge text in place — the feed/comments DOM is NOT rebuilt,
   // so an active scroll is never interrupted. Structural transitions (badge appearing/disappearing, the
@@ -26248,7 +26381,7 @@ function removeLocalPublicPendingRecord(ref) {
   }
   feed.updatedAt = new Date().toISOString();
   publicChannelFeedCache = { ...publicChannelFeedCache, [ref.channelId]: { feed, syncedAt: feed.updatedAt } };
-  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  commitPublicChannelFeedCache();
   renderPublicSurface({ anchorUnread: false });
 }
 
@@ -26449,7 +26582,7 @@ function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachm
     ...publicChannelFeedCache,
     [channelId]: { feed, syncedAt: feed.updatedAt },
   };
-  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  commitPublicChannelFeedCache();
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: false });
   renderThreads();
@@ -26500,7 +26633,7 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, o
     ...publicChannelFeedCache,
     [channelId]: { feed, syncedAt: feed.updatedAt },
   };
-  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  commitPublicChannelFeedCache();
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: false });
   // Reference for the public publish confirm driver (heal/confirm of a not-yet-confirmed publish).
@@ -27608,7 +27741,32 @@ publicChannelProfileCache = readPublicChannelProfileCache(publicChannelStorage()
 // Start the branded boot-screen backdrop animation as early as possible (before the avatar-warm wait below),
 // so the overlay that is already painted from HTML comes alive immediately.
 initBootScreen();
-await Promise.race([warmPublicChannelAvatarsFromCache(), delay(400)]);
+// Warm public POST images from IndexedDB in parallel with author avatars — BOTH before the first render — so a
+// reloaded post shows its own image in milliseconds. The localStorage feed cache stripped the image data-url on
+// persist, so without this warm the image only came back after the full serial chain walk (~a minute — the
+// owner-flagged "re-downloads from the blockchain every time"; it does not re-download, the walk that
+// rediscovers the per-part entry ids to consult the durable body cache is what takes the minute). warm mutates
+// the in-memory cache posts in place; rebuildThreadsFromPublicSubscriptions below reads them. If the IndexedDB
+// read loses the 400ms boot-render race (rare — getMany is ms), re-render once it lands (flag-gated so a warm
+// that WON the race — already reflected in the boot render — does not trigger a redundant repaint).
+let publicBootFeedRendered = false;
+// Warm BOTH media caches from IndexedDB before the first render — sequentially, never a concurrent Promise.all
+// (the blanket no-concurrent-read guard; these are local IndexedDB reads, but the rule is a literal ban and
+// serial is plenty fast). Bounded by one boot deadline so a slow/unavailable IndexedDB can never hang boot.
+const publicBootMediaWarm = (async () => {
+  await warmPublicChannelAvatarsFromCache();
+  const changed = await warmPublicPostImagesFromCache().catch(() => false);
+  // If this warm already landed BEFORE the boot render (won the race), the boot render below reflects it and
+  // publicBootFeedRendered is still false → no redundant repaint. If it lands AFTER (slow IndexedDB lost the
+  // race), re-render so the post image still appears in ms, not only after the serial chain sync.
+  if (changed && publicBootFeedRendered) {
+    rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
+    renderThreads();
+    renderConversation();
+  }
+  return changed;
+})();
+await Promise.race([publicBootMediaWarm, delay(400)]);
 setTimeout(() => { void migrateLegacyAvatarMediaCacheToIndexedDb(); }, 0);
 // One-time cleanup: an EXISTING device cache (written before the strip below) may still hold megabytes of
 // base64 media in localStorage — the root of the iOS Vault freeze. Re-persist it through the now-stripping
@@ -27620,6 +27778,8 @@ publicReadCursors = readPublicReadCursors();
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderConfiguredShell();
 renderDocsNav();
+// The boot public-feed render has now run; a post-image warm that lands AFTER this may re-render (see above).
+publicBootFeedRendered = true;
 // ── Quick-start onboarding (shown on first run when there is no wallet yet) ──────────────
 const quickStartDialog = document.querySelector('#quickStartDialog');
 const quickStartWelcomeView = document.querySelector('#quickStartWelcomeView');
