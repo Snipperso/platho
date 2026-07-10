@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=22';
+} from './i18n.mjs?v=23';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v751';
+const PLATHO_APP_RUNTIME_VERSION = 'v752';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1171,8 +1171,8 @@ const PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;
 // this budget/cycle; a full sweep of N channels takes ceil(N/budget) cycles. Users with <= budget subscriptions are
 // unaffected (every channel is still read every cycle). 24*125ms = ~3s of pump/cycle leaves room for send/receive.
 const PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE = 24;
-// F2 (render scale): the public feed is chat-style (newest at the BOTTOM). Render only the NEWEST this-many items;
-// older ones sit behind a "show older" button at the TOP that reveals another page. Bounds the live DOM node count
+// F2 (render scale): the public feed is newest-FIRST (newest at the TOP). Render only the NEWEST this-many items;
+// older ones sit behind a "show older" button at the BOTTOM that reveals another page. Bounds the live DOM node count
 // (and the per-render cost) regardless of how many posts the subscribed set has accumulated (short mode caches up to
 // 128/channel, long mode 4096/channel -> tens of thousands across many channels).
 const PUBLIC_FEED_RENDER_CAP = 150;
@@ -6149,20 +6149,12 @@ function mergeLocalPendingPublicFeed(channelId, chainPosts = []) {
     .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
 }
 
-function scrollPublicToOldestUnread() {
-  requestAnimationFrame(() => {
-    const target = publicFeed?.querySelector?.('.feed-item[data-unread="true"]');
-    if (target?.scrollIntoView) {
-      target.scrollIntoView({ block: 'start' });
-    }
-    updatePublicJumpDownVisibility();
-  });
-}
-
 function updatePublicJumpDownVisibility() {
   if (!publicJumpDownButton || !publicFeed) return;
   const maxScroll = Math.max(0, publicFeed.scrollHeight - publicFeed.clientHeight);
-  const awayFromNewest = publicFeed.scrollTop < maxScroll - 80;
+  // Newest is at the TOP now (v752): the jump-to-newest affordance shows once the user has scrolled DOWN
+  // (away from the top) into older posts.
+  const awayFromNewest = publicFeed.scrollTop > 80;
   publicJumpDownButton.hidden = !(maxScroll > 24 && awayFromNewest);
 }
 
@@ -6469,16 +6461,25 @@ function renderPublicFeed(items, options = {}) {
     requestAnimationFrame(updatePublicJumpDownVisibility);
     return;
   }
-  // F2 cap (chat-style feed: newest at the BOTTOM): render only the newest publicFeedShownCap items; the rest sit
-  // behind a "show older" button at the TOP. When anchoring to an unread that is older than the cap, grow the cap so
-  // the anchor target is actually rendered (else scrollPublicToOldestUnread would find nothing).
-  if (options.anchorUnread) {
-    for (let i = 0; i < allItems.length; i += 1) {
-      if (isUnreadPublicItem(allItems[i])) { publicFeedShownCap = Math.max(publicFeedShownCap, allItems.length - i); break; }
-    }
-  }
+  // F2 cap (newest-first feed: newest at the TOP): render only the newest publicFeedShownCap items; the rest sit
+  // behind a "show older" button at the BOTTOM. We do NOT grow the cap toward an old unread anymore: the feed lands on
+  // the newest (top), so an old unread stays behind "show older" (still unread until actually revealed) instead of
+  // forcing a full-history render on every open and marking an off-screen post read.
   const hiddenOlderCount = Math.max(0, allItems.length - publicFeedShownCap);
   const windowItems = hiddenOlderCount > 0 ? allItems.slice(hiddenOlderCount) : allItems;
+  // Preserve the reader's position across a background (non-anchor) re-render: newest-first prepends new posts at the
+  // TOP, which would shove a scrolled-down reader's content down (iOS/WebKit has no overflow-anchor). Snapshot the
+  // topmost visible article + its viewport offset now, restore it after the DOM is rebuilt below. Skipped at the top
+  // (scrollTop 0 -> new posts simply appear) and on an anchorUnread render (we jump to the newest instead).
+  let scrollAnchor = null;
+  if (!options.anchorUnread && publicFeed.scrollTop > 0) {
+    const feedTop = publicFeed.getBoundingClientRect().top;
+    for (const node of publicFeed.children) {
+      if (!node.dataset?.itemId) continue;
+      const nodeTop = node.getBoundingClientRect().top - feedTop;
+      if (nodeTop + node.offsetHeight > 0) { scrollAnchor = { id: node.dataset.itemId, offset: nodeTop }; break; }
+    }
+  }
   // F2 keyed reconciliation (mirrors renderThreads): reuse each <article> whose render signature is unchanged since
   // the last render (the common case on a background sync — post content is immutable), building only new/changed
   // ones and removing/reordering the delta. This also keeps the scroll position stable (no replaceChildren flicker)
@@ -6494,19 +6495,15 @@ function renderPublicFeed(items, options = {}) {
   const avatarUrlMemo = new Map();
   const seen = new Set();
   let prev = null;
-  // Top matter, in order at the very front: discovery CTA, then the "show older" button when items are hidden.
+  // The discovery CTA stays at the very top (a newcomer sees it first).
   if (shouldShowDiscoveryCta()) {
     const cta = buildDiscoveryCtaCard();
     if (cta !== publicFeed.firstChild) publicFeed.insertBefore(cta, publicFeed.firstChild);
     prev = cta;
   }
-  if (hiddenOlderCount > 0) {
-    const older = buildShowOlderButton(hiddenOlderCount);
-    const anchor = prev ? prev.nextSibling : publicFeed.firstChild;
-    if (older !== anchor) publicFeed.insertBefore(older, anchor);
-    prev = older;
-  }
-  for (const item of windowItems) {
+  // Newest-FIRST (v752, owner ask: newer posts on TOP): render the window REVERSED so newer posts sit at the top;
+  // the "show older" button then goes at the BOTTOM (below the oldest rendered post). windowItems is oldest→newest.
+  for (const item of windowItems.slice().reverse()) {
     const key = String(item.id);
     seen.add(key);
     const sig = publicFeedItemRenderSignature(item, avatarUrlMemo);
@@ -6528,8 +6525,27 @@ function renderPublicFeed(items, options = {}) {
     if (article !== anchor) publicFeed.insertBefore(article, anchor);
     prev = article;
   }
+  if (hiddenOlderCount > 0) {
+    const older = buildShowOlderButton(hiddenOlderCount);
+    const anchor = prev ? prev.nextSibling : publicFeed.firstChild;
+    if (older !== anchor) publicFeed.insertBefore(older, anchor);
+    prev = older;
+  }
   for (const [id, node] of existing) if (!seen.has(id)) node.remove();
-  if (options.anchorUnread) scrollPublicToOldestUnread();
+  if (options.anchorUnread && publicFeed) {
+    // Fresh view: land on the newest, now at the TOP (the old chat-style feed anchored to the oldest unread instead).
+    requestAnimationFrame(() => { publicFeed.scrollTop = 0; updatePublicJumpDownVisibility(); });
+  } else if (scrollAnchor && publicFeed) {
+    // Restore the anchored article to the same viewport offset so a new post added ABOVE doesn't shove the reader;
+    // content added BELOW (via "show older") leaves the anchor put, so this is a no-op there.
+    const feedTop = publicFeed.getBoundingClientRect().top;
+    for (const node of publicFeed.children) {
+      if (node.dataset?.itemId !== scrollAnchor.id) continue;
+      const nodeTop = node.getBoundingClientRect().top - feedTop;
+      publicFeed.scrollTop = Math.max(0, publicFeed.scrollTop + (nodeTop - scrollAnchor.offset));
+      break;
+    }
+  }
   requestAnimationFrame(updatePublicJumpDownVisibility);
   // Viewing the feed marks its (rendered) posts read (only when the Public tab is actually on screen, so a
   // background sync does not pre-clear unread). Re-render once to drop the unread badges.
@@ -6621,8 +6637,8 @@ function publicFeedItemRenderSignature(item, avatarUrlMemo) {
   ].join('');
 }
 
-// The "show older" affordance at the top of the chat-style feed: reveals another PUBLIC_FEED_RENDER_PAGE of older
-// posts. One button, rebuilt each render (cheap), with a fresh listener.
+// The "show older" affordance at the BOTTOM of the newest-first feed: reveals another PUBLIC_FEED_RENDER_PAGE of
+// older posts. One button, rebuilt each render (cheap), with a fresh listener.
 function buildShowOlderButton(hiddenOlderCount) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -17561,7 +17577,7 @@ publicJumpDownButton?.addEventListener('click', () => {
   markVisiblePublicFeedRead(items);
   renderPublicSurface({ anchorUnread: false });
   requestAnimationFrame(() => {
-    publicFeed?.scrollTo?.({ top: publicFeed.scrollHeight, behavior: 'smooth' });
+    publicFeed?.scrollTo?.({ top: 0, behavior: 'smooth' }); // newest is at the top now (v752)
     requestAnimationFrame(updatePublicJumpDownVisibility);
   });
 });

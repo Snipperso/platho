@@ -2061,7 +2061,7 @@ a .avatar.has-image,
   text-align: left;
 }
 
-/* F2: "show older" affordance at the TOP of the chat-style feed (newest at the bottom) — reveals another page of
+/* F2: "show older" affordance at the BOTTOM of the newest-first feed (newest at the top) — reveals another page of
    older posts that the render cap is holding back. */
 .feed-show-older {
   display: block;

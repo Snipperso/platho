@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=751" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=752" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5712,6 +5712,39 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/--message-media-width: 320px;/);
   });
 
+  it('PWA-PUBLIC-FEED-NEWEST-FIRST-01: the public feed renders newest-FIRST (top), show-older at the bottom, jump-to-newest scrolls up', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    // Owner ask (v752): newer public posts on TOP, not bottom. renderPublicFeed renders the (newest-N) window
+    // REVERSED so the newest article sits first, and the "show older" button is appended AFTER the item loop.
+    const render = app.slice(app.indexOf('function renderPublicFeed('), app.indexOf('function renderPublicFeed(') + 5900);
+    expect(render).toMatch(/for \(const item of windowItems\.slice\(\)\.reverse\(\)\)/);
+    // The show-older button is inserted AFTER the item loop (i.e. at the bottom of the list), not before it.
+    expect(render.indexOf('windowItems.slice().reverse()')).toBeLessThan(render.indexOf('buildShowOlderButton(hiddenOlderCount)'));
+    // On open (anchorUnread) the feed lands on the newest, which is at the TOP now: scrollTop = 0 (the old
+    // scrollPublicToOldestUnread chat-style anchor is gone).
+    expect(render).toMatch(/options\.anchorUnread && publicFeed\) \{[\s\S]*?publicFeed\.scrollTop = 0;/);
+    expect(app).not.toMatch(/scrollPublicToOldestUnread/);
+    // Review fix (missed-coupling): the anchorUnread cap-grow toward the oldest unread is GONE — since we no longer
+    // scroll there, growing the window would only bloat the DOM to full history + mark an off-screen post read.
+    expect(render).not.toMatch(/publicFeedShownCap = Math\.max\(publicFeedShownCap, allItems\.length - i\)/);
+    // Review fix (scroll-ux): a background (non-anchor) re-render preserves the reader's position — the topmost
+    // visible article is snapshotted and restored so a new post prepended ABOVE does not shove a scrolled-down
+    // reader (iOS/WebKit has no overflow-anchor). At the top (scrollTop 0) it is skipped so new posts just appear.
+    expect(render).toMatch(/let scrollAnchor = null;/);
+    expect(render).toMatch(/if \(!options\.anchorUnread && publicFeed\.scrollTop > 0\)/);
+    expect(render).toMatch(/publicFeed\.scrollTop = Math\.max\(0, publicFeed\.scrollTop \+ \(nodeTop - scrollAnchor\.offset\)\)/);
+    // The jump-to-newest button now points UP: it shows once scrolled DOWN from the top, and click scrolls to top.
+    expect(app).toMatch(/const awayFromNewest = publicFeed\.scrollTop > 80;/);
+    expect(app).toMatch(/publicFeed\?\.scrollTo\?\.\(\{ top: 0, behavior: 'smooth' \}\)/);
+    expect(app).not.toMatch(/publicFeed\?\.scrollTo\?\.\(\{ top: publicFeed\.scrollHeight/);
+    // The button chrome reflects the up direction + the renamed label key.
+    expect(html).toMatch(/id="publicJumpDownButton"[\s\S]*?icon-up[\s\S]*?data-i18n="public\.newest"/);
+    expect(I18N_STRINGS.en['public.newest']).toBe('Newest');
+    expect(I18N_STRINGS.ru['public.newest']).toBeTruthy();
+    expect(I18N_STRINGS.en['public.down']).toBeUndefined(); // key was renamed, not duplicated
+  });
+
   it('PWA-SAFE-LINK-01: URLs in user text auto-link SAFELY (scheme allowlist, textContent, noopener) and clicking routes through an external-link interstitial', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -6936,18 +6969,18 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v826/);
+    expect(sw).toMatch(/platho-pwa-prototype-v827/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=255/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=256/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=751/);
+    expect(sw).toMatch(/\.\/app\.js\?v=752/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=22/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=22/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=23/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=23/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
