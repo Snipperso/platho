@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v747';
+const PLATHO_APP_RUNTIME_VERSION = 'v748';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2858,14 +2858,35 @@ function resolveWalletChannelDisplay(counterpartyWallet) {
   if (explicit) return explicit;
   const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
   if (thread) {
-    const name = threadDisplayLabel(thread);
-    if (name) {
-      return {
-        name,
-        tone: threadDisplayTone(thread),
-        identity: threadSelectedIdentity(thread),
-        localLabel: thread.localLabel ?? null,
-      };
+    const threadIdentity = threadSelectedIdentity(thread);
+    // A private thread that only knows the BARE wallet address (no username, no local name) must NOT pin the
+    // channel to that address when a chain-VERIFIED .ath exists below — the username is primary everywhere the
+    // user has not chosen otherwise (owner rule). A thread that DOES carry a username or a local name still wins
+    // (it reflects how the user already sees that person in Private).
+    const threadIsBareAddress = !thread.localLabel
+      && (!threadIdentity || threadIdentity.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS);
+    if (!threadIsBareAddress) {
+      const name = threadDisplayLabel(thread);
+      if (name) {
+        return {
+          name,
+          tone: threadDisplayTone(thread),
+          identity: threadIdentity,
+          localLabel: thread.localLabel ?? null,
+        };
+      }
+    }
+  }
+  // No explicit choice and no username-bearing private thread → the channel's chain-VERIFIED .ath (proven owner
+  // of the linked NFT, never the raw ownerUsername claim) is the DEFAULT. This is the SAME source the "Display as"
+  // chevron already offers (contactDisplayContextForWallet injects it), so the default name a subscribed channel
+  // shows now MATCHES the menu instead of defaulting to the bare address the user then has to override by hand.
+  const verifiedUsername = publicChannelProfileCache[channelProfileCacheKey(counterpartyWallet)]?.verifiedUsername;
+  if (verifiedUsername) {
+    let identity = null;
+    try { identity = plathoUsernameIdentity(verifiedUsername); } catch { identity = null; }
+    if (identity) {
+      return { name: displayIdentityLabel(identity), tone: identityTone(identity), identity, localLabel: null };
     }
   }
   return null;
