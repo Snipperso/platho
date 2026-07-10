@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=746" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=747" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -941,7 +941,9 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.message \{[\s\S]*max-width:\s*min\(var\(--message-card-width\), 82%\)/);
     expect(css).toMatch(/\.message \{[\s\S]*min-width:\s*0;[\s\S]*overflow-wrap:\s*anywhere;/);
     expect(css).toMatch(/\.bubble \{[\s\S]*width:\s*fit-content;[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
-    expect(css).toMatch(/\.message-image,[\s\S]*\.feed-image \{[\s\S]*max-width:\s*var\(--message-media-width\)/);
+    // Private chat-bubble images keep the narrow bubble media cap (v747 split .message-image OFF the wider public
+    // .feed-image, which is covered by PWA-FEED-IMAGE-FIT-01).
+    expect(css).toMatch(/\.message-image \{[\s\S]*max-width:\s*var\(--message-media-width\)/);
     expect(css).toMatch(/\.public-feed\[data-public-mode="feed"\] > \.feed-item:not\(\.compact\) \{[\s\S]*width: 100%;/);
     expect(app).toMatch(/navVaultTonBalances/);
     expect(app).toMatch(/let navVaultBalanceState = \{/);
@@ -5693,6 +5695,23 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.image-lightbox-viewport \{[\s\S]*?grid-template-rows: minmax\(0, 1fr\);\s*\n\s*grid-template-columns: minmax\(0, 1fr\);/);
   });
 
+  it('PWA-FEED-IMAGE-FIT-01: a public feed image spans the content width or centers at natural size, never the tiny chat cap', () => {
+    const css = readFileSync('web/styles.css', 'utf8');
+    const feedImage = css.slice(css.indexOf('.feed-image {'), css.indexOf('.feed-image {') + 900);
+    // Owner ask (v747): fill the content column when it is no wider than the image, else center at natural size —
+    // never upscaled, never left-stuck. width:auto (no upscale) + max-width:100% (fill the column) + margin-inline:auto
+    // (center when narrower). height:auto keeps aspect; a scale-safety max-height bounds a pathological super-tall image.
+    expect(feedImage).toMatch(/width: auto;/);
+    expect(feedImage).toMatch(/max-width: 100%;/);
+    expect(feedImage).toMatch(/margin-inline: auto;/);
+    expect(feedImage).toMatch(/height: auto;/);
+    expect(feedImage).toMatch(/max-height: 1400px;/);
+    // The old 320px chat-bubble cap (var(--message-media-width)) that made feed images tiny is GONE from .feed-image.
+    expect(feedImage).not.toMatch(/max-width: var\(--message-media-width\)/);
+    // Private chat bubbles keep their own narrow media cap — this change is public-feed only.
+    expect(css).toMatch(/--message-media-width: 320px;/);
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -6814,15 +6833,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v821/);
+    expect(sw).toMatch(/platho-pwa-prototype-v822/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=252/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=253/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=746/);
+    expect(sw).toMatch(/\.\/app\.js\?v=747/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);

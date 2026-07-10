@@ -1726,8 +1726,10 @@ a .avatar.has-image,
   cursor: pointer;
 }
 
-.message-image,
-.feed-image {
+/* Private chat-bubble image: bounded to the narrow bubble media width (a bubble is not the full pane). This was
+   previously SHARED with .feed-image; v747 split them so the public feed can go wider (below) while private
+   bubbles keep the bubble cap. */
+.message-image {
   display: block;
   width: 100%;
   max-width: var(--message-media-width);
@@ -1736,6 +1738,28 @@ a .avatar.has-image,
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   object-fit: contain;
+  background: #0d1012;
+}
+
+/* Public post/comment image (v747, owner ask): span the CONTENT column when the column is no wider than the image
+   (fill, downscaling a big image), else sit CENTERED at natural size when the image is narrower than the column —
+   never upscaled, never left-stuck. width:auto (no upscale) + max-width:100% (never exceed the content column,
+   replacing the old 320px --message-media-width chat-bubble cap that made feed images tiny) + margin-inline:auto
+   (center when narrower); height:auto keeps aspect. Verified in-browser: 804x1024 -> natural 805x1025 centered on a
+   1111px column; 1600x600 -> 1111px full width; 200x150 -> natural centered; on a 321px mobile column all fill the
+   width. max-height 1400px is a scale-safety that bounds a pathological super-tall image (e.g. 300x4000 -> 106x1400)
+   without touching normal posts (a 1024px recipe is well under it) — the lightbox still shows the full image.
+   object-fit is gone: with auto width/height there is no fixed box to fit into. */
+.feed-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 1400px;
+  margin-top: 8px;
+  margin-inline: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
   background: #0d1012;
 }
 
@@ -2061,7 +2085,8 @@ a .avatar.has-image,
 
 .public-feed[data-public-mode="feed"] > .feed-item:not(.compact) {
   /* Full-width like the compact channel cards (was capped to image width, which left real posts
-     looking narrow/unfinished on desktop). Images inside keep their own --message-media-width cap. */
+     looking narrow/unfinished on desktop). Images inside (.feed-image) fill this content column or center
+     at natural size (v747) — no longer the narrow --message-media-width bubble cap. */
   width: 100%;
 }
 
