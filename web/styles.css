@@ -3642,6 +3642,14 @@ button.feed-item:hover {
 
 .image-lightbox-viewport {
   display: grid;
+  /* One DEFINITE cell (minmax(0,1fr) row+column), NOT the implicit auto track: an auto grid track grows to the
+     img's natural height, so the img's max-height:100% resolved against that circular content height and never
+     clamped — a tall image (e.g. 804x1024) overflowed the height-bounded dialog on DESKTOP, where its width did
+     not bind either (on a narrow phone max-width:100% clamps width first, so the bug hid). An explicit
+     minmax(0,1fr) fills the dialog's definite viewport row, so max-height:100% finally clamps and a tall image
+     scales to fit. Verified in-browser: a 804x1024 img went 1024px→708px (fits an 800px window). */
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   justify-items: center;
   min-height: 0;
