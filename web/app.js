@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v742';
+const PLATHO_APP_RUNTIME_VERSION = 'v743';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11138,6 +11138,20 @@ function messageMetaText(message) {
     if (/not sent|failed|blocked|retrying send|checking rpc/i.test(text)) {
       return message?.publishState ? publishStateMeta(message.publishState) : 'sending';
     }
+  } else if (
+    message?.type === 'out'
+    && message.publishState
+    && message.publishState.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && isStalePrivatePendingPublishConfirmation(message)
+    && /submitted|confirming|sending|waiting for chain/i.test(text)
+  ) {
+    // A private OUTBOUND stuck in a "confirming/submitted/sending" meta past the stale-confirmation window (24h) with
+    // no active recovery is de-facto UNDELIVERED — its publish never landed (e.g. an underpriced/rejected capsule) and
+    // no confirm job will ever flip it to CONFIRMED. Surface a durable terminal at RENDER time (works on reload even if
+    // no confirm job re-armed for it), instead of an ETERNAL "submitted N/N, confirming". messageStatusKey maps the
+    // "not confirmed" text to the red 'failed' class. Gated on stale (24h) + no active recovery, so a legitimately
+    // in-flight send (still auto-recovering, or under the window) is never falsely terminalized.
+    return privatePublishConfirmStoppedStatusText({ code: 'STALE_PRIVATE_PUBLISH' });
   }
   if (/chain #\d+/i.test(text)) return text.includes('parts') ? 'received parts' : 'received';
   if (/local capsule/i.test(text)) return 'sending';
