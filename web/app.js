@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v743';
+const PLATHO_APP_RUNTIME_VERSION = 'v744';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6166,6 +6166,12 @@ function publicFeedItemRenderSignature(item, avatarUrlMemo) {
     (item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet, avatarUrlMemo)) ?? '',
     item.commentsAllowed === false ? 'nc' : '',
     isPublicChannelSubscribed(item.channelId) ? 's' : '',
+    // Renderable-image presence IS mutable across the persist-strip round-trip: the localStorage feed cache strips
+    // image data urls (omitHeavyFeedMediaForPersist), so a reloaded post loses its image, then the post-reload sync
+    // re-hydrates it from the durable body cache. Without this term the reused article stayed image-less (the sync
+    // repaired the DATA but the signature/DOM never changed -> "the image showed once then vanished"). Count blocks
+    // that actually render an image + the legacy image-only imageUrl; stripped (0) vs re-hydrated (1) differ.
+    `img${(item.blocks ?? []).filter((block) => block?.type === 'image' && block.url).length}${item.imageUrl ? 'i' : ''}`,
   ].join('');
 }
 
