@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=740" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=741" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -2754,7 +2754,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function privateSendBlockReason/);
     expect(app).toMatch(/const reason = privateSendBlockReason\(thread\)/);
     expect(app).toMatch(/const blocked = Boolean\(reason\);[\s\S]*?sendButton\.disabled = blocked/);
-    expect(app).toMatch(/sendButton\.title = reason \?\? t\('send\.sendPrivateMessage'\)/);
+    expect(app).toMatch(/sendButton\.title = reason \?\? \(nothingToSend \? t\('composer\.nothingToSend'\) : t\('send\.sendPrivateMessage'\)\)/);
     expect(EN_STRINGS['send.sendPrivateMessage']).toBe('Send private message');
     expect(enCopy).toMatch(/Update ready - reload app/);
     expect(app).toMatch(/pendingServiceWorkerAppShellReload !== true/);
@@ -5570,6 +5570,38 @@ describe('PWA runtime config guard', () => {
     expect(renderSource).toMatch(/else if \(ownSendScrollToEnd\) \{[\s\S]*?behavior: 'smooth'/);
   });
 
+  it('PWA-COMPOSER-ORPHAN-MARKER-01: removing an image drops its [image N] marker; an empty/orphan draft can never be sent', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Attaching an image inserts an "[image N]" text marker; removing the attachment must strip that marker (and
+    // renumber the ones after it, since the attachment array re-indexes) — else the orphan marker lingers and sending
+    // it builds a capsule with no real block -> "Capsule publish payload is missing" (the owner's screenshot).
+    expect(app).toMatch(/function removeImageMarkerForComposer\(kind, removedIndex\) \{[\s\S]*?if \(!droppedOne && n === removedMarkerNum\) \{ droppedOne = true; return ''; \}[\s\S]*?if \(n > removedMarkerNum\) return `\[image \$\{n - 1\}\]`;/);
+    // Called from the private attachment remove handler BEFORE the array is filtered (so `index` still lines up).
+    expect(app).toMatch(/removeImageMarkerForComposer\('private', index\);[\s\S]*?privateImageAttachments = privateImageAttachments\.filter/);
+    // FAIL-CLOSED: the private send handler bails on zero resolved blocks instead of inserting an empty bubble.
+    expect(app).toMatch(/const draftBlocks = composerBlocksFromDraft\(text, attachments, paymentDraft, replyDraft, fileAttachments\);\s*\n\s*if \(draftBlocks\.length === 0\) \{[\s\S]*?t\('composer\.nothingToSend'\)[\s\S]*?return;/);
+    // The send BUTTON (only, not the whole composer) is disabled when nothing real resolves to send — so a stray marker
+    // can never be published, while the user can still attach to an empty field.
+    expect(app).toMatch(/function privateComposerHasSendableContent\(\) \{[\s\S]*?composerBlocksFromDraft\(messageInput\?\.value \?\? ''[\s\S]*?\.length > 0;/);
+    expect(app).toMatch(/const nothingToSend = !blocked && !privateComposerHasSendableContent\(\);\s*\n\s*if \(sendButton\) \{\s*\n\s*sendButton\.disabled = blocked \|\| nothingToSend;/);
+    // The composer's secondary controls still follow `blocked` ONLY (NOT nothingToSend) — attaching to an empty field must work.
+    expect(app).toMatch(/if \(privateComposerAddButton\) \{\s*\n\s*privateComposerAddButton\.disabled = blocked;/);
+    // PUBLIC symmetry: same button gate + the publish submit fails closed on zero blocks (orphan marker leaves non-empty
+    // text, so the old "!text && no attachments" gate let it through).
+    expect(app).toMatch(/function publicComposerHasSendableContent\(\) \{[\s\S]*?publicDocumentBlocksFromDraft\(publicMessageInput\?\.value \?\? ''\)\.length > 0;/);
+    expect(app).toMatch(/const documentBlocks = publicDocumentBlocksFromDraft\(resolvedDraft\.text, attachments\);\s*\n[\s\S]*?if \(documentBlocks\.length === 0\) return null;/);
+    // Symmetric public COMMENT path (generalize-symmetric): same zero-block fail-closed gate, not the old "!text" gate.
+    const commentFn = app.slice(app.indexOf('async function submitPublicCommentThroughVault('), app.indexOf('async function submitPublicCommentThroughVault(') + 1400);
+    expect(commentFn).toMatch(/const documentBlocks = publicDocumentBlocksFromDraft\(text, attachments\);\s*\n[\s\S]*?if \(documentBlocks\.length === 0\) return null;/);
+    expect(commentFn).not.toMatch(/if \(!text && attachments\.length === 0\) return null;/);
+    // The outer public composer submit gate also checks resolved blocks, so an orphan bails BEFORE the composer clears
+    // (a Ctrl+Enter requestSubmit bypasses the disabled button) — symmetric with the private handler's pre-clear guard.
+    const pubSubmit = app.slice(app.indexOf("publicComposer?.addEventListener('submit'"), app.indexOf("publicComposer?.addEventListener('submit'") + 800);
+    expect(pubSubmit).toMatch(/if \(publicDocumentBlocksFromDraft\(text, attachments\)\.length === 0\) return;/);
+    // i18n key present (all-language parity is enforced by the i18n test; pin EN here).
+    expect(EN_STRINGS['composer.nothingToSend']).toBe('Nothing to send');
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -6691,7 +6723,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v815/);
+    expect(sw).toMatch(/platho-pwa-prototype-v816/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6699,7 +6731,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=250/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=740/);
+    expect(sw).toMatch(/\.\/app\.js\?v=741/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);

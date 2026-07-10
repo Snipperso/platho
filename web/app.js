@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v740';
+const PLATHO_APP_RUNTIME_VERSION = 'v741';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -14359,13 +14359,24 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
   return result !== null;
 }
 
+// Does the private composer resolve to at least one real block to send? composerBlocksFromDraft drops an orphaned
+// "[image N]" marker (attachment removed) and trims empty text, so an "[image 1]"-only draft resolves to nothing — this
+// gates ONLY the send button (below), never the whole composer, so the user can still attach to an empty field. Cheap:
+// builds block objects by reference (no byte encoding, unlike the full send plan).
+function privateComposerHasSendableContent() {
+  return composerBlocksFromDraft(messageInput?.value ?? '', privateImageAttachments, privatePaymentCheckDraft, privateReplyDraft, privateFileAttachments).length > 0;
+}
+
 function refreshPrivateSendButtonState() {
   const thread = activeThread();
   const reason = privateSendBlockReason(thread);
   const blocked = Boolean(reason);
+  // Nothing real to send (empty draft, or an orphaned "[image N]" marker whose attachment was removed): disable ONLY
+  // the send button, not the composer — so a stray marker can never be published into "Capsule publish payload is missing".
+  const nothingToSend = !blocked && !privateComposerHasSendableContent();
   if (sendButton) {
-    sendButton.disabled = blocked;
-    sendButton.title = reason ?? t('send.sendPrivateMessage');
+    sendButton.disabled = blocked || nothingToSend;
+    sendButton.title = reason ?? (nothingToSend ? t('composer.nothingToSend') : t('send.sendPrivateMessage'));
   }
   // The composer's secondary controls follow the SAME send-block state (owner: an inactive composer must not
   // show live-looking buttons). Every enable/disable path funnels here (this runs at the end of
@@ -14393,10 +14404,21 @@ function publicComposerSendBlocked() {
   return !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || tonRpcLimited() || publicComposerKnownVaultTonShortfall();
 }
 
+function publicComposerHasSendableContent() {
+  // Same canonical builder the public send path uses (publicDocumentBlocksFromDraft), so the button-disable and the
+  // send match exactly: an orphaned "[image N]" marker resolves to no block -> button disabled.
+  return publicDocumentBlocksFromDraft(publicMessageInput?.value ?? '').length > 0;
+}
+
 function refreshPublicSendButtonState() {
   const blocked = publicComposerSendBlocked();
   const publicSendButton = publicComposer?.querySelector?.('.send-button');
-  if (publicSendButton) publicSendButton.disabled = blocked;
+  // Symmetric with private: disable ONLY the Publish button (not the composer) when nothing real resolves to send.
+  const nothingToSend = !blocked && !publicComposerHasSendableContent();
+  if (publicSendButton) {
+    publicSendButton.disabled = blocked || nothingToSend;
+    publicSendButton.title = nothingToSend ? t('composer.nothingToSend') : '';
+  }
   // Secondary controls follow the send state (owner: an inactive composer must not show live-looking
   // buttons) — mirrors the private composer's refreshPrivateSendButtonState. The label class mirrors the
   // checkbox's :disabled because the dim rule via :has() silently no-ops on the iOS floor (Safari 14).
@@ -14698,6 +14720,7 @@ function updatePrivateAttachmentUi() {
     remove.type = 'button';
     remove.textContent = t('common.remove');
     remove.addEventListener('click', () => {
+      removeImageMarkerForComposer('private', index); // drop the "[image N]" marker + renumber (before the array re-indexes)
       privateImageAttachments = privateImageAttachments.filter((_, itemIndex) => itemIndex !== index);
       updateImageAttachmentUi('private');
       refreshComposerCostStatus();
@@ -15058,6 +15081,26 @@ function insertComposerMarker(textarea, marker) {
 function insertImageMarkerForComposer(kind, index) {
   const marker = `[image ${index}]`;
   insertComposerMarker(kind === 'public' ? publicMessageInput : messageInput, marker);
+}
+
+// Removing an image ATTACHMENT must also drop its "[image N]" text marker (and renumber the markers AFTER it, since the
+// attachment array re-indexes down by one) — otherwise an orphaned marker lingers in the composer and sending it builds
+// a capsule with no real block -> "Capsule publish payload is missing". removedIndex is the 0-based index removed.
+function removeImageMarkerForComposer(kind, removedIndex) {
+  const textarea = kind === 'public' ? publicMessageInput : messageInput;
+  if (!textarea) return;
+  const removedMarkerNum = Number(removedIndex) + 1; // markers are 1-based: [image 1] == attachment index 0
+  let droppedOne = false;
+  const next = String(textarea.value ?? '').replace(/\[(?:image|img)\s+(\d+)\]/ig, (match, numStr) => {
+    const n = Number(numStr);
+    if (!droppedOne && n === removedMarkerNum) { droppedOne = true; return ''; } // drop the removed image's marker (first match)
+    if (n > removedMarkerNum) return `[image ${n - 1}]`;                          // renumber the ones after it (array shifted down)
+    return match;
+  });
+  let value = next.replace(/\n{3,}/g, '\n\n'); // collapse the blank line a self-line marker left behind
+  if (!value.trim()) value = '';               // the marker was the only content -> clear (also disables send via the guard)
+  textarea.value = value;
+  autoResizeComposerTextarea(textarea);
 }
 
 function insertPaymentCheckMarker() {
@@ -17305,7 +17348,10 @@ publicComposer?.addEventListener('submit', async (event) => {
   enforcePublicComposerByteLimit();
   const text = publicMessageInput?.value.trim() ?? '';
   const attachments = normalizePublicImageAttachments(publicImageAttachments);
-  if (!text && attachments.length === 0) return;
+  // Nothing real to publish (empty draft OR an orphaned "[image N]" marker whose attachment was cleared): bail BEFORE
+  // the composer clears below, so a Ctrl+Enter requestSubmit() (which bypasses the disabled button) is a clean no-op
+  // instead of wiping the draft. The inner submit fns also fail closed as a backstop.
+  if (publicDocumentBlocksFromDraft(text, attachments).length === 0) return;
   if (!plathoWallet) {
     setPublicStatus('create wallet first');
     return;
@@ -17449,6 +17495,18 @@ composer?.addEventListener('submit', async (event) => {
   const replyDraft = privateReplyDraft ? { ...privateReplyDraft } : null;
   const fileAttachments = normalizePrivateFileAttachments(privateFileAttachments);
   const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments);
+  if (draftBlocks.length === 0) {
+    // Nothing real to send (an orphaned "[image N]" marker whose attachment was removed, or an otherwise-empty draft):
+    // fail closed at the composer instead of inserting an empty bubble that dead-ends on "Capsule publish payload is
+    // missing". The send button is already disabled for this state (refreshPrivateSendButtonState); this backstops a
+    // programmatic / Enter-key send.
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = t('composer.nothingToSend');
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+    refreshPrivateSendButtonState();
+    return;
+  }
   const displayBlocks = displayBlocksFromDocumentBlocks(draftBlocks);
   const message = {
     type: 'out',
@@ -26762,9 +26820,13 @@ async function submitPublicPostThroughVault(draft = null) {
     commentsAllowed: publicComposerCommentsCheckbox?.checked !== false,
   };
   const attachments = normalizePublicImageAttachments(resolvedDraft.attachments ?? resolvedDraft.attachment);
-  if (!resolvedDraft.text && attachments.length === 0) return null;
+  const documentBlocks = publicDocumentBlocksFromDraft(resolvedDraft.text, attachments);
+  // Fail closed when nothing real resolves to send — covers an empty draft AND an orphaned "[image N]" marker whose
+  // attachment was removed (its text is non-empty, so the old "!text && no attachments" gate let it through into an
+  // empty publish that dead-ends on "Capsule publish payload is missing").
+  if (documentBlocks.length === 0) return null;
   setPublicStatus('public publish signing');
-  const blocks = displayBlocksFromDocumentBlocks(publicDocumentBlocksFromDraft(resolvedDraft.text, attachments));
+  const blocks = displayBlocksFromDocumentBlocks(documentBlocks);
   const payloads = await createPublicPayloadParts({
     type: 'post',
     text: resolvedDraft.text,
@@ -26863,9 +26925,13 @@ async function submitPublicCommentThroughVault(parent, bodyText = null, draftAtt
   if (parent.commentsAllowed === false) throw new Error('Comments are closed for this post');
   const text = bodyText?.trim() ?? publicMessageInput?.value?.trim() ?? '';
   const attachments = normalizePublicImageAttachments(draftAttachments);
-  if (!text && attachments.length === 0) return null;
+  const documentBlocks = publicDocumentBlocksFromDraft(text, attachments);
+  // Fail closed on zero resolved blocks — same as submitPublicPostThroughVault. An orphaned "[image N]" marker (text
+  // non-empty) would slip the old "!text && no attachments" gate into an empty publish -> "Capsule publish payload is
+  // missing"; a Ctrl+Enter requestSubmit() reaches here past the (correctly) disabled button, so this is the backstop.
+  if (documentBlocks.length === 0) return null;
   setPublicStatus('comment signing');
-  const blocks = displayBlocksFromDocumentBlocks(publicDocumentBlocksFromDraft(text, attachments));
+  const blocks = displayBlocksFromDocumentBlocks(documentBlocks);
   const payloads = await createPublicPayloadParts({
     type: 'comment',
     text,
