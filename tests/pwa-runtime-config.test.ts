@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=748" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=749" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5712,6 +5712,45 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/--message-media-width: 320px;/);
   });
 
+  it('PWA-SAFE-LINK-01: URLs in user text auto-link SAFELY (scheme allowlist, textContent, noopener) and clicking routes through an external-link interstitial', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // 1) User message/post text is rendered via appendLinkifiedText, NOT a raw textContent assignment, at every
+    //    user-text render site (private message block + legacy, public post/comment block + legacy).
+    expect(app).toMatch(/appendLinkifiedText\(text, block\.text\)/);
+    expect(app).toMatch(/appendLinkifiedText\(text, item\.text\)/);
+    expect(app).toMatch(/appendLinkifiedText\(text, message\.text\)/);
+    // The old raw assignments for these must be GONE (no user text goes straight to textContent + rendered clickable).
+    expect(app).not.toMatch(/text\.textContent = block\.text;/);
+    expect(app).not.toMatch(/text\.textContent = message\.text;/);
+    // 2) HARD scheme allowlist: only http:/https: ever become a link; javascript:/data:/etc. are rejected.
+    const safeFn = app.slice(app.indexOf('function safeExternalUrl('), app.indexOf('function safeExternalUrl(') + 320);
+    expect(safeFn).toMatch(/url\.protocol !== 'https:' && url\.protocol !== 'http:'/);
+    // 3) The anchor is built with createElement + textContent (never innerHTML). It carries NO live href/target —
+    //    the destination lives in a dataset so a MIDDLE-click (auxclick) or right-click "Open in new tab" cannot
+    //    navigate directly and bypass the interstitial (an IP-leak deanonymization vector). role=link + tabIndex
+    //    keep it keyboard-reachable.
+    const anchorFn = app.slice(app.indexOf('function buildExternalLinkAnchor('), app.indexOf('function buildExternalLinkAnchor(') + 1600);
+    expect(anchorFn).toMatch(/anchor\.textContent = displayText;/);
+    expect(anchorFn).toMatch(/anchor\.dataset\.externalUrl = safeHref;/);
+    expect(anchorFn).not.toMatch(/anchor\.href = safeHref/); // NO live href — that would enable the middle-click bypass
+    expect(anchorFn).toMatch(/anchor\.setAttribute\('role', 'link'\)/);
+    // 4) EVERY activation path (left click, middle-click auxclick, Enter/Space) preventDefaults and routes through
+    //    the interstitial — none navigate directly.
+    expect(anchorFn).toMatch(/event\.preventDefault\(\);[\s\S]*activateExternalLink\(safeHref\)/);
+    expect(anchorFn).toMatch(/anchor\.addEventListener\('auxclick', activate\)/);
+    expect(anchorFn).toMatch(/anchor\.addEventListener\('keydown'/);
+    // 5) The interstitial shows the destination + IP-disclosure warning + a per-domain "don't ask again"; trusted
+    //    domains skip the prompt (persisted).
+    expect(app).toMatch(/function showExternalLinkConfirm\(safeHref, host\)/);
+    expect(app).toMatch(/ipWarn\.textContent = t\('link\.ipWarning'\)/);
+    expect(app).toMatch(/if \(externalLinkDomainTrusted\(host\)\) \{ openExternalUrl\(safeHref\); return; \}/);
+    expect(app).toMatch(/function trustExternalDomain\(host\)/);
+    // 6) The interstitial strings exist in the dictionaries (all-locale parity is enforced by tests/i18n.test.ts).
+    expect(I18N_STRINGS.en['link.confirmTitle']).toBeTruthy();
+    expect(I18N_STRINGS.en['link.ipWarning']).toBeTruthy();
+    expect(I18N_STRINGS.ru['link.open']).toBeTruthy();
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -6846,18 +6885,18 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v823/);
+    expect(sw).toMatch(/platho-pwa-prototype-v824/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=253/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=254/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=748/);
+    expect(sw).toMatch(/\.\/app\.js\?v=749/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=20/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=20/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

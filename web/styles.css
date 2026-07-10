@@ -3802,6 +3802,82 @@ button.feed-item:hover {
   border-color: rgba(48, 213, 176, 0.34);
 }
 
+/* v749: auto-linked URLs in messages/posts + the external-link interstitial (built in JS with createElement +
+   textContent only). */
+.msg-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  cursor: pointer;
+}
+.msg-link:hover {
+  text-decoration: none;
+}
+.external-link-backdrop {
+  z-index: 80; /* above the image lightbox (70) — a leaving-the-app confirm must sit on top */
+}
+.external-link-dialog {
+  text-align: left;
+}
+.external-link-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.external-link-dialog p {
+  margin: 0;
+}
+.external-link-url {
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #0d1012;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.external-link-ip-warning {
+  color: #e8b64a;
+  font-size: 13px;
+}
+.external-link-dontask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.external-link-dontask input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.external-link-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.external-link-open {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 18px;
+  color: #04110d;
+  background: var(--accent);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.external-link-open:hover {
+  filter: brightness(1.06);
+}
+
 .docs-layout {
   display: grid;
   grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
