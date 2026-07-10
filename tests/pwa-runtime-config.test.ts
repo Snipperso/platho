@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=742" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=743" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5611,6 +5611,22 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function ownPublicChannel\(\) \{[\s\S]*?const wallet = rawWalletAddress\(plathoWallet\?\.address \?\? storedPlathoWalletRecord\(\)\?\.address\);/);
   });
 
+  it('PWA-STUCK-CONFIRMING-TERMINAL-01: an outbound stuck at "submitted N/N, confirming" past the stale window renders a terminal, not eternal', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // A private OUTBOUND whose publish never confirmed (e.g. an old underpriced/rejected capsule) stayed on
+    // "submitted N/N, confirming" forever because the terminal transition lives only inside a running confirm job that
+    // may never re-arm. messageMetaText now backstops it at RENDER time: stale (24h) + not CONFIRMED + no active
+    // recovery + a progress-style meta -> the durable "not confirmed" terminal (mapped to the red 'failed' class).
+    const metaFn = app.slice(app.indexOf('function messageMetaText(message)'), app.indexOf('function messageStatusKey('));
+    expect(metaFn).toMatch(/message\?\.type === 'out'\s*\n\s*&& message\.publishState\s*\n\s*&& message\.publishState\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\s*\n\s*&& isStalePrivatePendingPublishConfirmation\(message\)\s*\n\s*&& \/submitted\|confirming\|sending\|waiting for chain\/i\.test\(text\)/);
+    expect(metaFn).toMatch(/return privatePublishConfirmStoppedStatusText\(\{ code: 'STALE_PRIVATE_PUBLISH' \}\);/);
+    // The backstop is gated on !privateMessageHasAutoRecoveryPending (via the else branch), so an actively-recovering
+    // or under-window send is never falsely terminalized.
+    expect(metaFn).toMatch(/if \(privateMessageHasAutoRecoveryPending\(message\)\) \{[\s\S]*?\} else if \(/);
+    // The terminal string maps to the red 'failed' status class.
+    expect(app).toMatch(/if \(error\?\.code === 'STALE_PRIVATE_PUBLISH'\) return 'not confirmed: chain lookup expired';/);
+  });
+
   it('PWA-POPOVER-LIGHTBOX-FIT-01: the description popover fits+scrolls; the desktop image lightbox is viewport-bounded', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
@@ -6748,7 +6764,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v817/);
+    expect(sw).toMatch(/platho-pwa-prototype-v818/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6756,7 +6772,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=251/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=742/);
+    expect(sw).toMatch(/\.\/app\.js\?v=743/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
