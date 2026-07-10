@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v738';
+const PLATHO_APP_RUNTIME_VERSION = 'v739';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2881,6 +2881,15 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // mid-confirm would leave the Save button disabled and the global sync spinner stuck forever.
   prefsConfirmGeneration += 1;
   prefsSyncInFlight = false;
+  // The monotonic-activation guard is per-wallet: forget the previous wallet's activated state so the NEW wallet's
+  // first not-activated read is honoured (never masked by the old wallet's cache). Drop the external-balance retry
+  // for the same reason (it was chasing the old wallet's balance).
+  lastKnownActivatedVaultWalletRaw = null;
+  clearWalletTonProfileBalanceRetry();
+  // Drop the previous wallet's cached pocket balances so the NEW wallet never inherits them — neither the vault
+  // pocket nor (with the v739 carry-forward) a failed external read may surface wallet A's funds under wallet B. The
+  // new wallet's own reads repopulate this; until then the UI shows unknown ("-"/pending), which is correct.
+  vaultPocketState = { wallet: { ton_balance: null, ath_balance: null }, vault: { ton_balance: null, ath_balance: null } };
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   privateFileAttachments = [];
@@ -13359,8 +13368,64 @@ function currentVaultUserSource() {
     ?? null;
 }
 
+// Activation is MONOTONIC on-chain: once a wallet's Vault user exists with current_key_id>0 it never reverts. So a
+// read that comes back NOT-activated for a wallet we have ALREADY observed activated is a transient bad read (a
+// lagging RPC replica / a pre-registration block height / a reorg), never a real downgrade. Accepting one tore the
+// whole UI down to "activate your account" (Vault tab locked, profile "Activate" row, nav vault balance gone) for a
+// few seconds until the next good read healed it. Remember the last wallet seen activated; reject a not-activated
+// read for that same wallet. Cleared on a wallet change (clearWalletScopedRuntimeState). Sibling to
+// lastKnownOwnWalletRaw (the v728 messaging-identity guard) — same "never infer state from one bad read" rule.
+let lastKnownActivatedVaultWalletRaw = null;
+// A get_user read is STAMPED (in loadConnectedVaultUser) with the wallet it was ISSUED for. A read that resolves
+// AFTER an in-app wallet switch carries the OLD wallet's stamp, so it must never be attributed to the NEW wallet.
+// Without this, a stale activated read for wallet A, landing after a switch to a fresh wallet B, marked B activated
+// and the guard then masked B's genuine not-activated reads all session (the v739 review's cross-wallet poison).
+const VAULT_USER_READ_WALLET = Symbol('vaultUserReadWallet');
+
+function vaultUserReadWalletRaw(user) {
+  return (user && typeof user === 'object' && user[VAULT_USER_READ_WALLET]) || null;
+}
+
+// True when `user` came from a read ISSUED for a wallet OTHER than the one connected now (the wallet switched while
+// the read was in flight). Display callers discard such a read; note/guard never attribute it to the current wallet.
+function vaultUserReadIsStale(user) {
+  const readWallet = vaultUserReadWalletRaw(user);
+  if (!readWallet) return false; // unstamped (in-context caller) -> treated as current
+  const current = rawWalletAddress(plathoWallet?.address);
+  return Boolean(current && !sameWalletAddress(readWallet, current));
+}
+
+function vaultUserIsActivated(user) {
+  if (user?.exists !== true) return false;
+  try { return BigInt(user.current_key_id ?? 0n) > 0n; } catch { return false; }
+}
+
+function noteVaultUserActivationObserved(user) {
+  if (!vaultUserIsActivated(user)) return;
+  const current = rawWalletAddress(plathoWallet?.address);
+  // Only trust the observation if the read was issued for the CURRENTLY connected wallet — a stale cross-wallet read
+  // must never stamp the new wallet as activated (an unstamped in-context read is attributed to the current wallet).
+  if (!current || vaultUserReadIsStale(user)) return;
+  lastKnownActivatedVaultWalletRaw = current;
+}
+
+// True when `user` reports NOT-activated but we have already seen THIS wallet activated -> a transient bad read the
+// caller must not act on (don't clobber the binding / flip the UI; a display caller keeps last-known + retries, a
+// pre-sign caller still fails closed on the raw read it holds). A read issued for a DIFFERENT wallet is never
+// classified against this wallet's guard.
+function isTransientVaultActivationDowngrade(user) {
+  if (!user || typeof user !== 'object' || vaultUserIsActivated(user) || vaultUserReadIsStale(user)) return false;
+  const raw = rawWalletAddress(plathoWallet?.address);
+  return Boolean(raw && lastKnownActivatedVaultWalletRaw && sameWalletAddress(raw, lastKnownActivatedVaultWalletRaw));
+}
+
 function rememberConnectedVaultUser(user) {
   if (!user || typeof user !== 'object') return user;
+  // Suspect not-activated read for a wallet we know is activated: keep the good binding + nav balance untouched.
+  // Return the RAW read so a PRE-SIGN caller (readFreshConnectedVaultUserForOwnVaultAction) still fails closed on it
+  // instead of signing against a bad read — while the display never flips to "not activated".
+  if (isTransientVaultActivationDowngrade(user)) return user;
+  noteVaultUserActivationObserved(user);
   globalThis.plathoVaultBinding = {
     ...(globalThis.plathoVaultBinding ?? {}),
     walletAddress: plathoWallet?.address ?? globalThis.plathoVaultBinding?.walletAddress ?? null,
@@ -19386,13 +19451,27 @@ function vaultProviderStatusForError(error) {
 async function loadConnectedVaultUser(options = {}) {
   const provider = options.provider ?? await resolveVaultChainProvider();
   if (!provider?.getUser) throw new VaultChainProviderUnavailableError('Vault chain provider is not configured');
-  return withVaultReadLock(() => provider.getUser(requirePlathoWalletAddress(), {
-    vaultAddress: requireVaultAddress(),
-    verify: options.verify === true,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    priority: options.priority,
-    cacheTtlMs: options.cacheTtlMs,
-  }));
+  return withVaultReadLock(async () => {
+    // Stamp the read with the wallet it is ISSUED for (captured before the network await). A get_user that resolves
+    // AFTER an in-app wallet switch must never be attributed to the NEW wallet (the cross-wallet activation poison the
+    // v739 review found). This is the single choke point for EVERY vault-user read (display + pre-sign via
+    // readFreshConnectedVaultUser), so every consumer's user object carries its origin wallet.
+    const forWallet = requirePlathoWalletAddress();
+    const forWalletRaw = rawWalletAddress(forWallet);
+    const user = await provider.getUser(forWallet, {
+      vaultAddress: requireVaultAddress(),
+      verify: options.verify === true,
+      allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
+      priority: options.priority,
+      cacheTtlMs: options.cacheTtlMs,
+    });
+    if (user && typeof user === 'object' && forWalletRaw) {
+      try {
+        Object.defineProperty(user, VAULT_USER_READ_WALLET, { value: forWalletRaw, enumerable: false, configurable: true, writable: true });
+      } catch { /* non-extensible decode: guard falls back to ambient-wallet attribution, still fail-closed */ }
+    }
+    return user;
+  });
 }
 
 async function loadConnectedVaultGlobal(options = {}) {
@@ -20570,6 +20649,15 @@ async function refreshWalletTonBalanceForProfile() {
   }
   setText(walletTonBalanceStatus, t('wallet.checking'));
   const balance = await loadConnectedTonWalletBalance();
+  if (balance === null) {
+    // Transient failed read (loadConnectedTonWalletBalance returns null on total failure, it does not throw): do NOT
+    // wipe a known balance to "-" and do NOT give up — keep last-known and re-read on a short backoff so the profile
+    // eventually shows the balance instead of stranding on a dash until the user leaves and returns.
+    scheduleWalletTonProfileBalanceRetry();
+    refreshWalletTonProfileStatus();
+    return vaultPocketState.wallet?.ton_balance ?? null;
+  }
+  clearWalletTonProfileBalanceRetry();
   vaultPocketState = {
     wallet: {
       ton_balance: balance,
@@ -20581,11 +20669,47 @@ async function refreshWalletTonBalanceForProfile() {
   return balance;
 }
 
+// Bounded, view-gated retry for the profile external-GRAM balance. loadConnectedTonWalletBalance resolves null on a
+// failed read (never throws), so without this a single transient failure left the profile on "-" forever. Held under
+// the shared read mutex (loadConnectedTonWalletBalance -> withVaultReadLock), so a retry never overlaps a get_user
+// on iOS. Stops on success (clear), on leaving the Profile tab, or on a wallet change (clearWalletScopedRuntimeState).
+let walletTonProfileBalanceRetryTimer = null;
+let walletTonProfileBalanceRetryAttempt = 0;
+const WALLET_TON_PROFILE_BALANCE_RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
+
+function isProfileViewActive() {
+  return appShell?.dataset?.view === 'profile';
+}
+
+function clearWalletTonProfileBalanceRetry() {
+  if (walletTonProfileBalanceRetryTimer) {
+    clearTimeout(walletTonProfileBalanceRetryTimer);
+    walletTonProfileBalanceRetryTimer = null;
+  }
+  walletTonProfileBalanceRetryAttempt = 0;
+}
+
+function scheduleWalletTonProfileBalanceRetry() {
+  if (walletTonProfileBalanceRetryTimer) return; // one already armed
+  const attempt = Math.min(walletTonProfileBalanceRetryAttempt, WALLET_TON_PROFILE_BALANCE_RETRY_DELAYS_MS.length - 1);
+  walletTonProfileBalanceRetryAttempt += 1;
+  walletTonProfileBalanceRetryTimer = setTimeout(() => {
+    walletTonProfileBalanceRetryTimer = null;
+    // Stop chasing the balance if the wallet went away or the user left the Profile tab.
+    if (!plathoWallet?.address || !isProfileViewActive()) return;
+    refreshWalletTonBalanceForProfile().catch((error) => { if (!noteTonRpcRateLimit(error)) console.error(error); });
+  }, WALLET_TON_PROFILE_BALANCE_RETRY_DELAYS_MS[attempt]);
+}
+
 function renderVaultPocketCards(walletBalances, vaultUser) {
   vaultPocketState = {
     wallet: {
-      ton_balance: walletBalances?.ton_balance ?? null,
-      ath_balance: walletBalances?.ath_balance ?? null,
+      // Carry forward last-known on a FAILED read (null/undefined) instead of wiping to "-": a deferred external
+      // balance read that momentarily returns null must not flicker a known balance to a dash. A real 0 balance is
+      // still a bigint (0n) so it is preserved; only a failed read (null) falls through. Wallet change resets
+      // separately via resetVaultPocketState.
+      ton_balance: walletBalances?.ton_balance ?? vaultPocketState.wallet?.ton_balance ?? null,
+      ath_balance: walletBalances?.ath_balance ?? vaultPocketState.wallet?.ath_balance ?? null,
     },
     vault: {
       ton_balance: vaultUser && vaultUser.exists !== true ? 0n : vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ton_balance) : null,
@@ -20613,6 +20737,13 @@ function resetVaultPocketState() {
 }
 
 function applyVaultUserPocketState(user) {
+  // Monotonic-activation guard: a not-activated read for a wallet we've already seen activated is transient — keep
+  // the last-known binding + nav balance (do NOT zero the vault pocket / flip "activated") and re-read shortly.
+  if (isTransientVaultActivationDowngrade(user)) {
+    markNavVaultBalanceRetryNeeded('vault user read inconsistent');
+    return;
+  }
+  noteVaultUserActivationObserved(user);
   vaultPocketState = {
     wallet: vaultPocketState.wallet ?? { ton_balance: null, ath_balance: null },
     vault: {
@@ -20658,6 +20789,9 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
   navVaultBalanceRefreshPromise = (async () => {
     try {
       const user = await loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS });
+      // The wallet may have switched while this read was in flight: a stale cross-wallet read must never render / stamp
+      // the new wallet's state (the wallet-change refresh reads the new wallet itself).
+      if (vaultUserReadIsStale(user)) return null;
       applyVaultUserPocketState(user);
       return user;
     } catch (error) {
@@ -20915,6 +21049,23 @@ async function refreshVaultDashboard() {
   } else {
     userError = settledUser.reason;
   }
+  // The wallet may have switched while this dashboard read was in flight: discard a stale cross-wallet read entirely
+  // (never render it / write the binding / stamp activation under the new wallet). The wallet-change refresh, queued
+  // AFTER this read on the shared mutex, renders the new wallet.
+  if (user && vaultUserReadIsStale(user)) return null;
+  // Monotonic-activation guard: a not-activated read for a wallet we've already seen activated is a transient bad
+  // read — keep the activated UI intact (never flip to "Vault setup required" / clobber the binding / hide the nav
+  // balance) and re-read shortly. Intercept BEFORE renderVaultPocketCards, which would render the vault pocket as 0.
+  if (user && isTransientVaultActivationDowngrade(user)) {
+    renderAthProfileStats();
+    refreshComposerCostStatus();
+    setVaultStatus('RPC busy, retrying');
+    markNavVaultBalanceRetryNeeded('vault user read inconsistent');
+    refreshComposerPublishPolicy();
+    if (isVaultViewActive()) scheduleVaultAutoRefresh(1_000);
+    return null;
+  }
+  noteVaultUserActivationObserved(user);
   // Render the Vault from get_user ONLY. get_global (airdrop/registry display) is NOT awaited here — its
   // last-known value persists in vaultProtocolState and is refreshed by the deferred sequential reader.
   renderAthProfileStats();
