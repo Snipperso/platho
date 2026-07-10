@@ -178,7 +178,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=19';
+} from './i18n.mjs?v=20';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v748';
+const PLATHO_APP_RUNTIME_VERSION = 'v749';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1987,6 +1987,187 @@ function openTelegramDeepLink(href) {
     } catch { /* fall through to openLink */ }
   }
   return openExternalLinkInTelegram(href);
+}
+
+// ── Safe auto-linking of URLs in user text (v749) ──────────────────────────────────────────
+// User message / public-post text is rendered with appendLinkifiedText (below) instead of a raw textContent
+// assignment: literal http(s) URLs become clickable, EVERYTHING ELSE stays a plain text node. Three layers keep
+// this from re-opening the XSS-clean posture:
+//   1. Scheme allowlist (safeExternalUrl): only http:/https: ever become an <a href>. javascript:/data:/blob:/
+//      vbscript:/file:/tg:/intent: never match the autolink regex AND would be rejected here anyway, so a linkified
+//      token can never execute. (The strict live CSP with no 'unsafe-inline' is a second backstop against href JS.)
+//   2. No innerHTML anywhere — the anchor is built with createElement + textContent for the VISIBLE text.
+//   3. We autolink the LITERAL url only (visible text === destination), so there is no [label](url) mismatch a
+//      phisher could exploit — that markdown form stays limited to the owner's own Docs.
+// Clicking does NOT navigate directly: it routes through an interstitial that shows the real destination and warns
+// the external site will see the reader's IP (a real deanonymization vector for a privacy messenger — a unique
+// per-recipient link is a read-receipt + IP beacon). A per-domain "don't ask again" suppresses the prompt.
+const AUTOLINK_URL_RE = /https?:\/\/[^\s<>"']+/gi;
+
+function safeExternalUrl(raw) {
+  if (typeof raw !== 'string' || raw.length === 0) return null;
+  let url;
+  try { url = new URL(raw); } catch { return null; }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  return url.href;
+}
+
+function trimTrailingUrlPunctuation(url) {
+  let out = url;
+  while (out.length > 0 && '.,;:!?…\'")]}»'.includes(out[out.length - 1])) {
+    // Keep a ')' that closes a '(' inside the URL (e.g. a Wikipedia link), otherwise strip trailing punctuation.
+    if (out[out.length - 1] === ')' && out.includes('(')) break;
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
+function appendLinkifiedText(parent, text) {
+  const str = String(text ?? '');
+  if (!str) return;
+  AUTOLINK_URL_RE.lastIndex = 0;
+  let lastIndex = 0;
+  let match;
+  while ((match = AUTOLINK_URL_RE.exec(str)) !== null) {
+    if (match.index > lastIndex) parent.append(document.createTextNode(str.slice(lastIndex, match.index)));
+    const trimmed = trimTrailingUrlPunctuation(match[0]);
+    const safe = safeExternalUrl(trimmed);
+    parent.append(safe ? buildExternalLinkAnchor(trimmed, safe) : document.createTextNode(trimmed));
+    lastIndex = match.index + trimmed.length; // leave any trailing punctuation for the next text node
+    if (AUTOLINK_URL_RE.lastIndex <= match.index) AUTOLINK_URL_RE.lastIndex = match.index + match[0].length; // no zero-advance loop
+  }
+  if (lastIndex < str.length) parent.append(document.createTextNode(str.slice(lastIndex)));
+}
+
+function buildExternalLinkAnchor(displayText, safeHref) {
+  const anchor = document.createElement('a');
+  anchor.className = 'msg-link';
+  anchor.textContent = displayText; // the literal URL — what you see is where you go
+  // DELIBERATELY NO live href / target=_blank. A real href would let a MIDDLE-click (which fires 'auxclick', not
+  // 'click') and the right-click "Open link in new tab" context item navigate DIRECTLY — bypassing the interstitial
+  // and leaking the reader's IP to a per-recipient beacon URL (a deanonymization / read-receipt vector, the exact
+  // thing this feature exists to prevent, and worse than a plain non-clickable URL). So the destination lives in a
+  // dataset and EVERY activation path (left/middle click, Enter/Space) is forced through activateExternalLink →
+  // the confirm. role=link + tabIndex keep it a real, keyboard-reachable link; the URL is the visible text, so it
+  // is still selectable/copyable.
+  anchor.dataset.externalUrl = safeHref;
+  anchor.setAttribute('role', 'link');
+  anchor.tabIndex = 0;
+  const activate = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    activateExternalLink(safeHref);
+  };
+  anchor.addEventListener('click', activate);
+  anchor.addEventListener('auxclick', activate); // middle-click (belt-and-suspenders; no href already means no nav)
+  anchor.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') activate(event);
+  });
+  return anchor;
+}
+
+function openExternalUrl(safeHref) {
+  // Telegram embed: target=_blank is unreliable, route through the SDK. Plain web: a fresh noopener window.
+  if (isTelegramEnv() && openExternalLinkInTelegram(safeHref)) return;
+  window.open(safeHref, '_blank', 'noopener,noreferrer');
+}
+
+const EXTERNAL_LINK_TRUSTED_DOMAINS_KEY = 'platho.externalLink.trustedDomains.v1';
+function readTrustedExternalDomains() {
+  try {
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(scopedStorageKey(EXTERNAL_LINK_TRUSTED_DOMAINS_KEY)) ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+function externalLinkDomainTrusted(host) {
+  return Boolean(host) && readTrustedExternalDomains().includes(String(host).toLowerCase());
+}
+function trustExternalDomain(host) {
+  if (!host) return;
+  const set = new Set(readTrustedExternalDomains());
+  set.add(String(host).toLowerCase());
+  try {
+    localStorageOrNull()?.setItem(scopedStorageKey(EXTERNAL_LINK_TRUSTED_DOMAINS_KEY), JSON.stringify([...set].slice(-300)));
+  } catch { /* quota/unavailable: just re-prompt next time */ }
+}
+
+function activateExternalLink(safeHref) {
+  let host = '';
+  try { host = new URL(safeHref).hostname; } catch { host = ''; }
+  if (externalLinkDomainTrusted(host)) { openExternalUrl(safeHref); return; }
+  showExternalLinkConfirm(safeHref, host);
+}
+
+let activeExternalLinkModal = null;
+function closeExternalLinkModal() {
+  if (!activeExternalLinkModal) return;
+  const { backdrop, onKeydown, previousFocus } = activeExternalLinkModal;
+  document.removeEventListener('keydown', onKeydown, true);
+  backdrop.remove();
+  activeExternalLinkModal = null;
+  try { previousFocus?.focus?.(); } catch { /* focus target detached */ }
+}
+function showExternalLinkConfirm(safeHref, host) {
+  closeExternalLinkModal();
+  const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const domainLabel = host || safeHref;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop external-link-backdrop';
+  const card = document.createElement('section');
+  card.className = 'action-dialog external-link-dialog';
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+
+  const title = document.createElement('h2');
+  title.textContent = t('link.confirmTitle');
+  const body = document.createElement('p');
+  body.textContent = t('link.confirmBody', { domain: domainLabel });
+  const urlPreview = document.createElement('p');
+  urlPreview.className = 'external-link-url';
+  urlPreview.textContent = safeHref; // the exact destination, textContent-only
+  const ipWarn = document.createElement('p');
+  ipWarn.className = 'external-link-ip-warning';
+  ipWarn.textContent = t('link.ipWarning');
+
+  const dontAskRow = document.createElement('label');
+  dontAskRow.className = 'external-link-dontask';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  const dontAskText = document.createElement('span');
+  dontAskText.textContent = t('link.dontAskAgain', { domain: domainLabel });
+  dontAskRow.append(checkbox, dontAskText);
+
+  const actions = document.createElement('div');
+  actions.className = 'external-link-actions';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'secondary-button';
+  cancelBtn.textContent = t('common.cancel');
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.className = 'external-link-open';
+  openBtn.textContent = t('link.open');
+  actions.append(cancelBtn, openBtn);
+
+  card.append(title, body, urlPreview, ipWarn, dontAskRow, actions);
+  backdrop.append(card);
+  document.body.append(backdrop);
+
+  const confirmOpen = () => {
+    if (checkbox.checked && host) trustExternalDomain(host);
+    closeExternalLinkModal();
+    openExternalUrl(safeHref);
+  };
+  cancelBtn.addEventListener('click', closeExternalLinkModal);
+  openBtn.addEventListener('click', confirmOpen);
+  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) closeExternalLinkModal(); });
+  const onKeydown = (event) => {
+    if (event.key === 'Escape') { event.preventDefault(); closeExternalLinkModal(); }
+    else if (event.key === 'Enter' && document.activeElement === openBtn) { event.preventDefault(); confirmOpen(); }
+  };
+  document.addEventListener('keydown', onKeydown, true);
+  activeExternalLinkModal = { backdrop, onKeydown, previousFocus };
+  cancelBtn.focus();
 }
 
 // A bare window.open of a t.me/ link is a no-op inside the Telegram in-app WebView,
@@ -5953,7 +6134,7 @@ function appendPublicItemContent(container, item) {
       } else if (block?.type === 'text' && block.text) {
         const text = document.createElement('p');
         text.className = 'feed-block-text';
-        text.textContent = block.text;
+        appendLinkifiedText(text, block.text);
         container.append(text);
       } else if (block?.type === 'image' && block.url) {
         const image = document.createElement('img');
@@ -5972,7 +6153,7 @@ function appendPublicItemContent(container, item) {
   }
   if (item?.text) {
     const text = document.createElement('p');
-    text.textContent = item.text;
+    appendLinkifiedText(text, item.text);
     container.append(text);
   }
   if (item?.imageUrl) {
@@ -16226,7 +16407,7 @@ function renderConversation() {
         if (block?.type === 'text' && block.text) {
           const text = document.createElement('div');
           text.className = 'message-text-block';
-          text.textContent = block.text;
+          appendLinkifiedText(text, block.text);
           bubble.append(text);
         } else if (block?.type === 'image' && block.url) {
           const image = document.createElement('img');
@@ -16265,7 +16446,7 @@ function renderConversation() {
       }
     } else if (message.text) {
       const text = document.createElement('div');
-      text.textContent = message.text;
+      appendLinkifiedText(text, message.text);
       bubble.append(text);
     }
     if (blocks.length === 0 && message.attachment?.type === 'image' && message.attachment.url) {
