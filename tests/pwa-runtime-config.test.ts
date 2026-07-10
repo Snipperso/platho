@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=744" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=745" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5625,6 +5625,36 @@ describe('PWA runtime config guard', () => {
     expect(subs).toMatch(/if \(key === 'imageUrl' \|\| key === 'avatarImageUrl' \|\| key === 'url'\) return undefined;/);
   });
 
+  it('PWA-PUBLIC-POST-IMAGE-WARM-01: a reloaded post image hydrates from IndexedDB before first render (no chain re-walk)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Owner: "the image reappears after ~a minute, looks like it re-downloads from the blockchain every time". It does
+    // NOT re-download (the body is a durable-cache HIT) — the minute is the serial chain HEADER/INDEX walk that
+    // rediscovers the per-part entry ids before the durable body cache can be consulted (its keys + header_boc are not
+    // persisted). Fix = mirror the avatar/comment durable-media model: a decoded post-image store warmed BEFORE the
+    // first render, so the image appears in ms with zero chain reads.
+    // 1) A dedicated IndexedDB store for decoded post images (SAME shape as the avatar media store), NOT localStorage
+    //    (which the strip empties). Deployment-scoped so it is readable before unlock.
+    expect(app).toMatch(/createProfileAvatarMediaStore\(\{ dbName: scopedIndexedDbName\('platho-public-post-media-v1'\), cap: \d+ \}\)/);
+    // 2) Load-time warm overlays the durable media onto the stripped light item, filling only what is MISSING (an
+    //    already-hydrated post is never churned), and returns whether anything changed.
+    const warmFn = app.slice(app.indexOf('async function warmPublicPostImagesFromCache()'), app.indexOf('async function warmPublicPostImagesFromCache()') + 900);
+    expect(warmFn).toMatch(/await store\.getMany\(pending\.map\(\(entry\) => entry\.key\)\)/);
+    expect(warmFn).toMatch(/applyPublicPostMediaRecord\(post, media\)/);
+    expect(app).toMatch(/function applyPublicPostMediaRecord\(post, media\) \{[\s\S]*?if \(publicPostRenderableImageMedia\(post\)\) return false;/);
+    // 3) The warm runs BEFORE the first render, after the avatar warm (SEQUENTIAL — never a concurrent Promise.all,
+    //    per the no-concurrent-read guard), bounded by the boot deadline.
+    expect(app).toMatch(/await warmPublicChannelAvatarsFromCache\(\);\s*\n\s*const changed = await warmPublicPostImagesFromCache\(\)/);
+    expect(app).toMatch(/await Promise\.race\(\[publicBootMediaWarm, delay\(400\)\]\)/);
+    expect(app).not.toMatch(/Promise\.all\(\[/); // must not reintroduce the forbidden concurrent-read form
+    // 4) Every feed-cache write goes through one choke point that ALSO persists the heavy decoded image to IndexedDB —
+    //    symmetric with the localStorage strip — and the chain-sync commit routes through it (no bare writer there).
+    expect(app).toMatch(/function commitPublicChannelFeedCache\(\) \{\s*\n\s*writePublicChannelFeedCache\(publicChannelStorage\(\), publicChannelFeedCache\);\s*\n\s*schedulePublicPostImageMediaPersist\(\);/);
+    expect(app).toMatch(/if \(syncedFromChain\) \{\s*\n\s*commitPublicChannelFeedCache\(\);/);
+    expect(app).toMatch(/await store\.put\(key, JSON\.stringify\(media\)\);/);
+    // The persist keys are session-guarded (post media is immutable) so a post persists at most once per session.
+    expect(app).toMatch(/const persistedPublicPostMediaKeys = new Set\(\);/);
+  });
+
   it('PWA-STUCK-CONFIRMING-TERMINAL-01: an outbound stuck at "submitted N/N, confirming" past the stale window renders a terminal, not eternal', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // A private OUTBOUND whose publish never confirmed (e.g. an old underpriced/rejected capsule) stayed on
@@ -6778,7 +6808,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v819/);
+    expect(sw).toMatch(/platho-pwa-prototype-v820/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6786,7 +6816,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=251/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=744/);
+    expect(sw).toMatch(/\.\/app\.js\?v=745/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
