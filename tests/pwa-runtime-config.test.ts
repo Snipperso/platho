@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=750" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=751" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -4530,7 +4530,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function assertPublicComposerPartLimit\(partCount\)/);
     expect(app).toMatch(/assertPublicComposerPartLimit\(totalParts\);/);
     // The public composer blocks BEFORE clearing/signing, shows the split-it message, and disables the button.
-    expect(app).toMatch(/if \(publicComposerPartLimitMessage\(publicComposerSendPlan\(text, attachments\)\.length\)\) \{/);
+    expect(app).toMatch(/if \(publicComposerPartLimitMessage\(publicComposerSendPlan\(text, attachments, fileAttachments\)\.length\)\) \{/);
     expect(app).toMatch(/const publicLimitMessage = publicComposerPartLimitMessage\(publicPlan\.length\);/);
     expect(app).toMatch(/if \(publicComposerPartLimitMessage\(plan\.length\)\) return true;/);
     // The private button tooltip states the REAL reason (the limit message), not a GRAM-shortfall misattribution.
@@ -4960,7 +4960,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function composerBlocksFromDraft\(text, attachments = \[\], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments\)/);
     // The public builder pins its OWN reply draft AND an explicit EMPTY file list — private file drafts must
     // never leak into a public post (v652).
-    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, \[\]\)/);
+    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\)\)/);
     expect(app.match(/context\.replyDraft \?\? (context\.)?message\?\.privateDraft\?\.replyDraft \?\? null/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(app).toMatch(/const replyDraft = privateReplyDraft \? \{ \.\.\.privateReplyDraft \} : null;/);
     // The reply rides FIRST in the block list, only when the draft has a real chain ref.
@@ -5593,15 +5593,15 @@ describe('PWA runtime config guard', () => {
     // PUBLIC symmetry: same button gate + the publish submit fails closed on zero blocks (orphan marker leaves non-empty
     // text, so the old "!text && no attachments" gate let it through).
     expect(app).toMatch(/function publicComposerHasSendableContent\(\) \{[\s\S]*?publicDocumentBlocksFromDraft\(publicMessageInput\?\.value \?\? ''\)\.length > 0;/);
-    expect(app).toMatch(/const documentBlocks = publicDocumentBlocksFromDraft\(resolvedDraft\.text, attachments\);\s*\n[\s\S]*?if \(documentBlocks\.length === 0\) return null;/);
+    expect(app).toMatch(/const documentBlocks = publicDocumentBlocksFromDraft\(resolvedDraft\.text, attachments, fileAttachments\);\s*\n[\s\S]*?if \(documentBlocks\.length === 0\) return null;/);
     // Symmetric public COMMENT path (generalize-symmetric): same zero-block fail-closed gate, not the old "!text" gate.
     const commentFn = app.slice(app.indexOf('async function submitPublicCommentThroughVault('), app.indexOf('async function submitPublicCommentThroughVault(') + 1400);
-    expect(commentFn).toMatch(/const documentBlocks = publicDocumentBlocksFromDraft\(text, attachments\);\s*\n[\s\S]*?if \(documentBlocks\.length === 0\) return null;/);
+    expect(commentFn).toMatch(/const documentBlocks = publicDocumentBlocksFromDraft\(text, attachments, fileAttachments\);\s*\n[\s\S]*?if \(documentBlocks\.length === 0\) return null;/);
     expect(commentFn).not.toMatch(/if \(!text && attachments\.length === 0\) return null;/);
     // The outer public composer submit gate also checks resolved blocks, so an orphan bails BEFORE the composer clears
     // (a Ctrl+Enter requestSubmit bypasses the disabled button) — symmetric with the private handler's pre-clear guard.
     const pubSubmit = app.slice(app.indexOf("publicComposer?.addEventListener('submit'"), app.indexOf("publicComposer?.addEventListener('submit'") + 800);
-    expect(pubSubmit).toMatch(/if \(publicDocumentBlocksFromDraft\(text, attachments\)\.length === 0\) return;/);
+    expect(pubSubmit).toMatch(/if \(publicDocumentBlocksFromDraft\(text, attachments, fileAttachments\)\.length === 0\) return;/);
     // i18n key present (all-language parity is enforced by the i18n test; pin EN here).
     expect(EN_STRINGS['composer.nothingToSend']).toBe('Nothing to send');
   });
@@ -5777,6 +5777,29 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="publicLinkButton"/);
     expect(I18N_STRINGS.en['composer.insertLink']).toBeTruthy();
     expect(I18N_STRINGS.ru['composer.link']).toBeTruthy();
+  });
+
+  it('PWA-PUBLIC-COMPOSER-MENU-01: the public composer folds image/file/link into one "+" add-menu (no payment check), with public file attachments', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    // Owner ask (v751): don't proliferate public composer buttons — one "+" menu like the private composer, holding
+    // Image / File / Link (payment checks stay private-only).
+    expect(html).toMatch(/id="publicComposerAddButton"[\s\S]*?icon-plus/);
+    const pubMenu = html.slice(html.indexOf('id="publicComposerAddMenu"'), html.indexOf('id="publicComposerAddMenu"') + 1500);
+    expect(pubMenu).toMatch(/id="publicImageButton"/);
+    expect(pubMenu).toMatch(/id="publicFileButton"/);
+    expect(pubMenu).toMatch(/id="publicLinkButton"/);
+    expect(pubMenu).not.toMatch(/paymentCheckButton/); // no payment checks in public
+    expect(html).toMatch(/id="publicFileInput"/);
+    expect(html).toMatch(/id="publicFilePanel"/);
+    // Public FILE attachments ride the same FILE document block + publish path as private, threaded as a PARAM so the
+    // capture-at-submit (before the composer clears) is not dropped by an already-cleared global.
+    expect(app).toMatch(/function publicDocumentBlocksFromDraft\(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments\)/);
+    expect(app).toMatch(/const fileAttachments = normalizePrivateFileAttachments\(publicFileAttachments\);.*captured BEFORE the clear/);
+    expect(app).toMatch(/await submitPublicPostThroughVault\(\{\s*\n\s*text,\s*\n\s*attachments,\s*\n\s*fileAttachments,/);
+    expect(app).toMatch(/await submitPublicCommentThroughVault\(draftCommentTarget, text, attachments, fileAttachments\)/);
+    expect(app).toMatch(/function togglePublicComposerAddMenu\(\)/);
+    expect(I18N_STRINGS.en['composer.addPublicAttachment']).toBeTruthy();
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -6913,7 +6936,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v825/);
+    expect(sw).toMatch(/platho-pwa-prototype-v826/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6921,10 +6944,10 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=255/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=750/);
+    expect(sw).toMatch(/\.\/app\.js\?v=751/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=21/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=21/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=22/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=22/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

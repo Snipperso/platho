@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v750</span>
+              <span class="app-version-label" id="appVersionLabel">v751</span>
             </div>
           </div>
         </div>
@@ -251,16 +251,30 @@
               <span class="icon icon-chat" aria-hidden="true"></span>
               <span class="sr-only" data-i18n="public.allowComments">Allow comments</span>
             </label>
-            <button class="icon-button attachment-button" id="publicImageButton" type="button" aria-label="Attach image" title="Attach image" data-i18n-aria-label="composer.attachImage" data-i18n-title="composer.attachImage">
-              <span class="icon icon-image"></span>
-            </button>
-            <button class="icon-button link-button" id="publicLinkButton" type="button" aria-label="Insert link" title="Insert link" data-i18n-aria-label="composer.insertLink" data-i18n-title="composer.insertLink">
-              <span class="icon icon-link"></span>
-            </button>
+            <div class="composer-add">
+              <button class="icon-button composer-add-button" id="publicComposerAddButton" type="button" aria-label="Add attachment" title="Add image, file, or link" aria-haspopup="menu" aria-expanded="false" data-i18n-aria-label="composer.addPublicAttachment" data-i18n-title="composer.addPublicAttachment">
+                <span class="icon icon-plus"></span>
+              </button>
+              <div class="composer-add-menu" id="publicComposerAddMenu" role="menu" hidden>
+                <button class="composer-menu-button attachment-button" id="publicImageButton" type="button" role="menuitem" aria-label="Attach image" title="Attach image" data-i18n-aria-label="composer.attachImage" data-i18n-title="composer.attachImage">
+                  <span class="icon icon-image"></span>
+                  <span data-i18n="composer.image">Image</span>
+                </button>
+                <button class="composer-menu-button public-file-button" id="publicFileButton" type="button" role="menuitem" aria-label="Attach file" title="Attach file (up to ~250 KB)" data-i18n-aria-label="composer.attachFile" data-i18n-title="composer.attachFileLimit">
+                  <span class="icon icon-download"></span>
+                  <span data-i18n="composer.file">File</span>
+                </button>
+                <button class="composer-menu-button link-button" id="publicLinkButton" type="button" role="menuitem" aria-label="Insert link" title="Insert link" data-i18n-aria-label="composer.insertLink" data-i18n-title="composer.insertLink">
+                  <span class="icon icon-link"></span>
+                  <span data-i18n="composer.link">Link</span>
+                </button>
+              </div>
+            </div>
             <button class="icon-button emoji-button" id="publicEmojiButton" type="button" aria-label="Emoji" title="Emoji" aria-haspopup="true" aria-expanded="false" data-i18n-aria-label="composer.emoji" data-i18n-title="composer.emoji">
               <span class="icon icon-smiley" aria-hidden="true"></span>
             </button>
             <input id="publicImageInput" type="file" accept="image/*" hidden>
+            <input id="publicFileInput" type="file" hidden>
             <div class="composer-stack">
               <label class="sr-only" for="publicMessageInput" data-i18n="public.publicMessage">Public message</label>
               <textarea id="publicMessageInput" placeholder="Public message" rows="1" autocomplete="off" data-i18n-placeholder="composer.publicMessage"></textarea>
@@ -273,6 +287,10 @@
                   <option value="maximum" data-i18n="composer.imageMaximum">Maximum 64 KiB</option>
                 </select>
                 <button id="publicClearImageButton" type="button" data-i18n="common.remove">Remove</button>
+              </div>
+              <div class="composer-attachment composer-file-panel" id="publicFilePanel" hidden>
+                <span id="publicFileLabel" data-i18n="composer.noFiles">No files</span>
+                <button id="publicClearFilesButton" type="button" data-i18n="common.remove">Remove</button>
               </div>
               <div class="composer-context" id="publicCommentContext" hidden>
                 <span id="publicCommentContextText" data-i18n="public.commenting">Commenting</span>
@@ -382,7 +400,7 @@
               <p id="profileHandle" data-i18n="nav.profile">Profile</p>
               <!-- Build version, duplicated from the rail badge: the rail is hidden on the narrow (mobile / TG
                    Mini App) layout, and TMA webviews cache hard — this is the on-device way to verify the build. -->
-              <span class="app-version-label" id="profileVersionLabel">v750</span>
+              <span class="app-version-label" id="profileVersionLabel">v751</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -711,6 +729,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=750" type="module"></script>
+    <script src="./app.js?v=751" type="module"></script>
   </body>
 </html>

@@ -19,6 +19,7 @@ export const I18N_LOCALES = [
 
 export const I18N_STRINGS = {
   en: {
+    "composer.addPublicAttachment": "Add image, file, or link",
     "link.shownAs": "Shown as: {text}",
     "composer.link": "Link",
     "composer.insertLink": "Insert link",
@@ -876,6 +877,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} undelivered",
   },
   ru: {
+    "composer.addPublicAttachment": "Добавить картинку, файл или ссылку",
     "link.shownAs": "Отображается как: {text}",
     "composer.link": "Ссылка",
     "composer.insertLink": "Вставить ссылку",
@@ -1749,6 +1751,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} не доставлено",
   },
   zh: {
+    "composer.addPublicAttachment": "添加图片、文件或链接",
     "link.shownAs": "显示为：{text}",
     "composer.link": "链接",
     "composer.insertLink": "插入链接",
@@ -2598,6 +2601,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} 条未送达",
   },
   es: {
+    "composer.addPublicAttachment": "Añadir imagen, archivo o enlace",
     "link.shownAs": "Se muestra como: {text}",
     "composer.link": "Enlace",
     "composer.insertLink": "Insertar enlace",
@@ -3455,6 +3459,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} sin entregar",
   },
   pt: {
+    "composer.addPublicAttachment": "Adicionar imagem, arquivo ou link",
     "link.shownAs": "Exibido como: {text}",
     "composer.link": "Link",
     "composer.insertLink": "Inserir link",
@@ -4312,6 +4317,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} não entregues",
   },
   fr: {
+    "composer.addPublicAttachment": "Ajouter une image, un fichier ou un lien",
     "link.shownAs": "Affiché comme : {text}",
     "composer.link": "Lien",
     "composer.insertLink": "Insérer un lien",
@@ -5169,6 +5175,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} non remis",
   },
   de: {
+    "composer.addPublicAttachment": "Bild, Datei oder Link hinzufügen",
     "link.shownAs": "Angezeigt als: {text}",
     "composer.link": "Link",
     "composer.insertLink": "Link einfügen",
@@ -6026,6 +6033,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} nicht zugestellt",
   },
   hi: {
+    "composer.addPublicAttachment": "छवि, फ़ाइल या लिंक जोड़ें",
     "link.shownAs": "इस रूप में दिखाया गया: {text}",
     "composer.link": "लिंक",
     "composer.insertLink": "लिंक डालें",
@@ -6883,6 +6891,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} अवितरित",
   },
   id: {
+    "composer.addPublicAttachment": "Tambah gambar, file, atau tautan",
     "link.shownAs": "Ditampilkan sebagai: {text}",
     "composer.link": "Tautan",
     "composer.insertLink": "Sisipkan tautan",
@@ -7732,6 +7741,7 @@ export const I18N_STRINGS = {
     "sync.undelivered#other": "{count} tidak terkirim",
   },
   ja: {
+    "composer.addPublicAttachment": "画像・ファイル・リンクを追加",
     "link.shownAs": "表示名: {text}",
     "composer.link": "リンク",
     "composer.insertLink": "リンクを挿入",
