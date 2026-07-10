@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v741';
+const PLATHO_APP_RUNTIME_VERSION = 'v742';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3790,6 +3790,26 @@ function ensureIdentityPopover() {
   return identityPopover;
 }
 
+// Place a (visible) identity popover next to its anchor using its REAL measured size, not a hardcoded guess. The old
+// code clamped top against a magic 220px height, so a taller box still overflowed the bottom (description cut off) and
+// low anchors snapped to a fixed line ("appears haphazardly"). The popover height is bounded by the CSS max-height, so
+// this always lands the WHOLE box on-screen: below the anchor when it fits, else above it, else clamped to the top.
+function positionIdentityPopover(popover, anchor) {
+  if (!popover || popover.hidden || !anchor) return;
+  const rect = anchor.getBoundingClientRect();
+  const margin = 8;
+  const w = popover.offsetWidth;
+  const h = popover.offsetHeight;
+  const left = Math.max(margin, Math.min(rect.left, window.innerWidth - w - margin));
+  let top = rect.bottom + margin;
+  if (top + h > window.innerHeight - margin) {
+    const above = rect.top - margin - h;
+    top = above >= margin ? above : Math.max(margin, window.innerHeight - h - margin);
+  }
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
 function hideIdentityPopover() {
   if (identityPopover) identityPopover.hidden = true;
   // Reset whichever button opened the popover (Private header or a Public channel detail button).
@@ -3996,10 +4016,8 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
     loading.textContent = t('public.loadingDescription');
     body.append(loading);
   }
-  const rect = anchor.getBoundingClientRect();
-  popover.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
-  popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 220)}px`;
-  popover.hidden = false;
+  popover.hidden = false; // unhide FIRST so positionIdentityPopover can measure the real height (bounded by the CSS max-height)
+  positionIdentityPopover(popover, anchor);
   if (identityPopoverAnchor && identityPopoverAnchor !== anchor) identityPopoverAnchor.setAttribute('aria-expanded', 'false');
   identityPopoverAnchor = anchor;
   anchor.setAttribute('aria-expanded', 'true');
@@ -4010,8 +4028,12 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
     } catch (error) {
       resolved = cachedChannelProfile(authorWallet);
     }
-    // Only repaint if THIS popover is still the one open for THIS anchor (the user may have moved on).
-    if (!popover.hidden && identityPopoverAnchor === anchor) renderBody(resolved);
+    // Only repaint if THIS popover is still the one open for THIS anchor (the user may have moved on). The loaded
+    // description changes the height, so re-position against the real measured size.
+    if (!popover.hidden && identityPopoverAnchor === anchor) {
+      renderBody(resolved);
+      positionIdentityPopover(popover, anchor);
+    }
   }
 }
 
@@ -4199,10 +4221,8 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       onSelect(selected);
     }));
   }
-  const rect = anchor.getBoundingClientRect();
-  popover.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
-  popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 220)}px`;
-  popover.hidden = false;
+  popover.hidden = false; // unhide FIRST so positionIdentityPopover can measure the real height (bounded by the CSS max-height)
+  positionIdentityPopover(popover, anchor);
   // Track the opening button so its aria-expanded reflects the open state and is reset on close
   // (works for both the Private header button and a Public channel detail button).
   if (identityPopoverAnchor && identityPopoverAnchor !== anchor) {
@@ -7895,7 +7915,12 @@ function publicChannelIdForAuthorWallet(authorWallet) {
 // The synthesized object uses the same id (`wallet:<addr>`) and shape as ensurePublicChannelForAuthorWallet, so the
 // first publish's registration is idempotent (same id) and nothing duplicates.
 function ownPublicChannel() {
-  const wallet = rawWalletAddress(plathoWallet?.address);
+  // Fall back to the plaintext address persisted in storage (storedPlathoWalletRecord().address — no decryption) so
+  // the own channel is a feed source even when the wallet is LOCKED (auto-lock) or still loading at boot. Without it,
+  // plathoWallet is null while locked, so ownPublicChannel returned null, feedSourcePublicChannels dropped the own
+  // channel, and the user could not find their OWN channel in the public list (had to manually subscribe to self).
+  // Mirrors isOwnPublicAuthor's fallback.
+  const wallet = rawWalletAddress(plathoWallet?.address ?? storedPlathoWalletRecord()?.address);
   if (!wallet) return null;
   const existing = publicChannelRegistry.find((channel) => publicChannelMatchesAuthorWallet(channel, wallet));
   if (existing) return existing;

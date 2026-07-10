@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=741" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=742" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5018,8 +5018,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/appendRowReplyButton\(row, beginPrivateReplyForRow\);/);
     expect(app).toMatch(/appendRowReplyButton\(row, beginPublicCommentReplyForRow\);/);
     expect(css).toMatch(/@media \(hover: hover\) \{[\s\S]*?\.message:hover > \.row-reply-button/);
-    // Fullscreen lightbox (v647): the dialog fills the viewport — zooming needs the room, not a content card.
-    expect(css).toMatch(/\.image-lightbox-dialog \{[\s\S]*?width: 100%;\s*height: 100%;\s*max-height: none;/);
+    // Fullscreen lightbox (v647): the dialog fills the viewport — zooming needs the room, not a content card. v742
+    // bounds the height to --app-viewport-height on EVERY platform (bare height:100% didn't resolve on desktop -> a
+    // tall image overflowed the window).
+    expect(css).toMatch(/\.image-lightbox-dialog \{[\s\S]*?width: 100%;[\s\S]*?height: var\(--app-viewport-height, 100dvh\);\s*\n\s*max-height: var\(--app-viewport-height, 100dvh\);/);
     expect(css).toMatch(/\.image-lightbox-backdrop\.image-lightbox-backdrop \{\s*padding: 0;\s*\}/);
   });
 
@@ -5600,6 +5602,29 @@ describe('PWA runtime config guard', () => {
     expect(pubSubmit).toMatch(/if \(publicDocumentBlocksFromDraft\(text, attachments\)\.length === 0\) return;/);
     // i18n key present (all-language parity is enforced by the i18n test; pin EN here).
     expect(EN_STRINGS['composer.nothingToSend']).toBe('Nothing to send');
+  });
+
+  it('PWA-OWN-CHANNEL-WHILE-LOCKED-01: the own public channel resolves from the stored plaintext address (so it is a feed source even when the wallet is locked)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // ownPublicChannel must NOT depend on the live plathoWallet (null while locked / at boot) or the user cannot find
+    // their OWN channel in the public list. Same plaintext-address fallback isOwnPublicAuthor already uses.
+    expect(app).toMatch(/function ownPublicChannel\(\) \{[\s\S]*?const wallet = rawWalletAddress\(plathoWallet\?\.address \?\? storedPlathoWalletRecord\(\)\?\.address\);/);
+  });
+
+  it('PWA-POPOVER-LIGHTBOX-FIT-01: the description popover fits+scrolls; the desktop image lightbox is viewport-bounded', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // Description popover (.identity-popover) is height-capped to the viewport and scrolls its overflow (a long
+    // description was clipped off-screen, unreadable).
+    expect(css).toMatch(/\.identity-popover \{[\s\S]*?max-height: calc\(var\(--app-viewport-height, 100dvh\) - 24px\);\s*\n\s*overflow-y: auto;/);
+    // Positioning measures the REAL height (no hardcoded 220/280 guess) and lands the whole box on-screen (below the
+    // anchor, else above, else clamped), applied to BOTH the channel-about and the "Display as" popovers.
+    expect(app).toMatch(/function positionIdentityPopover\(popover, anchor\) \{[\s\S]*?const h = popover\.offsetHeight;[\s\S]*?if \(top \+ h > window\.innerHeight - margin\) \{/);
+    expect((app.match(/positionIdentityPopover\(popover, anchor\)/g) ?? []).length).toBeGreaterThanOrEqual(3); // decl-body + 2 call sites (+ async re-position)
+    expect(app).not.toMatch(/window\.innerHeight - 220/); // the magic-number clamp is gone
+    // Desktop image lightbox: the dialog is bounded to the viewport height (was height:100%, which did not resolve on
+    // desktop and let a tall image overflow, bottom clipped).
+    expect(css).toMatch(/\.image-lightbox-dialog \{[\s\S]*?height: var\(--app-viewport-height, 100dvh\);/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -6723,15 +6748,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v816/);
+    expect(sw).toMatch(/platho-pwa-prototype-v817/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=250/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=251/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=741/);
+    expect(sw).toMatch(/\.\/app\.js\?v=742/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
