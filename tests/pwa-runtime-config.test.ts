@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=739" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=740" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5517,7 +5517,7 @@ describe('PWA runtime config guard', () => {
     const listenerSource = app.slice(app.indexOf('function rememberConversationScroll()'), app.indexOf('function applyConversationStatusOnlyPatch'));
     expect(listenerSource).not.toMatch(/setTimeout/);
     // A fresh outbound tail remains the ONLY smooth scroll-to-end.
-    expect(renderSource).toMatch(/if \(conversationNewOutbound\) \{[\s\S]*?behavior: 'smooth'/);
+    expect(renderSource).toMatch(/else if \(ownSendScrollToEnd\) \{[\s\S]*?behavior: 'smooth'/);
     // PUBLIC twin (the symmetric case): a publish status tick patches the badge text in place via its
     // data-publish-local-id anchor instead of rebuilding the feed/comments through renderPublicSurface;
     // structural transitions (no badge mounted, terminal failed -> retry wiring) fall through to the full render.
@@ -5525,6 +5525,49 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(!patchPublicPublishBadgesInPlace\(job, patchedItem\)\) renderPublicSurface\(\{ anchorUnread: false \}\);/);
     expect(app).toMatch(/if \(!status \|\| status\.endsWith\('failed'\)\) return false;/);
     expect((app.match(/statusBadge\.dataset\.publishLocalId = /g) ?? []).length).toBe(2);
+  });
+
+  it('PWA-CHAT-OPEN-SCROLL-02: opening a dialog lands on the latest, or anchors the first unread at the top when the unread overflow', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const renderSource = app.slice(app.indexOf('function renderConversation()'), app.indexOf('docsButtons.forEach'));
+    // The unread count is captured BEFORE markThreadRead clears it, so the open-scroll can find the first unread.
+    expect(renderSource).toMatch(/const conversationOpenUnreadCount = conversationThreadChanged \? threadUnreadCount\(thread\) : 0;/);
+    expect(app.indexOf('const conversationOpenUnreadCount =')).toBeLessThan(app.indexOf('markThreadRead(thread))'));
+    // First unread = the oldest of the last `unreadCount` INCOMING, walking the sorted messages from the tail.
+    expect(app).toMatch(/function firstUnreadIncomingMessageRef\(thread, unreadCount\) \{[\s\S]*?messages\[i\]\?\.type === 'in'[\s\S]*?if \(seenIncoming >= n\) return messages\[i\]/);
+    // The anchor: land on the latest (bottom) UNLESS the first unread sits above the last screen -> put it at the top.
+    expect(app).toMatch(/function applyConversationOpenScroll\(\) \{[\s\S]*?if \(rowTopWithinStrip < maxScrollTop - 4\) \{\s*\n\s*setConversationScrollTop\(rowTopWithinStrip\);[\s\S]*?setConversationScrollTop\(messageStrip\.scrollHeight\);/);
+    // Set up on OPEN (thread change), after the sort so the first-unread ref is resolved against the final order.
+    expect(renderSource).toMatch(/conversationOpenFirstUnreadRef = firstUnreadIncomingMessageRef\(thread, conversationOpenUnreadCount\);\s*\n\s*conversationOpenScrollUnsettled = true;/);
+    // The first-unread row is tagged so applyConversationOpenScroll can find it.
+    expect(renderSource).toMatch(/if \(message === conversationOpenFirstUnreadRef\) row\.dataset\.firstUnread = 'true';/);
+    // Applied SYNCHRONOUSLY (so the next burst render reads the correct scrollTop, not a transient 0) AND in the rAF.
+    expect(renderSource).toMatch(/if \(conversationOpenScrollUnsettled\) applyConversationOpenScroll\(\);\s*\n\s*requestAnimationFrame/);
+    expect(renderSource).toMatch(/requestAnimationFrame\(\(\) => \{\s*\n\s*if \(conversationOpenScrollUnsettled\) \{\s*\n\s*[\s\S]*?applyConversationOpenScroll\(\);/);
+    // While the open burst is unsettled the render entry must NOT recompute the pin state from the transient scrollTop.
+    expect(renderSource).toMatch(/if \(stripMeasurable && !conversationOpenScrollUnsettled\) \{/);
+    // The open-anchor clears on the FIRST genuine user scroll (a scroll >150ms after our own programmatic write).
+    expect(app).toMatch(/if \(conversationOpenScrollUnsettled && Date\.now\(\) - conversationProgrammaticScrollAt > 150\) \{\s*\n\s*conversationOpenScrollUnsettled = false;/);
+    expect(app).toMatch(/function setConversationScrollTop\(top\) \{[\s\S]*?conversationProgrammaticScrollAt = Date\.now\(\);[\s\S]*?messageStrip\.scrollTop = top;/);
+    // Review fix A: the thread-list tap must NOT markThreadRead before renderConversation (that zeroed the count so the
+    // first-unread anchor never armed on the primary open path). renderConversation captures the count, THEN marks read.
+    const clickHandler = app.slice(app.indexOf("item.addEventListener('click', () => {"), app.indexOf("item.addEventListener('click', () => {") + 1100);
+    expect(clickHandler).not.toMatch(/markThreadRead\(/);
+    expect(clickHandler).toMatch(/renderThreads\(\);\s*\n\s*renderConversation\(\);/);
+    // Review fix B: a fresh own-send abandons the open-anchor (else the rAF's unsettled branch re-pins first-unread-top
+    // and the just-sent message is left off-screen). Gated on the PRECISE own-send flag (set by the send submit right
+    // before it inserts the optimistic message), NOT on conversationNewOutbound — a late out-of-order INCOMING can also
+    // leave an 'out' tail with a grown count and would wrongly clear the anchor + yank the reader (re-review finding).
+    expect(app).toMatch(/ownSendPendingRender = true; \/\/ the user just sent[\s\S]*?\n\s*insertThreadMessage\(thread, message\);/);
+    expect(renderSource).toMatch(/const ownSendScrollToEnd = ownSendPendingRender;\s*\n\s*ownSendPendingRender = false;/);
+    expect(renderSource).toMatch(/if \(ownSendScrollToEnd\) conversationOpenScrollUnsettled = false;/);
+    expect(renderSource).not.toMatch(/if \(conversationNewOutbound\) conversationOpenScrollUnsettled = false;/);
+    // The SECOND own-send path (payment-check create) also sets the flag, so it too abandons the open-anchor + scrolls
+    // to the sent message (root fix: the precise signal covers every own-send, not the conversationNewOutbound proxy).
+    expect(app).toMatch(/ownSendPendingRender = true; \/\/ own-send \(payment check\)[\s\S]*?\n\s*insertThreadMessage\(thread, message\);/);
+    // The rAF smooth-scroll-to-end is also gated on the precise flag now (not conversationNewOutbound), so a late
+    // out-of-order incoming can't yank a reader who scrolled up to read history.
+    expect(renderSource).toMatch(/else if \(ownSendScrollToEnd\) \{[\s\S]*?behavior: 'smooth'/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -6648,7 +6691,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v814/);
+    expect(sw).toMatch(/platho-pwa-prototype-v815/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6656,7 +6699,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=250/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=739/);
+    expect(sw).toMatch(/\.\/app\.js\?v=740/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);

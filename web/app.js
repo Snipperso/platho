@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v739';
+const PLATHO_APP_RUNTIME_VERSION = 'v740';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -15675,10 +15675,11 @@ function buildThreadRow(threadId) {
     if (activeThreadId !== thread.id) setPrivateReplyDraft(null);
     activeThreadId = thread.id;
     appShell.dataset.chatOpen = 'true';
-    // Selecting a chat always lands at the end (even re-selecting the current one), regardless of where it was
-    // left — renderConversation() reads this and scrolls to the bottom.
+    // Re-selecting the CURRENT dialog lands at the end (conversationThreadChanged is false, so renderConversation's
+    // open-anchor is not armed and this stickToBottom drives the scroll). Opening a DIFFERENT dialog is owned by
+    // renderConversation's open-scroll (latest, or first-unread at the top on overflow) — which needs the unread
+    // count, so DO NOT markThreadRead here: renderConversation captures the count and THEN marks the thread read.
     conversationStickToBottom = true;
-    markThreadRead(thread);
     renderThreads();
     renderConversation();
     // Re-check this dialog's .ath (has the peer transferred it away?) then reconcile OUR OWN linked .ath — both
@@ -15733,6 +15734,20 @@ let lastConversationThreadId = null;
 let lastConversationMsgCount = 0;
 let conversationStickToBottom = true;
 let conversationSavedScrollTop = 0;
+// Open-scroll anchor (v740). Replaces the fragile "restore where you were last time in this dialog" (it mislanded a
+// long history at the TOP during the multi-render open burst). On OPENING a dialog we always land on the latest, OR —
+// when unread messages OVERFLOW the viewport — put the FIRST unread at the top so the reader starts exactly where the
+// new messages begin and reads down. conversationOpenScrollUnsettled stays true across the whole open burst (every
+// render re-applies the anchor) and clears on the first genuine user scroll. It does NOT change the in-dialog rule: a
+// background sync while you read history still keeps your position (the else branch of the render's final rAF).
+let conversationOpenFirstUnreadRef = null;
+let conversationOpenScrollUnsettled = false;
+let conversationProgrammaticScrollAt = 0;
+// Set by the private send submit right before it inserts the optimistic own message; the NEXT renderConversation
+// consumes it to abandon the open-anchor (the user just sent -> show their message). Precise: keyed on the actual
+// send action, NOT on "the tail is an 'out' message" (a late out-of-order INCOMING can leave an 'out' tail and would
+// otherwise wrongly clear a first-unread anchor and yank the reader — the v740 review finding).
+let ownSendPendingRender = false;
 // Per-row structure fingerprint of the last full conversation render — drives the status-only fast path
 // (a status tick patches rows in place instead of rebuilding the strip, so the scroller never moves).
 let lastConversationRenderSnapshot = null;
@@ -15742,10 +15757,58 @@ let lastConversationRenderSnapshot = null;
 // snapshot used to yank a reader who had just scrolled up back to the bottom.
 function rememberConversationScroll() {
   if (!messageStrip) return;
+  // A genuine user scroll during the open window ends the open-anchor (the reader took over). Our OWN programmatic
+  // anchor writes also fire this handler, so ignore a scroll event that lands right after one (within 150ms).
+  if (conversationOpenScrollUnsettled && Date.now() - conversationProgrammaticScrollAt > 150) {
+    conversationOpenScrollUnsettled = false;
+  }
   conversationStickToBottom = (messageStrip.scrollHeight - messageStrip.scrollTop - messageStrip.clientHeight) < 24;
   conversationSavedScrollTop = messageStrip.scrollTop;
 }
 messageStrip?.addEventListener('scroll', rememberConversationScroll, { passive: true });
+
+// The FIRST unread INCOMING message (the oldest of the last `unreadCount` incoming), from the unread count taken
+// BEFORE markThreadRead cleared it. Walks the SORTED messages from the tail. null when nothing is unread.
+function firstUnreadIncomingMessageRef(thread, unreadCount) {
+  const n = Number(unreadCount) || 0;
+  if (n <= 0) return null;
+  const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+  let seenIncoming = 0;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.type === 'in') {
+      seenIncoming += 1;
+      if (seenIncoming >= n) return messages[i];
+    }
+  }
+  return null;
+}
+
+function setConversationScrollTop(top) {
+  if (!messageStrip) return;
+  conversationProgrammaticScrollAt = Date.now(); // mark this as OUR write so the scroll listener never reads it as a user scroll
+  messageStrip.scrollTop = top;
+}
+
+// Apply the open-scroll anchor: land on the latest when the unread fit the last screen (few/no new), else put the
+// FIRST unread at the top of the viewport (many new -> read down from there). Idempotent; re-run on every render of
+// the open burst so the transient scroll-to-0 a rebuild causes can never leave a long history stuck at the top.
+function applyConversationOpenScroll() {
+  if (!messageStrip) return;
+  const maxScrollTop = Math.max(0, messageStrip.scrollHeight - messageStrip.clientHeight);
+  const firstUnreadRow = conversationOpenFirstUnreadRef ? messageStrip.querySelector('[data-first-unread="true"]') : null;
+  let anchoredToUnread = false;
+  if (firstUnreadRow) {
+    const rowTopWithinStrip = messageStrip.scrollTop
+      + (firstUnreadRow.getBoundingClientRect().top - messageStrip.getBoundingClientRect().top);
+    // The first unread sits ABOVE the last screen (it would be scrolled off the top at the bottom) -> anchor it to top.
+    if (rowTopWithinStrip < maxScrollTop - 4) {
+      setConversationScrollTop(rowTopWithinStrip);
+      anchoredToUnread = true;
+    }
+  }
+  if (!anchoredToUnread) setConversationScrollTop(messageStrip.scrollHeight);
+  conversationStickToBottom = !anchoredToUnread;
+}
 
 // STATUS-ONLY FAST PATH: when the message list is structurally identical to the last full render (same
 // message objects, same rows — only meta text / status changed), patch the existing rows in place. The
@@ -15820,9 +15883,19 @@ function renderConversation() {
     lastConversationThreadId = null;
     lastConversationMsgCount = 0;
     conversationStickToBottom = true;
+    conversationOpenScrollUnsettled = false;
+    conversationOpenFirstUnreadRef = null;
     lastConversationRenderSnapshot = null;
     return;
   }
+  // Compute the open + capture the unread count BEFORE markThreadRead clears it, so the open-scroll can anchor to the
+  // first unread message.
+  const conversationThreadChanged = thread.id !== lastConversationThreadId;
+  const conversationOpenUnreadCount = conversationThreadChanged ? threadUnreadCount(thread) : 0;
+  // Consume the "user just sent" flag exactly once (the send submit set it right before inserting the optimistic
+  // message, so THIS render is the fresh own-send). Precise signal for abandoning the open-anchor — see the flag decl.
+  const ownSendScrollToEnd = ownSendPendingRender;
+  ownSendPendingRender = false;
   setThreadAvatarNode(activeAvatar, thread);
   if (isThreadConversationVisible(thread) && markThreadRead(thread)) {
     renderThreads();
@@ -15830,7 +15903,6 @@ function renderConversation() {
   renderConversationIdentity(thread);
   activeSubtitle.textContent = conversationSubtitleText(thread);
   // Capture the pre-render scroll state so a background re-render can restore it instead of jumping to the bottom.
-  const conversationThreadChanged = thread.id !== lastConversationThreadId;
   // LIVE scroll state read at render entry. The scroll listener's debounced snapshot lagged an active gesture
   // (the debounce timer reset on every scroll event), so a mid-scroll re-render restored wherever the user was
   // BEFORE the gesture began — the live read is always exact. The saved values remain only as the fallback for
@@ -15838,7 +15910,10 @@ function renderConversation() {
   // across tab switches).
   const stripMeasurable = messageStrip.clientHeight > 0 && messageStrip.scrollHeight > 0;
   const prevConversationScrollTop = stripMeasurable ? messageStrip.scrollTop : conversationSavedScrollTop;
-  if (stripMeasurable) {
+  // While the open burst is still settling (unsettled), the scroller is mid-rebuild and its scrollTop is transient —
+  // do NOT recompute the pin state from it (that transient scroll-to-0 is exactly what mislanded a long history at the
+  // top). applyConversationOpenScroll owns the position until the first user scroll clears unsettled.
+  if (stripMeasurable && !conversationOpenScrollUnsettled) {
     conversationStickToBottom = (messageStrip.scrollHeight - prevConversationScrollTop - messageStrip.clientHeight) < 24;
     conversationSavedScrollTop = prevConversationScrollTop;
   }
@@ -15864,12 +15939,24 @@ function renderConversation() {
   // refreshPrivateSendButtonState also refreshes the eye (updatePrivateSenderModeUi rides in the funnel).
   refreshPrivateSendButtonState();
   sortThreadMessages(thread);
+  if (conversationThreadChanged) {
+    // Opening the dialog: set up the open-scroll anchor from the pre-markThreadRead unread count and mark the open
+    // burst unsettled so every render re-applies the anchor until the reader scrolls.
+    conversationOpenFirstUnreadRef = firstUnreadIncomingMessageRef(thread, conversationOpenUnreadCount);
+    conversationOpenScrollUnsettled = true;
+  }
   // A fresh outbound message at the tail (the user just sent) is the only re-render that smooth-scrolls to the end.
   const conversationMsgCount = thread.messages.length;
   const conversationLastMsg = thread.messages[conversationMsgCount - 1];
   const conversationNewOutbound = !conversationThreadChanged
     && conversationMsgCount > lastConversationMsgCount
     && conversationLastMsg?.type === 'out';
+  // A fresh own-send ABANDONS the open-scroll anchor (the reader typed + sent, so they are at the composer): drop the
+  // unsettled state so the rAF takes the newOutbound branch and smooth-scrolls to the sent message, instead of the
+  // open-anchor branch re-pinning a first-unread-at-top and leaving the just-sent message off-screen at the bottom.
+  // Gated on the PRECISE own-send flag (not conversationNewOutbound): a late out-of-order INCOMING can also leave an
+  // 'out' tail with a grown count, and must NOT clear the anchor / yank the reader (the v740 review finding).
+  if (ownSendScrollToEnd) conversationOpenScrollUnsettled = false;
   lastConversationThreadId = thread.id;
   lastConversationMsgCount = conversationMsgCount;
   // Status tick with identical structure -> patch in place, scroller COMPLETELY untouched (no rebuild, no
@@ -15883,6 +15970,7 @@ function renderConversation() {
     // Chain anchor: the swipe-to-reply gesture reads it as the reply ref, and reply quotes scroll to it. A
     // not-yet-confirmed optimistic message has none — replying to it is gated until the entry id lands.
     if (message.chainEntryId !== undefined && message.chainEntryId !== null) row.dataset.entryId = String(message.chainEntryId);
+    if (message === conversationOpenFirstUnreadRef) row.dataset.firstUnread = 'true';
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     const blocks = Array.isArray(message.blocks) ? message.blocks : [];
@@ -16075,17 +16163,26 @@ function renderConversation() {
   });
   lastConversationRenderSnapshot = { threadId: thread.id, rows: conversationRenderSnapshotRows };
 
+  // Open burst: apply the anchor SYNCHRONOUSLY now (reading scrollHeight/getBoundingClientRect forces the layout), so
+  // the NEXT render in the burst reads the correct scrollTop at its entry instead of a transient 0 — the fix for a
+  // long history landing at the top. The rAF below re-applies it after layout/image settle.
+  if (conversationOpenScrollUnsettled) applyConversationOpenScroll();
+
   requestAnimationFrame(() => {
-    if (conversationNewOutbound) {
+    if (conversationOpenScrollUnsettled) {
+      // Still opening — (re)apply the open anchor (latest, or first-unread at the top when the unread overflow).
+      applyConversationOpenScroll();
+    } else if (ownSendScrollToEnd) {
       // The user just sent — scroll their message into view as a gentle scroll, not a sudden jump. Restore the
       // pre-rebuild position first (instant) so the smooth scroll travels only from there to the new bottom, instead
-      // of animating up from the cleared scrollTop=0 (the "flies to the beginning and back" jerk).
+      // of animating up from the cleared scrollTop=0 (the "flies to the beginning and back" jerk). Gated on the PRECISE
+      // own-send flag (not conversationNewOutbound): a late out-of-order INCOMING can leave an 'out' tail with a grown
+      // count and must NOT smooth-scroll a reader who has scrolled up to read history to the bottom.
       conversationStickToBottom = true;
       messageStrip.scrollTop = prevConversationScrollTop;
       messageStrip.scrollTo({ top: messageStrip.scrollHeight, behavior: 'smooth' });
     } else if (conversationStickToBottom) {
-      // Opening a chat, or already reading the latest — stay pinned to the end (instant). Robust to the multi-render
-      // burst on open: every render in the burst pins to the bottom, so there is no stale position to land on.
+      // Already reading the latest — stay pinned to the end (instant).
       messageStrip.scrollTop = messageStrip.scrollHeight;
     } else {
       // The reader scrolled up to read history — a background re-render keeps them EXACTLY where they were
@@ -17374,6 +17471,7 @@ composer?.addEventListener('submit', async (event) => {
   if (paymentDraft) {
     message.paymentDraft = paymentDraftForHistory(paymentDraft);
   }
+  ownSendPendingRender = true; // the user just sent: the next render abandons any open-anchor and scrolls to their message
   insertThreadMessage(thread, message);
   const sendContext = {
     thread,
@@ -22762,6 +22860,7 @@ async function submitCreatePaymentCheck(options = {}) {
     ...localMessageOrderFields(),
     paymentDraft: paymentDraftForHistory(paymentDetails),
   };
+  ownSendPendingRender = true; // own-send (payment check): the next render scrolls to it + abandons any open-anchor
   insertThreadMessage(thread, message);
   refreshThreadAfterMessageChange(thread);
   renderThreads();
