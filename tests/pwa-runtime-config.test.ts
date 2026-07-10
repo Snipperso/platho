@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=738" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=739" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5156,7 +5156,7 @@ describe('PWA runtime config guard', () => {
     expect(bg).toMatch(/if \(timedOut\) \{ setText\(savePrefsStatus, t\('sync\.saveFailed'\)\); refreshPrefsSyncButton\(\); \}/);
     // The confirm is superseded on a wallet switch (generation bump) AND the in-flight UI it held is released there —
     // else the stranded confirm's generation guard would leave the Save button + global spinner stuck after a switch.
-    expect(app).toMatch(/prefsConfirmGeneration \+= 1;\s*\n\s*prefsSyncInFlight = false;\s*\n\s*privateImageAttachments = \[\];/);
+    expect(app).toMatch(/prefsConfirmGeneration \+= 1;\s*\n\s*prefsSyncInFlight = false;/);
   });
 
   it('PWA-PREFS-CHAT-FILTER-01: a prefs capsule is diverted before thread routing and never becomes a chat message', () => {
@@ -5277,6 +5277,77 @@ describe('PWA runtime config guard', () => {
     expect(navFn).toMatch(/return vaultRefreshPromise\.catch/);
   });
 
+  it('PWA-VAULT-ACTIVATION-GUARD-01: a not-activated read for a wallet already seen activated never tears down the activated UI', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Activation is MONOTONIC on-chain (exists && current_key_id>0 never reverts), so a not-activated read for a
+    // wallet we've already observed activated is a TRANSIENT bad read (lagging replica / pre-registration height /
+    // reorg) — it must never flip the UI to "activate your account" (Vault tab locked, profile row, nav balance gone)
+    // until the next good read heals it. A downgrade guard rejects it; only a wallet change resets the memory.
+    expect(app).toMatch(/let lastKnownActivatedVaultWalletRaw = null;/);
+    expect(app).toMatch(/function vaultUserIsActivated\(user\) \{[\s\S]*?BigInt\(user\.current_key_id \?\? 0n\) > 0n/);
+    expect(app).toMatch(/function isTransientVaultActivationDowngrade\(user\) \{[\s\S]*?vaultUserIsActivated\(user\)[\s\S]*?return false;[\s\S]*?sameWalletAddress\(raw, lastKnownActivatedVaultWalletRaw\)/);
+    // rememberConnectedVaultUser (pre-sign + own-action reads): keep the good binding, return the RAW read so a
+    // pre-sign caller still fails closed instead of signing against a bad read.
+    const remember = app.slice(app.indexOf('function rememberConnectedVaultUser(user)'), app.indexOf('function hasActiveVaultMessagingKeys('));
+    expect(remember).toMatch(/if \(isTransientVaultActivationDowngrade\(user\)\) return user;/);
+    expect(remember).toMatch(/noteVaultUserActivationObserved\(user\);/);
+    // applyVaultUserPocketState (nav background refresh): keep last-known, re-read — do NOT zero the vault pocket.
+    const applyPocket = app.slice(app.indexOf('function applyVaultUserPocketState(user)'), app.indexOf('async function refreshVaultNavBalanceInBackground'));
+    expect(applyPocket).toMatch(/if \(isTransientVaultActivationDowngrade\(user\)\) \{\s*\n\s*markNavVaultBalanceRetryNeeded\('vault user read inconsistent'\);\s*\n\s*return;/);
+    // refreshVaultDashboard: intercept BEFORE renderVaultPocketCards (which would render the vault pocket as 0) and
+    // before the binding write — never setVaultStatus('Vault setup required') on a transient downgrade.
+    const dash = app.slice(app.indexOf('async function refreshVaultDashboard()'), app.indexOf('const VAULT_DEFERRED_READ_TIMEOUT_MS'));
+    expect(dash).toMatch(/if \(user && isTransientVaultActivationDowngrade\(user\)\) \{[\s\S]*?markNavVaultBalanceRetryNeeded\('vault user read inconsistent'\)[\s\S]*?return null;/);
+    // Wallet change forgets the previous wallet's activated state (the NEW wallet's first not-activated read is honoured).
+    expect(app).toMatch(/prefsSyncInFlight = false;[\s\S]{0,400}?lastKnownActivatedVaultWalletRaw = null;/);
+  });
+
+  it('PWA-VAULT-ACTIVATION-XWALLET-02: a stale get_user resolving after a wallet switch never marks the NEW wallet activated', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The v739 activation guard bound the observation to the AMBIENT wallet at read-resolution time. A get_user issued
+    // for wallet A that resolves AFTER an in-app switch to a fresh wallet B then marked B activated, and the guard
+    // masked B's genuine not-activated reads all session (the review's cross-wallet poison + a ~1/sec read storm).
+    // Fix: STAMP each read with the wallet it was issued for (loadConnectedVaultUser, the single choke point) and
+    // attribute note/guard only to a read whose stamp matches the currently-connected wallet.
+    expect(app).toMatch(/const VAULT_USER_READ_WALLET = Symbol\('vaultUserReadWallet'\);/);
+    expect(app).toMatch(/function vaultUserReadIsStale\(user\) \{[\s\S]*?const readWallet = vaultUserReadWalletRaw\(user\);[\s\S]*?!sameWalletAddress\(readWallet, current\)/);
+    // The stamp is applied at the single choke point for EVERY vault-user read (display + pre-sign).
+    const load = app.slice(app.indexOf('async function loadConnectedVaultUser'), app.indexOf('async function loadConnectedVaultGlobal'));
+    expect(load).toMatch(/const forWallet = requirePlathoWalletAddress\(\);/);
+    expect(load).toMatch(/Object\.defineProperty\(user, VAULT_USER_READ_WALLET, \{ value: forWalletRaw/);
+    // note/guard only attribute a read to the CURRENT wallet (a stale cross-wallet read is ignored, never poisons).
+    expect(app).toMatch(/function noteVaultUserActivationObserved\(user\) \{[\s\S]*?if \(!current \|\| vaultUserReadIsStale\(user\)\) return;/);
+    expect(app).toMatch(/function isTransientVaultActivationDowngrade\(user\) \{[\s\S]*?vaultUserReadIsStale\(user\)\) return false;/);
+    // Both display read paths discard a stale cross-wallet read entirely (no render / no binding write / no stamp).
+    const nav = app.slice(app.indexOf('navVaultBalanceRefreshPromise = (async () =>'), app.indexOf('navVaultBalanceRefreshPromise = (async () =>') + 700);
+    expect(nav).toMatch(/if \(vaultUserReadIsStale\(user\)\) return null;\s*\n\s*applyVaultUserPocketState\(user\);/);
+    const dash = app.slice(app.indexOf('async function refreshVaultDashboard()'), app.indexOf('const VAULT_DEFERRED_READ_TIMEOUT_MS'));
+    expect(dash).toMatch(/if \(user && vaultUserReadIsStale\(user\)\) return null;/);
+    // Wallet change also wipes the cached pocket balances so the NEW wallet never inherits wallet A's funds (also makes
+    // the v739 external-balance carry-forward safe across an in-app A->B switch).
+    expect(app).toMatch(/vaultPocketState = \{ wallet: \{ ton_balance: null, ath_balance: null \}, vault: \{ ton_balance: null, ath_balance: null \} \};\s*\n\s*privateImageAttachments = \[\];/);
+  });
+
+  it('PWA-WALLET-BALANCE-CARRY-RETRY-01: a failed external-balance read keeps last-known and retries, never a dash-and-give-up', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // loadConnectedTonWalletBalance resolves NULL on a total failure (it does not throw). Rendering that null wiped a
+    // known balance to "-" and never re-read. Fix 1: renderVaultPocketCards carries forward last-known on null (a real
+    // 0 balance is a bigint so it survives; only null/undefined falls through). Wallet change resets separately.
+    expect(app).toMatch(/ton_balance: walletBalances\?\.ton_balance \?\? vaultPocketState\.wallet\?\.ton_balance \?\? null,/);
+    expect(app).toMatch(/ath_balance: walletBalances\?\.ath_balance \?\? vaultPocketState\.wallet\?\.ath_balance \?\? null,/);
+    // Fix 2: the Profile external-GRAM reader carries forward on null AND arms a bounded, view-gated retry.
+    const prof = app.slice(app.indexOf('async function refreshWalletTonBalanceForProfile'), app.indexOf('function isProfileViewActive'));
+    expect(prof).toMatch(/if \(balance === null\) \{\s*\n[\s\S]*?scheduleWalletTonProfileBalanceRetry\(\);[\s\S]*?return vaultPocketState\.wallet\?\.ton_balance \?\? null;/);
+    expect(prof).toMatch(/clearWalletTonProfileBalanceRetry\(\);/);
+    expect(app).toMatch(/const WALLET_TON_PROFILE_BALANCE_RETRY_DELAYS_MS = \[1500, 3000, 6000, 12000\];/);
+    // The retry stops on success, on leaving the Profile tab, or when the wallet goes away.
+    const retry = app.slice(app.indexOf('function scheduleWalletTonProfileBalanceRetry'), app.indexOf('function scheduleWalletTonProfileBalanceRetry') + 700);
+    expect(retry).toMatch(/if \(!plathoWallet\?\.address \|\| !isProfileViewActive\(\)\) return;/);
+    expect(retry).toMatch(/refreshWalletTonBalanceForProfile\(\)\.catch/);
+    // Cleared on a wallet change so a stale timer never chases the old wallet's balance.
+    expect(app).toMatch(/lastKnownActivatedVaultWalletRaw = null;\s*\n\s*clearWalletTonProfileBalanceRetry\(\);/);
+  });
+
   it('PWA-IOS-VAULT-READ-MUTEX-01: ALL leaf Vault chain reads serialize through one withVaultReadLock mutex', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The single tail-chained mutex: at most one app-level Vault read in flight, across every driver. This is the
@@ -5287,7 +5358,7 @@ describe('PWA runtime config guard', () => {
     // reads (cache hit / fast reject) can never starve the iOS run loop in microtasks (the v604 dead-freeze fix).
     expect(app).toMatch(/function withVaultReadLock\(fn\) \{[\s\S]*?vaultReadMutexTail\.then\(\(\) => delay\(0\)\)\.then\([\s\S]*?return fn\(\);[\s\S]*?vaultReadMutexTail = run\.then\(\(\) => \{\}, \(\) => \{\}\)/);
     // Every leaf read primitive on the Vault-tab / activation paths is wrapped.
-    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getUser\(requirePlathoWalletAddress\(\)/); // loadConnectedVaultUser (nav + dashboard)
+    expect(app).toMatch(/withVaultReadLock\(async \(\) => \{[\s\S]*?provider\.getUser\(forWallet/); // loadConnectedVaultUser (nav + dashboard), reads stamped with the origin wallet
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getGlobal\(\{\s*vaultAddress: requireVaultAddress\(\)/); // loadConnectedVaultGlobal
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getKeyRecord\(user\.current_key_id/); // activation key record
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getJettonData\(/); // ATH stats
@@ -6577,7 +6648,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v813/);
+    expect(sw).toMatch(/platho-pwa-prototype-v814/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6585,7 +6656,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=250/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=738/);
+    expect(sw).toMatch(/\.\/app\.js\?v=739/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=19/);
