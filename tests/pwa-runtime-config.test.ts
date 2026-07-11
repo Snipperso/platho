@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=764" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=765" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5918,6 +5918,48 @@ describe('PWA runtime config guard', () => {
     expect(I18N_STRINGS.en['public.down']).toBeUndefined(); // key was renamed, not duplicated
   });
 
+  it('PWA-PUBLIC-POST-COLLAPSE-01: long feed/channel posts render clamped with a "Show full post" expander; the detail screen and comments never clamp', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // Owner ask (v765): long posts collapse to a max height in the FEED and the CHANNEL VIEW with an expand
+    // button. Both surfaces render through buildPublicFeedArticle, which wraps title+content in the clamped body.
+    const build = app.slice(app.indexOf('function buildPublicFeedArticle('), app.indexOf('function publicFeedItemRenderSignature('));
+    expect(build).toMatch(/body\.className = 'feed-post-body';/);
+    expect(build).toMatch(/bodyContent\.className = 'feed-post-body-inner';/);
+    expect(build).toMatch(/appendPublicItemContent\(bodyContent, item\);/);
+    // The clamp machinery is gated on ResizeObserver support (no observer -> no clamp: content must never be cut
+    // with no way to reveal it) and skips compact cards + posts the user already expanded this session.
+    expect(build).toMatch(/feedPostClampObserver && !item\.compact && !publicFeedExpandedPosts\.has\(String\(item\.id\)\)/);
+    expect(build).toMatch(/expandButton\.textContent = t\('public\.showFullPost'\);/);
+    // Expanding releases the clamp IN PLACE and is remembered for the session, so the signature-driven article
+    // rebuilds (unread -> read, background syncs) re-render the post expanded instead of snapping it shut.
+    expect(build).toMatch(/publicFeedExpandedPosts\.add\(String\(item\.id\)\);/);
+    expect(build).toMatch(/article\.classList\.remove\('feed-post-collapsible', 'feed-post-overflowing'\);/);
+    // ...and the expanded state is part of the render signature, so the OTHER surface's reused article (feed
+    // vs channel view render the same item independently) rebuilds expanded too instead of staying collapsed.
+    expect(app).toMatch(/publicFeedExpandedPosts\.has\(String\(item\.id\)\) \? 'x' : ''/);
+    // The observer watches the UNCLAMPED inner wrapper (the clamped outer box never resizes when a lazy image
+    // decodes later) and flags a post only when the clamp actually bites; a near-miss (less than the slack)
+    // releases the clamp silently instead of offering a button that reveals a sliver.
+    expect(app).toMatch(/const feedPostClampObserver = typeof ResizeObserver === 'function'/);
+    expect(app).toMatch(/const clippedHeight = body\.scrollHeight - body\.clientHeight;/);
+    expect(app).toMatch(/clippedHeight > FEED_POST_CLAMP_SLACK_PX/);
+    // CSS: the clamp height is a :root single-source var; the clamp applies only under .feed-post-collapsible,
+    // and the expand button shows only once the observer confirmed real overflow.
+    expect(css).toMatch(/--feed-post-collapsed-max-height: \d+px;/);
+    expect(css).toMatch(/\.feed-post-collapsible \.feed-post-body \{[^}]*max-height: var\(--feed-post-collapsed-max-height\);[^}]*overflow: hidden;/);
+    expect(css).toMatch(/\.feed-post-overflowing \.feed-expand-button \{\s*display: block;/);
+    // The post DETAIL screen (and its comments) calls appendPublicItemContent directly — no .feed-post-body
+    // wrapper — so an opened post always renders in full (the expander is a feed/channel affordance only).
+    const detail = app.slice(app.indexOf('function renderPublicPostDetail('), app.indexOf('function openPublicPostDetail('));
+    expect(detail).toMatch(/appendPublicItemContent\(post, item\);/);
+    expect(detail).not.toMatch(/feed-post-body/);
+    // Every locale ships the expander label (OPSEC key parity).
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      expect((I18N_STRINGS as Record<string, Record<string, string>>)[locale]['public.showFullPost']).toBeTruthy();
+    }
+  });
+
   it('PWA-CHANNEL-VIEW-01: a channel screen shows one channel\'s posts, previews unfollowed channels via a transient feed source, and never leaks the preview into the main feed', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -7235,18 +7277,18 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v839/);
+    expect(sw).toMatch(/platho-pwa-prototype-v840/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=257/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=258/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=764/);
+    expect(sw).toMatch(/\.\/app\.js\?v=765/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=25/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=25/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

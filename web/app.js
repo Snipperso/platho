@@ -179,7 +179,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=24';
+} from './i18n.mjs?v=25';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v764';
+const PLATHO_APP_RUNTIME_VERSION = 'v765';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6613,6 +6613,40 @@ function renderPublicFeed(items, options = {}) {
   }
 }
 
+// --- Long-post collapse (feed + channel view, v765) ---
+// A long post renders clamped to --feed-post-collapsed-max-height with a "Show full post" button; expanding
+// releases the clamp IN PLACE (no re-render — content grows downward under the reader). Session-scoped by item
+// id, so the signature-driven article rebuilds (unread -> read, identity changes, background syncs) re-render an
+// expanded post EXPANDED instead of snapping it shut. Never persisted — a fresh session starts collapsed again.
+const publicFeedExpandedPosts = new Set();
+// A clamp that hides less than this many pixels is released silently instead of showing the button: a
+// "Show full post" that reveals a two-line sliver is worse than just showing the two lines.
+const FEED_POST_CLAMP_SLACK_PX = 120;
+// One shared observer for every rendered post body. It watches the UNCLAMPED inner wrapper — once the clamp
+// bites, the outer clamped box stays at max-height forever, so an observer bound to it would never fire when a
+// lazy image decodes later and grows the content. scrollHeight (full content) vs clientHeight (clamped box) on
+// the OUTER box then says whether the clamp actually cuts anything. Pre-ResizeObserver engines get null: the
+// collapsible class is then never added, so nothing is ever clamped (fail-open to the full-height feed — a
+// clamp with no way to ever show the expand button would silently cut content).
+const feedPostClampObserver = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => {
+  for (const entry of entries) {
+    const body = entry.target.parentElement;
+    const article = body ? body.closest('.feed-item') : null;
+    if (!body || !article || !article.classList.contains('feed-post-collapsible')) continue;
+    const clippedHeight = body.scrollHeight - body.clientHeight;
+    if (clippedHeight > FEED_POST_CLAMP_SLACK_PX) {
+      article.classList.add('feed-post-overflowing');
+    } else if (clippedHeight > 0) {
+      // Near-miss: the clamp bites but hides less than the slack — release it with no button, so content is
+      // never silently cut. Not added to publicFeedExpandedPosts (that set records USER intent); a rebuilt
+      // article simply re-measures and re-releases.
+      article.classList.remove('feed-post-collapsible', 'feed-post-overflowing');
+    } else {
+      article.classList.remove('feed-post-overflowing');
+    }
+  }
+}) : null;
+
 // Build one feed <article> (chrome + content) for an item. Extracted so renderPublicFeed can REUSE an article whose
 // publicFeedItemRenderSignature is unchanged instead of rebuilding it every render.
 function buildPublicFeedArticle(item, avatarUrlMemo) {
@@ -6675,12 +6709,36 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
   const feedIdentityButton = publicItemIdentityButton(item);
   if (feedIdentityButton) authorRow.append(feedIdentityButton);
   article.append(authorRow);
+  // Long-post collapse: title + content live in a clamped body wrapper (feed + channel view only — the post
+  // detail screen and comments call appendPublicItemContent directly and never clamp). The inner wrapper is the
+  // observer target; the outer .feed-post-body is what the CSS max-height clamps.
+  const body = document.createElement('div');
+  body.className = 'feed-post-body';
+  const bodyContent = document.createElement('div');
+  bodyContent.className = 'feed-post-body-inner';
   if (item.title) {
     const title = document.createElement('h2');
     title.textContent = item.title;
-    article.append(title);
+    bodyContent.append(title);
   }
-  appendPublicItemContent(article, item);
+  appendPublicItemContent(bodyContent, item);
+  body.append(bodyContent);
+  article.append(body);
+  // Compact cards (channel plates / empty states) carry a line or two — no clamp machinery for them.
+  if (feedPostClampObserver && !item.compact && !publicFeedExpandedPosts.has(String(item.id))) {
+    article.classList.add('feed-post-collapsible');
+    const expandButton = document.createElement('button');
+    expandButton.type = 'button';
+    expandButton.className = 'feed-expand-button';
+    expandButton.textContent = t('public.showFullPost');
+    expandButton.addEventListener('click', () => {
+      publicFeedExpandedPosts.add(String(item.id));
+      article.classList.remove('feed-post-collapsible', 'feed-post-overflowing');
+      feedPostClampObserver.unobserve(bodyContent);
+    });
+    article.append(expandButton);
+    feedPostClampObserver.observe(bodyContent);
+  }
   // Comments are no longer rendered inline in the feed — they load on demand on the post detail screen
   // (openPublicPostDetail). appendPublicItemComments is reused there.
   appendPublicItemActions(article, item);
@@ -6697,6 +6755,10 @@ function publicFeedItemRenderSignature(item, avatarUrlMemo) {
   return [
     isUnreadPublicItem(item) ? 'u' : '',
     item.compact ? 'c' : '',
+    // Expanded long posts rebuild expanded on EVERY surface: the click mutates only the tapped article's DOM,
+    // so the OTHER surface's reused article (feed vs channel view render the same item independently) would
+    // otherwise stay collapsed until an unrelated rebuild.
+    publicFeedExpandedPosts.has(String(item.id)) ? 'x' : '',
     (item.meta ?? []).join(''),
     item.author ?? '',
     item.title ?? '',
