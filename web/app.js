@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v760';
+const PLATHO_APP_RUNTIME_VERSION = 'v761';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -27047,6 +27047,41 @@ function resumePendingPrivatePublishConfirmations() {
     }
   }
 }
+
+// Read-only console diagnostics for stuck outbound publishes (v761): one row per NON-confirmed
+// message with a publishState, surfacing every predicate the resume/scheduler paths consult — the
+// exact data needed to see WHY a pending message is (not) being driven, without a diagnostic build.
+// Console: plathoDebugPendingPublishes()
+globalThis.plathoDebugPendingPublishes = () => {
+  const rows = [];
+  for (const thread of threads) {
+    for (const message of thread.messages ?? []) {
+      const state = message?.publishState;
+      if (!state || state.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) continue;
+      rows.push({
+        thread: String(thread.id ?? '').slice(0, 12),
+        preview: String(message.text ?? '').slice(0, 12),
+        meta: message.meta ?? null,
+        status: state.status ?? null,
+        parts: (state.parts ?? []).map((part) => `${part.index ?? part.partIndex ?? '?'}:${part.status ?? '?'}:n${part.clientNonce ?? '?'}${part.error ? ':err' : ''}`),
+        confirmStopped: message.privatePublishConfirmStopped === true,
+        sendStopped: message.privateSendRetryStopped === true,
+        manualRetry: message.privateManualRetryAvailable === true,
+        hasAttempt: privateMessageHasPublishAttempt(message),
+        partialRetryable: privateMessageHasPartialRetryablePublish(message),
+        partialExpired: privatePartialSendRetryExpired(message),
+        stale: isStalePrivatePendingPublishConfirmation(message),
+        hasPending: hasPendingPrivatePublishConfirmation(message),
+        passRan: privatePublishConfirmPassRanThisSession.has(message),
+        jobArmed: message.privatePublishConfirmRetryKey ? privatePublishConfirmJobs.has(message.privatePublishConfirmRetryKey) : false,
+        lastResult: message.privatePublishConfirmLastResult ?? null,
+        lastError: message.privatePublishConfirmLastError ?? null,
+        nextAt: message.privatePublishConfirmNextAt ?? null,
+      });
+    }
+  }
+  return rows;
+};
 
 function hasPendingPrivateSendRetry(message) {
   const hasStoredCapsules = (Array.isArray(message?.capsules) && message.capsules.length > 0) || Boolean(message?.capsule);
