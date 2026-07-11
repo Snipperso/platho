@@ -24,13 +24,17 @@ describe('public publish heal driver guard', () => {
     expect(pass).toMatch(/privatePublishConfirmDelayMs\(\{ publishState, createdAtMs: job\.createdAt \}, passError\)/);
   });
 
-  it('PWA-PUBLIC-HEAL-02: age terminals fire BEFORE any RPC (no post-offline storm) with the shared constants', () => {
+  it('PWA-PUBLIC-HEAL-02: age terminals fire before the RPC, gated on one healing pass per session', () => {
     const pass = app.slice(app.indexOf('async function runPublicPublishConfirmationPass'), app.indexOf('function resumePendingPublicPublishConfirmations'));
     // v648: the no-progress terminal is the part-count-scaled helper (shared with the private drivers).
+    // v760: both terminals require ONE completed pass this session (publicPublishConfirmPassRanThisSession)
+    // so a reload attempts healing before it may bury a record; the post-offline RPC cost stays bounded
+    // (exactly one pass per stale record before its terminal may fire).
     const terminalIndex = pass.indexOf('publishConfirmNoProgressDeadlineMs(publishState)');
     const rpcIndex = pass.indexOf('retryUnconfirmedVaultPublishBroadcasts');
     expect(terminalIndex).toBeGreaterThan(-1);
     expect(rpcIndex).toBeGreaterThan(terminalIndex);
+    expect(pass).toMatch(/publicPublishConfirmPassRanThisSession\.has\(passKey\)\s*\n\s*&& publishState\?\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED/);
     expect(pass).toMatch(/PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS/);
     expect(pass).toMatch(/publishStateBroadcastIsFailing\(publishState\)/);
     expect(pass).toMatch(/publishStatus: 'public publish failed'/);

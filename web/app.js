@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v759';
+const PLATHO_APP_RUNTIME_VERSION = 'v760';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -26682,6 +26682,13 @@ function stopPartialPrivatePublishRecovery(context, error = { message: 'partial 
   const forcedStop = error?.code === 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED'
     && /limit/i.test(String(error?.message ?? ''));
   if (!privatePartialSendRetryExpired(message) && !forcedStop) return false;
+  // NOTE (v760): this stopper is deliberately NOT behind the one-pass-per-session grace. Gating it
+  // deadlocked expired partials into a zombie state (review finding): the blocked stop left the
+  // message with NO driver either — schedulePrivateSendRetry's expired branch returns without
+  // scheduling, and hasPendingPrivatePublishConfirmation excludes expired partials — so the promised
+  // healing pass never ran and the terminal it gated could never fire. Its immediate terminal is
+  // also the SAFE kind: PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED keeps privateManualRetryAvailable
+  // (one-click idempotent re-broadcast), unlike the 24h stale fallback the zombie decayed into.
   clearPrivateSendRetry(message);
   clearPrivatePublishConfirmRetry(message);
   message.privateSendRetryStopped = true;
@@ -26744,7 +26751,10 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   // (a) NOTHING landed AND every in-flight external is provably failing to broadcast for BROADCAST_FAIL_AFTER
   // -> actionable "RPC broadcast unavailable" + safe Retry, instead of spinning to the no-progress deadline. A
   // broadcasting-fine-but-slow send carries no part.error, so publishStateBroadcastIsFailing() is false here.
-  if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+  // Both age terminals require ONE completed pass this session (v760, see the WeakSet above): a reload
+  // must attempt healing before it may give up.
+  if (privatePublishConfirmPassRanThisSession.has(message)
+    && message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
     && Number(message.publishState?.confirmedCount ?? 0) === 0
     && Number(message.publishState?.submittedCount ?? 0) === 0
     && privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS
@@ -26755,7 +26765,8 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   // (b) No FULL confirmation by the no-progress deadline (covers a PARTIAL: one part landed, another never
   // confirmed) -> durable "chain lookup timed out" terminal + Retry instead of spinning forever. Part-count
   // scaled (v648): an 8-capsule send legitimately runs its serial ladders far past the 2-capsule 6-min figure.
-  if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+  if (privatePublishConfirmPassRanThisSession.has(message)
+    && message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
     && privatePendingPublishConfirmAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message.publishState)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
     return;
@@ -26825,6 +26836,17 @@ function scheduleImmediatePrivatePublishConfirmation(context) {
   return true;
 }
 
+// One-full-pass-per-session grace for the AGE give-up terminals (v760): a RELOAD must give every
+// pending publish one REAL healing attempt (fresh nonce read + re-broadcast + confirm + the
+// dropped-recovery machinery) BEFORE any age-based terminal may stop its driver. Without it, a queue
+// that aged past the windows while wedged came back from a reload pre-buried: the resume/scheduler
+// terminals fired before the first pass ever ran, so "reload to recover" silently did nothing (the
+// owner's 9-messages-behind-a-file wedge, second act). In-memory ON PURPOSE — a fresh session starts
+// with a clean slate, which is exactly the wanted semantics. Public records are REBUILT objects
+// (feed-cache rebuilds detach references), so the public side keys by `${channelId}:${localId}`.
+const privatePublishConfirmPassRanThisSession = new WeakSet();
+const publicPublishConfirmPassRanThisSession = new Set();
+
 async function runPrivatePublishConfirmationRetry(context) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
@@ -26880,12 +26902,20 @@ async function runPrivatePublishConfirmationRetry(context) {
     message.privatePublishConfirmRunCount = (Number(message.privatePublishConfirmRunCount ?? 0) || 0) + 1;
     message.privatePublishConfirmLastResult = 'checking';
     message.privatePublishConfirmNextAt = null;
-    const broadcastRetries = await retryUnconfirmedPrivatePublishBroadcasts(message.publishState, {
-      deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
-      readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
-      sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
-      queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
-    });
+    let broadcastRetries = 0;
+    try {
+      broadcastRetries = await retryUnconfirmedPrivatePublishBroadcasts(message.publishState, {
+        deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
+        readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
+        sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
+        queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
+      });
+    } finally {
+      // A REAL healing attempt was made this session (the pass reached the heal stage — even a failed
+      // RPC counts as the attempt): from here on the age give-up terminals are allowed. Marking on
+      // FAILURE too keeps a persistent outage terminating instead of rescheduling forever.
+      privatePublishConfirmPassRanThisSession.add(message);
+    }
     if (broadcastRetries > 0 && publishStateHasRetryableSendParts(message.publishState)) {
       message.privatePublishConfirmLastResult = `rebroadcast=${broadcastRetries}`;
       message.meta = publishStateMeta(message.publishState);
@@ -26987,11 +27017,14 @@ function resumePendingPrivatePublishConfirmations() {
         continue;
       }
       // A publish that is NOT fully confirmed and has been pending past the no-progress deadline (stable,
-      // reload-surviving age anchored on messageCreatedAtMs) surfaces the durable red terminal IMMEDIATELY on
-      // resume, rather than restarting its per-session attempt budget and spinning on "confirming" for another
-      // window. This covers a PARTIAL multi-external publish (confirmedCount in [1, partCount-1]) too — the
+      // reload-surviving age anchored on messageCreatedAtMs) surfaces the durable red terminal on resume —
+      // but ONLY after this session gave it one real healing pass (v760): the old instant-stop buried a
+      // recoverable queue right at reload (reload-did-not-help — the drivers never ran once). The
+      // driver armed below runs the pass; its own age terminals (gated the same way) then decide. This
+      // covers a PARTIAL multi-external publish (confirmedCount in [1, partCount-1]) too — the
       // confirmedCount===0 gate is intentionally absent so a one-of-two-landed image cannot hang forever.
-      if (privateMessageHasPublishAttempt(message)
+      if (privatePublishConfirmPassRanThisSession.has(message)
+        && privateMessageHasPublishAttempt(message)
         && message?.privatePublishConfirmStopped !== true
         && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
         && privatePendingPublishConfirmAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message?.publishState)) {
@@ -27598,20 +27631,25 @@ async function runPublicPublishConfirmationPass(job) {
   }
   const ageMs = Date.now() - job.createdAt;
   const publishState = job.publishState;
-  // Age terminals BEFORE any RPC — also protects resume-after-long-offline from an RPC storm: stale records
-  // terminal out without a single request.
-  if (publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+  const passKey = `${job.channelId}:${job.localId}`;
+  // Age terminals before RPC — but only after ONE completed pass this session (v760, symmetric with
+  // the private driver): a reload must attempt healing before it may give up, else a queue that aged
+  // while wedged comes back pre-buried. The resume-after-long-offline RPC cost stays bounded: each
+  // stale record gets exactly one pass (a couple of reads) before its terminal may fire.
+  if (publicPublishConfirmPassRanThisSession.has(passKey)
+    && publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
     && ageMs >= publishConfirmNoProgressDeadlineMs(publishState)) {
-    console.warn('[platho] public publish: no-progress terminal', { key: `${job.channelId}:${job.localId}` });
+    console.warn('[platho] public publish: no-progress terminal', { key: passKey });
     stopPublicPublishConfirmation(job, { publishStatus: 'public publish failed' });
     setPublicStatus('publish failed');
     return;
   }
-  if (Number(publishState?.confirmedCount ?? 0) === 0
+  if (publicPublishConfirmPassRanThisSession.has(passKey)
+    && Number(publishState?.confirmedCount ?? 0) === 0
     && Number(publishState?.submittedCount ?? 0) === 0
     && ageMs >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS
     && publishStateBroadcastIsFailing(publishState)) {
-    console.warn('[platho] public publish: broadcast-unavailable terminal', { key: `${job.channelId}:${job.localId}` });
+    console.warn('[platho] public publish: broadcast-unavailable terminal', { key: passKey });
     stopPublicPublishConfirmation(job, { publishStatus: 'public publish failed' });
     setPublicStatus('publish failed');
     return;
@@ -27633,6 +27671,9 @@ async function runPublicPublishConfirmationPass(job) {
   } catch (error) {
     passError = error;
     noteTonRpcRateLimit(error);
+  } finally {
+    // A real healing attempt was made this session (even a failed RPC counts): age terminals allowed.
+    publicPublishConfirmPassRanThisSession.add(passKey);
   }
   if (publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
     const entryId = publishState.parts?.find((part) => part?.entryId !== undefined && part?.entryId !== null)?.entryId ?? null;
