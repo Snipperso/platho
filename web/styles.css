@@ -1299,12 +1299,14 @@ a .avatar.has-image,
   white-space: nowrap;
 }
 
+/* v769: the composer is a vertical stack (flex column) — context strips, the formatting toolbar, the input row,
+   attachment panels, and the cost status stack top-to-bottom in DOM order. This replaced the fragile 5-column
+   grid (which needed a mobile 2-row reshuffle + an .is-replying juggle): with fewer buttons on the input row
+   (only the anon / comments control + textarea + send), everything just stacks naturally on every width. */
 .composer {
-  display: grid;
-  grid-template-columns: 44px 44px 44px minmax(0, 1fr) 52px;
-  align-items: start;
-  column-gap: 10px;
-  row-gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
   max-width: 100%;
   overflow: visible;
@@ -1317,45 +1319,22 @@ a .avatar.has-image,
   min-width: 0;
 }
 
-/* NO ID-scoped data-publish-mode layout rules: both modes share the ONE .composer grid. The old id-selector
-   duplicates carried (1,x,x) specificity that silently beat the mobile reply-row rules — with a wallet
-   present (publish-mode=vault-balance) the textarea/send stayed on row 1 and overlapped the reply quote. */
-
-.composer > .private-anonymous-button {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.composer > .composer-add {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.composer > .emoji-button {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.composer > textarea {
-  grid-column: 4;
-  grid-row: 1;
-}
-
-.composer > .send-button {
-  grid-column: 5;
-  grid-row: 1;
+/* The input row: leading control (anon toggle / comments toggle) | textarea | send. align-items:end keeps the
+   leading control and send pinned to the textarea's bottom line as it grows. */
+.composer-input-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
 }
 
 .composer textarea {
   min-height: 44px;
+  max-height: 144px;
+  padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #0d1012;
-}
-
-.composer textarea {
-  max-height: 144px;
-  padding: 11px 14px;
   resize: none;
   line-height: 1.35;
   overflow-y: hidden;
@@ -1363,12 +1342,6 @@ a .avatar.has-image,
 
 .composer textarea.is-scrollable {
   overflow-y: auto;
-}
-
-.composer-stack {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
 }
 
 .composer-post-option {
@@ -1511,40 +1484,131 @@ a .avatar.has-image,
   height: 44px;
 }
 
-.composer-add {
-  position: relative;
-  width: 44px;
-  height: 44px;
-}
-
-.composer .composer-add-button,
-.composer .private-anonymous-button,
-.composer .emoji-button,
-.public-composer > .attachment-button {
-  width: 44px;
-  height: 44px;
-}
-
-.composer .composer-add-button,
+/* The only icon-button left on the input row is the private anonymous / wallet-visibility toggle (the public
+   input row's leading control is the comments toggle). Everything else moved to the formatting toolbar (v769). */
 .composer .private-anonymous-button {
+  width: 44px;
+  height: 44px;
   background: rgba(48, 213, 176, 0.06);
   border-color: rgba(48, 213, 176, 0.26);
   color: var(--accent);
 }
 
-.composer .composer-add-button:hover,
 .composer .private-anonymous-button:hover {
   border-color: rgba(48, 213, 176, 0.42);
   background: rgba(48, 213, 176, 0.1);
 }
 
-/* NO :has() in this group: Safari 14 (iOS floor) drops a whole rule when ANY selector in the list is
-   unsupported — the +/eye disabled recolor must survive there. The toggle's variants live separately below. */
-.composer .composer-add-button:disabled,
+/* NO :has() here: Safari 14 (iOS floor) drops a whole rule when ANY selector in the list is unsupported. */
 .composer .private-anonymous-button:disabled {
   background: var(--panel-3);
   border-color: var(--line);
   color: var(--muted);
+}
+
+/* Formatting toolbar (v769): a slide-out row above the input. Shown on textarea focus/click, hidden while typing
+   and by the trailing ▼ button. Collapsed = max-height 0 + opacity 0 (animated). No sticky/fixed: the whole
+   app-shell tracks the visual viewport, so the toolbar rides above the mobile keyboard as a normal stacked row. */
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: max-height 0.22s ease, opacity 0.18s ease, transform 0.22s ease;
+  pointer-events: none;
+}
+
+.composer-toolbar.is-open {
+  max-height: 48px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-toolbar { transition: opacity 0.18s ease; transform: none; }
+}
+
+.composer-toolbar-scroll {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 2px;
+}
+
+.composer-toolbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.composer-toolbar-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-toolbar-button:hover:not(:disabled) {
+  background: rgba(48, 213, 176, 0.1);
+  color: var(--accent);
+}
+
+.composer-toolbar-button.is-active {
+  background: rgba(48, 213, 176, 0.16);
+  color: var(--accent);
+}
+
+.composer-toolbar-button:disabled {
+  color: var(--muted-2);
+  cursor: default;
+}
+
+.composer-toolbar-button .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.composer-toolbar-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 20px;
+  margin: 0 3px;
+  background: var(--line);
+}
+
+.composer-toolbar-hide {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-toolbar-hide:hover {
+  color: var(--accent);
+}
+
+.composer-toolbar-hide .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .composer-post-option.is-disabled {
@@ -1563,25 +1627,6 @@ a .avatar.has-image,
   border-color: rgba(48, 213, 176, 0.42);
   background: rgba(48, 213, 176, 0.1);
   color: var(--accent);
-}
-
-.composer-add-menu {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 8px);
-  z-index: 30;
-  display: grid;
-  gap: 6px;
-  min-width: 188px;
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0d1012;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.44);
-}
-
-.composer-add-menu[hidden] {
-  display: none;
 }
 
 /* Emoji picker: a global fixed popover (positioned via JS relative to the trigger, so it survives pane switches),
@@ -1628,40 +1673,6 @@ a .avatar.has-image,
 .emoji-picker-item:focus-visible {
   background: rgba(255, 255, 255, 0.08);
   outline: none;
-}
-
-.composer-menu-button {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 38px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-  text-align: left;
-  cursor: pointer;
-}
-
-.composer-menu-button:hover {
-  border-color: rgba(48, 213, 176, 0.32);
-  background: rgba(48, 213, 176, 0.08);
-}
-
-.composer-menu-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
-}
-
-.composer-menu-button .icon {
-  width: 18px;
-  height: 18px;
-  color: var(--accent);
 }
 
 .composer-attachment-controls {
@@ -1789,6 +1800,55 @@ a .avatar.has-image,
   margin-top: 8px;
 }
 
+/* Safe message formatting (v769): block-level elements emitted by appendFormattedMessageText into the
+   .message-text-block / .feed-block-text container (which stays white-space: pre-wrap, so newlines inside a
+   paragraph/quote render). Sizes are deliberately modest — this is chat/feed body text, not a document. */
+.msg-block {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.msg-block + .msg-block {
+  margin-top: 6px;
+}
+
+.msg-heading {
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.msg-heading-1 { font-size: 1.25em; }
+.msg-heading-2 { font-size: 1.12em; }
+.msg-heading-3 { font-size: 1em; }
+
+.msg-quote {
+  margin: 0;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+
+.msg-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.msg-list li {
+  margin: 2px 0;
+}
+
+.msg-align-center { text-align: center; }
+.msg-align-justify { text-align: justify; }
+
+.msg-code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(150, 161, 156, 0.16);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
 .message-payment-block {
   display: flex;
   align-items: center;
@@ -1855,59 +1915,18 @@ a .avatar.has-image,
 }
 
 .public-composer {
-  grid-template-columns: 44px 44px 44px minmax(0, 1fr) 52px;
-  align-items: start;
-  column-gap: 10px;
+  /* Full-bleed: the negative margins span the whole pane (the base .composer max-width:100% would otherwise
+     cap the width to the padded pane). Private's composer spans its pane the same way. Layout otherwise
+     inherits the base .composer flex column + the shared .composer-input-row grid. */
   margin: 0 -24px -24px;
-  /* Let the negative margins create a true full-bleed (the base .composer max-width:100% would
-     otherwise cap the width to the padded pane and leave a gap on the right). Private's composer
-     spans its whole pane the same way. */
   max-width: none;
   padding: 12px 24px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
-  border-top: 1px solid var(--line-soft);
-  background: rgba(15, 18, 20, 0.96);
 }
 
-.public-composer .composer-stack {
-  grid-column: 4;
-  gap: 10px;
-}
-
-.public-composer > .send-button {
-  grid-column: 5;
-  width: 52px;
-  height: 44px;
-}
-
-/* Comment mode (post detail screen) hides the "allow comments" toggle (composer-post-option, column 1). Drop that
-   track so the input doesn't leave an empty 44px gap where the toggle used to be: just image + input + send. */
-.public-composer[data-mode="comment"] {
-  grid-template-columns: 44px 44px minmax(0, 1fr) 52px;
-}
-
-.public-composer[data-mode="comment"] > .emoji-button {
-  grid-column: 2;
-}
-
-.public-composer[data-mode="comment"] .composer-stack {
-  grid-column: 3;
-}
-
-.public-composer[data-mode="comment"] > .send-button {
-  grid-column: 4;
-}
-
-.public-composer > .composer-post-option {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.public-composer .send-button {
-  align-self: start;
-}
-
-.public-composer textarea {
-  min-height: 44px;
+/* Comment mode (post detail screen) hides the "allow comments" toggle — the input row becomes textarea | send
+   (no empty leading track where the toggle used to be). */
+.public-composer[data-mode="comment"] .composer-input-row {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .public-pane,
@@ -2349,6 +2368,29 @@ button.feed-item:hover {
 
 .share-target-empty {
   margin: 12px 0 0;
+  color: var(--muted);
+}
+
+/* Composer preview modal (v769): renders the draft via the same safe formatting renderer as the live surfaces. */
+.composer-preview-dialog .composer-preview-body {
+  margin-top: 14px;
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--panel-2);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.composer-preview-body .feed-image,
+.composer-preview-body .message-image {
+  max-width: 100%;
+}
+
+.composer-preview-empty {
+  margin: 0;
   color: var(--muted);
 }
 
@@ -4396,6 +4438,13 @@ button.feed-item:hover {
 .icon-compass { --mask: url("./assets/icons/compass.svg"); }
 .icon-about { --mask: url("./assets/icons/about.svg"); }
 .icon-smiley { --mask: url("./assets/icons/smiley.svg"); }
+.icon-heading { --mask: url("./assets/icons/heading.svg"); }
+.icon-bold { --mask: url("./assets/icons/bold.svg"); }
+.icon-italic { --mask: url("./assets/icons/italic.svg"); }
+.icon-list { --mask: url("./assets/icons/list.svg"); }
+.icon-quote { --mask: url("./assets/icons/quote.svg"); }
+.icon-align-center { --mask: url("./assets/icons/align-center.svg"); }
+.icon-align-justify { --mask: url("./assets/icons/align-justify.svg"); }
 
 @media (max-width: 900px) {
   :root {
@@ -4616,101 +4665,27 @@ button.feed-item:hover {
     padding: 16px 14px;
   }
 
-  /* Mobile composer: TWO rows so the text field is not squeezed between buttons.
-     Row 1 = emoji | wide text field | send. Row 2 = the two secondary buttons + the cost/reserve hint.
-     (The reply/attachment strips keep spanning the full width and flow below on their own rows.) */
+  /* Mobile composer (v769): the flex-column stack needs only tighter padding + smaller controls. With the
+     buttons moved into the toolbar, the input row is just [leading control | textarea | send] and fits one line
+     at every phone width — no more 2-row grid reshuffle, no .is-replying juggle (the reply strip is just an
+     earlier flex child). */
   .composer {
-    grid-template-columns: 38px 38px minmax(0, 1fr) 48px;
-    column-gap: 8px;
-    row-gap: 8px;
-    align-items: start;
-    /* NO safe-area inset here: on the mobile layout the composer is NOT the bottommost element — the tab bar
-       (.sidebar) sits below it and reserves env(safe-area-inset-bottom) itself. Adding the inset here too produced
-       a dead gap between the composer and the tab bar on home-indicator iPhones (inset ~30px), while button
-       iPhones (SE2) / Android (inset 0) looked fine. Desktop keeps the base rule's inset — there the composer IS
-       the bottom edge of the viewport. */
+    /* NO safe-area inset here: on mobile the composer is NOT the bottommost element — the tab bar (.sidebar)
+       sits below it and reserves env(safe-area-inset-bottom) itself. Adding the inset here too produced a dead
+       gap between the composer and the tab bar on home-indicator iPhones. Desktop keeps the base rule's inset. */
     padding: 8px 14px 8px;
+    gap: 6px;
     overflow: visible;
   }
 
-  /* Row 1: emoji + wide text field + send (both composers, all public modes). */
-  .composer > .emoji-button,
-  .public-composer[data-mode="comment"] > .emoji-button {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .composer > textarea {
-    grid-column: 2 / 4;
-    grid-row: 1;
-  }
-  .public-composer .composer-stack,
-  .public-composer[data-mode="comment"] .composer-stack {
-    grid-column: 2 / 4;
-    grid-row: 1;
-  }
-  .composer > .send-button,
-  .public-composer > .send-button,
-  .public-composer[data-mode="comment"] > .send-button {
-    grid-column: 4;
-    grid-row: 1;
+  .composer-input-row {
+    gap: 8px;
   }
 
-  /* Row 2: private = wallet-visibility + add(+); public = comments + image; then the cost/reserve hint. */
-  .composer > .private-anonymous-button {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .composer > .composer-add {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .public-composer > .composer-post-option {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .public-composer > .attachment-button,
-  .public-composer[data-mode="comment"] > .attachment-button {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .composer > .composer-cost-status,
-  .public-composer > .composer-cost-status {
-    grid-column: 3 / 5;
-    grid-row: 2;
-    align-self: start;
-  }
-
-  /* When a swipe-reply quote strip is active (private composer), it takes the top row and pushes the input +
-     buttons down one row, so the quote sits directly above the field instead of stranded below the cost line.
-     Keyed to the JS-set .is-replying class (setPrivateReplyDraft), NOT :has(): :has() silently no-ops on the
-     iOS floor (Safari 14), and no other selector may outrank these rows (see the no-ID-rules note at the
-     base .composer grid). */
-  .composer.is-replying > .composer-reply-context {
-    grid-row: 1;
-  }
-  .composer.is-replying > .emoji-button,
-  .composer.is-replying > textarea,
-  .composer.is-replying > .send-button {
-    grid-row: 2;
-  }
-  .composer.is-replying > .private-anonymous-button,
-  .composer.is-replying > .composer-add,
-  .composer.is-replying > .composer-cost-status {
-    grid-row: 3;
-  }
-
-  .composer-add,
-  .composer .composer-add-button,
   .composer .private-anonymous-button,
-  .composer .emoji-button,
-  .public-composer > .composer-post-option,
-  .public-composer > .attachment-button {
+  .public-composer .composer-post-option {
     width: 38px;
     height: 44px;
-  }
-
-  .composer-add-menu {
-    min-width: 178px;
   }
 
   .composer .send-button {

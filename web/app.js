@@ -182,7 +182,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=27';
+} from './i18n.mjs?v=28';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v768';
+const PLATHO_APP_RUNTIME_VERSION = 'v769';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -368,6 +368,11 @@ const privateClearFilesButton = document.querySelector('#privateClearFilesButton
 // refreshers below reference them, and a module-scope call before a later declaration is the v692 TDZ boot crash.
 const privateEmojiButton = document.querySelector('#privateEmojiButton');
 const publicEmojiButton = document.querySelector('#publicEmojiButton');
+// Formatting toolbar (v769): the slide-out bar above each composer + its hide (▼) button.
+const privateComposerToolbar = document.querySelector('#privateComposerToolbar');
+const publicComposerToolbar = document.querySelector('#publicComposerToolbar');
+const privateToolbarHide = document.querySelector('#privateToolbarHide');
+const publicToolbarHide = document.querySelector('#publicToolbarHide');
 const attachmentControls = [
   ...document.querySelectorAll('[data-requires-wallet="true"], #attachButton, .attachment-button'),
 ];
@@ -681,6 +686,9 @@ const publicShareCancelButton = document.querySelector('#publicShareCancelButton
 const sharePostDialog = document.querySelector('#sharePostDialog');
 const sharePostList = document.querySelector('#sharePostList');
 const sharePostCloseButton = document.querySelector('#sharePostCloseButton');
+const composerPreviewDialog = document.querySelector('#composerPreviewDialog');
+const composerPreviewBody = document.querySelector('#composerPreviewBody');
+const composerPreviewCloseButton = document.querySelector('#composerPreviewCloseButton');
 const publicPostDetail = document.querySelector('#publicPostDetail');
 const publicPostDetailBody = document.querySelector('#publicPostDetailBody');
 const publicPostDetailAvatar = document.querySelector('#publicPostDetailAvatar');
@@ -2116,6 +2124,151 @@ function appendLinkifiedText(parent, text) {
     if (LINKIFY_RE.lastIndex <= match.index) LINKIFY_RE.lastIndex = match.index + match[0].length; // no zero-advance loop
   }
   if (lastIndex < str.length) parent.append(document.createTextNode(str.slice(lastIndex)));
+}
+
+// --- Safe message formatting renderer (v769) ---------------------------------------------------------------
+// A lightweight, XSS-SAFE markdown subset for message/post/comment bodies. Built ENTIRELY via createElement +
+// textContent (never innerHTML) — the same posture as appendLinkifiedText. Links go ONLY through
+// buildExternalLinkAnchor (interstitial, NO live href): the Docs renderer's appendInlineMarkdown uses a LIVE
+// href and MUST NOT be reused for messages (a live href leaks the reader's IP via middle-click / open-in-new-tab
+// — the deanonymization vector buildExternalLinkAnchor exists to close). The composer's formatting toolbar
+// inserts this markup; it rides inside the existing TEXT document block as raw UTF-8 (no wire change), so old
+// clients that haven't updated simply show the literal markup (graceful degradation), never a broken message.
+//
+// Inline: **bold** -> <strong>, *italic* -> <em>, `code` -> <code>, [label](url) + bare urls -> safe anchor.
+// Block (line-level): '# ' heading (1-3 -> small/smaller), '> ' blockquote, '- '/'* ' ul, '1. ' ol,
+// and a '::center '/'::justify ' paragraph-leading alignment prefix (alignment is not standard markdown and is
+// block-level, so it rides as a paragraph prefix parsed here; old clients show the literal prefix).
+const INLINE_FORMAT_RE = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)|(https?:\/\/[^\s<>"']+)/g;
+const MSG_HEADING_RE = /^(#{1,3})\s+(.+)$/;
+const MSG_QUOTE_RE = /^>\s?(.*)$/;
+const MSG_ULIST_RE = /^[-*]\s+(.+)$/;
+const MSG_OLIST_RE = /^\d+\.\s+(.+)$/;
+const MSG_ALIGN_RE = /^::(center|justify)\s+([\s\S]*)$/;
+
+function appendInlineFormatted(parent, text) {
+  const str = String(text ?? '');
+  if (!str) return;
+  INLINE_FORMAT_RE.lastIndex = 0;
+  let last = 0;
+  let match;
+  while ((match = INLINE_FORMAT_RE.exec(str)) !== null) {
+    if (match.index > last) parent.append(document.createTextNode(str.slice(last, match.index)));
+    let consumedEnd = match.index + match[0].length;
+    if (match[1] !== undefined) {
+      const el = document.createElement('strong');
+      el.textContent = match[1];
+      parent.append(el);
+    } else if (match[2] !== undefined) {
+      const el = document.createElement('em');
+      el.textContent = match[2];
+      parent.append(el);
+    } else if (match[3] !== undefined) {
+      const el = document.createElement('code');
+      el.className = 'msg-code';
+      el.textContent = match[3];
+      parent.append(el);
+    } else if (match[4] !== undefined) {
+      // [label](url) — link ONLY if the url passes the scheme allowlist; else emit the literal typed text.
+      const safe = safeExternalUrl(match[5]);
+      parent.append(safe ? buildExternalLinkAnchor(match[4], safe) : document.createTextNode(match[0]));
+    } else {
+      // bare url (match[6]) — trim trailing punctuation like appendLinkifiedText does.
+      const trimmed = trimTrailingUrlPunctuation(match[6]);
+      const safe = safeExternalUrl(trimmed);
+      parent.append(safe ? buildExternalLinkAnchor(trimmed, safe) : document.createTextNode(trimmed));
+      consumedEnd = match.index + trimmed.length; // leave trailing punctuation for the next text node
+    }
+    last = consumedEnd;
+    if (INLINE_FORMAT_RE.lastIndex <= match.index) INLINE_FORMAT_RE.lastIndex = match.index + match[0].length;
+  }
+  if (last < str.length) parent.append(document.createTextNode(str.slice(last)));
+}
+
+function messageTextHasBlockFormatting(text) {
+  const str = String(text ?? '');
+  if (!str.includes('\n') && !/^\s*(#{1,3}\s|>|[-*]\s|\d+\.\s|::(center|justify)\s)/.test(str)) {
+    // Fast path: a single line with no leading block marker cannot carry block formatting.
+    return false;
+  }
+  return str.split('\n').some((line) => (
+    MSG_HEADING_RE.test(line) || MSG_QUOTE_RE.test(line) || MSG_ULIST_RE.test(line)
+    || MSG_OLIST_RE.test(line) || MSG_ALIGN_RE.test(line)
+  ));
+}
+
+// Render message body text with the safe formatting subset. Appends block/inline children to `container`.
+// options.inlineOnly: skip block parsing (used for the shared-post embed snippet, which is a truncated excerpt
+// and must stay a single inline run inside its <p>). When no block markers are present, the inline fast path
+// keeps the common (unformatted) message structurally identical to the old appendLinkifiedText output.
+function appendFormattedMessageText(container, text, options = {}) {
+  const str = String(text ?? '');
+  if (options.inlineOnly === true || !messageTextHasBlockFormatting(str)) {
+    appendInlineFormatted(container, str);
+    return;
+  }
+  const lines = str.split('\n');
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (line.trim() === '') { index += 1; continue; }
+    const headingMatch = MSG_HEADING_RE.exec(line);
+    if (headingMatch) {
+      const level = Math.min(headingMatch[1].length, 3);
+      const heading = document.createElement('div');
+      heading.className = `msg-block msg-heading msg-heading-${level}`;
+      appendInlineFormatted(heading, headingMatch[2]);
+      container.append(heading);
+      index += 1;
+      continue;
+    }
+    if (MSG_QUOTE_RE.test(line)) {
+      const quoteLines = [];
+      while (index < lines.length && MSG_QUOTE_RE.test(lines[index])) {
+        quoteLines.push(lines[index].replace(MSG_QUOTE_RE, '$1'));
+        index += 1;
+      }
+      const quote = document.createElement('blockquote');
+      quote.className = 'msg-block msg-quote';
+      appendInlineFormatted(quote, quoteLines.join('\n'));
+      container.append(quote);
+      continue;
+    }
+    if (MSG_ULIST_RE.test(line) || MSG_OLIST_RE.test(line)) {
+      const ordered = MSG_OLIST_RE.test(line);
+      const itemRe = ordered ? MSG_OLIST_RE : MSG_ULIST_RE;
+      const list = document.createElement(ordered ? 'ol' : 'ul');
+      list.className = 'msg-block msg-list';
+      while (index < lines.length && itemRe.test(lines[index])) {
+        const item = document.createElement('li');
+        appendInlineFormatted(item, lines[index].replace(itemRe, '$1'));
+        list.append(item);
+        index += 1;
+      }
+      container.append(list);
+      continue;
+    }
+    // Plain paragraph — its FIRST line may carry an alignment prefix (::center / ::justify) applied to the whole
+    // paragraph. Collect consecutive non-block, non-blank lines.
+    const paragraphLines = [];
+    let align = null;
+    while (index < lines.length) {
+      const current = lines[index];
+      if (current.trim() === '' || MSG_HEADING_RE.test(current) || MSG_QUOTE_RE.test(current)
+        || MSG_ULIST_RE.test(current) || MSG_OLIST_RE.test(current)) break;
+      let value = current;
+      if (paragraphLines.length === 0) {
+        const alignMatch = MSG_ALIGN_RE.exec(current);
+        if (alignMatch) { align = alignMatch[1]; value = alignMatch[2]; }
+      }
+      paragraphLines.push(value);
+      index += 1;
+    }
+    const paragraph = document.createElement('div');
+    paragraph.className = `msg-block msg-p${align ? ` msg-align-${align}` : ''}`;
+    appendInlineFormatted(paragraph, paragraphLines.join('\n'));
+    container.append(paragraph);
+  }
 }
 
 function buildExternalLinkAnchor(displayText, safeHref) {
@@ -6305,9 +6458,10 @@ function appendPublicItemContent(container, item) {
         // Reply quote strip (tappable — scrolls to the quoted comment within the open post detail).
         container.append(buildReplyQuoteNode(block, publicPostDetailBody));
       } else if (block?.type === 'text' && block.text) {
-        const text = document.createElement('p');
+        // v769: a DIV (not <p>) so the formatting renderer can emit block children (heading/list/quote) validly.
+        const text = document.createElement('div');
         text.className = 'feed-block-text';
-        appendLinkifiedText(text, block.text);
+        appendFormattedMessageText(text, block.text);
         container.append(text);
       } else if (block?.type === 'image' && block.url) {
         const image = document.createElement('img');
@@ -6328,8 +6482,9 @@ function appendPublicItemContent(container, item) {
     return;
   }
   if (item?.text) {
-    const text = document.createElement('p');
-    appendLinkifiedText(text, item.text);
+    const text = document.createElement('div');
+    text.className = 'feed-block-text';
+    appendFormattedMessageText(text, item.text);
     container.append(text);
   }
   if (item?.imageUrl) {
@@ -6979,10 +7134,12 @@ function buildSharedPostEmbed(block) {
   if (block.snippet) {
     const text = document.createElement('p');
     text.className = 'feed-block-text shared-post-embed-text';
-    // Links render like in the original post (owner ask v767). Safe for an UNVERIFIED sender-authored snapshot:
-    // appendLinkifiedText allowlists http/https, sets NO live href, and every activation goes through the
-    // activateExternalLink interstitial that shows the real URL before opening.
-    appendLinkifiedText(text, block.snippet);
+    // Inline formatting + links only (inlineOnly): the snippet is a TRUNCATED excerpt inside a <p>, so block
+    // elements would be invalid and a half-cut heading/list would look odd. Bold/italic/links render; block
+    // markers (heading/list/quote) show as literal text in the preview excerpt. Links are safe for the
+    // UNVERIFIED sender snapshot — appendInlineFormatted routes every link through the activateExternalLink
+    // interstitial (no live href), like the original post.
+    appendFormattedMessageText(text, block.snippet, { inlineOnly: true });
     if (block.textTruncated) text.append(document.createTextNode('…'));
     inner.append(text);
   }
@@ -16486,6 +16643,211 @@ function insertComposerMarker(textarea, marker) {
   autoResizeComposerTextarea(textarea);
 }
 
+// --- Formatting toolbar (v769): selection-aware markdown insertion -----------------------------------------
+// The composer keeps a plain <textarea> (rock-solid vs contenteditable on mobile/IME); the toolbar buttons
+// insert markdown markers that the safe formatting renderer (appendFormattedMessageText) turns into styled DOM
+// on both sides. Bold/italic WRAP the selection; heading/quote/list PREFIX the selected lines (toggle off if
+// already prefixed); center/justify set a paragraph-leading alignment marker. Every edit fires an 'input' event
+// so the size/cost/send-enable pipeline stays in sync, and refocuses the textarea (keeping the toolbar open).
+
+function composerToolbarForTextarea(textarea) {
+  const form = textarea?.closest?.('.composer');
+  return form ? form.querySelector('.composer-toolbar') : null;
+}
+
+function showComposerToolbar(textarea) {
+  composerToolbarForTextarea(textarea)?.classList.add('is-open');
+}
+
+function hideComposerToolbar(textarea) {
+  composerToolbarForTextarea(textarea)?.classList.remove('is-open');
+}
+
+// Wrap the current selection in open/close markers (or drop the empty pair at the caret with the caret between).
+function wrapComposerSelection(textarea, open, close) {
+  if (!textarea || textarea.disabled) return;
+  const value = textarea.value ?? '';
+  const start = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : value.length;
+  const end = Number.isFinite(textarea.selectionEnd) ? textarea.selectionEnd : start;
+  const selected = value.slice(start, end);
+  const inserted = `${open}${selected}${close}`;
+  textarea.value = value.slice(0, start) + inserted + value.slice(end);
+  textarea.focus?.();
+  if (selected) textarea.setSelectionRange?.(start + open.length, start + open.length + selected.length);
+  else { const caret = start + open.length; textarea.setSelectionRange?.(caret, caret); }
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  autoResizeComposerTextarea(textarea);
+}
+
+// Prefix the selected lines (or the current line) with `prefix`; toggle OFF when every CONTENT line already
+// carries it, else ADD it only to lines that lack it. Used for '# ' heading, '> ' quote, '- ' list.
+function prefixComposerLines(textarea, prefix) {
+  if (!textarea || textarea.disabled) return;
+  const value = textarea.value ?? '';
+  const start = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : value.length;
+  const end = Number.isFinite(textarea.selectionEnd) ? textarea.selectionEnd : start;
+  const collapsed = start === end;
+  const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+  // A selection ending exactly at a line start (only the previous line's newline captured) must NOT pull that
+  // next line into the range.
+  let searchFrom = end;
+  if (end > lineStart && value[end - 1] === '\n') searchFrom = end - 1;
+  let lineEnd = value.indexOf('\n', searchFrom);
+  if (lineEnd === -1) lineEnd = value.length;
+  const lines = value.slice(lineStart, lineEnd).split('\n');
+  const single = lines.length === 1;
+  // Marker-only lines ([image N]/[file N]/[check]/[post]) and blank separators are not content: never prefix a
+  // marker line (it would ship an orphan fragment), and exclude both from the toggle-off decision.
+  const contentLines = lines.filter((line) => line.trim() !== '' && !COMPOSER_MARKER_ONLY_LINE_RE.test(line));
+  const allPrefixed = contentLines.length > 0 && contentLines.every((line) => line.startsWith(prefix));
+  const next = lines.map((line) => {
+    if (COMPOSER_MARKER_ONLY_LINE_RE.test(line)) return line;
+    // Blank separators are left alone in a MULTI-line selection; a single blank/empty line still gets the prefix
+    // so the button can START a list/heading/quote on an empty composer.
+    if (line.trim() === '' && !single) return line;
+    if (allPrefixed) return line.startsWith(prefix) ? line.slice(prefix.length) : line;
+    return line.startsWith(prefix) ? line : prefix + line;
+  }).join('\n');
+  textarea.value = value.slice(0, lineStart) + next + value.slice(lineEnd);
+  textarea.focus?.();
+  if (collapsed) {
+    const caret = lineStart + next.length;
+    textarea.setSelectionRange?.(caret, caret);
+  } else {
+    textarea.setSelectionRange?.(lineStart, lineStart + next.length);
+  }
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  autoResizeComposerTextarea(textarea);
+}
+
+// Set (or toggle/swap) the '::center '/'::justify ' alignment prefix on the current paragraph's first line.
+function setComposerAlignment(textarea, kind) {
+  if (!textarea || textarea.disabled) return;
+  const value = textarea.value ?? '';
+  const start = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : value.length;
+  const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+  let lineEnd = value.indexOf('\n', lineStart);
+  if (lineEnd === -1) lineEnd = value.length;
+  let line = value.slice(lineStart, lineEnd);
+  // Never align a line that is only an attachment marker — the '::center ' prefix would ride into the sent text.
+  if (COMPOSER_MARKER_ONLY_LINE_RE.test(line)) return;
+  const existing = /^::(center|justify)\s/.exec(line);
+  let next;
+  if (existing) {
+    line = line.slice(existing[0].length);
+    next = existing[1] === kind ? line : `::${kind} ${line}`; // same -> remove (toggle off); different -> swap
+  } else {
+    next = `::${kind} ${line}`;
+  }
+  textarea.value = value.slice(0, lineStart) + next + value.slice(lineEnd);
+  textarea.focus?.();
+  const caret = lineStart + next.length;
+  textarea.setSelectionRange?.(caret, caret);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  autoResizeComposerTextarea(textarea);
+}
+
+function applyComposerFormat(textarea, format) {
+  if (!textarea) return;
+  switch (format) {
+    case 'bold': wrapComposerSelection(textarea, '**', '**'); break;
+    case 'italic': wrapComposerSelection(textarea, '*', '*'); break;
+    case 'heading': prefixComposerLines(textarea, '# '); break;
+    case 'quote': prefixComposerLines(textarea, '> '); break;
+    case 'list': prefixComposerLines(textarea, '- '); break;
+    case 'center': setComposerAlignment(textarea, 'center'); break;
+    case 'justify': setComposerAlignment(textarea, 'justify'); break;
+    case 'preview': openComposerPreview(textarea); break;
+    default: break;
+  }
+}
+
+// Wire ONE toolbar: the ▼ hide button, a mousedown-preventDefault (so a format-button click never blurs the
+// textarea and its selection survives), and a delegated click on every [data-format] button.
+function setupComposerToolbar(toolbar, textarea, hideButton) {
+  if (!toolbar || !textarea) return;
+  hideButton?.addEventListener('click', () => hideComposerToolbar(textarea));
+  toolbar.addEventListener('mousedown', (event) => {
+    // Keep the textarea focused + its selection intact when a toolbar button is pressed. File inputs / the emoji
+    // picker / link dialog manage their own focus, so preventing the focus-shift here is safe for them too.
+    if (event.target.closest('.composer-toolbar-button, .composer-toolbar-hide')) event.preventDefault();
+  });
+  toolbar.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-format]');
+    if (!button) return;
+    event.preventDefault();
+    applyComposerFormat(textarea, button.dataset.format);
+  });
+  // Open on a deliberate click/tap of the field (NOT on focus/tab — the owner: it appears only on field click,
+  // and typing must not summon it). ▼ closes it; once open it stays through typing so you can format mid-compose.
+  textarea.addEventListener('click', () => showComposerToolbar(textarea));
+}
+
+// --- Composer preview (v769): render the current draft exactly as it will appear before sending ------------
+// Reuses the SAME safe formatting renderer + block builders as the live surfaces, so the preview is faithful.
+function renderComposerPreviewBlocks(container, displayBlocks) {
+  if (!container) return;
+  container.replaceChildren();
+  for (const block of displayBlocks ?? []) {
+    if (block?.type === 'text' && block.text) {
+      const text = document.createElement('div');
+      text.className = 'message-text-block';
+      appendFormattedMessageText(text, block.text);
+      container.append(text);
+    } else if (block?.type === 'image' && block.url) {
+      const image = document.createElement('img');
+      image.className = 'feed-image';
+      image.src = block.url;
+      image.loading = 'lazy';
+      container.append(image);
+    } else if (block?.type === 'file') {
+      container.append(buildFileBlockChip(block));
+    } else if (block?.type === 'payment') {
+      const payment = document.createElement('div');
+      payment.className = 'message-payment-block';
+      const label = document.createElement('span');
+      label.className = 'message-payment-label';
+      label.textContent = block.payment ? paymentMessageText(block.payment) : t('payment.paymentCheck');
+      payment.append(label);
+      container.append(payment);
+    } else if (block?.type === 'reply') {
+      container.append(buildReplyQuoteNode(block, null));
+    } else if (block?.type === 'share' && block.entryId) {
+      container.append(buildSharedPostEmbed(block));
+    }
+  }
+  if (container.childElementCount === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'composer-preview-empty';
+    empty.textContent = t('composer.previewEmpty');
+    container.append(empty);
+  }
+}
+
+function openComposerPreview(textarea) {
+  const isPublic = textarea === publicMessageInput;
+  const text = textarea?.value ?? '';
+  let documentBlocks = [];
+  try {
+    documentBlocks = isPublic
+      ? publicDocumentBlocksFromDraft(text, publicImageAttachments, publicFileAttachments)
+      : composerBlocksFromDraft(text, privateImageAttachments, privatePaymentCheckDraft, privateReplyDraft, privateFileAttachments, privateShareDraft);
+  } catch {
+    documentBlocks = [];
+  }
+  renderComposerPreviewBlocks(composerPreviewBody, displayBlocksFromDocumentBlocks(documentBlocks));
+  if (composerPreviewDialog) composerPreviewDialog.hidden = false;
+}
+
+function closeComposerPreview() {
+  if (composerPreviewDialog) composerPreviewDialog.hidden = true;
+}
+
+composerPreviewCloseButton?.addEventListener('click', () => closeComposerPreview());
+composerPreviewDialog?.addEventListener('click', (event) => {
+  if (event.target === composerPreviewDialog) closeComposerPreview();
+});
+
 function insertImageMarkerForComposer(kind, index) {
   const marker = `[image ${index}]`;
   insertComposerMarker(kind === 'public' ? publicMessageInput : messageInput, marker);
@@ -17458,7 +17820,7 @@ function renderConversation() {
         if (block?.type === 'text' && block.text) {
           const text = document.createElement('div');
           text.className = 'message-text-block';
-          appendLinkifiedText(text, block.text);
+          appendFormattedMessageText(text, block.text);
           bubble.append(text);
         } else if (block?.type === 'image' && block.url) {
           const image = document.createElement('img');
@@ -17499,7 +17861,8 @@ function renderConversation() {
       }
     } else if (message.text) {
       const text = document.createElement('div');
-      appendLinkifiedText(text, message.text);
+      text.className = 'message-text-block';
+      appendFormattedMessageText(text, message.text);
       bubble.append(text);
     }
     if (blocks.length === 0 && message.attachment?.type === 'image' && message.attachment.url) {
@@ -18627,6 +18990,8 @@ messageInput?.addEventListener('keydown', (event) => {
   event.preventDefault();
   composer?.requestSubmit?.();
 });
+setupComposerToolbar(privateComposerToolbar, messageInput, privateToolbarHide);
+setupComposerToolbar(publicComposerToolbar, publicMessageInput, publicToolbarHide);
 document.addEventListener('click', (event) => {
   if (!privateComposerAddMenuVisible()) return;
   if (privateComposerAddMenu?.contains(event.target) || privateComposerAddButton?.contains(event.target)) return;
@@ -18638,7 +19003,10 @@ document.addEventListener('click', (event) => {
   hidePublicComposerAddMenu();
 });
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') { hidePrivateComposerAddMenu(); hidePublicComposerAddMenu(); }
+  if (event.key !== 'Escape') return;
+  hidePrivateComposerAddMenu();
+  hidePublicComposerAddMenu();
+  if (composerPreviewDialog && !composerPreviewDialog.hidden) closeComposerPreview();
 });
 
 publicMessageInput?.addEventListener('input', () => {
@@ -20607,6 +20975,10 @@ const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\](?!\()/ig;
 // v766: `[post]` marks where the shared-post block lands (positional like [image]/[file]; single like [check]).
 const COMPOSER_SHARE_MARKER_RE = /\[post\](?!\()/ig;
 const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[file\s+(\d+)\](?!\()|(\[post\])(?!\()|\[(?:check|payment)\](?!\()/ig;
+// A line that is ONLY a composer attachment marker (v769): the formatting toolbar must NEVER prepend a
+// block-format prefix (# / > / - / ::center) to such a line — the prefix would ride into the sent text and
+// composerBlocksFromDraft would leave an orphan "- "/"# " fragment beside the extracted attachment block.
+const COMPOSER_MARKER_ONLY_LINE_RE = /^\s*(?:\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\]|\[(?:check|payment)\])\s*$/i;
 
 function concatUint8Arrays(parts) {
   const arrays = parts.map((part) => part instanceof Uint8Array ? part : new Uint8Array(part ?? []));

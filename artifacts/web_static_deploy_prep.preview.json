@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-11T19:18:43.123Z",
+  "generatedAt": "2026-07-11T21:27:13.271Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,14 +8,14 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 167,
-    "totalBytes": 5557503,
-    "bundleSha256": "f366f3ff65e815fd5ca9701c14308d6d24c6573074dc9cec866c682b2870f831",
+    "fileCount": 174,
+    "totalBytes": 5589588,
+    "bundleSha256": "6c83d3f390896d3acab0d9de7ab83e4d32bf20b928697ef2792126cdd780d838",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1467064,
-        "sha256": "bd9f1733ea5ac3c4064100eb5eddac1a421f31da0a71473f75849e6a2b1b355c"
+        "bytes": 1486413,
+        "sha256": "b0b76dacd17e049cdb2c5a9d05545f794ddce683ce7aa5385f5c803b9b94aa40"
       },
       {
         "path": "assets/icons/about.svg",
@@ -23,9 +23,24 @@
         "sha256": "74aeb17019534c60f65b7cc7f00477b0b976a75e2df4a1db6e1eeb3fe1874a1c"
       },
       {
+        "path": "assets/icons/align-center.svg",
+        "bytes": 174,
+        "sha256": "68c021fc19562c8ae2851431f42c615ecf2308662f220d2a80d9b287a1339d49"
+      },
+      {
+        "path": "assets/icons/align-justify.svg",
+        "bytes": 173,
+        "sha256": "089a82e60c0c42f15c260d8c9a12c3a59ea99d8f4bc2e2306f4104c829717cb2"
+      },
+      {
         "path": "assets/icons/back.svg",
         "bytes": 158,
         "sha256": "232cedcaacd7699a099ec78977b418f2d295fc6253268049b7eb42cf4e6771a2"
+      },
+      {
+        "path": "assets/icons/bold.svg",
+        "bytes": 328,
+        "sha256": "192bafd3cd8c3633679d56c0b95550eb204ed7f0befd34d189bf45e1817acf6c"
       },
       {
         "path": "assets/icons/bolt.svg",
@@ -88,6 +103,11 @@
         "sha256": "e24a041c2f714b34bba311bdd2470d7324cf305c1f6177c77713a4cb2fe8482b"
       },
       {
+        "path": "assets/icons/heading.svg",
+        "bytes": 122,
+        "sha256": "375cb7ddce356f3849bc2f4bf0ae431406a6e4c3723ca902a3de2c766fa9d9a4"
+      },
+      {
         "path": "assets/icons/image.svg",
         "bytes": 412,
         "sha256": "1b7adcf976cb87a49756e7b917243175ffc635aa00b9f04ee556921f506bd3b7"
@@ -103,9 +123,19 @@
         "sha256": "87e6f6c6bf95ba73c653e08731cbbf907cee6757f5cc0c91b9988a459248627a"
       },
       {
+        "path": "assets/icons/italic.svg",
+        "bytes": 147,
+        "sha256": "b96b390e57e8c8f47a805ba432d20ccaa8ecb5b42b9188d411899d652ce8156c"
+      },
+      {
         "path": "assets/icons/link.svg",
         "bytes": 244,
         "sha256": "6a904b30dbdfcea161123cd4a4827b6ddf2108f4a82c70d1c0fc9996563e14c2"
+      },
+      {
+        "path": "assets/icons/list.svg",
+        "bytes": 370,
+        "sha256": "41fc5c381f90eff75dcfefbb17b96c0260755c895080a2fa24e0ea1840464dbb"
       },
       {
         "path": "assets/icons/open-app.svg",
@@ -116,6 +146,11 @@
         "path": "assets/icons/plus.svg",
         "bytes": 125,
         "sha256": "069b59def41c91b277ff0bec92a23f1f1d4390ea49f44c36061a3477fe31b9ed"
+      },
+      {
+        "path": "assets/icons/quote.svg",
+        "bytes": 149,
+        "sha256": "f2fcd448cef4bb2a7f6150ac0964e7ef8d51227733001482ac6811248f602464"
       },
       {
         "path": "assets/icons/refresh.svg",
@@ -374,18 +409,18 @@
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 647426,
-        "sha256": "087f4db9d61da5dc7408429acd813af62d00dd6574a0c2f5e0f9e7633d0712d7"
+        "bytes": 653916,
+        "sha256": "25b7e7bd42f70bac961f855928e007be5d78c363ba829c6ef57e44cbf8bb96d3"
       },
       {
         "path": "i18n.mjs",
         "bytes": 4608,
-        "sha256": "0ebaa2c1c95e4a1f549265dd1ea047e819633e2c70b17ea16d3b7b48bcdbd53f"
+        "sha256": "cd4b999f1a599f3ee871d7b8b1e2eac5eb5bf4f60e69db83042b4c848cf41fc6"
       },
       {
         "path": "index.html",
-        "bytes": 58386,
-        "sha256": "3c9dc29bd1febca663dc22b6ccee83c9ebcb07d2496fb122fe0fab9b001e115a"
+        "bytes": 63046,
+        "sha256": "8e66b99bb385d46ba2a1d5698169aa02b63743ddc8ba148f7bb0543613b36b59"
       },
       {
         "path": "manifest.webmanifest",
@@ -449,13 +484,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 117706,
-        "sha256": "01f5c11009de3b14857cdaaced8c66c2dedff00a3e6717df4c9de7d6431bc6a7"
+        "bytes": 117603,
+        "sha256": "4fbdb0429361373b998ab24df9ce7217695924fc2c5db58f05ddd391f8f3e84f"
       },
       {
         "path": "sw.js",
-        "bytes": 7421,
-        "sha256": "f4ea1308a17cfe529826fe324792c71cdbfedee660569fe73a81cf3c6703665c"
+        "bytes": 7647,
+        "sha256": "0f3bd91071796fbe64fa4b09e4f3d4b00f2629b7693786891afe21231994aa3e"
       },
       {
         "path": "ton-dns-provider.mjs",
