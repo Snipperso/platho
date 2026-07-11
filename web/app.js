@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v763';
+const PLATHO_APP_RUNTIME_VERSION = 'v764';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -24473,7 +24473,11 @@ function publishStateMeta(publishState) {
   // plain two-word text — one step, nothing to count.
   const landed = Math.max(submitted, confirmed);
   const progressMeta = () => {
-    if (total === 1) return 'submitted, confirming';
+    // Single-part gets the SAME two phases, worded without a pointless 0/1 counter (v764, owner ask —
+    // the joint text leaked back for every 1-capsule message): 'sending' until the external actually
+    // lands on-chain (signed/queued/broadcast are all still "in flight"), then 'confirming'. Both
+    // words are in every substring gate (the 24h render backstop regex includes 'sending').
+    if (total === 1) return landed < total ? 'sending' : 'confirming';
     return landed < total
       ? `submitted ${landed}/${total}`
       : `confirming ${confirmed}/${total}`;
@@ -25520,11 +25524,15 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
         // the confirmation-retry path.
         const nonceFloor = vaultPublishNonceFloor(owner);
         let clientNonce;
+        // The freshest CHAIN nonce observed for batch 0 (kept SEPARATE from the floor clamp below):
+        // batch 0 POSTs immediately only when its signed nonce IS the chain's next expected one.
+        let observedChainNonce = null;
         if (batchIndex === 0) {
           clientNonce = options.allowOwnVaultActionReadFallback === true
             ? await readVaultPublishNonceForOwnVaultAction(provider, owner)
             : await readVaultPublishNonce(provider, owner);
           if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
+          observedChainNonce = clientNonce;
         } else {
           clientNonce = nonceFloor;
         }
@@ -25542,7 +25550,10 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
                 allowUnverifiedCriticalRead: true,
                 requestTimeoutMs: 4_000,
               });
-              if (reread !== null && reread > clientNonce) clientNonce = reread;
+              if (reread !== null && reread > clientNonce) {
+                clientNonce = reread;
+                observedChainNonce = reread;
+              }
             } catch (rereadError) {
               if (!isTonRpcRecoverableReadError(rereadError) && !isTonRpcRateLimitError(rereadError)) throw rereadError;
             }
@@ -25587,22 +25598,38 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
             notifyPublishState(options, publishState, partWithPublishId);
           }
         }
-        // The 2nd+ batch's external is signed under a nonce (N+i) the chain has NOT reached yet — batch 0's
-        // nonce N is still in flight — so an immediate back-to-back POST is GUARANTEED to bounce pre-accept with
-        // Vault exit code 16453 (throwUnless clientNonce == publish_nonce): a wasted request + an alarming 500 on
-        // every multi-capsule send, since the sub-second chain never lands batch 0 in the ~150ms before this POST.
-        // Skip the POST for batchIndex > 0: the part is stamped SENT with its signed externalBoc + nonce below,
-        // and the idempotent re-broadcast path sends it the moment batch 0 lands (currentNonce === clientNonce) —
-        // the same ~1s it would have re-broadcast the bounced one anyway. Batch 0 always POSTs (its nonce IS
-        // current). No double-send: retryUnconfirmedVaultPublishBroadcasts reads the chain nonce FIRST.
-        lastResult = batchIndex === 0 ? await sendVaultExternalBoc(batchExternal) : null;
+        // An external signed under a nonce the chain has NOT reached yet is GUARANTEED to bounce
+        // pre-accept with Vault exit code 16453 (throwUnless clientNonce == publish_nonce): a wasted
+        // request + an alarming native red 500 in the console for every such POST. That covers TWO
+        // cases: (a) batches 1+ of this burst (batch 0's nonce is still in flight — the v623 rule), and
+        // (b) batch 0 of a message QUEUED behind other in-flight sends, whose signed nonce was raised
+        // above the freshly-read chain nonce by the floor clamp (v764 — the owner's "scary console": a
+        // doomed red 500 per queued message). Defer both: parts are stamped SENT with the signed
+        // externalBoc + nonce below, and the idempotent re-broadcast path POSTs the external the moment
+        // its nonce becomes current (currentNonce === clientNonce) — the same ~1-3.5s cadence that would
+        // have re-sent the bounced copy anyway. Corner cost: a STALE pre-sign read (chain actually at
+        // the floor already) now defers a POST that would have succeeded — one heal-pass of added
+        // latency, traded for zero guaranteed-doomed requests. No double-send:
+        // retryUnconfirmedVaultPublishBroadcasts reads the chain nonce FIRST.
+        const postableNow = batchIndex === 0
+          && observedChainNonce !== null
+          && clientNonce === observedChainNonce;
+        lastResult = postableNow ? await sendVaultExternalBoc(batchExternal) : null;
         // externalBytes = the REAL serialized external BoC size (base64 -> bytes). The build guard already asserts
         // < 65535, so a value NEAR the ceiling on a specific image is the tell for "passes emulation, dropped by
         // validators" (diagnostic for the "one image won't send" report).
         const externalBytes = Math.floor(((batchExternal?.boc?.length ?? 0) * 3) / 4);
-        console.info('[platho] send timeline', batchIndex === 0
+        console.info('[platho] send timeline', postableNow
           ? { event: 'external POSTed (200)', nonce: String(clientNonce), batchIndex, externalBytes, parts: batch.items.length }
-          : { event: 'signed, POST deferred until prior nonce lands', nonce: String(clientNonce), batchIndex, externalBytes, parts: batch.items.length });
+          : {
+            event: batchIndex === 0
+              ? 'signed, POST deferred (queued behind in-flight sends)'
+              : 'signed, POST deferred until prior nonce lands',
+            nonce: String(clientNonce),
+            batchIndex,
+            externalBytes,
+            parts: batch.items.length,
+          });
         batch.result = lastResult;
         for (const item of batch.items) item.result = lastResult;
         // The signed external is now out (or, for batchIndex > 0, will be re-broadcast the moment N is reached):
@@ -26905,9 +26932,31 @@ function scheduleImmediatePrivatePublishConfirmation(context) {
 const privatePublishConfirmPassRanThisSession = new WeakSet();
 const publicPublishConfirmPassRanThisSession = new Set();
 
+// SINGLE-FLIGHT guards (v764): a resume/visibility sweep can fire while a pass for the SAME message
+// is already running — the private timer DELETES its jobs entry BEFORE the pass runs, so the jobs map
+// cannot see an in-flight pass, and the overlapping duplicate then reads the same head counters and
+// fires the SAME max_charge variant POST (a guaranteed ~60s-dedup no-op that holds the serial pump)
+// while double-stamping retry budgets — the owner's duplicated 'first heal POST' timeline lines. A
+// skipped duplicate loses nothing: the in-flight pass always ends by scheduling the next pass or
+// stopping. Keyed like the session sets (stable per-message key / `${channelId}:${localId}`).
+const privatePublishConfirmPassKeysInFlight = new Set();
+const publicPublishConfirmPassKeysInFlight = new Set();
+
 async function runPrivatePublishConfirmationRetry(context) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
+  const singleFlightKey = privatePublishConfirmRetryKey(message);
+  if (privatePublishConfirmPassKeysInFlight.has(singleFlightKey)) return;
+  privatePublishConfirmPassKeysInFlight.add(singleFlightKey);
+  try {
+    await runPrivatePublishConfirmationRetryPass(context);
+  } finally {
+    privatePublishConfirmPassKeysInFlight.delete(singleFlightKey);
+  }
+}
+
+async function runPrivatePublishConfirmationRetryPass(context) {
+  const { thread, message } = context;
   if (stopPartialPrivatePublishRecovery(context)) return;
   if (isStalePrivatePendingPublishConfirmation(message)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
@@ -27113,7 +27162,9 @@ function resumePendingPrivatePublishConfirmations() {
       }
       if (!hasPendingPrivatePublishConfirmation(message)) continue;
       const existingKey = message.privatePublishConfirmRetryKey;
-      if (existingKey && privatePublishConfirmJobs.has(existingKey)) continue;
+      // A scheduled job OR an in-flight pass (invisible to the jobs map — the timer deletes its entry
+      // before running) both mean the driver is live: do not start an overlapping one (v764).
+      if (existingKey && (privatePublishConfirmJobs.has(existingKey) || privatePublishConfirmPassKeysInFlight.has(existingKey))) continue;
       if (scheduleImmediatePrivatePublishConfirmation({
         thread,
         message,
@@ -27732,6 +27783,18 @@ function startPublicPublishConfirmation(record) {
 }
 
 async function runPublicPublishConfirmationPass(job) {
+  // Single-flight per record (v764, symmetric with the private driver — see the guard sets there).
+  const singleFlightKey = `${job.channelId}:${job.localId}`;
+  if (publicPublishConfirmPassKeysInFlight.has(singleFlightKey)) return;
+  publicPublishConfirmPassKeysInFlight.add(singleFlightKey);
+  try {
+    await runPublicPublishConfirmationPassInner(job);
+  } finally {
+    publicPublishConfirmPassKeysInFlight.delete(singleFlightKey);
+  }
+}
+
+async function runPublicPublishConfirmationPassInner(job) {
   // Re-locate first: record gone, or already merged with its on-chain twin (entryId set / bodyHash merge in
   // mergeLocalPendingPublicFeed) -> quiet success stop.
   const located = findLocalPublicPendingRecord(job.channelId, job.localId);
