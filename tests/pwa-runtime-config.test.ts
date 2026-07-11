@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=765" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=766" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -3789,7 +3789,7 @@ describe('PWA runtime config guard', () => {
     expect(paymentButtonSource).not.toMatch(/submitCreatePaymentCheck\(/);
     expect(submitSource).toMatch(/const attachments = normalizePrivateImageAttachments\(privateImageAttachments\)/);
     expect(submitSource).toMatch(/const paymentDraft = privatePaymentCheckDraft/);
-    expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*paymentDraft,\s*replyDraft,\s*fileAttachments\)/);
+    expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*paymentDraft,\s*replyDraft,\s*fileAttachments,\s*shareDraft\)/);
     expect(submitSource).toMatch(/blocks:\s*displayBlocks/);
     expect(submitSource).toMatch(/await attemptPrivatePaymentCheckPublish\(sendContext\)/);
     expect(submitSource).not.toMatch(/submitCreatePaymentCheck\(\{ thread, paymentDetails: paymentDraft \}\)/);
@@ -3862,7 +3862,7 @@ describe('PWA runtime config guard', () => {
     expect(source).not.toMatch(/getReceiveIntentId/);
     expect(source).not.toMatch(/allowUnverifiedCriticalRead:\s*true[\s\S]*getReceiveIntentId/);
     expect(source).toMatch(/const commitment = secret32/);
-    expect(source).toMatch(/createPrivateComposerCapsules\(context\.text \?\? '', context\.attachments \?\? \[\], recipientEntry, thread\.id, senderOptions, \{ payment, replyDraft: contextReplyDraft, fileAttachments: contextFileAttachments \}\)/);
+    expect(source).toMatch(/createPrivateComposerCapsules\(context\.text \?\? '', context\.attachments \?\? \[\], recipientEntry, thread\.id, senderOptions, \{ payment, replyDraft: contextReplyDraft, shareDraft: contextShareDraft, fileAttachments: contextFileAttachments \}\)/);
     expect(app).toMatch(/function paymentSecret32Bytes\(payment\)/);
     expect(app).toMatch(/function normalizePaymentForMessage\(payment\)[\s\S]*secret32Hex:\s*bytesToHex\(paymentSecret32Bytes\(payment\)\)/);
     expect(app).toMatch(/function documentPaymentContent\(payment, options = \{\}\)[\s\S]*paymentSecret32Bytes\(payment\)[\s\S]*options\.allowMissingPaymentSecret === true[\s\S]*new Uint8Array\(32\)/);
@@ -4772,7 +4772,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/content = encodeProfileBlockContent\(block\);/);
     expect(app).toMatch(/const profile = decodeProfileBlockContent\(content\);\s*if \(profile\) blocks\.push\(\{ type: 'profile', \.\.\.profile \}\);/);
     // Imported from the policy module (bumped ?v in lockstep with the codec change).
-    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*\} from '\.\/capsule-part-policy\.mjs\?v=7';/);
+    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,\s*\} from '\.\/capsule-part-policy\.mjs\?v=8';/);
   });
 
   it('PWA-PROFILE-USERNAME-01: channel .ath username is claimed in the profile, verified on-chain, and only the verified name is shown', () => {
@@ -5108,10 +5108,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(block\.type === 'reply'\) \{\s*return \{ type: 'reply', refEntryId: block\.refEntryId/);
     // Composer threading: the PRIVATE builder defaults to the live draft; retry paths replay the CAPTURED one;
     // the PUBLIC builder pins its OWN draft (never the private one).
-    expect(app).toMatch(/function composerBlocksFromDraft\(text, attachments = \[\], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments\)/);
+    expect(app).toMatch(/function composerBlocksFromDraft\(text, attachments = \[\], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft\)/);
     // The public builder pins its OWN reply draft AND an explicit EMPTY file list — private file drafts must
     // never leak into a public post (v652).
-    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\)\)/);
+    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\), publicShareDraft\)/);
     expect(app.match(/context\.replyDraft \?\? (context\.)?message\?\.privateDraft\?\.replyDraft \?\? null/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(app).toMatch(/const replyDraft = privateReplyDraft \? \{ \.\.\.privateReplyDraft \} : null;/);
     // The reply rides FIRST in the block list, only when the draft has a real chain ref.
@@ -5135,7 +5135,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(publicCommentReplyTo\) \{\s*setPublicCommentReplyTo\(null\);\s*return;\s*\}/);
     expect(app).toMatch(/privateReplyCancelButton\?\.addEventListener\('click'/);
     // Drafts clear on send, thread switch, and account switch.
-    expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*privateFileAttachments = \[\];\s*updatePrivateFileAttachmentUi\(\);\s*updateImageAttachmentUi\('private'\);/);
+    expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*setPrivateShareDraft\(null\);\s*privateFileAttachments = \[\];\s*updatePrivateFileAttachmentUi\(\);\s*updateImageAttachmentUi\('private'\);/);
     expect(app).toMatch(/if \(activeThreadId !== thread\.id\) setPrivateReplyDraft\(null\);/);
     expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*setPublicCommentReplyTo\(null\);/);
     // UI shells + gesture CSS (touch-action pan-y keeps vertical scroll native; position:relative anchors the
@@ -5145,7 +5145,8 @@ describe('PWA runtime config guard', () => {
     // .is-replying class (setPrivateReplyDraft) — NOT :has() (no-op on the iOS floor) — and NO ID-scoped
     // #composer[data-publish-mode] layout rule may exist: its (1,x,x) specificity silently beat the reply
     // rows whenever a wallet was present (textarea/send stayed on row 1, overlapping the quote strip).
-    expect(app).toMatch(/composer\?\.classList\.toggle\('is-replying', Boolean\(privateReplyDraft\)\);/);
+    // v766: the share chip shares the same composer row — the class stays while EITHER strip is up.
+    expect(app).toMatch(/composer\?\.classList\.toggle\('is-replying', Boolean\(privateReplyDraft \|\| privateShareDraft\)\);/);
     expect(css).toMatch(/\.composer\.is-replying > \.composer-reply-context \{\s*grid-row: 1;/);
     expect(css).toMatch(/\.composer\.is-replying > \.emoji-button,\s*\.composer\.is-replying > textarea,\s*\.composer\.is-replying > \.send-button \{\s*grid-row: 2;/);
     expect(css).toMatch(/\.composer\.is-replying > \.private-anonymous-button,\s*\.composer\.is-replying > \.composer-add,\s*\.composer\.is-replying > \.composer-cost-status \{\s*grid-row: 3;/);
@@ -5734,7 +5735,7 @@ describe('PWA runtime config guard', () => {
     // Called from the private attachment remove handler BEFORE the array is filtered (so `index` still lines up).
     expect(app).toMatch(/removeImageMarkerForComposer\('private', index\);[\s\S]*?privateImageAttachments = privateImageAttachments\.filter/);
     // FAIL-CLOSED: the private send handler bails on zero resolved blocks instead of inserting an empty bubble.
-    expect(app).toMatch(/const draftBlocks = composerBlocksFromDraft\(text, attachments, paymentDraft, replyDraft, fileAttachments\);\s*\n\s*if \(draftBlocks\.length === 0\) \{[\s\S]*?t\('composer\.nothingToSend'\)[\s\S]*?return;/);
+    expect(app).toMatch(/const draftBlocks = composerBlocksFromDraft\(text, attachments, paymentDraft, replyDraft, fileAttachments, shareDraft\);\s*\n\s*if \(draftBlocks\.length === 0\) \{[\s\S]*?t\('composer\.nothingToSend'\)[\s\S]*?return;/);
     // The send BUTTON (only, not the whole composer) is disabled when nothing real resolves to send — so a stray marker
     // can never be published, while the user can still attach to an empty field.
     expect(app).toMatch(/function privateComposerHasSendableContent\(\) \{[\s\S]*?composerBlocksFromDraft\(messageInput\?\.value \?\? ''[\s\S]*?\.length > 0;/);
@@ -5771,7 +5772,7 @@ describe('PWA runtime config guard', () => {
     // Review fixes (v759): (a) the private submit's empty-draft early-return counts FILE attachments as
     // content — a file-only draft (marker hand-deleted) must reach the block-based send, not dead-click;
     // (b) clearing files removes each marker LINE locally, never a global \n{3,} rewrite of the draft.
-    expect(app).toMatch(/if \(!text && attachments\.length === 0 && !paymentDraft\s*\n\s*&& normalizePrivateFileAttachments\(privateFileAttachments\)\.length === 0\) \{/);
+    expect(app).toMatch(/if \(!text && attachments\.length === 0 && !paymentDraft && !privateShareDraft\s*\n\s*&& normalizePrivateFileAttachments\(privateFileAttachments\)\.length === 0\) \{/);
     const clearFileMarkersFn = app.slice(
       app.indexOf('function removeAllFileMarkersForComposer('),
       app.indexOf('function removeImageMarkerForComposer('),
@@ -5933,8 +5934,16 @@ describe('PWA runtime config guard', () => {
     expect(build).toMatch(/expandButton\.textContent = t\('public\.showFullPost'\);/);
     // Expanding releases the clamp IN PLACE and is remembered for the session, so the signature-driven article
     // rebuilds (unread -> read, background syncs) re-render the post expanded instead of snapping it shut.
+    // v766: the release is ANIMATED (expandClampedBody transitions max-height via CSSOM, then drops the clamp;
+    // a timer backstop covers reduced-motion / hidden surfaces where transitionend never fires).
     expect(build).toMatch(/publicFeedExpandedPosts\.add\(String\(item\.id\)\);/);
-    expect(build).toMatch(/article\.classList\.remove\('feed-post-collapsible', 'feed-post-overflowing'\);/);
+    expect(build).toMatch(/expandClampedBody\(article, body\);/);
+    expect(app).toMatch(/function expandClampedBody\(root, body\)/);
+    expect(app).toMatch(/body\.style\.removeProperty\('max-height'\);/);
+    expect(app).toMatch(/body\.addEventListener\('transitionend', release, \{ once: true \}\);/);
+    expect(app).toMatch(/window\.setTimeout\(release, 450\);/);
+    expect(css).toMatch(/\.feed-post-expanding > \.feed-post-body \{[^}]*transition: max-height 0\.3s ease;/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.feed-post-expanding > \.feed-post-body \{\s*transition: none;/);
     // ...and the expanded state is part of the render signature, so the OTHER surface's reused article (feed
     // vs channel view render the same item independently) rebuilds expanded too instead of staying collapsed.
     expect(app).toMatch(/publicFeedExpandedPosts\.has\(String\(item\.id\)\) \? 'x' : ''/);
@@ -5944,11 +5953,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const feedPostClampObserver = typeof ResizeObserver === 'function'/);
     expect(app).toMatch(/const clippedHeight = body\.scrollHeight - body\.clientHeight;/);
     expect(app).toMatch(/clippedHeight > FEED_POST_CLAMP_SLACK_PX/);
-    // CSS: the clamp height is a :root single-source var; the clamp applies only under .feed-post-collapsible,
-    // and the expand button shows only once the observer confirmed real overflow.
+    // CSS: the clamp height is a :root single-source var; the clamp applies only under .feed-post-collapsible.
+    // All rules are DIRECT-CHILD (v766): a shared-post embed nests its own clamp INSIDE a post's clamped body,
+    // and a descendant selector would leak the post's clamp onto the embed (and keep clamping an expanded embed).
     expect(css).toMatch(/--feed-post-collapsed-max-height: \d+px;/);
-    expect(css).toMatch(/\.feed-post-collapsible \.feed-post-body \{[^}]*max-height: var\(--feed-post-collapsed-max-height\);[^}]*overflow: hidden;/);
-    expect(css).toMatch(/\.feed-post-overflowing \.feed-expand-button \{\s*display: block;/);
+    expect(css).toMatch(/\.feed-post-collapsible > \.feed-post-body \{[^}]*max-height: var\(--feed-post-collapsed-max-height\);[^}]*overflow: hidden;/);
+    expect(css).toMatch(/\.feed-post-overflowing > \.feed-expand-button \{\s*display: block;/);
     // The post DETAIL screen (and its comments) calls appendPublicItemContent directly — no .feed-post-body
     // wrapper — so an opened post always renders in full (the expander is a feed/channel affordance only).
     const detail = app.slice(app.indexOf('function renderPublicPostDetail('), app.indexOf('function openPublicPostDetail('));
@@ -5957,6 +5967,63 @@ describe('PWA runtime config guard', () => {
     // Every locale ships the expander label (OPSEC key parity).
     for (const locale of Object.keys(I18N_STRINGS)) {
       expect((I18N_STRINGS as Record<string, Record<string, string>>)[locale]['public.showFullPost']).toBeTruthy();
+    }
+  });
+
+  it('PWA-PUBLIC-POST-SHARE-01: a public post shares into My notes / a private contact / the own channel as a SHARE block with a collapsed source-channel embed', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const subs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    // Wire: SHARE=8 rides the shared PDC1 container, codec in capsule-part-policy (round-trips pinned by
+    // PWA-SHARE-CODEC-01/02); a malformed frame is dropped, never poisons the message (the REPLY/FILE rule).
+    expect(app).toMatch(/SHARE: 8,/);
+    expect(app).toMatch(/content = encodeShareBlockContent\(block\);/);
+    expect(app).toMatch(/const share = decodeShareBlockContent\(content\);\s*if \(share\) blocks\.push\(\{ type: 'share', \.\.\.share \}\);/);
+    // Composer: the draft is captured AT SUBMIT (echo/wire/retries byte-identical — the replyDraft contract),
+    // threaded through every plan/build/retry path, and the PUBLIC surface reads its OWN draft.
+    expect(app).toMatch(/const shareDraft = privateShareDraft \? \{ \.\.\.privateShareDraft \} : null;/);
+    expect(app).toMatch(/extras\.shareDraft === undefined \? privateShareDraft : extras\.shareDraft/);
+    expect(app).toMatch(/shareDraft: context\.shareDraft \?\? context\.message\?\.privateDraft\?\.shareDraft \?\? null,/);
+    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\), publicShareDraft\)/);
+    // A share-only draft (no typed text) IS a sendable message: the block builder pushes it even alone, and the
+    // private empty-submit early-return lets it through.
+    expect(app).toMatch(/if \(shareDraft\?\.entryId && !usedShare\) \{\s*usedShare = true;\s*blocks\.unshift\(\{ type: 'share', \.\.\.shareDraft \}\);/);
+    expect(app).toMatch(/!text && attachments\.length === 0 && !paymentDraft && !privateShareDraft/);
+    // The [post] marker is positional (like [image]/[file]); cancel strips it with the chip.
+    expect(app).toMatch(/\(\\\[post\\\]\)/); // the marker alternative inside COMPOSER_MARKER_RE
+    expect(app).toMatch(/function removeShareMarkerForComposer\(textarea\)/);
+    // Share gate mirrors the comment gate: chain coordinates required (entryId + 32-byte bodyHash + wallet).
+    const payloadFn = app.slice(app.indexOf('function sharePayloadFromPublicItem('), app.indexOf('function truncateUtf8ToShareSnippet('));
+    expect(payloadFn).toMatch(/0x\[0-9a-fA-F\]\{64\}/);
+    // Targets: own channel + My notes + private contacts (Saved first, contacts by recency — the thread-list order).
+    expect(app).toMatch(/function chooseShareTargetOwnChannel\(\)/);
+    expect(app).toMatch(/function chooseShareTargetThread\(thread\)/);
+    expect(app).toMatch(/openPrivateThreadForWallet\(wallet\)/);
+    expect(app).toMatch(/openPublicChannelView\(\{ channelId: own\.id/);
+    expect(html).toMatch(/id="sharePostDialog"[\s\S]*?id="sharePostList"/);
+    expect(html).toMatch(/id="privateShareContext"[\s\S]*?id="privateShareCancelButton"/);
+    expect(html).toMatch(/id="publicShareContext"[\s\S]*?id="publicShareCancelButton"/);
+    // Embed: source-channel header resolved by the RECIPIENT (their own resolver; the sender's snapshot label is
+    // a fallback only), snippet rendered as PLAIN TEXT (textContent — the snapshot is sender-authored/unverified,
+    // no linkify), collapsed with the shared clamp machinery keyed by the shared post's entry id.
+    const embedFn = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildPublicFeedArticle('));
+    expect(embedFn).toMatch(/resolveWalletChannelDisplay\(wallet\)\?\.name/);
+    expect(embedFn).toMatch(/text\.textContent = block\.textTruncated \? `\$\{block\.snippet\}…` : block\.snippet;/);
+    expect(embedFn).not.toMatch(/appendLinkifiedText/);
+    expect(embedFn).toMatch(/expandedSharedEmbeds\.has\(String\(block\.entryId\)\)/);
+    expect(embedFn).toMatch(/expandClampedBody\(embed, body\);/);
+    // Both display surfaces render the embed (private bubbles + public posts/comments).
+    expect(app).toMatch(/bubble\.append\(buildSharedPostEmbed\(block\)\);/);
+    expect(app).toMatch(/container\.append\(buildSharedPostEmbed\(block\)\);/);
+    // The feed cache round-trip keeps share blocks (normalizeFeedBlocks whitelists them like reply quotes).
+    expect(subs).toMatch(/if \(block\.type === 'share'\) \{/);
+    expect(subs).toMatch(/textTruncated: block\.textTruncated === true,/);
+    // Every locale ships the share strings (OPSEC key parity).
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
+      for (const key of ['public.share', 'public.sharedPost', 'composer.sharingPost', 'dialog.sharePost', 'dialog.shareToOwnChannel', 'dialog.shareNoTargets']) {
+        expect(dict[key], `${locale}:${key}`).toBeTruthy();
+      }
     }
   });
 
@@ -7277,18 +7344,18 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v840/);
+    expect(sw).toMatch(/platho-pwa-prototype-v841/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=258/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=259/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=765/);
+    expect(sw).toMatch(/\.\/app\.js\?v=766/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=25/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=25/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=26/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=26/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
@@ -7299,7 +7366,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=59/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=14/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=17/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);

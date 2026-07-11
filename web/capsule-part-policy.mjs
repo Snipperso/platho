@@ -367,3 +367,96 @@ export function decodeProfileBlockContent(content) {
   }
   return { description, tags, ownerUsername };
 }
+
+// --- Shared-post content codec (document block type SHARE) ---
+// A reference to a PUBLIC post shared into a private chat / the sender's own channel (v766), riding inside the
+// shared PDC1 document container — symmetric across surfaces like REPLY/FILE above. Carries the post's chain
+// coordinates (entryId + bodyHash: content-addressed, so the original is always fetchable/verifiable) plus a
+// DENORMALIZED display snapshot (author label + title + text excerpt) so the embed renders instantly with zero
+// chain reads, Telegram-forward-style. The snapshot is SENDER-authored (unverified, the REPLY-quote precedent);
+// the recipient resolves the header identity (avatar/name) from authorWallet through their OWN resolver, so
+// only title/snippet are ever claim-only. Content layout:
+//   [version u8=1][flags u8: bit0 hasImage, bit1 textTruncated]
+//   [entryId u64 BE][bodyHash 32 bytes]
+//   [walletLen u8][wallet utf8 raw form][authorLen u8][author utf8][titleLen u8][title utf8][snippet utf8 ...]
+export const SHARE_BLOCK_CONTENT_VERSION = 1;
+export const SHARE_AUTHOR_MAX_BYTES = 64;
+export const SHARE_TITLE_MAX_BYTES = 96;
+export const SHARE_WALLET_MAX_BYTES = 80;
+// Big enough to carry the vast majority of posts WHOLE (so "expand" honestly shows the full text); a
+// pathological post truncates with the textTruncated flag and the embed's channel link leads to the original.
+export const SHARE_SNIPPET_MAX_BYTES = 4096;
+export const SHARE_FLAG_HAS_IMAGE = 0x01;
+export const SHARE_FLAG_TEXT_TRUNCATED = 0x02;
+
+export function encodeShareBlockContent(share) {
+  const entryId = BigInt(share?.entryId ?? -1n);
+  if (entryId < 0n || entryId > 0xffffffffffffffffn) throw new Error('share entryId must fit uint64');
+  const bodyHashHex = String(share?.bodyHash ?? '').replace(/^0x/i, '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(bodyHashHex)) throw new Error('share bodyHash must be 32 hex bytes');
+  const wallet = textEncoder.encode(truncateUtf8ToBytes(String(share?.authorWallet ?? '').trim(), SHARE_WALLET_MAX_BYTES));
+  if (wallet.length === 0) throw new Error('share block needs the author wallet');
+  const author = textEncoder.encode(truncateUtf8ToBytes(share?.author ?? '', SHARE_AUTHOR_MAX_BYTES));
+  const title = textEncoder.encode(truncateUtf8ToBytes(share?.title ?? '', SHARE_TITLE_MAX_BYTES));
+  const fullSnippet = String(share?.snippet ?? '');
+  const snippetText = truncateUtf8ToBytes(fullSnippet, SHARE_SNIPPET_MAX_BYTES);
+  const snippet = textEncoder.encode(snippetText);
+  // textTruncated survives from the draft too: the composer pre-truncates so the echo matches the wire, and the
+  // encoder's own re-cut is then a no-op that must not drop the flag.
+  const flags = (share?.hasImage ? SHARE_FLAG_HAS_IMAGE : 0)
+    | (share?.textTruncated || snippetText.length < fullSnippet.length ? SHARE_FLAG_TEXT_TRUNCATED : 0);
+  const out = new Uint8Array(2 + 8 + 32 + 1 + wallet.length + 1 + author.length + 1 + title.length + snippet.length);
+  out[0] = SHARE_BLOCK_CONTENT_VERSION;
+  out[1] = flags;
+  let id = entryId;
+  for (let i = 9; i >= 2; i -= 1) { out[i] = Number(id & 0xffn); id >>= 8n; }
+  for (let i = 0; i < 32; i += 1) out[10 + i] = parseInt(bodyHashHex.slice(i * 2, i * 2 + 2), 16);
+  let offset = 42;
+  out[offset] = wallet.length;
+  out.set(wallet, offset + 1);
+  offset += 1 + wallet.length;
+  out[offset] = author.length;
+  out.set(author, offset + 1);
+  offset += 1 + author.length;
+  out[offset] = title.length;
+  out.set(title, offset + 1);
+  offset += 1 + title.length;
+  out.set(snippet, offset);
+  return out;
+}
+
+export function decodeShareBlockContent(content) {
+  const bytes = content instanceof Uint8Array ? content : new Uint8Array(content ?? []);
+  // Unknown future versions / truncated frames return null — a bad share block must never make the carrying
+  // message undecodable (the REPLY/FILE/PROFILE rule).
+  if (bytes.length < 45 || bytes[0] !== SHARE_BLOCK_CONTENT_VERSION) return null;
+  const flags = bytes[1];
+  let entryId = 0n;
+  for (let i = 2; i <= 9; i += 1) entryId = (entryId << 8n) | BigInt(bytes[i]);
+  let bodyHash = '0x';
+  for (let i = 10; i < 42; i += 1) bodyHash += bytes[i].toString(16).padStart(2, '0');
+  let offset = 42;
+  const walletLength = bytes[offset];
+  if (walletLength === 0 || offset + 1 + walletLength + 1 > bytes.length) return null;
+  const decoder = new TextDecoder();
+  const authorWallet = decoder.decode(bytes.subarray(offset + 1, offset + 1 + walletLength));
+  offset += 1 + walletLength;
+  const authorLength = bytes[offset];
+  if (offset + 1 + authorLength + 1 > bytes.length) return null;
+  const author = decoder.decode(bytes.subarray(offset + 1, offset + 1 + authorLength));
+  offset += 1 + authorLength;
+  const titleLength = bytes[offset];
+  if (offset + 1 + titleLength > bytes.length) return null;
+  const title = decoder.decode(bytes.subarray(offset + 1, offset + 1 + titleLength));
+  offset += 1 + titleLength;
+  return {
+    entryId: entryId.toString(),
+    bodyHash,
+    authorWallet,
+    author,
+    title,
+    snippet: decoder.decode(bytes.subarray(offset)),
+    hasImage: (flags & SHARE_FLAG_HAS_IMAGE) !== 0,
+    textTruncated: (flags & SHARE_FLAG_TEXT_TRUNCATED) !== 0,
+  };
+}

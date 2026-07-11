@@ -253,6 +253,25 @@ function normalizeFeedBlocks(blocks) {
         ? { type: 'reply', refEntryId, author: String(block.author ?? ''), snippet: String(block.snippet ?? '') }
         : null;
     }
+    // Shared public post (v766): all-string snapshot, localStorage-safe like the reply quote — keeps the embed
+    // across reloads (and a share-only post isn't dropped as empty).
+    if (block.type === 'share') {
+      const entryId = nonEmptyString(String(block.entryId ?? ''));
+      const authorWallet = nonEmptyString(block.authorWallet);
+      return entryId && authorWallet
+        ? {
+          type: 'share',
+          entryId,
+          bodyHash: String(block.bodyHash ?? ''),
+          authorWallet,
+          author: String(block.author ?? ''),
+          title: String(block.title ?? ''),
+          snippet: String(block.snippet ?? ''),
+          hasImage: block.hasImage === true,
+          textTruncated: block.textTruncated === true,
+        }
+        : null;
+    }
     return null;
   }).filter(Boolean);
 }
@@ -262,6 +281,7 @@ function feedBlocksPreview(blocks) {
   if (text) return text;
   const imageCount = (blocks ?? []).filter((block) => block?.type === 'image').length;
   if (imageCount > 0) return imageCount === 1 ? 'Image' : `${imageCount} images`;
+  if ((blocks ?? []).some((block) => block?.type === 'share')) return 'Shared post';
   return null;
 }
 

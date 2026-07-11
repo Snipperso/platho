@@ -6,6 +6,10 @@
      "Show full post" button. SINGLE SOURCE — the JS side never hardcodes this; it detects the clamp biting via
      scrollHeight vs clientHeight. */
   --feed-post-collapsed-max-height: 480px;
+  /* Shared-post embed (v766): the forwarded-post card clamps tighter than a full feed post. */
+  --shared-post-embed-max-height: 220px;
+  /* Opaque embed card background — the collapse fade must blend into it, so it cannot be translucent. */
+  --shared-post-embed-bg: #10161a;
   --bg: #0b0d0f;
   --panel: #111417;
   --panel-2: #151a1d;
@@ -2133,18 +2137,21 @@ button.feed-item:hover {
   word-break: break-word;
 }
 
-/* Long-post collapse (v765, feed + channel view): the post body is clamped while the article carries
-   .feed-post-collapsible (added by JS only when ResizeObserver support exists — no observer, no clamp, so
-   content is never cut with no way to reveal it). feedPostClampObserver marks articles whose content the clamp
-   ACTUALLY cuts with .feed-post-overflowing — that shows the bottom fade + the "Show full post" button.
-   The post-detail screen and comments never get the wrapper and always render in full. */
-.feed-post-collapsible .feed-post-body {
+/* Long-post collapse (v765, feed + channel view): the post body is clamped while the collapsible ROOT (the
+   feed <article>, or a shared-post embed since v766) carries .feed-post-collapsible (added by JS only when
+   ResizeObserver support exists — no observer, no clamp, so content is never cut with no way to reveal it).
+   feedPostClampObserver marks roots whose content the clamp ACTUALLY cuts with .feed-post-overflowing — that
+   shows the bottom fade + the "Show full post" button. All rules are DIRECT-CHILD (`>`): a shared-post embed
+   nests its own clamp INSIDE a post's clamped body, and a descendant selector would leak the post's clamp onto
+   the embed's body (and keep clamping it after the embed expands). The post-detail screen and comments never
+   get the wrapper and always render in full. */
+.feed-post-collapsible > .feed-post-body {
   position: relative;
   max-height: var(--feed-post-collapsed-max-height);
   overflow: hidden;
 }
 
-.feed-post-collapsible.feed-post-overflowing .feed-post-body::after {
+.feed-post-collapsible.feed-post-overflowing > .feed-post-body::after {
   content: "";
   position: absolute;
   right: 0;
@@ -2153,6 +2160,20 @@ button.feed-item:hover {
   height: 72px;
   background: linear-gradient(to bottom, transparent, var(--panel-2));
   pointer-events: none;
+}
+
+/* Expand animation (v766): expandClampedBody drives max-height via CSSOM from the clamped height to the full
+   height under this transition, then removes the inline value + this class. Reduced motion opts out — the JS
+   timer backstop releases the clamp without a transitionend. */
+.feed-post-expanding > .feed-post-body {
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-post-expanding > .feed-post-body {
+    transition: none;
+  }
 }
 
 .feed-expand-button {
@@ -2170,12 +2191,164 @@ button.feed-item:hover {
   cursor: pointer;
 }
 
-.feed-post-overflowing .feed-expand-button {
+.feed-post-overflowing > .feed-expand-button {
   display: block;
 }
 
 .feed-expand-button:hover {
   border-color: var(--accent);
+}
+
+/* Shared-post embed (v766): a forwarded public post inside a private bubble or a public post/comment.
+   Header = source channel (tappable, opens the channel view); body reuses the long-post clamp machinery with
+   its own tighter max height. */
+.shared-post-embed {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--shared-post-embed-bg);
+}
+
+.shared-post-embed-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.shared-post-embed-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  font-size: 12px;
+}
+
+.shared-post-embed-channel {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.shared-post-embed-kind {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.shared-post-embed-name {
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shared-post-embed-header:hover .shared-post-embed-name {
+  text-decoration: underline;
+}
+
+.shared-post-embed-title {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.shared-post-embed-text {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.shared-post-embed-media-hint {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.shared-post-embed.feed-post-collapsible > .feed-post-body {
+  max-height: var(--shared-post-embed-max-height);
+}
+
+.shared-post-embed.feed-post-collapsible.feed-post-overflowing > .feed-post-body::after {
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--shared-post-embed-bg));
+}
+
+.shared-post-embed > .feed-expand-button {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* Share-target modal (v766). */
+.share-post-dialog .share-post-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+}
+
+.share-target-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.share-target-row:hover {
+  border-color: var(--accent);
+}
+
+.share-target-avatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  font-size: 13px;
+}
+
+.share-target-text {
+  display: grid;
+  min-width: 0;
+}
+
+.share-target-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-target-sublabel {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-target-empty {
+  margin: 12px 0 0;
+  color: var(--muted);
 }
 
 .comment-list {
