@@ -2028,6 +2028,12 @@ export function createFallbackTonRpcTransport(options = {}) {
     const queueAllowanceMs = finiteNonNegativeMs(args[0]?.queueTimeoutMs, 0);
     const operationTimeoutMs = requestTimeoutMs > 0 ? requestTimeoutMs + queueAllowanceMs : 0;
     let lastError = null;
+    // Delivery ambiguity ACROSS send attempts: a TIMEOUT'd / connection-dropped upload can still have
+    // been DELIVERED (an aborted upload has been observed to land later), so once any attempt of this
+    // external ends with unknown delivery, every LATER transport's definitive-looking reject (e.g. a
+    // lagging node's pre-accept nonce bounce) must not be taken as proof that no copy is in flight.
+    // Stamped onto the surfaced error; callers gate "definitively not relayed" conclusions on it.
+    let priorDeliveryAmbiguous = false;
     const candidates = orderedTonRpcTransportCandidates(transports, (transport) => {
       if (typeof transport?.[methodName] !== 'function') return false;
       if (methodName === 'sendBoc' && transport.supportsSendBoc === false) return false;
@@ -2046,6 +2052,16 @@ export function createFallbackTonRpcTransport(options = {}) {
       } catch (error) {
         lastError = error;
         if (methodName === 'sendBoc' && isSendBocTransportUnavailableError(error)) continue;
+        if (methodName === 'sendBoc' && priorDeliveryAmbiguous) {
+          try { error.tonRpcPriorDeliveryAmbiguous = true; } catch { /* frozen error object — flag lost, fail-safe stays ambiguous upstream */ }
+        }
+        if (methodName === 'sendBoc') {
+          const status = Number(error?.status ?? error?.response?.status ?? 0);
+          // An HTTP answer (4xx/5xx) or a local queue expiry means THIS attempt provably did not
+          // deliver; anything without a status (client abort mid-upload, network death, TypeError)
+          // leaves delivery unknown.
+          if (status < 400 && String(error?.code ?? '') !== 'QUEUE_TIMEOUT') priorDeliveryAmbiguous = true;
+        }
         noteTonRpcTransportFailure(transport, error, transportDeadRetryMs);
         // A PRIMARY (non-emergency) toncenter that answered with an HTTP 5xx is
         // reachable and has accepted the external into its pipeline. Falling through

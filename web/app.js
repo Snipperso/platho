@@ -37,7 +37,7 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=104';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=105';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -45,7 +45,7 @@ import {
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
   TON_RPC_REQUEST_TIMEOUT_MS,
-} from './vault-ton-rpc-provider.mjs?v=61';
+} from './vault-ton-rpc-provider.mjs?v=62';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -153,19 +153,19 @@ import {
   batchMaxChargeForItems,
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=7';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=41';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=42';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=58';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=43';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=39';
+} from './capsulehub-ton-rpc-provider.mjs?v=59';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=44';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=40';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=46';
+} from './username-ton-rpc-provider.mjs?v=47';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v757';
+const PLATHO_APP_RUNTIME_VERSION = 'v758';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -14630,6 +14630,31 @@ function isVaultPublishNonceConsumedError(error) {
   return /\b16453\b/.test(String(error?.responseBody ?? error?.message ?? ''));
 }
 
+// Per-receiver Vault pre-accept nonce-reject exit codes (throwUnless(code, clientNonce == user.publish_nonce)
+// in contracts/Vault.tact) for every SINGLE-EXTERNAL action the no-retained-boc submit helpers send:
+// WithdrawTon 16808 (:1402), WithdrawAth 16037 (:1471), ReplaceMessagingKeys 16135 (:1755),
+// CreateReceiveIntent 16233 (:1871), ClaimReceiveIntent 16249 (:1998), CancelReceiveIntent 16262 (:2050),
+// SetProfileAvatar 16611 (:2345), MintUsername 16711 (:2457). 16453 is the BATCH-publish receiver's code
+// and can never genuinely appear on these paths.
+const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES = Object.freeze([16037, 16135, 16233, 16249, 16262, 16611, 16711, 16808]);
+const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_RE = new RegExp(`\\b(?:${VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES.join('|')})\\b`);
+
+// A DEFINITIVE not-relayed verdict for a single-external broadcast 5xx: toncenter's emulation rejected
+// the external pre-accept on the receiver's nonce gate, so it was never queued/relayed by that node and
+// its nonce was NOT consumed. Deliberately STRICT, failing safe toward AMBIGUOUS (= the caller's old
+// raise-floor-and-wait behavior): (1) the exit-code CONTEXT is required, never a bare number anywhere in
+// a proxy error page — a false "definitely rejected" on a funds-moving external invites a user retry of
+// a possibly-delivered action (double execution), while a false "ambiguous" costs at most the old floor
+// overshoot; (2) it never fires when an EARLIER transport attempt's delivery is unknown
+// (tonRpcPriorDeliveryAmbiguous, stamped by callSend): a TIMEOUT'd primary upload can still be delivered
+// later, so a lagging fallback node's nonce reject does not prove that no copy is in flight.
+function isDefinitiveVaultSingleExternalNonceReject(error) {
+  if (error?.tonRpcPriorDeliveryAmbiguous === true) return false;
+  const text = String(error?.responseBody ?? error?.message ?? '');
+  if (!/exit\s*_?code/i.test(text)) return false;
+  return VAULT_SINGLE_EXTERNAL_NONCE_REJECT_RE.test(text);
+}
+
 // toncenter "cannot send external message : duplicate message" = the SAME BoC is already queued in its
 // mempool (an earlier broadcast of this exact external is still being processed). The external IS in flight,
 // so a re-broadcast attempt that hits this is effectively a SUCCESSFUL relay, not a failure: without treating
@@ -22850,7 +22875,24 @@ async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, u
       detail: error?.responseBody ?? shortUiErrorText(error, 'auth broadcast failed'),
       clientNonce: String(clientNonce),
     });
-    if (!isAmbiguousTonRpcBroadcastError(error)) throw error;
+    // A 500 whose body carries THIS path's Vault pre-accept nonce reject (per-receiver exit codes — see
+    // isDefinitiveVaultSingleExternalNonceReject; 16453 belongs to the BATCH receiver and never appears
+    // here) is toncenter's own emulation verdict: the external was rejected BEFORE acceptance and never
+    // queued/relayed, so its nonce was NOT consumed by this attempt. The batch publish path keeps
+    // treating such 500s as ambiguous — it RETAINS the signed external and the heal loop reconciles
+    // either way — but this single-external path retains nothing: ratcheting the floor on a proven
+    // pre-accept reject is pure overshoot (the v756-review liveness wedge: during a publish burst an
+    // auth action signs at the floor, bounces "too early", the floor climbs past a nonce nothing will
+    // ever consume, and every later auth external signs above the chain and bounces in turn — stuck
+    // until a reload resets the in-memory floor). Throwing the definitive error also closes the "too
+    // late" false-success: if the nonce was consumed by ANOTHER action, the old ambiguous flow saw the
+    // nonce advance and reported this action as maybe-landed when it definitively never executed.
+    // Double-spend-safe: the floor's invariant is "never sign below a CONSUMED nonce" — a pre-accept
+    // reject consumed nothing; a nonce consumed elsewhere is re-observed by every pre-sign read; and
+    // the matcher refuses when ANY earlier transport attempt's delivery was ambiguous (a delivered
+    // first copy + a lagging fallback node's bounce must keep the old raise-floor-and-wait flow, which
+    // correctly reports the FIRST attempt as landed instead of inviting a double-executing retry).
+    if (!isAmbiguousTonRpcBroadcastError(error) || isDefinitiveVaultSingleExternalNonceReject(error)) throw error;
     ambiguousBroadcast = true;
     broadcastError = error;
     raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
@@ -22967,7 +23009,12 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
       detail: error?.responseBody ?? shortUiErrorText(error, 'receive-intent broadcast failed'),
       clientNonce: String(clientNonce),
     });
-    if (!isAmbiguousTonRpcBroadcastError(error)) throw error;
+    // Same rule as the auth-external path above: a 500 carrying this path's per-receiver Vault
+    // pre-accept nonce reject (see isDefinitiveVaultSingleExternalNonceReject — strict matcher, refuses
+    // after an ambiguous-delivery prior attempt) is a DEFINITIVE not-relayed verdict on this
+    // no-retained-external path — throw instead of raising the floor (floor overshoot here wedges every
+    // later single-external action) or reporting a maybe-landed intent that never executed.
+    if (!isAmbiguousTonRpcBroadcastError(error) || isDefinitiveVaultSingleExternalNonceReject(error)) throw error;
     ambiguousBroadcast = true;
     broadcastError = error;
     raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
@@ -26642,7 +26689,7 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   }
   clearPrivateMessageManualRecovery(message);
   const delayMs = privatePublishConfirmDelayMs(message, error);
-  // Retained ONLY for the "still checking" meta text + debug; the cadence and give-up terminals are age-based.
+  // Retained for debug only; the cadence and give-up terminals are age-based.
   context.confirmAttempt = attempt + 1;
   message.privatePublishConfirmAttempt = context.confirmAttempt;
   const scheduledAt = Date.now();
@@ -26650,10 +26697,9 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   message.privatePublishConfirmDelayMs = delayMs;
   message.privatePublishConfirmNextAt = new Date(scheduledAt + delayMs).toISOString();
   message.privatePublishConfirmLastError = error ? shortUiErrorText(error, 'confirm retry delayed') : null;
-  const baseMeta = publishStateMeta(message.publishState);
-  message.meta = attempt >= 6 && baseMeta.includes('confirming')
-    ? `${baseMeta} - still checking`
-    : baseMeta;
+  // The old attempt-count suffix on the confirming meta was dropped (v758): the multi-part meta now
+  // carries the live `confirming C/N` counter, which IS the liveness signal — the suffix was noise.
+  message.meta = publishStateMeta(message.publishState);
   globalThis.plathoLastPrivatePublishConfirmSchedule = {
     attempt: context.confirmAttempt,
     delayMs,

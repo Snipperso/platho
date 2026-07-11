@@ -209,7 +209,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=39/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=40/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=757" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=758" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1995,7 +1995,9 @@ describe('PWA runtime config guard', () => {
     expect(metaSource).not.toMatch(/partial publish/);
     expect(app).toMatch(/text\.includes\('not sent'\)/);
     expect(app).not.toMatch(/text\.includes\('partial'\)\) return 'failed'/);
-    expect(app).toMatch(/still checking/);
+    // v758: the "- still checking" suffix is gone — the live `confirming C/N` counter IS the liveness
+    // signal now (owner request). The confirm driver writes the plain publishStateMeta text.
+    expect(app).not.toMatch(/- still checking/);
     expect(app).toMatch(/not confirmed/);
     expect(app).toMatch(/privatePublishConfirmAttempt/);
     expect(app).toMatch(/privatePublishConfirmStopped/);
@@ -3871,6 +3873,23 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n/);
     expect(source).toMatch(/confirmationPending: Boolean\(nonceWaitError\)/);
     expect(source).toMatch(/if \(ambiguousBroadcast \|\| result\) \{[\s\S]*nonceWaitError = error;[\s\S]*\} else \{[\s\S]*throw error;/);
+    // v758: a 500 carrying THIS path's per-receiver Vault pre-accept nonce reject is DEFINITIVE on the
+    // no-retained-external path — throw WITHOUT ratcheting the nonce floor (the floor-overshoot
+    // liveness wedge) and without reporting a maybe-landed intent that never executed. The batch
+    // publish path intentionally keeps treating such 500s as ambiguous: it retains the signed
+    // external and the heal loop reconciles either way. The matcher is STRICT and fails safe toward
+    // ambiguous: verified per-receiver codes only (16453 is the batch receiver's — a guard matching it
+    // here would never fire), exit-code context required (no bare-number matches in proxy error pages),
+    // and it refuses when an earlier transport attempt's delivery was unknown (a delivered first copy +
+    // a lagging fallback bounce must keep the old raise-floor-and-wait flow — a false "definitely
+    // rejected" on a funds-moving external invites a double-executing user retry).
+    expect(source).toMatch(/if \(!isAmbiguousTonRpcBroadcastError\(error\) \|\| isDefinitiveVaultSingleExternalNonceReject\(error\)\) throw error;/);
+    expect(app).toMatch(/const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES = Object\.freeze\(\[16037, 16135, 16233, 16249, 16262, 16611, 16711, 16808\]\)/);
+    expect(app).toMatch(/function isDefinitiveVaultSingleExternalNonceReject\(error\)[\s\S]{0,300}tonRpcPriorDeliveryAmbiguous === true\) return false;/);
+    expect(app).toMatch(/if \(!\/exit\\s\*_\?code\/i\.test\(text\)\) return false;/);
+    const vaultRpcProviderForSend = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    expect(vaultRpcProviderForSend).toMatch(/error\.tonRpcPriorDeliveryAmbiguous = true;/);
+    expect(vaultRpcProviderForSend).toMatch(/if \(status < 400 && String\(error\?\.code \?\? ''\) !== 'QUEUE_TIMEOUT'\) priorDeliveryAmbiguous = true;/);
   });
 
   it('PWA-CONFIG-01D4C: service Vault externals handle ambiguous broadcast before downstream finality checks', () => {
@@ -3897,6 +3916,9 @@ describe('PWA runtime config guard', () => {
     );
 
     expect(helperSource).toMatch(/catch \(error\) \{[\s\S]*isAmbiguousTonRpcBroadcastError\(error\)/);
+    // v758: same definitive per-receiver nonce-reject throw as the receive-intent path (no floor
+    // ratchet, no false maybe-landed) — see PWA-CONFIG-01D4B's pin for the rationale.
+    expect(helperSource).toMatch(/if \(!isAmbiguousTonRpcBroadcastError\(error\) \|\| isDefinitiveVaultSingleExternalNonceReject\(error\)\) throw error;/);
     expect(helperSource).toMatch(/ambiguousBroadcast = true/);
     expect(helperSource).toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n/);
     expect(helperSource).toMatch(/if \(ambiguousBroadcast \|\| result\) \{[\s\S]*nonceWaitError = error;[\s\S]*\} else \{[\s\S]*throw error;/);
@@ -7136,7 +7158,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v832/);
+    expect(sw).toMatch(/platho-pwa-prototype-v833/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7144,7 +7166,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=757/);
+    expect(sw).toMatch(/\.\/app\.js\?v=758/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);
@@ -7154,20 +7176,20 @@ describe('PWA runtime config guard', () => {
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=7/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=104/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=58/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=46/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=105/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=59/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=61/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=43/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=58/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=41/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=39/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=46/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=62/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=44/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=59/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=42/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=40/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=8/);
