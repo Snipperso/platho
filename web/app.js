@@ -66,7 +66,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=17';
+} from './public-channel-subscriptions.mjs?v=18';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -96,7 +96,10 @@ import {
   encodeProfileBlockContent,
   decodeProfileBlockContent,
   normalizeProfileTags,
-} from './capsule-part-policy.mjs?v=7';
+  encodeShareBlockContent,
+  decodeShareBlockContent,
+  SHARE_SNIPPET_MAX_BYTES,
+} from './capsule-part-policy.mjs?v=8';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -179,7 +182,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=25';
+} from './i18n.mjs?v=26';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -191,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v765';
+const PLATHO_APP_RUNTIME_VERSION = 'v766';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -669,6 +672,15 @@ const publicCancelCommentButton = document.querySelector('#publicCancelCommentBu
 const privateReplyContext = document.querySelector('#privateReplyContext');
 const privateReplyContextText = document.querySelector('#privateReplyContextText');
 const privateReplyCancelButton = document.querySelector('#privateReplyCancelButton');
+const privateShareContext = document.querySelector('#privateShareContext');
+const privateShareContextText = document.querySelector('#privateShareContextText');
+const privateShareCancelButton = document.querySelector('#privateShareCancelButton');
+const publicShareContext = document.querySelector('#publicShareContext');
+const publicShareContextText = document.querySelector('#publicShareContextText');
+const publicShareCancelButton = document.querySelector('#publicShareCancelButton');
+const sharePostDialog = document.querySelector('#sharePostDialog');
+const sharePostList = document.querySelector('#sharePostList');
+const sharePostCloseButton = document.querySelector('#sharePostCloseButton');
 const publicPostDetail = document.querySelector('#publicPostDetail');
 const publicPostDetailBody = document.querySelector('#publicPostDetailBody');
 const publicPostDetailAvatar = document.querySelector('#publicPostDetailAvatar');
@@ -886,6 +898,12 @@ let privatePaymentCheckDraft = null;
 // Composer block builders read these (default params) so the size plan, the optimistic echo and the wire agree.
 let privateReplyDraft = null;
 let publicCommentReplyTo = null;
+// Shared-post drafts (v766): the public post the NEXT send forwards — {entryId, bodyHash, authorWallet,
+// author, title, snippet, hasImage} | null. Same default-param pattern as reply so the size plan, the
+// optimistic echo and the wire agree; captured-at-submit for retries. Private and public composers each
+// carry their OWN draft (the share modal sets exactly one).
+let privateShareDraft = null;
+let publicShareDraft = null;
 // File attachments (v652): [{name, mime, bytes: Uint8Array}] for the NEXT private send — same default-param
 // pattern as images/reply so plan, echo and wire agree; captured-at-submit for retries.
 let privateFileAttachments = [];
@@ -3381,6 +3399,8 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   privateFileAttachments = [];
   setPrivateReplyDraft(null);
   setPublicCommentReplyTo(null);
+  setPrivateShareDraft(null);
+  setPublicShareDraft(null);
   localProfileAvatarPointer = null;
   profileAvatarLoadPromises.clear();
   delete globalThis.plathoVaultBinding;
@@ -6300,6 +6320,9 @@ function appendPublicItemContent(container, item) {
         // Receive-side forward-compat (v652): the public composer has no file attach UI yet, but a FILE block
         // arriving on the public surface renders the same download chip as private bubbles.
         container.append(buildFileBlockChip(block));
+      } else if (block?.type === 'share' && block.entryId) {
+        // Shared public post (v766): the embed card with the source channel's header.
+        container.append(buildSharedPostEmbed(block));
       }
     }
     return;
@@ -6465,6 +6488,17 @@ function appendPublicItemActions(article, item) {
   const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
   const isOwnPost = isOwnPublicAuthor(authorWallet);
 
+  // "Share" (v766) — forward this post into My notes / a private contact / the own channel. Needs the post's
+  // chain coordinates (same gate the share payload builder enforces): a local-pending post can't be shared yet.
+  if (sharePayloadFromPublicItem(item)) {
+    const shareButton = document.createElement('button');
+    shareButton.type = 'button';
+    shareButton.textContent = t('public.share');
+    shareButton.title = t('public.sharePostTitle');
+    shareButton.addEventListener('click', () => openSharePostDialog(item));
+    actions.append(shareButton);
+  }
+
   // "Private chat" — open the author in Private. HIDDEN on your own post: a dialog with yourself is meaningless.
   if (!isOwnPost) {
     const privateButton = document.createElement('button');
@@ -6503,6 +6537,165 @@ function appendPublicItemActions(article, item) {
   }
   article.append(actions);
 }
+
+// ---- Share a public post (v766): into My notes / a private contact / the own channel ----
+// The modal picks the TARGET; choosing navigates to that composer surface with the share draft attached (a
+// cancellable chip + a positional [post] marker). The draft is a SNAPSHOT (entryId + bodyHash + author wallet +
+// title/text excerpt) — the send encodes it as a SHARE document block.
+let pendingSharePayload = null;
+
+function sharePayloadFromPublicItem(item) {
+  // Chain coordinates are REQUIRED (same gate as commenting): a local-pending post has no entryId yet.
+  if (item?.entryId === undefined || item?.entryId === null) return null;
+  if (!/^0x[0-9a-fA-F]{64}$/.test(String(item?.bodyHash ?? ''))) return null;
+  const authorWallet = rawWalletAddress(item.authorWallet);
+  if (!authorWallet) return null;
+  const blocks = Array.isArray(item.blocks) ? item.blocks : [];
+  const fullText = (blocks
+    .filter((block) => block?.type === 'text' && String(block.text ?? '').trim())
+    .map((block) => String(block.text).trim())
+    .join('\n\n') || String(item.text ?? '')).trim();
+  // Truncate at DRAFT time (not just at encode) so the optimistic echo shows exactly what the wire carries.
+  const snippet = truncateUtf8ToShareSnippet(fullText);
+  return {
+    entryId: String(item.entryId),
+    bodyHash: String(item.bodyHash),
+    authorWallet,
+    author: String(item.author ?? '').trim() || publicAuthorLabel(authorWallet) || shortAddress(authorWallet),
+    title: String(item.title ?? ''),
+    snippet,
+    hasImage: blocks.some((block) => block?.type === 'image' && block.url) || Boolean(item.imageUrl),
+    textTruncated: snippet.length < fullText.length,
+  };
+}
+
+// UTF-8-safe byte-bounded cut for the share snippet (matches the codec's truncateUtf8ToBytes semantics).
+function truncateUtf8ToShareSnippet(text) {
+  const value = String(text ?? '');
+  const encoder = new TextEncoder();
+  if (encoder.encode(value).length <= SHARE_SNIPPET_MAX_BYTES) return value;
+  // Byte length >= char count, so a char-cut to the byte budget lands close; then trim to the exact bound.
+  let out = value.slice(0, SHARE_SNIPPET_MAX_BYTES);
+  while (out.length > 0 && encoder.encode(out).length > SHARE_SNIPPET_MAX_BYTES) out = out.slice(0, -1);
+  return out;
+}
+
+function openSharePostDialog(item) {
+  const share = sharePayloadFromPublicItem(item);
+  if (!share) return;
+  pendingSharePayload = share;
+  renderSharePostList();
+  if (sharePostDialog) sharePostDialog.hidden = false;
+}
+
+function closeSharePostDialog() {
+  pendingSharePayload = null;
+  if (sharePostDialog) sharePostDialog.hidden = true;
+}
+
+function buildShareTargetRow(label, sublabel, avatarUrl, onChoose) {
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'share-target-row';
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar share-target-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  setAvatarNode(avatar, String(label ?? 'P').slice(0, 1), avatarUrl);
+  const text = document.createElement('span');
+  text.className = 'share-target-text';
+  const name = document.createElement('span');
+  name.className = 'share-target-name';
+  name.textContent = label;
+  text.append(name);
+  if (sublabel) {
+    const sub = document.createElement('span');
+    sub.className = 'share-target-sublabel';
+    sub.textContent = sublabel;
+    text.append(sub);
+  }
+  row.append(avatar, text);
+  row.addEventListener('click', onChoose);
+  return row;
+}
+
+function renderSharePostList() {
+  if (!sharePostList) return;
+  sharePostList.replaceChildren();
+  // Own channel first (a repost is the loudest action), then My notes, then private contacts by recency —
+  // the same order the thread list shows them.
+  const ownWallet = rawWalletAddress(plathoWallet?.address ?? storedPlathoWalletRecord()?.address);
+  const own = ownPublicChannel();
+  if (own && ownWallet) {
+    sharePostList.append(buildShareTargetRow(
+      t('dialog.shareToOwnChannel'),
+      t('public.you'),
+      publicAvatarUrlForWallet(ownWallet),
+      () => chooseShareTargetOwnChannel(),
+    ));
+  }
+  const visible = threads.filter((thread) => !thread.readOnly && !isTransientPendingResolutionThread(thread));
+  const ordered = [
+    ...visible.filter((thread) => isSavedMessagesThread(thread)),
+    ...visible
+      .filter((thread) => !isSavedMessagesThread(thread))
+      .sort((a, b) => threadLastActivityMs(b) - threadLastActivityMs(a)),
+  ];
+  for (const thread of ordered) {
+    const wallet = threadPrimaryWalletRaw(thread);
+    if (!wallet) continue;
+    const label = isSavedMessagesThread(thread) ? t('chat.myNotes') : (thread.name || shortAddress(wallet));
+    sharePostList.append(buildShareTargetRow(
+      label,
+      isSavedMessagesThread(thread) ? '' : shortAddress(wallet),
+      publicAvatarUrlForWallet(wallet),
+      () => chooseShareTargetThread(thread),
+    ));
+  }
+  if (sharePostList.childElementCount === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'share-target-empty';
+    empty.textContent = t('dialog.shareNoTargets');
+    sharePostList.append(empty);
+  }
+}
+
+function insertShareMarker(textarea) {
+  if (!textarea) return;
+  COMPOSER_SHARE_MARKER_RE.lastIndex = 0;
+  if (COMPOSER_SHARE_MARKER_RE.test(String(textarea.value ?? ''))) return;
+  insertComposerMarker(textarea, '[post]');
+  autoResizeComposerTextarea(textarea);
+}
+
+function chooseShareTargetThread(thread) {
+  const share = pendingSharePayload;
+  closeSharePostDialog();
+  const wallet = threadPrimaryWalletRaw(thread);
+  if (!share || !wallet) return;
+  // The canonical open path (selectOrCreateRecipientThread) — matches by identity variants, so Saved and every
+  // existing dialog resolve to their real thread; view + chatOpen handled inside.
+  if (!openPrivateThreadForWallet(wallet)) return;
+  setPrivateShareDraft(share);
+  insertShareMarker(messageInput);
+  if (messageInput && !messageInput.disabled) messageInput.focus();
+}
+
+function chooseShareTargetOwnChannel() {
+  const share = pendingSharePayload;
+  closeSharePostDialog();
+  const own = ownPublicChannel();
+  if (!share || !own) return;
+  setView('public');
+  openPublicChannelView({ channelId: own.id, authorWallet: rawWalletAddress(plathoWallet?.address ?? storedPlathoWalletRecord()?.address) });
+  setPublicShareDraft(share);
+  insertShareMarker(publicMessageInput);
+  if (publicMessageInput && !publicMessageInput.disabled) publicMessageInput.focus();
+}
+
+sharePostCloseButton?.addEventListener('click', () => closeSharePostDialog());
+sharePostDialog?.addEventListener('click', (event) => {
+  if (event.target === sharePostDialog) closeSharePostDialog();
+});
 
 function renderPublicFeed(items, options = {}) {
   if (!publicFeed) return;
@@ -6631,21 +6824,128 @@ const FEED_POST_CLAMP_SLACK_PX = 120;
 const feedPostClampObserver = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => {
   for (const entry of entries) {
     const body = entry.target.parentElement;
-    const article = body ? body.closest('.feed-item') : null;
-    if (!body || !article || !article.classList.contains('feed-post-collapsible')) continue;
+    // The collapsible ROOT is always the clamped body's parent — a feed <article> or a shared-post embed
+    // (v766); the CSS clamp rules are direct-child (`.feed-post-collapsible > .feed-post-body`) so a nested
+    // embed clamp never leaks into (or inherits from) the post clamp around it.
+    const root = body ? body.parentElement : null;
+    if (!body || !root || !root.classList.contains('feed-post-collapsible')) continue;
     const clippedHeight = body.scrollHeight - body.clientHeight;
     if (clippedHeight > FEED_POST_CLAMP_SLACK_PX) {
-      article.classList.add('feed-post-overflowing');
+      root.classList.add('feed-post-overflowing');
     } else if (clippedHeight > 0) {
       // Near-miss: the clamp bites but hides less than the slack — release it with no button, so content is
       // never silently cut. Not added to publicFeedExpandedPosts (that set records USER intent); a rebuilt
       // article simply re-measures and re-releases.
-      article.classList.remove('feed-post-collapsible', 'feed-post-overflowing');
+      root.classList.remove('feed-post-collapsible', 'feed-post-overflowing');
     } else {
-      article.classList.remove('feed-post-overflowing');
+      root.classList.remove('feed-post-overflowing');
     }
   }
 }) : null;
+
+// Animated clamp release (owner ask: expanding should feel alive): transition max-height from the clamped
+// height to the measured full height, then drop the clamp entirely (max-height:none — later image growth stays
+// unclamped). CSSOM per-property assignment only (prod CSP kills setAttribute('style'), allows .style.prop).
+// prefers-reduced-motion turns the transition off in CSS — transitionend then never fires, so the timer
+// backstop (also covering a mid-flight display:none) guarantees the release either way.
+function expandClampedBody(root, body) {
+  const fullHeight = body.scrollHeight;
+  body.style.maxHeight = `${body.clientHeight}px`;
+  root.classList.add('feed-post-expanding');
+  root.classList.remove('feed-post-collapsible', 'feed-post-overflowing');
+  requestAnimationFrame(() => { body.style.maxHeight = `${fullHeight}px`; });
+  const release = () => {
+    body.style.removeProperty('max-height');
+    root.classList.remove('feed-post-expanding');
+  };
+  body.addEventListener('transitionend', release, { once: true });
+  window.setTimeout(release, 450);
+}
+
+// Session-expanded shared-post embeds, by the SHARED post's entry id: private bubbles and feed articles rebuild
+// on every render pass, so a DOM-only expand would snap shut — the builder re-applies from here (the
+// publicFeedExpandedPosts pattern one level down).
+const expandedSharedEmbeds = new Set();
+
+// The shared-post embed card (v766): source-channel header (recipient-resolved identity; the sender's snapshot
+// label only as fallback) + title/text snapshot, clamped with its own smaller max height and the same expand
+// machinery as long posts. Snippet renders as PLAIN TEXT (textContent, no linkify): the snapshot is
+// sender-authored/unverified — the tappable header leads to the REAL channel (chain truth) instead.
+function buildSharedPostEmbed(block) {
+  const embed = document.createElement('div');
+  embed.className = 'shared-post-embed';
+  const wallet = rawWalletAddress(block.authorWallet);
+  const label = (wallet ? resolveWalletChannelDisplay(wallet)?.name : null)
+    || (wallet ? publicAuthorLabel(wallet) : null)
+    || String(block.author ?? '').trim()
+    || (wallet ? shortAddress(wallet) : t('public.channel'));
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.className = 'shared-post-embed-header';
+  header.title = t('public.openSharedChannel');
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar shared-post-embed-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  setAvatarNode(avatar, String(label).slice(0, 1), wallet ? publicAvatarUrlForWallet(wallet) : null);
+  const headText = document.createElement('span');
+  headText.className = 'shared-post-embed-channel';
+  const kind = document.createElement('span');
+  kind.className = 'shared-post-embed-kind';
+  kind.textContent = t('public.sharedPost');
+  const name = document.createElement('span');
+  name.className = 'shared-post-embed-name';
+  name.textContent = label;
+  headText.append(kind, name);
+  header.append(avatar, headText);
+  header.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!wallet) return;
+    // Works from the PRIVATE surface too: the channel view lives on the Public pane.
+    setView('public');
+    openPublicChannelView({ authorWallet: wallet });
+  });
+  embed.append(header);
+  const body = document.createElement('div');
+  body.className = 'feed-post-body';
+  const inner = document.createElement('div');
+  inner.className = 'feed-post-body-inner';
+  if (block.title) {
+    const title = document.createElement('div');
+    title.className = 'shared-post-embed-title';
+    title.textContent = block.title;
+    inner.append(title);
+  }
+  if (block.snippet) {
+    const text = document.createElement('p');
+    text.className = 'feed-block-text shared-post-embed-text';
+    text.textContent = block.textTruncated ? `${block.snippet}…` : block.snippet;
+    inner.append(text);
+  }
+  if (block.hasImage) {
+    const mediaHint = document.createElement('span');
+    mediaHint.className = 'shared-post-embed-media-hint';
+    mediaHint.textContent = t('public.sharedPostImageHint');
+    inner.append(mediaHint);
+  }
+  body.append(inner);
+  embed.append(body);
+  if (feedPostClampObserver && !expandedSharedEmbeds.has(String(block.entryId))) {
+    embed.classList.add('feed-post-collapsible');
+    const expandButton = document.createElement('button');
+    expandButton.type = 'button';
+    expandButton.className = 'feed-expand-button';
+    expandButton.textContent = t('public.showFullPost');
+    expandButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      expandedSharedEmbeds.add(String(block.entryId));
+      feedPostClampObserver.unobserve(inner);
+      expandClampedBody(embed, body);
+    });
+    embed.append(expandButton);
+    feedPostClampObserver.observe(inner);
+  }
+  return embed;
+}
 
 // Build one feed <article> (chrome + content) for an item. Extracted so renderPublicFeed can REUSE an article whose
 // publicFeedItemRenderSignature is unchanged instead of rebuilding it every render.
@@ -6733,8 +7033,8 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
     expandButton.textContent = t('public.showFullPost');
     expandButton.addEventListener('click', () => {
       publicFeedExpandedPosts.add(String(item.id));
-      article.classList.remove('feed-post-collapsible', 'feed-post-overflowing');
       feedPostClampObserver.unobserve(bodyContent);
+      expandClampedBody(article, body);
     });
     article.append(expandButton);
     feedPostClampObserver.observe(bodyContent);
@@ -6873,12 +7173,60 @@ function setPrivateReplyDraft(reply) {
   if (privateReplyContext) privateReplyContext.hidden = !privateReplyDraft;
   // The mobile composer grid re-rows around the quote strip via this class — a JS-set class, not :has():
   // :has() silently no-ops on the iOS floor (Safari 14), which left the strip stranded under the buttons.
-  composer?.classList.toggle('is-replying', Boolean(privateReplyDraft));
+  // Share (v766) uses the same row, so the class stays while EITHER strip is up.
+  composer?.classList.toggle('is-replying', Boolean(privateReplyDraft || privateShareDraft));
   if (privateReplyDraft && privateReplyContextText) {
     replyStripContent(privateReplyContextText, privateReplyDraft);
   }
   if (privateReplyDraft && messageInput && !messageInput.disabled) messageInput.focus();
   refreshComposerCostStatus();
+}
+
+// Strip content for the share chip (v766): "Sharing post" label + the source channel/title as the snippet.
+function shareStripContent(node, share) {
+  if (!node) return;
+  const label = document.createElement('span');
+  label.className = 'composer-reply-author';
+  label.textContent = t('composer.sharingPost');
+  const snippet = document.createElement('span');
+  snippet.textContent = [share.author, share.title || share.snippet].filter(Boolean).join(' - ');
+  const wrap = document.createElement('span');
+  wrap.className = 'composer-reply-text';
+  wrap.append(label, snippet);
+  node.replaceChildren(wrap);
+}
+
+// Cancel path: the [post] marker leaves the text with the draft (mirrors removeImageMarkerForComposer).
+function removeShareMarkerForComposer(textarea) {
+  if (!textarea) return;
+  COMPOSER_SHARE_MARKER_RE.lastIndex = 0;
+  let value = String(textarea.value ?? '').replace(COMPOSER_SHARE_MARKER_RE, '');
+  value = value.replace(/\n{3,}/g, '\n\n');
+  if (!value.trim()) value = '';
+  textarea.value = value;
+  autoResizeComposerTextarea(textarea);
+}
+
+function setPrivateShareDraft(share) {
+  privateShareDraft = share ?? null;
+  if (privateShareContext) privateShareContext.hidden = !privateShareDraft;
+  composer?.classList.toggle('is-replying', Boolean(privateReplyDraft || privateShareDraft));
+  if (privateShareDraft && privateShareContextText) {
+    shareStripContent(privateShareContextText, privateShareDraft);
+  }
+  refreshComposerCostStatus();
+  // A share-only draft (no typed text) IS sendable — the button must open the moment the draft attaches.
+  refreshPrivateSendButtonState();
+}
+
+function setPublicShareDraft(share) {
+  publicShareDraft = share ?? null;
+  if (publicShareContext) publicShareContext.hidden = !publicShareDraft;
+  if (publicShareDraft && publicShareContextText) {
+    shareStripContent(publicShareContextText, publicShareDraft);
+  }
+  refreshComposerCostStatus();
+  refreshPublicSendButtonState();
 }
 
 // Suppression state mirrors setPublicCommentTarget's showContext decision so reply mode can temporarily re-show
@@ -6939,6 +7287,7 @@ function replySnippetFromContent(item) {
   if (blocks.some((block) => block?.type === 'image') || item?.imageUrl || item?.attachment?.type === 'image') return 'Image';
   if (blocks.some((block) => block?.type === 'payment') || item?.payment) return 'Payment check';
   if (blocks.some((block) => block?.type === 'file')) return 'File';
+  if (blocks.some((block) => block?.type === 'share')) return 'Shared post';
   return 'Message';
 }
 
@@ -13288,11 +13637,14 @@ function serializeMessageForHistory(message) {
     vaultCreateIntent: safeJsonClone(message.vaultCreateIntent) ?? null,
     vaultPublish: safeJsonClone(message.vaultPublish) ?? null,
     vaultCancelIntent: safeJsonClone(message.vaultCancelIntent) ?? null,
-    // Minimal privateDraft persistence (v646): ONLY the reply quote. A post-reload capsule REBUILD (the rare
-    // capsule-less failure path) must reproduce the same reply block; text/attachments intentionally stay
-    // unpersisted (bytes) — the rebuild falls back to message.text as before.
-    privateDraft: message.privateDraft?.replyDraft
-      ? { replyDraft: safeJsonClone(message.privateDraft.replyDraft) }
+    // Minimal privateDraft persistence (v646, +share v766): ONLY the reply quote + share snapshot. A post-reload
+    // capsule REBUILD (the rare capsule-less failure path) must reproduce the same reply/share blocks;
+    // text/attachments intentionally stay unpersisted (bytes) — the rebuild falls back to message.text as before.
+    privateDraft: (message.privateDraft?.replyDraft || message.privateDraft?.shareDraft)
+      ? {
+        replyDraft: safeJsonClone(message.privateDraft.replyDraft) ?? null,
+        shareDraft: safeJsonClone(message.privateDraft.shareDraft) ?? null,
+      }
       : null,
     privateSendRetryAttempt: Number(message.privateSendRetryAttempt ?? 0) || 0,
     privateSendRetryStopped: message.privateSendRetryStopped === true,
@@ -14966,7 +15318,8 @@ function privateComposerSendPlan(text, attachments = privateImageAttachments, op
   const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.paymentCheck ?? privatePaymentCheckDraft, {
     allowMissingPaymentSecret: true,
   }, extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft,
-  extras.fileAttachments === undefined ? privateFileAttachments : extras.fileAttachments);
+  extras.fileAttachments === undefined ? privateFileAttachments : extras.fileAttachments,
+  extras.shareDraft === undefined ? privateShareDraft : extras.shareDraft);
   if (!documentBytes) return plan;
   for (const part of splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
     perPartOverheadBytes: privateCompactPayloadOverhead(options),
@@ -15916,7 +16269,7 @@ function togglePublicComposerAddMenu() {
   else showPublicComposerAddMenu();
 }
 
-function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments) {
+function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft) {
   const source = String(text ?? '');
   const images = normalizePrivateImageAttachments(attachments);
   const usedImages = new Set();
@@ -15948,6 +16301,13 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
     usedPayment = true;
     blocks.push({ type: 'payment', paymentDraft, payment: paymentDraft });
   };
+  // Shared post (v766): positional via the [post] marker, single like the payment check.
+  let usedShare = false;
+  const pushShare = () => {
+    if (!shareDraft?.entryId || usedShare) return;
+    usedShare = true;
+    blocks.push({ type: 'share', ...shareDraft });
+  };
   // File attachments are POSITIONAL like images (v759): attaching inserts a `[file N]` marker at the
   // cursor and the block lands exactly there. Markerless files (older drafts restored from history, or
   // a marker the user hand-deleted while keeping the attachment) still append after the visible
@@ -15967,6 +16327,7 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
     pushText(source.slice(cursor, match.index));
     if (match[1] !== undefined) pushImage(match[1]);
     else if (match[2] !== undefined) pushFile(match[2]);
+    else if (match[3] !== undefined) pushShare();
     else pushPayment();
     cursor = match.index + match[0].length;
   }
@@ -15978,6 +16339,12 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
   files.forEach((_, index) => {
     if (!usedFiles.has(index)) pushFile(index + 1);
   });
+  // A markerless share (the [post] marker hand-deleted while the draft stays attached) leads the message —
+  // forward-then-comment, and a share-only draft (no typed text) is a legitimate send by itself.
+  if (shareDraft?.entryId && !usedShare) {
+    usedShare = true;
+    blocks.unshift({ type: 'share', ...shareDraft });
+  }
   // Swipe-to-reply (v646): the quote rides as the FIRST document block, so the size plan, the optimistic echo,
   // and the wire all carry it from the same draft state (default-param style matches privateImageAttachments).
   if (blocks.length > 0 && replyDraft?.refEntryId !== undefined && replyDraft?.refEntryId !== null) {
@@ -16009,6 +16376,20 @@ function displayBlocksFromDocumentBlocks(blocks) {
     if (block.type === 'reply') {
       return { type: 'reply', refEntryId: block.refEntryId, author: block.author ?? '', snippet: block.snippet ?? '' };
     }
+    // Shared public post (v766): all-string snapshot — display blocks persist through JSON history/caches.
+    if (block.type === 'share') {
+      return {
+        type: 'share',
+        entryId: String(block.entryId ?? ''),
+        bodyHash: String(block.bodyHash ?? ''),
+        authorWallet: String(block.authorWallet ?? ''),
+        author: String(block.author ?? ''),
+        title: String(block.title ?? ''),
+        snippet: String(block.snippet ?? ''),
+        hasImage: block.hasImage === true,
+        textTruncated: block.textTruncated === true,
+      };
+    }
     // File attachment (v652): the display block carries a data: URL STRING (never a Uint8Array — display blocks
     // persist through JSON history/caches; the wire bytes only exist here at decode time). The chip renders
     // name + size; the click builds a Blob from the url.
@@ -16026,8 +16407,8 @@ function displayBlocksFromDocumentBlocks(blocks) {
   }).filter(Boolean);
 }
 
-function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = null, options = {}, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments) {
-  const blocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments);
+function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = null, options = {}, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft) {
+  const blocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments, shareDraft);
   if (blocks.length <= 0) return null;
   return encodeMessageDocumentBlocks(blocks, options);
 }
@@ -16042,6 +16423,7 @@ function messagePreviewFromBlocks(blocks = []) {
   const fileBlocks = blocks.filter((block) => block?.type === 'file');
   if (fileBlocks.length === 1) return String(fileBlocks[0].name ?? 'File');
   if (fileBlocks.length > 1) return `${fileBlocks.length} files`;
+  if (blocks.some((block) => block?.type === 'share')) return 'Shared post';
   return '';
 }
 
@@ -17069,6 +17451,8 @@ function renderConversation() {
           bubble.append(paymentBlock);
         } else if (block?.type === 'file' && block.url) {
           bubble.append(buildFileBlockChip(block));
+        } else if (block?.type === 'share' && block.entryId) {
+          bubble.append(buildSharedPostEmbed(block));
         }
       }
     } else if (message.text) {
@@ -18095,6 +18479,16 @@ privateReplyCancelButton?.addEventListener('click', () => {
   setPrivateReplyDraft(null);
 });
 
+privateShareCancelButton?.addEventListener('click', () => {
+  setPrivateShareDraft(null);
+  removeShareMarkerForComposer(messageInput);
+});
+
+publicShareCancelButton?.addEventListener('click', () => {
+  setPublicShareDraft(null);
+  removeShareMarkerForComposer(publicMessageInput);
+});
+
 publicPostBackButton?.addEventListener('click', () => {
   requestNavBack();
 });
@@ -18491,6 +18885,7 @@ publicComposer?.addEventListener('submit', async (event) => {
   // here. Capture the comment target + reply quote BEFORE clearing so a cancel can restore the exact draft.
   const draftCommentTarget = publicCommentTarget;
   const draftReplyTo = publicCommentReplyTo;
+  const draftShare = publicShareDraft;
   publicMessageInput.value = '';
   publicImageAttachments = [];
   publicFileAttachments = [];
@@ -18521,6 +18916,7 @@ publicComposer?.addEventListener('submit', async (event) => {
       publicImageAttachments = attachments;
       publicFileAttachments = fileAttachments;
       if (draftReplyTo) setPublicCommentReplyTo(draftReplyTo);
+      if (draftShare) setPublicShareDraft(draftShare);
       updateImageAttachmentUi('public');
       updatePublicFileAttachmentUi();
       autoResizeComposerTextarea(publicMessageInput);
@@ -18544,10 +18940,10 @@ composer?.addEventListener('submit', async (event) => {
   // hand-deleted, text empty) must reach the block-based send below, not dead-click here (the send
   // button IS enabled for it via privateComposerHasSendableContent; the public composer's equivalent
   // gate has been block-based all along).
-  if (!text && attachments.length === 0 && !paymentDraft
+  if (!text && attachments.length === 0 && !paymentDraft && !privateShareDraft
     && normalizePrivateFileAttachments(privateFileAttachments).length === 0) {
     // Empty submit (e.g. an accidental Send click with nothing typed) — return focus to the input so the user can
-    // just start typing, the same as after a real send.
+    // just start typing, the same as after a real send. A share-only draft (v766) IS content — falls through.
     messageInput?.focus();
     return;
   }
@@ -18612,11 +19008,12 @@ composer?.addEventListener('submit', async (event) => {
     refreshPrivateSendButtonState();
     return;
   }
-  // Capture the reply quote NOW: the composer state clears below, but the capsule build (and any later manual
-  // retry) runs long after — the captured value keeps the echo, the wire, and every retry byte-identical.
+  // Capture the reply quote + share NOW: the composer state clears below, but the capsule build (and any later
+  // manual retry) runs long after — the captured values keep the echo, the wire, and every retry byte-identical.
   const replyDraft = privateReplyDraft ? { ...privateReplyDraft } : null;
+  const shareDraft = privateShareDraft ? { ...privateShareDraft } : null;
   const fileAttachments = normalizePrivateFileAttachments(privateFileAttachments);
-  const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments);
+  const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments, shareDraft);
   if (draftBlocks.length === 0) {
     // Nothing real to send (an orphaned "[image N]" marker whose attachment was removed, or an otherwise-empty draft):
     // fail closed at the composer instead of inserting an empty bubble that dead-ends on "Capsule publish payload is
@@ -18642,6 +19039,7 @@ composer?.addEventListener('submit', async (event) => {
       selectedSuite,
       senderOptions,
       replyDraft,
+      shareDraft,
       fileAttachments,
     },
     privateManualRetryAvailable: false,
@@ -18662,6 +19060,7 @@ composer?.addEventListener('submit', async (event) => {
     selectedSuite,
     senderOptions,
     replyDraft,
+    shareDraft,
     fileAttachments,
     retryAttempt: 0,
     confirmAttempt: 0,
@@ -18671,6 +19070,7 @@ composer?.addEventListener('submit', async (event) => {
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   setPrivateReplyDraft(null);
+  setPrivateShareDraft(null);
   privateFileAttachments = [];
   updatePrivateFileAttachmentUi();
   updateImageAttachmentUi('private');
@@ -20148,6 +20548,10 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   // can read a channel's profile by walking that author's public_author_index. Codec in capsule-part-policy.mjs;
   // old clients skip it via the tolerant public decode (the REPLY/FILE precedent).
   PROFILE: 7,
+  // A public post shared into a private chat / the sender's own channel (v766): chain coordinates + a
+  // denormalized display snapshot — codec in capsule-part-policy.mjs. Old clients skip it via the tolerant
+  // decode on BOTH surfaces (the private DISPLAY decode has been tolerant since v646).
+  SHARE: 8,
 });
 const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
 // The `(?!\()` on every marker keeps a labeled LINK `[check](url)` / `[image 1](url)` (v750) from being mis-read as
@@ -20158,7 +20562,9 @@ const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\](?!\()/ig;
 // v759: `[file N]` joins `[image N]` as a positional composer marker — a file attachment lands at the
 // cursor like an image does, instead of silently appending after the body. Group 1 = image index,
 // group 2 = file index; the `(?!\()` keeps labeled links ([file 1](url)) out, same as images.
-const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[file\s+(\d+)\](?!\()|\[(?:check|payment)\](?!\()/ig;
+// v766: `[post]` marks where the shared-post block lands (positional like [image]/[file]; single like [check]).
+const COMPOSER_SHARE_MARKER_RE = /\[post\](?!\()/ig;
+const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[file\s+(\d+)\](?!\()|(\[post\])(?!\()|\[(?:check|payment)\](?!\()/ig;
 
 function concatUint8Arrays(parts) {
   const arrays = parts.map((part) => part instanceof Uint8Array ? part : new Uint8Array(part ?? []));
@@ -20265,6 +20671,9 @@ function encodeMessageDocumentBlocks(blocks, options = {}) {
     } else if (block.type === 'profile') {
       type = PLATHO_DOCUMENT_BLOCK_TYPES.PROFILE;
       content = encodeProfileBlockContent(block);
+    } else if (block.type === 'share') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.SHARE;
+      content = encodeShareBlockContent(block);
     } else {
       throw new Error('Unsupported document block type');
     }
@@ -20336,6 +20745,10 @@ function decodeMessageDocumentBlocks(bytesLike, options = {}) {
       // Same null-on-malformed rule: a bad profile frame is dropped, never poisons the carrying post.
       const profile = decodeProfileBlockContent(content);
       if (profile) blocks.push({ type: 'profile', ...profile });
+    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.SHARE) {
+      // Same null-on-malformed rule: a bad share frame is dropped, never poisons the carrying message.
+      const share = decodeShareBlockContent(content);
+      if (share) blocks.push({ type: 'share', ...share });
     } else if (tolerateUnknownBlocks) {
       // Skip an unrecognized block (offset already advanced past its content above) — forward-compat.
       continue;
@@ -23854,10 +24267,11 @@ async function attemptPrivatePaymentCheckPublish(context) {
     clientNonce,
   });
   const contextReplyDraft = context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null;
+  const contextShareDraft = context.shareDraft ?? context.message?.privateDraft?.shareDraft ?? null;
   const contextFileAttachments = context.fileAttachments ?? context.message?.privateDraft?.fileAttachments ?? [];
-  const capsules = await createPrivateComposerCapsules(context.text ?? '', context.attachments ?? [], recipientEntry, thread.id, senderOptions, { payment, replyDraft: contextReplyDraft, fileAttachments: contextFileAttachments });
+  const capsules = await createPrivateComposerCapsules(context.text ?? '', context.attachments ?? [], recipientEntry, thread.id, senderOptions, { payment, replyDraft: contextReplyDraft, shareDraft: contextShareDraft, fileAttachments: contextFileAttachments });
   const publishState = createCapsulePublishState(capsules);
-  const displayBlocks = displayBlocksFromDocumentBlocks(composerBlocksFromDraft(context.text ?? '', context.attachments ?? [], payment, contextReplyDraft, contextFileAttachments));
+  const displayBlocks = displayBlocksFromDocumentBlocks(composerBlocksFromDraft(context.text ?? '', context.attachments ?? [], payment, contextReplyDraft, contextFileAttachments, contextShareDraft));
   message.text = messagePreviewFromBlocks(displayBlocks) || paymentMessageText(payment);
   message.blocks = displayBlocks;
   message.payment = payment;
@@ -26747,6 +27161,7 @@ function privateSendRetryContextForMessage(thread, message) {
     selectedSuite: draft.selectedSuite ?? VAULT_RECEIVE_CRYPTO_SUITE,
     senderOptions: draft.senderOptions ?? message?.senderOptions ?? null,
     replyDraft: draft.replyDraft ?? null,
+    shareDraft: draft.shareDraft ?? null,
     fileAttachments: normalizePrivateFileAttachments(draft.fileAttachments ?? []),
     payment,
     paymentIntentCreated: hasPaymentIntent,
@@ -27413,6 +27828,7 @@ async function retryPrivateMessageFromUi(thread, message) {
       const plan = privateComposerSendPlan(context.text, context.attachments, context.senderOptions, {
         paymentCheck: context.paymentDraft,
         replyDraft: context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null,
+        shareDraft: context.shareDraft ?? context.message?.privateDraft?.shareDraft ?? null,
         fileAttachments: context.fileAttachments ?? context.message?.privateDraft?.fileAttachments ?? [],
       });
       await assertVaultHasPrivatePublishHold(context.selectedSuite, plan, {
@@ -27490,10 +27906,11 @@ async function attemptPrivateComposerMessagePublish(context) {
   if (!capsules) {
     const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
     refreshThreadIdentityFromVariants(thread, privateWalletIdentityVariants(recipientEntry.walletAddress));
-    // replyDraft: the CAPTURED quote (context/history), never the live composer state — a retry runs after clear.
+    // replyDraft/shareDraft: the CAPTURED state (context/history), never the live composer — a retry runs after clear.
     capsules = await createPrivateComposerCapsules(text, attachments ?? (attachment ? [attachment] : []), recipientEntry, thread.id, senderOptions, {
       payment,
       replyDraft: context.replyDraft ?? message?.privateDraft?.replyDraft ?? null,
+      shareDraft: context.shareDraft ?? message?.privateDraft?.shareDraft ?? null,
       fileAttachments: context.fileAttachments ?? message?.privateDraft?.fileAttachments ?? [],
     });
     message.recipientWallet = recipientEntry.walletAddress;
@@ -28060,9 +28477,9 @@ function imagePartsForSend(attachment, label = 'image') {
 // clears and thread the exact files through — otherwise the async publish would read an already-cleared global and
 // drop the files (same capture-at-submit pattern private uses).
 function publicDocumentBlocksFromDraft(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments) {
-  // Explicit replyDraft: the PUBLIC surface quotes publicCommentReplyTo (non-null only in comment-reply mode) —
-  // never the private composer's draft (composerBlocksFromDraft defaults to privateReplyDraft).
-  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null, publicCommentReplyTo, normalizePrivateFileAttachments(fileAttachments))
+  // Explicit replyDraft + shareDraft: the PUBLIC surface reads its OWN drafts (publicCommentReplyTo /
+  // publicShareDraft) — never the private composer's (composerBlocksFromDraft defaults to the private ones).
+  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null, publicCommentReplyTo, normalizePrivateFileAttachments(fileAttachments), publicShareDraft)
     .filter((block) => block.type !== 'payment');
 }
 
@@ -28103,7 +28520,8 @@ async function createPrivateComposerCapsules(text, attachments, recipientEntry, 
   // extras.replyDraft: undefined -> live composer draft; explicit null/value -> that captured state (retries).
   const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.payment ?? extras.paymentDraft ?? null, {},
     extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft,
-    extras.fileAttachments === undefined ? privateFileAttachments : extras.fileAttachments);
+    extras.fileAttachments === undefined ? privateFileAttachments : extras.fileAttachments,
+    extras.shareDraft === undefined ? privateShareDraft : extras.shareDraft);
   if (!documentBytes) return [];
   const documentParts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
     perPartOverheadBytes: privateCompactPayloadOverhead(options),
@@ -28428,6 +28846,10 @@ async function submitPublicPostThroughVault(draft = null) {
     fileAttachments,
     commentsAllowed: resolvedDraft.commentsAllowed,
   });
+  // Both consumers of publicShareDraft (the display blocks above + the send plan inside createPublicPayloadParts,
+  // read synchronously on entry) are done — drop the share chip now, like the reply quote in the comment path.
+  // The composer handler restores it on a user-cancelled price change.
+  setPublicShareDraft(null);
   // Private-composer parity: the post appears in the feed IMMEDIATELY (optimistic local record with a live
   // private-style status), inserted as soon as the payloads exist so bodyHash-based merging with the on-chain
   // twin keeps working. The publish pipeline streams part-state updates into the record via onPartState.
@@ -28539,6 +28961,7 @@ async function submitPublicCommentThroughVault(parent, bodyText = null, draftAtt
   // createPublicPayloadParts, read synchronously on entry) are done — drop the quote strip now, exactly like the
   // text input clears on send. The composer handler restores it on a user-cancelled price change.
   setPublicCommentReplyTo(null);
+  setPublicShareDraft(null);
   // Private-composer parity: insert the optimistic local comment immediately (live private-style status), then
   // stream part-state updates into it; patch the SAME record on result — never insert a second one.
   const ref = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {

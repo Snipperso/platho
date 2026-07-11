@@ -241,4 +241,63 @@ describe('profile block content codec', () => {
     expect(decodedChop!.description).toBe('hi');
     expect(decodedChop!.ownerUsername).toBe('');
   });
+
+  it('PWA-SHARE-CODEC-01: shared-post content round-trips exactly (chain coords + snapshot + flags, incl. non-ASCII)', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    const share = {
+      entryId: '123456789',
+      bodyHash: `0x${'ab'.repeat(32)}`,
+      authorWallet: '0:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      author: 'канал «Гласность»',
+      title: 'Заголовок поста 🌍',
+      snippet: 'Первый абзац.\n\nВторой абзац с эмодзи 🚀 и текстом.',
+      hasImage: true,
+      textTruncated: false,
+    };
+    const decoded = m.decodeShareBlockContent(m.encodeShareBlockContent(share));
+    expect(decoded).toEqual(share);
+    // uint64 bounds — 0 and max round-trip, negatives/overflow throw (the REPLY-CODEC-02 contract).
+    const base = { ...share, author: '', title: '', snippet: '' };
+    expect(m.decodeShareBlockContent(m.encodeShareBlockContent({ ...base, entryId: '0' }))?.entryId).toBe('0');
+    expect(m.decodeShareBlockContent(m.encodeShareBlockContent({ ...base, entryId: '18446744073709551615' }))?.entryId)
+      .toBe('18446744073709551615');
+    expect(() => m.encodeShareBlockContent({ ...base, entryId: '-1' })).toThrow();
+    expect(() => m.encodeShareBlockContent({ ...base, entryId: '18446744073709551616' })).toThrow();
+    // bodyHash + authorWallet are REQUIRED (the share gate mirrors the comment gate).
+    expect(() => m.encodeShareBlockContent({ ...base, bodyHash: '0x1234' })).toThrow();
+    expect(() => m.encodeShareBlockContent({ ...base, authorWallet: '' })).toThrow();
+  });
+
+  it('PWA-SHARE-CODEC-02: byte caps (unicode-safe), truncation flag survives a pre-truncated draft, null-on-malformed', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    const base = {
+      entryId: '7',
+      bodyHash: `0x${'cd'.repeat(32)}`,
+      authorWallet: '0:bb',
+    };
+    // Snippet/author/title are BYTE-capped on encode, never mid-codepoint.
+    const capped = m.decodeShareBlockContent(m.encodeShareBlockContent({
+      ...base,
+      author: 'я'.repeat(200),
+      title: 'ж'.repeat(200),
+      snippet: 'ю'.repeat(5000),
+    }));
+    expect(m.utf8ByteLength(capped!.author)).toBeLessThanOrEqual(m.SHARE_AUTHOR_MAX_BYTES);
+    expect(m.utf8ByteLength(capped!.title)).toBeLessThanOrEqual(m.SHARE_TITLE_MAX_BYTES);
+    expect(m.utf8ByteLength(capped!.snippet)).toBeLessThanOrEqual(m.SHARE_SNIPPET_MAX_BYTES);
+    // The encoder's own cut sets the flag...
+    expect(capped!.textTruncated).toBe(true);
+    // ...and a draft PRE-truncated by the composer (echo == wire) keeps the flag even though the re-cut is a no-op.
+    const preCut = m.decodeShareBlockContent(m.encodeShareBlockContent({ ...base, snippet: 'short', textTruncated: true }));
+    expect(preCut!.textTruncated).toBe(true);
+    expect(preCut!.hasImage).toBe(false);
+    // Malformed / future frames decode to null — a bad share block never poisons the carrying message.
+    expect(m.decodeShareBlockContent(new Uint8Array())).toBe(null);
+    expect(m.decodeShareBlockContent(new Uint8Array(64).fill(9))).toBe(null); // future version byte
+    const good = m.encodeShareBlockContent({ ...base, author: 'ab', title: 'cd', snippet: 'ef' });
+    expect(m.decodeShareBlockContent(good.slice(0, 44))).toBe(null); // chopped inside the wallet field
+    const badWalletLen = good.slice();
+    badWalletLen[42] = 0xff; // wallet length points past the buffer
+    expect(m.decodeShareBlockContent(badWalletLen)).toBe(null);
+  });
 });
