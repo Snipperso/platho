@@ -120,7 +120,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: 'd9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=60',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=61',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
@@ -130,7 +130,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=38',
+      moduleUrl: './ton-dns-provider.mjs?v=39',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
