@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=768" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=769" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -316,8 +316,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/alex, alex\.ath, alex\.ton, or EQ\.\.\./);
     expect(html).toMatch(/Local label is only shown on this device/);
     expect(html).toMatch(/id="identityMenuButton"/);
-    expect(html).toMatch(/id="privateComposerAddButton"/);
-    expect(html).toMatch(/id="privateComposerAddMenu"/);
+    // v769: the "+" add-menu is gone — image/file/link/check moved into the formatting toolbar; the payment
+    // check button keeps its id inside the toolbar, and the anonymous/wallet-visibility button stays on the row.
+    expect(html).toMatch(/id="privateComposerToolbar"/);
+    expect(html).not.toMatch(/id="privateComposerAddButton"/);
+    expect(html).not.toMatch(/id="privateComposerAddMenu"/);
     expect(html).toMatch(/id="paymentCheckButton"/);
     expect(html).toMatch(/id="privateAnonymousButton"/);
     expect(html).toMatch(/icon-eye-off/);
@@ -619,11 +622,12 @@ describe('PWA runtime config guard', () => {
     // (v730: an explanatory comment now sits between margin and padding — the mobile composer padding is
     // inset-free because the tab bar below owns the safe area; see the mobile-block pins in PWA-MSG-01.)
     expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;[\s\S]{0,260}?padding: 8px 14px/);
-    // Public composer is consistent with Private: full-bleed (no right gap) and its two left buttons
-    // are sized exactly like the Private composer buttons at both breakpoints.
+    // Public composer is consistent with Private: full-bleed (no right gap). v769: the "+" add-menu and its
+    // attachment button are gone (moved into the formatting toolbar); the public composer's leading input-row
+    // control is the comments toggle, sized like the private anon button at both breakpoints.
     expect(css).toMatch(/\.public-composer\s*{[\s\S]*?max-width: none;/);
-    expect(css).toMatch(/\.public-composer > \.attachment-button\s*{\s*width: 44px;\s*height: 44px;/);
-    expect(css).toMatch(/\.public-composer > \.composer-post-option,\s*\.public-composer > \.attachment-button\s*{\s*width: 38px;\s*height: 44px;/);
+    expect(css).toMatch(/\.composer-post-option\s*{[\s\S]*?width: 44px;\s*height: 44px;/);
+    expect(css).toMatch(/\.composer \.private-anonymous-button,\s*\.public-composer \.composer-post-option\s*{\s*width: 38px;\s*height: 44px;/);
     expect(css).toMatch(/\.vault-move-list\s*{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
     expect(css).toMatch(/\.vault-asset-move-header\s*{\s*grid-template-columns: minmax\(0, 1fr\) auto;/);
     expect(css).toMatch(/\.vault-asset-move-body\s*{\s*grid-template-columns: max-content minmax\(0, 1fr\);/);
@@ -5147,9 +5151,11 @@ describe('PWA runtime config guard', () => {
     // rows whenever a wallet was present (textarea/send stayed on row 1, overlapping the quote strip).
     // v766: the share chip shares the same composer row — the class stays while EITHER strip is up.
     expect(app).toMatch(/composer\?\.classList\.toggle\('is-replying', Boolean\(privateReplyDraft \|\| privateShareDraft\)\);/);
-    expect(css).toMatch(/\.composer\.is-replying > \.composer-reply-context \{\s*grid-row: 1;/);
-    expect(css).toMatch(/\.composer\.is-replying > \.emoji-button,\s*\.composer\.is-replying > textarea,\s*\.composer\.is-replying > \.send-button \{\s*grid-row: 2;/);
-    expect(css).toMatch(/\.composer\.is-replying > \.private-anonymous-button,\s*\.composer\.is-replying > \.composer-add,\s*\.composer\.is-replying > \.composer-cost-status \{\s*grid-row: 3;/);
+    // v769: the composer is a flex COLUMN now (no grid reply-row reshuffle). The reply/share context strips are
+    // earlier flex children, so DOM order alone puts them directly above the input row on every width — no
+    // .is-replying grid juggling needed (the class stays as a harmless hook).
+    expect(css).toMatch(/\.composer \{\s*display: flex;\s*flex-direction: column;/);
+    expect(html).toMatch(/id="privateReplyContext"[\s\S]*?id="privateShareContext"[\s\S]*?class="composer-input-row"/);
     expect(css).not.toMatch(/#composer\[data-publish-mode/);
     expect(css).not.toMatch(/\.composer:has\(> \.composer-reply-context/);
     expect(css).toMatch(/\.message,\s*\.comment-item \{\s*position: relative;\s*touch-action: pan-y;/);
@@ -6025,12 +6031,13 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="publicShareContext"[\s\S]*?id="publicShareCancelButton"/);
     // Embed: source-channel header resolved by the RECIPIENT (their own resolver; the sender's snapshot label is
     // a fallback only), collapsed with the shared toggle machinery keyed by the shared post's entry id.
-    // v767 (owner ask): the snippet LINKIFIES like the original post — safe for an unverified sender-authored
-    // snapshot because appendLinkifiedText allowlists http/https, sets NO live href, and every activation goes
-    // through the activateExternalLink interstitial that shows the real URL before opening.
+    // v767 (owner ask): the snippet LINKIFIES like the original post; v769 renders it through the safe formatting
+    // renderer (inlineOnly — a truncated excerpt stays a single inline run in its <p>). Safe for an unverified
+    // sender-authored snapshot: appendInlineFormatted routes every link through buildExternalLinkAnchor (no live
+    // href, activateExternalLink interstitial) and never uses innerHTML.
     const embedFn = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildPublicFeedArticle('));
     expect(embedFn).toMatch(/resolveWalletChannelDisplay\(wallet\)\?\.name/);
-    expect(embedFn).toMatch(/appendLinkifiedText\(text, block\.snippet\);/);
+    expect(embedFn).toMatch(/appendFormattedMessageText\(text, block\.snippet, \{ inlineOnly: true \}\);/);
     expect(embedFn).toMatch(/if \(block\.textTruncated\) text\.append\(document\.createTextNode\('…'\)\);/);
     expect(embedFn).toMatch(/wireClampToggleButton\(embed, body, inner, expandedSharedEmbeds, String\(block\.entryId\)\);/);
     // Both display surfaces render the embed (private bubbles + public posts/comments).
@@ -6142,14 +6149,22 @@ describe('PWA runtime config guard', () => {
   it('PWA-SAFE-LINK-01: URLs in user text auto-link SAFELY (scheme allowlist, textContent, noopener) and clicking routes through an external-link interstitial', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
-    // 1) User message/post text is rendered via appendLinkifiedText, NOT a raw textContent assignment, at every
-    //    user-text render site (private message block + legacy, public post/comment block + legacy).
-    expect(app).toMatch(/appendLinkifiedText\(text, block\.text\)/);
-    expect(app).toMatch(/appendLinkifiedText\(text, item\.text\)/);
-    expect(app).toMatch(/appendLinkifiedText\(text, message\.text\)/);
+    // 1) User message/post text is rendered via appendFormattedMessageText (v769 — the safe formatting renderer,
+    //    superseding appendLinkifiedText), NOT a raw textContent assignment, at every user-text render site
+    //    (private message block + legacy, public post/comment block + legacy).
+    expect(app).toMatch(/appendFormattedMessageText\(text, block\.text\)/);
+    expect(app).toMatch(/appendFormattedMessageText\(text, item\.text\)/);
+    expect(app).toMatch(/appendFormattedMessageText\(text, message\.text\)/);
     // The old raw assignments for these must be GONE (no user text goes straight to textContent + rendered clickable).
     expect(app).not.toMatch(/text\.textContent = block\.text;/);
     expect(app).not.toMatch(/text\.textContent = message\.text;/);
+    // v769: the live inline renderer (appendInlineFormatted, used by appendFormattedMessageText) links ONLY via
+    // the interstitial builder — never a live href, never innerHTML — exactly like the appendLinkifiedText path.
+    const inlineFn = app.slice(app.indexOf('function appendInlineFormatted('), app.indexOf('function messageTextHasBlockFormatting('));
+    expect(inlineFn).toMatch(/const safe = safeExternalUrl\(match\[5\]\);/); // [label](url): url is group 5
+    expect(inlineFn).toMatch(/safe \? buildExternalLinkAnchor\(match\[4\], safe\) : document\.createTextNode\(match\[0\]\)/);
+    expect(inlineFn).not.toMatch(/innerHTML/);
+    expect(inlineFn).not.toMatch(/\.href =/);
     // 2) HARD scheme allowlist: only http:/https: ever become a link; javascript:/data:/etc. are rejected.
     const safeFn = app.slice(app.indexOf('function safeExternalUrl('), app.indexOf('function safeExternalUrl(') + 320);
     expect(safeFn).toMatch(/url\.protocol !== 'https:' && url\.protocol !== 'http:'/);
@@ -6206,17 +6221,18 @@ describe('PWA runtime config guard', () => {
     expect(I18N_STRINGS.ru['composer.link']).toBeTruthy();
   });
 
-  it('PWA-PUBLIC-COMPOSER-MENU-01: the public composer folds image/file/link into one "+" add-menu (no payment check), with public file attachments', () => {
+  it('PWA-PUBLIC-COMPOSER-MENU-01: the public composer moves image/file/link into the formatting toolbar (no payment check), with public file attachments', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
-    // Owner ask (v751): don't proliferate public composer buttons — one "+" menu like the private composer, holding
-    // Image / File / Link (payment checks stay private-only).
-    expect(html).toMatch(/id="publicComposerAddButton"[\s\S]*?icon-plus/);
-    const pubMenu = html.slice(html.indexOf('id="publicComposerAddMenu"'), html.indexOf('id="publicComposerAddMenu"') + 1500);
-    expect(pubMenu).toMatch(/id="publicImageButton"/);
-    expect(pubMenu).toMatch(/id="publicFileButton"/);
-    expect(pubMenu).toMatch(/id="publicLinkButton"/);
-    expect(pubMenu).not.toMatch(/paymentCheckButton/); // no payment checks in public
+    // v769: the "+" add-menu is gone — the public formatting toolbar holds Image / File / Link (payment checks
+    // stay private-only). The toolbar buttons keep their ids so the existing handlers still find them.
+    expect(html).not.toMatch(/id="publicComposerAddButton"/);
+    const pubToolbar = html.slice(html.indexOf('id="publicComposerToolbar"'), html.indexOf('id="publicComposerToolbar"') + 4200);
+    expect(pubToolbar).toMatch(/id="publicImageButton"/);
+    expect(pubToolbar).toMatch(/id="publicFileButton"/);
+    expect(pubToolbar).toMatch(/id="publicLinkButton"/);
+    expect(pubToolbar).toMatch(/id="publicEmojiButton"/);
+    expect(pubToolbar).not.toMatch(/paymentCheckButton/); // no payment checks in public
     expect(html).toMatch(/id="publicFileInput"/);
     expect(html).toMatch(/id="publicFilePanel"/);
     // Public FILE attachments ride the same FILE document block + publish path as private, threaded as a PARAM so the
@@ -6225,8 +6241,83 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const fileAttachments = normalizePrivateFileAttachments\(publicFileAttachments\);.*captured BEFORE the clear/);
     expect(app).toMatch(/await submitPublicPostThroughVault\(\{\s*\n\s*text,\s*\n\s*attachments,\s*\n\s*fileAttachments,/);
     expect(app).toMatch(/await submitPublicCommentThroughVault\(draftCommentTarget, text, attachments, fileAttachments\)/);
-    expect(app).toMatch(/function togglePublicComposerAddMenu\(\)/);
-    expect(I18N_STRINGS.en['composer.addPublicAttachment']).toBeTruthy();
+    // The toolbar is wired (▼ hide + delegated format buttons + open-on-field-click).
+    expect(app).toMatch(/setupComposerToolbar\(publicComposerToolbar, publicMessageInput, publicToolbarHide\)/);
+    expect(I18N_STRINGS.en['composer.formatBar']).toBeTruthy();
+  });
+
+  it('PWA-COMPOSER-FORMAT-01: a slide-out formatting toolbar (both composers) inserts safe markdown that renders via a textContent-only formatter, with a live preview', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+
+    // SAFE renderer: inline (bold/italic/code/link) + block (heading/quote/list) + a paragraph alignment prefix.
+    // XSS posture: createElement + textContent ONLY, never innerHTML; links via the interstitial builder.
+    const inlineFn = app.slice(app.indexOf('function appendInlineFormatted('), app.indexOf('function messageTextHasBlockFormatting('));
+    expect(inlineFn).toMatch(/const el = document\.createElement\('strong'\);\s*el\.textContent = match\[1\];/);
+    expect(inlineFn).toMatch(/const el = document\.createElement\('em'\);\s*el\.textContent = match\[2\];/);
+    expect(inlineFn).toMatch(/buildExternalLinkAnchor\(match\[4\], safe\)/);
+    expect(inlineFn).not.toMatch(/innerHTML/);
+    const blockFn = app.slice(app.indexOf('function appendFormattedMessageText('), app.indexOf('function appendFormattedMessageText(') + 3200);
+    expect(blockFn).toMatch(/options\.inlineOnly === true \|\| !messageTextHasBlockFormatting\(str\)/); // inline fast path
+    expect(blockFn).toMatch(/msg-heading/);
+    expect(blockFn).toMatch(/document\.createElement\('blockquote'\)/);
+    expect(blockFn).toMatch(/document\.createElement\(ordered \? 'ol' : 'ul'\)/);
+    expect(blockFn).toMatch(/msg-align-\$\{align\}/);
+    expect(blockFn).not.toMatch(/innerHTML/);
+    // Block-marker regexes.
+    expect(app).toMatch(/const MSG_HEADING_RE = \/\^\(#\{1,3\}\)/);
+    expect(app).toMatch(/const MSG_QUOTE_RE = /);
+    expect(app).toMatch(/const MSG_ALIGN_RE = \/\^::\(center\|justify\)/);
+    // The 5 message render sites go through the formatter (private bubble + legacy, public post/comment + legacy,
+    // shared-post embed). Covered by count.
+    expect(app.match(/appendFormattedMessageText\(/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+
+    // Toolbar markup (both composers): format buttons + relocated attachment/emoji buttons + ▼ hide.
+    for (const bar of ['privateComposerToolbar', 'publicComposerToolbar']) {
+      const slice = html.slice(html.indexOf(`id="${bar}"`), html.indexOf(`id="${bar}"`) + 4200);
+      for (const fmt of ['heading', 'bold', 'italic', 'list', 'quote', 'center', 'justify', 'preview']) {
+        expect(slice, `${bar}:${fmt}`).toMatch(new RegExp(`data-format="${fmt}"`));
+      }
+      expect(slice).toMatch(/composer-toolbar-hide/);
+    }
+    // Only the private toolbar carries the payment-check button.
+    const privBar = html.slice(html.indexOf('id="privateComposerToolbar"'), html.indexOf('id="privateComposerToolbar"') + 4200);
+    expect(privBar).toMatch(/id="paymentCheckButton"/);
+    // The input row keeps ONLY the leading control + textarea + send.
+    expect(html).toMatch(/class="composer-input-row">\s*<button class="icon-button private-anonymous-button"/);
+
+    // Format logic: selection wrap (bold/italic), line prefix (heading/quote/list), alignment prefix.
+    expect(app).toMatch(/function wrapComposerSelection\(textarea, open, close\)/);
+    expect(app).toMatch(/function prefixComposerLines\(textarea, prefix\)/);
+    expect(app).toMatch(/function setComposerAlignment\(textarea, kind\)/);
+    const applyFn = app.slice(app.indexOf('function applyComposerFormat('), app.indexOf('function applyComposerFormat(') + 700);
+    expect(applyFn).toMatch(/case 'bold': wrapComposerSelection\(textarea, '\*\*', '\*\*'\)/);
+    expect(applyFn).toMatch(/case 'heading': prefixComposerLines\(textarea, '# '\)/);
+    expect(applyFn).toMatch(/case 'center': setComposerAlignment\(textarea, 'center'\)/);
+    expect(applyFn).toMatch(/case 'preview': openComposerPreview\(textarea\)/);
+    // Driver: open on a deliberate field CLICK (not focus/typing), ▼ hides, mousedown keeps the selection.
+    const setupFn = app.slice(app.indexOf('function setupComposerToolbar('), app.indexOf('function setupComposerToolbar(') + 1100);
+    expect(setupFn).toMatch(/textarea\.addEventListener\('click', \(\) => showComposerToolbar\(textarea\)\)/);
+    expect(setupFn).toMatch(/hideButton\?\.addEventListener\('click', \(\) => hideComposerToolbar\(textarea\)\)/);
+    expect(setupFn).toMatch(/toolbar\.addEventListener\('mousedown'/);
+    expect(css).toMatch(/\.composer-toolbar \{[\s\S]*?max-height: 0;[\s\S]*?opacity: 0;/);
+    expect(css).toMatch(/\.composer-toolbar\.is-open \{[\s\S]*?opacity: 1;/);
+
+    // Preview modal renders the draft through the SAME safe formatter + block builders.
+    expect(html).toMatch(/id="composerPreviewDialog"[\s\S]*?id="composerPreviewBody"/);
+    expect(app).toMatch(/function openComposerPreview\(textarea\)/);
+    const previewFn = app.slice(app.indexOf('function renderComposerPreviewBlocks('), app.indexOf('function renderComposerPreviewBlocks(') + 1600);
+    expect(previewFn).toMatch(/appendFormattedMessageText\(text, block\.text\)/);
+    expect(previewFn).toMatch(/buildSharedPostEmbed\(block\)/);
+
+    // Every locale ships the toolbar/preview strings (OPSEC key parity).
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
+      for (const key of ['composer.formatHeading', 'composer.formatBold', 'composer.formatItalic', 'composer.formatList', 'composer.formatQuote', 'composer.formatAlignCenter', 'composer.formatAlignJustify', 'composer.previewPost', 'composer.hideFormatBar', 'composer.previewTitle', 'composer.previewEmpty']) {
+        expect(dict[key], `${locale}:${key}`).toBeTruthy();
+      }
+    }
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7365,18 +7456,18 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v843/);
+    expect(sw).toMatch(/platho-pwa-prototype-v844/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=260/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=261/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=768/);
+    expect(sw).toMatch(/\.\/app\.js\?v=769/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=27/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=27/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=28/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
