@@ -182,7 +182,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=26';
+} from './i18n.mjs?v=27';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v766';
+const PLATHO_APP_RUNTIME_VERSION = 'v767';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6847,11 +6847,12 @@ const feedPostClampObserver = typeof ResizeObserver === 'function' ? new ResizeO
 // height to the measured full height, then drop the clamp entirely (max-height:none — later image growth stays
 // unclamped). CSSOM per-property assignment only (prod CSP kills setAttribute('style'), allows .style.prop).
 // prefers-reduced-motion turns the transition off in CSS — transitionend then never fires, so the timer
-// backstop (also covering a mid-flight display:none) guarantees the release either way.
+// backstop (also covering a mid-flight display:none) guarantees the release either way. The expanded class
+// keeps the toggle button visible (relabeled "Collapse" by the caller).
 function expandClampedBody(root, body) {
   const fullHeight = body.scrollHeight;
   body.style.maxHeight = `${body.clientHeight}px`;
-  root.classList.add('feed-post-expanding');
+  root.classList.add('feed-post-expanding', 'feed-post-expanded');
   root.classList.remove('feed-post-collapsible', 'feed-post-overflowing');
   requestAnimationFrame(() => { body.style.maxHeight = `${fullHeight}px`; });
   const release = () => {
@@ -6860,6 +6861,61 @@ function expandClampedBody(root, body) {
   };
   body.addEventListener('transitionend', release, { once: true });
   window.setTimeout(release, 450);
+}
+
+// Reverse toggle (owner ask v767): re-clamp an expanded post/embed, animated from the current full height down
+// to the CSS clamp. The clamp target is read from the :root var that applies to this root (posts vs shared-post
+// embeds); an unparseable value degrades to an instant un-animated re-clamp. After the release the card is
+// pulled back into view — collapsing removes the content the reader was level with, which would otherwise
+// strand them past the card's new bottom.
+function collapseClampedBody(root, body) {
+  const varName = root.classList.contains('shared-post-embed') ? '--shared-post-embed-max-height' : '--feed-post-collapsed-max-height';
+  const target = Number.parseFloat(getComputedStyle(root).getPropertyValue(varName));
+  root.classList.remove('feed-post-expanded');
+  root.classList.add('feed-post-collapsible', 'feed-post-overflowing');
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    body.style.removeProperty('max-height');
+    root.classList.remove('feed-post-expanding');
+    root.scrollIntoView({ block: 'nearest' });
+  };
+  if (!Number.isFinite(target)) { release(); return; }
+  // Pin the current height inline (overrides the class clamp), then transition down to the clamp value; the
+  // release removes the inline pin at the exact height the class clamp takes over — no jump.
+  body.style.maxHeight = `${body.scrollHeight}px`;
+  root.classList.add('feed-post-expanding');
+  requestAnimationFrame(() => { body.style.maxHeight = `${target}px`; });
+  body.addEventListener('transitionend', release, { once: true });
+  window.setTimeout(release, 450);
+}
+
+// The shared expand/collapse toggle button for a clamped root (feed article or shared-post embed): one button,
+// relabeled per state, session state carried by `expandedSet[key]` so rebuilds re-render the current state.
+function wireClampToggleButton(root, body, inner, expandedSet, key) {
+  const expanded = expandedSet.has(key);
+  root.classList.add(expanded ? 'feed-post-expanded' : 'feed-post-collapsible');
+  const toggleButton = document.createElement('button');
+  toggleButton.type = 'button';
+  toggleButton.className = 'feed-expand-button';
+  toggleButton.textContent = expanded ? t('public.collapsePost') : t('public.showFullPost');
+  toggleButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (expandedSet.has(key)) {
+      expandedSet.delete(key);
+      toggleButton.textContent = t('public.showFullPost');
+      feedPostClampObserver.observe(inner);
+      collapseClampedBody(root, body);
+    } else {
+      expandedSet.add(key);
+      toggleButton.textContent = t('public.collapsePost');
+      feedPostClampObserver.unobserve(inner);
+      expandClampedBody(root, body);
+    }
+  });
+  root.append(toggleButton);
+  if (!expanded) feedPostClampObserver.observe(inner);
 }
 
 // Session-expanded shared-post embeds, by the SHARED post's entry id: private bubbles and feed articles rebuild
@@ -6918,7 +6974,11 @@ function buildSharedPostEmbed(block) {
   if (block.snippet) {
     const text = document.createElement('p');
     text.className = 'feed-block-text shared-post-embed-text';
-    text.textContent = block.textTruncated ? `${block.snippet}…` : block.snippet;
+    // Links render like in the original post (owner ask v767). Safe for an UNVERIFIED sender-authored snapshot:
+    // appendLinkifiedText allowlists http/https, sets NO live href, and every activation goes through the
+    // activateExternalLink interstitial that shows the real URL before opening.
+    appendLinkifiedText(text, block.snippet);
+    if (block.textTruncated) text.append(document.createTextNode('…'));
     inner.append(text);
   }
   if (block.hasImage) {
@@ -6929,20 +6989,8 @@ function buildSharedPostEmbed(block) {
   }
   body.append(inner);
   embed.append(body);
-  if (feedPostClampObserver && !expandedSharedEmbeds.has(String(block.entryId))) {
-    embed.classList.add('feed-post-collapsible');
-    const expandButton = document.createElement('button');
-    expandButton.type = 'button';
-    expandButton.className = 'feed-expand-button';
-    expandButton.textContent = t('public.showFullPost');
-    expandButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      expandedSharedEmbeds.add(String(block.entryId));
-      feedPostClampObserver.unobserve(inner);
-      expandClampedBody(embed, body);
-    });
-    embed.append(expandButton);
-    feedPostClampObserver.observe(inner);
+  if (feedPostClampObserver) {
+    wireClampToggleButton(embed, body, inner, expandedSharedEmbeds, String(block.entryId));
   }
   return embed;
 }
@@ -7025,19 +7073,8 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
   body.append(bodyContent);
   article.append(body);
   // Compact cards (channel plates / empty states) carry a line or two — no clamp machinery for them.
-  if (feedPostClampObserver && !item.compact && !publicFeedExpandedPosts.has(String(item.id))) {
-    article.classList.add('feed-post-collapsible');
-    const expandButton = document.createElement('button');
-    expandButton.type = 'button';
-    expandButton.className = 'feed-expand-button';
-    expandButton.textContent = t('public.showFullPost');
-    expandButton.addEventListener('click', () => {
-      publicFeedExpandedPosts.add(String(item.id));
-      feedPostClampObserver.unobserve(bodyContent);
-      expandClampedBody(article, body);
-    });
-    article.append(expandButton);
-    feedPostClampObserver.observe(bodyContent);
+  if (feedPostClampObserver && !item.compact) {
+    wireClampToggleButton(article, body, bodyContent, publicFeedExpandedPosts, String(item.id));
   }
   // Comments are no longer rendered inline in the feed — they load on demand on the post detail screen
   // (openPublicPostDetail). appendPublicItemComments is reused there.

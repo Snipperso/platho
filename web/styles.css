@@ -2191,7 +2191,8 @@ button.feed-item:hover {
   cursor: pointer;
 }
 
-.feed-post-overflowing > .feed-expand-button {
+.feed-post-overflowing > .feed-expand-button,
+.feed-post-expanded > .feed-expand-button {
   display: block;
 }
 
