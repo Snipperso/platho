@@ -209,7 +209,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=37/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=38/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=754" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=755" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1850,8 +1850,24 @@ describe('PWA runtime config guard', () => {
     // 500s from post-landing stragglers). The variant window advances on the SUM of per-pass counters
     // (retryCount doesn't advance on race/duplicate branches) so every pass still fires a FRESH variant.
     expect(app).not.toMatch(/PRIVATE_PUBLISH_BROADCAST_BURST_COUNT/);
-    expect(app).toMatch(/const broadcastPassIndex = retryCount \+ duplicateRelayCount \+ nonceRaceCount/);
+    expect(app).toMatch(/const broadcastPassIndex = retryCount \+ duplicateRelayCount \+ nonceRaceCount \+ timeoutAbortCount/);
     expect(app).toMatch(/const primaryIndex = variantBocs \? \(1 \+ broadcastPassIndex\) % variantBocs\.length : 0/);
+    // v755: a large-media external's sendBoc ceiling scales with its wire size (+1s/4KB, capped at the
+    // queue tier) — the flat 8s heal ceiling client-aborted every ~47KB POST during a toncenter slow
+    // spell, an endless zero-progress loop. The base mirrors the transport default via IMPORT (not a
+    // hand-copied literal), and a client-aborted (TIMEOUT) POST stamps a dedicated counter so the next
+    // pass paces on the short cooldown and rotates to a fresh max_charge variant.
+    expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS = 1_000/);
+    expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_MAX_MS = PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS/);
+    expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_BASE_MS = TON_RPC_REQUEST_TIMEOUT_MS/);
+    expect(app).toMatch(/request\.requestTimeoutMs = vaultSendBocRequestTimeoutMs\(built\.boc, options\.requestTimeoutMs \?\? options\.timeoutMs\)/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT = 6/);
+    expect(app).toMatch(/broadcastTimeoutAbortCount: timeoutAbortCount \+ 1/);
+    // v755: callSend's operation bound adds the queue allowance so a busy serial pump cannot eat the
+    // upload budget (the fetch itself stays bounded by requestTimeoutMs via its own AbortController).
+    const vaultRpcProviderSrc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    expect(vaultRpcProviderSrc).toMatch(/const operationTimeoutMs = requestTimeoutMs > 0 \? requestTimeoutMs \+ queueAllowanceMs : 0/);
+    expect(vaultRpcProviderSrc).toMatch(/export const TON_RPC_REQUEST_TIMEOUT_MS = 15_000/);
     // v629: the ~16×47KB variant BoCs are STRIPPED before persisting to encrypted history (else every status
     // notify would re-encrypt+write ~1.5MB — a latency regression). In-memory rotation keeps them.
     expect(app).toMatch(/function publishStateForHistory\(publishState\)/);
@@ -1884,8 +1900,10 @@ describe('PWA runtime config guard', () => {
     // skips the 35s cooldown; repeat attempts keep it. Collapses the residual second-capsule delay.
     // v626: the cooldown is race-aware — zero on the very first heal, the short race cooldown while 16453
     // fleet-race bounces are fresh, and the full 35s otherwise (repeat relays / duplicates).
-    expect(app).toMatch(/let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;\s*if \(pastFastBudget\) \{\s*rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS;\s*\} else if \(retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce\) \{\s*if \(nonceRaceCount === 0\) rebroadcastCooldownMs = 0;\s*else if \(nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT\) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;/);
-    expect(app).toMatch(/duplicateRelayCount >= PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT \|\| nonceRaceCount >= PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT[\s\S]{0,400}rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS/);
+    // v755: timeout-aborted POSTs join the ladder — zero-cooldown requires a clean timeout history too,
+    // the short race cooldown paces fresh timeout-aborts, and the 35s tail takes over past their limit.
+    expect(app).toMatch(/let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;\s*if \(pastFastBudget\) \{\s*rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS;\s*\} else if \(retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce\) \{\s*if \(nonceRaceCount === 0 && timeoutAbortCount === 0\) rebroadcastCooldownMs = 0;\s*else if \(nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT\s*&& timeoutAbortCount < PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT\) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;/);
+    expect(app).toMatch(/duplicateRelayCount >= PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT\s*\|\| nonceRaceCount >= PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT\s*\|\| timeoutAbortCount >= PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT[\s\S]{0,400}rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS/);
     expect(app).toMatch(/if \(publishPartLastBroadcastAgeMs\(head\) < rebroadcastCooldownMs\) continue/);
     expect(app).not.toMatch(/function markPublishPartForFreshNonceRetry/);
     expect(app).not.toMatch(/fresh nonce retry required/);
@@ -7066,7 +7084,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v829/);
+    expect(sw).toMatch(/platho-pwa-prototype-v830/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7074,7 +7092,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=754/);
+    expect(sw).toMatch(/\.\/app\.js\?v=755/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);
@@ -7084,20 +7102,20 @@ describe('PWA runtime config guard', () => {
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=7/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=102/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=56/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=44/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=103/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=57/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=59/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=41/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=56/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=39/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=37/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=44/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=60/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=42/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=57/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=40/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=38/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=8/);
