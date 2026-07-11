@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=759" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=760" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1456,13 +1456,28 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function publishConfirmNoProgressDeadlineMs\(publishState\)/);
     expect(app).toMatch(/function privatePendingPublishConfirmAgeMs\(message\)/);
     expect(app).toMatch(/const createdAtMs = messageCreatedAtMs\(message\)/);
-    // Resume immediately surfaces Retry for an already-stuck no-progress message (no confirm round-trip).
+    // Resume surfaces Retry for an already-stuck no-progress message — AFTER one healing pass this
+    // session (v760): the old instant-stop buried a recoverable queue right at reload (drivers never
+    // ran once, so "reload to recover" silently did nothing). The age terminals (scheduler a+b, resume,
+    // and the public driver symmetrically) share the one-pass grace; the pass marks itself in a
+    // finally, so a FAILED RPC attempt also counts — a persistent outage still terminates instead of
+    // rescheduling forever. The PARTIAL-expiry stopper is deliberately NOT gated (review: gating it
+    // deadlocked expired partials into a driverless zombie; its terminal keeps the manual Retry).
     const resumeSrc = app.slice(
       app.indexOf('function resumePendingPrivatePublishConfirmations'),
       app.indexOf('function hasPendingPrivateSendRetry'),
     );
     expect(resumeSrc).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\?\.publishState\)/);
     expect(resumeSrc).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
+    expect(resumeSrc).toMatch(/privatePublishConfirmPassRanThisSession\.has\(message\)\s*\n\s*&& privateMessageHasPublishAttempt\(message\)/);
+    expect(app).toMatch(/const privatePublishConfirmPassRanThisSession = new WeakSet\(\);/);
+    expect(app).toMatch(/const publicPublishConfirmPassRanThisSession = new Set\(\);/);
+    expect(app).toMatch(/\} finally \{[\s\S]{0,400}privatePublishConfirmPassRanThisSession\.add\(message\);\s*\n\s*\}/);
+    expect(app).toMatch(/if \(privatePublishConfirmPassRanThisSession\.has\(message\)\s*\n\s*&& message\.publishState\?\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED/);
+    // The partial-expiry stopper must stay UNGATED (a gated stop + no armed driver = driverless zombie).
+    expect(app).not.toMatch(/!forcedStop && !privatePublishConfirmPassRanThisSession\.has\(message\)/);
+    expect(app).toMatch(/publicPublishConfirmPassRanThisSession\.has\(passKey\)/);
+    expect(app).toMatch(/publicPublishConfirmPassRanThisSession\.add\(passKey\);/);
     // Stopping marks the message for manual recovery (the Retry button's render condition).
     const stopSource = app.slice(
       app.indexOf('function stopPrivatePublishConfirmationRetry'),
@@ -7188,7 +7203,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v834/);
+    expect(sw).toMatch(/platho-pwa-prototype-v835/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7196,7 +7211,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=759/);
+    expect(sw).toMatch(/\.\/app\.js\?v=760/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);
