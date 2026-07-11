@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=762" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=763" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1045,7 +1045,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function sendPreparedCapsulesThroughVault/);
     expect(app).toMatch(/CAPSULEHUB_PUBLISH_STATUS_CONFIRMED/);
     expect(app).toMatch(/VAULT_PUBLISH_STATUS_PARTIAL/);
-    expect(app).toMatch(/submitted \$\{count\}\/\$\{total\}, confirming \$\{confirmed\}\/\$\{total\}/);
+    expect(app).toMatch(/`submitted \$\{landed\}\/\$\{total\}`/);
+    expect(app).toMatch(/`confirming \$\{confirmed\}\/\$\{total\}`/);
     expect(app).toMatch(/publishState: message\.publishState/);
     expect(app).toMatch(/updateMessageInEncryptedHistory/);
     expect(app).toMatch(/attemptCancelPaymentCheckAfterPublishFailure/);
@@ -1434,8 +1435,12 @@ describe('PWA runtime config guard', () => {
     // The private publish-confirm auto-retry is bounded by AGE-based terminals (decoupled from the poll cadence,
     // so tight ~1s polling never trips them early): past the no-progress deadline with nothing fully confirmed it
     // STOPS and surfaces a durable Retry instead of spinning on "submitted N/N, confirming" forever. v648: the
-    // deadline is PART-COUNT SCALED (the flat 6-min constant was the 2-capsule calibration).
-    expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\.publishState\)/);
+    // deadline is PART-COUNT SCALED (the flat 6-min constant was the 2-capsule calibration). v763: the age is
+    // QUEUE-PROGRESS anchored (chain-nonce advance / own parts landing), not creation-anchored — a message deep
+    // in a MOVING queue must never be buried, nor a manual Retry oscillate back to red within seconds.
+    expect(app).toMatch(/function privatePublishNoProgressAgeMs\(message\)/);
+    expect(app).toMatch(/publishState\.queueProgressAt = Date\.now\(\)/);
+    expect(app).toMatch(/privatePublishNoProgressAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\.publishState\)/);
     expect(app).toMatch(/Number\(message\.publishState\?\.confirmedCount \?\? 0\) === 0/);
     expect(app).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
     expect(app).toMatch(/error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'\) return 'not confirmed: chain confirmation timed out'/);
@@ -1444,7 +1449,7 @@ describe('PWA runtime config guard', () => {
     // to the full deadline, gated by publishStateBroadcastIsFailing so a fine-but-slow send is never killed.
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS = 2 \* 60 \* 1000/);
     expect(app).toMatch(/function publishStateBroadcastIsFailing\(publishState\)/);
-    expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS[\s\S]*publishStateBroadcastIsFailing\(message\.publishState\)/);
+    expect(app).toMatch(/privatePublishNoProgressAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS[\s\S]*publishStateBroadcastIsFailing\(message\.publishState\)/);
     expect(app).toMatch(/code: 'BROADCAST_REJECTED'/);
     expect(app).toMatch(/error\?\.code === 'BROADCAST_REJECTED'\) return 'not confirmed: RPC broadcast unavailable'/);
     // STABLE-age trigger: a long-stuck no-progress message surfaces Retry without restarting the
@@ -1467,7 +1472,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function resumePendingPrivatePublishConfirmations'),
       app.indexOf('function hasPendingPrivateSendRetry'),
     );
-    expect(resumeSrc).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\?\.publishState\)/);
+    expect(resumeSrc).toMatch(/privatePublishNoProgressAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\?\.publishState\)/);
     expect(resumeSrc).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
     expect(resumeSrc).toMatch(/privatePublishConfirmPassRanThisSession\.has\(message\)\s*\n\s*&& privateMessageHasPublishAttempt\(message\)/);
     expect(app).toMatch(/const privatePublishConfirmPassRanThisSession = new WeakSet\(\);/);
@@ -2011,16 +2016,20 @@ describe('PWA runtime config guard', () => {
     expect(metaSource).toMatch(/PUBLISH_PART_STATUS_SENT/);
     expect(metaSource).toMatch(/PUBLISH_PART_STATUS_UNKNOWN/);
     expect(metaSource).toMatch(/const broadcast = Math\.max\(0, publishStateBroadcastCount\(publishState\)\)/);
-    // v757: the multi-part confirming text carries a LIVE `confirming C/N` counter (frozen "submitted
-    // 8/8, confirming" over a ~1min burst read as a hang); single-part keeps the plain two-word text.
-    expect(metaSource).toMatch(/const confirmingMeta = \(count\) => \(total === 1/);
-    expect(metaSource).toMatch(/submitted \$\{count\}\/\$\{total\}, confirming \$\{confirmed\}\/\$\{total\}/);
-    expect(metaSource).toMatch(/confirmingMeta\(broadcast\)/);
-    expect(metaSource).toMatch(/confirmingMeta\(pending\)/);
+    // v763: TWO-PHASE live progress (owner ask — the joint "submitted 8/8, confirming 1/8" glued two
+    // counters, and its "submitted" jumped instantly because it counted sign-time SENT stamps):
+    // phase 1 `submitted L/N` ticks with REAL on-chain landings, phase 2 `confirming C/N` ticks
+    // CapsuleHub confirmations; each phase keeps its keyword so the substring gates match both.
+    expect(metaSource).toMatch(/const landed = Math\.max\(submitted, confirmed\)/);
+    expect(metaSource).toMatch(/landed < total\s*\n\s*\? `submitted \$\{landed\}\/\$\{total\}`\s*\n\s*: `confirming \$\{confirmed\}\/\$\{total\}`/);
+    expect(metaSource).toMatch(/return progressMeta\(\)/);
+    expect(metaSource).not.toMatch(/confirmingMeta/);
     expect(metaSource).toMatch(/const pending = Math\.max\(submitted, publishStatePendingCount\(publishState\), publishStateVisibleSubmittedCount\(publishState\)\)/);
     expect(metaSource).toMatch(/if \(pending <= 0\) return 'not sent'/);
-    expect(metaSource).toMatch(/total === 1\s*\? 'submitted, confirming'/);
-    expect(metaSource).toMatch(/submitted \$\{pending\}\/\$\{total\}, retrying/);
+    expect(metaSource).toMatch(/if \(total === 1\) return 'submitted, confirming';/);
+    // The retrying branch shares the landed-count semantics (counting pending made the visible number
+    // JUMP UP when a part flipped FAILED).
+    expect(metaSource).toMatch(/submitted \$\{landed\}\/\$\{total\}, retrying/);
     expect(metaSource).not.toMatch(/partial publish/);
     expect(app).toMatch(/text\.includes\('not sent'\)/);
     expect(app).not.toMatch(/text\.includes\('partial'\)\) return 'failed'/);
@@ -3518,7 +3527,7 @@ describe('PWA runtime config guard', () => {
     // A multi-part publish that never FULLY confirms STOPS at the AGE-based no-progress deadline (decoupled from
     // the poll cadence) and surfaces a manual Retry instead of spinning forever on "submitted N/N, confirming".
     // The manual Retry for a fully-submitted message re-confirms (never re-publishes), so no double-send regression.
-    expect(confirmationRetry).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\.publishState\)[\s\S]{0,200}stopPrivatePublishConfirmationRetry/);
+    expect(confirmationRetry).toMatch(/privatePublishNoProgressAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\.publishState\)[\s\S]{0,200}stopPrivatePublishConfirmationRetry/);
     expect(confirmationRetry).toMatch(/const delayMs = privatePublishConfirmDelayMs\(message, error\)/);
     expect(sendRetry).toMatch(/isStalePrivatePendingPublish\(message\) && !privateMessageHasPublishAttempt\(message\)/);
     expect(resumeSource).toMatch(/isStalePrivatePendingPublishConfirmation\(message\)/);
@@ -7209,7 +7218,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v837/);
+    expect(sw).toMatch(/platho-pwa-prototype-v838/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7217,7 +7226,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=762/);
+    expect(sw).toMatch(/\.\/app\.js\?v=763/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);

@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v762';
+const PLATHO_APP_RUNTIME_VERSION = 'v763';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -24376,6 +24376,9 @@ function setPublishPartStatus(publishState, index, status, extra = {}) {
       by: extra.confirmedBy ?? null,
       at: new Date().toISOString(),
     });
+    // OWN forward progress (a part landed or confirmed) refreshes the queue-progress anchor too —
+    // symmetric with the chain-nonce-advance stamp in the heal loop (see privatePublishNoProgressAgeMs).
+    if (status !== PUBLISH_PART_STATUS_FAILED) publishState.queueProgressAt = Date.now();
   }
   if (
     status === PUBLISH_PART_STATUS_SENT
@@ -24461,23 +24464,33 @@ function publishStateMeta(publishState) {
   const submitted = Math.max(0, Number(publishState?.submittedCount) || 0);
   const broadcast = Math.max(0, publishStateBroadcastCount(publishState));
   const pending = Math.max(submitted, publishStatePendingCount(publishState), publishStateVisibleSubmittedCount(publishState));
-  // The multi-part confirming text carries a LIVE progress counter (owner: a frozen "submitted 8/8,
-  // confirming" over a ~1min 8-part burst reads as a hang): `confirming C/N` ticks every few seconds
-  // as batches land and confirm (C = capsules fully CapsuleHub-confirmed; each part's confirm notify
-  // re-renders the chip). Single-part keeps the plain two-word text — one step, nothing to count.
-  const confirmingMeta = (count) => (total === 1
-    ? 'submitted, confirming'
-    : `submitted ${count}/${total}, confirming ${confirmed}/${total}`);
+  // TWO-PHASE live progress (v763, owner ask — the joint "submitted 8/8, confirming 1/8" read as two
+  // counters glued together, and its "submitted" jumped to 8/8 instantly because it counted the
+  // sign-time SENT stamp): phase 1 `submitted L/N` ticks batch-by-batch with REAL on-chain landings
+  // (vault_submitted+confirmed — submittedCount already includes confirmed); once every part landed,
+  // phase 2 `confirming C/N` ticks CapsuleHub confirmations up to 'published'. Each phase keeps its
+  // keyword ('submitted' / 'confirming') so every substring gate matches both. Single-part keeps the
+  // plain two-word text — one step, nothing to count.
+  const landed = Math.max(submitted, confirmed);
+  const progressMeta = () => {
+    if (total === 1) return 'submitted, confirming';
+    return landed < total
+      ? `submitted ${landed}/${total}`
+      : `confirming ${confirmed}/${total}`;
+  };
   if (confirmed >= total) return 'published';
   if (publishState?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
     if (pending <= 0) return 'not sent';
-    if (submitted <= 0 && broadcast > 0) return confirmingMeta(broadcast);
-    if (pending >= total) return confirmingMeta(pending);
-    return `submitted ${pending}/${total}, retrying`;
+    if (submitted <= 0 && broadcast > 0) return progressMeta();
+    if (pending >= total) return progressMeta();
+    // Same landed-count semantics as the phase display (review fix): counting PENDING here made the
+    // visible "submitted" figure JUMP UP when a part flipped FAILED (pending shrank below total and
+    // this branch took over with a bigger number than the landed count).
+    return `submitted ${landed}/${total}, retrying`;
   }
-  if (submitted <= 0 && broadcast > 0) return confirmingMeta(broadcast);
+  if (submitted <= 0 && broadcast > 0) return progressMeta();
   if (pending > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    return confirmingMeta(pending);
+    return progressMeta();
   }
   if (publishState?.status === 'failed') {
     // A pre-send failure (RPC 429/500/verification-degraded before anything left
@@ -25775,7 +25788,16 @@ function privatePartialSendRetryAgeMs(message) {
 
 function privatePartialSendRetryExpired(message) {
   if (!privateMessageHasPartialRetryablePublish(message)) return false;
-  const ageMs = privatePartialSendRetryAgeMs(message);
+  const startedAgeMs = privatePartialSendRetryAgeMs(message);
+  // QUEUE-PROGRESS anchored like the sibling give-up terminals (v763): a queued PARTIAL in a MOVING
+  // queue must not hard-expire on its immovable start time — that resurrected the Retry-oscillation
+  // (expire -> red -> manual Retry -> re-bounce behind the still-draining queue -> re-expire within
+  // seconds) for exactly the PARTIAL class. While the chain nonce advances under this message's
+  // passes (or its own parts land), the window slides; a genuinely stalled queue expires as before.
+  const progressMs = Number(message?.publishState?.queueProgressAt ?? 0) || 0;
+  const ageMs = startedAgeMs === null
+    ? null
+    : (progressMs > 0 ? Math.min(startedAgeMs, Math.max(0, Date.now() - progressMs)) : startedAgeMs);
   // Part-count scaled (v648): the partial-retry window must stay ABOVE the scaled no-progress terminal (its
   // calibrated 2-part relation was 15min = 6min terminal + 9min slack) or an honest N>=3 partial would lose its
   // retry machinery while the confirm driver still legitimately waits.
@@ -25846,6 +25868,20 @@ function clearPublishPartSignedAttempt(part) {
   delete part.broadcastDuplicateRelayCount;
   delete part.broadcastBudgetExhaustedWarned;
   delete part.externalBocVariants;
+}
+
+// Age for the give-up terminals (v763): time since the LAST observed forward progress — the chain
+// nonce advancing under this message's passes, or its own parts landing/confirming — never earlier
+// than the message's creation. Creation-anchored age buried messages sitting DEEP in a MOVING queue
+// (their age passed the deadline long before their turn while every pass proved others were landing)
+// and made a manual Retry oscillate back to red within seconds (re-arm -> one pass -> "age >=
+// deadline" -> red again; the owner pressed Retry 3-5x per message). Progress-anchored age decays
+// only when the queue is actually stalled.
+function privatePublishNoProgressAgeMs(message) {
+  const createdMs = Number(messageCreatedAtMs(message)) || 0;
+  const progressMs = Number(message?.publishState?.queueProgressAt ?? 0) || 0;
+  const anchor = Math.max(createdMs, progressMs);
+  return anchor > 0 ? Math.max(0, Date.now() - anchor) : privatePendingPublishConfirmAgeMs(message);
 }
 
 function publishPartNeedsBroadcastRetry(part) {
@@ -25963,6 +25999,28 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
   // whose nonce is >= this proven floor — their receipt slot cannot exist yet.
   publishState.lastBroadcastRetryNonceReadOkAt = Date.now();
   publishState.lastBroadcastRetryNonceReadValue = String(currentNonce);
+  // QUEUE-PROGRESS anchor (v763): when the observed chain nonce ADVANCES between passes, the serial
+  // queue in front of this message is MOVING — stamp the progress time. The age give-up terminals
+  // measure staleness from this anchor (see privatePublishNoProgressAgeMs), not from message creation:
+  // creation-anchored age buried messages deep in a moving queue (their age exceeded the deadline long
+  // before their turn) and made a manual Retry oscillate back to red within seconds. A genuinely
+  // stalled queue stops advancing, the anchor decays, and the terminals fire as before.
+  // MONOTONIC floor (review fix): the stored observation only ever RISES — a lagging keyless-fallback
+  // replica returning a lower nonce must neither regress the floor nor let the next higher read count
+  // as fresh "progress" (that alternation would re-stamp the anchor every ~2 passes under exactly the
+  // congested conditions that cause read fallbacks, and a wedged message would never terminal).
+  if (currentNonce !== null) {
+    let previousMax = null;
+    try {
+      previousMax = publishState.lastObservedChainNonce === undefined || publishState.lastObservedChainNonce === null
+        ? null
+        : BigInt(publishState.lastObservedChainNonce);
+    } catch { previousMax = null; /* malformed persisted value -> repair below as first observation */ }
+    if (previousMax === null || currentNonce > previousMax) {
+      publishState.lastObservedChainNonce = currentNonce.toString();
+      publishState.queueProgressAt = Date.now();
+    }
+  }
   // VPB2: every part of a batch shares ONE externalBoc + nonce. Group the retryable parts by that shared nonce
   // so each distinct in-flight external is re-broadcast at most ONCE per pass; all parts of the batch then move
   // together (the contract accepts or rejects the single external atomically).
@@ -26757,7 +26815,7 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
     && message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
     && Number(message.publishState?.confirmedCount ?? 0) === 0
     && Number(message.publishState?.submittedCount ?? 0) === 0
-    && privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS
+    && privatePublishNoProgressAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS
     && publishStateBroadcastIsFailing(message.publishState)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'RPC broadcast unavailable', code: 'BROADCAST_REJECTED' });
     return;
@@ -26767,7 +26825,7 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   // scaled (v648): an 8-capsule send legitimately runs its serial ladders far past the 2-capsule 6-min figure.
   if (privatePublishConfirmPassRanThisSession.has(message)
     && message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-    && privatePendingPublishConfirmAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message.publishState)) {
+    && privatePublishNoProgressAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message.publishState)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
     return;
   }
@@ -27049,7 +27107,7 @@ function resumePendingPrivatePublishConfirmations() {
         && privateMessageHasPublishAttempt(message)
         && message?.privatePublishConfirmStopped !== true
         && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-        && privatePendingPublishConfirmAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message?.publishState)) {
+        && privatePublishNoProgressAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message?.publishState)) {
         stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
         continue;
       }
@@ -27686,8 +27744,10 @@ async function runPublicPublishConfirmationPass(job) {
     schedulePublicPublishConfirmationPass(job, 2_500);
     return;
   }
-  const ageMs = Date.now() - job.createdAt;
   const publishState = job.publishState;
+  // Progress-anchored age (v763, symmetric with the private driver): the queue-progress stamp lives on
+  // the shared publishState, so a public record deep in a moving queue is not buried either.
+  const ageMs = Date.now() - Math.max(Number(job.createdAt) || 0, Number(publishState?.queueProgressAt ?? 0) || 0);
   const passKey = `${job.channelId}:${job.localId}`;
   // Age terminals before RPC — but only after ONE completed pass this session (v760, symmetric with
   // the private driver): a reload must attempt healing before it may give up, else a queue that aged
