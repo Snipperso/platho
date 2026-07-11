@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v756';
+const PLATHO_APP_RUNTIME_VERSION = 'v757';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -24367,16 +24367,23 @@ function publishStateMeta(publishState) {
   const submitted = Math.max(0, Number(publishState?.submittedCount) || 0);
   const broadcast = Math.max(0, publishStateBroadcastCount(publishState));
   const pending = Math.max(submitted, publishStatePendingCount(publishState), publishStateVisibleSubmittedCount(publishState));
+  // The multi-part confirming text carries a LIVE progress counter (owner: a frozen "submitted 8/8,
+  // confirming" over a ~1min 8-part burst reads as a hang): `confirming C/N` ticks every few seconds
+  // as batches land and confirm (C = capsules fully CapsuleHub-confirmed; each part's confirm notify
+  // re-renders the chip). Single-part keeps the plain two-word text — one step, nothing to count.
+  const confirmingMeta = (count) => (total === 1
+    ? 'submitted, confirming'
+    : `submitted ${count}/${total}, confirming ${confirmed}/${total}`);
   if (confirmed >= total) return 'published';
   if (publishState?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
     if (pending <= 0) return 'not sent';
-    if (submitted <= 0 && broadcast > 0) return total === 1 ? 'submitted, confirming' : `submitted ${broadcast}/${total}, confirming`;
-    if (pending >= total) return total === 1 ? 'submitted, confirming' : `submitted ${pending}/${total}, confirming`;
+    if (submitted <= 0 && broadcast > 0) return confirmingMeta(broadcast);
+    if (pending >= total) return confirmingMeta(pending);
     return `submitted ${pending}/${total}, retrying`;
   }
-  if (submitted <= 0 && broadcast > 0) return total === 1 ? 'submitted, confirming' : `submitted ${broadcast}/${total}, confirming`;
+  if (submitted <= 0 && broadcast > 0) return confirmingMeta(broadcast);
   if (pending > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    return total === 1 ? 'submitted, confirming' : `submitted ${pending}/${total}, confirming`;
+    return confirmingMeta(pending);
   }
   if (publishState?.status === 'failed') {
     // A pre-send failure (RPC 429/500/verification-degraded before anything left
@@ -25205,7 +25212,9 @@ async function runVaultPublishNonceWatch(watch) {
           for (const partIndex of target.partIndexes) {
             const part = watch.publishState.parts?.[partIndex];
             if (part && part.status === PUBLISH_PART_STATUS_SENT) {
-              watch.notify(watch.publishState, setPublishPartStatus(watch.publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
+              watch.notify(watch.publishState, setPublishPartStatus(watch.publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
+                confirmedBy: 'nonce_watch',
+              }));
             }
           }
         }
@@ -25877,7 +25886,13 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     const { clientNonce, parts } = group;
     if (currentNonce !== null && currentNonce > clientNonce) {
       // The chain consumed this batch's nonce: the external landed. Every part of the batch is on-chain.
+      // Re-check each part's LIVE status at flip time: the group snapshot was taken at pass start, and a
+      // CONCURRENT receipt/entry confirm can flip a part CAPSULEHUB_CONFIRMED while this pass's nonce
+      // read is in flight — the nonce-derived flip must only ever LIFT a not-yet-confirmed part, never
+      // DOWNGRADE a confirmed one (observed 2026-07-11: confirmed -> vault_submitted -> re-confirmed
+      // churn in the owner's send timeline, one wasted receipt read per occurrence).
       for (const part of parts) {
+        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
         setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
           confirmedBy: 'vault_nonce',
           error: null,
