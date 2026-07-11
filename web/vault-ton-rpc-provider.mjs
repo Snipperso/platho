@@ -26,7 +26,9 @@ const TONCENTER_RUN_GET_METHOD_CACHE_TTL_MS = 15_000;
 const TONCENTER_RUN_GET_METHOD_CACHE_MAX_ENTRIES = 512;
 const TONCENTER_MESSAGES_CACHE_TTL_MS = 300_000;
 const TONCENTER_MESSAGES_CACHE_MAX_ENTRIES = 128;
-const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
+// Exported: app.js's size-scaled sendBoc ceiling (vaultSendBocRequestTimeoutMs) uses this as its base
+// for callers that pass no explicit ceiling — importing it keeps the two from silently diverging.
+export const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
 // TON aborts a get-method run against an account that has no code (e.g. a
 // never-deployed wallet) with this exit code. It is a definitive on-chain
 // answer that every node agrees on — not a transport failure — so a caller that
@@ -1992,7 +1994,15 @@ export function createFallbackTonRpcTransport(options = {}) {
   }
 
   async function callSend(methodName, args) {
-    const operationTimeoutMs = tonRpcOperationTimeoutMs(args[0] ?? {}, options);
+    // The operation bound wraps the WHOLE transport call: serial-pump queue wait + upload + answer.
+    // requestTimeoutMs must bound only the fetch (the transport's own AbortController does that);
+    // without the queue allowance a busy pump eats the upload budget — a size-scaled 20s send that
+    // spent 12s queued behind sync reads was operation-aborted with only 8s of wire time, reproducing
+    // the endless client-abort loop the scaled ceiling exists to close. The queue wait itself is
+    // separately bounded by the queue timer, so the sum stays a hard bound.
+    const requestTimeoutMs = tonRpcOperationTimeoutMs(args[0] ?? {}, options);
+    const queueAllowanceMs = finiteNonNegativeMs(args[0]?.queueTimeoutMs, 0);
+    const operationTimeoutMs = requestTimeoutMs > 0 ? requestTimeoutMs + queueAllowanceMs : 0;
     let lastError = null;
     const candidates = orderedTonRpcTransportCandidates(transports, (transport) => {
       if (typeof transport?.[methodName] !== 'function') return false;

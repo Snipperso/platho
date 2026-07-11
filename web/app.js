@@ -37,14 +37,15 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=102';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=103';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=59';
+  TON_RPC_REQUEST_TIMEOUT_MS,
+} from './vault-ton-rpc-provider.mjs?v=60';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -152,19 +153,19 @@ import {
   batchMaxChargeForItems,
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=7';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=39';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=40';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=56';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=41';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=37';
+} from './capsulehub-ton-rpc-provider.mjs?v=57';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=42';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=38';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=44';
+} from './username-ton-rpc-provider.mjs?v=45';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -190,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v754';
+const PLATHO_APP_RUNTIME_VERSION = 'v755';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -24139,6 +24140,14 @@ const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS = 35_000;
 // every ~1s confirm pass. After a few races fall back to the full 35s cooldown.
 const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 3_500;
 const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6;
+// A client-aborted (TIMEOUT) send POST is ambiguous — the upload may have fully reached toncenter and
+// be queued (observed 2026-07-11: an aborted ~47KB upload landed about a minute later) — and each
+// attempt can hold the serial pump up to the size-scaled ceiling. So timeout-aborts pace on the short
+// race cooldown while fresh (a slow spell usually eases within a few attempts), rotate the max_charge
+// variant every attempt via broadcastPassIndex (a same-bytes re-POST of a possibly-delivered body is a
+// ~60s-dedup no-op), and fall back to the sparse 35s tail past this limit. They do NOT burn retryCount:
+// the relay budget tracks REAL 200 relays only.
+const PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT = 6;
 // "duplicate message" = the BoC is queued at toncenter. On the sub-second chain a LIVE queued copy lands in
 // ~1-3s, so if ~4 block-times pass with the nonce unmoved the copy is likely stalled/dropped and a re-poke is
 // productive. Poke every ~4s for the first few duplicates (heals the ACK-no-deliver mode in seconds), then
@@ -24154,6 +24163,10 @@ const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 * 1000;
 // 8s (the recovery tier) lets a slow-but-alive read through so the re-broadcast proceeds; a healthy read is
 // unaffected (it returns in <1s regardless of the ceiling).
 const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 * 1000;
+// BASE tier only: sendVaultExternalBoc raises every sendBoc ceiling to the external's size-scaled
+// physics floor (+1s per 4KB of base64 body, 30s cap — see vaultSendBocRequestTimeoutMs). The flat
+// 8s alone starved big media externals: a ~36KB batch POST that toncenter answers in 10-20s under
+// load was aborted every heal pass forever (v755).
 const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 * 1000;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS = 30 * 1000;
@@ -24959,12 +24972,44 @@ async function publishCapsuleThroughVault(capsule, options = {}) {
   };
 }
 
+// Physics-scaled ceiling for a sendBoc POST. The flat tiers (8s heal / 15s transport default) are
+// calibrated for ~1-2KB text externals; a multi-part media batch external is a 35-88KB base64 JSON
+// upload plus a proportionally heavier toncenter-side pre-accept emulation, and during a toncenter
+// slow spell the healthy answer for one takes 10-20s (observed 2026-07-11: a 236KiB file's batches,
+// externalBytes 35619, looped 'timed out after 8000 ms' for MINUTES — every heal POST was aborted
+// client-side just before toncenter answered; one aborted upload still LANDED later, proving the
+// endpoint was slow, not dead). Aborting below the physics floor guarantees ZERO forward progress —
+// the same POST dies the same death forever — while a raised ceiling costs nothing when healthy
+// (the answer still arrives in <1s regardless of the ceiling). +1s per 4KB of wire body (~a 32kbps
+// uplink floor; note the incident's externalBytes 35619 is DECODED bytes ≈ 47.5K base64 chars on the
+// wire, so it scales as 12 ticks, not 9), capped at the queue tier so a genuinely dead endpoint
+// cannot hold the serial pump longer than a queue wait.
+const VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS = 1_000;
+const VAULT_SEND_BOC_TIMEOUT_MAX_MS = PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS;
+// The transport default, imported so the two cannot silently diverge; used for callers that pass no
+// explicit ceiling. NOTE: a caller-passed 0 is coerced to this base too — the transport's "0 = no
+// client abort" escape hatch is intentionally not honored for vault sends (an unbounded POST would
+// hold the serial pump indefinitely).
+const VAULT_SEND_BOC_TIMEOUT_BASE_MS = TON_RPC_REQUEST_TIMEOUT_MS;
+
+function vaultSendBocRequestTimeoutMs(bocBase64, callerTimeoutMs) {
+  const caller = Number(callerTimeoutMs);
+  const baseMs = Number.isFinite(caller) && caller > 0 ? caller : VAULT_SEND_BOC_TIMEOUT_BASE_MS;
+  const wireChars = typeof bocBase64 === 'string' ? bocBase64.length : 0;
+  const scaledMs = Math.min(
+    VAULT_SEND_BOC_TIMEOUT_MAX_MS,
+    baseMs + Math.ceil(wireChars / 4096) * VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS,
+  );
+  // An explicit caller ceiling larger than the cap is never lowered (no current caller passes one —
+  // defensive; such a caller opts out of the size scaling entirely).
+  return Math.max(baseMs, scaledMs);
+}
+
 async function sendVaultExternalBoc(built, options = {}) {
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.sendBoc) throw new Error('TON RPC sendBoc transport is not configured');
   const request = { boc: built.boc, walletAddress: requireVaultAddress() };
-  if (options.requestTimeoutMs !== undefined) request.requestTimeoutMs = options.requestTimeoutMs;
-  if (options.timeoutMs !== undefined) request.timeoutMs = options.timeoutMs;
+  request.requestTimeoutMs = vaultSendBocRequestTimeoutMs(built.boc, options.requestTimeoutMs ?? options.timeoutMs);
   if (options.queueTimeoutMs !== undefined) request.queueTimeoutMs = options.queueTimeoutMs;
   if (options.skipIfRateLimited !== undefined) request.skipIfRateLimited = options.skipIfRateLimited;
   if (options.priority !== undefined) request.priority = options.priority;
@@ -25640,6 +25685,7 @@ function resetPublishBroadcastBudgetForManualRetry(publishState) {
     part.broadcastRetryCount = 0;
     part.broadcastNonceRaceCount = 0;
     part.broadcastDuplicateRelayCount = 0;
+    part.broadcastTimeoutAbortCount = 0;
     part.broadcastBudgetExhaustedWarned = false;
     part.lastBroadcastAt = null;
   }
@@ -25751,6 +25797,7 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     }
     const nonceRaceCount = Number(head.broadcastNonceRaceCount ?? 0) || 0;
     const duplicateRelayCount = Number(head.broadcastDuplicateRelayCount ?? 0) || 0;
+    const timeoutAbortCount = Number(head.broadcastTimeoutAbortCount ?? 0) || 0;
     // FIRST heal of a proven-not-landed external re-broadcasts with NO cooldown. Reaching here with
     // currentNonce === clientNonce means the chain's next-expected nonce is EXACTLY this batch's nonce, so
     // its back-to-back external never landed (a landed one would have advanced the nonce past it — that is
@@ -25765,8 +25812,9 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     if (pastFastBudget) {
       rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS;
     } else if (retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce) {
-      if (nonceRaceCount === 0) rebroadcastCooldownMs = 0;
-      else if (nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;
+      if (nonceRaceCount === 0 && timeoutAbortCount === 0) rebroadcastCooldownMs = 0;
+      else if (nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT
+        && timeoutAbortCount < PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;
     } else if (duplicateRelayCount > 0
       && duplicateRelayCount < PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT
       && currentNonce !== null && currentNonce === clientNonce) {
@@ -25775,9 +25823,11 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
       // landed yet, so a quick idempotent re-poke is the fastest safe heal for toncenter's queued-not-delivered
       // mode. Past the fast limit the conservative 35s tail takes over.
       rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS;
-    } else if (duplicateRelayCount >= PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT || nonceRaceCount >= PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT) {
-      // Past the duplicate/nonce-race fast windows each answer is a native red 500 — keep the sparse 35s tail
-      // so the console is not painted every 10s by a wedged queue or a persistently lagging send node.
+    } else if (duplicateRelayCount >= PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT
+      || nonceRaceCount >= PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT
+      || timeoutAbortCount >= PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT) {
+      // Past the duplicate/nonce-race/timeout-abort fast windows each answer is a native red error — keep the
+      // sparse 35s tail so the console is not painted every 10s by a wedged queue or a persistently slow node.
       rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS;
     }
     if (publishPartLastBroadcastAgeMs(head) < rebroadcastCooldownMs) continue;
@@ -25800,9 +25850,9 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
       // pass's main send and nonce/receipt reads — main sends hit the 8s timeout, and post-landing stragglers
       // bounced 16453 as unexplained red 500s. Parallel lottery tickets need parallel channels, which the
       // single-pump transport intentionally does not have.) The variant window still advances on the SUM of ALL
-      // per-pass counters, because the 16453-race and "duplicate" branches do NOT increment retryCount — keying
-      // on retryCount alone would re-fire the SAME variant (a dedup no-op) every race/duplicate pass.
-      const broadcastPassIndex = retryCount + duplicateRelayCount + nonceRaceCount;
+      // per-pass counters, because the 16453-race, "duplicate" and timeout-abort branches do NOT increment
+      // retryCount — keying on retryCount alone would re-fire the SAME variant (a dedup no-op) every such pass.
+      const broadcastPassIndex = retryCount + duplicateRelayCount + nonceRaceCount + timeoutAbortCount;
       const primaryIndex = variantBocs ? (1 + broadcastPassIndex) % variantBocs.length : 0;
       const retryBoc = variantBocs ? variantBocs[primaryIndex] : head.externalBoc;
       result = await sendVaultExternalBoc({ boc: retryBoc }, sendOptions);
@@ -25858,6 +25908,22 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
         }
         continue;
       }
+      // A client-aborted (TIMEOUT) POST held the pump for its whole ceiling and may STILL have delivered
+      // the body (the abort races the response; an aborted upload has been observed to land later). Stamp
+      // lastBroadcastAt + the dedicated counter so the next pass paces on the short race-tier cooldown
+      // instead of zero-cooldown hammering, and so broadcastPassIndex rotates to a FRESH variant (a
+      // same-bytes re-POST of a possibly-delivered body is a ~60s-dedup no-op). QUEUE_TIMEOUT is excluded:
+      // a queue-expired POST never started uploading, so an immediate retry is safe and productive.
+      if (String(error?.code ?? '') === 'TIMEOUT') {
+        const timeoutAt = new Date().toISOString();
+        for (const part of parts) {
+          setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
+            broadcastTimeoutAbortCount: timeoutAbortCount + 1,
+            lastBroadcastAt: timeoutAt,
+          });
+          changed += 1;
+        }
+      }
       const retryError = shortUiErrorText(error, 'broadcast retry failed');
       const retryErrorAt = new Date().toISOString();
       for (const part of parts) {
@@ -25898,6 +25964,9 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
       part.lastBroadcastResult = result?.result ?? null;
       setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
         broadcastRetryCount: retryCount + 1,
+        // A real 200 relay restores the timeout-abort fast window: an intermittently-slow spell keeps
+        // pacing on the short cooldown instead of decaying to the sparse tail after 6 lifetime aborts.
+        broadcastTimeoutAbortCount: 0,
         lastBroadcastAt: broadcastAt,
         error: null,
       });
