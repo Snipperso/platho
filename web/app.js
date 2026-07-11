@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v767';
+const PLATHO_APP_RUNTIME_VERSION = 'v768';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6864,31 +6864,36 @@ function expandClampedBody(root, body) {
 }
 
 // Reverse toggle (owner ask v767): re-clamp an expanded post/embed, animated from the current full height down
-// to the CSS clamp. The clamp target is read from the :root var that applies to this root (posts vs shared-post
-// embeds); an unparseable value degrades to an instant un-animated re-clamp. After the release the card is
-// pulled back into view — collapsing removes the content the reader was level with, which would otherwise
-// strand them past the card's new bottom.
+// to the CSS clamp — the exact MIRROR of expandClampedBody. The clamp target is read from the :root var that
+// applies to this root (posts vs shared-post embeds); an unparseable value degrades to an instant un-animated
+// re-clamp. The clamp classes (feed-post-collapsible/-overflowing) are re-applied ONLY in settle(), never up
+// front: adding feed-post-collapsible before the transition sets max-height to the clamp instantly, and reading
+// scrollHeight while it is applied would commit that clamped height as the transition baseline — so the
+// 850->480 change nets to zero and the browser skips the animation (the "collapses instantly" bug). settle()
+// also pulls the card back into view: collapsing removes the content the reader was level with, which would
+// otherwise strand them past the card's new bottom.
 function collapseClampedBody(root, body) {
   const varName = root.classList.contains('shared-post-embed') ? '--shared-post-embed-max-height' : '--feed-post-collapsed-max-height';
   const target = Number.parseFloat(getComputedStyle(root).getPropertyValue(varName));
   root.classList.remove('feed-post-expanded');
-  root.classList.add('feed-post-collapsible', 'feed-post-overflowing');
   let released = false;
-  const release = () => {
+  const settle = () => {
     if (released) return;
     released = true;
     body.style.removeProperty('max-height');
     root.classList.remove('feed-post-expanding');
+    root.classList.add('feed-post-collapsible', 'feed-post-overflowing');
     root.scrollIntoView({ block: 'nearest' });
   };
-  if (!Number.isFinite(target)) { release(); return; }
-  // Pin the current height inline (overrides the class clamp), then transition down to the clamp value; the
-  // release removes the inline pin at the exact height the class clamp takes over — no jump.
+  if (!Number.isFinite(target)) { settle(); return; }
+  // Pin the CURRENT full height inline (the body still renders unclamped here — no visual change), turn on the
+  // transition, then animate down to the clamp value. The 850px baseline is the last rendered height, so the
+  // rAF change to the clamp target animates. overflow:hidden comes from feed-post-expanding during the run.
   body.style.maxHeight = `${body.scrollHeight}px`;
   root.classList.add('feed-post-expanding');
   requestAnimationFrame(() => { body.style.maxHeight = `${target}px`; });
-  body.addEventListener('transitionend', release, { once: true });
-  window.setTimeout(release, 450);
+  body.addEventListener('transitionend', settle, { once: true });
+  window.setTimeout(settle, 450);
 }
 
 // The shared expand/collapse toggle button for a clamped root (feed article or shared-post embed): one button,

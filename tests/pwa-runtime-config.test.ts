@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=767" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=768" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5945,6 +5945,17 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function collapseClampedBody\(root, body\)/);
     expect(app).toMatch(/root\.classList\.contains\('shared-post-embed'\) \? '--shared-post-embed-max-height' : '--feed-post-collapsed-max-height'/);
     expect(app).toMatch(/root\.scrollIntoView\(\{ block: 'nearest' \}\);/);
+    // v768 regression guard: collapse must PIN the current full height (body.scrollHeight) and turn on the
+    // transition BEFORE re-adding the clamp class; adding feed-post-collapsible up front (or reading scrollHeight
+    // while it is applied) commits the CLAMPED height as the transition baseline -> the 850->480 change nets to
+    // zero and the browser skips the animation ("collapses instantly"). So inside collapseClampedBody the clamp
+    // class is re-added ONLY after the inline pin is removed (i.e. in settle), never before the scrollHeight pin.
+    const collapseFn = app.slice(app.indexOf('function collapseClampedBody('), app.indexOf('function wireClampToggleButton('));
+    // The pin (current full height) is turned into a transition BEFORE the rAF drop to the clamp target...
+    expect(collapseFn).toMatch(/body\.style\.maxHeight = `\$\{body\.scrollHeight\}px`;\s*root\.classList\.add\('feed-post-expanding'\);/);
+    // ...and the clamp class is re-applied ONLY in settle, AFTER the inline pin is removed — never up front (a
+    // classList.add of the clamp before the transition commits the clamped height as the baseline -> no animation).
+    expect(collapseFn).toMatch(/body\.style\.removeProperty\('max-height'\);\s*root\.classList\.remove\('feed-post-expanding'\);\s*root\.classList\.add\('feed-post-collapsible', 'feed-post-overflowing'\);/);
     expect(app).toMatch(/body\.style\.removeProperty\('max-height'\);/);
     expect(app).toMatch(/body\.addEventListener\('transitionend', release, \{ once: true \}\);/);
     expect(app).toMatch(/window\.setTimeout\(release, 450\);/);
@@ -7354,7 +7365,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v842/);
+    expect(sw).toMatch(/platho-pwa-prototype-v843/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7362,7 +7373,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=260/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=767/);
+    expect(sw).toMatch(/\.\/app\.js\?v=768/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=27/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=27/);
