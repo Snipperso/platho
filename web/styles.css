@@ -1536,7 +1536,7 @@ a .avatar.has-image,
 .composer-toolbar-scroll {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   flex: 1;
   min-width: 0;
   overflow-x: auto;
@@ -1552,8 +1552,8 @@ a .avatar.has-image,
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border: 1px solid transparent;
   border-radius: 7px;
   background: transparent;
@@ -1585,7 +1585,7 @@ a .avatar.has-image,
   flex: 0 0 auto;
   width: 1px;
   height: 20px;
-  margin: 0 3px;
+  margin: 0 2px;
   background: var(--line);
 }
 

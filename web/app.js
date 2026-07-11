@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v769';
+const PLATHO_APP_RUNTIME_VERSION = 'v770';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16720,43 +16720,12 @@ function prefixComposerLines(textarea, prefix) {
   autoResizeComposerTextarea(textarea);
 }
 
-// Set (or toggle/swap) the '::center '/'::justify ' alignment prefix on the current paragraph's first line.
-function setComposerAlignment(textarea, kind) {
-  if (!textarea || textarea.disabled) return;
-  const value = textarea.value ?? '';
-  const start = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : value.length;
-  const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-  let lineEnd = value.indexOf('\n', lineStart);
-  if (lineEnd === -1) lineEnd = value.length;
-  let line = value.slice(lineStart, lineEnd);
-  // Never align a line that is only an attachment marker — the '::center ' prefix would ride into the sent text.
-  if (COMPOSER_MARKER_ONLY_LINE_RE.test(line)) return;
-  const existing = /^::(center|justify)\s/.exec(line);
-  let next;
-  if (existing) {
-    line = line.slice(existing[0].length);
-    next = existing[1] === kind ? line : `::${kind} ${line}`; // same -> remove (toggle off); different -> swap
-  } else {
-    next = `::${kind} ${line}`;
-  }
-  textarea.value = value.slice(0, lineStart) + next + value.slice(lineEnd);
-  textarea.focus?.();
-  const caret = lineStart + next.length;
-  textarea.setSelectionRange?.(caret, caret);
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  autoResizeComposerTextarea(textarea);
-}
-
 function applyComposerFormat(textarea, format) {
   if (!textarea) return;
   switch (format) {
     case 'bold': wrapComposerSelection(textarea, '**', '**'); break;
     case 'italic': wrapComposerSelection(textarea, '*', '*'); break;
-    case 'heading': prefixComposerLines(textarea, '# '); break;
-    case 'quote': prefixComposerLines(textarea, '> '); break;
     case 'list': prefixComposerLines(textarea, '- '); break;
-    case 'center': setComposerAlignment(textarea, 'center'); break;
-    case 'justify': setComposerAlignment(textarea, 'justify'); break;
     case 'preview': openComposerPreview(textarea); break;
     default: break;
   }

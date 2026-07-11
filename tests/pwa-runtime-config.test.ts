@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=769" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=770" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6273,12 +6273,18 @@ describe('PWA runtime config guard', () => {
     // shared-post embed). Covered by count.
     expect(app.match(/appendFormattedMessageText\(/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
 
-    // Toolbar markup (both composers): format buttons + relocated attachment/emoji buttons + ▼ hide.
+    // Toolbar markup (both composers): emoji FIRST (v770), then the format + attachment buttons + ▼ hide. v770
+    // trimmed heading/quote/center/justify (didn't fit one row) — those must NOT be present as buttons.
     for (const bar of ['privateComposerToolbar', 'publicComposerToolbar']) {
       const slice = html.slice(html.indexOf(`id="${bar}"`), html.indexOf(`id="${bar}"`) + 4200);
-      for (const fmt of ['heading', 'bold', 'italic', 'list', 'quote', 'center', 'justify', 'preview']) {
+      for (const fmt of ['bold', 'italic', 'list', 'preview']) {
         expect(slice, `${bar}:${fmt}`).toMatch(new RegExp(`data-format="${fmt}"`));
       }
+      for (const gone of ['heading', 'quote', 'center', 'justify']) {
+        expect(slice, `${bar}:${gone}-removed`).not.toMatch(new RegExp(`data-format="${gone}"`));
+      }
+      // Emoji is the first toolbar button.
+      expect(slice).toMatch(/composer-toolbar-scroll">\s*<button class="composer-toolbar-button emoji-button"/);
       expect(slice).toMatch(/composer-toolbar-hide/);
     }
     // Only the private toolbar carries the payment-check button.
@@ -6287,15 +6293,17 @@ describe('PWA runtime config guard', () => {
     // The input row keeps ONLY the leading control + textarea + send.
     expect(html).toMatch(/class="composer-input-row">\s*<button class="icon-button private-anonymous-button"/);
 
-    // Format logic: selection wrap (bold/italic), line prefix (heading/quote/list), alignment prefix.
+    // Format logic: selection wrap (bold/italic) + line prefix (list). v770: the alignment helper and the
+    // heading/quote/center/justify cases were removed with their buttons (the RENDERER still parses those for
+    // received messages — appendFormattedMessageText below — but the composer no longer inserts them).
     expect(app).toMatch(/function wrapComposerSelection\(textarea, open, close\)/);
     expect(app).toMatch(/function prefixComposerLines\(textarea, prefix\)/);
-    expect(app).toMatch(/function setComposerAlignment\(textarea, kind\)/);
+    expect(app).not.toMatch(/function setComposerAlignment\(/);
     const applyFn = app.slice(app.indexOf('function applyComposerFormat('), app.indexOf('function applyComposerFormat(') + 700);
     expect(applyFn).toMatch(/case 'bold': wrapComposerSelection\(textarea, '\*\*', '\*\*'\)/);
-    expect(applyFn).toMatch(/case 'heading': prefixComposerLines\(textarea, '# '\)/);
-    expect(applyFn).toMatch(/case 'center': setComposerAlignment\(textarea, 'center'\)/);
+    expect(applyFn).toMatch(/case 'list': prefixComposerLines\(textarea, '- '\)/);
     expect(applyFn).toMatch(/case 'preview': openComposerPreview\(textarea\)/);
+    expect(applyFn).not.toMatch(/case 'center'/);
     // Driver: open on a deliberate field CLICK (not focus/typing), ▼ hides, mousedown keeps the selection.
     const setupFn = app.slice(app.indexOf('function setupComposerToolbar('), app.indexOf('function setupComposerToolbar(') + 1100);
     expect(setupFn).toMatch(/textarea\.addEventListener\('click', \(\) => showComposerToolbar\(textarea\)\)/);
@@ -6311,10 +6319,11 @@ describe('PWA runtime config guard', () => {
     expect(previewFn).toMatch(/appendFormattedMessageText\(text, block\.text\)/);
     expect(previewFn).toMatch(/buildSharedPostEmbed\(block\)/);
 
-    // Every locale ships the toolbar/preview strings (OPSEC key parity).
+    // Every locale ships the ACTIVE toolbar/preview strings (OPSEC key parity). The heading/quote/align keys
+    // stay in the dictionaries as reserved (their buttons were trimmed in v770) — parity is unaffected.
     for (const locale of Object.keys(I18N_STRINGS)) {
       const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
-      for (const key of ['composer.formatHeading', 'composer.formatBold', 'composer.formatItalic', 'composer.formatList', 'composer.formatQuote', 'composer.formatAlignCenter', 'composer.formatAlignJustify', 'composer.previewPost', 'composer.hideFormatBar', 'composer.previewTitle', 'composer.previewEmpty']) {
+      for (const key of ['composer.formatBold', 'composer.formatItalic', 'composer.formatList', 'composer.previewPost', 'composer.hideFormatBar', 'composer.previewTitle', 'composer.previewEmpty']) {
         expect(dict[key], `${locale}:${key}`).toBeTruthy();
       }
     }
@@ -7456,15 +7465,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v844/);
+    expect(sw).toMatch(/platho-pwa-prototype-v845/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=261/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=262/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=769/);
+    expect(sw).toMatch(/\.\/app\.js\?v=770/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=28/);
