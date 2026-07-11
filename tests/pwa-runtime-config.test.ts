@@ -209,7 +209,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=38/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=39/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=755" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=756" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1666,10 +1666,15 @@ describe('PWA runtime config guard', () => {
     const sendIndex = sendSource.indexOf('lastResult = batchIndex === 0 ? await sendVaultExternalBoc(batchExternal)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
     const confirmNonceIndex = sendSource.indexOf('shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)');
-    const barrierWaitIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, expectedNonce, nonceWaitOptions)');
-    const submittedStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_VAULT_SUBMITTED');
-    const finalBarrierIndex = sendSource.indexOf('installVaultPublishNonceBarrier');
+    const watchCreateIndex = sendSource.indexOf('burstNonceWatch = createVaultPublishNonceWatch({');
+    const watchRegisterIndex = sendSource.indexOf('registerVaultPublishNonceWatchTarget(burstNonceWatch, {');
     const partialIndex = sendSource.indexOf('vaultPublishPartialError');
+    // v756: the SENT -> VAULT_SUBMITTED flip + the barrier install live in the shared burst nonce
+    // watcher (one ~1s 'messages'-priority read stream for the WHOLE burst), not in per-batch pollers.
+    const nonceWatchSource = app.slice(
+      app.indexOf('function createVaultPublishNonceWatch'),
+      app.indexOf('async function readVaultPublishNonceForBroadcastRetry'),
+    );
     const clientNonceSource = sendSource.slice(
       sendSource.indexOf('clientNonce = options.allowOwnVaultActionReadFallback === true'),
       sendSource.indexOf('if (clientNonce === null)'),
@@ -1693,14 +1698,15 @@ describe('PWA runtime config guard', () => {
     expect(sendIndex).toBeGreaterThan(buildIndex);
     expect(sentStatusIndex).toBeGreaterThan(sendIndex);
     expect(confirmNonceIndex).toBeGreaterThan(sentStatusIndex);
-    // NON-BLOCKING: every NON-FINAL batch installs the background nonce barrier (the final batch does not,
-    // to avoid a self-blocking post-burst wait); there is NO blocking inter-batch wait. The barrier's nonce
-    // poll (on expectedNonce) runs inside the installed task, after the install.
-    expect(finalBarrierIndex).toBeGreaterThan(confirmNonceIndex);
-    expect(barrierWaitIndex).toBeGreaterThan(finalBarrierIndex);
-    expect(submittedStatusIndex).toBeGreaterThan(finalBarrierIndex);
-    // The OLD blocking middle-batch nonce wait (await directly in the loop on clientNonce + 1n) is gone.
-    expect(sendSource).not.toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n, nonceWaitOptions\)/);
+    // NON-BLOCKING: every NON-FINAL batch registers its target on the ONE shared burst nonce watcher
+    // (v756 — the old per-batch background pollers ran up to SIX concurrent critical-priority 1s read
+    // streams on a 7-batch send and STARVED the heal send POST in the strict-priority serial pump);
+    // there is NO blocking inter-batch wait. The watcher's completion is the publish nonce barrier.
+    expect(watchCreateIndex).toBeGreaterThan(confirmNonceIndex);
+    expect(watchRegisterIndex).toBeGreaterThan(watchCreateIndex);
+    // NO blocking nonce wait anywhere in the send loop (the old per-batch awaits are gone entirely).
+    expect(sendSource).not.toMatch(/await waitForVaultPublishNonce\(/);
+    expect(sendSource).not.toMatch(/installVaultPublishNonceBarrier\(\(async \(\) => \{/);
     // A FOLLOWING signed vault action still serializes on the publish nonce barrier.
     expect(sendSource).toMatch(/await awaitVaultPublishNonceBarrier\(\)/);
     // Monotonic per-owner nonce floor: a lagging replica must never make the
@@ -1717,8 +1723,20 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function provePublishPartAbsentFromSenderIndex\(publishState, part\)/);
     expect(app).toMatch(/confirmedBy:\s*'dropped_recovery_scan'/);
     expect(app).toMatch(/if \(chainNonce <= clientNonce\) continue/);
-    expect(sendSource).toMatch(/installVaultPublishNonceBarrier\(\(async \(\) => \{/);
-    expect(sendSource).toMatch(/if \(part && part\.status === PUBLISH_PART_STATUS_SENT\)/);
+    // The watcher owns the barrier install, the observational 'messages'-priority read (must never
+    // outrank the send POST / heal reads), and the SENT -> VAULT_SUBMITTED flip.
+    expect(nonceWatchSource).toMatch(/installVaultPublishNonceBarrier\(watch\.promise\)/);
+    expect(nonceWatchSource).toMatch(/priority: 'messages'/);
+    expect(nonceWatchSource).toMatch(/ignoreNonceBarrier: true/);
+    expect(nonceWatchSource).toMatch(/verify: false/);
+    expect(nonceWatchSource).toMatch(/if \(part && part\.status === PUBLISH_PART_STATUS_SENT\)/);
+    expect(nonceWatchSource).toMatch(/PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
+    // A completed watch RESTARTS for a late-registering batch (else its target never flips and the
+    // resolved barrier is never re-installed), and a NON-recoverable read error releases the barrier
+    // immediately instead of holding every subsequent vault action to the burst deadline.
+    expect(nonceWatchSource).toMatch(/if \(!watch\.running\) \{\s*watch\.running = true;/);
+    expect(nonceWatchSource).toMatch(/if \(!isTonRpcRecoverableReadError\(error\) && !isTonRpcRateLimitError\(error\)\) return;/);
+    expect(nonceWatchSource).toMatch(/\} finally \{\s*watch\.running = false;\s*\}/);
     expect(sendSource).toMatch(/readVaultPublishNonceForOwnVaultAction\(provider, owner\)/);
     expect(clientNonceSource).not.toMatch(/allowUnverifiedNonceRead|allowUnverifiedCriticalRead|verify:/);
     // VPB2: each part of a batch is stamped with the SHARED batch external boc + a single broadcast timestamp.
@@ -1746,7 +1764,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*if \(isTonRpcRateLimitError\(error\)\) return false;/);
     expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*Number\(error\?\.status \?\? error\?\.response\?\.status \?\? 0\) >= 500/);
     expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*rejected\|bad request\|invalid boc\|invalid message\|exit code\|not enough vault ton\|nonce/);
-    expect(partialIndex).toBeGreaterThan(submittedStatusIndex);
+    expect(partialIndex).toBeGreaterThan(watchRegisterIndex);
     expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{ hot: true, receiptOnly: true \}\)/);
     expect(sendSource).toMatch(/: VAULT_PUBLISH_STATUS_SUBMITTED/);
     // v620 AGE-based confirm cadence (sub-second TON chain + toncenter queue pacing): settle 1.5s, active ~1s
@@ -1823,8 +1841,10 @@ describe('PWA runtime config guard', () => {
     // v633: the dead confirmFinalNonce is REMOVED from the public path — the public publish confirm driver
     // (tests/public-publish-heal.test.ts) owns final-batch heal/confirmation for posts/comments.
     expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]{0,400}allowOwnVaultActionReadFallback: true \}\);/);
-    // v648: batch K's background nonce wait scales with its burst position (K prior serial landings first).
-    expect(sendSource).toMatch(/timeoutMs: options\.timeoutMs \?\? \(VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS \* \(batchIndex \+ 1\)\),\s*requestTimeoutMs: options\.requestTimeoutMs,\s*queueTimeoutMs: options\.queueTimeoutMs,\s*\}/);
+    // v648: batch K's background nonce watch deadline scales with its burst position (K prior serial
+    // landings first); v756: it is a register-target field, the read options live on the shared watcher.
+    expect(sendSource).toMatch(/timeoutMs: options\.timeoutMs \?\? \(VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS \* \(batchIndex \+ 1\)\),\s*\}\);/);
+    expect(sendSource).toMatch(/createVaultPublishNonceWatch\(\{\s*provider,\s*owner,\s*publishState,\s*requestTimeoutMs: options\.requestTimeoutMs,\s*queueTimeoutMs: options\.queueTimeoutMs,/);
     expect(sendSource).not.toMatch(/needsQueuedNonce|VAULT_PUBLISH_QUEUE_NONCE_CONFIRM_TIMEOUT_MS/);
     // v629 mobilization: with max_charge-variant rotation EVERY retry is a REAL broadcast (new root hash beats
     // all ~60s dedup layers), so the tail is 3.5s and the fast budget is 20 (a ~70s fast window); past it,
@@ -1858,7 +1878,11 @@ describe('PWA runtime config guard', () => {
     // hand-copied literal), and a client-aborted (TIMEOUT) POST stamps a dedicated counter so the next
     // pass paces on the short cooldown and rotates to a fresh max_charge variant.
     expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS = 1_000/);
-    expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_MAX_MS = PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS/);
+    // The heal queue tier carries a +15s margin OVER the max POST ceiling, so a pass enqueued right
+    // after ANOTHER driver's max-size POST started survives that hold instead of losing the race to
+    // its own queue budget at exactly the boundary.
+    expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_MAX_MS = 30 \* 1000/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = VAULT_SEND_BOC_TIMEOUT_MAX_MS \+ 15 \* 1000/);
     expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_BASE_MS = TON_RPC_REQUEST_TIMEOUT_MS/);
     expect(app).toMatch(/request\.requestTimeoutMs = vaultSendBocRequestTimeoutMs\(built\.boc, options\.requestTimeoutMs \?\? options\.timeoutMs\)/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT = 6/);
@@ -1868,6 +1892,25 @@ describe('PWA runtime config guard', () => {
     const vaultRpcProviderSrc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
     expect(vaultRpcProviderSrc).toMatch(/const operationTimeoutMs = requestTimeoutMs > 0 \? requestTimeoutMs \+ queueAllowanceMs : 0/);
     expect(vaultRpcProviderSrc).toMatch(/export const TON_RPC_REQUEST_TIMEOUT_MS = 15_000/);
+    // v756: pump-starvation cures. (1) The heal (re-)broadcast POST is CRITICAL priority — at
+    // 'background' it starved behind the continuous read stream of a multi-batch send (QUEUE_TIMEOUT
+    // on every pass, zero wire time). (2) The pump's strict-priority queue AGES waiting tasks one
+    // class per 5s so no class can be starved unboundedly. (3) QUEUE_TIMEOUT is a transient error
+    // (local congestion — the request never left the device), not a scary thrown one.
+    const healSendOptionsSource = app.slice(
+      app.indexOf('async function retryUnconfirmedVaultPublishBroadcasts'),
+      app.indexOf('async function retryUnconfirmedPrivatePublishBroadcasts'),
+    );
+    expect(healSendOptionsSource).toMatch(/const sendOptions = \{[\s\S]{0,900}priority: 'critical',\s*\}/);
+    expect(healSendOptionsSource).not.toMatch(/priority: 'background'/);
+    expect(vaultRpcProviderSrc).toMatch(/const TONCENTER_QUEUE_AGING_STEP_MS = 5_000/);
+    // Aging floors at weight 1: aged observational herds must never tie with (and FIFO-beat) a FRESH
+    // interactive critical read that arrives right after a long POST frees the pump.
+    expect(vaultRpcProviderSrc).toMatch(/const TONCENTER_QUEUE_AGING_FLOOR_WEIGHT = 1/);
+    expect(vaultRpcProviderSrc).toMatch(/function toncenterEffectiveTaskWeight\(task, now\)/);
+    expect(vaultRpcProviderSrc).toMatch(/task\.priorityWeight - Math\.floor\(waitedMs \/ TONCENTER_QUEUE_AGING_STEP_MS\)/);
+    expect(vaultRpcProviderSrc).toMatch(/Math\.max\(Math\.min\(task\.priorityWeight, TONCENTER_QUEUE_AGING_FLOOR_WEIGHT\), agedWeight\)/);
+    expect(app).toMatch(/\|\| error\?\.code === 'QUEUE_TIMEOUT'/);
     // v629: the ~16×47KB variant BoCs are STRIPPED before persisting to encrypted history (else every status
     // notify would re-encrypt+write ~1.5MB — a latency regression). In-memory rotation keeps them.
     expect(app).toMatch(/function publishStateForHistory\(publishState\)/);
@@ -1875,7 +1918,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = 30 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS = 30 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS = 60 \* 1000/);
     expect(app).toMatch(/async function retryUnconfirmedVaultPublishBroadcasts\(publishState, options = \{\}\)/);
@@ -1888,7 +1930,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/result = await sendVaultExternalBoc\(\{ boc: retryBoc \}, sendOptions\)/);
     expect(app).toMatch(/queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS/);
     expect(app).toMatch(/skipIfRateLimited:\s*true/);
-    expect(app).toMatch(/priority:\s*'background'/);
     expect(app).toMatch(/lastBroadcastRetryError/);
     expect(app).toMatch(/setPublishPartStatus\(publishState, part\.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
     expect(app).toMatch(/clearPublishPartSignedAttempt\(part\)/);
@@ -4039,7 +4080,9 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/provider\.getUser\(owner,\s*\{/);
     expect(source).toMatch(/verify:\s*options\.verify !== false/);
     expect(source).toMatch(/waitForVaultPublishNonce\(provider, owner, expectedNonce, options = \{\}\)/);
-    expect(source).toMatch(/priority:\s*'critical'/);
+    // v756: the nonce read's priority is caller-overridable ONLY for the observational burst watcher;
+    // the DEFAULT stays critical — pin the exact expression so a default flip cannot pass unnoticed.
+    expect(source).toMatch(/priority: options\.priority \?\? 'critical'/);
     expect(source).toMatch(/cacheTtlMs:\s*0/);
   });
 
@@ -7084,7 +7127,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v830/);
+    expect(sw).toMatch(/platho-pwa-prototype-v831/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7092,7 +7135,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=755/);
+    expect(sw).toMatch(/\.\/app\.js\?v=756/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);
@@ -7102,20 +7145,20 @@ describe('PWA runtime config guard', () => {
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=7/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=103/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=57/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=45/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=104/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=58/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=46/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=60/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=42/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=57/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=40/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=38/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=45/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=61/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=43/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=58/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=41/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=39/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=46/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=8/);

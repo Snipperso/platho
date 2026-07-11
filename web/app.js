@@ -37,7 +37,7 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=103';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=104';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -45,7 +45,7 @@ import {
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
   TON_RPC_REQUEST_TIMEOUT_MS,
-} from './vault-ton-rpc-provider.mjs?v=60';
+} from './vault-ton-rpc-provider.mjs?v=61';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -153,19 +153,19 @@ import {
   batchMaxChargeForItems,
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=7';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=40';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=41';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=57';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=42';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=38';
+} from './capsulehub-ton-rpc-provider.mjs?v=58';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=43';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=39';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=45';
+} from './username-ton-rpc-provider.mjs?v=46';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v755';
+const PLATHO_APP_RUNTIME_VERSION = 'v756';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -14576,6 +14576,9 @@ function isTonRpcTransientError(error) {
   return isTonRpcRateLimitError(error)
     || Number(error?.status ?? error?.response?.status ?? 0) >= 500
     || error?.code === 'TIMEOUT'
+    // Local queue congestion — the request never left the device; retrying next pass is safe and the
+    // provider is fine (isTonRpcHardTransportError excludes it from transport-health parking too).
+    || error?.code === 'QUEUE_TIMEOUT'
     || error?.code === 'NETWORK_ERROR'
     || error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
     || error?.code === 'RPC_DISAGREEMENT'
@@ -24168,7 +24171,14 @@ const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 * 1000;
 // 8s alone starved big media externals: a ~36KB batch POST that toncenter answers in 10-20s under
 // load was aborted every heal pass forever (v755).
 const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 * 1000;
-const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = 30 * 1000;
+// Hard cap of the size-scaled sendBoc fetch ceiling (see vaultSendBocRequestTimeoutMs): the longest a
+// single POST may hold the serial pump.
+const VAULT_SEND_BOC_TIMEOUT_MAX_MS = 30 * 1000;
+// The heal pass's queue tier (its nonce read AND its POST) carries a +15s margin OVER the max POST
+// ceiling: a pass enqueued right after ANOTHER driver's max-size POST started must SURVIVE that hold
+// (with aging + critical priority it dequeues right behind it). At exactly the cap the read lost the
+// race to its own queue budget on the boundary and the whole pass returned 0.
+const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = VAULT_SEND_BOC_TIMEOUT_MAX_MS + 15 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS = 60 * 1000;
 
@@ -24982,10 +24992,10 @@ async function publishCapsuleThroughVault(capsule, options = {}) {
 // the same POST dies the same death forever — while a raised ceiling costs nothing when healthy
 // (the answer still arrives in <1s regardless of the ceiling). +1s per 4KB of wire body (~a 32kbps
 // uplink floor; note the incident's externalBytes 35619 is DECODED bytes ≈ 47.5K base64 chars on the
-// wire, so it scales as 12 ticks, not 9), capped at the queue tier so a genuinely dead endpoint
-// cannot hold the serial pump longer than a queue wait.
+// wire, so it scales as 12 ticks, not 9), capped at VAULT_SEND_BOC_TIMEOUT_MAX_MS (defined with the
+// broadcast tiers above: the heal queue tier carries a +15s margin over this cap, so a pass queued
+// behind another driver's max-size POST survives the hold).
 const VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS = 1_000;
-const VAULT_SEND_BOC_TIMEOUT_MAX_MS = PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS;
 // The transport default, imported so the two cannot silently diverge; used for callers that pass no
 // explicit ceiling. NOTE: a caller-passed 0 is coerced to this base too — the transport's "0 = no
 // client abort" escape hatch is intentionally not honored for vault sends (an unbounded POST would
@@ -25043,7 +25053,9 @@ async function readVaultPublishNonce(provider, owner, options = {}) {
     vaultAddress: requireVaultAddress(),
     verify: options.verify !== false,
     allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    priority: 'critical',
+    // Critical by default (pre-sign / heal-gating reads). The burst nonce WATCH passes 'messages':
+    // purely observational polling must never outrank the send POST or the heal driver's own read.
+    priority: options.priority ?? 'critical',
     cacheTtlMs: 0,
     requestTimeoutMs: options.requestTimeoutMs ?? options.timeoutMs,
     queueTimeoutMs: options.queueTimeoutMs,
@@ -25113,6 +25125,103 @@ async function waitForVaultPublishNonce(provider, owner, expectedNonce, options 
 
 async function waitForVaultPublishNonceForOwnVaultAction(provider, owner, expectedNonce, options = {}) {
   return waitForVaultPublishNonce(provider, owner, expectedNonce, options);
+}
+
+// ONE shared nonce watcher per send burst (v756). The old design installed a SEPARATE background
+// poller per non-final batch (waitForVaultPublishNonce, ~1s cadence, critical-priority reads,
+// 90s x batch-position ceiling) — a 7-batch file send ran SIX concurrent pollers, and together with
+// receipt confirms and sync they kept the strict-priority serial pump's high lane non-empty for
+// minutes, STARVING the heal driver's send POST in the queue (the owner's QUEUE_TIMEOUT-every-pass
+// loop; pre-v755 the coupled operation timer cut the same starvation off at 8s and mislabeled it
+// 'TIMEOUT'). One watcher serves every batch of the burst with a single ~1s read stream at
+// 'messages' priority: it flips each batch's parts SENT -> VAULT_SUBMITTED as the chain nonce
+// passes that batch, and its completion is the publish nonce barrier for subsequent unrelated vault
+// actions — identical gating to the old code, where each install REPLACED the pending barrier so
+// only the last (highest-nonce, longest-wait) task ever gated anything.
+function createVaultPublishNonceWatch(context) {
+  return {
+    provider: context.provider,
+    owner: context.owner,
+    publishState: context.publishState,
+    notify: context.notify,
+    requestTimeoutMs: context.requestTimeoutMs,
+    queueTimeoutMs: context.queueTimeoutMs,
+    targets: [],
+    deadlineAt: 0,
+    running: false,
+    promise: null,
+  };
+}
+
+function registerVaultPublishNonceWatchTarget(watch, target) {
+  watch.targets.push(target);
+  const timeoutMs = Number(target.timeoutMs);
+  watch.deadlineAt = Math.max(
+    watch.deadlineAt,
+    Date.now() + (Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS),
+  );
+  // (Re)start the loop when it is not live — including a RESTART when a fast-landing earlier batch let
+  // the loop drain and exit before this batch registered (sub-second chain + a slow next-batch POST):
+  // a target pushed into a completed run would otherwise never flip and, worse, never re-install the
+  // publish nonce barrier (the resolved one self-clears). `running` flips false in the runner's own
+  // `finally`, which executes SYNCHRONOUSLY with the loop's return — no microtask window where a fresh
+  // register could observe a stale true.
+  if (!watch.running) {
+    watch.running = true;
+    watch.promise = runVaultPublishNonceWatch(watch);
+    installVaultPublishNonceBarrier(watch.promise);
+  }
+}
+
+async function runVaultPublishNonceWatch(watch) {
+  // Observational-only loop: TRANSIENT read errors never end the watch (the deadline decides), and
+  // every part it leaves un-flipped is healed by the confirmation-retry driver's own nonce read later.
+  try {
+    for (;;) {
+      if (watch.targets.length === 0 || Date.now() >= watch.deadlineAt) return;
+      let nonce = null;
+      let lastError = null;
+      try {
+        nonce = await readVaultPublishNonce(watch.provider, watch.owner, {
+          ignoreNonceBarrier: true,
+          verify: false,
+          allowUnverifiedCriticalRead: true,
+          priority: 'messages',
+          requestTimeoutMs: watch.requestTimeoutMs,
+          queueTimeoutMs: watch.queueTimeoutMs,
+        });
+      } catch (error) {
+        // A NON-recoverable read error (structural provider failure, not rate-limit/transient) ends the
+        // watch at once — same as the old per-batch task, whose waitForVaultPublishNonce threw and
+        // released the barrier immediately. Holding the barrier while hammering a read that cannot
+        // succeed would park every subsequent vault action for up to the full burst deadline.
+        if (!isTonRpcRecoverableReadError(error) && !isTonRpcRateLimitError(error)) return;
+        lastError = error;
+      }
+      if (nonce !== null) {
+        const landed = watch.targets.filter((target) => nonce >= target.expectedNonce);
+        watch.targets = watch.targets.filter((target) => nonce < target.expectedNonce);
+        for (const target of landed) {
+          for (const partIndex of target.partIndexes) {
+            const part = watch.publishState.parts?.[partIndex];
+            if (part && part.status === PUBLISH_PART_STATUS_SENT) {
+              watch.notify(watch.publishState, setPublishPartStatus(watch.publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
+            }
+          }
+        }
+        if (watch.targets.length === 0) return;
+      }
+      const remainingMs = watch.deadlineAt - Date.now();
+      if (remainingMs <= 0) return;
+      let pollMs = VAULT_PUBLISH_NONCE_POLL_MS;
+      if (lastError && isTonRpcRateLimitError(lastError)) {
+        pollMs = Math.max(pollMs, Math.min(tonRpcLimitBackoffMs(lastError), remainingMs));
+      }
+      await delay(Math.max(250, Math.min(pollMs, remainingMs)));
+    }
+  } finally {
+    watch.running = false;
+  }
 }
 
 async function readVaultPublishNonceForBroadcastRetry(provider, owner, options = {}) {
@@ -25252,6 +25361,10 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
   // address is not secret, and resolvePublishOwner refuses if a different account later unlocks.
   if (publishState && !publishState.ownerWallet) publishState.ownerWallet = owner;
   let lastResult = null;
+  // ONE shared background nonce watcher for the whole burst (see createVaultPublishNonceWatch) —
+  // created lazily at the first non-final batch; a later batch failure throws out of the send loop
+  // but the watcher keeps serving the already-registered targets.
+  let burstNonceWatch = null;
   // VPB2: the flat per-capsule charge plan is packed into batches of
   // 1..MAX_BATCH_PARTS contiguous same-kind items; each batch is ONE signed
   // external consuming ONE strictly-sequential nonce. Every item in a batch
@@ -25383,39 +25496,32 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
           notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
         }
         if (shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)) {
-          const nonceWaitOptions = {
-            // Batch K's nonce only lands after K prior serial landings — its background wait scales with its
-            // position (v648) so a mid-burst slowdown doesn't expire the poll before the batch's turn (a lapsed
-            // wait is swallowed and healed later anyway; this just keeps the SENT->VAULT_SUBMITTED flip live).
-            timeoutMs: options.timeoutMs ?? (VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS * (batchIndex + 1)),
-            requestTimeoutMs: options.requestTimeoutMs,
-            queueTimeoutMs: options.queueTimeoutMs,
-          };
           // NON-BLOCKING for EVERY batch (middle and final): never await the chain nonce advance inside
-          // the send loop. Each batch tracks its own nonce confirmation in the background barrier and the
-          // loop proceeds straight to the next batch, which signs at the freshly-raised floor -> all batches
-          // broadcast back-to-back instead of one-land-at-a-time (this is what collapses the multi-minute
-          // image to near-text latency). installVaultPublishNonceBarrier REPLACES the pending barrier, so a
-          // subsequent UNRELATED signed vault action awaits the last (highest-nonce) wait — and since the
-          // contract only reaches the highest nonce after every lower one landed, that still serializes a
-          // following action behind the whole burst. The per-batch background task still runs to flip that
-          // batch's parts SENT -> VAULT_SUBMITTED when its nonce lands.
-          const batchPartIndexes = batch.items.map((item) => item.partIndex);
-          const expectedNonce = clientNonce + 1n;
-          installVaultPublishNonceBarrier((async () => {
-            try {
-              await waitForVaultPublishNonce(provider, owner, expectedNonce, nonceWaitOptions);
-              for (const partIndex of batchPartIndexes) {
-                const part = publishState.parts?.[partIndex];
-                if (part && part.status === PUBLISH_PART_STATUS_SENT) {
-                  notifyPublishState(options, publishState, setPublishPartStatus(publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
-                }
-              }
-            } catch {
-              // Confirmation retries re-broadcast and re-check this batch;
-              // a failed background nonce poll must not surface here.
-            }
-          })());
+          // the send loop — the loop proceeds straight to the next batch, which signs at the freshly-
+          // raised floor, so all batches broadcast back-to-back instead of one-land-at-a-time (this is
+          // what collapses the multi-minute image to near-text latency). v756: ONE shared watcher per
+          // burst replaces the old per-batch background pollers (six concurrent critical-priority 1s
+          // read streams on a 7-batch send — the pump-starvation source; see
+          // createVaultPublishNonceWatch). Each batch just registers its target: the watcher flips its
+          // parts SENT -> VAULT_SUBMITTED when the chain nonce passes it, and the watcher's completion
+          // is the publish nonce barrier gating a subsequent unrelated vault action behind the burst.
+          // The deadline still scales with batch position (v648) so a mid-burst slowdown doesn't expire
+          // the watch before a late batch's turn (a lapsed watch is swallowed and healed later anyway).
+          if (!burstNonceWatch) {
+            burstNonceWatch = createVaultPublishNonceWatch({
+              provider,
+              owner,
+              publishState,
+              requestTimeoutMs: options.requestTimeoutMs,
+              queueTimeoutMs: options.queueTimeoutMs,
+              notify: (state, part) => notifyPublishState(options, state, part),
+            });
+          }
+          registerVaultPublishNonceWatchTarget(burstNonceWatch, {
+            expectedNonce: clientNonce + 1n,
+            partIndexes: batch.items.map((item) => item.partIndex),
+            timeoutMs: options.timeoutMs ?? (VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS * (batchIndex + 1)),
+          });
         }
       } catch (error) {
         // Surface WHY toncenter rejected the INITIAL broadcast (raw upstream error.responseBody) — symmetric with
@@ -25843,7 +25949,13 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
         requestTimeoutMs: sendTimeoutMs,
         queueTimeoutMs,
         skipIfRateLimited: true,
-        priority: 'background',
+        // CRITICAL, not background (v756): during an active send the (re-)broadcast POST is the single
+        // most important request in the system — mobilization philosophy. At 'background' (the LOWEST
+        // class) it STARVED in the strict-priority serial pump behind the continuous critical/messages
+        // read stream of a multi-batch send (nonce watch + receipt confirms + sync): the owner's 8-part
+        // file send burned its whole 30s queue budget every pass (QUEUE_TIMEOUT loop, zero wire time).
+        // Still ONE send per pass (the v630/v631 lesson) — this changes WHO wins the queue, not volume.
+        priority: 'critical',
       };
       // ONE send per pass. (v630 tried a 3-variant burst per pass; measured on-device it REGRESSED ~50s→~100s:
       // the unified per-IP request pump is SERIAL, so two extra ~47KB uploads per pass queued AHEAD of the next

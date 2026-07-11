@@ -558,16 +558,40 @@ function toncenterRequestState(key) {
   return state;
 }
 
+// Starvation guard for the strict-priority queue: a SUSTAINED stream of higher-priority arrivals must
+// not starve a queued task forever (observed 2026-07-11: during an 8-part file send the background
+// heal sendBoc waited out its ENTIRE 30s queue budget behind critical nonce/sync reads, QUEUE_TIMEOUT
+// on every heal pass — zero forward progress while the pump was never idle). Aging promotes a waiting
+// task one priority class per step waited, so the worst-case wait for the lowest class is bounded at
+// ~3 steps (15s) plus one in-flight request, instead of unbounded. Ordering within a class stays FIFO
+// (sequence), and a task that just arrived is unaffected — healthy scheduling is unchanged. Promotion
+// FLOORS at weight 1 (never reaches 'critical'): after a long in-flight POST everything queued behind
+// it has aged >= 3 steps, and letting that herd tie at weight 0 would put a FRESH interactive critical
+// read (activation/balance, 8s queue budget) at the BACK of a global-FIFO tail — fresh criticals must
+// always preempt aged observational work.
+const TONCENTER_QUEUE_AGING_STEP_MS = 5_000;
+const TONCENTER_QUEUE_AGING_FLOOR_WEIGHT = 1;
+
+function toncenterEffectiveTaskWeight(task, now) {
+  const waitedMs = Math.max(0, now - task.enqueuedAt);
+  const agedWeight = task.priorityWeight - Math.floor(waitedMs / TONCENTER_QUEUE_AGING_STEP_MS);
+  return Math.max(Math.min(task.priorityWeight, TONCENTER_QUEUE_AGING_FLOOR_WEIGHT), agedWeight);
+}
+
 function takeNextToncenterTask(state) {
+  const now = Date.now();
   let bestIndex = 0;
+  let bestWeight = toncenterEffectiveTaskWeight(state.pending[0], now);
   for (let index = 1; index < state.pending.length; index += 1) {
     const candidate = state.pending[index];
     const best = state.pending[bestIndex];
+    const candidateWeight = toncenterEffectiveTaskWeight(candidate, now);
     if (
-      candidate.priorityWeight < best.priorityWeight
-      || (candidate.priorityWeight === best.priorityWeight && candidate.sequence < best.sequence)
+      candidateWeight < bestWeight
+      || (candidateWeight === bestWeight && candidate.sequence < best.sequence)
     ) {
       bestIndex = index;
+      bestWeight = candidateWeight;
     }
   }
   return state.pending.splice(bestIndex, 1)[0];
