@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=753" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=754" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5814,9 +5814,14 @@ describe('PWA runtime config guard', () => {
     // in the headless loop + withHeads).
     expect(app).toMatch(/if \(readThisCycle\.has\(c\.id\) \|\| !isHeadless\(c\)\) continue;/);
     expect(app).toMatch(/const withHeads = idSorted\.filter\(\(c\) => !readThisCycle\.has\(c\.id\) && !isHeadless\(c\)\);/);
-    // Entry points: feed author row (avatar + meta), discovery card head + an "Open channel" action, about popover.
+    // Entry points: feed author NAME/meta block, discovery card NAME + an "Open channel" action, about popover.
+    // v754 (owner): the AVATAR is NOT wired — it keeps its v651 tap-to-view lightbox meaning on both surfaces.
     expect(app).toMatch(/openPublicChannelView\(\{ channelId: item\.channelId, authorWallet: item\.authorWallet \}\)/);
     expect(app).toMatch(/openPublicChannelView\(\{ authorWallet: channel\.authorWallet, returnTo: 'discovery' \}\)/);
+    expect(app).toMatch(/meta\.addEventListener\('click', openChannel\);/);
+    expect(app).not.toMatch(/authorAvatar\.addEventListener\('click', openChannel\)/);
+    expect(app).toMatch(/name\.addEventListener\('click', openDiscoveredChannel\);/);
+    expect(app).not.toMatch(/head\.addEventListener\('click', openDiscoveredChannel\)/);
     expect(app).toMatch(/openChannelButton\.className = 'discovery-cta-action channel-about-open';/);
     // Back stack: post detail closes FIRST (it stacks on top), then the channel view; Telegram BackButton and the
     // history sentinel both see the channel view as an open overlay.
@@ -7061,7 +7066,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v828/);
+    expect(sw).toMatch(/platho-pwa-prototype-v829/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7069,7 +7074,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=753/);
+    expect(sw).toMatch(/\.\/app\.js\?v=754/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);

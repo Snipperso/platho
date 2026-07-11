@@ -190,7 +190,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v753';
+const PLATHO_APP_RUNTIME_VERSION = 'v754';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6635,7 +6635,9 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
     meta.append(span);
   }
   authorRow.append(authorAvatar, meta);
-  // Tapping the author (avatar or the name/meta block) opens the channel screen — this channel's posts only.
+  // Tapping the author NAME/meta block opens the channel screen — this channel's posts only. The AVATAR is NOT
+  // wired here: it keeps its v651 tap-to-view meaning (the delegated document click opens an image-bearing avatar
+  // in the fullscreen lightbox) — owner: avatar tap = see the avatar, name tap = open the channel.
   // Plain click affordance, NO role/aria-label: an aria-label would wipe the author/date/unread text from the
   // accessibility tree, and the meta block can host interactive children (the publish-status retry chip) — a
   // nested-button-in-button violation. The keyboard path to the channel is the about "i" button's "Open channel"
@@ -6648,10 +6650,8 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
       event.stopPropagation();
       openPublicChannelView({ channelId: item.channelId, authorWallet: item.authorWallet });
     };
-    for (const node of [authorAvatar, meta]) {
-      node.classList.add('feed-author-link');
-      node.addEventListener('click', openChannel);
-    }
+    meta.classList.add('feed-author-link');
+    meta.addEventListener('click', openChannel);
   }
   // Own pending publishes carry a status badge ('public publish submitted…' / 'public publish failed') —
   // CSS classes only (prod CSP style-src 'self' silently kills inline styles).
@@ -7469,20 +7469,20 @@ function buildDiscoveryCard(channel) {
   name.className = 'discovery-card-name';
   name.textContent = label;
   head.append(avatar, name);
-  // The card head opens the channel screen (read the posts BEFORE deciding to follow). Plain click affordance,
-  // no role/aria-label (it would wipe the channel name from the accessibility tree and nest the chevron button
-  // inside a button role) — the keyboard path is the explicit "Open channel" action button below. The chevron
-  // stopPropagations, so relabeling stays an independent target.
-  head.classList.add('feed-author-link');
+  // The card NAME opens the channel screen (read the posts BEFORE deciding to follow); the AVATAR keeps its
+  // tap-to-view lightbox meaning (owner: avatar tap = see the avatar, name tap = open the channel). Plain click
+  // affordance, no role/aria-label — the keyboard path is the explicit "Open channel" action button below. The
+  // chevron stopPropagations, so relabeling stays an independent target.
+  name.classList.add('feed-author-link');
   const openDiscoveredChannel = (event) => {
     if (event && event.target instanceof Element && event.target !== event.currentTarget
       && event.target.closest('button')) return;
-    // stopPropagation: the delegated document-level avatar-lightbox handler (setAvatarNode tap-to-view) must not
-    // ALSO fire when the tap lands on the card's avatar — opening the channel is this tap's one meaning.
+    // stopPropagation: one tap, one meaning — the document-level closers see nothing (openPublicChannelView
+    // hides a floating popover itself).
     event?.stopPropagation?.();
     openPublicChannelView({ authorWallet: channel.authorWallet, returnTo: 'discovery' });
   };
-  head.addEventListener('click', openDiscoveredChannel);
+  name.addEventListener('click', openDiscoveredChannel);
   // "Display as" chevron — same affordance as a public post's author row: relabel this channel by its verified
   // .ath username, wallet address (with copy), or a local name, shared per-counterparty with any Private dialog.
   // Skipped for your own channel (nothing to relabel) or an entry with no author wallet.
