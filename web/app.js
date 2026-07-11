@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v761';
+const PLATHO_APP_RUNTIME_VERSION = 'v762';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -26964,6 +26964,14 @@ async function runPrivatePublishConfirmationRetry(context) {
     message.privatePublishConfirmLastResult = broadcastRetries > 0
       ? `${statusResult} rebroadcast=${broadcastRetries}`
       : (sendRetryScheduled ? `${statusResult} send-retry` : statusResult);
+    // A stop can fire MID-pass (ensurePendingPrivateSendRetry above routes into the partial-expiry
+    // stopper): overwriting its red terminal meta back to live green here — while the stopped flags
+    // stay true — persisted an unrevivable ZOMBIE (stopped driver + green meta + no Retry; observed
+    // live as the owner's frozen queue). Leave the terminal state exactly as the stop wrote it.
+    if (message.privatePublishConfirmStopped === true
+      && message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+      return;
+    }
     message.meta = publishStateMeta(message.publishState);
     thread.state = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
     await updateMessageInEncryptedHistory(thread, message);
@@ -27005,6 +27013,20 @@ function resumePendingPrivatePublishConfirmations() {
   for (const thread of threads) {
     for (const message of thread.messages ?? []) {
       if (stopPartialPrivatePublishRecovery({ thread, message })) continue;
+      // Reconcile a CORRUPT persisted stop (v762): a driver-stopped, non-confirmed message MUST carry
+      // the manual Retry — it is the durable-terminal design's only escape hatch (resume never re-arms
+      // a stopped driver). The v758-era mid-pass overwrite race persisted stopped flags with a live
+      // green 'confirming' meta and a cleared Retry: an invisible, unrevivable zombie (the owner's
+      // frozen queue). Re-stop through the standard path — honest red terminal + working idempotent
+      // Retry. Genuinely-stale (24h+) no-action terminals are left as designed.
+      if (message?.privatePublishConfirmStopped === true
+        && privateMessageHasPublishAttempt(message)
+        && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+        && message?.privateManualRetryAvailable !== true
+        && !isStalePrivatePendingPublishConfirmation(message)) {
+        stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain confirmation timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
+        continue;
+      }
       ensurePendingPrivateSendRetry(thread, message, {
         message: 'resume missing capsule parts',
         code: 'NETWORK_ERROR',
