@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=763" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=764" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1483,6 +1483,17 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toMatch(/!forcedStop && !privatePublishConfirmPassRanThisSession\.has\(message\)/);
     expect(app).toMatch(/publicPublishConfirmPassRanThisSession\.has\(passKey\)/);
     expect(app).toMatch(/publicPublishConfirmPassRanThisSession\.add\(passKey\);/);
+    // v764: SINGLE-FLIGHT per message/record — an in-flight pass is invisible to the jobs map (the
+    // timer deletes its entry before running), so overlapping resume sweeps duplicated the same
+    // variant POST ('first heal POST' x2-3 per nonce in the owner's timelines). The wrapper skips a
+    // duplicate; the in-flight pass always ends by scheduling or stopping, so nothing is lost.
+    expect(app).toMatch(/const privatePublishConfirmPassKeysInFlight = new Set\(\);/);
+    expect(app).toMatch(/const publicPublishConfirmPassKeysInFlight = new Set\(\);/);
+    expect(app).toMatch(/if \(privatePublishConfirmPassKeysInFlight\.has\(singleFlightKey\)\) return;/);
+    expect(app).toMatch(/await runPrivatePublishConfirmationRetryPass\(context\);/);
+    expect(app).toMatch(/if \(publicPublishConfirmPassKeysInFlight\.has\(singleFlightKey\)\) return;/);
+    expect(app).toMatch(/await runPublicPublishConfirmationPassInner\(job\);/);
+    expect(resumeSrc).toMatch(/privatePublishConfirmPassKeysInFlight\.has\(existingKey\)/);
     // v762: corrupt persisted stops self-heal on resume (stopped + non-confirmed + NO manual Retry →
     // re-stop via the standard path: honest red terminal + working idempotent Retry; genuinely-stale
     // 24h+ no-action terminals stay as designed), and the pass never overwrites a mid-pass terminal
@@ -1689,7 +1700,7 @@ describe('PWA runtime config guard', () => {
     const nonceReadIndex = sendSource.indexOf('clientNonce = options.allowOwnVaultActionReadFallback === true');
     const floorNonceIndex = sendSource.indexOf('clientNonce = nonceFloor;');
     const buildIndex = sendSource.indexOf('batchExternal = await buildBatchExternalFromPublishItems(batch');
-    const sendIndex = sendSource.indexOf('lastResult = batchIndex === 0 ? await sendVaultExternalBoc(batchExternal)');
+    const sendIndex = sendSource.indexOf('lastResult = postableNow ? await sendVaultExternalBoc(batchExternal)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
     const confirmNonceIndex = sendSource.indexOf('shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)');
     const watchCreateIndex = sendSource.indexOf('burstNonceWatch = createVaultPublishNonceWatch({');
@@ -1772,10 +1783,14 @@ describe('PWA runtime config guard', () => {
     expect(sendSource).toMatch(/partWithPublishId\.lastBroadcastAt = broadcastAt/);
     expect(sendSource).toMatch(/const epi1 = publishHashPlain\(batchExternal\.entryPublishIds\[entryIndex\]\)/);
     expect(sendSource).toMatch(/batchExternal = await buildBatchExternalFromPublishItems\(batch/);
-    // v623: only batch 0 (whose nonce is current) POSTs; a 2nd+ batch's back-to-back external is signed + stamped
-    // SENT but NOT broadcast (it would bounce pre-accept with exit code 16453 = "too early"), and the idempotent
-    // re-broadcast path sends it the moment batch 0 lands. Kills the guaranteed-doomed request + the alarming 500.
-    expect(sendSource).toMatch(/lastResult = batchIndex === 0 \? await sendVaultExternalBoc\(batchExternal\) : null/);
+    // v623/v764: a POST happens ONLY when the signed nonce IS the chain's next expected one — batches 1+
+    // of a burst (v623) AND batch 0 of a message queued behind in-flight sends (v764, the floor clamp
+    // raised it above the fresh chain read) are signed + stamped SENT but NOT broadcast (a guaranteed
+    // pre-accept 16453 bounce = a doomed request + an alarming native red 500 per queued message); the
+    // idempotent re-broadcast path POSTs each the moment its nonce becomes current.
+    expect(sendSource).toMatch(/const postableNow = batchIndex === 0\s*\n\s*&& observedChainNonce !== null\s*\n\s*&& clientNonce === observedChainNonce;/);
+    expect(sendSource).toMatch(/lastResult = postableNow \? await sendVaultExternalBoc\(batchExternal\) : null/);
+    expect(sendSource).toMatch(/'signed, POST deferred \(queued behind in-flight sends\)'/);
     // Post-broadcast nonce polling is unverified, cache-bypassing, and
     // tolerant of transient RPC trouble until the deadline decides.
     expect(nonceWaitSource).toMatch(/ignoreNonceBarrier: true/);
@@ -2026,7 +2041,9 @@ describe('PWA runtime config guard', () => {
     expect(metaSource).not.toMatch(/confirmingMeta/);
     expect(metaSource).toMatch(/const pending = Math\.max\(submitted, publishStatePendingCount\(publishState\), publishStateVisibleSubmittedCount\(publishState\)\)/);
     expect(metaSource).toMatch(/if \(pending <= 0\) return 'not sent'/);
-    expect(metaSource).toMatch(/if \(total === 1\) return 'submitted, confirming';/);
+    // v764: single-part gets the SAME two phases without a 0/1 counter — 'sending' until the external
+    // lands on-chain, then 'confirming' (both words are in every substring gate incl. the 24h backstop).
+    expect(metaSource).toMatch(/if \(total === 1\) return landed < total \? 'sending' : 'confirming';/);
     // The retrying branch shares the landed-count semantics (counting pending made the visible number
     // JUMP UP when a part flipped FAILED).
     expect(metaSource).toMatch(/submitted \$\{landed\}\/\$\{total\}, retrying/);
@@ -7218,7 +7235,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v838/);
+    expect(sw).toMatch(/platho-pwa-prototype-v839/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7226,7 +7243,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=763/);
+    expect(sw).toMatch(/\.\/app\.js\?v=764/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);
