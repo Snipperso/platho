@@ -2,6 +2,10 @@
   color-scheme: dark;
   --message-media-width: 320px;
   --message-card-width: calc(var(--message-media-width) + 28px);
+  /* Long-post collapse (v765): max height a feed/channel post body renders at before it is clamped behind the
+     "Show full post" button. SINGLE SOURCE — the JS side never hardcodes this; it detects the clamp biting via
+     scrollHeight vs clientHeight. */
+  --feed-post-collapsed-max-height: 480px;
   --bg: #0b0d0f;
   --panel: #111417;
   --panel-2: #151a1d;
@@ -2127,6 +2131,51 @@ button.feed-item:hover {
      viewport (matches .feed-block-text). The grid-column cap above only helps if children can shrink. */
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+/* Long-post collapse (v765, feed + channel view): the post body is clamped while the article carries
+   .feed-post-collapsible (added by JS only when ResizeObserver support exists — no observer, no clamp, so
+   content is never cut with no way to reveal it). feedPostClampObserver marks articles whose content the clamp
+   ACTUALLY cuts with .feed-post-overflowing — that shows the bottom fade + the "Show full post" button.
+   The post-detail screen and comments never get the wrapper and always render in full. */
+.feed-post-collapsible .feed-post-body {
+  position: relative;
+  max-height: var(--feed-post-collapsed-max-height);
+  overflow: hidden;
+}
+
+.feed-post-collapsible.feed-post-overflowing .feed-post-body::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 72px;
+  background: linear-gradient(to bottom, transparent, var(--panel-2));
+  pointer-events: none;
+}
+
+.feed-expand-button {
+  display: none;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.feed-post-overflowing .feed-expand-button {
+  display: block;
+}
+
+.feed-expand-button:hover {
+  border-color: var(--accent);
 }
 
 .comment-list {
