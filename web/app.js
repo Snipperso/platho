@@ -191,7 +191,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v758';
+const PLATHO_APP_RUNTIME_VERSION = 'v759';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -15886,11 +15886,25 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
     usedPayment = true;
     blocks.push({ type: 'payment', paymentDraft, payment: paymentDraft });
   };
+  // File attachments are POSITIONAL like images (v759): attaching inserts a `[file N]` marker at the
+  // cursor and the block lands exactly there. Markerless files (older drafts restored from history, or
+  // a marker the user hand-deleted while keeping the attachment) still append after the visible
+  // content, so nothing already persisted changes meaning.
+  const files = Array.isArray(fileAttachments) ? fileAttachments : [];
+  const usedFiles = new Set();
+  const pushFile = (index) => {
+    const fileIndex = Number(index) - 1;
+    const file = files[fileIndex];
+    if (!file?.bytes?.length || usedFiles.has(fileIndex)) return;
+    usedFiles.add(fileIndex);
+    blocks.push({ type: 'file', name: file.name, mime: file.mime, bytes: file.bytes });
+  };
   let cursor = 0;
   COMPOSER_MARKER_RE.lastIndex = 0;
   for (const match of source.matchAll(COMPOSER_MARKER_RE)) {
     pushText(source.slice(cursor, match.index));
     if (match[1] !== undefined) pushImage(match[1]);
+    else if (match[2] !== undefined) pushFile(match[2]);
     else pushPayment();
     cursor = match.index + match[0].length;
   }
@@ -15899,11 +15913,9 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
     if (!usedImages.has(index)) pushImage(index + 1);
   });
   if (paymentDraft && !usedPayment) pushPayment();
-  // File attachments (v652) append after the visible content — no text markers, order = attach order.
-  for (const file of Array.isArray(fileAttachments) ? fileAttachments : []) {
-    if (!file?.bytes?.length) continue;
-    blocks.push({ type: 'file', name: file.name, mime: file.mime, bytes: file.bytes });
-  }
+  files.forEach((_, index) => {
+    if (!usedFiles.has(index)) pushFile(index + 1);
+  });
   // Swipe-to-reply (v646): the quote rides as the FIRST document block, so the size plan, the optimistic echo,
   // and the wire all carry it from the same draft state (default-param style matches privateImageAttachments).
   if (blocks.length > 0 && replyDraft?.refEntryId !== undefined && replyDraft?.refEntryId !== null) {
@@ -15991,6 +16003,29 @@ function insertComposerMarker(textarea, marker) {
 function insertImageMarkerForComposer(kind, index) {
   const marker = `[image ${index}]`;
   insertComposerMarker(kind === 'public' ? publicMessageInput : messageInput, marker);
+}
+
+// File markers mirror image markers (v759): attaching inserts `[file N]` at the cursor so the
+// attachment has a concrete place in the message instead of silently trailing the body. The public
+// composer serves posts AND comments (comment mode = publicCommentTarget set), so both get this.
+function insertFileMarkerForComposer(kind, index) {
+  insertComposerMarker(kind === 'public' ? publicMessageInput : messageInput, `[file ${index}]`);
+}
+
+// File removal is ALL-at-once (one clear button wipes the whole attachment array), so strip EVERY
+// `[file N]` marker — a lingering orphan would resolve to zero blocks and just disable send, but it
+// reads as content the user has to hand-delete. `(?!\()` keeps labeled links [file 1](url) intact.
+function removeAllFileMarkersForComposer(kind) {
+  const textarea = kind === 'public' ? publicMessageInput : messageInput;
+  if (!textarea) return;
+  // Remove each marker LINE locally (the marker + its own leading newline; insertComposerMarker puts
+  // markers on their own line), never a global whitespace rewrite — a whole-draft blank-line collapse
+  // would destroy deliberate wide spacing in regions that never contained a marker.
+  let value = String(textarea.value ?? '').replace(/\n?\[file\s+\d+\](?!\()(?=\n|$)/ig, '');
+  value = value.replace(/\[file\s+\d+\](?!\()/ig, ''); // inline leftovers (user-edited placement)
+  if (!value.trim()) value = ''; // markers were the only content -> clear (send guard disables)
+  textarea.value = value;
+  autoResizeComposerTextarea(textarea);
 }
 
 // Removing an image ATTACHMENT must also drop its "[image N]" text marker (and renumber the markers AFTER it, since the
@@ -18241,12 +18276,14 @@ privateFileInput?.addEventListener('change', async () => {
     mime: file.type || 'application/octet-stream',
     bytes,
   }];
+  insertFileMarkerForComposer('private', privateFileAttachments.length); // positional, like images (v759)
   updatePrivateFileAttachmentUi();
   refreshComposerCostStatus();
 });
 
 privateClearFilesButton?.addEventListener('click', () => {
   privateFileAttachments = [];
+  removeAllFileMarkersForComposer('private');
   updatePrivateFileAttachmentUi();
   refreshComposerCostStatus();
 });
@@ -18269,12 +18306,14 @@ publicFileInput?.addEventListener('change', async () => {
     mime: file.type || 'application/octet-stream',
     bytes,
   }];
+  insertFileMarkerForComposer('public', publicFileAttachments.length); // posts AND comments (v759)
   updatePublicFileAttachmentUi();
   refreshComposerCostStatus();
 });
 
 publicClearFilesButton?.addEventListener('click', () => {
   publicFileAttachments = [];
+  removeAllFileMarkersForComposer('public');
   updatePublicFileAttachmentUi();
   refreshComposerCostStatus();
 });
@@ -18439,7 +18478,12 @@ composer?.addEventListener('submit', async (event) => {
   const text = messageInput.value.trim();
   const attachments = normalizePrivateImageAttachments(privateImageAttachments);
   const paymentDraft = privatePaymentCheckDraft;
-  if (!text && attachments.length === 0 && !paymentDraft) {
+  // v759: file attachments count as content — a file-only draft (its auto-inserted [file N] marker
+  // hand-deleted, text empty) must reach the block-based send below, not dead-click here (the send
+  // button IS enabled for it via privateComposerHasSendableContent; the public composer's equivalent
+  // gate has been block-based all along).
+  if (!text && attachments.length === 0 && !paymentDraft
+    && normalizePrivateFileAttachments(privateFileAttachments).length === 0) {
     // Empty submit (e.g. an accidental Send click with nothing typed) — return focus to the input so the user can
     // just start typing, the same as after a real send.
     messageInput?.focus();
@@ -20049,7 +20093,10 @@ const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
 // whereas a labeled link always is. Without this, a link whose text happened to be "check"/"payment"/"image N" had
 // its label + brackets eaten on send (and could attach a stray payment/image block).
 const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\](?!\()/ig;
-const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[(?:check|payment)\](?!\()/ig;
+// v759: `[file N]` joins `[image N]` as a positional composer marker — a file attachment lands at the
+// cursor like an image does, instead of silently appending after the body. Group 1 = image index,
+// group 2 = file index; the `(?!\()` keeps labeled links ([file 1](url)) out, same as images.
+const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[file\s+(\d+)\](?!\()|\[(?:check|payment)\](?!\()/ig;
 
 function concatUint8Arrays(parts) {
   const arrays = parts.map((part) => part instanceof Uint8Array ? part : new Uint8Array(part ?? []));
@@ -25581,16 +25628,23 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
         }
       } catch (error) {
         // Surface WHY toncenter rejected the INITIAL broadcast (raw upstream error.responseBody) — symmetric with
-        // the re-broadcast warn — so a bare "500" on the FIRST send is diagnosable instead of a mystery: exit code
-        // 16453 = a later batch (nonce N+1) signed before an earlier one (N) landed ("too early", expected for
-        // back-to-back) vs a genuine toncenter reject/flakiness.
-        console.warn('[platho] vault publish broadcast failed', {
-          status: error?.status ?? null,
-          code: error?.code ?? null,
-          detail: error?.responseBody ?? shortUiErrorText(error, 'broadcast failed'),
-          clientNonce: batch.clientNonce === undefined || batch.clientNonce === null ? null : String(batch.clientNonce),
-          batchIndex,
-        });
+        // the re-broadcast warn — so a bare "500" on the FIRST send is diagnosable instead of a mystery. Exit code
+        // 16453 ("too early": this message signed ahead of a chain still landing earlier sends) is the EXPECTED
+        // back-to-back pipelining bounce — one per message queued behind an in-flight burst — so it logs at
+        // debug, not as a scary warn wall; anything else (genuine toncenter reject/flakiness) keeps the warn.
+        const expectedPipelineBounce = isVaultPublishNonceConsumedError(error);
+        (expectedPipelineBounce ? console.debug : console.warn)(
+          expectedPipelineBounce
+            ? '[platho] vault publish initial POST bounced 16453 (queued behind in-flight sends), heal delivers it in turn'
+            : '[platho] vault publish broadcast failed',
+          {
+            status: error?.status ?? null,
+            code: error?.code ?? null,
+            detail: error?.responseBody ?? shortUiErrorText(error, 'broadcast failed'),
+            clientNonce: batch.clientNonce === undefined || batch.clientNonce === null ? null : String(batch.clientNonce),
+            batchIndex,
+          },
+        );
         const sentBeforeFailure = Boolean(batch.result);
         const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError(error);
         // If the external may have landed (sent-before-failure, or an ambiguous
@@ -25948,7 +26002,26 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
       }
       continue;
     }
-    if (currentNonce !== null && currentNonce < clientNonce) continue;
+    if (currentNonce !== null && currentNonce < clientNonce) {
+      // WAITING IN LINE: a fresh nonce read proves this batch's turn has not come yet — expected for
+      // every message queued behind an in-flight burst (back-to-back pipelining signs ahead of the
+      // chain; the initial POST bounces pre-accept "too early" and stamps part.error). Clear that
+      // STALE error here, else the 2-minute broadcast-failing terminal (publishStateBroadcastIsFailing:
+      // all pending parts carry errors + nothing landed) fires a false red "RPC broadcast unavailable"
+      // for a message that is merely queued (the owner's 9 quick sends behind an 8-cap file). A REAL
+      // broadcast outage still terminates: once the turn comes, failing heal POSTs stamp fresh errors,
+      // and a dead READ path never reaches this branch at all.
+      let clearedStaleError = false;
+      for (const part of parts) {
+        if (part.error) {
+          part.error = null;
+          part.retryReason = null;
+          clearedStaleError = true;
+        }
+      }
+      if (clearedStaleError) changed += 1;
+      continue;
+    }
     // Per-part retry budget/cooldown is identical across a batch (shared lastBroadcastAt/count); read it off the head.
     const head = parts[0];
     const retryCount = publishPartBroadcastRetryCount(head);

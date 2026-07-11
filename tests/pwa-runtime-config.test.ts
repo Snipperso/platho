@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=758" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=759" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -1788,9 +1788,17 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/console\.warn\('\[platho\] vault publish re-broadcast failed'/);
     expect(app).toMatch(/detail: error\?\.responseBody/);
     // v622: the INITIAL broadcast catch AND the receipt-read catch also surface the raw toncenter reason, so a bare
-    // "500" on the first send, or a silent slow receipt read (the "confirming ... still checking" drag), is diagnosable.
-    expect(app).toMatch(/console\.warn\('\[platho\] vault publish broadcast failed'/);
+    // "500" on the first send, or a silent slow receipt read, is diagnosable. v759: the EXPECTED back-to-back
+    // pipelining bounce (16453 "too early" for a message queued behind in-flight sends) logs at debug — one per
+    // queued message is noise, not a failure — while every other initial-broadcast error keeps the warn.
+    expect(app).toMatch(/const expectedPipelineBounce = isVaultPublishNonceConsumedError\(error\);/);
+    expect(app).toMatch(/\(expectedPipelineBounce \? console\.debug : console\.warn\)\(/);
+    expect(app).toMatch(/'\[platho\] vault publish broadcast failed'/);
     expect(app).toMatch(/console\.warn\('\[platho\] vault publish receipt read failed'/);
+    // v759: a batch whose turn has NOT come (fresh read: currentNonce < clientNonce) clears its STALE
+    // initial-bounce part.error — a merely-queued message must never trip the 2-minute broadcast-failing
+    // terminal (false red "RPC broadcast unavailable" on quick sends queued behind an 8-cap burst).
+    expect(app).toMatch(/if \(currentNonce !== null && currentNonce < clientNonce\) \{[\s\S]{0,900}part\.error = null;[\s\S]{0,200}clearedStaleError = true;/);
     // v624: the last two broadcast paths without a [platho] warn (Vault auth + receive-intent externals) now also
     // surface the toncenter reason, so NO broadcast 500 can be a bare mystery on any path.
     expect(app).toMatch(/console\.warn\('\[platho\] vault auth external broadcast failed'/);
@@ -5700,6 +5708,28 @@ describe('PWA runtime config guard', () => {
     expect(pubSubmit).toMatch(/if \(publicDocumentBlocksFromDraft\(text, attachments, fileAttachments\)\.length === 0\) return;/);
     // i18n key present (all-language parity is enforced by the i18n test; pin EN here).
     expect(EN_STRINGS['composer.nothingToSend']).toBe('Nothing to send');
+    // v759: FILE attachments are positional like images — attaching inserts a `[file N]` marker at the
+    // cursor (private + public/comments: one public composer serves both), the block builder places the
+    // FILE block at the marker, markerless files (old drafts) still append after the body, and the
+    // clear-all button strips every file marker. The marker regex keeps the `(?!\()` labeled-link guard.
+    expect(app).toMatch(/\|\\\[file\\s\+\(\\d\+\)\\\]\(\?!\\\(\)/);
+    expect(app).toMatch(/function insertFileMarkerForComposer\(kind, index\)/);
+    expect(app).toMatch(/insertFileMarkerForComposer\('private', privateFileAttachments\.length\)/);
+    expect(app).toMatch(/insertFileMarkerForComposer\('public', publicFileAttachments\.length\)/);
+    expect(app).toMatch(/function removeAllFileMarkersForComposer\(kind\)/);
+    expect(app).toMatch(/removeAllFileMarkersForComposer\('private'\);\s*\n\s*updatePrivateFileAttachmentUi\(\)/);
+    expect(app).toMatch(/removeAllFileMarkersForComposer\('public'\);\s*\n\s*updatePublicFileAttachmentUi\(\)/);
+    expect(app).toMatch(/else if \(match\[2\] !== undefined\) pushFile\(match\[2\]\);/);
+    expect(app).toMatch(/files\.forEach\(\(_, index\) => \{\s*\n\s*if \(!usedFiles\.has\(index\)\) pushFile\(index \+ 1\);/);
+    // Review fixes (v759): (a) the private submit's empty-draft early-return counts FILE attachments as
+    // content — a file-only draft (marker hand-deleted) must reach the block-based send, not dead-click;
+    // (b) clearing files removes each marker LINE locally, never a global \n{3,} rewrite of the draft.
+    expect(app).toMatch(/if \(!text && attachments\.length === 0 && !paymentDraft\s*\n\s*&& normalizePrivateFileAttachments\(privateFileAttachments\)\.length === 0\) \{/);
+    const clearFileMarkersFn = app.slice(
+      app.indexOf('function removeAllFileMarkersForComposer('),
+      app.indexOf('function removeImageMarkerForComposer('),
+    );
+    expect(clearFileMarkersFn).not.toMatch(/\\n\{3,\}/);
   });
 
   it('PWA-OWN-CHANNEL-WHILE-LOCKED-01: the own public channel resolves from the stored plaintext address (so it is a feed source even when the wallet is locked)', () => {
@@ -7158,7 +7188,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v833/);
+    expect(sw).toMatch(/platho-pwa-prototype-v834/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7166,7 +7196,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=257/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=758/);
+    expect(sw).toMatch(/\.\/app\.js\?v=759/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=24/);
