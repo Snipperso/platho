@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=766" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=767" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5929,16 +5929,22 @@ describe('PWA runtime config guard', () => {
     expect(build).toMatch(/bodyContent\.className = 'feed-post-body-inner';/);
     expect(build).toMatch(/appendPublicItemContent\(bodyContent, item\);/);
     // The clamp machinery is gated on ResizeObserver support (no observer -> no clamp: content must never be cut
-    // with no way to reveal it) and skips compact cards + posts the user already expanded this session.
-    expect(build).toMatch(/feedPostClampObserver && !item\.compact && !publicFeedExpandedPosts\.has\(String\(item\.id\)\)/);
-    expect(build).toMatch(/expandButton\.textContent = t\('public\.showFullPost'\);/);
-    // Expanding releases the clamp IN PLACE and is remembered for the session, so the signature-driven article
-    // rebuilds (unread -> read, background syncs) re-render the post expanded instead of snapping it shut.
-    // v766: the release is ANIMATED (expandClampedBody transitions max-height via CSSOM, then drops the clamp;
-    // a timer backstop covers reduced-motion / hidden surfaces where transitionend never fires).
-    expect(build).toMatch(/publicFeedExpandedPosts\.add\(String\(item\.id\)\);/);
-    expect(build).toMatch(/expandClampedBody\(article, body\);/);
+    // with no way to reveal it) and skips compact cards. v767: the shared toggle helper wires the button — one
+    // button relabeled per state (Show full post <-> Collapse), session state in the expanded Set so rebuilds
+    // re-render the current state on every surface.
+    expect(build).toMatch(/feedPostClampObserver && !item\.compact\) \{\s*wireClampToggleButton\(article, body, bodyContent, publicFeedExpandedPosts, String\(item\.id\)\);/);
+    expect(app).toMatch(/function wireClampToggleButton\(root, body, inner, expandedSet, key\)/);
+    const toggle = app.slice(app.indexOf('function wireClampToggleButton('), app.indexOf('// Build one feed <article>'));
+    expect(toggle).toMatch(/toggleButton\.textContent = expanded \? t\('public\.collapsePost'\) : t\('public\.showFullPost'\);/);
+    expect(toggle).toMatch(/expandedSet\.delete\(key\);[\s\S]*?collapseClampedBody\(root, body\);/);
+    expect(toggle).toMatch(/expandedSet\.add\(key\);[\s\S]*?expandClampedBody\(root, body\);/);
+    // Expanding/collapsing is ANIMATED (max-height transition via CSSOM, then the clamp drops/re-applies; a
+    // timer backstop covers reduced-motion / hidden surfaces where transitionend never fires). Collapse reads
+    // the clamp target from the :root var that applies to this root and pulls the card back into view.
     expect(app).toMatch(/function expandClampedBody\(root, body\)/);
+    expect(app).toMatch(/function collapseClampedBody\(root, body\)/);
+    expect(app).toMatch(/root\.classList\.contains\('shared-post-embed'\) \? '--shared-post-embed-max-height' : '--feed-post-collapsed-max-height'/);
+    expect(app).toMatch(/root\.scrollIntoView\(\{ block: 'nearest' \}\);/);
     expect(app).toMatch(/body\.style\.removeProperty\('max-height'\);/);
     expect(app).toMatch(/body\.addEventListener\('transitionend', release, \{ once: true \}\);/);
     expect(app).toMatch(/window\.setTimeout\(release, 450\);/);
@@ -5958,15 +5964,18 @@ describe('PWA runtime config guard', () => {
     // and a descendant selector would leak the post's clamp onto the embed (and keep clamping an expanded embed).
     expect(css).toMatch(/--feed-post-collapsed-max-height: \d+px;/);
     expect(css).toMatch(/\.feed-post-collapsible > \.feed-post-body \{[^}]*max-height: var\(--feed-post-collapsed-max-height\);[^}]*overflow: hidden;/);
-    expect(css).toMatch(/\.feed-post-overflowing > \.feed-expand-button \{\s*display: block;/);
+    // The toggle button shows while overflowing (as "Show full post") AND while expanded (as "Collapse").
+    expect(css).toMatch(/\.feed-post-overflowing > \.feed-expand-button,\s*\.feed-post-expanded > \.feed-expand-button \{\s*display: block;/);
     // The post DETAIL screen (and its comments) calls appendPublicItemContent directly — no .feed-post-body
     // wrapper — so an opened post always renders in full (the expander is a feed/channel affordance only).
     const detail = app.slice(app.indexOf('function renderPublicPostDetail('), app.indexOf('function openPublicPostDetail('));
     expect(detail).toMatch(/appendPublicItemContent\(post, item\);/);
     expect(detail).not.toMatch(/feed-post-body/);
-    // Every locale ships the expander label (OPSEC key parity).
+    // Every locale ships both toggle labels (OPSEC key parity).
     for (const locale of Object.keys(I18N_STRINGS)) {
-      expect((I18N_STRINGS as Record<string, Record<string, string>>)[locale]['public.showFullPost']).toBeTruthy();
+      const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
+      expect(dict['public.showFullPost']).toBeTruthy();
+      expect(dict['public.collapsePost']).toBeTruthy();
     }
   });
 
@@ -6004,14 +6013,15 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="privateShareContext"[\s\S]*?id="privateShareCancelButton"/);
     expect(html).toMatch(/id="publicShareContext"[\s\S]*?id="publicShareCancelButton"/);
     // Embed: source-channel header resolved by the RECIPIENT (their own resolver; the sender's snapshot label is
-    // a fallback only), snippet rendered as PLAIN TEXT (textContent — the snapshot is sender-authored/unverified,
-    // no linkify), collapsed with the shared clamp machinery keyed by the shared post's entry id.
+    // a fallback only), collapsed with the shared toggle machinery keyed by the shared post's entry id.
+    // v767 (owner ask): the snippet LINKIFIES like the original post — safe for an unverified sender-authored
+    // snapshot because appendLinkifiedText allowlists http/https, sets NO live href, and every activation goes
+    // through the activateExternalLink interstitial that shows the real URL before opening.
     const embedFn = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildPublicFeedArticle('));
     expect(embedFn).toMatch(/resolveWalletChannelDisplay\(wallet\)\?\.name/);
-    expect(embedFn).toMatch(/text\.textContent = block\.textTruncated \? `\$\{block\.snippet\}…` : block\.snippet;/);
-    expect(embedFn).not.toMatch(/appendLinkifiedText/);
-    expect(embedFn).toMatch(/expandedSharedEmbeds\.has\(String\(block\.entryId\)\)/);
-    expect(embedFn).toMatch(/expandClampedBody\(embed, body\);/);
+    expect(embedFn).toMatch(/appendLinkifiedText\(text, block\.snippet\);/);
+    expect(embedFn).toMatch(/if \(block\.textTruncated\) text\.append\(document\.createTextNode\('…'\)\);/);
+    expect(embedFn).toMatch(/wireClampToggleButton\(embed, body, inner, expandedSharedEmbeds, String\(block\.entryId\)\);/);
     // Both display surfaces render the embed (private bubbles + public posts/comments).
     expect(app).toMatch(/bubble\.append\(buildSharedPostEmbed\(block\)\);/);
     expect(app).toMatch(/container\.append\(buildSharedPostEmbed\(block\)\);/);
@@ -7344,18 +7354,18 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v841/);
+    expect(sw).toMatch(/platho-pwa-prototype-v842/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=259/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=260/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=766/);
+    expect(sw).toMatch(/\.\/app\.js\?v=767/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=26/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=26/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=27/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=27/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
