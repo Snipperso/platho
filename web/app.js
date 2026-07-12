@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v783';
+const PLATHO_APP_RUNTIME_VERSION = 'v784';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19698,51 +19698,54 @@ function composerMaximizeButtonLabel(button, on) {
   button.setAttribute('title', label);
 }
 
-// Maximize (v780; FLIP-animated v783): a full-screen composer for long posts. .is-maximized on the composer FORM is a
-// CSS overlay (styles.css); the editor DOM never moves, so the draft/caret/selection survive. The composer visibly
-// GROWS from its inline footprint to full-screen (and shrinks back) via a FLIP: record the inline rect, go full-screen,
-// then transition a transform that maps full-screen back to that rect and animate it away. NOT persisted.
-function composerClearFlipStyles(form) {
-  form.style.transition = '';
-  form.style.transform = '';
-  form.style.transformOrigin = '';
+// Maximize (v780; REAL geometry animation v784): a full-screen composer for long posts. .is-maximized on the FORM is a
+// CSS overlay (styles.css); the editor DOM never moves, so the draft/caret survive. The composer GROWS from its inline
+// footprint to full-screen (and shrinks back) by animating its REAL geometry (top/left/width/height) — the content
+// stays at natural size and RE-LAYS-OUT as the box changes (NOT a transform:scale, which squished the content and made
+// the real composer JERK into place on collapse). NOT persisted.
+function composerClearMaxAnimStyles(form) {
+  for (const prop of ['transition', 'top', 'left', 'right', 'width', 'height']) form.style[prop] = '';
 }
-// Cancel an in-flight maximize FLIP (its transitionend listener + fallback timer + inline transform). MUST run before
-// exit (send/nav) or a re-toggle mutates the state, or a stale timer/listener would later fire on a changed composer.
+// Cancel an in-flight maximize animation (its transitionend listener + fallback timer + inline geometry). MUST run
+// before exit (send/nav) or a re-toggle mutates the state, or a stale timer/listener would fire on a changed composer.
 function composerCancelMaxFlip(form) {
   const flip = form && form.__maxFlip;
   if (flip) { clearTimeout(flip.timer); form.removeEventListener('transitionend', flip.onEnd); form.__maxFlip = null; }
-  if (form) composerClearFlipStyles(form);
+  if (form) composerClearMaxAnimStyles(form);
 }
 function composerCollapseMaximizeNow(form) {
   composerCancelMaxFlip(form);
   form.classList.remove('is-maximized', 'is-restoring');
   composerMaximizeButtonLabel(form.querySelector('.composer-toolbar-maximize'), false);
 }
-// growing=true: animate inline-footprint -> full-screen (leave it maximized). growing=false: full-screen -> inline
+// growing=true: animate the inline footprint -> full-screen (stays maximized). growing=false: full-screen -> the inline
 // footprint, then collapse to the inline layout. Uses form.__inlineRect captured at maximize time.
-function composerRunMaximizeFlip(form, growing) {
+function composerRunMaximizeGeo(form, growing) {
   composerCancelMaxFlip(form);
-  const rect = form.__inlineRect;
-  const full = form.getBoundingClientRect();
-  if (!rect || !full.width || !full.height) { if (!growing) composerCollapseMaximizeNow(form); return; }
-  const inlineTransform = `translate(${rect.left - full.left}px, ${rect.top - full.top}px) scale(${rect.width / full.width}, ${rect.height / full.height})`;
-  form.style.transformOrigin = 'top left';
+  const inlineRect = form.__inlineRect;
+  const full = form.getBoundingClientRect(); // form currently has .is-maximized -> its full-screen rect
+  if (!inlineRect || !full.width || !full.height) { if (!growing) composerCollapseMaximizeNow(form); return; }
+  const fullRect = { top: full.top, left: full.left, width: full.width, height: full.height };
+  const setGeo = (r) => {
+    form.style.top = `${r.top}px`; form.style.left = `${r.left}px`; form.style.right = 'auto';
+    form.style.width = `${r.width}px`; form.style.height = `${r.height}px`;
+  };
   const finish = () => {
-    composerCancelMaxFlip(form);
-    if (!growing) composerCollapseMaximizeNow(form);
-    // The FLIP transformed the composer AND its emoji button; if a picker is still open (opened mid-FLIP), re-anchor
-    // it to the button's now-final rect (else it stays where the mid-flight transformed rect put it).
+    // On a shrink, drop .is-maximized WHILE the inline-footprint geometry is still applied (composer already at its
+    // resting size -> no full-screen flash), THEN clear the inline geometry -> seamless hand-off to the inline layout.
+    if (!growing) { form.classList.remove('is-maximized', 'is-restoring'); composerMaximizeButtonLabel(form.querySelector('.composer-toolbar-maximize'), false); }
+    composerCancelMaxFlip(form); // clears inline geometry + timer + listener
     if (emojiPicker && !emojiPicker.hidden && emojiPickerTargetButton) positionEmojiPicker(emojiPickerTargetButton);
   };
-  const onEnd = (event) => { if (event.target === form && event.propertyName === 'transform') finish(); };
+  const onEnd = (event) => { if (event.target === form && event.propertyName === 'height') finish(); };
   form.style.transition = 'none';
-  form.style.transform = growing ? inlineTransform : 'none'; // start state
-  void form.offsetWidth; // reflow so the next transform transitions
-  form.style.transition = `transform 0.5s ${growing ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)'}`;
-  form.style.transform = growing ? 'none' : inlineTransform; // end state
+  setGeo(growing ? inlineRect : fullRect); // start state
+  void form.offsetWidth; // reflow so the next geometry transitions
+  const ease = growing ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)';
+  form.style.transition = `top 0.5s ${ease}, left 0.5s ${ease}, width 0.5s ${ease}, height 0.5s ${ease}`;
+  setGeo(growing ? fullRect : inlineRect); // end state -> the box grows/shrinks and the content re-lays-out
   form.addEventListener('transitionend', onEnd);
-  form.__maxFlip = { timer: setTimeout(finish, 700), onEnd }; // fallback so a missed transitionend can't strand mid-FLIP
+  form.__maxFlip = { timer: setTimeout(finish, 700), onEnd }; // fallback so a missed transitionend can't strand mid-animation
 }
 function toggleComposerMaximize(form, button) {
   if (!form) return;
@@ -19754,7 +19757,7 @@ function toggleComposerMaximize(form, button) {
     composerMaximizeButtonLabel(button, false);
     if (composerReducedMotion() || !form.__inlineRect) { composerCollapseMaximizeNow(form); return; }
     form.classList.add('is-restoring'); // marker: a shrink FLIP is running (still full-screen until it finishes)
-    composerRunMaximizeFlip(form, false);
+    composerRunMaximizeGeo(form, false);
   } else {
     const r = form.getBoundingClientRect(); // the inline footprint to grow FROM / shrink back TO
     form.__inlineRect = { left: r.left, top: r.top, width: r.width, height: r.height };
@@ -19764,7 +19767,7 @@ function toggleComposerMaximize(form, button) {
     composerMaximizeButtonLabel(button, true);
     form.querySelector('.composer-input')?.focus?.();
     if (composerReducedMotion()) return;
-    composerRunMaximizeFlip(form, true);
+    composerRunMaximizeGeo(form, true);
   }
 }
 // Collapse any maximized composer INSTANTLY (after a send clears the draft, or on navigation away — the overlay must

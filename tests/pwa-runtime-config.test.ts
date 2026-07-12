@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=783" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=784" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6597,16 +6597,19 @@ describe('PWA runtime config guard', () => {
     expect(css).not.toMatch(/@keyframes composerMaximizeIn/); // replaced by the JS FLIP
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.composer-toolbar\.is-docking \{ animation: none;/);
     expect(app).toMatch(/const composerReducedMotion = \(\) =>/);
-    expect(app).toMatch(/function composerRunMaximizeFlip\(form, growing\)/);
-    expect(app).toMatch(/const inlineTransform = `translate\(\$\{rect\.left - full\.left\}px/); // maps full-screen back to the inline rect
-    expect(app).toMatch(/form\.style\.transition = `transform 0\.5s /); // 2x slower than the old 0.24s
+    // v784: maximize/restore animates REAL geometry (top/left/width/height) — the content re-lays-out, NOT a
+    // transform:scale (which squished it + jerked on collapse). No transform is set.
+    expect(app).toMatch(/function composerRunMaximizeGeo\(form, growing\)/);
+    expect(app).not.toMatch(/const inlineTransform = `translate/); // the transform-scale FLIP is gone
+    expect(app).toMatch(/form\.style\.top = `\$\{r\.top\}px`; form\.style\.left = `\$\{r\.left\}px`/); // setGeo
+    expect(app).toMatch(/form\.style\.transition = `top 0\.5s \$\{ease\}, left 0\.5s \$\{ease\}, width 0\.5s \$\{ease\}, height 0\.5s \$\{ease\}`/);
     expect(app).toMatch(/form\.__inlineRect = \{ left: r\.left/); // inline footprint captured at maximize time
-    expect(app).toMatch(/if \(isMax && isRestoring\) return; \/\/ mid-shrink FLIP/);
-    // exit/re-toggle CANCEL an in-flight FLIP so a stale timer/listener can't fire on a changed composer.
+    expect(app).toMatch(/if \(isMax && isRestoring\) return; \/\/ mid-shrink/);
+    // exit/re-toggle CANCEL an in-flight animation so a stale timer/listener can't fire on a changed composer.
     expect(app).toMatch(/function composerCancelMaxFlip\(form\)/);
     expect(app).toMatch(/clearTimeout\(flip\.timer\); form\.removeEventListener\('transitionend', flip\.onEnd\)/);
-    expect(app).toMatch(/composerCancelMaxFlip\(form\); \/\/ kill any in-flight FLIP/); // exitComposerMaximize
-    expect(app).toMatch(/timer: setTimeout\(finish, 700\), onEnd \}/); // FLIP fallback
+    expect(app).toMatch(/composerCancelMaxFlip\(form\); \/\/ kill any in-flight/); // exitComposerMaximize
+    expect(app).toMatch(/timer: setTimeout\(finish, 700\), onEnd \}/); // fallback
     expect(app).toMatch(/tb\.style\.setProperty\('--dock-shift', shift\)/);
     // v783: the link chip is inline-BLOCK (atomic mouse selection like the atoms), not inline (letter-by-letter).
     expect(css).toMatch(/\.composer \.composer-input \.composer-block-link \{[\s\S]*?display: inline-block;/);
@@ -7752,7 +7755,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v858/);
+    expect(sw).toMatch(/platho-pwa-prototype-v859/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7761,7 +7764,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=783/);
+    expect(sw).toMatch(/\.\/app\.js\?v=784/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);
