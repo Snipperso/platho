@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=782" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=783" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6241,7 +6241,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function buildComposerLinkBlock\(markup, label\)/);
     expect(app).toMatch(/function composerEditorInsertLinkBlock\(el, markup, label, savedRange\)/);
     expect(app).toMatch(/else \{ target\.append\(buildComposerLinkBlock\(`\[\$\{match\[6\]\}\]\(\$\{match\[7\]\}\)`, match\[6\]\)\); \}/);
-    expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.composer-block-link \{[\s\S]*?display: inline;[\s\S]*?vertical-align: baseline;[\s\S]*?text-decoration: underline;/); // v779: link sits on the text baseline
+    expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.composer-block-link \{[\s\S]*?display: inline-block;[\s\S]*?vertical-align: baseline;[\s\S]*?text-decoration: underline;/); // v779 baseline; v783 inline-block for atomic mouse selection
     expect(app).toMatch(/#privateLinkButton'\)\?\.addEventListener\('click'/);
     expect(app).toMatch(/#publicLinkButton'\)\?\.addEventListener\('click'/);
     expect(html).toMatch(/id="privateLinkButton"/);
@@ -6529,7 +6529,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="privateToolbarMaximize"[^>]*aria-pressed="false"[^>]*data-i18n-title="composer\.maximize"/);
     expect(html).toMatch(/id="publicToolbarMaximize"[^>]*aria-pressed="false"[^>]*data-i18n-title="composer\.maximize"/);
     expect(app).toMatch(/function toggleComposerMaximize\(form, button\) \{/);
-    expect(app).toMatch(/form\.classList\.add\('is-maximized'\); \/\/ the composerMaximizeIn animation plays via CSS/);
+    expect(app).toMatch(/form\.classList\.add\('is-maximized'\);\s*composerMaximizeButtonLabel\(button, true\)/);
     expect(app).toMatch(/function exitComposerMaximize\(\) \{/);
     expect(app).toMatch(/#privateToolbarMaximize'\)\?\.addEventListener\('click', \(event\) => toggleComposerMaximize\(document\.getElementById\('composer'\), event\.currentTarget\)\)/);
     expect(app).toMatch(/#publicToolbarMaximize'\)\?\.addEventListener\('click', \(event\) => toggleComposerMaximize\(document\.getElementById\('publicComposer'\), event\.currentTarget\)\)/);
@@ -6590,23 +6590,30 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/composerEditorPruneEmptyFmt\(el\); \/\/ a cut that emptied a fmt span/);
     expect(app).toMatch(/const keepTrailingBr = !\(fillerBr && range\.intersectsNode\(fillerBr\)\);/);
     expect(app).toMatch(/function serializeComposerEditor\(el, keepTrailingBr = false\)/);
-    // v782 animations: dock-toggle slides the toolbar; maximize/restore slide the overlay in/out (reduced-motion safe).
-    expect(css).toMatch(/@keyframes composerMaximizeIn/);
-    expect(css).toMatch(/@keyframes composerMaximizeOut/);
+    // v783 animations: dock-toggle slides the toolbar (2x slower, 0.48s); maximize/restore FLIP the composer between
+    // its inline footprint and full-screen (a JS transform TRANSITION, not a keyframe — the old keyframes are gone).
     expect(css).toMatch(/@keyframes composerDockShift/);
-    expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?animation: composerMaximizeIn/);
-    expect(css).toMatch(/\.composer\.is-maximized\.is-restoring \{\s*animation: composerMaximizeOut/);
-    expect(css).toMatch(/\.composer-toolbar\.is-docking \{ animation: composerDockShift/);
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none;/);
+    expect(css).toMatch(/\.composer-toolbar\.is-docking \{ animation: composerDockShift 0\.48s/);
+    expect(css).not.toMatch(/@keyframes composerMaximizeIn/); // replaced by the JS FLIP
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.composer-toolbar\.is-docking \{ animation: none;/);
     expect(app).toMatch(/const composerReducedMotion = \(\) =>/);
-    expect(app).toMatch(/if \(isMax && isRestoring\) return; \/\/ mid-restore animation — debounce/);
-    expect(app).toMatch(/form\.classList\.add\('is-restoring'\);/);
-    expect(app).toMatch(/timer: setTimeout\(finish, 400\), onEnd \}/); // fallback so a missed animationend can't strand full-screen
-    // Review fix: exit/re-maximize CANCEL an in-flight restore's stale fallback timer so it can't collapse a re-maximized composer.
-    expect(app).toMatch(/function composerCancelPendingRestore\(form\)/);
-    expect(app).toMatch(/clearTimeout\(pending\.timer\);\s*form\.removeEventListener\('animationend', pending\.onEnd\)/);
-    expect(app).toMatch(/composerCancelPendingRestore\(form\); \/\/ kill any in-flight restore first/); // exitComposerMaximize
+    expect(app).toMatch(/function composerRunMaximizeFlip\(form, growing\)/);
+    expect(app).toMatch(/const inlineTransform = `translate\(\$\{rect\.left - full\.left\}px/); // maps full-screen back to the inline rect
+    expect(app).toMatch(/form\.style\.transition = `transform 0\.5s /); // 2x slower than the old 0.24s
+    expect(app).toMatch(/form\.__inlineRect = \{ left: r\.left/); // inline footprint captured at maximize time
+    expect(app).toMatch(/if \(isMax && isRestoring\) return; \/\/ mid-shrink FLIP/);
+    // exit/re-toggle CANCEL an in-flight FLIP so a stale timer/listener can't fire on a changed composer.
+    expect(app).toMatch(/function composerCancelMaxFlip\(form\)/);
+    expect(app).toMatch(/clearTimeout\(flip\.timer\); form\.removeEventListener\('transitionend', flip\.onEnd\)/);
+    expect(app).toMatch(/composerCancelMaxFlip\(form\); \/\/ kill any in-flight FLIP/); // exitComposerMaximize
+    expect(app).toMatch(/timer: setTimeout\(finish, 700\), onEnd \}/); // FLIP fallback
     expect(app).toMatch(/tb\.style\.setProperty\('--dock-shift', shift\)/);
+    // v783: the link chip is inline-BLOCK (atomic mouse selection like the atoms), not inline (letter-by-letter).
+    expect(css).toMatch(/\.composer \.composer-input \.composer-block-link \{[\s\S]*?display: inline-block;/);
+    // v783 review fix: a maximize FLIP transforms the emoji button too, so close the picker on toggle + re-anchor an
+    // open one to the button's FINAL rect when the FLIP finishes (else the fixed picker stays where the mid-flight rect put it).
+    expect(app).toMatch(/closeEmojiPicker\(\); \/\/ the emoji button is inside the composer/);
+    expect(app).toMatch(/if \(emojiPicker && !emojiPicker\.hidden && emojiPickerTargetButton\) positionEmojiPicker\(emojiPickerTargetButton\)/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7745,16 +7752,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v857/);
+    expect(sw).toMatch(/platho-pwa-prototype-v858/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=271/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=272/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=782/);
+    expect(sw).toMatch(/\.\/app\.js\?v=783/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);

@@ -1423,14 +1423,17 @@ a .avatar.has-image,
    plain inline text (unlike the block image/file atoms), so it flows on the text BASELINE — the inherited
    inline-block + vertical-align:bottom + vertical margin from .composer-block would drop it below the line (v779). */
 .composer .composer-input .composer-block-link {
-  display: inline;
+  /* inline-BLOCK (like the image/file atoms), NOT inline: an inline contenteditable=false chip let the MOUSE hit-test
+     between its letters (partial/letter-by-letter selection + the drag got stuck on it); inline-block makes the mouse
+     treat it as ONE atomic unit. vertical-align:baseline + margin:0 keep it on the text baseline (v779). */
+  display: inline-block;
   vertical-align: baseline;
   margin: 0;
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer; /* click to edit the link (opens the dialog pre-filled) */
-  /* user-select inherits `text` from .composer-block above (atomic via contenteditable=false, no 'all' flicker). */
+  /* user-select inherits `text` from .composer-block above (atomic via contenteditable=false + inline-block, no flicker). */
 }
 
 .composer .composer-input .composer-block-file {
@@ -1654,34 +1657,22 @@ a .avatar.has-image,
   max-width: none;
   background: #0f1214; /* opaque (the resting composer bg is translucent — it would show the app behind) */
   padding-top: calc(12px + var(--app-safe-area-top, env(safe-area-inset-top)));
-  animation: composerMaximizeIn 0.24s cubic-bezier(0.16, 1, 0.3, 1); /* slide + fade up into full-screen (v782) */
 }
 
-/* Restore (v782): the button toggle adds .is-restoring, which plays the reverse animation while still full-screen; JS
-   removes .is-maximized on animationend, snapping back to the inline layout. exitComposerMaximize (send/nav) is instant. */
-.composer.is-maximized.is-restoring {
-  animation: composerMaximizeOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
-}
-@keyframes composerMaximizeIn {
-  from { opacity: 0; transform: translateY(26px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes composerMaximizeOut {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(26px) scale(0.985); }
-}
+/* Maximize/restore (v783): the composer visibly GROWS from its inline footprint to full-screen (and shrinks back) via
+   a JS FLIP — composerRunMaximizeFlip measures the inline rect, then transitions a transform that maps full-screen
+   back to that rect. So the animation is driven by inline transform/transition set in JS (CSSOM per-property, CSP-ok),
+   NOT a keyframe. transform-origin is set to top left by the FLIP. */
 
-/* Dock-toggle (v782): when the ↕ button flips the toolbar above<->below the input, it slides + fades back in on its
-   new side. --dock-shift (set by JS) points the slide the right way. */
+/* Dock-toggle (v782, slower v783): when the ↕ button flips the toolbar above<->below the input, it slides + fades back
+   in on its new side. --dock-shift (set by JS) points the slide the right way. */
 @keyframes composerDockShift {
-  from { opacity: 0.2; transform: translateY(var(--dock-shift, 10px)); }
+  from { opacity: 0.15; transform: translateY(var(--dock-shift, 12px)); }
   to { opacity: 1; transform: translateY(0); }
 }
-.composer-toolbar.is-docking { animation: composerDockShift 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+.composer-toolbar.is-docking { animation: composerDockShift 0.48s cubic-bezier(0.16, 1, 0.3, 1); }
 
 @media (prefers-reduced-motion: reduce) {
-  .composer.is-maximized,
-  .composer.is-maximized.is-restoring,
   .composer-toolbar.is-docking { animation: none; }
 }
 
