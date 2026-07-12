@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=780" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=781" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6211,15 +6211,15 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/shownAs\.textContent = t\('link\.shownAs', \{ text: displayText \}\)/);
     // 9) v750 composer "Insert link": a dialog inserts [text](url) markup, url scheme-checked before insert; both
     //    composers have the button. No hand-crafting markup.
-    expect(app).toMatch(/function openLinkComposerDialog\(targetInput\)/);
-    const linkDlg = app.slice(app.indexOf('function openLinkComposerDialog('), app.indexOf('function openLinkComposerDialog(') + 4700);
+    expect(app).toMatch(/function openLinkComposerDialog\(targetInput, editChip = null\)/);
+    const linkDlg = app.slice(app.indexOf('function openLinkComposerDialog('), app.indexOf('function openLinkComposerDialog(') + 5600);
     expect(linkDlg).toMatch(/const safe = safeExternalUrl\(raw\);/);
     // v778: always a labeled [display](url) so the editor renders it as a link chip; label defaults to the url.
     expect(linkDlg).toMatch(/const display = label \|\| safe;\s*const markup = `\[\$\{display\}\]\(\$\{encodedUrl\}\)`;/);
     // v780: a SELECTED word pre-fills the link-text field (sanitized), and focus jumps to the URL field when prefilled.
     expect(linkDlg).toMatch(/const selectedText = savedRange && !savedRange\.collapsed \? savedRange\.toString\(\)\.replace\(\/\[\[\\\]\\n\]\/g, ' '\)\.trim\(\)\.slice\(0, 200\) : '';/);
-    expect(linkDlg).toMatch(/if \(selectedText\) textInput\.value = selectedText;/);
-    expect(linkDlg).toMatch(/\(selectedText \? urlInput : textInput\)\.focus\(\);/);
+    expect(linkDlg).toMatch(/if \(selectedText\) \{ textInput\.value = selectedText; prefilledText = true; \}/);
+    expect(linkDlg).toMatch(/\(prefilledText \? urlInput : textInput\)\.focus\(\);/);
     // v780: composerEditorInsertLinkBlock REPLACES a selection with the link (deleteContents), then ALWAYS lifts the
     // caret OUT of any enclosing fmt span (escape) + prunes the emptied span — else a link on a bold/italic word
     // serializes to a DEAD `**[label](url)**` (recipient renders literal bold text) or a stray `****`.
@@ -6378,7 +6378,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/initComposerEditor\(publicMessageInput\)/);
 
     // Editor core: DOM<->string serializer pair.
-    expect(app).toMatch(/function serializeComposerEditor\(el\)/);
+    expect(app).toMatch(/function serializeComposerEditor\(el, keepTrailingBr = false\)/);
     expect(app).toMatch(/function buildComposerEditorDom\(el, text\)/);
     expect(app).toMatch(/function initComposerEditor\(el\)/);
     // The .value / .disabled / .placeholder accessor shims keep the whole textarea-era send pipeline working.
@@ -6522,6 +6522,7 @@ describe('PWA runtime config guard', () => {
       expect(dict['composer.selectWord'], `${locale}:select`).toBeTruthy();
       expect(dict['composer.maximize'], `${locale}:maximize`).toBeTruthy();
       expect(dict['composer.restore'], `${locale}:restore`).toBeTruthy();
+      expect(dict['composer.editLink'], `${locale}:editLink`).toBeTruthy();
     }
     // v780: maximize button expands the composer to a full-screen overlay for long posts. Button in BOTH toolbars,
     // toggles .is-maximized on the FORM (CSS overlay, editor DOM untouched), un-maximizes after a send clears.
@@ -6548,11 +6549,48 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?position: fixed;[\s\S]*?height: var\(--app-viewport-height-exact, var\(--app-viewport-height, 100dvh\)\);[\s\S]*?z-index: 30;/);
     expect(app).toMatch(/setProperty\('--app-viewport-height-exact'/); // the unfloored height var is published
     expect(css).toMatch(/\.composer\.is-maximized \.composer-input-row \{[\s\S]*?flex: 1 1 auto;[\s\S]*?align-items: stretch;/);
-    expect(css).toMatch(/\.composer\.is-maximized \.composer-toolbar-maximize \.icon \{\s*--mask: url\("\.\/assets\/icons\/collapse\.svg"\);/);
-    expect(css).toMatch(/\.icon-expand \{ --mask: url\("\.\/assets\/icons\/expand\.svg"\); \}/);
+    // v781: distinct diagonal-arrow maximize icon (was a duplicate of the corner-bracket select-word icon); the ?v=2
+    // busts the browser/Caddy cache for the same-URL asset whose CONTENT changed.
+    expect(css).toMatch(/\.composer\.is-maximized \.composer-toolbar-maximize \.icon \{\s*--mask: url\("\.\/assets\/icons\/collapse\.svg\?v=2"\);/);
+    expect(css).toMatch(/\.icon-expand \{ --mask: url\("\.\/assets\/icons\/expand\.svg\?v=2"\); \}/);
     // icons are precached so the offline shell renders the button both ways.
     expect(sw).toMatch(/\.\/assets\/icons\/expand\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/collapse\.svg/);
+
+    // v781: a finished link chip is EDITABLE — clicking it re-opens the dialog pre-filled with its label+url and
+    // REPLACES the chip in place (openLinkComposerDialog takes an editChip; the marker's %28/%29 are decoded back).
+    expect(app).toMatch(/function openLinkComposerDialog\(targetInput, editChip = null\)/);
+    expect(app).toMatch(/function composerEditorLinkClick\(el, event\) \{/);
+    expect(app).toMatch(/event\.target\?\.closest\?\.\('\.composer-block-link'\)/);
+    expect(app).toMatch(/openLinkComposerDialog\(el, chip\)/);
+    expect(app).toMatch(/addEventListener\('click', \(event\) => composerEditorLinkClick\((?:messageInput|publicMessageInput), event\)\)/);
+    expect(app).toMatch(/editChip\.replaceWith\(newBlock\)/);
+    expect(app).toMatch(/editUrl = m\[2\]\.replace\(\/%28\/g, '\('\)\.replace\(\/%29\/g, '\)'\)/);
+    expect(app).toMatch(/title\.textContent = t\(editChip \? 'composer\.editLink' : 'composer\.insertLink'\)/);
+    expect(css).toMatch(/\.composer-block-link \{[\s\S]*?cursor: pointer;/); // signals the chip is clickable/editable
+    // v781: copy/cut serialize the SELECTED fragment to markers so a link/image chip round-trips (the native copy
+    // drops a contenteditable=false chip); paste re-renders those markers via appendEditorInline (text/plain only).
+    expect(app).toMatch(/function composerEditorCopySelection\(el, event, isCut\) \{/);
+    expect(app).toMatch(/wrapper\.appendChild\(range\.cloneContents\(\)\);/);
+    expect(app).toMatch(/event\.clipboardData\.setData\('text\/plain', serializeComposerEditor\(wrapper, keepTrailingBr\)\)/);
+    expect(app).toMatch(/addEventListener\('copy', \(event\) => composerEditorCopySelection\((?:messageInput|publicMessageInput), event, false\)\)/);
+    expect(app).toMatch(/addEventListener\('cut', \(event\) => composerEditorCopySelection\((?:messageInput|publicMessageInput), event, true\)\)/);
+    expect(app).toMatch(/function appendEditorInline\(target, text, context = target, renderAttachmentMarkers = true\)/); // paste passes the real editor as marker context
+    // Paste escapes the enclosing fmt span (a link chip must not land inside **…** = dead wire) and keeps attachment
+    // markers as LITERAL text (renderAttachmentMarkers=false) so a pasted [image N] can't phantom-bind the editor's own attachment.
+    expect(app).toMatch(/composerEditorEscapeTrailingFmt\(el\); \/\/ never let a pasted LINK chip/);
+    expect(app).toMatch(/appendEditorInline\(frag, line, el, false\)/);
+    expect(app).toMatch(/renderAttachmentMarkers \? buildComposerBlock\(match\[5\], context\) : document\.createTextNode\(match\[5\]\)/);
+    // Review fixes: attachment atoms (image/file/…) are stripped from the clipboard (they can't round-trip a text
+    // clipboard); cut prunes an emptied fmt span (no stray ****); the editor's filler <br> isn't dropped from a real
+    // selected newline (keepTrailingBr); serializeComposerEditor gained the keepTrailingBr param.
+    expect(app).toMatch(/if \(!\/\\\]\\\(\/\.test\(atom\.dataset\.marker \|\| ''\)\) atom\.remove\(\);/);
+    expect(app).toMatch(/composerEditorPruneEmptyFmt\(el\); \/\/ a cut that emptied a fmt span/);
+    expect(app).toMatch(/const keepTrailingBr = !\(fillerBr && range\.intersectsNode\(fillerBr\)\);/);
+    expect(app).toMatch(/function serializeComposerEditor\(el, keepTrailingBr = false\)/);
+    // Only LINK chips are user-select:all (selectable, so copy serializes them); attachment atoms stay none.
+    expect(css).toMatch(/\.composer \.composer-input \.composer-block \{[\s\S]*?user-select: none;/);
+    expect(css).toMatch(/\.composer-block-link \{[\s\S]*?user-select: all;/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7691,19 +7729,19 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v855/);
+    expect(sw).toMatch(/platho-pwa-prototype-v856/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=269/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=270/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=780/);
+    expect(sw).toMatch(/\.\/app\.js\?v=781/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=30/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=30/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

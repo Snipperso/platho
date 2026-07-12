@@ -1389,6 +1389,9 @@ a .avatar.has-image,
   max-width: 100%;
   vertical-align: bottom;
   margin: 2px 1px;
+  /* Attachment atoms (image/file/payment/post) stay unselectable: their data lives in arrays, not text, so they can't
+     round-trip a text clipboard. Only LINK chips opt into user-select:all (below) so copy/cut can serialize them. */
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -1424,7 +1427,11 @@ a .avatar.has-image,
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
-  cursor: default;
+  cursor: pointer; /* click to edit the link (opens the dialog pre-filled) */
+  /* Atomic + selectable (unlike the attachment atoms above): a spanning selection includes the whole link chip as one
+     unit, so copy/cut serialize its [label](url) marker and it round-trips. */
+  -webkit-user-select: all;
+  user-select: all;
 }
 
 .composer .composer-input .composer-block-file {
@@ -1677,7 +1684,7 @@ a .avatar.has-image,
 
 /* The button flips to the inward-arrows "restore" glyph while maximized. */
 .composer.is-maximized .composer-toolbar-maximize .icon {
-  --mask: url("./assets/icons/collapse.svg");
+  --mask: url("./assets/icons/collapse.svg?v=2");
 }
 
 .composer-toolbar-scroll {
@@ -4599,8 +4606,8 @@ button.feed-item:hover {
 .icon-swap-circular { --mask: url("./assets/icons/swap-circular.svg"); }
 .icon-swap-vertical { --mask: url("./assets/icons/swap-vertical.svg"); }
 .icon-text-select { --mask: url("./assets/icons/text-select.svg"); }
-.icon-expand { --mask: url("./assets/icons/expand.svg"); }
-.icon-collapse { --mask: url("./assets/icons/collapse.svg"); }
+.icon-expand { --mask: url("./assets/icons/expand.svg?v=2"); }
+.icon-collapse { --mask: url("./assets/icons/collapse.svg?v=2"); }
 .icon-bolt { --mask: url("./assets/icons/bolt.svg"); }
 .icon-gear { --mask: url("./assets/icons/gear.svg"); }
 .icon-install { --mask: url("./assets/icons/install.svg"); }

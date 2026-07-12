@@ -182,7 +182,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=30';
+} from './i18n.mjs?v=31';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v780';
+const PLATHO_APP_RUNTIME_VERSION = 'v781';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2444,7 +2444,7 @@ function closeLinkComposerModal() {
   activeLinkComposerModal = null;
   try { previousFocus?.focus?.(); } catch { /* detached */ }
 }
-function openLinkComposerDialog(targetInput) {
+function openLinkComposerDialog(targetInput, editChip = null) {
   if (!targetInput || targetInput.disabled) return;
   closeLinkComposerModal();
   // Capture the editor caret BEFORE the dialog steals focus, so the link lands where the user was typing (not at
@@ -2463,22 +2463,31 @@ function openLinkComposerDialog(targetInput) {
   card.setAttribute('aria-modal', 'true');
 
   const title = document.createElement('h2');
-  title.textContent = t('composer.insertLink');
+  title.textContent = t(editChip ? 'composer.editLink' : 'composer.insertLink');
   const textInput = document.createElement('input');
   textInput.type = 'text';
   textInput.className = 'link-composer-input';
   textInput.placeholder = t('composer.linkText');
   textInput.setAttribute('aria-label', t('composer.linkText'));
   textInput.maxLength = 200;
-  // If a word/phrase was SELECTED, pre-fill it as the link text (and the link replaces the selection on insert).
-  const selectedText = savedRange && !savedRange.collapsed ? savedRange.toString().replace(/[[\]\n]/g, ' ').trim().slice(0, 200) : '';
-  if (selectedText) textInput.value = selectedText;
+  // Pre-fill: editing an existing chip fills BOTH fields from its [label](url) marker (decoding the %28/%29 we
+  // encode on insert); otherwise a SELECTED word pre-fills the link text (and the link replaces the selection).
+  let editUrl = '';
+  let prefilledText = false;
+  if (editChip) {
+    const m = String(editChip.dataset.marker || '').match(/^\[([\s\S]*)\]\(([\s\S]*)\)$/);
+    if (m) { textInput.value = m[1]; editUrl = m[2].replace(/%28/g, '(').replace(/%29/g, ')'); prefilledText = true; }
+  } else {
+    const selectedText = savedRange && !savedRange.collapsed ? savedRange.toString().replace(/[[\]\n]/g, ' ').trim().slice(0, 200) : '';
+    if (selectedText) { textInput.value = selectedText; prefilledText = true; }
+  }
   const urlInput = document.createElement('input');
   urlInput.type = 'url';
   urlInput.className = 'link-composer-input';
   urlInput.placeholder = t('composer.linkUrl');
   urlInput.setAttribute('aria-label', t('composer.linkUrl'));
   urlInput.inputMode = 'url';
+  if (editUrl) urlInput.value = editUrl;
   const errorLine = document.createElement('p');
   errorLine.className = 'link-composer-error';
   errorLine.hidden = true;
@@ -2510,7 +2519,17 @@ function openLinkComposerDialog(targetInput) {
     const display = label || safe;
     const markup = `[${display}](${encodedUrl})`; // always a labeled link so the editor can render it as a link chip
     closeLinkComposerModal();
-    composerEditorInsertLinkBlock(targetInput, markup, display, savedRange); // renders as a link chip at the caret
+    if (editChip) {
+      // Editing an existing chip: replace it in place (do nothing if it was removed while the dialog was open).
+      if (editChip.isConnected) {
+        const newBlock = buildComposerLinkBlock(markup, display);
+        editChip.replaceWith(newBlock);
+        composerEditorPlaceCaretAfter(newBlock);
+        composerEditorAfterEdit(targetInput);
+      }
+    } else {
+      composerEditorInsertLinkBlock(targetInput, markup, display, savedRange); // renders as a link chip at the caret
+    }
   };
   cancelBtn.addEventListener('click', closeLinkComposerModal);
   insertBtn.addEventListener('click', doInsert);
@@ -2520,8 +2539,8 @@ function openLinkComposerDialog(targetInput) {
   const onKeydown = (event) => { if (event.key === 'Escape') { event.preventDefault(); closeLinkComposerModal(); } };
   document.addEventListener('keydown', onKeydown, true);
   activeLinkComposerModal = { backdrop, onKeydown, previousFocus };
-  // If the link text is already filled from the selection, jump straight to the URL field (the next thing to type).
-  (selectedText ? urlInput : textInput).focus();
+  // If the link text is already filled (a selected word, or the chip being edited), jump straight to the URL field.
+  (prefilledText ? urlInput : textInput).focus();
 }
 
 // A bare window.open of a t.me/ link is a no-op inside the Telegram in-app WebView,
@@ -16216,7 +16235,9 @@ function isFreshPublicTimestamp(value, cutoffMs = publicSyncCutoffMs()) {
 //  - Paste/drop are sanitized to text/plain; IME composition is guarded (the isComposing keydown check).
 
 // Serialize a composer editor's DOM back to the plain markdown+marker string that the send pipeline reads.
-function serializeComposerEditor(el) {
+// keepTrailingBr: normally the editor's OWN trailing <br> is an invisible filler and is dropped. The copy/cut path
+// serializes a cloned SELECTION where a trailing <br> is a REAL newline the user selected, so it passes true.
+function serializeComposerEditor(el, keepTrailingBr = false) {
   if (!el) return '';
   let out = '';
   const walk = (node) => {
@@ -16229,7 +16250,7 @@ function serializeComposerEditor(el) {
         if (tag === 'BR') {
           // A trailing <br> that is the editor's own last child is the "filler" break browsers (and our
           // Enter handler) leave to make the final empty line visible — it is not real content, so drop it.
-          if (node === el && !child.nextSibling) { /* filler trailing br */ }
+          if (!keepTrailingBr && node === el && !child.nextSibling) { /* filler trailing br */ }
           else out += '\n';
         } else if (child.dataset && child.dataset.marker) {
           out += child.dataset.marker; // atomic attachment/link chip -> its [marker]
@@ -16348,7 +16369,51 @@ function buildComposerLinkBlock(markup, label) {
   return block;
 }
 
-function appendEditorInline(target, text) {
+// A finished link chip is contenteditable=false (atomic), so it can't be edited by typing. Clicking it re-opens the
+// link dialog pre-filled with its label + url and replaces the chip in place on save — the only way to fix a link.
+function composerEditorLinkClick(el, event) {
+  if (!el || el.disabled) return;
+  const chip = event.target?.closest?.('.composer-block-link');
+  if (!chip || !el.contains(chip)) return;
+  event.preventDefault();
+  openLinkComposerDialog(el, chip);
+}
+
+// Copy/cut: the native clipboard drops a contenteditable=false chip (so a copied link/image lost its marker+url and
+// vanished on paste). Serialize the SELECTED fragment to the SAME markdown+marker string the editor uses, so the
+// chip round-trips (paste re-renders it via appendEditorInline). text/plain only — no clipboard HTML crosses.
+function composerEditorCopySelection(el, event, isCut) {
+  if (!el || !event.clipboardData) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return; // nothing selected -> let the browser handle it
+  const range = sel.getRangeAt(0);
+  if (!el.contains(range.commonAncestorContainer)) return;
+  const wrapper = document.createElement('div');
+  wrapper.appendChild(range.cloneContents()); // includes any user-select:all link chip the selection spans
+  // Attachment atoms (image/file/payment/post) carry their data OUTSIDE the text — in arrays keyed by the marker
+  // index — so they can't round-trip through a text clipboard: a copied [image 1] is a dangling ref and a cut one is
+  // pruned before paste (dead pill). Drop those markers; only [label](url) LINK chips round-trip.
+  for (const atom of wrapper.querySelectorAll('[data-marker]')) {
+    if (!/\]\(/.test(atom.dataset.marker || '')) atom.remove();
+  }
+  // Keep a real trailing newline the user selected, but NOT the editor's invisible filler <br> (only cloned when the
+  // selection reaches the editor's very end).
+  const fillerBr = el.lastChild && el.lastChild.nodeName === 'BR' && !el.lastChild.nextSibling ? el.lastChild : null;
+  const keepTrailingBr = !(fillerBr && range.intersectsNode(fillerBr));
+  event.clipboardData.setData('text/plain', serializeComposerEditor(wrapper, keepTrailingBr));
+  event.preventDefault();
+  if (isCut && !el.disabled) {
+    range.deleteContents();
+    composerEditorPruneEmptyFmt(el); // a cut that emptied a fmt span would else serialize to a stray `****`
+    composerEditorAfterEdit(el); // input -> reconcileComposerAttachments prunes any cut atom's attachment
+  }
+}
+
+// context (default: target) is the editor element a marker atom resolves its attachment against — pass the real
+// editor when building into a detached fragment. renderAttachmentMarkers=false keeps a literal [image N]/[file N]/
+// [post]/[check] as PLAIN TEXT (paste path): rendering it as a live atom would bind a pasted token to the editor's
+// OWN attachment -> a phantom duplicate whose Backspace deletes the real attachment. Links still render.
+function appendEditorInline(target, text, context = target, renderAttachmentMarkers = true) {
   const str = String(text ?? '');
   if (!str) return;
   EDITOR_INLINE_RE.lastIndex = 0;
@@ -16364,7 +16429,7 @@ function appendEditorInline(target, text) {
     else if (match[2] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-bold'; s.textContent = match[2]; target.append(s); }
     else if (match[3] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-italic'; s.textContent = match[3]; target.append(s); }
     else if (match[4] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-code'; s.textContent = match[4]; target.append(s); }
-    else if (match[5] !== undefined) { target.append(buildComposerBlock(match[5], target)); }
+    else if (match[5] !== undefined) { target.append(renderAttachmentMarkers ? buildComposerBlock(match[5], context) : document.createTextNode(match[5])); }
     else { target.append(buildComposerLinkBlock(`[${match[6]}](${match[7]})`, match[6])); } // [label](url) link chip
     last = match.index + match[0].length;
   }
@@ -16870,13 +16935,17 @@ function composerEditorBeforeInput(el, event) {
 function composerEditorInsertPlainMultiline(el, text) {
   if (!el || el.disabled) return;
   el.focus();
+  composerEditorRange(el).deleteContents(); // collapse any selection at the paste point first
+  composerEditorEscapeTrailingFmt(el); // never let a pasted LINK chip land INSIDE **…**/*…*/`…` (a dead-wire link)
   const range = composerEditorRange(el);
-  range.deleteContents();
   const frag = document.createDocumentFragment();
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
   lines.forEach((line, index) => {
     if (index > 0) frag.append(document.createElement('br'));
-    if (line) frag.append(document.createTextNode(line));
+    // Render links + formatting so a link copied FROM the composer round-trips as a live chip (not raw `[label](url)`
+    // code). Attachment markers ([image N]/…) stay LITERAL TEXT (renderAttachmentMarkers=false): a live pasted atom
+    // would bind to the editor's OWN attachment (phantom dup + delete-the-real-one). Still text/plain: NO clipboard HTML.
+    appendEditorInline(frag, line, el, false);
   });
   const last = frag.lastChild;
   range.insertNode(frag);
@@ -19578,6 +19647,9 @@ messageInput?.addEventListener('keydown', (event) => {
 // Newline (insertParagraph/insertLineBreak) + a format-bleed guard, shared with the public composer. In
 // beforeinput NOT keydown so Android soft-keyboard Enter (keyCode 229, key!=='Enter') still lands a clean <br>.
 messageInput?.addEventListener('beforeinput', (event) => composerEditorBeforeInput(messageInput, event));
+messageInput?.addEventListener('click', (event) => composerEditorLinkClick(messageInput, event));
+messageInput?.addEventListener('copy', (event) => composerEditorCopySelection(messageInput, event, false));
+messageInput?.addEventListener('cut', (event) => composerEditorCopySelection(messageInput, event, true));
 messageInput?.addEventListener('paste', (event) => {
   event.preventDefault(); // strip clipboard HTML (XSS surface) — only text/plain crosses into the editor
   composerEditorInsertPlainMultiline(messageInput, event.clipboardData?.getData('text/plain') ?? '');
@@ -19676,6 +19748,9 @@ publicMessageInput?.addEventListener('keydown', (event) => {
 });
 // Newline + format-bleed guard via beforeinput (not keydown) so Android soft-keyboard Enter (keyCode 229) lands.
 publicMessageInput?.addEventListener('beforeinput', (event) => composerEditorBeforeInput(publicMessageInput, event));
+publicMessageInput?.addEventListener('click', (event) => composerEditorLinkClick(publicMessageInput, event));
+publicMessageInput?.addEventListener('copy', (event) => composerEditorCopySelection(publicMessageInput, event, false));
+publicMessageInput?.addEventListener('cut', (event) => composerEditorCopySelection(publicMessageInput, event, true));
 publicMessageInput?.addEventListener('paste', (event) => {
   event.preventDefault(); // strip clipboard HTML (XSS surface) — only text/plain crosses into the editor
   composerEditorInsertPlainMultiline(publicMessageInput, event.clipboardData?.getData('text/plain') ?? '');
