@@ -182,7 +182,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=29';
+} from './i18n.mjs?v=30';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v778';
+const PLATHO_APP_RUNTIME_VERSION = 'v780';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1881,7 +1881,13 @@ function syncViewportCssVars() {
   } else {
     height = visual;
   }
-  document.documentElement.style.setProperty('--app-viewport-height', `${Math.max(320, Math.round(height))}px`);
+  const rounded = Math.max(0, Math.round(height));
+  document.documentElement.style.setProperty('--app-viewport-height', `${Math.max(320, rounded)}px`);
+  // Unclamped variant (no 320px floor) for the full-screen maximized composer only: on a short viewport (landscape or
+  // a small/old device with the keyboard up) the floored value is taller than the visible area, so the overlay's
+  // bottom-pinned send button (and a docked-below restore button) would hide behind the keyboard. The floor is kept
+  // for --app-viewport-height because other layouts rely on it.
+  if (rounded > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${rounded}px`);
 }
 
 // ---- Telegram Mini App adapter --------------------------------------------
@@ -1986,6 +1992,14 @@ function syncNavBackAffordance() {
 }
 
 function closeNavOverlay() {
+  // A maximized composer is a full-screen overlay above the post detail / conversation; ANY back-navigation
+  // (native/TG BackButton, hardware/swipe Back — these sit OUTSIDE the web viewport, so the overlay can't intercept
+  // them) collapses it FIRST and consumes this Back, or the overlay strands the user over whatever they backed into.
+  // A second Back then closes the underlying overlay.
+  if (exitComposerMaximize()) {
+    syncNavBackAffordance();
+    return true;
+  }
   // Public post detail -> back to the feed. Checked before the chat branch so Back closes whichever overlay is on.
   // closePublicPostDetail() also exits the composer's comment mode (setPublicCommentTarget(null)) — without it the
   // shared composer would stay pinned to the closed post and a feed "post" would publish as a comment.
@@ -2456,6 +2470,9 @@ function openLinkComposerDialog(targetInput) {
   textInput.placeholder = t('composer.linkText');
   textInput.setAttribute('aria-label', t('composer.linkText'));
   textInput.maxLength = 200;
+  // If a word/phrase was SELECTED, pre-fill it as the link text (and the link replaces the selection on insert).
+  const selectedText = savedRange && !savedRange.collapsed ? savedRange.toString().replace(/[[\]\n]/g, ' ').trim().slice(0, 200) : '';
+  if (selectedText) textInput.value = selectedText;
   const urlInput = document.createElement('input');
   urlInput.type = 'url';
   urlInput.className = 'link-composer-input';
@@ -2503,7 +2520,8 @@ function openLinkComposerDialog(targetInput) {
   const onKeydown = (event) => { if (event.key === 'Escape') { event.preventDefault(); closeLinkComposerModal(); } };
   document.addEventListener('keydown', onKeydown, true);
   activeLinkComposerModal = { backdrop, onKeydown, previousFocus };
-  textInput.focus();
+  // If the link text is already filled from the selection, jump straight to the URL field (the next thing to type).
+  (selectedText ? urlInput : textInput).focus();
 }
 
 // A bare window.open of a t.me/ link is a no-op inside the Telegram in-app WebView,
@@ -16406,34 +16424,67 @@ function composerEditorInsertText(el, text) {
   composerEditorAfterEdit(el);
 }
 
-// Plain Enter = a clean single <br> newline (Ctrl/Cmd+Enter sends). We intercept Enter so the browser never
-// injects <div>/<p> blocks; a filler <br> is appended when the break is the editor's last node so the new empty
-// line is visible (the serializer drops that trailing filler).
-// If the collapsed caret sits at the trailing boundary of a .fmt-* span (right after a formatted word), move it to
-// just AFTER that span. Without this, a newline / an attachment / typing inserted while the caret is inside the
-// span EXTENDS the formatting across it — and a marker (image) inside a bold span serializes to `**…[image N]…**`,
-// which composerBlocksFromDraft splits on the marker into two blocks with UNBALANCED `**` (recipient sees literal
-// asterisks). Called before Enter and chip insertion, and after a word-toggle.
+// If the collapsed caret is ANYWHERE inside a .fmt-* span, move it to just AFTER the OUTERMOST such span. A newline
+// or an attachment marker inserted WHILE the caret is inside the span would otherwise be trapped in the formatting:
+// a marker inside bold serializes to `**…[image N]…**` which composerBlocksFromDraft splits into UNBALANCED `**`
+// blocks, and a `<br>` inside bold serializes to `**…\n…**` which the recipient can't match (bold cannot span a
+// newline) — both show literal asterisks. So Enter/attachment always land OUTSIDE the word's formatting. (Since
+// v779 the caret can rest MID-word after a toggle, so we escape the whole span, not just its trailing edge.)
 function composerEditorEscapeTrailingFmt(el) {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
   if (!range.collapsed) return;
-  const node = range.startContainer;
   const isFmt = (n) => n && n.nodeType === 1 && /\bfmt-/.test(n.className || '');
-  if (node.nodeType === 3) { if (range.startOffset !== (node.nodeValue || '').length) return; }
-  else if (node.nodeType === 1) { if (range.startOffset !== node.childNodes.length) return; }
-  else return;
-  let n = node;
+  let n = range.startContainer;
   let span = null;
   while (n && n !== el) {
-    if (isFmt(n)) span = n;    // remember the OUTERMOST .fmt-* ancestor whose trailing edge the caret is at, so a
-    if (n.nextSibling) break;  // nested bold>italic escapes ALL the way out (else the marker lands inside the bold)
+    if (isFmt(n)) span = n;    // the OUTERMOST .fmt-* ancestor of the caret (nested bold>italic escapes ALL the way)
     n = n.parentNode;
   }
   if (!span) return;
   const r = document.createRange();
   r.setStartAfter(span);
+  r.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+// Drop any .fmt-* span a deletion emptied (e.g. replacing the selected bold word with a link removes the span's text
+// but leaves the span): an empty fmt span serializes to a stray `****` / `**` the recipient shows as literal asterisks.
+// Skips spans still holding a <br> or a marker atom, and spans whose parent was already pruned (isConnected).
+function composerEditorPruneEmptyFmt(el) {
+  for (const span of [...el.querySelectorAll('[class*="fmt-"]')]) {
+    if (!span.isConnected) continue;
+    if (/\bfmt-/.test(span.className || '') && span.textContent === '' && !span.querySelector('br, [data-marker]')) span.remove();
+  }
+}
+
+// After a selection is deleted, the collapsed caret may sit inside a NON-empty fmt span (a partial selection of a
+// multi-word bold/italic run). Split that span at the caret — the text AFTER the caret moves into a sibling clone
+// with the same formatting — and leave the caret BETWEEN the two halves. So a link inserted here lands at the true
+// selection point with the surrounding text kept in order, instead of after the whole span (which silently reversed
+// word order for a non-trailing partial selection). No-op if the caret is not inside a fmt span.
+function composerEditorSplitFmtAtCaret(el) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const caret = sel.getRangeAt(0);
+  if (!caret.collapsed) return;
+  const isFmt = (n) => n && n.nodeType === 1 && /\bfmt-/.test(n.className || '');
+  let n = caret.startContainer, span = null;
+  while (n && n !== el) { if (isFmt(n)) span = n; n = n.parentNode; } // outermost enclosing fmt span
+  if (!span) return;
+  const tail = document.createRange();
+  tail.setStart(caret.startContainer, caret.startOffset);
+  tail.setEnd(span, span.childNodes.length); // caret -> end of the span's content
+  const afterFrag = tail.extractContents();
+  if (afterFrag && afterFrag.textContent !== '') {
+    const afterSpan = span.cloneNode(false); // same fmt-* class, no children
+    afterSpan.appendChild(afterFrag);
+    span.after(afterSpan);
+  }
+  const r = document.createRange();
+  r.setStartAfter(span); // between the before-span and the after-span; an emptied before-span is pruned later
   r.collapse(true);
   sel.removeAllRanges();
   sel.addRange(r);
@@ -16471,19 +16522,32 @@ function composerEditorInsertChip(el, marker) {
   composerEditorAfterEdit(el);
 }
 
-// Insert a link chip (the "Insert link" dialog) at the caret. Restores the caret the dialog stole (savedRange) so
-// the link lands where the user was typing, not at the start; collapses a live selection first (don't delete text).
+// Insert a link chip (the "Insert link" dialog). Restores the caret the dialog stole (savedRange) so the link lands
+// where the user was typing, not at the start. If the user had a SELECTION, the link REPLACES it (the selected word
+// was pre-filled as the link text). Either way the link must land OUTSIDE any enclosing .fmt-* span: a link chip
+// trapped inside **…**/*…*/`…` serializes to `**[label](url)**`, and the recipient's inline regex matches the outer
+// **…** first — rendering the marker as literal bold/italic text, a DEAD non-clickable link on the wire.
 function composerEditorInsertLinkBlock(el, markup, label, savedRange) {
   if (!el || el.disabled) return;
   el.focus();
   if (savedRange) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); }
   const sel = window.getSelection();
-  if (sel && sel.rangeCount && !sel.isCollapsed) { const r = sel.getRangeAt(0); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
-  composerEditorEscapeTrailingFmt(el);
+  const hadSelection = sel && sel.rangeCount && !sel.isCollapsed;
+  if (hadSelection) {
+    sel.getRangeAt(0).deleteContents(); // the link REPLACES the selection
+    // Caret now sits where the selection was — maybe inside the fmt span it was part of. SPLIT that span at the caret
+    // so the link lands AT the selection point and the before/after text keeps its order + formatting (escaping to
+    // after the WHOLE span would reverse word order for a non-trailing partial selection).
+    composerEditorSplitFmtAtCaret(el);
+  } else {
+    // Bare caret in a bold/italic word: put the link AFTER the whole word rather than splitting it mid-way.
+    composerEditorEscapeTrailingFmt(el);
+  }
   const range = composerEditorRange(el);
   range.deleteContents();
   const block = buildComposerLinkBlock(markup, label);
-  range.insertNode(block);
+  range.insertNode(block); // lands between the before/after fmt spans (or after a bare word), never inside formatting
+  composerEditorPruneEmptyFmt(el); // remove a fmt span the split/deletion emptied BEFORE it serializes to a stray `****`
   composerEditorPlaceCaretAfter(block);
   composerEditorAfterEdit(el);
 }
@@ -16664,12 +16728,14 @@ function composerEditorToggleFormat(el, className) {
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
   if (!el.contains(range.commonAncestorContainer)) return;
-  const startedCollapsed = range.collapsed; // a word-toggle (tap-in-word + B): collapse the caret back afterwards
+  const startedCollapsed = range.collapsed; // a word-toggle (tap-in-word + B): keep the caret where it was afterwards
+  let caretInWord = -1; // the caret's offset WITHIN the word, so we can put it back at the same spot after formatting
   if (range.collapsed) {
     // No selection: expand to the WORD under the caret so tapping into a word + B formats the whole word
     // (mobile-friendly — no precise selection, no native menu). Caret on whitespace/empty -> no-op.
     const word = composerEditorWordRangeAtCaret(range);
     if (!word) return;
+    caretInWord = range.startOffset - word.start; // remember WHERE in the word the caret was, to restore it
     range.setStart(word.node, word.start);
     range.setEnd(word.node, word.end);
     sel.removeAllRanges();
@@ -16730,23 +16796,23 @@ function composerEditorToggleFormat(el, className) {
     r.selectNodeContents(span);
     sel.removeAllRanges(); sel.addRange(r);
   }
-  // A word-toggle started from a collapsed caret should NOT leave the whole word highlighted — collapse to a caret
-  // at the end of the formatted word (a real selection stays selected so bold+italic can chain). Keep the caret
-  // INSIDE the word's TEXT node (not on an element boundary) so pressing Bold/Italic AGAIN re-finds the same word
-  // to un-toggle it (composerEditorWordRangeAtCaret needs a text-node caret). We do NOT escape the span here — the
-  // format-leak on the NEXT Enter/attachment/typing is already prevented by the escape in composerEditorInsertLine-
-  // Break / composerEditorInsertChip and the insertText bleed guard, so the caret can safely rest in the word.
+  // A word-toggle started from a collapsed caret should NOT leave the whole word highlighted — put the caret back
+  // WHERE IT WAS within the word (same offset), inside the word's TEXT node. Same-spot means pressing Bold/Italic
+  // AGAIN re-finds the word to un-toggle it (composerEditorWordRangeAtCaret needs a text-node caret) and the user's
+  // caret doesn't jump to the word end. We do NOT escape the span here — the format-leak on the NEXT Enter/attach-
+  // ment/typing is already prevented by the escape in composerEditorInsertLineBreak / composerEditorInsertChip and
+  // the insertText bleed guard, so the caret can safely rest in the word.
   if (startedCollapsed && sel.rangeCount) {
     const r = sel.getRangeAt(0);
-    r.collapse(false);
-    let c = r.startContainer, o = r.startOffset;
-    if (c.nodeType === 1) { // descend an element caret to the trailing text node of the just-formatted word
-      let t = c.childNodes[o - 1];
-      while (t && t.nodeType === 1) t = t.lastChild;
-      if (t && t.nodeType === 3) { c = t; o = t.nodeValue.length; }
+    let node = r.startContainer, off = r.startOffset;
+    if (node.nodeType === 1) { // descend to the FIRST text node of the (re)formatted word
+      let c = node.childNodes[off] || node.firstChild;
+      while (c && c.nodeType === 1) c = c.firstChild;
+      if (c && c.nodeType === 3) { node = c; off = 0; }
     }
+    if (node.nodeType === 3) off = caretInWord >= 0 ? Math.min(caretInWord, node.nodeValue.length) : node.nodeValue.length;
     const r2 = document.createRange();
-    r2.setStart(c, o);
+    r2.setStart(node, off);
     r2.collapse(true);
     sel.removeAllRanges();
     sel.addRange(r2);
@@ -17833,6 +17899,9 @@ function refreshMessagingControls() {
 }
 
 function setView(view) {
+  // Switching tabs leaves the composing context — collapse a full-screen composer so its fixed overlay can't cover
+  // the tab the user switched to (the rail is reachable via keyboard / TG even though the overlay covers it visually).
+  exitComposerMaximize();
   // The Vault tab is gated until activation (see refreshVaultTabLock) — a programmatic/deep-link attempt to
   // open it un-activated falls back to Public.
   if (view === 'vault' && !hasActivePlathoAccount()) view = 'public';
@@ -19539,6 +19608,43 @@ function toggleComposerDockPosition() {
 applyComposerDockPosition();
 document.querySelector('#privateToolbarDock')?.addEventListener('click', toggleComposerDockPosition);
 document.querySelector('#publicToolbarDock')?.addEventListener('click', toggleComposerDockPosition);
+
+// Maximize (v780): a full-screen composer for long posts. Toggles .is-maximized on the composer FORM (a CSS overlay,
+// see styles.css) — the editor DOM never moves, so the draft/caret/selection survive. The button flips its
+// aria-pressed + label to "restore"; expanding focuses the editor so the user can type immediately. NOT persisted:
+// a maximized composer is a transient composing mode, not a setting to restore into on the next launch.
+function toggleComposerMaximize(form, button) {
+  if (!form) return;
+  const on = form.classList.toggle('is-maximized');
+  if (button) {
+    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const label = t(on ? 'composer.restore' : 'composer.maximize');
+    button.setAttribute('aria-label', label);
+    button.setAttribute('title', label);
+  }
+  if (on) form.querySelector('.composer-input')?.focus?.();
+}
+// Collapse any maximized composer back to the inline layout (after a send clears the draft, or on any navigation away
+// so the full-screen overlay can't strand the user). Returns true if it collapsed one. Idempotent.
+function exitComposerMaximize() {
+  let collapsed = false;
+  for (const id of ['composer', 'publicComposer']) {
+    const form = document.getElementById(id);
+    if (!form?.classList.contains('is-maximized')) continue;
+    form.classList.remove('is-maximized');
+    collapsed = true;
+    const button = form.querySelector('.composer-toolbar-maximize');
+    if (button) {
+      button.setAttribute('aria-pressed', 'false');
+      const label = t('composer.maximize');
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+    }
+  }
+  return collapsed;
+}
+document.querySelector('#privateToolbarMaximize')?.addEventListener('click', (event) => toggleComposerMaximize(document.getElementById('composer'), event.currentTarget));
+document.querySelector('#publicToolbarMaximize')?.addEventListener('click', (event) => toggleComposerMaximize(document.getElementById('publicComposer'), event.currentTarget));
 document.addEventListener('click', (event) => {
   if (!privateComposerAddMenuVisible()) return;
   if (privateComposerAddMenu?.contains(event.target) || privateComposerAddButton?.contains(event.target)) return;
@@ -19860,7 +19966,9 @@ publicComposer?.addEventListener('submit', async (event) => {
   const draftCommentTarget = publicCommentTarget;
   const draftReplyTo = publicCommentReplyTo;
   const draftShare = publicShareDraft;
+  const draftWasMaximized = publicComposer.classList.contains('is-maximized');
   publicMessageInput.value = '';
+  exitComposerMaximize(); // a send finishes the post — collapse the full-screen composer back to the feed
   publicImageAttachments = [];
   publicFileAttachments = [];
   updateImageAttachmentUi('public');
@@ -19893,6 +20001,10 @@ publicComposer?.addEventListener('submit', async (event) => {
       updateImageAttachmentUi('public');
       updatePublicFileAttachmentUi();
       refreshComposerCostStatus();
+      // Nothing was published — put the user back in the full-screen editor they cancelled out of (not the 144px inline one).
+      if (draftWasMaximized && !publicComposer.classList.contains('is-maximized')) {
+        toggleComposerMaximize(publicComposer, publicComposer.querySelector('.composer-toolbar-maximize'));
+      }
     }
     setPublicStatus(cancelled ? 'publish cancelled' : (rateLimited ? 'sync delayed' : (draftCommentTarget ? 'comment blocked' : 'publish blocked')));
     if (!rateLimited && !cancelled) console.error(error);
@@ -20039,6 +20151,7 @@ composer?.addEventListener('submit', async (event) => {
   };
   refreshThreadAfterMessageChange(thread);
   messageInput.value = '';
+  exitComposerMaximize(); // a send finishes the message — collapse the full-screen composer back to the conversation
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   setPrivateReplyDraft(null);
@@ -31119,10 +31232,19 @@ function positionEmojiPicker(button) {
   if (!emojiPicker || !button) return;
   const rect = button.getBoundingClientRect();
   const width = emojiPicker.offsetWidth; // measured after the picker is shown (display:block)
+  const height = emojiPicker.offsetHeight;
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-  const bottom = Math.max(8, window.innerHeight - rect.top + 8); // sit just above the trigger (composer is at the bottom)
   emojiPicker.style.left = `${left}px`;
-  emojiPicker.style.bottom = `${bottom}px`;
+  // Normally open UPWARD (the composer sits at the bottom). But a MAXIMIZED composer puts the toolbar/emoji button at
+  // the TOP of the full-screen overlay, so opening up would run off-screen — fall back to opening downward when there
+  // isn't room above. (CSSOM per-property assignment only — prod CSP blocks setAttribute('style').)
+  if (rect.top >= height + 8) {
+    emojiPicker.style.top = 'auto';
+    emojiPicker.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
+  } else {
+    emojiPicker.style.bottom = 'auto';
+    emojiPicker.style.top = `${Math.min(rect.bottom + 8, Math.max(8, window.innerHeight - height - 8))}px`;
+  }
 }
 
 function closeEmojiPicker() {
