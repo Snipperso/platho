@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v782';
+const PLATHO_APP_RUNTIME_VERSION = 'v783';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19698,49 +19698,83 @@ function composerMaximizeButtonLabel(button, on) {
   button.setAttribute('title', label);
 }
 
-// Maximize (v780, animated v782): a full-screen composer for long posts. Toggles .is-maximized on the composer FORM
-// (a CSS overlay, see styles.css) — the editor DOM never moves, so the draft/caret/selection survive. Expanding plays
-// a slide-up-in animation + focuses the editor; the button toggle RESTORE plays the reverse (an .is-restoring class
-// holds it full-screen through the out-animation, then animationend snaps it to inline). NOT persisted.
-// Cancel an in-flight restore animation's pending fallback timer + animationend listener. MUST run before any other
-// path (exit on send/nav, or a re-maximize) mutates the maximize state — otherwise the stale 400ms timer fires later
-// and collapses a composer that was meanwhile re-maximized (button-state desync).
-function composerCancelPendingRestore(form) {
-  const pending = form && form.__composerRestore;
-  if (!pending) return;
-  clearTimeout(pending.timer);
-  form.removeEventListener('animationend', pending.onEnd);
-  form.__composerRestore = null;
+// Maximize (v780; FLIP-animated v783): a full-screen composer for long posts. .is-maximized on the composer FORM is a
+// CSS overlay (styles.css); the editor DOM never moves, so the draft/caret/selection survive. The composer visibly
+// GROWS from its inline footprint to full-screen (and shrinks back) via a FLIP: record the inline rect, go full-screen,
+// then transition a transform that maps full-screen back to that rect and animate it away. NOT persisted.
+function composerClearFlipStyles(form) {
+  form.style.transition = '';
+  form.style.transform = '';
+  form.style.transformOrigin = '';
+}
+// Cancel an in-flight maximize FLIP (its transitionend listener + fallback timer + inline transform). MUST run before
+// exit (send/nav) or a re-toggle mutates the state, or a stale timer/listener would later fire on a changed composer.
+function composerCancelMaxFlip(form) {
+  const flip = form && form.__maxFlip;
+  if (flip) { clearTimeout(flip.timer); form.removeEventListener('transitionend', flip.onEnd); form.__maxFlip = null; }
+  if (form) composerClearFlipStyles(form);
+}
+function composerCollapseMaximizeNow(form) {
+  composerCancelMaxFlip(form);
+  form.classList.remove('is-maximized', 'is-restoring');
+  composerMaximizeButtonLabel(form.querySelector('.composer-toolbar-maximize'), false);
+}
+// growing=true: animate inline-footprint -> full-screen (leave it maximized). growing=false: full-screen -> inline
+// footprint, then collapse to the inline layout. Uses form.__inlineRect captured at maximize time.
+function composerRunMaximizeFlip(form, growing) {
+  composerCancelMaxFlip(form);
+  const rect = form.__inlineRect;
+  const full = form.getBoundingClientRect();
+  if (!rect || !full.width || !full.height) { if (!growing) composerCollapseMaximizeNow(form); return; }
+  const inlineTransform = `translate(${rect.left - full.left}px, ${rect.top - full.top}px) scale(${rect.width / full.width}, ${rect.height / full.height})`;
+  form.style.transformOrigin = 'top left';
+  const finish = () => {
+    composerCancelMaxFlip(form);
+    if (!growing) composerCollapseMaximizeNow(form);
+    // The FLIP transformed the composer AND its emoji button; if a picker is still open (opened mid-FLIP), re-anchor
+    // it to the button's now-final rect (else it stays where the mid-flight transformed rect put it).
+    if (emojiPicker && !emojiPicker.hidden && emojiPickerTargetButton) positionEmojiPicker(emojiPickerTargetButton);
+  };
+  const onEnd = (event) => { if (event.target === form && event.propertyName === 'transform') finish(); };
+  form.style.transition = 'none';
+  form.style.transform = growing ? inlineTransform : 'none'; // start state
+  void form.offsetWidth; // reflow so the next transform transitions
+  form.style.transition = `transform 0.5s ${growing ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)'}`;
+  form.style.transform = growing ? 'none' : inlineTransform; // end state
+  form.addEventListener('transitionend', onEnd);
+  form.__maxFlip = { timer: setTimeout(finish, 700), onEnd }; // fallback so a missed transitionend can't strand mid-FLIP
 }
 function toggleComposerMaximize(form, button) {
   if (!form) return;
   const isMax = form.classList.contains('is-maximized');
   const isRestoring = form.classList.contains('is-restoring');
-  if (isMax && isRestoring) return; // mid-restore animation — debounce the click
+  if (isMax && isRestoring) return; // mid-shrink FLIP — debounce the click
+  closeEmojiPicker(); // the emoji button is inside the composer; a picker anchored to it goes stale across the FLIP
   if (isMax) {
     composerMaximizeButtonLabel(button, false);
-    if (composerReducedMotion()) { form.classList.remove('is-maximized', 'is-restoring'); return; }
-    form.classList.add('is-restoring');
-    const finish = () => { composerCancelPendingRestore(form); form.classList.remove('is-maximized', 'is-restoring'); };
-    const onEnd = (event) => { if (event.target === form && event.animationName === 'composerMaximizeOut') finish(); };
-    form.addEventListener('animationend', onEnd);
-    form.__composerRestore = { timer: setTimeout(finish, 400), onEnd }; // fallback so a missed animationend can't strand full-screen
+    if (composerReducedMotion() || !form.__inlineRect) { composerCollapseMaximizeNow(form); return; }
+    form.classList.add('is-restoring'); // marker: a shrink FLIP is running (still full-screen until it finishes)
+    composerRunMaximizeFlip(form, false);
   } else {
-    composerCancelPendingRestore(form); // a re-maximize invalidates any still-pending restore timer/listener
+    const r = form.getBoundingClientRect(); // the inline footprint to grow FROM / shrink back TO
+    form.__inlineRect = { left: r.left, top: r.top, width: r.width, height: r.height };
+    composerCancelMaxFlip(form);
     form.classList.remove('is-restoring');
-    form.classList.add('is-maximized'); // the composerMaximizeIn animation plays via CSS
+    form.classList.add('is-maximized');
     composerMaximizeButtonLabel(button, true);
     form.querySelector('.composer-input')?.focus?.();
+    if (composerReducedMotion()) return;
+    composerRunMaximizeFlip(form, true);
   }
 }
 // Collapse any maximized composer INSTANTLY (after a send clears the draft, or on navigation away — the overlay must
-// get out of the way at once, no exit animation there). Returns true if it collapsed one. Idempotent.
+// get out of the way at once, no shrink animation). Cancels any in-flight FLIP first. Returns true if it collapsed one.
 function exitComposerMaximize() {
   let collapsed = false;
   for (const id of ['composer', 'publicComposer']) {
     const form = document.getElementById(id);
     if (!form) continue;
-    composerCancelPendingRestore(form); // kill any in-flight restore first, so its stale timer can't collapse a re-maximize
+    composerCancelMaxFlip(form); // kill any in-flight FLIP so its stale timer/listener can't fire on a changed composer
     if (!form.classList.contains('is-maximized')) continue;
     form.classList.remove('is-maximized', 'is-restoring');
     collapsed = true;
