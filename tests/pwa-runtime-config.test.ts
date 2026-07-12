@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=781" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=782" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6529,7 +6529,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="privateToolbarMaximize"[^>]*aria-pressed="false"[^>]*data-i18n-title="composer\.maximize"/);
     expect(html).toMatch(/id="publicToolbarMaximize"[^>]*aria-pressed="false"[^>]*data-i18n-title="composer\.maximize"/);
     expect(app).toMatch(/function toggleComposerMaximize\(form, button\) \{/);
-    expect(app).toMatch(/const on = form\.classList\.toggle\('is-maximized'\);/);
+    expect(app).toMatch(/form\.classList\.add\('is-maximized'\); \/\/ the composerMaximizeIn animation plays via CSS/);
     expect(app).toMatch(/function exitComposerMaximize\(\) \{/);
     expect(app).toMatch(/#privateToolbarMaximize'\)\?\.addEventListener\('click', \(event\) => toggleComposerMaximize\(document\.getElementById\('composer'\), event\.currentTarget\)\)/);
     expect(app).toMatch(/#publicToolbarMaximize'\)\?\.addEventListener\('click', \(event\) => toggleComposerMaximize\(document\.getElementById\('publicComposer'\), event\.currentTarget\)\)/);
@@ -6581,16 +6581,32 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/composerEditorEscapeTrailingFmt\(el\); \/\/ never let a pasted LINK chip/);
     expect(app).toMatch(/appendEditorInline\(frag, line, el, false\)/);
     expect(app).toMatch(/renderAttachmentMarkers \? buildComposerBlock\(match\[5\], context\) : document\.createTextNode\(match\[5\]\)/);
-    // Review fixes: attachment atoms (image/file/…) are stripped from the clipboard (they can't round-trip a text
-    // clipboard); cut prunes an emptied fmt span (no stray ****); the editor's filler <br> isn't dropped from a real
-    // selected newline (keepTrailingBr); serializeComposerEditor gained the keepTrailingBr param.
-    expect(app).toMatch(/if \(!\/\\\]\\\(\/\.test\(atom\.dataset\.marker \|\| ''\)\) atom\.remove\(\);/);
+    // v782: EVERY atom selects ATOMICALLY (user-select:text via contenteditable=false — no 'all' flicker / no
+    // right-to-left block) and copy serializes ALL its markers (link + image/file/payment/post); the earlier
+    // attachment-marker STRIP was removed. Paste keeps attachment markers literal so a pasted [image N] can't phantom-bind.
+    expect(css).toMatch(/\.composer \.composer-input \.composer-block \{[\s\S]*?user-select: text;/);
+    expect(app).not.toMatch(/\.test\(atom\.dataset\.marker \|\| ''\)\) atom\.remove\(\)/); // strip removed
+    // Cut still prunes an emptied fmt span (no stray ****); the filler <br> isn't dropped from a real selected newline.
     expect(app).toMatch(/composerEditorPruneEmptyFmt\(el\); \/\/ a cut that emptied a fmt span/);
     expect(app).toMatch(/const keepTrailingBr = !\(fillerBr && range\.intersectsNode\(fillerBr\)\);/);
     expect(app).toMatch(/function serializeComposerEditor\(el, keepTrailingBr = false\)/);
-    // Only LINK chips are user-select:all (selectable, so copy serializes them); attachment atoms stay none.
-    expect(css).toMatch(/\.composer \.composer-input \.composer-block \{[\s\S]*?user-select: none;/);
-    expect(css).toMatch(/\.composer-block-link \{[\s\S]*?user-select: all;/);
+    // v782 animations: dock-toggle slides the toolbar; maximize/restore slide the overlay in/out (reduced-motion safe).
+    expect(css).toMatch(/@keyframes composerMaximizeIn/);
+    expect(css).toMatch(/@keyframes composerMaximizeOut/);
+    expect(css).toMatch(/@keyframes composerDockShift/);
+    expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?animation: composerMaximizeIn/);
+    expect(css).toMatch(/\.composer\.is-maximized\.is-restoring \{\s*animation: composerMaximizeOut/);
+    expect(css).toMatch(/\.composer-toolbar\.is-docking \{ animation: composerDockShift/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none;/);
+    expect(app).toMatch(/const composerReducedMotion = \(\) =>/);
+    expect(app).toMatch(/if \(isMax && isRestoring\) return; \/\/ mid-restore animation — debounce/);
+    expect(app).toMatch(/form\.classList\.add\('is-restoring'\);/);
+    expect(app).toMatch(/timer: setTimeout\(finish, 400\), onEnd \}/); // fallback so a missed animationend can't strand full-screen
+    // Review fix: exit/re-maximize CANCEL an in-flight restore's stale fallback timer so it can't collapse a re-maximized composer.
+    expect(app).toMatch(/function composerCancelPendingRestore\(form\)/);
+    expect(app).toMatch(/clearTimeout\(pending\.timer\);\s*form\.removeEventListener\('animationend', pending\.onEnd\)/);
+    expect(app).toMatch(/composerCancelPendingRestore\(form\); \/\/ kill any in-flight restore first/); // exitComposerMaximize
+    expect(app).toMatch(/tb\.style\.setProperty\('--dock-shift', shift\)/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7729,16 +7745,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v856/);
+    expect(sw).toMatch(/platho-pwa-prototype-v857/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=270/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=271/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=781/);
+    expect(sw).toMatch(/\.\/app\.js\?v=782/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);

@@ -1389,10 +1389,12 @@ a .avatar.has-image,
   max-width: 100%;
   vertical-align: bottom;
   margin: 2px 1px;
-  /* Attachment atoms (image/file/payment/post) stay unselectable: their data lives in arrays, not text, so they can't
-     round-trip a text clipboard. Only LINK chips opt into user-select:all (below) so copy/cut can serialize them. */
-  -webkit-user-select: none;
-  user-select: none;
+  /* Every atom (link/image/file/payment/post) selects ATOMICALLY: contenteditable=false stops the caret going inside,
+     so a mouse drag includes the whole chip as one unit, and copy/cut serialize its marker. user-select:text (NOT
+     'all') — 'all' made the selection FLICKER as the cursor moved over the chip and blocked extending a right-to-left
+     selection past it; text keeps the atomic-via-contenteditable behavior without the flicker. */
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .composer .composer-input .composer-block > * {
@@ -1428,10 +1430,7 @@ a .avatar.has-image,
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer; /* click to edit the link (opens the dialog pre-filled) */
-  /* Atomic + selectable (unlike the attachment atoms above): a spanning selection includes the whole link chip as one
-     unit, so copy/cut serialize its [label](url) marker and it round-trips. */
-  -webkit-user-select: all;
-  user-select: all;
+  /* user-select inherits `text` from .composer-block above (atomic via contenteditable=false, no 'all' flicker). */
 }
 
 .composer .composer-input .composer-block-file {
@@ -1655,6 +1654,35 @@ a .avatar.has-image,
   max-width: none;
   background: #0f1214; /* opaque (the resting composer bg is translucent — it would show the app behind) */
   padding-top: calc(12px + var(--app-safe-area-top, env(safe-area-inset-top)));
+  animation: composerMaximizeIn 0.24s cubic-bezier(0.16, 1, 0.3, 1); /* slide + fade up into full-screen (v782) */
+}
+
+/* Restore (v782): the button toggle adds .is-restoring, which plays the reverse animation while still full-screen; JS
+   removes .is-maximized on animationend, snapping back to the inline layout. exitComposerMaximize (send/nav) is instant. */
+.composer.is-maximized.is-restoring {
+  animation: composerMaximizeOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes composerMaximizeIn {
+  from { opacity: 0; transform: translateY(26px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes composerMaximizeOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(26px) scale(0.985); }
+}
+
+/* Dock-toggle (v782): when the ↕ button flips the toolbar above<->below the input, it slides + fades back in on its
+   new side. --dock-shift (set by JS) points the slide the right way. */
+@keyframes composerDockShift {
+  from { opacity: 0.2; transform: translateY(var(--dock-shift, 10px)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.composer-toolbar.is-docking { animation: composerDockShift 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .composer.is-maximized,
+  .composer.is-maximized.is-restoring,
+  .composer-toolbar.is-docking { animation: none; }
 }
 
 /* The toolbar auto-hides while typing; force it visible when maximized so the restore button is always reachable. */

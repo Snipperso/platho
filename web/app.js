@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v781';
+const PLATHO_APP_RUNTIME_VERSION = 'v782';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16379,9 +16379,11 @@ function composerEditorLinkClick(el, event) {
   openLinkComposerDialog(el, chip);
 }
 
-// Copy/cut: the native clipboard drops a contenteditable=false chip (so a copied link/image lost its marker+url and
-// vanished on paste). Serialize the SELECTED fragment to the SAME markdown+marker string the editor uses, so the
-// chip round-trips (paste re-renders it via appendEditorInline). text/plain only — no clipboard HTML crosses.
+// Copy/cut: the native clipboard drops a contenteditable=false chip (so a copied link/image/etc. lost its marker and
+// vanished on paste). Serialize the SELECTED fragment to the SAME markdown+marker string the editor uses, so EVERY
+// atom the selection spans (link/image/file/payment/post) round-trips its marker. A LINK re-renders as a live chip on
+// paste; attachment markers paste as LITERAL text (their bytes can't ride a text clipboard, and a live re-render would
+// phantom-bind the editor's own attachment — see composerEditorInsertPlainMultiline). text/plain only — no clipboard HTML.
 function composerEditorCopySelection(el, event, isCut) {
   if (!el || !event.clipboardData) return;
   const sel = window.getSelection();
@@ -16389,13 +16391,7 @@ function composerEditorCopySelection(el, event, isCut) {
   const range = sel.getRangeAt(0);
   if (!el.contains(range.commonAncestorContainer)) return;
   const wrapper = document.createElement('div');
-  wrapper.appendChild(range.cloneContents()); // includes any user-select:all link chip the selection spans
-  // Attachment atoms (image/file/payment/post) carry their data OUTSIDE the text — in arrays keyed by the marker
-  // index — so they can't round-trip through a text clipboard: a copied [image 1] is a dangling ref and a cut one is
-  // pruned before paste (dead pill). Drop those markers; only [label](url) LINK chips round-trip.
-  for (const atom of wrapper.querySelectorAll('[data-marker]')) {
-    if (!/\]\(/.test(atom.dataset.marker || '')) atom.remove();
-  }
+  wrapper.appendChild(range.cloneContents()); // includes any atom chip the selection spans (contenteditable=false = atomic)
   // Keep a real trailing newline the user selected, but NOT the editor's invisible filler <br> (only cloned when the
   // selection reaches the editor's very end).
   const fillerBr = el.lastChild && el.lastChild.nodeName === 'BR' && !el.lastChild.nextSibling ? el.lastChild : null;
@@ -19672,46 +19668,83 @@ function composerDockIsBelow() {
 function applyComposerDockPosition() {
   document.documentElement.classList.toggle('is-composer-dock-below', composerDockIsBelow());
 }
+const composerReducedMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+
 function toggleComposerDockPosition() {
   const next = !composerDockIsBelow();
   try { localStorage.setItem(COMPOSER_DOCK_STORAGE_KEY, next ? '1' : '0'); } catch { /* private mode: session-only */ }
   applyComposerDockPosition();
+  if (composerReducedMotion()) return;
+  // Animate the toolbar sliding back in on its NEW side (below -> drops down into place; above -> rises up).
+  const shift = next ? '-12px' : '12px';
+  for (const tb of document.querySelectorAll('.composer-toolbar')) {
+    tb.style.setProperty('--dock-shift', shift);
+    tb.classList.remove('is-docking');
+    void tb.offsetWidth; // reflow so the animation restarts even if it is still mid-play
+    tb.classList.add('is-docking');
+    const done = () => { tb.classList.remove('is-docking'); tb.removeEventListener('animationend', done); };
+    tb.addEventListener('animationend', done);
+  }
 }
 applyComposerDockPosition();
 document.querySelector('#privateToolbarDock')?.addEventListener('click', toggleComposerDockPosition);
 document.querySelector('#publicToolbarDock')?.addEventListener('click', toggleComposerDockPosition);
 
-// Maximize (v780): a full-screen composer for long posts. Toggles .is-maximized on the composer FORM (a CSS overlay,
-// see styles.css) — the editor DOM never moves, so the draft/caret/selection survive. The button flips its
-// aria-pressed + label to "restore"; expanding focuses the editor so the user can type immediately. NOT persisted:
-// a maximized composer is a transient composing mode, not a setting to restore into on the next launch.
+function composerMaximizeButtonLabel(button, on) {
+  if (!button) return;
+  button.setAttribute('aria-pressed', on ? 'true' : 'false');
+  const label = t(on ? 'composer.restore' : 'composer.maximize');
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+}
+
+// Maximize (v780, animated v782): a full-screen composer for long posts. Toggles .is-maximized on the composer FORM
+// (a CSS overlay, see styles.css) — the editor DOM never moves, so the draft/caret/selection survive. Expanding plays
+// a slide-up-in animation + focuses the editor; the button toggle RESTORE plays the reverse (an .is-restoring class
+// holds it full-screen through the out-animation, then animationend snaps it to inline). NOT persisted.
+// Cancel an in-flight restore animation's pending fallback timer + animationend listener. MUST run before any other
+// path (exit on send/nav, or a re-maximize) mutates the maximize state — otherwise the stale 400ms timer fires later
+// and collapses a composer that was meanwhile re-maximized (button-state desync).
+function composerCancelPendingRestore(form) {
+  const pending = form && form.__composerRestore;
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  form.removeEventListener('animationend', pending.onEnd);
+  form.__composerRestore = null;
+}
 function toggleComposerMaximize(form, button) {
   if (!form) return;
-  const on = form.classList.toggle('is-maximized');
-  if (button) {
-    button.setAttribute('aria-pressed', on ? 'true' : 'false');
-    const label = t(on ? 'composer.restore' : 'composer.maximize');
-    button.setAttribute('aria-label', label);
-    button.setAttribute('title', label);
+  const isMax = form.classList.contains('is-maximized');
+  const isRestoring = form.classList.contains('is-restoring');
+  if (isMax && isRestoring) return; // mid-restore animation — debounce the click
+  if (isMax) {
+    composerMaximizeButtonLabel(button, false);
+    if (composerReducedMotion()) { form.classList.remove('is-maximized', 'is-restoring'); return; }
+    form.classList.add('is-restoring');
+    const finish = () => { composerCancelPendingRestore(form); form.classList.remove('is-maximized', 'is-restoring'); };
+    const onEnd = (event) => { if (event.target === form && event.animationName === 'composerMaximizeOut') finish(); };
+    form.addEventListener('animationend', onEnd);
+    form.__composerRestore = { timer: setTimeout(finish, 400), onEnd }; // fallback so a missed animationend can't strand full-screen
+  } else {
+    composerCancelPendingRestore(form); // a re-maximize invalidates any still-pending restore timer/listener
+    form.classList.remove('is-restoring');
+    form.classList.add('is-maximized'); // the composerMaximizeIn animation plays via CSS
+    composerMaximizeButtonLabel(button, true);
+    form.querySelector('.composer-input')?.focus?.();
   }
-  if (on) form.querySelector('.composer-input')?.focus?.();
 }
-// Collapse any maximized composer back to the inline layout (after a send clears the draft, or on any navigation away
-// so the full-screen overlay can't strand the user). Returns true if it collapsed one. Idempotent.
+// Collapse any maximized composer INSTANTLY (after a send clears the draft, or on navigation away — the overlay must
+// get out of the way at once, no exit animation there). Returns true if it collapsed one. Idempotent.
 function exitComposerMaximize() {
   let collapsed = false;
   for (const id of ['composer', 'publicComposer']) {
     const form = document.getElementById(id);
-    if (!form?.classList.contains('is-maximized')) continue;
-    form.classList.remove('is-maximized');
+    if (!form) continue;
+    composerCancelPendingRestore(form); // kill any in-flight restore first, so its stale timer can't collapse a re-maximize
+    if (!form.classList.contains('is-maximized')) continue;
+    form.classList.remove('is-maximized', 'is-restoring');
     collapsed = true;
-    const button = form.querySelector('.composer-toolbar-maximize');
-    if (button) {
-      button.setAttribute('aria-pressed', 'false');
-      const label = t('composer.maximize');
-      button.setAttribute('aria-label', label);
-      button.setAttribute('title', label);
-    }
+    composerMaximizeButtonLabel(form.querySelector('.composer-toolbar-maximize'), false);
   }
   return collapsed;
 }
