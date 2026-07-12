@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=772" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=773" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -5738,8 +5738,10 @@ describe('PWA runtime config guard', () => {
     // renumber the ones after it, since the attachment array re-indexes) — else the orphan marker lingers and sending
     // it builds a capsule with no real block -> "Capsule publish payload is missing" (the owner's screenshot).
     expect(app).toMatch(/function removeImageMarkerForComposer\(kind, removedIndex\) \{[\s\S]*?if \(!droppedOne && n === removedMarkerNum\) \{ droppedOne = true; return ''; \}[\s\S]*?if \(n > removedMarkerNum\) return `\[image \$\{n - 1\}\]`;/);
-    // Called from the private attachment remove handler BEFORE the array is filtered (so `index` still lines up).
-    expect(app).toMatch(/removeImageMarkerForComposer\('private', index\);[\s\S]*?privateImageAttachments = privateImageAttachments\.filter/);
+    // Removal routes through removeComposerImageAt (v773: also used by Backspace on the image atom) — it splices the
+    // array then strips + renumbers the marker, so a deleted image is never orphaned into the send.
+    expect(app).toMatch(/remove\.addEventListener\('click', \(\) => removeComposerImageAt\('private', index\)\)/);
+    expect(app).toMatch(/function removeComposerImageAt\(kind, index\) \{[\s\S]*?filter\(\(_, i\) => i !== index\);[\s\S]*?removeImageMarkerForComposer\(kind, index\);/);
     // FAIL-CLOSED: the private send handler bails on zero resolved blocks instead of inserting an empty bubble.
     expect(app).toMatch(/const draftBlocks = composerBlocksFromDraft\(text, attachments, paymentDraft, replyDraft, fileAttachments, shareDraft\);\s*\n\s*if \(draftBlocks\.length === 0\) \{[\s\S]*?t\('composer\.nothingToSend'\)[\s\S]*?return;/);
     // The send BUTTON (only, not the whole composer) is disabled when nothing real resolves to send — so a stray marker
@@ -6277,10 +6279,11 @@ describe('PWA runtime config guard', () => {
     // trimmed heading/quote/center/justify (didn't fit one row) — those must NOT be present as buttons.
     for (const bar of ['privateComposerToolbar', 'publicComposerToolbar']) {
       const slice = html.slice(html.indexOf(`id="${bar}"`), html.indexOf(`id="${bar}"`) + 4200);
-      for (const fmt of ['bold', 'italic', 'list', 'preview']) {
+      for (const fmt of ['bold', 'italic', 'list']) {
         expect(slice, `${bar}:${fmt}`).toMatch(new RegExp(`data-format="${fmt}"`));
       }
-      for (const gone of ['heading', 'quote', 'center', 'justify']) {
+      // v773 removed the preview button (the WYSIWYG editor IS the preview); heading/quote/center/justify stay gone.
+      for (const gone of ['preview', 'heading', 'quote', 'center', 'justify']) {
         expect(slice, `${bar}:${gone}-removed`).not.toMatch(new RegExp(`data-format="${gone}"`));
       }
       // Emoji is the first toolbar button.
@@ -6304,8 +6307,7 @@ describe('PWA runtime config guard', () => {
     expect(applyFn).toMatch(/case 'bold': composerEditorToggleFormat\(editor, 'fmt-bold'\)/);
     expect(applyFn).toMatch(/case 'italic': composerEditorToggleFormat\(editor, 'fmt-italic'\)/);
     expect(applyFn).toMatch(/case 'list': composerEditorInsertAtLineStart\(editor, '- '\)/);
-    expect(applyFn).toMatch(/case 'preview': openComposerPreview\(editor\)/);
-    expect(applyFn).not.toMatch(/wrapComposerSelection|prefixComposerLines/);
+    expect(applyFn).not.toMatch(/wrapComposerSelection|prefixComposerLines|openComposerPreview/);
     expect(applyFn).not.toMatch(/case 'center'/);
     // Driver: open on a deliberate field CLICK (not focus/typing), ▼ hides, mousedown keeps the selection.
     const setupFn = app.slice(app.indexOf('function setupComposerToolbar('), app.indexOf('function setupComposerToolbar(') + 1100);
@@ -6315,18 +6317,15 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.composer-toolbar \{[\s\S]*?max-height: 0;[\s\S]*?opacity: 0;/);
     expect(css).toMatch(/\.composer-toolbar\.is-open \{[\s\S]*?opacity: 1;/);
 
-    // Preview modal renders the draft through the SAME safe formatter + block builders.
-    expect(html).toMatch(/id="composerPreviewDialog"[\s\S]*?id="composerPreviewBody"/);
-    expect(app).toMatch(/function openComposerPreview\(textarea\)/);
-    const previewFn = app.slice(app.indexOf('function renderComposerPreviewBlocks('), app.indexOf('function renderComposerPreviewBlocks(') + 1600);
-    expect(previewFn).toMatch(/appendFormattedMessageText\(text, block\.text\)/);
-    expect(previewFn).toMatch(/buildSharedPostEmbed\(block\)/);
+    // v773: the preview modal + its code are REMOVED (the WYSIWYG editor renders the real content live).
+    expect(html).not.toMatch(/id="composerPreviewDialog"/);
+    expect(app).not.toMatch(/function openComposerPreview\(|function renderComposerPreviewBlocks\(/);
 
-    // Every locale ships the ACTIVE toolbar/preview strings (OPSEC key parity). The heading/quote/align keys
-    // stay in the dictionaries as reserved (their buttons were trimmed in v770) — parity is unaffected.
+    // Every locale ships the ACTIVE toolbar strings (OPSEC key parity). The heading/quote/align/preview keys
+    // stay in the dictionaries as reserved (their buttons were trimmed/removed) — parity is unaffected.
     for (const locale of Object.keys(I18N_STRINGS)) {
       const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
-      for (const key of ['composer.formatBold', 'composer.formatItalic', 'composer.formatList', 'composer.previewPost', 'composer.hideFormatBar', 'composer.previewTitle', 'composer.previewEmpty']) {
+      for (const key of ['composer.formatBold', 'composer.formatItalic', 'composer.formatList', 'composer.hideFormatBar']) {
         expect(dict[key], `${locale}:${key}`).toBeTruthy();
       }
     }
@@ -6392,21 +6391,55 @@ describe('PWA runtime config guard', () => {
       expect(app, `${input}:beforeinput`).toMatch(new RegExp(`${input}\\?\\.addEventListener\\('beforeinput', \\(event\\) => composerEditorBeforeInput\\(${input}, event\\)\\)`));
     }
     // Shared beforeinput: newline via insertParagraph/insertLineBreak + a format-bleed guard on insertText.
-    const beforeFn = app.slice(app.indexOf('function composerEditorBeforeInput('), app.indexOf('function composerEditorBeforeInput(') + 900);
+    const beforeFn = app.slice(app.indexOf('function composerEditorBeforeInput('), app.indexOf('function composerEditorBeforeInput(') + 1500);
     expect(beforeFn).toMatch(/inputType === 'insertParagraph' \|\| event\.inputType === 'insertLineBreak'/);
     expect(beforeFn).toMatch(/composerEditorInsertLineBreak\(el\)/);
     expect(beforeFn).toMatch(/inputType === 'insertText'/);
     expect(beforeFn).toMatch(/composerEditorTrailingFmtSpan\(sel\.getRangeAt\(0\), el\)/);
     // Toggle-OFF a format over PART of a run splits the run (three-way), it does not clear the whole span.
-    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 1800);
+    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 2800);
     expect(toggleFn).toMatch(/three-way split/);
     expect(toggleFn).toMatch(/const mid = spanText\.slice\(startOff, endOff\)/);
+    // A collapsed caret + a format button acts on the WHOLE word under the caret (mobile: tap word + B).
+    expect(app).toMatch(/function composerEditorWordRangeAtCaret\(range\)/);
+    expect(toggleFn).toMatch(/if \(range\.collapsed\) \{[\s\S]*?composerEditorWordRangeAtCaret\(range\)/);
 
-    // CSS for the editor: sizing/placeholder/format spans/chips.
+    // CSS for the editor: sizing/placeholder/format spans/blocks.
     expect(css).toMatch(/\.composer \.composer-input \{[\s\S]*?min-height: 44px;[\s\S]*?white-space: pre-wrap;/);
     expect(css).toMatch(/\.composer \.composer-input\.is-empty::before \{[\s\S]*?content: attr\(placeholder\);/);
     expect(css).toMatch(/\.composer \.composer-input \.fmt-bold \{ font-weight: 700; \}/);
-    expect(css).toMatch(/\.composer \.composer-input \.composer-chip \{/);
+    // v773: marker atoms render REAL content — the image capped + inner display-only (pointer-events off).
+    expect(css).toMatch(/\.composer \.composer-input \.composer-block \{/);
+    expect(css).toMatch(/\.composer \.composer-input \.composer-block > \* \{\s*pointer-events: none;/);
+    expect(css).toMatch(/\.composer \.composer-input \.composer-block-image \{[\s\S]*?max-height: 200px;/);
+
+    // Rich atoms (v773): buildComposerBlock resolves a marker to its real image/file/payment/share, atomic +
+    // contenteditable=false + data-marker (so serialize round-trips), pill fallback for an orphan marker.
+    expect(app).toMatch(/function buildComposerBlock\(marker, el\)/);
+    expect(app).toMatch(/function composerBlockInner\(marker, ctx\)/);
+    expect(app).toMatch(/function composerBlockContextForEditor\(el\)/);
+    const blockFn = app.slice(app.indexOf('function buildComposerBlock('), app.indexOf('function buildComposerBlock(') + 700);
+    expect(blockFn).toMatch(/block\.contentEditable = 'false';/);
+    expect(blockFn).toMatch(/block\.dataset\.marker = String\(marker\);/);
+    const innerFn = app.slice(app.indexOf('function composerBlockInner('), app.indexOf('function composerBlockInner(') + 1500);
+    expect(innerFn).toMatch(/img\.src = bytesToImageDataUrl\(att\.bytes, 'image\/webp'\)/);
+    expect(innerFn).not.toMatch(/innerHTML/);
+
+    // Backspace/Delete next to a marker atom removes the atom AND its attachment/draft (no orphan gets sent).
+    const beforeFn2 = app.slice(app.indexOf('function composerEditorBeforeInput('), app.indexOf('function composerEditorBeforeInput(') + 1400);
+    expect(beforeFn2).toMatch(/deleteContentBackward' \|\| event\.inputType === 'deleteContentForward'/);
+    expect(beforeFn2).toMatch(/composerEditorAdjacentAtom\(sel\.getRangeAt\(0\), el,/);
+    expect(beforeFn2).toMatch(/removeComposerAtom\(el, atom\)/);
+    expect(app).toMatch(/function removeComposerAtom\(el, atom\)/);
+    expect(app).toMatch(/function removeComposerImageAt\(kind, index\)/);
+    // The format-span chip guard keys on [data-marker] (v773 renamed atoms .composer-chip -> .composer-block), so
+    // bolding across an attachment stays a no-op (else the serialized ** splits on the marker -> literal ** sent).
+    expect(toggleFn).toMatch(/for \(const block of el\.querySelectorAll\('\[data-marker\]'\)\)/);
+    // A non-collapsed delete / Ctrl+A / paste-over can drop an atom's node without the collapsed-delete sync, so an
+    // input-time reconcile prunes attachments whose marker vanished (else a "deleted" image is still sent).
+    expect(app).toMatch(/function reconcileComposerAttachments\(el\)/);
+    expect(app).toMatch(/reconcileComposerAttachments\(messageInput\)/);
+    expect(app).toMatch(/reconcileComposerAttachments\(publicMessageInput\)/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7545,15 +7578,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v847/);
+    expect(sw).toMatch(/platho-pwa-prototype-v848/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=263/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=264/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=772/);
+    expect(sw).toMatch(/\.\/app\.js\?v=773/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=28/);

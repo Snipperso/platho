@@ -1368,10 +1368,29 @@ a .avatar.has-image,
   padding: 0 3px;
 }
 
-.composer .composer-input .composer-chip {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 2px;
+/* v773: marker atoms render their REAL content live (image/file/payment/share). Each is one atomic, deletable
+   unit — its inner content is display-only (pointer-events off) so a click selects the block, not the media. */
+.composer .composer-input .composer-block {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+  margin: 2px 1px;
+  user-select: none;
+}
+
+.composer .composer-input .composer-block > * {
+  pointer-events: none;
+}
+
+.composer .composer-input .composer-block-image {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.composer .composer-input .composer-block-pill {
   padding: 1px 9px;
   border-radius: 999px;
   background: rgba(48, 213, 176, 0.14);
@@ -1379,7 +1398,23 @@ a .avatar.has-image,
   color: var(--accent);
   font-size: 0.85em;
   white-space: nowrap;
-  user-select: none;
+}
+
+.composer .composer-input .composer-block-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  font-size: 0.85em;
+}
+
+.composer .composer-input .composer-block.is-selected,
+.composer .composer-input .composer-block:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .composer-post-option {
