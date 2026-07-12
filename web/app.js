@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v770';
+const PLATHO_APP_RUNTIME_VERSION = 'v771';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -347,6 +347,7 @@ const imageLightboxCloseButton = document.querySelector('#imageLightboxCloseButt
 const imageLightboxDownloadButton = document.querySelector('#imageLightboxDownloadButton');
 const composer = document.querySelector('#composer');
 const messageInput = document.querySelector('#messageInput');
+initComposerEditor(messageInput); // v771: WYSIWYG contenteditable + .value/.disabled/.placeholder shims
 const sendButton = document.querySelector('.send-button');
 const privateComposerCostStatus = document.querySelector('#privateComposerCostStatus');
 const privateComposerAddButton = document.querySelector('#privateComposerAddButton');
@@ -655,6 +656,7 @@ const publicChannelViewBody = document.querySelector('#publicChannelViewBody');
 const publicJumpDownButton = document.querySelector('#publicJumpDownButton');
 const publicComposer = document.querySelector('#publicComposer');
 const publicMessageInput = document.querySelector('#publicMessageInput');
+initComposerEditor(publicMessageInput); // v771: WYSIWYG contenteditable + .value/.disabled/.placeholder shims
 const publicComposerCostStatus = document.querySelector('#publicComposerCostStatus');
 const publicImageButton = document.querySelector('#publicImageButton');
 const publicImageInput = document.querySelector('#publicImageInput');
@@ -6819,7 +6821,6 @@ function insertShareMarker(textarea) {
   COMPOSER_SHARE_MARKER_RE.lastIndex = 0;
   if (COMPOSER_SHARE_MARKER_RE.test(String(textarea.value ?? ''))) return;
   insertComposerMarker(textarea, '[post]');
-  autoResizeComposerTextarea(textarea);
 }
 
 function chooseShareTargetThread(thread) {
@@ -7403,7 +7404,6 @@ function removeShareMarkerForComposer(textarea) {
   value = value.replace(/\n{3,}/g, '\n\n');
   if (!value.trim()) value = '';
   textarea.value = value;
-  autoResizeComposerTextarea(textarea);
 }
 
 function setPrivateShareDraft(share) {
@@ -16173,12 +16173,326 @@ function isFreshPublicTimestamp(value, cutoffMs = publicSyncCutoffMs()) {
   return timestamp >= cutoffMs;
 }
 
-function autoResizeComposerTextarea(node) {
-  if (!node || node.tagName !== 'TEXTAREA') return;
-  node.style.height = '0px';
-  const targetHeight = Math.min(144, Math.max(44, node.scrollHeight));
-  node.style.height = `${targetHeight}px`;
-  node.classList.toggle('is-scrollable', node.scrollHeight > 144);
+// --- WYSIWYG composer editor (v771) --------------------------------------------------------------------------
+// Each composer is a contenteditable .composer-input div. It SERIALIZES to the exact same markdown+marker string
+// the old <textarea>.value produced, so composerBlocksFromDraft / the size-cost plan / the submit capture / the
+// receive renderer all keep working UNCHANGED. Rules that keep the DOM tractable + safe:
+//  - Inline formatting = CLASS spans (.fmt-bold / .fmt-italic / .fmt-code) — never inline styles (prod CSP
+//    style-src 'self') and never execCommand.
+//  - Attachment markers = ATOMIC contenteditable=false chips carrying data-marker="[image N]" — the user can't
+//    split "[image" / "N]" and orphan it (the v769 marker-corruption class of bug, closed by construction).
+//  - Line breaks = <br>. Enter is intercepted so the browser never inserts <div>/<p> blocks; a stray block from
+//    paste is still tolerated by the serializer (treated as a newline boundary).
+//  - Paste/drop are sanitized to text/plain; IME composition is guarded (the isComposing keydown check).
+
+// Serialize a composer editor's DOM back to the plain markdown+marker string that the send pipeline reads.
+function serializeComposerEditor(el) {
+  if (!el) return '';
+  let out = '';
+  const walk = (node) => {
+    for (const child of node.childNodes) {
+      if (child.nodeType === 3) { // text
+        out += child.nodeValue;
+      } else if (child.nodeType === 1) { // element
+        const tag = child.tagName;
+        const cls = child.classList;
+        if (tag === 'BR') {
+          // A trailing <br> that is the editor's own last child is the "filler" break browsers (and our
+          // Enter handler) leave to make the final empty line visible — it is not real content, so drop it.
+          if (node === el && !child.nextSibling) { /* filler trailing br */ }
+          else out += '\n';
+        } else if (child.dataset && child.dataset.marker) {
+          out += child.dataset.marker; // atomic attachment/link chip -> its [marker]
+        } else if (tag === 'STRONG' || tag === 'B' || cls.contains('fmt-bold')) {
+          out += '**'; walk(child); out += '**';
+        } else if (tag === 'EM' || tag === 'I' || cls.contains('fmt-italic')) {
+          out += '*'; walk(child); out += '*';
+        } else if (tag === 'CODE' || cls.contains('fmt-code')) {
+          out += '`'; walk(child); out += '`';
+        } else if (tag === 'DIV' || tag === 'P') {
+          // A block boundary (browser/paste inserted one despite the Enter intercept) -> newline before content.
+          if (out && !out.endsWith('\n')) out += '\n';
+          walk(child);
+        } else {
+          walk(child); // unknown wrapper (e.g. a plain <span> from paste) -> just its content
+        }
+      }
+    }
+  };
+  walk(el);
+  return out;
+}
+
+// Build the EDITABLE DOM for a composer editor from a markdown+marker string (draft restore / share insertion).
+// Inverse of serializeComposerEditor: **bold** -> <span class=fmt-bold>, [image N] -> chip, \n -> <br>. Uses the
+// SAME inline tokenizer family as the renderer but emits editor spans/chips (not the receive-side anchors).
+const EDITOR_INLINE_RE = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|(\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\]|\[(?:check|payment)\])(?!\()/g;
+
+function composerChipLabelForMarker(marker) {
+  const m = String(marker);
+  if (/^\[(?:image|img)\s+\d+\]$/i.test(m)) return t('composer.image');
+  if (/^\[file\s+\d+\]$/i.test(m)) return t('composer.file');
+  if (/^\[post\]$/i.test(m)) return t('public.sharedPost');
+  if (/^\[(?:check|payment)\]$/i.test(m)) return t('payment.paymentCheck');
+  return m;
+}
+
+function buildComposerChip(marker) {
+  const chip = document.createElement('span');
+  chip.className = 'composer-chip';
+  chip.contentEditable = 'false';
+  chip.dataset.marker = String(marker);
+  chip.textContent = composerChipLabelForMarker(marker);
+  return chip;
+}
+
+function appendEditorInline(target, text) {
+  const str = String(text ?? '');
+  if (!str) return;
+  EDITOR_INLINE_RE.lastIndex = 0;
+  let last = 0;
+  let match;
+  while ((match = EDITOR_INLINE_RE.exec(str)) !== null) {
+    if (match.index > last) target.append(document.createTextNode(str.slice(last, match.index)));
+    if (match[1] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-bold'; s.textContent = match[1]; target.append(s); }
+    else if (match[2] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-italic'; s.textContent = match[2]; target.append(s); }
+    else if (match[3] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-code'; s.textContent = match[3]; target.append(s); }
+    else { target.append(buildComposerChip(match[4])); }
+    last = match.index + match[0].length;
+  }
+  if (last < str.length) target.append(document.createTextNode(str.slice(last)));
+}
+
+function buildComposerEditorDom(el, text) {
+  el.replaceChildren();
+  const lines = String(text ?? '').split('\n');
+  lines.forEach((line, index) => {
+    if (index > 0) el.append(document.createElement('br'));
+    appendEditorInline(el, line);
+  });
+}
+
+
+// --- Editor caret ops (v771) ---------------------------------------------------------------------------------
+// Range-based insert/format for the contenteditable composer. All of them end with composerEditorAfterEdit() so
+// the size/cost/send-enable pipeline (an 'input' listener) stays in sync and the placeholder tracks correctly.
+
+// The live Range if the caret sits inside the editor, else a collapsed caret at the very end of the editor.
+function composerEditorRange(el) {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount) {
+    const range = sel.getRangeAt(0);
+    if (el.contains(range.commonAncestorContainer)) return range;
+  }
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  return range;
+}
+
+function composerEditorPlaceCaretAfter(node) {
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  range.setStartAfter(node);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function composerEditorAfterEdit(el) {
+  el.classList.toggle('is-empty', serializeComposerEditor(el).trim() === '');
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function composerEditorInsertText(el, text) {
+  if (!el || el.disabled) return;
+  el.focus();
+  const range = composerEditorRange(el);
+  range.deleteContents();
+  const node = document.createTextNode(String(text ?? ''));
+  range.insertNode(node);
+  composerEditorPlaceCaretAfter(node);
+  composerEditorAfterEdit(el);
+}
+
+// Plain Enter = a clean single <br> newline (Ctrl/Cmd+Enter sends). We intercept Enter so the browser never
+// injects <div>/<p> blocks; a filler <br> is appended when the break is the editor's last node so the new empty
+// line is visible (the serializer drops that trailing filler).
+function composerEditorInsertLineBreak(el) {
+  if (!el || el.disabled) return;
+  el.focus();
+  const range = composerEditorRange(el);
+  range.deleteContents();
+  const br = document.createElement('br');
+  range.insertNode(br);
+  if (!br.nextSibling) br.after(document.createElement('br'));
+  composerEditorPlaceCaretAfter(br);
+  composerEditorAfterEdit(el);
+}
+
+// True when the caret sits at the start of a line (line = run between <br>s) — a chip we insert then needs no
+// leading <br> to stand on its own line.
+function composerEditorAtLineStart(range) {
+  const c = range.startContainer;
+  if (c.nodeType === 3) return range.startOffset === 0 && (!c.previousSibling || c.previousSibling.nodeName === 'BR');
+  if (range.startOffset === 0) return true;
+  const before = c.childNodes[range.startOffset - 1];
+  return Boolean(before && before.nodeName === 'BR');
+}
+
+// Insert an atomic attachment/link chip on its own line at the caret (mirrors the textarea marker-on-own-line rule).
+function composerEditorInsertChip(el, marker) {
+  if (!el || el.disabled) return;
+  el.focus();
+  const range = composerEditorRange(el);
+  range.deleteContents();
+  const frag = document.createDocumentFragment();
+  const empty = serializeComposerEditor(el).length === 0;
+  if (!empty && !composerEditorAtLineStart(range)) frag.append(document.createElement('br'));
+  frag.append(buildComposerChip(marker));
+  const tailBr = document.createElement('br');
+  frag.append(tailBr);
+  range.insertNode(frag);
+  composerEditorPlaceCaretAfter(tailBr);
+  composerEditorAfterEdit(el);
+}
+
+// The ancestor format span of `className` fully enclosing the range (its common ancestor is inside it), else null.
+function composerEditorEnclosingFormat(range, className, el) {
+  let node = range.commonAncestorContainer;
+  while (node && node !== el) {
+    if (node.nodeType === 1 && node.classList && node.classList.contains(className)) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+// Toggle an inline format CLASS span (.fmt-bold / .fmt-italic) over the selection. Collapsed selection = no-op
+// (no stray markers on mobile). Never inline styles (prod CSP style-src 'self'), never execCommand.
+function composerEditorToggleFormat(el, className) {
+  if (!el || el.disabled) return;
+  el.focus();
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (!el.contains(range.commonAncestorContainer) || range.collapsed) return;
+  // Never let a format span swallow an atomic attachment chip: extractContents would nest it, and the serialized
+  // `**…[image N]…**` splits on the marker into two blocks with unbalanced markers (recipient sees literal `**`).
+  for (const chip of el.querySelectorAll('.composer-chip')) {
+    if (range.intersectsNode(chip)) return;
+  }
+  const enclosing = composerEditorEnclosingFormat(range, className, el);
+  if (enclosing) {
+    const parent = enclosing.parentNode;
+    const kids = [];
+    while (enclosing.firstChild) { kids.push(enclosing.firstChild); parent.insertBefore(enclosing.firstChild, enclosing); }
+    parent.removeChild(enclosing);
+    if (kids.length) {
+      const r = document.createRange();
+      r.setStartBefore(kids[0]);
+      r.setEndAfter(kids[kids.length - 1]);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+  } else {
+    const span = document.createElement('span');
+    span.className = className;
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    // Flatten any same-class descendants so serialization doesn't emit doubled markers.
+    span.querySelectorAll('.' + className).forEach((n) => { while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n); n.remove(); });
+    const r = document.createRange();
+    r.selectNodeContents(span);
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+  composerEditorAfterEdit(el);
+}
+
+// Insert `text` (e.g. "- ") at the start of the caret's line. Milestone-1 list button: add-only (no toggle-off).
+function composerEditorInsertAtLineStart(el, text) {
+  if (!el || el.disabled) return;
+  el.focus();
+  const range = composerEditorRange(el);
+  // Resolve the caret to an index into el.childNodes (the slot new content would occupy on the caret's line).
+  let caretIndex;
+  if (range.startContainer === el) {
+    caretIndex = range.startOffset;
+  } else {
+    let c = range.startContainer;
+    while (c.parentNode && c.parentNode !== el) c = c.parentNode;
+    caretIndex = Array.prototype.indexOf.call(el.childNodes, c);
+    if (caretIndex < 0) caretIndex = el.childNodes.length;
+  }
+  // Line start = the slot right after the preceding <br> (a line is the run between <br>s). Walking BACK from the
+  // caret index (not from a node before it) is what keeps "- " on the caret's OWN line after an Enter.
+  let startIdx = caretIndex;
+  while (startIdx > 0 && el.childNodes[startIdx - 1].nodeName !== 'BR') startIdx--;
+  // Never prefix a marker-only line (a lone attachment chip) — it would ship an orphan "-" text block, the same
+  // corruption COMPOSER_MARKER_ONLY_LINE_RE guards against on the textarea path.
+  let hasChip = false, hasText = false;
+  for (let i = startIdx; i < el.childNodes.length && el.childNodes[i].nodeName !== 'BR'; i++) {
+    const n = el.childNodes[i];
+    if (n.nodeType === 1 && n.dataset && n.dataset.marker) hasChip = true;
+    else if ((n.textContent ?? '').trim() !== '') hasText = true;
+  }
+  if (hasChip && !hasText) return;
+  const node = document.createTextNode(text);
+  el.insertBefore(node, el.childNodes[startIdx] || null);
+  composerEditorPlaceCaretAfter(node);
+  composerEditorAfterEdit(el);
+}
+
+// Sanitize pasted/dropped content down to text/plain and insert it at the caret (new XSS surface — never trust
+// clipboard HTML; only text crosses into the editor). \r\n normalized; the serializer turns \n into <br>.
+function composerEditorInsertPlainMultiline(el, text) {
+  if (!el || el.disabled) return;
+  el.focus();
+  const range = composerEditorRange(el);
+  range.deleteContents();
+  const frag = document.createDocumentFragment();
+  const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+  lines.forEach((line, index) => {
+    if (index > 0) frag.append(document.createElement('br'));
+    if (line) frag.append(document.createTextNode(line));
+  });
+  const last = frag.lastChild;
+  range.insertNode(frag);
+  if (last) composerEditorPlaceCaretAfter(last);
+  composerEditorAfterEdit(el);
+}
+
+// Turn a bare <div id> into a live composer editor: contenteditable + the .value/.disabled/.placeholder accessor
+// shims that let the ENTIRE textarea-era send pipeline (size plan, submit capture, draft clear/restore, i18n
+// placeholder) keep reading/writing it unchanged. Idempotent.
+function initComposerEditor(el) {
+  if (!el || el.dataset.editorReady === '1') return;
+  el.dataset.editorReady = '1';
+  el.contentEditable = 'true';
+  el.setAttribute('role', 'textbox');
+  el.setAttribute('aria-multiline', 'true');
+  el.classList.add('composer-input');
+  el.classList.toggle('is-empty', serializeComposerEditor(el).trim() === '');
+  let disabledFlag = false;
+  Object.defineProperty(el, 'value', {
+    configurable: true,
+    get() { return serializeComposerEditor(this); },
+    set(v) { buildComposerEditorDom(this, String(v ?? '')); this.classList.toggle('is-empty', String(v ?? '').trim() === ''); },
+  });
+  Object.defineProperty(el, 'disabled', {
+    configurable: true,
+    get() { return disabledFlag; },
+    set(v) {
+      disabledFlag = Boolean(v);
+      this.contentEditable = disabledFlag ? 'false' : 'true';
+      this.classList.toggle('is-disabled', disabledFlag);
+      if (disabledFlag) this.setAttribute('aria-disabled', 'true'); else this.removeAttribute('aria-disabled');
+    },
+  });
+  Object.defineProperty(el, 'placeholder', {
+    configurable: true,
+    get() { return this.getAttribute('placeholder') ?? ''; },
+    set(v) { this.setAttribute('placeholder', String(v ?? '')); },
+  });
 }
 
 function privateAttachmentLabelForImage(attachment) {
@@ -16398,13 +16712,11 @@ function refreshComposerPublishPolicy() {
     messageInput.placeholder = privateComposerPlaceholder({
       readOnly: composer?.dataset.readOnly === 'true',
     });
-    autoResizeComposerTextarea(messageInput);
   }
   if (publicComposer) publicComposer.dataset.publishMode = canPublish ? 'vault-balance' : 'wallet-required';
   if (publicMessageInput) {
     publicMessageInput.removeAttribute('maxlength');
     publicMessageInput.placeholder = publicComposerPlaceholder();
-    autoResizeComposerTextarea(publicMessageInput);
   }
   // Attachment/add-button DISABLED state is NOT written here: it is owned by refreshPrivateSendButtonState /
   // refreshPublicSendButtonState (both run via refreshComposerCostStatus below), keyed to the full send-block
@@ -16626,29 +16938,16 @@ function messagePreviewFromBlocks(blocks = []) {
   return '';
 }
 
-function insertComposerMarker(textarea, marker) {
-  if (!textarea) return;
-  const value = textarea.value ?? '';
-  const start = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : value.length;
-  const end = Number.isFinite(textarea.selectionEnd) ? textarea.selectionEnd : start;
-  const before = value.slice(0, start);
-  const after = value.slice(end);
-  const prefix = before && !before.endsWith('\n') ? '\n' : '';
-  const suffix = after && !after.startsWith('\n') ? '\n' : '';
-  const insert = `${prefix}${marker}${suffix}`;
-  textarea.value = `${before}${insert}${after}`;
-  const nextCursor = before.length + insert.length;
-  textarea.focus?.();
-  textarea.setSelectionRange?.(nextCursor, nextCursor);
-  autoResizeComposerTextarea(textarea);
+// Insert an attachment/link/share marker into a composer editor as an atomic chip at the caret.
+function insertComposerMarker(editor, marker) {
+  if (!editor) return;
+  composerEditorInsertChip(editor, marker);
 }
 
-// --- Formatting toolbar (v769): selection-aware markdown insertion -----------------------------------------
-// The composer keeps a plain <textarea> (rock-solid vs contenteditable on mobile/IME); the toolbar buttons
-// insert markdown markers that the safe formatting renderer (appendFormattedMessageText) turns into styled DOM
-// on both sides. Bold/italic WRAP the selection; heading/quote/list PREFIX the selected lines (toggle off if
-// already prefixed); center/justify set a paragraph-leading alignment marker. Every edit fires an 'input' event
-// so the size/cost/send-enable pipeline stays in sync, and refocuses the textarea (keeping the toolbar open).
+// --- Formatting toolbar (v769; WYSIWYG editor v771) --------------------------------------------------------
+// The composer is a contenteditable editor (see the WYSIWYG core above); the toolbar buttons drive the live
+// Range-based format ops (bold/italic wrap the selection in a .fmt-* span, list prefixes the line). The toolbar
+// opens on a deliberate field click and a mousedown-preventDefault keeps the selection when a button is pressed.
 
 function composerToolbarForTextarea(textarea) {
   const form = textarea?.closest?.('.composer');
@@ -16663,70 +16962,13 @@ function hideComposerToolbar(textarea) {
   composerToolbarForTextarea(textarea)?.classList.remove('is-open');
 }
 
-// Wrap the current selection in open/close markers (or drop the empty pair at the caret with the caret between).
-function wrapComposerSelection(textarea, open, close) {
-  if (!textarea || textarea.disabled) return;
-  const value = textarea.value ?? '';
-  const start = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : value.length;
-  const end = Number.isFinite(textarea.selectionEnd) ? textarea.selectionEnd : start;
-  const selected = value.slice(start, end);
-  const inserted = `${open}${selected}${close}`;
-  textarea.value = value.slice(0, start) + inserted + value.slice(end);
-  textarea.focus?.();
-  if (selected) textarea.setSelectionRange?.(start + open.length, start + open.length + selected.length);
-  else { const caret = start + open.length; textarea.setSelectionRange?.(caret, caret); }
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  autoResizeComposerTextarea(textarea);
-}
-
-// Prefix the selected lines (or the current line) with `prefix`; toggle OFF when every CONTENT line already
-// carries it, else ADD it only to lines that lack it. Used for '# ' heading, '> ' quote, '- ' list.
-function prefixComposerLines(textarea, prefix) {
-  if (!textarea || textarea.disabled) return;
-  const value = textarea.value ?? '';
-  const start = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : value.length;
-  const end = Number.isFinite(textarea.selectionEnd) ? textarea.selectionEnd : start;
-  const collapsed = start === end;
-  const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-  // A selection ending exactly at a line start (only the previous line's newline captured) must NOT pull that
-  // next line into the range.
-  let searchFrom = end;
-  if (end > lineStart && value[end - 1] === '\n') searchFrom = end - 1;
-  let lineEnd = value.indexOf('\n', searchFrom);
-  if (lineEnd === -1) lineEnd = value.length;
-  const lines = value.slice(lineStart, lineEnd).split('\n');
-  const single = lines.length === 1;
-  // Marker-only lines ([image N]/[file N]/[check]/[post]) and blank separators are not content: never prefix a
-  // marker line (it would ship an orphan fragment), and exclude both from the toggle-off decision.
-  const contentLines = lines.filter((line) => line.trim() !== '' && !COMPOSER_MARKER_ONLY_LINE_RE.test(line));
-  const allPrefixed = contentLines.length > 0 && contentLines.every((line) => line.startsWith(prefix));
-  const next = lines.map((line) => {
-    if (COMPOSER_MARKER_ONLY_LINE_RE.test(line)) return line;
-    // Blank separators are left alone in a MULTI-line selection; a single blank/empty line still gets the prefix
-    // so the button can START a list/heading/quote on an empty composer.
-    if (line.trim() === '' && !single) return line;
-    if (allPrefixed) return line.startsWith(prefix) ? line.slice(prefix.length) : line;
-    return line.startsWith(prefix) ? line : prefix + line;
-  }).join('\n');
-  textarea.value = value.slice(0, lineStart) + next + value.slice(lineEnd);
-  textarea.focus?.();
-  if (collapsed) {
-    const caret = lineStart + next.length;
-    textarea.setSelectionRange?.(caret, caret);
-  } else {
-    textarea.setSelectionRange?.(lineStart, lineStart + next.length);
-  }
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  autoResizeComposerTextarea(textarea);
-}
-
-function applyComposerFormat(textarea, format) {
-  if (!textarea) return;
+function applyComposerFormat(editor, format) {
+  if (!editor) return;
   switch (format) {
-    case 'bold': wrapComposerSelection(textarea, '**', '**'); break;
-    case 'italic': wrapComposerSelection(textarea, '*', '*'); break;
-    case 'list': prefixComposerLines(textarea, '- '); break;
-    case 'preview': openComposerPreview(textarea); break;
+    case 'bold': composerEditorToggleFormat(editor, 'fmt-bold'); break;
+    case 'italic': composerEditorToggleFormat(editor, 'fmt-italic'); break;
+    case 'list': composerEditorInsertAtLineStart(editor, '- '); break;
+    case 'preview': openComposerPreview(editor); break;
     default: break;
   }
 }
@@ -16842,7 +17084,6 @@ function removeAllFileMarkersForComposer(kind) {
   value = value.replace(/\[file\s+\d+\](?!\()/ig, ''); // inline leftovers (user-edited placement)
   if (!value.trim()) value = ''; // markers were the only content -> clear (send guard disables)
   textarea.value = value;
-  autoResizeComposerTextarea(textarea);
 }
 
 // Removing an image ATTACHMENT must also drop its "[image N]" text marker (and renumber the markers AFTER it, since the
@@ -16862,7 +17103,6 @@ function removeImageMarkerForComposer(kind, removedIndex) {
   let value = next.replace(/\n{3,}/g, '\n\n'); // collapse the blank line a self-line marker left behind
   if (!value.trim()) value = '';               // the marker was the only content -> clear (also disables send via the guard)
   textarea.value = value;
-  autoResizeComposerTextarea(textarea);
 }
 
 function insertPaymentCheckMarker() {
@@ -17677,7 +17917,6 @@ function renderConversation() {
     if (messageInput) {
       messageInput.disabled = true;
       messageInput.placeholder = plathoWallet ? t('chat.createOrChoosePrivateChat') : t('common.walletRequired');
-      autoResizeComposerTextarea(messageInput);
     }
     if (sendButton) sendButton.disabled = true;
     if (paymentCheckButton) paymentCheckButton.disabled = true;
@@ -18845,7 +19084,6 @@ publicCancelCommentButton?.addEventListener('click', () => {
     return;
   }
   setPublicCommentTarget(null);
-  autoResizeComposerTextarea(publicMessageInput);
   refreshComposerCostStatus();
 });
 
@@ -18951,13 +19189,34 @@ registerVaultKeysButton?.addEventListener('click', async () => {
 
 messageInput?.addEventListener('input', () => {
   enforceComposerByteLimit();
-  autoResizeComposerTextarea(messageInput);
+  messageInput.classList.toggle('is-empty', serializeComposerEditor(messageInput).trim() === '');
   refreshComposerCostStatus();
 });
 messageInput?.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter' || (!event.ctrlKey && !event.metaKey)) return;
+  if (event.isComposing) return; // IME composition (CJK etc.) owns Enter until it commits
+  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    composer?.requestSubmit?.();
+  }
+});
+// Newline = a clean single <br> (Ctrl/Cmd+Enter sends). Handled in beforeinput, NOT keydown, so it fires on
+// Android soft keyboards too — there the Enter keydown arrives as keyCode 229 with key!=='Enter', but beforeinput
+// still reports inputType 'insertParagraph'. Desktop plain / Shift+Enter route through the same path.
+messageInput?.addEventListener('beforeinput', (event) => {
+  if (event.isComposing) return;
+  if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
+    event.preventDefault();
+    composerEditorInsertLineBreak(messageInput);
+  }
+});
+messageInput?.addEventListener('paste', (event) => {
+  event.preventDefault(); // strip clipboard HTML (XSS surface) — only text/plain crosses into the editor
+  composerEditorInsertPlainMultiline(messageInput, event.clipboardData?.getData('text/plain') ?? '');
+});
+messageInput?.addEventListener('drop', (event) => {
+  if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('text/plain')) return; // let file drops fall through
   event.preventDefault();
-  composer?.requestSubmit?.();
+  composerEditorInsertPlainMultiline(messageInput, event.dataTransfer.getData('text/plain'));
 });
 setupComposerToolbar(privateComposerToolbar, messageInput, privateToolbarHide);
 setupComposerToolbar(publicComposerToolbar, publicMessageInput, publicToolbarHide);
@@ -18980,13 +19239,32 @@ document.addEventListener('keydown', (event) => {
 
 publicMessageInput?.addEventListener('input', () => {
   enforcePublicComposerByteLimit();
-  autoResizeComposerTextarea(publicMessageInput);
+  publicMessageInput.classList.toggle('is-empty', serializeComposerEditor(publicMessageInput).trim() === '');
   refreshComposerCostStatus();
 });
 publicMessageInput?.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter' || (!event.ctrlKey && !event.metaKey)) return;
+  if (event.isComposing) return; // IME composition (CJK etc.) owns Enter until it commits
+  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    publicComposer?.requestSubmit?.();
+  }
+});
+// Newline via beforeinput (not keydown) so Android soft-keyboard Enter (keyCode 229) still lands a clean <br>.
+publicMessageInput?.addEventListener('beforeinput', (event) => {
+  if (event.isComposing) return;
+  if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
+    event.preventDefault();
+    composerEditorInsertLineBreak(publicMessageInput);
+  }
+});
+publicMessageInput?.addEventListener('paste', (event) => {
+  event.preventDefault(); // strip clipboard HTML (XSS surface) — only text/plain crosses into the editor
+  composerEditorInsertPlainMultiline(publicMessageInput, event.clipboardData?.getData('text/plain') ?? '');
+});
+publicMessageInput?.addEventListener('drop', (event) => {
+  if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('text/plain')) return; // let file drops fall through
   event.preventDefault();
-  publicComposer?.requestSubmit?.();
+  composerEditorInsertPlainMultiline(publicMessageInput, event.dataTransfer.getData('text/plain'));
 });
 
 privateImageButton?.addEventListener('click', () => {
@@ -19270,7 +19548,6 @@ publicComposer?.addEventListener('submit', async (event) => {
   publicFileAttachments = [];
   updateImageAttachmentUi('public');
   updatePublicFileAttachmentUi();
-  autoResizeComposerTextarea(publicMessageInput);
   refreshComposerCostStatus();
   try {
     if (draftCommentTarget) {
@@ -19298,7 +19575,6 @@ publicComposer?.addEventListener('submit', async (event) => {
       if (draftShare) setPublicShareDraft(draftShare);
       updateImageAttachmentUi('public');
       updatePublicFileAttachmentUi();
-      autoResizeComposerTextarea(publicMessageInput);
       refreshComposerCostStatus();
     }
     setPublicStatus(cancelled ? 'publish cancelled' : (rateLimited ? 'sync delayed' : (draftCommentTarget ? 'comment blocked' : 'publish blocked')));
@@ -19453,7 +19729,6 @@ composer?.addEventListener('submit', async (event) => {
   privateFileAttachments = [];
   updatePrivateFileAttachmentUi();
   updateImageAttachmentUi('private');
-  autoResizeComposerTextarea(messageInput);
   // Return focus to the composer so the user can keep typing without re-tapping the field. Clicking the
   // send button moved focus to the button (and on mobile would drop the keyboard); refocus synchronously
   // within the submit gesture so the keyboard stays up. messageInput is the static shell element (not
@@ -29947,8 +30222,6 @@ window.visualViewport?.addEventListener?.('scroll', syncViewportCssVars, { passi
 // Composer textareas auto-size on input, but a window/pane resize re-wraps EXISTING text (a one-liner
 // becomes two lines when the window narrows) with no input event — so refit both fields on resize too.
 window.addEventListener('resize', () => {
-  autoResizeComposerTextarea(messageInput);
-  autoResizeComposerTextarea(publicMessageInput);
 }, { passive: true });
 
 customPublicChannels = readCustomPublicChannels();
@@ -30518,19 +30791,11 @@ const emojiPickerGrid = document.querySelector('#emojiPickerGrid');
 let emojiPickerTargetInput = null;
 let emojiPickerTargetButton = null;
 
+// Insert emoji (or the link dialog's markup) at the editor caret. A picker opened BEFORE the composer got
+// blocked can outlive its (now-disabled) trigger button — never write into a disabled editor.
 function insertEmojiAtCaret(input, emoji) {
-  // A picker opened BEFORE the composer got blocked can outlive its (now-disabled) trigger button — never
-  // write into a disabled input (programmatic .value assignment bypasses the disabled attribute).
   if (!input || input.disabled) return;
-  const value = input.value ?? '';
-  const start = Number.isFinite(input.selectionStart) ? input.selectionStart : value.length;
-  const end = Number.isFinite(input.selectionEnd) ? input.selectionEnd : start;
-  input.value = `${value.slice(0, start)}${emoji}${value.slice(end)}`;
-  const caret = start + emoji.length;
-  input.focus?.();
-  input.setSelectionRange?.(caret, caret);
-  input.dispatchEvent(new Event('input', { bubbles: true })); // fire cost/draft/send-enable listeners
-  autoResizeComposerTextarea?.(input);
+  composerEditorInsertText(input, emoji);
 }
 
 function positionEmojiPicker(button) {

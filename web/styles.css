@@ -599,8 +599,7 @@ html[data-platho-telegram="true"] .install-header-button {
   display: none;
 }
 
-.search-row input,
-.composer textarea {
+.search-row input {
   min-width: 0;
   border: 0;
   outline: 0;
@@ -609,8 +608,7 @@ html[data-platho-telegram="true"] .install-header-button {
   font: inherit;
 }
 
-.search-row input::placeholder,
-.composer textarea::placeholder {
+.search-row input::placeholder {
   color: var(--muted-2);
 }
 
@@ -1328,20 +1326,60 @@ a .avatar.has-image,
   gap: 10px;
 }
 
-.composer textarea {
+/* WYSIWYG contenteditable composer (v771): a single-line-min, 144px-max editable area that renders formatting
+   live. The placeholder rides on a ::before gated by the JS is-empty class (a contenteditable has no native
+   placeholder). Inline format = CLASS spans (no inline styles per prod CSP style-src 'self'). */
+.composer .composer-input {
+  min-width: 0;
   min-height: 44px;
   max-height: 144px;
   padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #0d1012;
-  resize: none;
+  color: var(--text);
+  font: inherit;
   line-height: 1.35;
-  overflow-y: hidden;
+  overflow-y: auto;
+  outline: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
 }
 
-.composer textarea.is-scrollable {
-  overflow-y: auto;
+.composer .composer-input.is-empty::before {
+  content: attr(placeholder);
+  color: var(--muted-2);
+  pointer-events: none;
+}
+
+.composer .composer-input.is-disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.composer .composer-input .fmt-bold { font-weight: 700; }
+.composer .composer-input .fmt-italic { font-style: italic; }
+.composer .composer-input .fmt-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
+.composer .composer-input .composer-chip {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 2px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: rgba(48, 213, 176, 0.14);
+  border: 1px solid rgba(48, 213, 176, 0.3);
+  color: var(--accent);
+  font-size: 0.85em;
+  white-space: nowrap;
+  user-select: none;
 }
 
 .composer-post-option {
