@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=770" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=771" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -994,8 +994,8 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
 
-    expect(html).not.toMatch(/<textarea id="messageInput"[^>]*maxlength=/);
-    expect(html).not.toMatch(/<textarea id="publicMessageInput"[^>]*maxlength=/);
+    expect(html).not.toMatch(/<div id="messageInput"[^>]*maxlength=/);
+    expect(html).not.toMatch(/<div id="publicMessageInput"[^>]*maxlength=/);
     expect(html).not.toMatch(/1024 bytes max/);
     expect(app).toMatch(/removeAttribute\('maxlength'\)/);
     expect(html).toMatch(/id="privateComposerCostStatus"/);
@@ -1011,7 +1011,7 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['composer.privateMessage']).toBe('Private message');
     expect(html).toMatch(/id="publicComposer"/);
     expect(html).toMatch(/id="publicComposerCommentsCheckbox"/);
-    expect(html).toMatch(/id="publicComposer"[\s\S]*id="publicComposerCommentsCheckbox"[\s\S]*<textarea id="publicMessageInput"/);
+    expect(html).toMatch(/id="publicComposer"[\s\S]*id="publicComposerCommentsCheckbox"[\s\S]*<div id="publicMessageInput"[^>]*contenteditable="true"/);
     expect(html).toMatch(/Allow comments/);
     expect(enCopy).toMatch(/Open public comments\?/);
     expect(enCopy).toMatch(/Publish with comments/);
@@ -6293,16 +6293,19 @@ describe('PWA runtime config guard', () => {
     // The input row keeps ONLY the leading control + textarea + send.
     expect(html).toMatch(/class="composer-input-row">\s*<button class="icon-button private-anonymous-button"/);
 
-    // Format logic: selection wrap (bold/italic) + line prefix (list). v770: the alignment helper and the
-    // heading/quote/center/justify cases were removed with their buttons (the RENDERER still parses those for
-    // received messages — appendFormattedMessageText below — but the composer no longer inserts them).
-    expect(app).toMatch(/function wrapComposerSelection\(textarea, open, close\)/);
-    expect(app).toMatch(/function prefixComposerLines\(textarea, prefix\)/);
+    // Format logic (v771 WYSIWYG): applyComposerFormat is editor-only — live class-span formatting via the
+    // composerEditor* Range ops. The legacy textarea helpers (wrapComposerSelection/prefixComposerLines) and the
+    // heading/quote/center/justify/alignment cases are GONE (the RENDERER still parses those for received messages
+    // — appendFormattedMessageText below — but no composer inserts them).
+    expect(app).not.toMatch(/function wrapComposerSelection\(/);
+    expect(app).not.toMatch(/function prefixComposerLines\(/);
     expect(app).not.toMatch(/function setComposerAlignment\(/);
-    const applyFn = app.slice(app.indexOf('function applyComposerFormat('), app.indexOf('function applyComposerFormat(') + 700);
-    expect(applyFn).toMatch(/case 'bold': wrapComposerSelection\(textarea, '\*\*', '\*\*'\)/);
-    expect(applyFn).toMatch(/case 'list': prefixComposerLines\(textarea, '- '\)/);
-    expect(applyFn).toMatch(/case 'preview': openComposerPreview\(textarea\)/);
+    const applyFn = app.slice(app.indexOf('function applyComposerFormat('), app.indexOf('function applyComposerFormat(') + 500);
+    expect(applyFn).toMatch(/case 'bold': composerEditorToggleFormat\(editor, 'fmt-bold'\)/);
+    expect(applyFn).toMatch(/case 'italic': composerEditorToggleFormat\(editor, 'fmt-italic'\)/);
+    expect(applyFn).toMatch(/case 'list': composerEditorInsertAtLineStart\(editor, '- '\)/);
+    expect(applyFn).toMatch(/case 'preview': openComposerPreview\(editor\)/);
+    expect(applyFn).not.toMatch(/wrapComposerSelection|prefixComposerLines/);
     expect(applyFn).not.toMatch(/case 'center'/);
     // Driver: open on a deliberate field CLICK (not focus/typing), ▼ hides, mousedown keeps the selection.
     const setupFn = app.slice(app.indexOf('function setupComposerToolbar('), app.indexOf('function setupComposerToolbar(') + 1100);
@@ -6327,6 +6330,75 @@ describe('PWA runtime config guard', () => {
         expect(dict[key], `${locale}:${key}`).toBeTruthy();
       }
     }
+  });
+
+  it('PWA-COMPOSER-WYSIWYG-01: both composers are contenteditable editors that serialize to the same markdown+marker string, with sanitized paste and no execCommand/innerHTML', () => {
+    const html = readFileSync('web/index.html', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+
+    // Both inputs are contenteditable .composer-input divs now — NOT <textarea>. role/aria keep them a11y-textboxes.
+    expect(html).toMatch(/<div id="messageInput" class="composer-input is-empty" contenteditable="true" role="textbox" aria-multiline="true"[^>]*placeholder="Wallet required"/);
+    expect(html).toMatch(/<div id="publicMessageInput" class="composer-input is-empty" contenteditable="true" role="textbox" aria-multiline="true"[^>]*placeholder="Public message"/);
+    expect(html).not.toMatch(/<textarea id="messageInput"/);
+    expect(html).not.toMatch(/<textarea id="publicMessageInput"/);
+    expect(app).toMatch(/initComposerEditor\(messageInput\)/);
+    expect(app).toMatch(/initComposerEditor\(publicMessageInput\)/);
+
+    // Editor core: DOM<->string serializer pair.
+    expect(app).toMatch(/function serializeComposerEditor\(el\)/);
+    expect(app).toMatch(/function buildComposerEditorDom\(el, text\)/);
+    expect(app).toMatch(/function initComposerEditor\(el\)/);
+    // The .value / .disabled / .placeholder accessor shims keep the whole textarea-era send pipeline working.
+    const initFn = app.slice(app.indexOf('function initComposerEditor('), app.indexOf('function initComposerEditor(') + 1600);
+    expect(initFn).toMatch(/Object\.defineProperty\(el, 'value', \{[\s\S]*?get\(\) \{ return serializeComposerEditor\(this\); \}/);
+    expect(initFn).toMatch(/Object\.defineProperty\(el, 'disabled', \{/);
+    expect(initFn).toMatch(/Object\.defineProperty\(el, 'placeholder', \{/);
+    expect(initFn).toMatch(/this\.contentEditable = disabledFlag \? 'false' : 'true'/);
+
+    // Caret ops (Range-based) exist and the marker/emoji dispatchers delegate to them (legacy textarea paths gone).
+    for (const fn of ['composerEditorToggleFormat', 'composerEditorInsertChip', 'composerEditorInsertAtLineStart', 'composerEditorInsertLineBreak', 'composerEditorInsertText', 'composerEditorInsertPlainMultiline']) {
+      expect(app, fn).toMatch(new RegExp(`function ${fn}\\(`));
+    }
+    expect(app).not.toMatch(/function isComposerEditor\(/);
+    expect(app).not.toMatch(/function autoResizeComposerTextarea\(/);
+    expect(app).toMatch(/function insertComposerMarker\(editor, marker\) \{[\s\S]*?composerEditorInsertChip\(editor, marker\);/);
+    expect(app).toMatch(/function insertEmojiAtCaret\(input, emoji\) \{[\s\S]*?composerEditorInsertText\(input, emoji\);/);
+    // Bold/italic wrap in CLASS spans (prod CSP style-src 'self' — never inline styles, never execCommand).
+    expect(app).toMatch(/span\.className = className;/);
+    expect(app).not.toMatch(/execCommand\((['"])(bold|italic|insertHTML|formatBlock|styleWithCSS)/i);
+    expect(app).not.toMatch(/styleWithCSS/);
+
+    // Paste/drop are sanitized to text/plain on BOTH composers (the clipboard-HTML XSS surface never enters the DOM).
+    for (const input of ['messageInput', 'publicMessageInput']) {
+      const paste = app.slice(app.indexOf(`${input}?.addEventListener('paste'`), app.indexOf(`${input}?.addEventListener('paste'`) + 400);
+      expect(paste, `${input}:paste`).toMatch(/event\.preventDefault\(\)/);
+      expect(paste, `${input}:paste`).toMatch(/getData\('text\/plain'\)/);
+      expect(paste, `${input}:paste`).not.toMatch(/text\/html/);
+    }
+    // buildComposerEditorDom builds via createElement/textContent only — no innerHTML anywhere in the editor build.
+    const buildFn = app.slice(app.indexOf('function appendEditorInline('), app.indexOf('function buildComposerEditorDom(') + 400);
+    expect(buildFn).not.toMatch(/innerHTML/);
+    expect(buildFn).toMatch(/document\.createElement\('span'\)/);
+    expect(buildFn).toMatch(/\.textContent = /);
+
+    // keydown handles Ctrl/Cmd+Enter = send (IME-guarded); newline lives in BEFOREINPUT so Android soft-keyboard
+    // Enter (keyCode 229, key!=='Enter') still lands a clean <br> via inputType insertParagraph/insertLineBreak.
+    for (const input of ['messageInput', 'publicMessageInput']) {
+      const keydown = app.slice(app.indexOf(`${input}?.addEventListener('keydown'`), app.indexOf(`${input}?.addEventListener('keydown'`) + 240);
+      expect(keydown, `${input}:ime`).toMatch(/if \(event\.isComposing\) return;/);
+      expect(keydown, `${input}:send`).toMatch(/event\.key === 'Enter' && \(event\.ctrlKey \|\| event\.metaKey\)/);
+      expect(keydown, `${input}:no-linebreak-in-keydown`).not.toMatch(/composerEditorInsertLineBreak\(/);
+      const beforeinput = app.slice(app.indexOf(`${input}?.addEventListener('beforeinput'`), app.indexOf(`${input}?.addEventListener('beforeinput'`) + 320);
+      expect(beforeinput, `${input}:linebreak`).toMatch(/inputType === 'insertParagraph' \|\| event\.inputType === 'insertLineBreak'/);
+      expect(beforeinput, `${input}:linebreak`).toMatch(/composerEditorInsertLineBreak\(/);
+    }
+
+    // CSS for the editor: sizing/placeholder/format spans/chips.
+    expect(css).toMatch(/\.composer \.composer-input \{[\s\S]*?min-height: 44px;[\s\S]*?white-space: pre-wrap;/);
+    expect(css).toMatch(/\.composer \.composer-input\.is-empty::before \{[\s\S]*?content: attr\(placeholder\);/);
+    expect(css).toMatch(/\.composer \.composer-input \.fmt-bold \{ font-weight: 700; \}/);
+    expect(css).toMatch(/\.composer \.composer-input \.composer-chip \{/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7465,15 +7537,15 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v845/);
+    expect(sw).toMatch(/platho-pwa-prototype-v846/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=262/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=263/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=770/);
+    expect(sw).toMatch(/\.\/app\.js\?v=771/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=28/);
