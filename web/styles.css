@@ -1330,6 +1330,7 @@ a .avatar.has-image,
    live. The placeholder rides on a ::before gated by the JS is-empty class (a contenteditable has no native
    placeholder). Inline format = CLASS spans (no inline styles per prod CSP style-src 'self'). */
 .composer .composer-input {
+  position: relative; /* anchor for the absolutely-positioned placeholder below */
   min-width: 0;
   min-height: 44px;
   max-height: 144px;
@@ -1347,8 +1348,21 @@ a .avatar.has-image,
   cursor: text;
 }
 
+/* The placeholder is absolutely positioned (out of the inline flow) so the caret in the empty editor sits at the
+   real start, offset 0 — NOT after the placeholder text. An inline ::before is generated content that precedes
+   offset 0, so the browser rendered the caret at the END of the placeholder. Out of flow also keeps the box at one
+   line even when the browser leaves a bogus <br> after a manual clear. nowrap+ellipsis degrades a placeholder too
+   long for a narrow screen to a single truncated line (absolute content can't grow the box, so wrapping would clip
+   the 2nd line mid-word). top/left/right match the input padding. */
 .composer .composer-input.is-empty::before {
   content: attr(placeholder);
+  position: absolute;
+  top: 11px;
+  left: 14px;
+  right: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--muted-2);
   pointer-events: none;
 }
@@ -1400,8 +1414,13 @@ a .avatar.has-image,
   white-space: nowrap;
 }
 
-/* v778: an inserted link renders live as a link chip (accent + underline), not raw [label](url) markdown. */
+/* v778: an inserted link renders live as a link chip (accent + underline), not raw [label](url) markdown. It is
+   plain inline text (unlike the block image/file atoms), so it flows on the text BASELINE — the inherited
+   inline-block + vertical-align:bottom + vertical margin from .composer-block would drop it below the line (v779). */
 .composer .composer-input .composer-block-link {
+  display: inline;
+  vertical-align: baseline;
+  margin: 0;
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -1614,6 +1633,53 @@ a .avatar.has-image,
   .composer-toolbar { transition: opacity 0.18s ease; transform: none; }
 }
 
+/* Maximize (v780): expand the composer to a full-screen overlay for composing long posts. The editor DOM is untouched
+   (draft/caret/selection preserved) — only the container is restyled. Height = --app-viewport-height (JS tracks the
+   visual viewport), so the send button stays above the mobile keyboard. z-index 30 sits ABOVE the app chrome (<=4)
+   but BELOW every dialog/picker/lightbox (>=40), so Insert-link / emoji / attachments still open on top. */
+.composer.is-maximized {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0; /* the public composer bleeds to the pane edges with margin: 0 -24px — reset it so left/right:0 = viewport */
+  height: var(--app-viewport-height-exact, var(--app-viewport-height, 100dvh)); /* exact (unfloored) so send/restore stay above the keyboard on short viewports */
+  z-index: 30;
+  max-width: none;
+  background: #0f1214; /* opaque (the resting composer bg is translucent — it would show the app behind) */
+  padding-top: calc(12px + var(--app-safe-area-top, env(safe-area-inset-top)));
+}
+
+/* The toolbar auto-hides while typing; force it visible when maximized so the restore button is always reachable. */
+.composer.is-maximized .composer-toolbar {
+  max-height: 48px;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* The input row grows to fill the overlay; the editor stretches to fill it, the leading/send controls stay pinned to
+   the bottom edge (as in the resting align-items:end layout). */
+.composer.is-maximized .composer-input-row {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+.composer.is-maximized .composer-input-row > .icon-button,
+.composer.is-maximized .composer-input-row > .send-button,
+.composer.is-maximized .composer-input-row > .composer-post-option {
+  align-self: end;
+}
+.composer.is-maximized .composer-input {
+  max-height: none;
+  height: auto;
+}
+
+/* The button flips to the inward-arrows "restore" glyph while maximized. */
+.composer.is-maximized .composer-toolbar-maximize .icon {
+  --mask: url("./assets/icons/collapse.svg");
+}
+
 .composer-toolbar-scroll {
   display: flex;
   align-items: center;
@@ -1674,7 +1740,8 @@ a .avatar.has-image,
 }
 
 .composer-toolbar-hide,
-.composer-toolbar-dock {
+.composer-toolbar-dock,
+.composer-toolbar-maximize {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -1689,13 +1756,15 @@ a .avatar.has-image,
 
 @media (hover: hover) {
   .composer-toolbar-hide:hover,
-  .composer-toolbar-dock:hover {
+  .composer-toolbar-dock:hover,
+  .composer-toolbar-maximize:hover {
     color: var(--accent);
   }
 }
 
 .composer-toolbar-hide .icon,
-.composer-toolbar-dock .icon {
+.composer-toolbar-dock .icon,
+.composer-toolbar-maximize .icon {
   width: 18px;
   height: 18px;
 }
@@ -4530,6 +4599,8 @@ button.feed-item:hover {
 .icon-swap-circular { --mask: url("./assets/icons/swap-circular.svg"); }
 .icon-swap-vertical { --mask: url("./assets/icons/swap-vertical.svg"); }
 .icon-text-select { --mask: url("./assets/icons/text-select.svg"); }
+.icon-expand { --mask: url("./assets/icons/expand.svg"); }
+.icon-collapse { --mask: url("./assets/icons/collapse.svg"); }
 .icon-bolt { --mask: url("./assets/icons/bolt.svg"); }
 .icon-gear { --mask: url("./assets/icons/gear.svg"); }
 .icon-install { --mask: url("./assets/icons/install.svg"); }

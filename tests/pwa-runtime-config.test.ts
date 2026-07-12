@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=778" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=780" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6212,10 +6212,28 @@ describe('PWA runtime config guard', () => {
     // 9) v750 composer "Insert link": a dialog inserts [text](url) markup, url scheme-checked before insert; both
     //    composers have the button. No hand-crafting markup.
     expect(app).toMatch(/function openLinkComposerDialog\(targetInput\)/);
-    const linkDlg = app.slice(app.indexOf('function openLinkComposerDialog('), app.indexOf('function openLinkComposerDialog(') + 3400);
+    const linkDlg = app.slice(app.indexOf('function openLinkComposerDialog('), app.indexOf('function openLinkComposerDialog(') + 4700);
     expect(linkDlg).toMatch(/const safe = safeExternalUrl\(raw\);/);
     // v778: always a labeled [display](url) so the editor renders it as a link chip; label defaults to the url.
     expect(linkDlg).toMatch(/const display = label \|\| safe;\s*const markup = `\[\$\{display\}\]\(\$\{encodedUrl\}\)`;/);
+    // v780: a SELECTED word pre-fills the link-text field (sanitized), and focus jumps to the URL field when prefilled.
+    expect(linkDlg).toMatch(/const selectedText = savedRange && !savedRange\.collapsed \? savedRange\.toString\(\)\.replace\(\/\[\[\\\]\\n\]\/g, ' '\)\.trim\(\)\.slice\(0, 200\) : '';/);
+    expect(linkDlg).toMatch(/if \(selectedText\) textInput\.value = selectedText;/);
+    expect(linkDlg).toMatch(/\(selectedText \? urlInput : textInput\)\.focus\(\);/);
+    // v780: composerEditorInsertLinkBlock REPLACES a selection with the link (deleteContents), then ALWAYS lifts the
+    // caret OUT of any enclosing fmt span (escape) + prunes the emptied span — else a link on a bold/italic word
+    // serializes to a DEAD `**[label](url)**` (recipient renders literal bold text) or a stray `****`.
+    const insLink = app.slice(app.indexOf('function composerEditorInsertLinkBlock('), app.indexOf('function composerEditorInsertLinkBlock(') + 1400);
+    expect(insLink).toMatch(/const hadSelection = sel && sel\.rangeCount && !sel\.isCollapsed;/);
+    // selection replaced -> deleteContents then SPLIT the fmt span at the caret so the link lands at the selection
+    // point (word order preserved for a non-trailing partial selection); bare caret -> escape after the whole word.
+    expect(insLink).toMatch(/sel\.getRangeAt\(0\)\.deleteContents\(\);[\s\S]*?composerEditorSplitFmtAtCaret\(el\);/);
+    expect(insLink).toMatch(/composerEditorEscapeTrailingFmt\(el\);/);
+    expect(insLink).toMatch(/range\.insertNode\(block\);[\s\S]*?composerEditorPruneEmptyFmt\(el\);/);
+    expect(app).toMatch(/function composerEditorSplitFmtAtCaret\(el\) \{/);
+    expect(app).toMatch(/const afterFrag = tail\.extractContents\(\);/);
+    expect(app).toMatch(/function composerEditorPruneEmptyFmt\(el\) \{/);
+    expect(app).toMatch(/span\.textContent === '' && !span\.querySelector\('br, \[data-marker\]'\)\) span\.remove\(\);/);
     // v778: the dialog captures the editor caret BEFORE it steals focus (savedRange) and inserts a LINK CHIP at it —
     // not raw markdown at the start. The link renders live (composer-block-link) and round-trips via EDITOR_INLINE_RE.
     expect(linkDlg).toMatch(/targetInput\.contains\(r\.commonAncestorContainer\)\) return r\.cloneRange\(\)/);
@@ -6223,7 +6241,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function buildComposerLinkBlock\(markup, label\)/);
     expect(app).toMatch(/function composerEditorInsertLinkBlock\(el, markup, label, savedRange\)/);
     expect(app).toMatch(/else \{ target\.append\(buildComposerLinkBlock\(`\[\$\{match\[6\]\}\]\(\$\{match\[7\]\}\)`, match\[6\]\)\); \}/);
-    expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.composer-block-link \{[\s\S]*?text-decoration: underline;/);
+    expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.composer-block-link \{[\s\S]*?display: inline;[\s\S]*?vertical-align: baseline;[\s\S]*?text-decoration: underline;/); // v779: link sits on the text baseline
     expect(app).toMatch(/#privateLinkButton'\)\?\.addEventListener\('click'/);
     expect(app).toMatch(/#publicLinkButton'\)\?\.addEventListener\('click'/);
     expect(html).toMatch(/id="privateLinkButton"/);
@@ -6349,6 +6367,7 @@ describe('PWA runtime config guard', () => {
     const html = readFileSync('web/index.html', 'utf8');
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
+    const sw = readFileSync('web/sw.js', 'utf8');
 
     // Both inputs are contenteditable .composer-input divs now — NOT <textarea>. role/aria keep them a11y-textboxes.
     expect(html).toMatch(/<div id="messageInput" class="composer-input is-empty" contenteditable="true" role="textbox" aria-multiline="true"[^>]*placeholder="Wallet required"/);
@@ -6415,7 +6434,7 @@ describe('PWA runtime config guard', () => {
     expect(beforeFn).toMatch(/inputType === 'insertText'/);
     expect(beforeFn).toMatch(/composerEditorTrailingFmtSpan\(sel\.getRangeAt\(0\), el\)/);
     // Toggle-OFF a format over PART of a run splits the run (three-way), it does not clear the whole span.
-    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 5200);
+    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 5800);
     expect(toggleFn).toMatch(/three-way split/);
     expect(toggleFn).toMatch(/const mid = spanText\.slice\(startOff, endOff\)/);
     // A collapsed caret + a format button acts on the WHOLE word under the caret (mobile: tap word + B).
@@ -6423,8 +6442,10 @@ describe('PWA runtime config guard', () => {
     expect(toggleFn).toMatch(/if \(range\.collapsed\) \{[\s\S]*?composerEditorWordRangeAtCaret\(range\)/);
 
     // CSS for the editor: sizing/placeholder/format spans/blocks.
-    expect(css).toMatch(/\.composer \.composer-input \{[\s\S]*?min-height: 44px;[\s\S]*?white-space: pre-wrap;/);
-    expect(css).toMatch(/\.composer \.composer-input\.is-empty::before \{[\s\S]*?content: attr\(placeholder\);/);
+    expect(css).toMatch(/\.composer \.composer-input \{\s*position: relative;[\s\S]*?min-height: 44px;[\s\S]*?white-space: pre-wrap;/); // v780: relative anchors the absolute placeholder
+    // v780: the placeholder is absolutely positioned (out of the inline flow) so the caret in the empty editor sits at
+    // offset 0, NOT after the placeholder text (an inline ::before is generated content that precedes offset 0).
+    expect(css).toMatch(/\.composer \.composer-input\.is-empty::before \{[\s\S]*?content: attr\(placeholder\);[\s\S]*?position: absolute;/);
     expect(css).toMatch(/\.composer \.composer-input \.fmt-bold \{ font-weight: 700; \}/);
     // v773: marker atoms render REAL content — the image capped + inner display-only (pointer-events off).
     expect(css).toMatch(/\.composer \.composer-input \.composer-block \{/);
@@ -6462,11 +6483,12 @@ describe('PWA runtime config guard', () => {
     // v774: a word-toggle (tap-in-word + Bold) collapses the caret afterwards (word not left selected); a REAL
     // selection stays selected. Guarded by startedCollapsed in composerEditorToggleFormat.
     expect(toggleFn).toMatch(/const startedCollapsed = range\.collapsed;/);
-    expect(toggleFn).toMatch(/if \(startedCollapsed && sel\.rangeCount\) \{[\s\S]*?r\.collapse\(false\)/);
-    // v777: after a word-toggle the caret rests INSIDE the word's text node (descend an element caret to the
-    // trailing text node) so pressing Bold/Italic AGAIN un-toggles the same word — and the toggle does NOT escape
-    // the span itself (the leak on the NEXT Enter/attachment/typing is handled at insert time, not here).
-    expect(toggleFn).toMatch(/while \(t && t\.nodeType === 1\) t = t\.lastChild;/);
+    expect(toggleFn).toMatch(/if \(startedCollapsed && sel\.rangeCount\) \{[\s\S]*?const r2 = document\.createRange\(\)/);
+    // v777/v779: after a word-toggle the caret rests at the SAME offset it was (caretInWord), inside the word's
+    // text node — so pressing Bold/Italic AGAIN un-toggles the same word and the caret does not jump to the word
+    // end. The toggle does NOT escape the span itself (the leak on the NEXT Enter/attachment is handled at insert).
+    expect(toggleFn).toMatch(/caretInWord = range\.startOffset - word\.start;/);
+    expect(toggleFn).toMatch(/off = caretInWord >= 0 \? Math\.min\(caretInWord, node\.nodeValue\.length\) :/);
     expect(toggleFn).not.toMatch(/composerEditorEscapeTrailingFmt/);
     // v774: Select-word button selects the word under the caret (start a selection without the OS menu).
     expect(app).toMatch(/function composerEditorSelectWordAtCaret\(el\)/);
@@ -6498,7 +6520,39 @@ describe('PWA runtime config guard', () => {
       const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
       expect(dict['composer.dockToolbar'], `${locale}:dock`).toBeTruthy();
       expect(dict['composer.selectWord'], `${locale}:select`).toBeTruthy();
+      expect(dict['composer.maximize'], `${locale}:maximize`).toBeTruthy();
+      expect(dict['composer.restore'], `${locale}:restore`).toBeTruthy();
     }
+    // v780: maximize button expands the composer to a full-screen overlay for long posts. Button in BOTH toolbars,
+    // toggles .is-maximized on the FORM (CSS overlay, editor DOM untouched), un-maximizes after a send clears.
+    expect(html).toMatch(/id="privateToolbarMaximize"[^>]*aria-pressed="false"[^>]*data-i18n-title="composer\.maximize"/);
+    expect(html).toMatch(/id="publicToolbarMaximize"[^>]*aria-pressed="false"[^>]*data-i18n-title="composer\.maximize"/);
+    expect(app).toMatch(/function toggleComposerMaximize\(form, button\) \{/);
+    expect(app).toMatch(/const on = form\.classList\.toggle\('is-maximized'\);/);
+    expect(app).toMatch(/function exitComposerMaximize\(\) \{/);
+    expect(app).toMatch(/#privateToolbarMaximize'\)\?\.addEventListener\('click', \(event\) => toggleComposerMaximize\(document\.getElementById\('composer'\), event\.currentTarget\)\)/);
+    expect(app).toMatch(/#publicToolbarMaximize'\)\?\.addEventListener\('click', \(event\) => toggleComposerMaximize\(document\.getElementById\('publicComposer'\), event\.currentTarget\)\)/);
+    // un-maximize is wired into BOTH send-clear paths (public + private) AND both navigation-away paths (setView tab
+    // switch + closeNavOverlay back), so the full-screen overlay can never strand the user over another view.
+    expect((app.match(/exitComposerMaximize\(\)/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect(app).toMatch(/function exitComposerMaximize\(\) \{[\s\S]*?return collapsed;/); // returns whether it collapsed
+    expect(app).toMatch(/if \(exitComposerMaximize\(\)\) \{\s*syncNavBackAffordance\(\);\s*return true;/); // back consumes the nav
+    expect(app).toMatch(/exitComposerMaximize\(\);\s*\/\/ The Vault tab is gated/); // setView (tab switch) collapse
+    // A cancelled public publish (price-change dialog) hands the draft back into the SAME full-screen editor, not the 144px inline one.
+    expect(app).toMatch(/const draftWasMaximized = publicComposer\.classList\.contains\('is-maximized'\);/);
+    expect(app).toMatch(/if \(draftWasMaximized && !publicComposer\.classList\.contains\('is-maximized'\)\)/);
+    // The emoji picker opens DOWNWARD when there is no room above (a top-docked toolbar in the maximized overlay).
+    expect(app).toMatch(/if \(rect\.top >= height \+ 8\) \{[\s\S]*?emojiPicker\.style\.bottom = /);
+    expect(app).toMatch(/emojiPicker\.style\.bottom = 'auto';\s*emojiPicker\.style\.top = /);
+    // CSS overlay: fixed, sized to the UNFLOORED visual-viewport var (keyboard-safe on short viewports), z-index 30.
+    expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?position: fixed;[\s\S]*?height: var\(--app-viewport-height-exact, var\(--app-viewport-height, 100dvh\)\);[\s\S]*?z-index: 30;/);
+    expect(app).toMatch(/setProperty\('--app-viewport-height-exact'/); // the unfloored height var is published
+    expect(css).toMatch(/\.composer\.is-maximized \.composer-input-row \{[\s\S]*?flex: 1 1 auto;[\s\S]*?align-items: stretch;/);
+    expect(css).toMatch(/\.composer\.is-maximized \.composer-toolbar-maximize \.icon \{\s*--mask: url\("\.\/assets\/icons\/collapse\.svg"\);/);
+    expect(css).toMatch(/\.icon-expand \{ --mask: url\("\.\/assets\/icons\/expand\.svg"\); \}/);
+    // icons are precached so the offline shell renders the button both ways.
+    expect(sw).toMatch(/\.\/assets\/icons\/expand\.svg/);
+    expect(sw).toMatch(/\.\/assets\/icons\/collapse\.svg/);
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7637,19 +7691,19 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v853/);
+    expect(sw).toMatch(/platho-pwa-prototype-v855/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=267/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=269/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=778/);
+    expect(sw).toMatch(/\.\/app\.js\?v=780/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=29/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=29/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=30/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=30/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
