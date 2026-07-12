@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v776';
+const PLATHO_APP_RUNTIME_VERSION = 'v777';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16693,13 +16693,25 @@ function composerEditorToggleFormat(el, className) {
     sel.removeAllRanges(); sel.addRange(r);
   }
   // A word-toggle started from a collapsed caret should NOT leave the whole word highlighted — collapse to a caret
-  // at the end of the formatted word (a real selection stays selected so bold+italic can chain), then step OUTSIDE
-  // the span so the next Enter / attachment / typing is plain (not swallowed into the formatting).
+  // at the end of the formatted word (a real selection stays selected so bold+italic can chain). Keep the caret
+  // INSIDE the word's TEXT node (not on an element boundary) so pressing Bold/Italic AGAIN re-finds the same word
+  // to un-toggle it (composerEditorWordRangeAtCaret needs a text-node caret). We do NOT escape the span here — the
+  // format-leak on the NEXT Enter/attachment/typing is already prevented by the escape in composerEditorInsertLine-
+  // Break / composerEditorInsertChip and the insertText bleed guard, so the caret can safely rest in the word.
   if (startedCollapsed && sel.rangeCount) {
     const r = sel.getRangeAt(0);
     r.collapse(false);
-    sel.removeAllRanges(); sel.addRange(r);
-    composerEditorEscapeTrailingFmt(el);
+    let c = r.startContainer, o = r.startOffset;
+    if (c.nodeType === 1) { // descend an element caret to the trailing text node of the just-formatted word
+      let t = c.childNodes[o - 1];
+      while (t && t.nodeType === 1) t = t.lastChild;
+      if (t && t.nodeType === 3) { c = t; o = t.nodeValue.length; }
+    }
+    const r2 = document.createRange();
+    r2.setStart(c, o);
+    r2.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r2);
   }
   composerEditorAfterEdit(el);
 }
