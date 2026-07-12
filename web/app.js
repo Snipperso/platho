@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v777';
+const PLATHO_APP_RUNTIME_VERSION = 'v778';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2433,6 +2433,13 @@ function closeLinkComposerModal() {
 function openLinkComposerDialog(targetInput) {
   if (!targetInput || targetInput.disabled) return;
   closeLinkComposerModal();
+  // Capture the editor caret BEFORE the dialog steals focus, so the link lands where the user was typing (not at
+  // the start). The editor DOM does not change while the dialog is open, so the cloned range stays valid.
+  const savedRange = (() => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount) { const r = sel.getRangeAt(0); if (targetInput.contains(r.commonAncestorContainer)) return r.cloneRange(); }
+    return null;
+  })();
   const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop link-composer-backdrop';
@@ -2483,9 +2490,10 @@ function openLinkComposerDialog(targetInput) {
     if (!safe) { errorLine.textContent = t('composer.linkUrlInvalid'); errorLine.hidden = false; urlInput.focus(); return; }
     const label = String(textInput.value ?? '').replace(/[[\]\n]/g, ' ').trim();
     const encodedUrl = safe.replace(/\(/g, '%28').replace(/\)/g, '%29'); // keep parens out of the [text](url) parse
-    const markup = label ? `[${label}](${encodedUrl})` : safe;
+    const display = label || safe;
+    const markup = `[${display}](${encodedUrl})`; // always a labeled link so the editor can render it as a link chip
     closeLinkComposerModal();
-    insertEmojiAtCaret(targetInput, markup); // generic caret insert: writes the markup + fires input/resize listeners
+    composerEditorInsertLinkBlock(targetInput, markup, display, savedRange); // renders as a link chip at the caret
   };
   cancelBtn.addEventListener('click', closeLinkComposerModal);
   insertBtn.addEventListener('click', doInsert);
@@ -16230,7 +16238,7 @@ function serializeComposerEditor(el) {
 // Build the EDITABLE DOM for a composer editor from a markdown+marker string (draft restore / share insertion).
 // Inverse of serializeComposerEditor: **bold** -> <span class=fmt-bold>, [image N] -> chip, \n -> <br>. Uses the
 // SAME inline tokenizer family as the renderer but emits editor spans/chips (not the receive-side anchors).
-const EDITOR_INLINE_RE = /\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|(\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\]|\[(?:check|payment)\])(?!\()/g;
+const EDITOR_INLINE_RE = /\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|(\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\]|\[(?:check|payment)\])(?!\()|\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)/g;
 
 function composerChipLabelForMarker(marker) {
   const m = String(marker);
@@ -16310,6 +16318,18 @@ function buildComposerBlock(marker, el) {
   return block;
 }
 
+// A link renders live in the editor as a styled, atomic (contenteditable=false) chip showing the LABEL, with
+// data-marker = the `[label](url)` markdown so serializeComposerEditor round-trips it as plain text — the recipient
+// side (appendInlineFormatted) turns that text into the interstitial link. No live href in the editor.
+function buildComposerLinkBlock(markup, label) {
+  const block = document.createElement('span');
+  block.className = 'composer-block composer-block-link';
+  block.contentEditable = 'false';
+  block.dataset.marker = String(markup);
+  block.textContent = String(label || markup);
+  return block;
+}
+
 function appendEditorInline(target, text) {
   const str = String(text ?? '');
   if (!str) return;
@@ -16326,7 +16346,8 @@ function appendEditorInline(target, text) {
     else if (match[2] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-bold'; s.textContent = match[2]; target.append(s); }
     else if (match[3] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-italic'; s.textContent = match[3]; target.append(s); }
     else if (match[4] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-code'; s.textContent = match[4]; target.append(s); }
-    else { target.append(buildComposerBlock(match[5], target)); }
+    else if (match[5] !== undefined) { target.append(buildComposerBlock(match[5], target)); }
+    else { target.append(buildComposerLinkBlock(`[${match[6]}](${match[7]})`, match[6])); } // [label](url) link chip
     last = match.index + match[0].length;
   }
   if (last < str.length) target.append(document.createTextNode(str.slice(last)));
@@ -16445,6 +16466,23 @@ function composerEditorInsertChip(el, marker) {
   const range = composerEditorRange(el);
   range.deleteContents();
   const block = buildComposerBlock(marker, el);
+  range.insertNode(block);
+  composerEditorPlaceCaretAfter(block);
+  composerEditorAfterEdit(el);
+}
+
+// Insert a link chip (the "Insert link" dialog) at the caret. Restores the caret the dialog stole (savedRange) so
+// the link lands where the user was typing, not at the start; collapses a live selection first (don't delete text).
+function composerEditorInsertLinkBlock(el, markup, label, savedRange) {
+  if (!el || el.disabled) return;
+  el.focus();
+  if (savedRange) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); }
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && !sel.isCollapsed) { const r = sel.getRangeAt(0); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
+  composerEditorEscapeTrailingFmt(el);
+  const range = composerEditorRange(el);
+  range.deleteContents();
+  const block = buildComposerLinkBlock(markup, label);
   range.insertNode(block);
   composerEditorPlaceCaretAfter(block);
   composerEditorAfterEdit(el);

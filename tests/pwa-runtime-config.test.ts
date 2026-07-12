@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=777" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=778" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6214,7 +6214,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function openLinkComposerDialog\(targetInput\)/);
     const linkDlg = app.slice(app.indexOf('function openLinkComposerDialog('), app.indexOf('function openLinkComposerDialog(') + 3400);
     expect(linkDlg).toMatch(/const safe = safeExternalUrl\(raw\);/);
-    expect(linkDlg).toMatch(/const markup = label \? `\[\$\{label\}\]\(\$\{encodedUrl\}\)` : safe;/);
+    // v778: always a labeled [display](url) so the editor renders it as a link chip; label defaults to the url.
+    expect(linkDlg).toMatch(/const display = label \|\| safe;\s*const markup = `\[\$\{display\}\]\(\$\{encodedUrl\}\)`;/);
+    // v778: the dialog captures the editor caret BEFORE it steals focus (savedRange) and inserts a LINK CHIP at it —
+    // not raw markdown at the start. The link renders live (composer-block-link) and round-trips via EDITOR_INLINE_RE.
+    expect(linkDlg).toMatch(/targetInput\.contains\(r\.commonAncestorContainer\)\) return r\.cloneRange\(\)/);
+    expect(linkDlg).toMatch(/composerEditorInsertLinkBlock\(targetInput, markup, display, savedRange\)/);
+    expect(app).toMatch(/function buildComposerLinkBlock\(markup, label\)/);
+    expect(app).toMatch(/function composerEditorInsertLinkBlock\(el, markup, label, savedRange\)/);
+    expect(app).toMatch(/else \{ target\.append\(buildComposerLinkBlock\(`\[\$\{match\[6\]\}\]\(\$\{match\[7\]\}\)`, match\[6\]\)\); \}/);
+    expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.composer-block-link \{[\s\S]*?text-decoration: underline;/);
     expect(app).toMatch(/#privateLinkButton'\)\?\.addEventListener\('click'/);
     expect(app).toMatch(/#publicLinkButton'\)\?\.addEventListener\('click'/);
     expect(html).toMatch(/id="privateLinkButton"/);
@@ -7628,16 +7637,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v852/);
+    expect(sw).toMatch(/platho-pwa-prototype-v853/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=266/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=267/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=777/);
+    expect(sw).toMatch(/\.\/app\.js\?v=778/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=29/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=29/);
