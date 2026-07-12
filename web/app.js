@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v771';
+const PLATHO_APP_RUNTIME_VERSION = 'v772';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16384,15 +16384,42 @@ function composerEditorToggleFormat(el, className) {
   }
   const enclosing = composerEditorEnclosingFormat(range, className, el);
   if (enclosing) {
-    const parent = enclosing.parentNode;
-    const kids = [];
-    while (enclosing.firstChild) { kids.push(enclosing.firstChild); parent.insertBefore(enclosing.firstChild, enclosing); }
-    parent.removeChild(enclosing);
-    if (kids.length) {
+    const hasElementChild = Array.from(enclosing.childNodes).some((n) => n.nodeType === 1);
+    if (!hasElementChild) {
+      // Toggle OFF over the SELECTION ONLY (three-way split): the unselected head/tail of the span stay
+      // formatted, only the selected middle goes plain. (The old code unwrapped the WHOLE span — un-italic on
+      // one word of a two-word italic run cleared both.)
+      const spanText = enclosing.textContent;
+      const pre = document.createRange();
+      pre.selectNodeContents(enclosing);
+      pre.setEnd(range.startContainer, range.startOffset);
+      const startOff = pre.toString().length;
+      const endOff = startOff + range.toString().length;
+      const head = spanText.slice(0, startOff);
+      const mid = spanText.slice(startOff, endOff);
+      const tail = spanText.slice(endOff);
+      const frag = document.createDocumentFragment();
+      if (head) { const s = document.createElement('span'); s.className = className; s.textContent = head; frag.append(s); }
+      const midNode = document.createTextNode(mid);
+      frag.append(midNode);
+      if (tail) { const s = document.createElement('span'); s.className = className; s.textContent = tail; frag.append(s); }
+      enclosing.replaceWith(frag);
       const r = document.createRange();
-      r.setStartBefore(kids[0]);
-      r.setEndAfter(kids[kids.length - 1]);
+      r.selectNode(midNode);
       sel.removeAllRanges(); sel.addRange(r);
+    } else {
+      // Nested formatting inside the span (e.g. a .fmt-bold inside this .fmt-italic): unwrap the whole span but
+      // KEEP the nested children so the other format survives.
+      const parent = enclosing.parentNode;
+      const kids = [];
+      while (enclosing.firstChild) { kids.push(enclosing.firstChild); parent.insertBefore(enclosing.firstChild, enclosing); }
+      parent.removeChild(enclosing);
+      if (kids.length) {
+        const r = document.createRange();
+        r.setStartBefore(kids[0]);
+        r.setEndAfter(kids[kids.length - 1]);
+        sel.removeAllRanges(); sel.addRange(r);
+      }
     }
   } else {
     const span = document.createElement('span');
@@ -16406,6 +16433,42 @@ function composerEditorToggleFormat(el, className) {
     sel.removeAllRanges(); sel.addRange(r);
   }
   composerEditorAfterEdit(el);
+}
+
+// The .fmt-* span whose TRAILING text edge the collapsed caret sits at (text node is the span's last child and
+// the caret is at its end) — i.e. the caret is right after a formatted word, so new typing must NOT inherit it.
+function composerEditorTrailingFmtSpan(range, el) {
+  const node = range.startContainer;
+  if (node.nodeType !== 3 || range.startOffset !== node.nodeValue.length) return null;
+  const span = node.parentNode;
+  if (span && span !== el && span.nodeType === 1 && /\bfmt-/.test(span.className || '') && node === span.lastChild) return span;
+  return null;
+}
+
+// Shared beforeinput for both composer editors: (1) newline via insertParagraph/insertLineBreak so Android
+// soft-keyboard Enter (keyCode 229) still lands a clean <br>; (2) a bleed guard — a char typed at the trailing
+// edge of a .fmt-* span is inserted OUTSIDE the span (plain) so a word typed after a formatted word is normal.
+function composerEditorBeforeInput(el, event) {
+  if (event.isComposing) return;
+  if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
+    event.preventDefault();
+    composerEditorInsertLineBreak(el);
+    return;
+  }
+  if (event.inputType === 'insertText' && typeof event.data === 'string') {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    const span = composerEditorTrailingFmtSpan(sel.getRangeAt(0), el);
+    if (!span) return;
+    event.preventDefault();
+    const textNode = document.createTextNode(event.data);
+    span.after(textNode);
+    const r = document.createRange();
+    r.setStart(textNode, textNode.length);
+    r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    composerEditorAfterEdit(el);
+  }
 }
 
 // Insert `text` (e.g. "- ") at the start of the caret's line. Milestone-1 list button: add-only (no toggle-off).
@@ -19199,16 +19262,9 @@ messageInput?.addEventListener('keydown', (event) => {
     composer?.requestSubmit?.();
   }
 });
-// Newline = a clean single <br> (Ctrl/Cmd+Enter sends). Handled in beforeinput, NOT keydown, so it fires on
-// Android soft keyboards too — there the Enter keydown arrives as keyCode 229 with key!=='Enter', but beforeinput
-// still reports inputType 'insertParagraph'. Desktop plain / Shift+Enter route through the same path.
-messageInput?.addEventListener('beforeinput', (event) => {
-  if (event.isComposing) return;
-  if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
-    event.preventDefault();
-    composerEditorInsertLineBreak(messageInput);
-  }
-});
+// Newline (insertParagraph/insertLineBreak) + a format-bleed guard, shared with the public composer. In
+// beforeinput NOT keydown so Android soft-keyboard Enter (keyCode 229, key!=='Enter') still lands a clean <br>.
+messageInput?.addEventListener('beforeinput', (event) => composerEditorBeforeInput(messageInput, event));
 messageInput?.addEventListener('paste', (event) => {
   event.preventDefault(); // strip clipboard HTML (XSS surface) — only text/plain crosses into the editor
   composerEditorInsertPlainMultiline(messageInput, event.clipboardData?.getData('text/plain') ?? '');
@@ -19249,14 +19305,8 @@ publicMessageInput?.addEventListener('keydown', (event) => {
     publicComposer?.requestSubmit?.();
   }
 });
-// Newline via beforeinput (not keydown) so Android soft-keyboard Enter (keyCode 229) still lands a clean <br>.
-publicMessageInput?.addEventListener('beforeinput', (event) => {
-  if (event.isComposing) return;
-  if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
-    event.preventDefault();
-    composerEditorInsertLineBreak(publicMessageInput);
-  }
-});
+// Newline + format-bleed guard via beforeinput (not keydown) so Android soft-keyboard Enter (keyCode 229) lands.
+publicMessageInput?.addEventListener('beforeinput', (event) => composerEditorBeforeInput(publicMessageInput, event));
 publicMessageInput?.addEventListener('paste', (event) => {
   event.preventDefault(); // strip clipboard HTML (XSS surface) — only text/plain crosses into the editor
   composerEditorInsertPlainMultiline(publicMessageInput, event.clipboardData?.getData('text/plain') ?? '');

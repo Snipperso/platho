@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=771" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=772" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6382,17 +6382,25 @@ describe('PWA runtime config guard', () => {
     expect(buildFn).toMatch(/document\.createElement\('span'\)/);
     expect(buildFn).toMatch(/\.textContent = /);
 
-    // keydown handles Ctrl/Cmd+Enter = send (IME-guarded); newline lives in BEFOREINPUT so Android soft-keyboard
-    // Enter (keyCode 229, key!=='Enter') still lands a clean <br> via inputType insertParagraph/insertLineBreak.
+    // keydown handles Ctrl/Cmd+Enter = send (IME-guarded); newline + the bleed guard live in a shared BEFOREINPUT
+    // handler so Android soft-keyboard Enter (keyCode 229, key!=='Enter') still lands a clean <br>.
     for (const input of ['messageInput', 'publicMessageInput']) {
       const keydown = app.slice(app.indexOf(`${input}?.addEventListener('keydown'`), app.indexOf(`${input}?.addEventListener('keydown'`) + 240);
       expect(keydown, `${input}:ime`).toMatch(/if \(event\.isComposing\) return;/);
       expect(keydown, `${input}:send`).toMatch(/event\.key === 'Enter' && \(event\.ctrlKey \|\| event\.metaKey\)/);
       expect(keydown, `${input}:no-linebreak-in-keydown`).not.toMatch(/composerEditorInsertLineBreak\(/);
-      const beforeinput = app.slice(app.indexOf(`${input}?.addEventListener('beforeinput'`), app.indexOf(`${input}?.addEventListener('beforeinput'`) + 320);
-      expect(beforeinput, `${input}:linebreak`).toMatch(/inputType === 'insertParagraph' \|\| event\.inputType === 'insertLineBreak'/);
-      expect(beforeinput, `${input}:linebreak`).toMatch(/composerEditorInsertLineBreak\(/);
+      expect(app, `${input}:beforeinput`).toMatch(new RegExp(`${input}\\?\\.addEventListener\\('beforeinput', \\(event\\) => composerEditorBeforeInput\\(${input}, event\\)\\)`));
     }
+    // Shared beforeinput: newline via insertParagraph/insertLineBreak + a format-bleed guard on insertText.
+    const beforeFn = app.slice(app.indexOf('function composerEditorBeforeInput('), app.indexOf('function composerEditorBeforeInput(') + 900);
+    expect(beforeFn).toMatch(/inputType === 'insertParagraph' \|\| event\.inputType === 'insertLineBreak'/);
+    expect(beforeFn).toMatch(/composerEditorInsertLineBreak\(el\)/);
+    expect(beforeFn).toMatch(/inputType === 'insertText'/);
+    expect(beforeFn).toMatch(/composerEditorTrailingFmtSpan\(sel\.getRangeAt\(0\), el\)/);
+    // Toggle-OFF a format over PART of a run splits the run (three-way), it does not clear the whole span.
+    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 1800);
+    expect(toggleFn).toMatch(/three-way split/);
+    expect(toggleFn).toMatch(/const mid = spanText\.slice\(startOff, endOff\)/);
 
     // CSS for the editor: sizing/placeholder/format spans/chips.
     expect(css).toMatch(/\.composer \.composer-input \{[\s\S]*?min-height: 44px;[\s\S]*?white-space: pre-wrap;/);
@@ -7537,7 +7545,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v846/);
+    expect(sw).toMatch(/platho-pwa-prototype-v847/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7545,7 +7553,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/styles\.css\?v=263/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=771/);
+    expect(sw).toMatch(/\.\/app\.js\?v=772/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=28/);
