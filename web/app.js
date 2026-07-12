@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v772';
+const PLATHO_APP_RUNTIME_VERSION = 'v773';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -688,9 +688,6 @@ const publicShareCancelButton = document.querySelector('#publicShareCancelButton
 const sharePostDialog = document.querySelector('#sharePostDialog');
 const sharePostList = document.querySelector('#sharePostList');
 const sharePostCloseButton = document.querySelector('#sharePostCloseButton');
-const composerPreviewDialog = document.querySelector('#composerPreviewDialog');
-const composerPreviewBody = document.querySelector('#composerPreviewBody');
-const composerPreviewCloseButton = document.querySelector('#composerPreviewCloseButton');
 const publicPostDetail = document.querySelector('#publicPostDetail');
 const publicPostDetailBody = document.querySelector('#publicPostDetailBody');
 const publicPostDetailAvatar = document.querySelector('#publicPostDetailAvatar');
@@ -16237,13 +16234,73 @@ function composerChipLabelForMarker(marker) {
   return m;
 }
 
-function buildComposerChip(marker) {
-  const chip = document.createElement('span');
-  chip.className = 'composer-chip';
-  chip.contentEditable = 'false';
-  chip.dataset.marker = String(marker);
-  chip.textContent = composerChipLabelForMarker(marker);
-  return chip;
+// v773: resolve a composer editor to the attachment arrays / drafts its markers point at, so the editor can
+// render each marker as its REAL content (image/file/payment/share) live — WYSIWYG, no separate preview.
+function composerBlockContextForEditor(el) {
+  if (el === publicMessageInput) {
+    return { kind: 'public', images: publicImageAttachments, files: publicFileAttachments, payment: null, share: publicShareDraft };
+  }
+  return { kind: 'private', images: privateImageAttachments, files: privateFileAttachments, payment: privatePaymentCheckDraft, share: privateShareDraft };
+}
+
+// The rich inner node a marker renders as (real image / file chip / payment card / shared-post embed), or null
+// when the attachment/draft can't be resolved (an orphan marker) so the caller falls back to a labeled pill.
+function composerBlockInner(marker, ctx) {
+  let m;
+  if ((m = marker.match(/^\[(?:image|img)\s+(\d+)\]$/i))) {
+    const att = ctx.images?.[Number(m[1]) - 1];
+    if (!att?.bytes?.length) return null;
+    const img = document.createElement('img');
+    img.className = 'composer-block-image';
+    img.src = bytesToImageDataUrl(att.bytes, 'image/webp');
+    img.alt = String(att.name ?? '');
+    img.draggable = false;
+    return img;
+  }
+  if ((m = marker.match(/^\[file\s+(\d+)\]$/i))) {
+    const att = ctx.files?.[Number(m[1]) - 1];
+    if (!att) return null;
+    const chip = document.createElement('span');
+    chip.className = 'composer-block-file';
+    const icon = document.createElement('span'); icon.className = 'icon icon-download';
+    const name = document.createElement('span'); name.className = 'message-file-name'; name.textContent = String(att.name ?? t('chat.fileFallbackName'));
+    const size = document.createElement('span'); size.className = 'message-file-size'; size.textContent = imageByteCountLabel(att.bytes?.length ?? 0);
+    chip.append(icon, name, size);
+    return chip;
+  }
+  if (/^\[(?:check|payment)\]$/i.test(marker)) {
+    if (!ctx.payment) return null;
+    const box = document.createElement('div');
+    box.className = 'message-payment-block';
+    const label = document.createElement('span');
+    label.className = 'message-payment-label';
+    label.textContent = paymentMessageText(ctx.payment);
+    box.append(label);
+    return box;
+  }
+  if (/^\[post\]$/i.test(marker)) {
+    if (!ctx.share?.entryId) return null;
+    return buildSharedPostEmbed(ctx.share);
+  }
+  return null;
+}
+
+// An atomic (contenteditable=false) editor block carrying data-marker (so serializeComposerEditor round-trips it
+// unchanged) whose visual is the REAL content, or a labeled pill fallback. Inner is display-only (CSS neutralizes
+// its pointer events) so the block behaves as one selectable/deletable unit.
+function buildComposerBlock(marker, el) {
+  const block = document.createElement('div');
+  block.className = 'composer-block';
+  block.contentEditable = 'false';
+  block.dataset.marker = String(marker);
+  const inner = el ? composerBlockInner(String(marker), composerBlockContextForEditor(el)) : null;
+  if (inner) {
+    block.append(inner);
+  } else {
+    block.classList.add('composer-block-pill');
+    block.textContent = composerChipLabelForMarker(marker);
+  }
+  return block;
 }
 
 function appendEditorInline(target, text) {
@@ -16257,7 +16314,7 @@ function appendEditorInline(target, text) {
     if (match[1] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-bold'; s.textContent = match[1]; target.append(s); }
     else if (match[2] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-italic'; s.textContent = match[2]; target.append(s); }
     else if (match[3] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-code'; s.textContent = match[3]; target.append(s); }
-    else { target.append(buildComposerChip(match[4])); }
+    else { target.append(buildComposerBlock(match[4], target)); }
     last = match.index + match[0].length;
   }
   if (last < str.length) target.append(document.createTextNode(str.slice(last)));
@@ -16331,31 +16388,159 @@ function composerEditorInsertLineBreak(el) {
   composerEditorAfterEdit(el);
 }
 
-// True when the caret sits at the start of a line (line = run between <br>s) — a chip we insert then needs no
-// leading <br> to stand on its own line.
-function composerEditorAtLineStart(range) {
-  const c = range.startContainer;
-  if (c.nodeType === 3) return range.startOffset === 0 && (!c.previousSibling || c.previousSibling.nodeName === 'BR');
-  if (range.startOffset === 0) return true;
-  const before = c.childNodes[range.startOffset - 1];
-  return Boolean(before && before.nodeName === 'BR');
-}
-
-// Insert an atomic attachment/link chip on its own line at the caret (mirrors the textarea marker-on-own-line rule).
+// Insert an atomic attachment/link block (the rich content) at the caret. It is inline-block, so it sits in the
+// text flow and Backspace right after it deletes it as one unit (handled in composerEditorBeforeInput).
 function composerEditorInsertChip(el, marker) {
   if (!el || el.disabled) return;
   el.focus();
   const range = composerEditorRange(el);
   range.deleteContents();
-  const frag = document.createDocumentFragment();
-  const empty = serializeComposerEditor(el).length === 0;
-  if (!empty && !composerEditorAtLineStart(range)) frag.append(document.createElement('br'));
-  frag.append(buildComposerChip(marker));
-  const tailBr = document.createElement('br');
-  frag.append(tailBr);
-  range.insertNode(frag);
-  composerEditorPlaceCaretAfter(tailBr);
+  const block = buildComposerBlock(marker, el);
+  range.insertNode(block);
+  composerEditorPlaceCaretAfter(block);
   composerEditorAfterEdit(el);
+}
+
+// Re-render the editor's marker blocks against the CURRENT attachments/drafts (after a compression-mode change or
+// a removal): rebuilds from the serialized value so every [image N]/[file N]/[check]/[post] atom re-resolves.
+// Only called on non-typing panel interactions (caret loss is fine there), never on keystrokes.
+function refreshComposerEditorBlocks(el) {
+  if (!el || el.dataset?.editorReady !== '1') return;
+  el.value = serializeComposerEditor(el);
+}
+
+function composerEditorIsAtom(node) {
+  return Boolean(node && node.nodeType === 1 && node.dataset && node.dataset.marker);
+}
+
+// The atom immediately before (dir<0) or after (dir>0) a COLLAPSED caret, else null.
+function composerEditorAdjacentAtom(range, el, dir) {
+  const c = range.startContainer;
+  const off = range.startOffset;
+  if (c === el) {
+    const node = dir < 0 ? el.childNodes[off - 1] : el.childNodes[off];
+    return composerEditorIsAtom(node) ? node : null;
+  }
+  if (c.nodeType === 3) {
+    if (dir < 0 && off === 0) return composerEditorIsAtom(c.previousSibling) ? c.previousSibling : null;
+    if (dir > 0 && off === (c.nodeValue || '').length) return composerEditorIsAtom(c.nextSibling) ? c.nextSibling : null;
+  }
+  return null;
+}
+
+// Delete a marker atom (Backspace/Delete) AND its underlying attachment/draft — otherwise a deleted image would
+// still be SENT (composerBlocksFromDraft appends a markerless attachment).
+function removeComposerAtom(el, atom) {
+  const marker = atom?.dataset?.marker || '';
+  const kind = el === publicMessageInput ? 'public' : 'private';
+  let m;
+  if ((m = marker.match(/^\[(?:image|img)\s+(\d+)\]$/i))) { removeComposerImageAt(kind, Number(m[1]) - 1); return; }
+  if ((m = marker.match(/^\[file\s+(\d+)\]$/i))) { removeComposerFileAt(kind, Number(m[1]) - 1); return; }
+  if (/^\[(?:check|payment)\]$/i.test(marker)) { removeComposerPaymentAtom(kind); return; }
+  if (/^\[post\]$/i.test(marker)) { removeComposerShareAtom(kind); return; }
+  atom.remove(); // unknown atom: just drop the node
+  composerEditorAfterEdit(el);
+}
+
+function removeComposerImageAt(kind, index) {
+  if (kind === 'public') publicImageAttachments = publicImageAttachments.filter((_, i) => i !== index);
+  else privateImageAttachments = privateImageAttachments.filter((_, i) => i !== index);
+  removeImageMarkerForComposer(kind, index); // strips [image index+1] + renumbers; the rebuild resolves the spliced array
+  updateImageAttachmentUi(kind);
+  refreshComposerCostStatus();
+}
+
+// Strip ONE [file N] marker + renumber the ones after it (mirrors removeImageMarkerForComposer) for per-file removal.
+function removeFileMarkerForComposer(kind, removedIndex) {
+  const editor = kind === 'public' ? publicMessageInput : messageInput;
+  if (!editor) return;
+  const removedNum = Number(removedIndex) + 1;
+  let dropped = false;
+  const next = String(editor.value ?? '').replace(/\[file\s+(\d+)\](?!\()/ig, (match, numStr) => {
+    const n = Number(numStr);
+    if (!dropped && n === removedNum) { dropped = true; return ''; }
+    if (n > removedNum) return `[file ${n - 1}]`;
+    return match;
+  });
+  let value = next.replace(/\n{3,}/g, '\n\n');
+  if (!value.trim()) value = '';
+  editor.value = value;
+}
+
+function removeComposerFileAt(kind, index) {
+  if (kind === 'public') publicFileAttachments = publicFileAttachments.filter((_, i) => i !== index);
+  else privateFileAttachments = privateFileAttachments.filter((_, i) => i !== index);
+  removeFileMarkerForComposer(kind, index);
+  if (kind === 'public') updatePublicFileAttachmentUi(); else updatePrivateFileAttachmentUi();
+  refreshComposerCostStatus();
+}
+
+function removeComposerPaymentAtom(kind) {
+  const editor = kind === 'public' ? publicMessageInput : messageInput;
+  if (kind === 'private') privatePaymentCheckDraft = null; // payment checks are private-only
+  if (editor) {
+    let value = String(editor.value ?? '').replace(/\[(?:check|payment)\](?!\()/ig, '').replace(/\n{3,}/g, '\n\n');
+    if (!value.trim()) value = '';
+    editor.value = value;
+  }
+  updateImageAttachmentUi(kind);
+  refreshComposerCostStatus();
+}
+
+function removeComposerShareAtom(kind) {
+  const editor = kind === 'public' ? publicMessageInput : messageInput;
+  if (kind === 'public') setPublicShareDraft(null); else setPrivateShareDraft(null);
+  removeShareMarkerForComposer(editor); // strips [post] + rebuild
+  refreshComposerCostStatus();
+}
+
+// Drop attachments whose marker is no longer in `value`, keeping the marker-referenced ones in document order and
+// renumbering their markers to 1..K. Returns { changed, value (renumbered), arr (pruned) }. Cheap no-op when every
+// attachment still has a marker (the common case). Markers the user typed as LITERAL prose (out of range) are left
+// untouched. Backs the reconcile pass that closes the non-collapsed-delete/paste orphan hole.
+function reconcileMarkerArray(value, arr, re, fmt) {
+  const present = [];
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(value)) !== null) present.push(Number(m[1]));
+  const keptIdx = [];
+  const seen = new Set();
+  for (const n of present) { if (n >= 1 && n <= arr.length && !seen.has(n)) { seen.add(n); keptIdx.push(n - 1); } }
+  if (keptIdx.length === arr.length) return { changed: false, value, arr };
+  const newArr = keptIdx.map((i) => arr[i]);
+  const remap = new Map();
+  keptIdx.forEach((oldI, newPos) => remap.set(oldI + 1, newPos + 1));
+  const newValue = value.replace(re, (full, numStr) => {
+    const n = Number(numStr);
+    return remap.has(n) ? fmt(remap.get(n)) : full; // leave out-of-range/literal markers as typed
+  });
+  return { changed: true, value: newValue, arr: newArr };
+}
+
+// Reconcile the attachment arrays/drafts with the markers ACTUALLY present in the editor. A collapsed Backspace on
+// an atom syncs itself (removeComposerAtom); this backstops the paths that don't — a non-collapsed delete, Ctrl+A
+// then type, cut, or a paste over a selection that spans an atom — where the browser drops the atom node but the
+// attachment would otherwise linger and get appended markerless on send. Called from the input handlers.
+function reconcileComposerAttachments(el) {
+  const kind = el === publicMessageInput ? 'public' : 'private';
+  let value = serializeComposerEditor(el);
+  let changed = false;
+  const imgArr = kind === 'public' ? publicImageAttachments : privateImageAttachments;
+  const ri = reconcileMarkerArray(value, imgArr, /\[(?:image|img)\s+(\d+)\]/ig, (n) => `[image ${n}]`);
+  if (ri.changed) { changed = true; value = ri.value; if (kind === 'public') publicImageAttachments = ri.arr; else privateImageAttachments = ri.arr; }
+  const fileArr = kind === 'public' ? publicFileAttachments : privateFileAttachments;
+  const rf = reconcileMarkerArray(value, fileArr, /\[file\s+(\d+)\]/ig, (n) => `[file ${n}]`);
+  if (rf.changed) { changed = true; value = rf.value; if (kind === 'public') publicFileAttachments = rf.arr; else privateFileAttachments = rf.arr; }
+  if (kind === 'private' && privatePaymentCheckDraft && !/\[(?:check|payment)\](?!\()/i.test(value)) { privatePaymentCheckDraft = null; changed = true; }
+  const share = kind === 'public' ? publicShareDraft : privateShareDraft;
+  if (share && !/\[post\](?!\()/i.test(value)) { if (kind === 'public') setPublicShareDraft(null); else setPrivateShareDraft(null); changed = true; }
+  if (!changed) return false;
+  el.value = value; // rebuild once with the pruned arrays + renumbered markers (caret loss OK — a big edit just ran)
+  if (kind === 'private') { updatePrivateAttachmentUi(); updatePrivateFileAttachmentUi(); }
+  else { updateImageAttachmentUi('public'); updatePublicFileAttachmentUi(); }
+  refreshComposerPublishPolicy();
+  refreshComposerCostStatus();
+  return true;
 }
 
 // The ancestor format span of `className` fully enclosing the range (its common ancestor is inside it), else null.
@@ -16370,17 +16555,42 @@ function composerEditorEnclosingFormat(range, className, el) {
 
 // Toggle an inline format CLASS span (.fmt-bold / .fmt-italic) over the selection. Collapsed selection = no-op
 // (no stray markers on mobile). Never inline styles (prod CSP style-src 'self'), never execCommand.
+// The word (run of letters/digits/underscore, any script) the collapsed caret sits in, as offsets into its text
+// node — so a format toggle with no selection acts on the whole word. Null if the caret is on whitespace/empty.
+function composerEditorWordRangeAtCaret(range) {
+  const node = range.startContainer;
+  if (node.nodeType !== 3) return null;
+  const text = node.nodeValue || '';
+  const isWord = (ch) => ch !== undefined && /[\p{L}\p{N}_]/u.test(ch);
+  let start = range.startOffset;
+  let end = range.startOffset;
+  while (start > 0 && isWord(text[start - 1])) start--;
+  while (end < text.length && isWord(text[end])) end++;
+  if (start === end) return null;
+  return { node, start, end };
+}
+
 function composerEditorToggleFormat(el, className) {
   if (!el || el.disabled) return;
   el.focus();
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
-  if (!el.contains(range.commonAncestorContainer) || range.collapsed) return;
-  // Never let a format span swallow an atomic attachment chip: extractContents would nest it, and the serialized
+  if (!el.contains(range.commonAncestorContainer)) return;
+  if (range.collapsed) {
+    // No selection: expand to the WORD under the caret so tapping into a word + B formats the whole word
+    // (mobile-friendly — no precise selection, no native menu). Caret on whitespace/empty -> no-op.
+    const word = composerEditorWordRangeAtCaret(range);
+    if (!word) return;
+    range.setStart(word.node, word.start);
+    range.setEnd(word.node, word.end);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  // Never let a format span swallow an atomic attachment block: extractContents would nest it, and the serialized
   // `**…[image N]…**` splits on the marker into two blocks with unbalanced markers (recipient sees literal `**`).
-  for (const chip of el.querySelectorAll('.composer-chip')) {
-    if (range.intersectsNode(chip)) return;
+  for (const block of el.querySelectorAll('[data-marker]')) {
+    if (range.intersectsNode(block)) return;
   }
   const enclosing = composerEditorEnclosingFormat(range, className, el);
   if (enclosing) {
@@ -16453,6 +16663,15 @@ function composerEditorBeforeInput(el, event) {
   if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
     event.preventDefault();
     composerEditorInsertLineBreak(el);
+    return;
+  }
+  // Backspace/Delete next to a marker atom removes the atom AND its attachment/draft (some browsers won't delete
+  // a contenteditable=false block on their own, and a bare node-delete would orphan the attachment into the send).
+  if (event.inputType === 'deleteContentBackward' || event.inputType === 'deleteContentForward') {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    const atom = composerEditorAdjacentAtom(sel.getRangeAt(0), el, event.inputType === 'deleteContentBackward' ? -1 : 1);
+    if (atom) { event.preventDefault(); removeComposerAtom(el, atom); }
     return;
   }
   if (event.inputType === 'insertText' && typeof event.data === 'string') {
@@ -16603,12 +16822,7 @@ function updatePrivateAttachmentUi() {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = t('common.remove');
-    remove.addEventListener('click', () => {
-      removeImageMarkerForComposer('private', index); // drop the "[image N]" marker + renumber (before the array re-indexes)
-      privateImageAttachments = privateImageAttachments.filter((_, itemIndex) => itemIndex !== index);
-      updateImageAttachmentUi('private');
-      refreshComposerCostStatus();
-    });
+    remove.addEventListener('click', () => removeComposerImageAt('private', index));
     row.append(label, modeSelect, remove);
     rows.push(row);
   });
@@ -16626,16 +16840,13 @@ function updatePrivateAttachmentUi() {
       if (!paymentDetails) return;
       privatePaymentCheckDraft = paymentDetails;
       updateImageAttachmentUi('private');
+      refreshComposerEditorBlocks(messageInput); // re-render the inline payment card at the new amount
       refreshComposerCostStatus();
     });
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = t('common.remove');
-    remove.addEventListener('click', () => {
-      privatePaymentCheckDraft = null;
-      updateImageAttachmentUi('private');
-      refreshComposerCostStatus();
-    });
+    remove.addEventListener('click', () => removeComposerPaymentAtom('private'));
     row.append(label, edit, remove);
     rows.push(row);
   }
@@ -16731,6 +16942,7 @@ async function recompressPrivateImageAttachment(index, modeId) {
       itemIndex === index ? next : item
     ));
     updateImageAttachmentUi('private');
+    refreshComposerEditorBlocks(messageInput); // re-render the inline image at the new compression
     refreshComposerCostStatus();
   } catch (error) {
     if (status) {
@@ -16749,6 +16961,7 @@ async function recompressImageAttachment(kind) {
     const next = await compressImageFile(attachment.sourceFile, modeSelect.value);
     publicImageAttachments = publicImageAttachments.map((item, index) => (index === 0 ? next : item));
     updateImageAttachmentUi('public');
+    refreshComposerEditorBlocks(publicMessageInput); // re-render the inline image at the new compression
     refreshComposerCostStatus();
   } else {
     await recompressPrivateImageAttachment(0, modeSelect.value);
@@ -17031,7 +17244,6 @@ function applyComposerFormat(editor, format) {
     case 'bold': composerEditorToggleFormat(editor, 'fmt-bold'); break;
     case 'italic': composerEditorToggleFormat(editor, 'fmt-italic'); break;
     case 'list': composerEditorInsertAtLineStart(editor, '- '); break;
-    case 'preview': openComposerPreview(editor); break;
     default: break;
   }
 }
@@ -17057,70 +17269,8 @@ function setupComposerToolbar(toolbar, textarea, hideButton) {
   textarea.addEventListener('click', () => showComposerToolbar(textarea));
 }
 
-// --- Composer preview (v769): render the current draft exactly as it will appear before sending ------------
-// Reuses the SAME safe formatting renderer + block builders as the live surfaces, so the preview is faithful.
-function renderComposerPreviewBlocks(container, displayBlocks) {
-  if (!container) return;
-  container.replaceChildren();
-  for (const block of displayBlocks ?? []) {
-    if (block?.type === 'text' && block.text) {
-      const text = document.createElement('div');
-      text.className = 'message-text-block';
-      appendFormattedMessageText(text, block.text);
-      container.append(text);
-    } else if (block?.type === 'image' && block.url) {
-      const image = document.createElement('img');
-      image.className = 'feed-image';
-      image.src = block.url;
-      image.loading = 'lazy';
-      container.append(image);
-    } else if (block?.type === 'file') {
-      container.append(buildFileBlockChip(block));
-    } else if (block?.type === 'payment') {
-      const payment = document.createElement('div');
-      payment.className = 'message-payment-block';
-      const label = document.createElement('span');
-      label.className = 'message-payment-label';
-      label.textContent = block.payment ? paymentMessageText(block.payment) : t('payment.paymentCheck');
-      payment.append(label);
-      container.append(payment);
-    } else if (block?.type === 'reply') {
-      container.append(buildReplyQuoteNode(block, null));
-    } else if (block?.type === 'share' && block.entryId) {
-      container.append(buildSharedPostEmbed(block));
-    }
-  }
-  if (container.childElementCount === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'composer-preview-empty';
-    empty.textContent = t('composer.previewEmpty');
-    container.append(empty);
-  }
-}
-
-function openComposerPreview(textarea) {
-  const isPublic = textarea === publicMessageInput;
-  const text = textarea?.value ?? '';
-  let documentBlocks = [];
-  try {
-    documentBlocks = isPublic
-      ? publicDocumentBlocksFromDraft(text, publicImageAttachments, publicFileAttachments)
-      : composerBlocksFromDraft(text, privateImageAttachments, privatePaymentCheckDraft, privateReplyDraft, privateFileAttachments, privateShareDraft);
-  } catch {
-    documentBlocks = [];
-  }
-  renderComposerPreviewBlocks(composerPreviewBody, displayBlocksFromDocumentBlocks(documentBlocks));
-  if (composerPreviewDialog) composerPreviewDialog.hidden = false;
-}
-
-function closeComposerPreview() {
-  if (composerPreviewDialog) composerPreviewDialog.hidden = true;
-}
-
-composerPreviewCloseButton?.addEventListener('click', () => closeComposerPreview());
-composerPreviewDialog?.addEventListener('click', (event) => {
-  if (event.target === composerPreviewDialog) closeComposerPreview();
-});
+// Composer preview removed in v773: the WYSIWYG editor renders the real content live (image/file/payment/share
+// blocks), so a separate preview modal is redundant.
 
 function insertImageMarkerForComposer(kind, index) {
   const marker = `[image ${index}]`;
@@ -19252,6 +19402,7 @@ registerVaultKeysButton?.addEventListener('click', async () => {
 
 messageInput?.addEventListener('input', () => {
   enforceComposerByteLimit();
+  reconcileComposerAttachments(messageInput); // prune attachments whose atom a non-collapsed delete/paste removed
   messageInput.classList.toggle('is-empty', serializeComposerEditor(messageInput).trim() === '');
   refreshComposerCostStatus();
 });
@@ -19290,11 +19441,11 @@ document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   hidePrivateComposerAddMenu();
   hidePublicComposerAddMenu();
-  if (composerPreviewDialog && !composerPreviewDialog.hidden) closeComposerPreview();
 });
 
 publicMessageInput?.addEventListener('input', () => {
   enforcePublicComposerByteLimit();
+  reconcileComposerAttachments(publicMessageInput); // prune attachments whose atom a non-collapsed delete/paste removed
   publicMessageInput.classList.toggle('is-empty', serializeComposerEditor(publicMessageInput).trim() === '');
   refreshComposerCostStatus();
 });
@@ -19551,6 +19702,10 @@ privateClearImageButton?.addEventListener('click', () => {
 
 publicClearImageButton?.addEventListener('click', () => {
   publicImageAttachments = [];
+  if (publicMessageInput) { // strip the now-orphaned [image N] atoms so nothing markerless is appended on send
+    let v = String(publicMessageInput.value ?? '').replace(/\[(?:image|img)\s+\d+\](?!\()/ig, '').replace(/\n{3,}/g, '\n\n');
+    publicMessageInput.value = v.trim() ? v : '';
+  }
   updateImageAttachmentUi('public');
   refreshComposerCostStatus();
 });
