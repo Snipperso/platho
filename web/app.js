@@ -182,7 +182,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=28';
+} from './i18n.mjs?v=29';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v773';
+const PLATHO_APP_RUNTIME_VERSION = 'v774';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16577,6 +16577,7 @@ function composerEditorToggleFormat(el, className) {
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
   if (!el.contains(range.commonAncestorContainer)) return;
+  const startedCollapsed = range.collapsed; // a word-toggle (tap-in-word + B): collapse the caret back afterwards
   if (range.collapsed) {
     // No selection: expand to the WORD under the caret so tapping into a word + B formats the whole word
     // (mobile-friendly — no precise selection, no native menu). Caret on whitespace/empty -> no-op.
@@ -16640,6 +16641,13 @@ function composerEditorToggleFormat(el, className) {
     span.querySelectorAll('.' + className).forEach((n) => { while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n); n.remove(); });
     const r = document.createRange();
     r.selectNodeContents(span);
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+  // A word-toggle started from a collapsed caret should NOT leave the whole word highlighted — collapse to a caret
+  // at the end of the formatted word (a real selection stays selected so bold+italic can chain).
+  if (startedCollapsed && sel.rangeCount) {
+    const r = sel.getRangeAt(0);
+    r.collapse(false);
     sel.removeAllRanges(); sel.addRange(r);
   }
   composerEditorAfterEdit(el);
@@ -17244,8 +17252,27 @@ function applyComposerFormat(editor, format) {
     case 'bold': composerEditorToggleFormat(editor, 'fmt-bold'); break;
     case 'italic': composerEditorToggleFormat(editor, 'fmt-italic'); break;
     case 'list': composerEditorInsertAtLineStart(editor, '- '); break;
+    case 'select': composerEditorSelectWordAtCaret(editor); break;
     default: break;
   }
+}
+
+// Select the word under the caret (toolbar "Select" button). Gives a way to START a text selection precisely — the
+// native selection handles then appear and can be dragged to extend — without first summoning the OS selection menu.
+function composerEditorSelectWordAtCaret(el) {
+  if (!el || el.disabled) return;
+  el.focus();
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (!el.contains(range.commonAncestorContainer)) return;
+  const word = composerEditorWordRangeAtCaret(range);
+  if (!word) return;
+  const r = document.createRange();
+  r.setStart(word.node, word.start);
+  r.setEnd(word.node, word.end);
+  sel.removeAllRanges();
+  sel.addRange(r);
 }
 
 // Wire ONE toolbar: the ▼ hide button, a mousedown-preventDefault (so a format-button click never blurs the
@@ -17256,7 +17283,7 @@ function setupComposerToolbar(toolbar, textarea, hideButton) {
   toolbar.addEventListener('mousedown', (event) => {
     // Keep the textarea focused + its selection intact when a toolbar button is pressed. File inputs / the emoji
     // picker / link dialog manage their own focus, so preventing the focus-shift here is safe for them too.
-    if (event.target.closest('.composer-toolbar-button, .composer-toolbar-hide')) event.preventDefault();
+    if (event.target.closest('.composer-toolbar-button, .composer-toolbar-hide, .composer-toolbar-dock')) event.preventDefault();
   });
   toolbar.addEventListener('click', (event) => {
     const button = event.target.closest('[data-format]');
@@ -19427,6 +19454,25 @@ messageInput?.addEventListener('drop', (event) => {
 });
 setupComposerToolbar(privateComposerToolbar, messageInput, privateToolbarHide);
 setupComposerToolbar(publicComposerToolbar, publicMessageInput, publicToolbarHide);
+
+// v774: the ↕ dock button flips the formatting toolbar above/below the input, PERSISTED across reloads. iOS pops
+// the native selection menu BELOW a selection (colliding with a toolbar-below) while Android pops it above, and
+// OEM behavior varies — so it is a manual per-user toggle, not a platform guess. Default = above (right for iOS).
+const COMPOSER_DOCK_STORAGE_KEY = 'platho.composerDockBelow';
+function composerDockIsBelow() {
+  try { return localStorage.getItem(COMPOSER_DOCK_STORAGE_KEY) === '1'; } catch { return false; }
+}
+function applyComposerDockPosition() {
+  document.documentElement.classList.toggle('is-composer-dock-below', composerDockIsBelow());
+}
+function toggleComposerDockPosition() {
+  const next = !composerDockIsBelow();
+  try { localStorage.setItem(COMPOSER_DOCK_STORAGE_KEY, next ? '1' : '0'); } catch { /* private mode: session-only */ }
+  applyComposerDockPosition();
+}
+applyComposerDockPosition();
+document.querySelector('#privateToolbarDock')?.addEventListener('click', toggleComposerDockPosition);
+document.querySelector('#publicToolbarDock')?.addEventListener('click', toggleComposerDockPosition);
 document.addEventListener('click', (event) => {
   if (!privateComposerAddMenuVisible()) return;
   if (privateComposerAddMenu?.contains(event.target) || privateComposerAddButton?.contains(event.target)) return;
