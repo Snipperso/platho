@@ -1400,6 +1400,14 @@ a .avatar.has-image,
   white-space: nowrap;
 }
 
+/* v778: an inserted link renders live as a link chip (accent + underline), not raw [label](url) markdown. */
+.composer .composer-input .composer-block-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: default;
+}
+
 .composer .composer-input .composer-block-file {
   display: inline-flex;
   align-items: center;
