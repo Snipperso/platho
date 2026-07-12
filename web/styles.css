@@ -1662,7 +1662,8 @@ a .avatar.has-image,
   background: var(--line);
 }
 
-.composer-toolbar-hide {
+.composer-toolbar-hide,
+.composer-toolbar-dock {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -1675,14 +1676,25 @@ a .avatar.has-image,
   cursor: pointer;
 }
 
-.composer-toolbar-hide:hover {
+.composer-toolbar-hide:hover,
+.composer-toolbar-dock:hover {
   color: var(--accent);
 }
 
-.composer-toolbar-hide .icon {
+.composer-toolbar-hide .icon,
+.composer-toolbar-dock .icon {
   width: 18px;
   height: 18px;
 }
+
+/* v774: the ↕ dock button flips the formatting toolbar BELOW the input (owner-chosen, persisted). Reorder the
+   composer's flex children; reply/share strips stay above the input, attachments + cost stay below the toolbar.
+   Default (no class) keeps the toolbar above the input (DOM order) — right for iOS/desktop. */
+:root.is-composer-dock-below .composer-context { order: 0; }
+:root.is-composer-dock-below .composer-input-row { order: 1; }
+:root.is-composer-dock-below .composer-toolbar { order: 2; }
+:root.is-composer-dock-below .composer-attachment { order: 3; }
+:root.is-composer-dock-below .composer-cost-status { order: 4; }
 
 .composer-post-option.is-disabled {
   background: var(--panel-3);
@@ -4501,6 +4513,8 @@ button.feed-item:hover {
 .icon-chevron-down { --mask: url("./assets/icons/chevron-down.svg"); }
 .icon-refresh { --mask: url("./assets/icons/refresh.svg"); }
 .icon-swap-circular { --mask: url("./assets/icons/swap-circular.svg"); }
+.icon-swap-vertical { --mask: url("./assets/icons/swap-vertical.svg"); }
+.icon-text-select { --mask: url("./assets/icons/text-select.svg"); }
 .icon-bolt { --mask: url("./assets/icons/bolt.svg"); }
 .icon-gear { --mask: url("./assets/icons/gear.svg"); }
 .icon-install { --mask: url("./assets/icons/install.svg"); }

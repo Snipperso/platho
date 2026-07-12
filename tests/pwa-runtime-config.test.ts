@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=773" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=774" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6279,16 +6279,17 @@ describe('PWA runtime config guard', () => {
     // trimmed heading/quote/center/justify (didn't fit one row) — those must NOT be present as buttons.
     for (const bar of ['privateComposerToolbar', 'publicComposerToolbar']) {
       const slice = html.slice(html.indexOf(`id="${bar}"`), html.indexOf(`id="${bar}"`) + 4200);
-      for (const fmt of ['bold', 'italic', 'list']) {
+      for (const fmt of ['bold', 'italic', 'list', 'select']) { // v774: a Select-word button (right after emoji)
         expect(slice, `${bar}:${fmt}`).toMatch(new RegExp(`data-format="${fmt}"`));
       }
       // v773 removed the preview button (the WYSIWYG editor IS the preview); heading/quote/center/justify stay gone.
       for (const gone of ['preview', 'heading', 'quote', 'center', 'justify']) {
         expect(slice, `${bar}:${gone}-removed`).not.toMatch(new RegExp(`data-format="${gone}"`));
       }
-      // Emoji is the first toolbar button.
-      expect(slice).toMatch(/composer-toolbar-scroll">\s*<button class="composer-toolbar-button emoji-button"/);
-      expect(slice).toMatch(/composer-toolbar-hide/);
+      // Emoji is the first toolbar button, immediately followed by the Select-word button (owner: 'сразу после смайлов').
+      expect(slice).toMatch(/composer-toolbar-scroll">\s*<button class="composer-toolbar-button emoji-button"[\s\S]*?<\/button>\s*<button class="composer-toolbar-button" data-format="select"/);
+      // v774: a ↕ dock button (flips the toolbar above/below the input) sits next to the ▼ hide button.
+      expect(slice).toMatch(/class="composer-toolbar-dock"[\s\S]*?class="composer-toolbar-hide"/);
     }
     // Only the private toolbar carries the payment-check button.
     const privBar = html.slice(html.indexOf('id="privateComposerToolbar"'), html.indexOf('id="privateComposerToolbar"') + 4200);
@@ -6307,10 +6308,11 @@ describe('PWA runtime config guard', () => {
     expect(applyFn).toMatch(/case 'bold': composerEditorToggleFormat\(editor, 'fmt-bold'\)/);
     expect(applyFn).toMatch(/case 'italic': composerEditorToggleFormat\(editor, 'fmt-italic'\)/);
     expect(applyFn).toMatch(/case 'list': composerEditorInsertAtLineStart\(editor, '- '\)/);
+    expect(applyFn).toMatch(/case 'select': composerEditorSelectWordAtCaret\(editor\)/); // v774
     expect(applyFn).not.toMatch(/wrapComposerSelection|prefixComposerLines|openComposerPreview/);
     expect(applyFn).not.toMatch(/case 'center'/);
     // Driver: open on a deliberate field CLICK (not focus/typing), ▼ hides, mousedown keeps the selection.
-    const setupFn = app.slice(app.indexOf('function setupComposerToolbar('), app.indexOf('function setupComposerToolbar(') + 1100);
+    const setupFn = app.slice(app.indexOf('function setupComposerToolbar('), app.indexOf('function setupComposerToolbar(') + 1300);
     expect(setupFn).toMatch(/textarea\.addEventListener\('click', \(\) => showComposerToolbar\(textarea\)\)/);
     expect(setupFn).toMatch(/hideButton\?\.addEventListener\('click', \(\) => hideComposerToolbar\(textarea\)\)/);
     expect(setupFn).toMatch(/toolbar\.addEventListener\('mousedown'/);
@@ -6397,7 +6399,7 @@ describe('PWA runtime config guard', () => {
     expect(beforeFn).toMatch(/inputType === 'insertText'/);
     expect(beforeFn).toMatch(/composerEditorTrailingFmtSpan\(sel\.getRangeAt\(0\), el\)/);
     // Toggle-OFF a format over PART of a run splits the run (three-way), it does not clear the whole span.
-    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 2800);
+    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 4400);
     expect(toggleFn).toMatch(/three-way split/);
     expect(toggleFn).toMatch(/const mid = spanText\.slice\(startOff, endOff\)/);
     // A collapsed caret + a format button acts on the WHOLE word under the caret (mobile: tap word + B).
@@ -6440,6 +6442,26 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function reconcileComposerAttachments\(el\)/);
     expect(app).toMatch(/reconcileComposerAttachments\(messageInput\)/);
     expect(app).toMatch(/reconcileComposerAttachments\(publicMessageInput\)/);
+
+    // v774: a word-toggle (tap-in-word + Bold) collapses the caret afterwards (word not left selected); a REAL
+    // selection stays selected. Guarded by startedCollapsed in composerEditorToggleFormat.
+    expect(toggleFn).toMatch(/const startedCollapsed = range\.collapsed;/);
+    expect(toggleFn).toMatch(/if \(startedCollapsed && sel\.rangeCount\) \{[\s\S]*?r\.collapse\(false\)/);
+    // v774: Select-word button selects the word under the caret (start a selection without the OS menu).
+    expect(app).toMatch(/function composerEditorSelectWordAtCaret\(el\)/);
+    // v774: ↕ dock button flips the toolbar above/below the input, PERSISTED (localStorage), applied on boot.
+    expect(app).toMatch(/function applyComposerDockPosition\(\)/);
+    expect(app).toMatch(/function toggleComposerDockPosition\(\)/);
+    expect(app).toMatch(/localStorage\.setItem\(COMPOSER_DOCK_STORAGE_KEY/);
+    expect(app).toMatch(/classList\.toggle\('is-composer-dock-below', composerDockIsBelow\(\)\)/);
+    expect(app).toMatch(/#privateToolbarDock'\)\?\.addEventListener\('click', toggleComposerDockPosition\)/);
+    expect(css).toMatch(/:root\.is-composer-dock-below \.composer-toolbar \{ order: 2; \}/);
+    // v774 i18n keys present in every locale (parity enforced by the i18n test; presence pinned here).
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
+      expect(dict['composer.dockToolbar'], `${locale}:dock`).toBeTruthy();
+      expect(dict['composer.selectWord'], `${locale}:select`).toBeTruthy();
+    }
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7578,18 +7600,19 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v848/);
+    expect(sw).toMatch(/platho-pwa-prototype-v849/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=264/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=265/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
+    expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=773/);
+    expect(sw).toMatch(/\.\/app\.js\?v=774/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=28/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=28/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=29/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=29/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
