@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v774';
+const PLATHO_APP_RUNTIME_VERSION = 'v775';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16376,9 +16376,40 @@ function composerEditorInsertText(el, text) {
 // Plain Enter = a clean single <br> newline (Ctrl/Cmd+Enter sends). We intercept Enter so the browser never
 // injects <div>/<p> blocks; a filler <br> is appended when the break is the editor's last node so the new empty
 // line is visible (the serializer drops that trailing filler).
+// If the collapsed caret sits at the trailing boundary of a .fmt-* span (right after a formatted word), move it to
+// just AFTER that span. Without this, a newline / an attachment / typing inserted while the caret is inside the
+// span EXTENDS the formatting across it — and a marker (image) inside a bold span serializes to `**…[image N]…**`,
+// which composerBlocksFromDraft splits on the marker into two blocks with UNBALANCED `**` (recipient sees literal
+// asterisks). Called before Enter and chip insertion, and after a word-toggle.
+function composerEditorEscapeTrailingFmt(el) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed) return;
+  const node = range.startContainer;
+  const isFmt = (n) => n && n.nodeType === 1 && /\bfmt-/.test(n.className || '');
+  if (node.nodeType === 3) { if (range.startOffset !== (node.nodeValue || '').length) return; }
+  else if (node.nodeType === 1) { if (range.startOffset !== node.childNodes.length) return; }
+  else return;
+  let n = node;
+  let span = null;
+  while (n && n !== el) {
+    if (isFmt(n)) span = n;    // remember the OUTERMOST .fmt-* ancestor whose trailing edge the caret is at, so a
+    if (n.nextSibling) break;  // nested bold>italic escapes ALL the way out (else the marker lands inside the bold)
+    n = n.parentNode;
+  }
+  if (!span) return;
+  const r = document.createRange();
+  r.setStartAfter(span);
+  r.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
 function composerEditorInsertLineBreak(el) {
   if (!el || el.disabled) return;
   el.focus();
+  composerEditorEscapeTrailingFmt(el); // a newline after a bold word starts a PLAIN line, not more bold
   const range = composerEditorRange(el);
   range.deleteContents();
   const br = document.createElement('br');
@@ -16393,6 +16424,12 @@ function composerEditorInsertLineBreak(el) {
 function composerEditorInsertChip(el, marker) {
   if (!el || el.disabled) return;
   el.focus();
+  // Attach at the caret WITHOUT deleting a live selection — a selection sitting inside a .fmt-* span (toggleFormat
+  // leaves the formatted word selected) would otherwise be replaced by the marker INSIDE the span (lost text +
+  // unbalanced ** on send). Collapse to the selection end first, then escape any trailing fmt span.
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && !sel.isCollapsed) { const r = sel.getRangeAt(0); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
+  composerEditorEscapeTrailingFmt(el); // never drop an attachment marker INSIDE a fmt span (unbalanced ** on send)
   const range = composerEditorRange(el);
   range.deleteContents();
   const block = buildComposerBlock(marker, el);
@@ -16644,11 +16681,13 @@ function composerEditorToggleFormat(el, className) {
     sel.removeAllRanges(); sel.addRange(r);
   }
   // A word-toggle started from a collapsed caret should NOT leave the whole word highlighted — collapse to a caret
-  // at the end of the formatted word (a real selection stays selected so bold+italic can chain).
+  // at the end of the formatted word (a real selection stays selected so bold+italic can chain), then step OUTSIDE
+  // the span so the next Enter / attachment / typing is plain (not swallowed into the formatting).
   if (startedCollapsed && sel.rangeCount) {
     const r = sel.getRangeAt(0);
     r.collapse(false);
     sel.removeAllRanges(); sel.addRange(r);
+    composerEditorEscapeTrailingFmt(el);
   }
   composerEditorAfterEdit(el);
 }
@@ -16696,40 +16735,6 @@ function composerEditorBeforeInput(el, event) {
     sel.removeAllRanges(); sel.addRange(r);
     composerEditorAfterEdit(el);
   }
-}
-
-// Insert `text` (e.g. "- ") at the start of the caret's line. Milestone-1 list button: add-only (no toggle-off).
-function composerEditorInsertAtLineStart(el, text) {
-  if (!el || el.disabled) return;
-  el.focus();
-  const range = composerEditorRange(el);
-  // Resolve the caret to an index into el.childNodes (the slot new content would occupy on the caret's line).
-  let caretIndex;
-  if (range.startContainer === el) {
-    caretIndex = range.startOffset;
-  } else {
-    let c = range.startContainer;
-    while (c.parentNode && c.parentNode !== el) c = c.parentNode;
-    caretIndex = Array.prototype.indexOf.call(el.childNodes, c);
-    if (caretIndex < 0) caretIndex = el.childNodes.length;
-  }
-  // Line start = the slot right after the preceding <br> (a line is the run between <br>s). Walking BACK from the
-  // caret index (not from a node before it) is what keeps "- " on the caret's OWN line after an Enter.
-  let startIdx = caretIndex;
-  while (startIdx > 0 && el.childNodes[startIdx - 1].nodeName !== 'BR') startIdx--;
-  // Never prefix a marker-only line (a lone attachment chip) — it would ship an orphan "-" text block, the same
-  // corruption COMPOSER_MARKER_ONLY_LINE_RE guards against on the textarea path.
-  let hasChip = false, hasText = false;
-  for (let i = startIdx; i < el.childNodes.length && el.childNodes[i].nodeName !== 'BR'; i++) {
-    const n = el.childNodes[i];
-    if (n.nodeType === 1 && n.dataset && n.dataset.marker) hasChip = true;
-    else if ((n.textContent ?? '').trim() !== '') hasText = true;
-  }
-  if (hasChip && !hasText) return;
-  const node = document.createTextNode(text);
-  el.insertBefore(node, el.childNodes[startIdx] || null);
-  composerEditorPlaceCaretAfter(node);
-  composerEditorAfterEdit(el);
 }
 
 // Sanitize pasted/dropped content down to text/plain and insert it at the caret (new XSS surface — never trust
@@ -17251,7 +17256,6 @@ function applyComposerFormat(editor, format) {
   switch (format) {
     case 'bold': composerEditorToggleFormat(editor, 'fmt-bold'); break;
     case 'italic': composerEditorToggleFormat(editor, 'fmt-italic'); break;
-    case 'list': composerEditorInsertAtLineStart(editor, '- '); break;
     case 'select': composerEditorSelectWordAtCaret(editor); break;
     default: break;
   }

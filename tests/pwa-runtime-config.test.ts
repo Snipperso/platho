@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=774" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=775" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6279,11 +6279,11 @@ describe('PWA runtime config guard', () => {
     // trimmed heading/quote/center/justify (didn't fit one row) — those must NOT be present as buttons.
     for (const bar of ['privateComposerToolbar', 'publicComposerToolbar']) {
       const slice = html.slice(html.indexOf(`id="${bar}"`), html.indexOf(`id="${bar}"`) + 4200);
-      for (const fmt of ['bold', 'italic', 'list', 'select']) { // v774: a Select-word button (right after emoji)
+      for (const fmt of ['bold', 'italic', 'select']) { // v774: a Select-word button (right after emoji)
         expect(slice, `${bar}:${fmt}`).toMatch(new RegExp(`data-format="${fmt}"`));
       }
-      // v773 removed the preview button (the WYSIWYG editor IS the preview); heading/quote/center/justify stay gone.
-      for (const gone of ['preview', 'heading', 'quote', 'center', 'justify']) {
+      // v773 removed preview; v775 removed the list button (just prefixed "- ", easier by hand); heading/quote/etc stay gone.
+      for (const gone of ['list', 'preview', 'heading', 'quote', 'center', 'justify']) {
         expect(slice, `${bar}:${gone}-removed`).not.toMatch(new RegExp(`data-format="${gone}"`));
       }
       // Emoji is the first toolbar button, immediately followed by the Select-word button (owner: 'сразу после смайлов').
@@ -6307,7 +6307,7 @@ describe('PWA runtime config guard', () => {
     const applyFn = app.slice(app.indexOf('function applyComposerFormat('), app.indexOf('function applyComposerFormat(') + 500);
     expect(applyFn).toMatch(/case 'bold': composerEditorToggleFormat\(editor, 'fmt-bold'\)/);
     expect(applyFn).toMatch(/case 'italic': composerEditorToggleFormat\(editor, 'fmt-italic'\)/);
-    expect(applyFn).toMatch(/case 'list': composerEditorInsertAtLineStart\(editor, '- '\)/);
+    expect(applyFn).not.toMatch(/case 'list'|composerEditorInsertAtLineStart/); // v775: list button removed
     expect(applyFn).toMatch(/case 'select': composerEditorSelectWordAtCaret\(editor\)/); // v774
     expect(applyFn).not.toMatch(/wrapComposerSelection|prefixComposerLines|openComposerPreview/);
     expect(applyFn).not.toMatch(/case 'center'/);
@@ -6327,7 +6327,7 @@ describe('PWA runtime config guard', () => {
     // stay in the dictionaries as reserved (their buttons were trimmed/removed) — parity is unaffected.
     for (const locale of Object.keys(I18N_STRINGS)) {
       const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
-      for (const key of ['composer.formatBold', 'composer.formatItalic', 'composer.formatList', 'composer.hideFormatBar']) {
+      for (const key of ['composer.formatBold', 'composer.formatItalic', 'composer.hideFormatBar']) {
         expect(dict[key], `${locale}:${key}`).toBeTruthy();
       }
     }
@@ -6358,7 +6358,7 @@ describe('PWA runtime config guard', () => {
     expect(initFn).toMatch(/this\.contentEditable = disabledFlag \? 'false' : 'true'/);
 
     // Caret ops (Range-based) exist and the marker/emoji dispatchers delegate to them (legacy textarea paths gone).
-    for (const fn of ['composerEditorToggleFormat', 'composerEditorInsertChip', 'composerEditorInsertAtLineStart', 'composerEditorInsertLineBreak', 'composerEditorInsertText', 'composerEditorInsertPlainMultiline']) {
+    for (const fn of ['composerEditorToggleFormat', 'composerEditorInsertChip', 'composerEditorInsertLineBreak', 'composerEditorInsertText', 'composerEditorInsertPlainMultiline']) {
       expect(app, fn).toMatch(new RegExp(`function ${fn}\\(`));
     }
     expect(app).not.toMatch(/function isComposerEditor\(/);
@@ -6449,6 +6449,22 @@ describe('PWA runtime config guard', () => {
     expect(toggleFn).toMatch(/if \(startedCollapsed && sel\.rangeCount\) \{[\s\S]*?r\.collapse\(false\)/);
     // v774: Select-word button selects the word under the caret (start a selection without the OS menu).
     expect(app).toMatch(/function composerEditorSelectWordAtCaret\(el\)/);
+    // v775: a newline/attachment/word-toggle steps the caret OUT of a trailing .fmt-* span, so bold never swallows
+    // a <br>/image atom (which would serialize to unbalanced ** across the marker -> literal ** at the recipient).
+    expect(app).toMatch(/function composerEditorEscapeTrailingFmt\(el\)/);
+    expect(app).toMatch(/composerEditorEscapeTrailingFmt\(el\); \/\/ a newline after a bold word/);
+    expect(app).toMatch(/composerEditorEscapeTrailingFmt\(el\); \/\/ never drop an attachment marker/);
+    // escape steps out of the OUTERMOST .fmt-* ancestor (nested bold>italic), not just the innermost (else a marker
+    // lands inside the still-open bold -> unbalanced ** on send). No `break` on the first fmt match.
+    const escFn = app.slice(app.indexOf('function composerEditorEscapeTrailingFmt('), app.indexOf('function composerEditorEscapeTrailingFmt(') + 900);
+    expect(escFn).toMatch(/if \(isFmt\(n\)\) span = n;/);
+    expect(escFn).not.toMatch(/if \(isFmt\(n\)\) \{ span = n; break; \}/);
+    // Toolbar-button :hover is gated behind @media (hover: hover) — on touch, :hover STICKS after a tap so Bold/
+    // Italic stayed accent-green after pressing (owner report). No ungated :hover background rule.
+    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.composer-toolbar-button:hover:not\(:disabled\) \{/);
+    expect(css).not.toMatch(/^\.composer-toolbar-button:hover:not\(:disabled\) \{/m);
+    // v775: a multi-attachment list is capped (~3 rows) and scrolls, so it can't eat the whole screen.
+    expect(css).toMatch(/\.composer-attachment\.is-list \{[\s\S]*?max-height: 150px;[\s\S]*?overflow-y: auto;/);
     // v774: ↕ dock button flips the toolbar above/below the input, PERSISTED (localStorage), applied on boot.
     expect(app).toMatch(/function applyComposerDockPosition\(\)/);
     expect(app).toMatch(/function toggleComposerDockPosition\(\)/);
@@ -7600,16 +7616,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v849/);
+    expect(sw).toMatch(/platho-pwa-prototype-v850/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=265/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=266/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=774/);
+    expect(sw).toMatch(/\.\/app\.js\?v=775/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=29/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=29/);

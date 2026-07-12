@@ -1634,9 +1634,12 @@ a .avatar.has-image,
   cursor: pointer;
 }
 
-.composer-toolbar-button:hover:not(:disabled) {
-  background: rgba(48, 213, 176, 0.1);
-  color: var(--accent);
+/* hover: hover only — on touch devices :hover STICKS after a tap, so Bold/Italic stayed accent-green after pressing. */
+@media (hover: hover) {
+  .composer-toolbar-button:hover:not(:disabled) {
+    background: rgba(48, 213, 176, 0.1);
+    color: var(--accent);
+  }
 }
 
 .composer-toolbar-button.is-active {
@@ -1676,9 +1679,11 @@ a .avatar.has-image,
   cursor: pointer;
 }
 
-.composer-toolbar-hide:hover,
-.composer-toolbar-dock:hover {
-  color: var(--accent);
+@media (hover: hover) {
+  .composer-toolbar-hide:hover,
+  .composer-toolbar-dock:hover {
+    color: var(--accent);
+  }
 }
 
 .composer-toolbar-hide .icon,
@@ -1799,6 +1804,8 @@ a .avatar.has-image,
 .composer-attachment.is-list {
   align-items: stretch;
   flex-direction: column;
+  max-height: 150px; /* v775: ~3 rows, then scroll — a long attachment list must not eat the whole screen */
+  overflow-y: auto;
 }
 
 .composer-attachment-row {
