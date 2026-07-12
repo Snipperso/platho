@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v775';
+const PLATHO_APP_RUNTIME_VERSION = 'v776';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2138,7 +2138,7 @@ function appendLinkifiedText(parent, text) {
 // Block (line-level): '# ' heading (1-3 -> small/smaller), '> ' blockquote, '- '/'* ' ul, '1. ' ol,
 // and a '::center '/'::justify ' paragraph-leading alignment prefix (alignment is not standard markdown and is
 // block-level, so it rides as a paragraph prefix parsed here; old clients show the literal prefix).
-const INLINE_FORMAT_RE = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)|(https?:\/\/[^\s<>"']+)/g;
+const INLINE_FORMAT_RE = /\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)|(https?:\/\/[^\s<>"']+)/g;
 const MSG_HEADING_RE = /^(#{1,3})\s+(.+)$/;
 const MSG_QUOTE_RE = /^>\s?(.*)$/;
 const MSG_ULIST_RE = /^[-*]\s+(.+)$/;
@@ -2155,25 +2155,32 @@ function appendInlineFormatted(parent, text) {
     if (match.index > last) parent.append(document.createTextNode(str.slice(last, match.index)));
     let consumedEnd = match.index + match[0].length;
     if (match[1] !== undefined) {
-      const el = document.createElement('strong');
-      el.textContent = match[1];
-      parent.append(el);
+      // ***bold+italic*** -> <strong><em>
+      const strong = document.createElement('strong');
+      const em = document.createElement('em');
+      em.textContent = match[1];
+      strong.append(em);
+      parent.append(strong);
     } else if (match[2] !== undefined) {
-      const el = document.createElement('em');
+      const el = document.createElement('strong');
       el.textContent = match[2];
       parent.append(el);
     } else if (match[3] !== undefined) {
-      const el = document.createElement('code');
-      el.className = 'msg-code';
+      const el = document.createElement('em');
       el.textContent = match[3];
       parent.append(el);
     } else if (match[4] !== undefined) {
+      const el = document.createElement('code');
+      el.className = 'msg-code';
+      el.textContent = match[4];
+      parent.append(el);
+    } else if (match[5] !== undefined) {
       // [label](url) — link ONLY if the url passes the scheme allowlist; else emit the literal typed text.
-      const safe = safeExternalUrl(match[5]);
-      parent.append(safe ? buildExternalLinkAnchor(match[4], safe) : document.createTextNode(match[0]));
+      const safe = safeExternalUrl(match[6]);
+      parent.append(safe ? buildExternalLinkAnchor(match[5], safe) : document.createTextNode(match[0]));
     } else {
-      // bare url (match[6]) — trim trailing punctuation like appendLinkifiedText does.
-      const trimmed = trimTrailingUrlPunctuation(match[6]);
+      // bare url (match[7]) — trim trailing punctuation like appendLinkifiedText does.
+      const trimmed = trimTrailingUrlPunctuation(match[7]);
       const safe = safeExternalUrl(trimmed);
       parent.append(safe ? buildExternalLinkAnchor(trimmed, safe) : document.createTextNode(trimmed));
       consumedEnd = match.index + trimmed.length; // leave trailing punctuation for the next text node
@@ -16223,7 +16230,7 @@ function serializeComposerEditor(el) {
 // Build the EDITABLE DOM for a composer editor from a markdown+marker string (draft restore / share insertion).
 // Inverse of serializeComposerEditor: **bold** -> <span class=fmt-bold>, [image N] -> chip, \n -> <br>. Uses the
 // SAME inline tokenizer family as the renderer but emits editor spans/chips (not the receive-side anchors).
-const EDITOR_INLINE_RE = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|(\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\]|\[(?:check|payment)\])(?!\()/g;
+const EDITOR_INLINE_RE = /\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|(\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\]|\[(?:check|payment)\])(?!\()/g;
 
 function composerChipLabelForMarker(marker) {
   const m = String(marker);
@@ -16311,10 +16318,15 @@ function appendEditorInline(target, text) {
   let match;
   while ((match = EDITOR_INLINE_RE.exec(str)) !== null) {
     if (match.index > last) target.append(document.createTextNode(str.slice(last, match.index)));
-    if (match[1] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-bold'; s.textContent = match[1]; target.append(s); }
-    else if (match[2] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-italic'; s.textContent = match[2]; target.append(s); }
-    else if (match[3] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-code'; s.textContent = match[3]; target.append(s); }
-    else { target.append(buildComposerBlock(match[4], target)); }
+    if (match[1] !== undefined) { // ***bold+italic*** -> nested fmt-bold > fmt-italic
+      const b = document.createElement('span'); b.className = 'fmt-bold';
+      const i = document.createElement('span'); i.className = 'fmt-italic'; i.textContent = match[1];
+      b.append(i); target.append(b);
+    }
+    else if (match[2] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-bold'; s.textContent = match[2]; target.append(s); }
+    else if (match[3] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-italic'; s.textContent = match[3]; target.append(s); }
+    else if (match[4] !== undefined) { const s = document.createElement('span'); s.className = 'fmt-code'; s.textContent = match[4]; target.append(s); }
+    else { target.append(buildComposerBlock(match[5], target)); }
     last = match.index + match[0].length;
   }
   if (last < str.length) target.append(document.createTextNode(str.slice(last)));

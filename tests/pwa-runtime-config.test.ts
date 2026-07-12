@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=775" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=776" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6163,8 +6163,8 @@ describe('PWA runtime config guard', () => {
     // v769: the live inline renderer (appendInlineFormatted, used by appendFormattedMessageText) links ONLY via
     // the interstitial builder — never a live href, never innerHTML — exactly like the appendLinkifiedText path.
     const inlineFn = app.slice(app.indexOf('function appendInlineFormatted('), app.indexOf('function messageTextHasBlockFormatting('));
-    expect(inlineFn).toMatch(/const safe = safeExternalUrl\(match\[5\]\);/); // [label](url): url is group 5
-    expect(inlineFn).toMatch(/safe \? buildExternalLinkAnchor\(match\[4\], safe\) : document\.createTextNode\(match\[0\]\)/);
+    expect(inlineFn).toMatch(/const safe = safeExternalUrl\(match\[6\]\);/); // [label](url): url is group 6 (v776: *** shifted groups +1)
+    expect(inlineFn).toMatch(/safe \? buildExternalLinkAnchor\(match\[5\], safe\) : document\.createTextNode\(match\[0\]\)/);
     expect(inlineFn).not.toMatch(/innerHTML/);
     expect(inlineFn).not.toMatch(/\.href =/);
     // 2) HARD scheme allowlist: only http:/https: ever become a link; javascript:/data:/etc. are rejected.
@@ -6256,9 +6256,12 @@ describe('PWA runtime config guard', () => {
     // SAFE renderer: inline (bold/italic/code/link) + block (heading/quote/list) + a paragraph alignment prefix.
     // XSS posture: createElement + textContent ONLY, never innerHTML; links via the interstitial builder.
     const inlineFn = app.slice(app.indexOf('function appendInlineFormatted('), app.indexOf('function messageTextHasBlockFormatting('));
-    expect(inlineFn).toMatch(/const el = document\.createElement\('strong'\);\s*el\.textContent = match\[1\];/);
-    expect(inlineFn).toMatch(/const el = document\.createElement\('em'\);\s*el\.textContent = match\[2\];/);
-    expect(inlineFn).toMatch(/buildExternalLinkAnchor\(match\[4\], safe\)/);
+    // v776: ***bold+italic*** -> nested <strong><em> (match[1]); then **bold** (2), *italic* (3), `code` (4), link (5/6).
+    expect(inlineFn).toMatch(/const strong = document\.createElement\('strong'\);\s*const em = document\.createElement\('em'\);\s*em\.textContent = match\[1\];/);
+    expect(inlineFn).toMatch(/const el = document\.createElement\('strong'\);\s*el\.textContent = match\[2\];/);
+    expect(inlineFn).toMatch(/const el = document\.createElement\('em'\);\s*el\.textContent = match\[3\];/);
+    expect(inlineFn).toMatch(/buildExternalLinkAnchor\(match\[5\], safe\)/);
+    expect(app).toMatch(/const INLINE_FORMAT_RE = \/\\\*\\\*\\\*\(\[\^\*\\n\]\+\)\\\*\\\*\\\*\|/); // *** alternative is FIRST
     expect(inlineFn).not.toMatch(/innerHTML/);
     const blockFn = app.slice(app.indexOf('function appendFormattedMessageText('), app.indexOf('function appendFormattedMessageText(') + 3200);
     expect(blockFn).toMatch(/options\.inlineOnly === true \|\| !messageTextHasBlockFormatting\(str\)/); // inline fast path
@@ -6382,6 +6385,10 @@ describe('PWA runtime config guard', () => {
     expect(buildFn).not.toMatch(/innerHTML/);
     expect(buildFn).toMatch(/document\.createElement\('span'\)/);
     expect(buildFn).toMatch(/\.textContent = /);
+    // v776: ***bold+italic*** round-trips — EDITOR_INLINE_RE has the *** alternative first, and appendEditorInline
+    // builds a NESTED fmt-bold > fmt-italic for match[1] (else a rebuild/receive shows literal `*` around bold).
+    expect(app).toMatch(/const EDITOR_INLINE_RE = \/\\\*\\\*\\\*\(\[\^\*\\n\]\+\)\\\*\\\*\\\*\|/);
+    expect(buildFn).toMatch(/if \(match\[1\] !== undefined\) \{ \/\/ \*\*\*bold\+italic\*\*\*[\s\S]*?b\.className = 'fmt-bold'[\s\S]*?i\.className = 'fmt-italic'[\s\S]*?b\.append\(i\)/);
 
     // keydown handles Ctrl/Cmd+Enter = send (IME-guarded); newline + the bleed guard live in a shared BEFOREINPUT
     // handler so Android soft-keyboard Enter (keyCode 229, key!=='Enter') still lands a clean <br>.
@@ -7616,7 +7623,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v850/);
+    expect(sw).toMatch(/platho-pwa-prototype-v851/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7625,7 +7632,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=775/);
+    expect(sw).toMatch(/\.\/app\.js\?v=776/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=29/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=29/);
