@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=797" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=798" type="module">/);
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=276">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
@@ -6503,7 +6503,7 @@ describe('PWA runtime config guard', () => {
     expect(beforeFn).toMatch(/inputType === 'insertText'/);
     expect(beforeFn).toMatch(/composerEditorTrailingFmtSpan\(sel\.getRangeAt\(0\), el\)/);
     // Toggle-OFF a format over PART of a run splits the run (three-way), it does not clear the whole span.
-    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 7600);
+    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 9500);
     expect(toggleFn).toMatch(/three-way split/);
     expect(toggleFn).toMatch(/const mid = spanText\.slice\(startOff, endOff\)/);
     // A collapsed caret + a format button acts on the WHOLE word under the caret (mobile: tap word + B).
@@ -6867,6 +6867,30 @@ describe('PWA runtime config guard', () => {
     expect(policy).toContain('export const SHARE_BLOCK_CONTENT_VERSION = 1;');
     // The resolved image has a feed-style image rule.
     expect(css).toMatch(/\.shared-post-embed-image \{[\s\S]*?max-width: 100%;[\s\S]*?max-height: 260px;/);
+  });
+
+  it('PWA-COMPOSER-UNFORMAT-01: a format toggle UN-formats any selection (multi-span/select-all), Enter shows a visible line, and delete-all clears format (v798)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The toggle detects "already fully formatted" over the LIVE DOM (not cloneContents, which drops the enclosing
+    // span for a single-text-node range) so a select-all / multi-span / multi-line run correctly UN-formats. A single
+    // enclosing span keeps the three-way split; a multi-span run unwraps each. (Was: only one enclosing span could be
+    // un-formatted — a select-all's commonAncestorContainer is the editor -> no enclosing -> it re-ADDED bold.)
+    expect(app).toContain('function composerEditorSelectionFullyFormatted(range, className, el)');
+    expect(app).toContain('return range.compareBoundaryPoints(Range.END_TO_START, nr) < 0'); // live-DOM overlap, not cloneContents
+    expect(app).toContain('function composerEditorUnformatRange(range, className, el)');
+    const toggle = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 5200);
+    expect(toggle).toContain('const enclosing = composerEditorEnclosingFormat(range, className, el);');
+    expect(toggle).toContain('} else if (composerEditorSelectionFullyFormatted(range, className, el)) {');
+    expect(toggle).toContain('composerEditorUnformatRange(range, className, el);');
+    expect(toggle).toContain('const mid = spanText.slice(startOff, endOff);'); // three-way split retained for one span
+    // unformat hoists the insertion point OUT of an emptied enclosing span so a re-insert can't re-format it.
+    expect(app).toContain('if (encl) { range.setStartAfter(encl); range.collapse(true); }');
+    // Enter drops stray EMPTY text nodes after the <br> so the trailing filler <br> is added and the new line is VISIBLE.
+    expect(app).toContain("while (br.nextSibling && br.nextSibling.nodeType === 3 && br.nextSibling.nodeValue === '') br.nextSibling.remove();");
+    // Deleting ALL text strips every lingering fmt span (even a <br>-only one) so the next keystroke types PLAIN.
+    const norm = app.slice(app.indexOf('function composerEditorNormalizeEmptyFmt('), app.indexOf('function composerEditorNormalizeEmptyFmt(') + 1400);
+    expect(norm).toContain("if ((el.textContent || '').trim() === '') {");
+    expect(norm).toContain('while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);');
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -8007,7 +8031,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v872/);
+    expect(sw).toMatch(/platho-pwa-prototype-v873/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -8016,7 +8040,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=797/);
+    expect(sw).toMatch(/\.\/app\.js\?v=798/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);
