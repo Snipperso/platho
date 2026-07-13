@@ -2501,6 +2501,16 @@ button.feed-item:hover {
   font-size: 12px;
 }
 
+/* v797: the referenced post's real image, resolved by entryId from the local cache (no wire copy). */
+.shared-post-embed-image {
+  display: block;
+  margin-top: 8px;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
 .shared-post-embed.feed-post-collapsible > .feed-post-body {
   max-height: var(--shared-post-embed-max-height);
 }
