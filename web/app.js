@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v787';
+const PLATHO_APP_RUNTIME_VERSION = 'v788';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19882,7 +19882,17 @@ function composerCollapseMaximizeNow(form) {
 // footprint, then collapse to the inline layout. Uses form.__inlineRect captured at maximize time.
 function composerRunMaximizeGeo(form, growing) {
   composerCancelMaxFlip(form);
-  const inlineRect = form.__inlineRect;
+  let inlineRect = form.__inlineRect;
+  // On a SHRINK the app viewport may have changed since maximize (the keyboard appeared or was dismissed), so the inline
+  // TOP captured at maximize time is stale — the composer would shrink to the OLD slot (e.g. behind the keyboard) then
+  // JUMP to the real one. The spacer holds the composer's CURRENT inline slot and RIDES the layout (it moves with the
+  // keyboard), so shift the captured top by how far the spacer has MOVED since maximize (__spacerTop0). We use the DELTA,
+  // not the spacer's absolute top: the spacer sits at a small structural offset from the form's own box (and lacks the
+  // public composer's edge-bleed margin), so the delta cancels that offset and a no-viewport-change restore is seamless.
+  if (!growing && inlineRect && form.__spacer && form.__spacerTop0 != null) {
+    const curTop = form.__spacer.getBoundingClientRect().top;
+    inlineRect = { ...inlineRect, top: inlineRect.top + (curTop - form.__spacerTop0) };
+  }
   const full = form.getBoundingClientRect(); // form currently has .is-maximized -> its full-screen rect
   if (!inlineRect || !full.width || !full.height) { if (!growing) composerCollapseMaximizeNow(form); return; }
   const fullRect = { top: full.top, left: full.left, width: full.width, height: full.height };
@@ -19927,6 +19937,9 @@ function toggleComposerMaximize(form, button) {
     form.classList.remove('is-restoring');
     composerReserveSpacer(form, r.height); // hold the inline slot so the chat/feed content doesn't jump
     form.classList.add('is-maximized');
+    // Reference top of the spacer in the maximized (form-out-of-flow) layout — the shrink retargets by how far it later
+    // MOVES from here (the keyboard changed the app viewport), so the composer collapses to the CURRENT inline slot.
+    form.__spacerTop0 = form.__spacer ? form.__spacer.getBoundingClientRect().top : null;
     composerMaximizeButtonLabel(button, true);
     if (!composerReducedMotion()) composerRunMaximizeGeo(form, true);
   }
