@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=784" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=785" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6434,12 +6434,33 @@ describe('PWA runtime config guard', () => {
     expect(beforeFn).toMatch(/inputType === 'insertText'/);
     expect(beforeFn).toMatch(/composerEditorTrailingFmtSpan\(sel\.getRangeAt\(0\), el\)/);
     // Toggle-OFF a format over PART of a run splits the run (three-way), it does not clear the whole span.
-    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 5800);
+    const toggleFn = app.slice(app.indexOf('function composerEditorToggleFormat('), app.indexOf('function composerEditorToggleFormat(') + 7600);
     expect(toggleFn).toMatch(/three-way split/);
     expect(toggleFn).toMatch(/const mid = spanText\.slice\(startOff, endOff\)/);
     // A collapsed caret + a format button acts on the WHOLE word under the caret (mobile: tap word + B).
-    expect(app).toMatch(/function composerEditorWordRangeAtCaret\(range\)/);
-    expect(toggleFn).toMatch(/if \(range\.collapsed\) \{[\s\S]*?composerEditorWordRangeAtCaret\(range\)/);
+    // v785: the word detector is SPAN-AWARE — it walks the inline text-node run across .fmt-* boundaries (a TreeWalker
+    // that SKIPs fmt spans = transparent, but stops at <br>/atoms) so a PARTIALLY-bold word (`**he**llo`) is treated as
+    // ONE word. It returns node/offset endpoints (start/end may be in DIFFERENT text nodes) + caretInWord.
+    expect(app).toMatch(/function composerEditorWordRangeAtCaret\(range, el\)/);
+    const wordFn = app.slice(app.indexOf('function composerEditorWordRangeAtCaret('), app.indexOf('function composerEditorWordRangeAtCaret(') + 4200);
+    expect(wordFn).toMatch(/createTreeWalker\(root, NodeFilter\.SHOW_TEXT \| NodeFilter\.SHOW_ELEMENT/);
+    // Hard word boundaries mirror serializeComposerEditor's NEWLINE set (BR + DIV/P block wrappers) + atom chips, so a
+    // toggle never spans a block boundary and serializes `**foo\nbar**` (a newline trapped in bold -> literal ** for the
+    // recipient). DIV/P added in the v785 2nd-review fix.
+    expect(wordFn).toMatch(/n\.nodeName === 'BR' \|\| n\.nodeName === 'DIV' \|\| n\.nodeName === 'P' \|\| \(n\.dataset && n\.dataset\.marker\)/);
+    // v785 (review fix): FILTER_ACCEPT on the atom element does NOT prune its subtree, so a text node INSIDE an atom
+    // chip (the chip's own label) is REJECTED — else a word abutting a chip merges the label into the word run
+    // (select-word anchors inside the contenteditable=false chip; Bold/Italic no-ops as the range intersects the atom).
+    expect(wordFn).toMatch(/n\.parentElement && n\.parentElement\.closest\('\[data-marker\]'\)\) \? NodeFilter\.FILTER_REJECT : NodeFilter\.FILTER_ACCEPT/);
+    expect(wordFn).toMatch(/return \{\s*startNode: startPos\.node, startOffset: startPos\.local,\s*endNode: lastPos\.node, endOffset: lastPos\.local \+ 1,\s*caretInWord: caretGlobal - s,/);
+    expect(toggleFn).toMatch(/if \(range\.collapsed\) \{[\s\S]*?composerEditorWordRangeAtCaret\(range, el\)/);
+    expect(toggleFn).toMatch(/range\.setStart\(word\.startNode, word\.startOffset\);\s*range\.setEnd\(word\.endNode, word\.endOffset\)/);
+    // Toggling a partially-formatted word splits the old span (extractContents) and can leave an EMPTY .fmt-* span
+    // behind, which serializes to a stray `****`; the toggle prunes it (and normalizes flattened text so caret-restore
+    // by offset lands exactly). Both callers (toggle + select-word) consume the new node/offset return shape.
+    expect(toggleFn).toMatch(/span\.normalize\(\); \/\/ merge the adjacent text nodes/);
+    expect(toggleFn).toMatch(/composerEditorPruneEmptyFmt\(el\);\s*composerEditorAfterEdit\(el\);/);
+    expect(app).toMatch(/const word = composerEditorWordRangeAtCaret\(range, el\);[\s\S]*?r\.setStart\(word\.startNode, word\.startOffset\);\s*r\.setEnd\(word\.endNode, word\.endOffset\)/); // select-word caller
 
     // CSS for the editor: sizing/placeholder/format spans/blocks.
     expect(css).toMatch(/\.composer \.composer-input \{\s*position: relative;[\s\S]*?min-height: 44px;[\s\S]*?white-space: pre-wrap;/); // v780: relative anchors the absolute placeholder
@@ -6487,8 +6508,12 @@ describe('PWA runtime config guard', () => {
     // v777/v779: after a word-toggle the caret rests at the SAME offset it was (caretInWord), inside the word's
     // text node — so pressing Bold/Italic AGAIN un-toggles the same word and the caret does not jump to the word
     // end. The toggle does NOT escape the span itself (the leak on the NEXT Enter/attachment is handled at insert).
-    expect(toggleFn).toMatch(/caretInWord = range\.startOffset - word\.start;/);
-    expect(toggleFn).toMatch(/off = caretInWord >= 0 \? Math\.min\(caretInWord, node\.nodeValue\.length\) :/);
+    expect(toggleFn).toMatch(/caretInWord = word\.caretInWord;/); // v785: the span-aware detector returns the in-word offset
+    // v785 (review fix): the (re)formatted word can span MULTIPLE text nodes (Bold OVER a partially-italic word wraps a
+    // NESTED fmt span), so the caret restore walks the word's text nodes IN ORDER (range-bounded via intersectsNode) to
+    // land at the caretInWord-th char — clamping to the FIRST text node's length alone put the caret a char early.
+    expect(toggleFn).toMatch(/acceptNode: \(tn\) => r\.intersectsNode\(tn\) \? NodeFilter\.FILTER_ACCEPT : NodeFilter\.FILTER_SKIP/);
+    expect(toggleFn).toMatch(/if \(acc \+ len >= want\) \{ node = tn; off = from \+ \(want - acc\); placed = true; break; \}/);
     expect(toggleFn).not.toMatch(/composerEditorEscapeTrailingFmt/);
     // v774: Select-word button selects the word under the caret (start a selection without the OS menu).
     expect(app).toMatch(/function composerEditorSelectWordAtCaret\(el\)/);
@@ -6617,6 +6642,33 @@ describe('PWA runtime config guard', () => {
     // open one to the button's FINAL rect when the FLIP finishes (else the fixed picker stays where the mid-flight rect put it).
     expect(app).toMatch(/closeEmojiPicker\(\); \/\/ the emoji button is inside the composer/);
     expect(app).toMatch(/if \(emojiPicker && !emojiPicker\.hidden && emojiPickerTargetButton\) positionEmojiPicker\(emojiPickerTargetButton\)/);
+    // v785 #1: while maximized the composer is position:fixed (out of flow) — a same-height spacer holds its inline
+    // slot so the chat/feed content doesn't jump down on maximize and up on restore. Reserved at maximize, released at
+    // the shrink finish / instant collapse / exit.
+    expect(app).toMatch(/function composerReserveSpacer\(form, height\)/);
+    expect(app).toMatch(/function composerReleaseSpacer\(form\)/);
+    expect(app).toMatch(/spacer\.setAttribute\('aria-hidden', 'true'\);[\s\S]*?spacer\.style\.height = `\$\{height\}px`;[\s\S]*?form\.after\(spacer\);\s*form\.__spacer = spacer;/);
+    expect(app).toMatch(/composerReserveSpacer\(form, r\.height\); \/\/ hold the inline slot/); // maximize reserves
+    expect(app).toMatch(/form\.classList\.remove\('is-maximized', 'is-restoring'\); composerReleaseSpacer\(form\)/); // shrink finish releases
+    expect(app).toMatch(/composerCollapseMaximizeNow\(form\) \{[\s\S]*?composerReleaseSpacer\(form\)/); // instant collapse releases
+    expect(app).toMatch(/composerCancelMaxFlip\(form\); \/\/ kill any in-flight[\s\S]*?composerReleaseSpacer\(form\)/); // exit releases
+    // v785 #4: maximize/restore must NOT change the editor's focus — force-focus pops the mobile keyboard, blur hides
+    // it. Capture wasFocused, never force .focus() on maximize (removed), only re-focus IF it was focused (a geometry
+    // change can drop contenteditable focus). The maximize button also joins the toolbar mousedown-preventDefault so a
+    // tap never blurs the editor in the first place.
+    expect(app).toMatch(/const wasFocused = !!editorEl && document\.activeElement === editorEl;/);
+    expect(app).toMatch(/if \(wasFocused && editorEl && document\.activeElement !== editorEl\) editorEl\.focus\(\{ preventScroll: true \}\)/);
+    const maxFn = app.slice(app.indexOf('function toggleComposerMaximize('), app.indexOf('function toggleComposerMaximize(') + 1500);
+    expect(maxFn).not.toMatch(/\.composer-input'\)\?\.focus\?\.\(\)/); // the old forced focus is gone
+    expect(app).toMatch(/\.composer-toolbar-button, \.composer-toolbar-hide, \.composer-toolbar-dock, \.composer-toolbar-maximize'\)\) event\.preventDefault\(\)/);
+    // v785 #3: the dock toggle FLIPs the composer's NON-toolbar children (the input row + panels) so the input row
+    // SLIDES to its new position instead of jumping when the toolbar order flips (the toolbar keeps its own slide).
+    const dockFn = app.slice(app.indexOf('function toggleComposerDockPosition('), app.indexOf('function toggleComposerDockPosition(') + 1600);
+    expect(dockFn).toMatch(/document\.querySelectorAll\('\.composer > :not\(\.composer-toolbar\)'\)\]\.filter\(\(el\) => el\.offsetParent !== null && !el\.hidden\)/);
+    expect(dockFn).toMatch(/const firstTops = rows\.map\(\(el\) => el\.getBoundingClientRect\(\)\.top\)/); // First
+    expect(dockFn).toMatch(/const delta = firstTops\[i\] - el\.getBoundingClientRect\(\)\.top;\s*if \(!delta\) return;/); // Invert
+    expect(dockFn).toMatch(/el\.style\.transition = 'transform 0\.48s cubic-bezier\(0\.16, 1, 0\.3, 1\)';\s*el\.style\.transform = 'none';/); // Play
+    expect(dockFn).toMatch(/event\.propertyName !== 'transform'\) return; el\.style\.transition = ''; el\.style\.transform = ''/); // cleanup
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7755,7 +7807,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v859/);
+    expect(sw).toMatch(/platho-pwa-prototype-v860/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7764,7 +7816,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=784/);
+    expect(sw).toMatch(/\.\/app\.js\?v=785/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);
