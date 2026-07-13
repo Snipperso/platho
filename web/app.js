@@ -198,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v795';
+const PLATHO_APP_RUNTIME_VERSION = 'v796';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16527,9 +16527,16 @@ function composerEditorCopySelection(el, event, isCut) {
   event.clipboardData.setData('text/plain', serializeComposerEditor(wrapper, keepTrailingBr));
   event.preventDefault();
   if (isCut && !el.disabled) {
-    range.deleteContents();
-    composerEditorPruneEmptyFmt(el); // a cut that emptied a fmt span would else serialize to a stray `****`
-    composerEditorAfterEdit(el); // input -> reconcileComposerAttachments prunes any cut atom's attachment
+    // An ATTACHMENT chip's BYTES can't ride a text clipboard, so Cut-then-Paste would silently LOSE the image/file:
+    // deleting the atom drops its marker, and reconcileComposerAttachments then prunes the marker-less attachment.
+    // Treat a cut that spans an attachment atom ([image N]/[file N]/[post]/[check], NOT a `](`-link which DOES
+    // round-trip) as a COPY — leave the original in place so nothing is lost. Text-only / link-only cuts still delete.
+    const hasAttachmentAtom = [...wrapper.querySelectorAll('[data-marker]')].some((a) => !/\]\(/.test(a.dataset.marker || ''));
+    if (!hasAttachmentAtom) {
+      range.deleteContents();
+      composerEditorPruneEmptyFmt(el); // a cut that emptied a fmt span would else serialize to a stray `****`
+      composerEditorAfterEdit(el); // input -> reconcileComposerAttachments prunes any cut atom's attachment
+    }
   }
 }
 
@@ -17178,6 +17185,23 @@ function composerEditorTrailingFmtSpan(range, el) {
   return span;
 }
 
+// [21] IME composition (and the mobile keyboards / autocorrect that route ordinary typing THROUGH composition)
+// bypass the beforeinput bleed guard entirely (composerEditorBeforeInput returns on event.isComposing), so a word
+// composed at the trailing edge of a fmt span would inherit the format. Pre-escape the caret OUT of a trailing fmt
+// span at compositionstart so the composed text lands plain. Fires ONLY at a true trailing edge
+// (composerEditorTrailingFmtSpan) — mid-word composition (editing an existing word) is left untouched.
+function composerEditorEscapeFmtForComposition(el) {
+  if (!el || el.disabled) return;
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+  const span = composerEditorTrailingFmtSpan(sel.getRangeAt(0), el);
+  if (!span) return;
+  const r = document.createRange();
+  r.setStartAfter(span);
+  r.collapse(true);
+  sel.removeAllRanges(); sel.addRange(r);
+}
+
 // Shared beforeinput for both composer editors: (1) newline via insertParagraph/insertLineBreak so Android
 // soft-keyboard Enter (keyCode 229) still lands a clean <br>; (2) a bleed guard — a char typed at the trailing
 // edge of a .fmt-* span is inserted OUTSIDE the span (plain) so a word typed after a formatted word is normal.
@@ -17197,7 +17221,13 @@ function composerEditorBeforeInput(el, event) {
     if (atom) { event.preventDefault(); removeComposerAtom(el, atom); }
     return;
   }
-  if (event.inputType === 'insertText' && typeof event.data === 'string') {
+  // [22] The bleed guard also covers the replacement/composition/autofill insert families (a mobile suggestion
+  // commit / desktop autocorrect / autofill), not just plain insertText — else a word inserted at the trailing edge
+  // of a fmt span inherits the format. A RANGE-replacing variant (non-collapsed target, e.g. spell-correcting a word
+  // IN the span) bails at the isCollapsed check below and is left in place (correctly stays formatted).
+  if ((event.inputType === 'insertText' || event.inputType === 'insertReplacementText'
+    || event.inputType === 'insertFromComposition' || event.inputType === 'insertFromAutofill')
+    && typeof event.data === 'string') {
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
     const span = composerEditorTrailingFmtSpan(sel.getRangeAt(0), el);
@@ -17218,11 +17248,21 @@ function composerEditorBeforeInput(el, event) {
 function composerEditorInsertPlainMultiline(el, text) {
   if (!el || el.disabled) return;
   el.focus();
+  // [18] Neutralize marker-like tokens in the pasted TEXT so serialize->composerBlocksFromDraft can't re-parse a
+  // pasted `[image 1]` as a real chip's marker (which would bind it to the editor's OWN attachment or drop the text
+  // on send). A zero-width space after `[` breaks the marker regex while staying invisible; the `(?!\()` mirrors
+  // EDITOR_INLINE_RE so a link label like `[image 1](url)` is left intact.
+  let raw = String(text ?? '').replace(/\r\n?/g, '\n');
+  raw = raw.replace(/\[((?:image|img)\s+\d+|file\s+\d+|post|check|payment)\](?!\()/gi, '[\u200b$1]');
   composerEditorRange(el).deleteContents(); // collapse any selection at the paste point first
-  composerEditorEscapeTrailingFmt(el); // never let a pasted LINK chip land INSIDE **…**/*…*/`…` (a dead-wire link)
+  // [25] Only ESCAPE the caret out of a trailing fmt span when the paste yields a LINK chip (a link chip trapped
+  // inside **…**/*…*/`…` is a dead-wire link). Plain/marker text inserts at the REAL caret (mid-word, inheriting the
+  // surrounding format) instead of unconditionally jumping to the formatted word's end.
+  const hasLink = /\[[^\]\n]{1,200}\]\([^\s()]{1,2000}\)/.test(raw);
+  if (hasLink) composerEditorEscapeTrailingFmt(el);
   const range = composerEditorRange(el);
   const frag = document.createDocumentFragment();
-  const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const lines = raw.split('\n');
   lines.forEach((line, index) => {
     if (index > 0) frag.append(document.createElement('br'));
     // Render links + formatting so a link copied FROM the composer round-trips as a live chip (not raw `[label](url)`
@@ -19941,6 +19981,7 @@ messageInput?.addEventListener('keydown', (event) => {
 // Newline (insertParagraph/insertLineBreak) + a format-bleed guard, shared with the public composer. In
 // beforeinput NOT keydown so Android soft-keyboard Enter (keyCode 229, key!=='Enter') still lands a clean <br>.
 messageInput?.addEventListener('beforeinput', (event) => composerEditorBeforeInput(messageInput, event));
+messageInput?.addEventListener('compositionstart', () => composerEditorEscapeFmtForComposition(messageInput)); // IME text lands plain after a bold word
 messageInput?.addEventListener('click', (event) => composerEditorLinkClick(messageInput, event));
 messageInput?.addEventListener('copy', (event) => composerEditorCopySelection(messageInput, event, false));
 messageInput?.addEventListener('cut', (event) => composerEditorCopySelection(messageInput, event, true));
@@ -20172,6 +20213,7 @@ publicMessageInput?.addEventListener('keydown', (event) => {
 });
 // Newline + format-bleed guard via beforeinput (not keydown) so Android soft-keyboard Enter (keyCode 229) lands.
 publicMessageInput?.addEventListener('beforeinput', (event) => composerEditorBeforeInput(publicMessageInput, event));
+publicMessageInput?.addEventListener('compositionstart', () => composerEditorEscapeFmtForComposition(publicMessageInput)); // IME text lands plain after a bold word
 publicMessageInput?.addEventListener('click', (event) => composerEditorLinkClick(publicMessageInput, event));
 publicMessageInput?.addEventListener('copy', (event) => composerEditorCopySelection(publicMessageInput, event, false));
 publicMessageInput?.addEventListener('cut', (event) => composerEditorCopySelection(publicMessageInput, event, true));

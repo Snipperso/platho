@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=795" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=796" type="module">/);
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=275">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
@@ -6497,7 +6497,7 @@ describe('PWA runtime config guard', () => {
       expect(app, `${input}:beforeinput`).toMatch(new RegExp(`${input}\\?\\.addEventListener\\('beforeinput', \\(event\\) => composerEditorBeforeInput\\(${input}, event\\)\\)`));
     }
     // Shared beforeinput: newline via insertParagraph/insertLineBreak + a format-bleed guard on insertText.
-    const beforeFn = app.slice(app.indexOf('function composerEditorBeforeInput('), app.indexOf('function composerEditorBeforeInput(') + 1500);
+    const beforeFn = app.slice(app.indexOf('function composerEditorBeforeInput('), app.indexOf('function composerEditorBeforeInput(') + 2300);
     expect(beforeFn).toMatch(/inputType === 'insertParagraph' \|\| event\.inputType === 'insertLineBreak'/);
     expect(beforeFn).toMatch(/composerEditorInsertLineBreak\(el\)/);
     expect(beforeFn).toMatch(/inputType === 'insertText'/);
@@ -6688,9 +6688,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/addEventListener\('copy', \(event\) => composerEditorCopySelection\((?:messageInput|publicMessageInput), event, false\)\)/);
     expect(app).toMatch(/addEventListener\('cut', \(event\) => composerEditorCopySelection\((?:messageInput|publicMessageInput), event, true\)\)/);
     expect(app).toMatch(/function appendEditorInline\(target, text, context = target, renderAttachmentMarkers = true\)/); // paste passes the real editor as marker context
-    // Paste escapes the enclosing fmt span (a link chip must not land inside **…** = dead wire) and keeps attachment
-    // markers as LITERAL text (renderAttachmentMarkers=false) so a pasted [image N] can't phantom-bind the editor's own attachment.
-    expect(app).toMatch(/composerEditorEscapeTrailingFmt\(el\); \/\/ never let a pasted LINK chip/);
+    // Paste escapes the enclosing fmt span ONLY when it yields a link chip (a link inside **…** = dead wire); v796
+    // made that conditional (see PWA-COMPOSER-PASTE-IME-01) so plain/marker text inserts at the caret. Attachment
+    // markers stay LITERAL text (renderAttachmentMarkers=false) so a pasted [image N] can't phantom-bind the own attachment.
+    expect(app).toMatch(/if \(hasLink\) composerEditorEscapeTrailingFmt\(el\);/);
     expect(app).toMatch(/appendEditorInline\(frag, line, el, false\)/);
     expect(app).toMatch(/renderAttachmentMarkers \? buildComposerBlock\(match\[5\], context\) : document\.createTextNode\(match\[5\]\)/);
     // v782: EVERY atom selects ATOMICALLY (user-select:text via contenteditable=false — no 'all' flicker / no
@@ -6814,6 +6815,31 @@ describe('PWA runtime config guard', () => {
     const trail = app.slice(app.indexOf('function composerEditorTrailingFmtSpan('), app.indexOf('function composerEditorTrailingFmtSpan(') + 900);
     expect(trail).toContain('while (span.parentNode && span.parentNode !== el && span.parentNode.nodeType === 1');
     expect(trail).toContain('&& /\\bfmt-/.test(span.parentNode.className || \'\') && span === span.parentNode.lastChild) {');
+  });
+
+  it('PWA-COMPOSER-PASTE-IME-01: paste/cut and IME/replacement input never lose text, an attachment, or leak format (v796 audit)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // [19] Cutting a selection that spans an ATTACHMENT atom is treated as a COPY (the bytes can't ride the text
+    // clipboard, so a real cut+paste would silently lose the image/file); a link atom DOES round-trip so it still cuts.
+    const cut = app.slice(app.indexOf('function composerEditorCopySelection('), app.indexOf('function composerEditorCopySelection(') + 2600);
+    expect(cut).toContain("const hasAttachmentAtom = [...wrapper.querySelectorAll('[data-marker]')].some((a) => !/\\]\\(/.test(a.dataset.marker || ''));");
+    expect(cut).toContain('if (!hasAttachmentAtom) {');
+    // [18] Pasted marker-like tokens are neutralized with a zero-width space (kept invisible, `(?!\\()` spares links)
+    // so serialize->composerBlocksFromDraft can't re-bind a pasted [image 1] to the editor's own attachment on send.
+    expect(app).toContain("raw = raw.replace(/\\[((?:image|img)\\s+\\d+|file\\s+\\d+|post|check|payment)\\](?!\\()/gi, '[\\u200b$1]');");
+    // [25] The paste escape (which jumps the caret to the formatted word's end) fires ONLY when the paste yields a
+    // LINK chip; plain/marker text inserts at the real caret (mid-word), so pasting into a bold word stays put.
+    expect(app).toContain('const hasLink = /\\[[^\\]\\n]{1,200}\\]\\([^\\s()]{1,2000}\\)/.test(raw);');
+    expect(app).toContain('if (hasLink) composerEditorEscapeTrailingFmt(el);');
+    // [22] The bleed guard also covers the replacement/composition/autofill insert families (mobile suggestion /
+    // desktop autocorrect / autofill), not just plain insertText, so a word inserted at a fmt trailing edge is plain.
+    expect(app).toContain("event.inputType === 'insertReplacementText'");
+    expect(app).toContain("event.inputType === 'insertFromComposition' || event.inputType === 'insertFromAutofill'");
+    // [21] IME composition bypasses beforeinput (isComposing), so a compositionstart listener pre-escapes the caret
+    // out of a trailing fmt span before the composed text lands, keeping CJK/mobile-autocorrect words plain.
+    expect(app).toContain('function composerEditorEscapeFmtForComposition(el)');
+    expect(app).toContain("messageInput?.addEventListener('compositionstart', () => composerEditorEscapeFmtForComposition(messageInput));");
+    expect(app).toContain("publicMessageInput?.addEventListener('compositionstart', () => composerEditorEscapeFmtForComposition(publicMessageInput));");
   });
 
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
@@ -7954,7 +7980,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v870/);
+    expect(sw).toMatch(/platho-pwa-prototype-v871/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7963,7 +7989,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=795/);
+    expect(sw).toMatch(/\.\/app\.js\?v=796/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);
