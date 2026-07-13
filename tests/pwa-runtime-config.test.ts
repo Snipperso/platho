@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=793" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=794" type="module">/);
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=275">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
@@ -521,7 +521,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/actionCancelButton\.hidden = !cancellable/);
     expect(app).toMatch(/actionCancelButton\.disabled = !cancellable/);
     expect(app).toMatch(/activeActionDialog\?\.dismissOnBackdrop !== false\) closeActionDialog\(null\)/);
-    expect(app).toMatch(/dismissOnBackdrop = true/);
+    expect(app).toMatch(/dismissOnBackdrop = false/);
     expect(app).toMatch(/dismissOnBackdrop,/);
     expect(app).toMatch(/formAutocomplete: 'on'/);
     expect(app).toMatch(/input:not\(\[readonly\]\):not\(\[type="hidden"\]\):not\(\.password-manager-username\)/);
@@ -2493,7 +2493,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // openActionDialog decouples the close (✕) button (cancellable) from outside-click/Escape (dismissOnBackdrop).
-    expect(app).toMatch(/const cancellable = config\.cancellable \?\? dismissible/);
+    expect(app).toMatch(/const cancellable = config\.cancellable \?\? true/);
     expect(app).toMatch(/actionCancelButton\.hidden = !cancellable/);
     // the ✕ handler is gated on cancellable (NOT on dismissOnBackdrop), so the ✕ works even when backdrop-dismiss is off.
     expect(app).toMatch(/actionCancelButton\?\.addEventListener\('click', \(\) => \{\s*if \(activeActionDialog\?\.cancellable === false\) return/);
@@ -2507,6 +2507,38 @@ describe('PWA runtime config guard', () => {
     );
     expect(unlockSource).toMatch(/dismissOnBackdrop: false/);
     expect(unlockSource).toMatch(/cancellable: true/);
+  });
+
+  it('PWA-MODAL-DISMISS-01: every modal closes ONLY via its ✕ / Cancel — an outside/backdrop tap and Escape no longer dismiss (uniform; the image lightbox viewer is the one opt-in exception)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // v794 (owner): black modals used to close on a stray tap anywhere outside them, discarding in-progress input.
+    // The shared backdrop helper now DEFAULT-DENIES an outside tap; a modal must opt back in.
+    expect(app).toMatch(/function closeOnBackdropClick\(backdrop, close, \{ allowOutsideTap = false \} = \{\}\)/);
+    expect(app).toMatch(/if \(!allowOutsideTap\) return;/);
+    // The action dialog keeps its own per-open opt-in (dismissOnBackdrop, now default OFF); the ✕ stays on by default.
+    expect(app).toMatch(/const dismissible = config\.dismissOnBackdrop === true;/);
+    expect(app).toMatch(/const cancellable = config\.cancellable \?\? true;/);
+    // The three standalone dialogs are wired X-only (NO allowOutsideTap third arg).
+    expect(app).toMatch(/closeOnBackdropClick\(newChatDialog, closeNewChatDialog\);/);
+    expect(app).toMatch(/closeOnBackdropClick\(docsDialog, closeDocsDialog\);/);
+    expect(app).toMatch(/closeOnBackdropClick\(installDialog, \(\) => closeInstallDialog\(\{ dismissed: true \}\)\);/);
+    // The image lightbox is a fullscreen viewer, not a data dialog: it alone keeps tap-outside-to-dismiss.
+    expect(app).toMatch(/closeOnBackdropClick\(imageLightboxDialog, closeImageLightbox, \{ allowOutsideTap: true \}\);/);
+    // The share dialog + the two dynamically-built modals dropped their outside/backdrop click-to-close.
+    expect(app).not.toMatch(/event\.target === sharePostDialog/);
+    expect(app).not.toMatch(/if \(event\.target === backdrop\) closeExternalLinkModal\(\)/);
+    expect(app).not.toMatch(/if \(event\.target === backdrop\) closeLinkComposerModal\(\)/);
+    // The link-composer no longer registers an Escape-to-close keydown listener (stored handler is null now).
+    expect(app).toMatch(/activeLinkComposerModal = \{ backdrop, onKeydown: null, previousFocus \}/);
+    // The global Escape handler no longer dismisses newChat / docs / install (lightbox + popover keep Escape).
+    const escBlock = app.slice(
+      app.indexOf("if (event.key !== 'Escape') return;"),
+      app.indexOf("if (event.key !== 'Escape') return;") + 700,
+    );
+    expect(escBlock).toMatch(/closeImageLightbox\(\)/);
+    expect(escBlock).not.toMatch(/closeNewChatDialog/);
+    expect(escBlock).not.toMatch(/closeDocsDialog/);
+    expect(escBlock).not.toMatch(/closeInstallDialog/);
   });
 
   it('PWA-SEND-LOCK-01: an in-flight send defers the background lock (bounded), and keyless resume needs no key', () => {
@@ -7892,7 +7924,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v868/);
+    expect(sw).toMatch(/platho-pwa-prototype-v869/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7901,7 +7933,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=793/);
+    expect(sw).toMatch(/\.\/app\.js\?v=794/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);
