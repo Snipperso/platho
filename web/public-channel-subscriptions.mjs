@@ -349,12 +349,11 @@ export function publicChannelFeedToThread(channel, feed) {
       type: 'in',
       text: post.title ? `${post.title}\n${post.text}` : (feedBlocksPreview(post.blocks) ?? post.text),
       blocks: post.blocks,
-      // The author/channel name is shown once by the feed item (thread.name); keep only status + date here so
-      // a wallet post does not repeat the name. The technical entry uid was dropped — it is internal noise in
-      // the always-visible header (the author name + status + date already identify the post).
-      meta: [post.publishStatus, shortTime(post.createdAt)]
-        .filter(Boolean)
-        .join(' · '),
+      // The author/channel name is shown once by the feed item (thread.name); keep only the DATE here so a wallet
+      // post does not repeat the name. publishStatus is intentionally NOT included: buildPublicFeedArticle renders it
+      // as a separate LIVE .public-publish-status badge (updated in place, retry-wired) — putting it here too printed
+      // the status TWICE (a static stale copy in the meta line + the live badge). The technical entry uid was dropped.
+      meta: shortTime(post.createdAt) ?? '',
       publicPostId: post.id,
       publicPostTitle: post.title,
       publicPostText: post.text,

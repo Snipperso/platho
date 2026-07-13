@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=790" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=791" type="module">/);
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=273">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
@@ -425,7 +425,10 @@ describe('PWA runtime config guard', () => {
     const mjs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
     // (1) A wallet post shows its author/channel name ONCE: dropped from message.meta, and no title
     // fallback to the channel name (the live name comes from thread.name in the feed item).
-    expect(mjs).toMatch(/meta: \[post\.publishStatus, shortTime\(post\.createdAt\)/);
+    // v791: the header meta is the DATE only — publishStatus is NOT included here (buildPublicFeedArticle renders it as
+    // a separate LIVE .public-publish-status badge, so including it in the meta printed the status TWICE while sending).
+    expect(mjs).toMatch(/meta: shortTime\(post\.createdAt\) \?\? ''/);
+    expect(mjs).not.toMatch(/meta: \[post\.publishStatus, shortTime/);
     expect(mjs).toMatch(/title: message\.publicPostTitle \?\? null/);
     // (2) Posts are marked read when actually viewed (Public tab active). F2 render cap: only the rendered window
     // (newest publicFeedShownCap items) is marked read -- older posts held behind "show older" are not pre-cleared.
@@ -7795,8 +7798,10 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.public-feed \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/);
     // 3b. Plain feed post bodies wrap long tokens.
     expect(css).toMatch(/\.feed-item p \{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?word-break: break-word;/);
-    // 3c. The technical entry uid is dropped from the feed header meta.
-    expect(pubMjs).toMatch(/meta: \[post\.publishStatus, shortTime\(post\.createdAt\)\]/);
+    // 3c. The technical entry uid is dropped from the feed header meta; v791: publishStatus is dropped too (it prints
+    // once as the live .public-publish-status badge — including it here duplicated the status while sending).
+    expect(pubMjs).toMatch(/meta: shortTime\(post\.createdAt\) \?\? ''/);
+    expect(pubMjs).not.toMatch(/meta: \[post\.publishStatus, shortTime/);
     expect(pubMjs).not.toMatch(/uid \$\{post\.entryUid/);
     // 4. Own posts show in the feed without auto-subscribing (feed source = subscribed + own).
     expect(app).toMatch(/function feedSourcePublicChannels\(\)/);
@@ -7850,7 +7855,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v865/);
+    expect(sw).toMatch(/platho-pwa-prototype-v866/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7859,7 +7864,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=790/);
+    expect(sw).toMatch(/\.\/app\.js\?v=791/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);
@@ -7873,7 +7878,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=59/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=14/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=18/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=19/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
