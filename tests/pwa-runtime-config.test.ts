@@ -283,8 +283,8 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=792" type="module">/);
-    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=274">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=793" type="module">/);
+    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=275">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6070,10 +6070,25 @@ describe('PWA runtime config guard', () => {
     // The feed cache round-trip keeps share blocks (normalizeFeedBlocks whitelists them like reply quotes).
     expect(subs).toMatch(/if \(block\.type === 'share'\) \{/);
     expect(subs).toMatch(/textTruncated: block\.textTruncated === true,/);
-    // Every locale ships the share strings (OPSEC key parity).
+    // v793 (owner): share modal reordered (Copy to clipboard, then My notes, then own channel, then contacts) + a new
+    // Copy-to-clipboard target; My notes uses its pencil icon (setThreadAvatarNode), not the wallet-letter avatar.
+    expect(app).toMatch(/function buildShareTargetRow\(\{ label, sublabel, avatarUrl, thread, icon, onChoose \}\)/);
+    expect(app).toMatch(/if \(thread\) \{\s*setThreadAvatarNode\(avatar, thread\);/);
+    expect(app).toMatch(/\} else if \(icon === 'copy'\) \{[\s\S]*?avatar\.innerHTML = SHARE_COPY_ICON_SVG;/);
+    expect(app).toMatch(/function chooseShareCopyToClipboard\(\)/);
+    expect(app).toMatch(/copyTextToClipboard\(text\)[\s\S]*?setPublicStatus\(t\('dialog\.shareCopied'\)\)/);
+    expect(app).toMatch(/fullText, \/\/ untruncated/); // the copy target uses the untruncated body
+    const shareList = app.slice(app.indexOf('function renderSharePostList()'), app.indexOf('function renderSharePostList()') + 1700);
+    expect(shareList).toMatch(/label: t\('dialog\.shareCopyToClipboard'\),\s*icon: 'copy',/);
+    // order: Copy row -> My notes (Saved, thread icon) -> own channel -> contacts by recency
+    expect(shareList).toMatch(/shareCopyToClipboard[\s\S]*?isSavedMessagesThread\(thread\)[\s\S]*?label: t\('chat\.myNotes'\),\s*thread,[\s\S]*?if \(own && ownWallet\)[\s\S]*?const contacts = visible/);
+    const shareCss = readFileSync('web/styles.css', 'utf8');
+    expect(shareCss).toMatch(/--modal-outline: rgba\(48, 213, 176, 0\.5\);/);
+    expect(shareCss).toMatch(/\.recipient-dialog,\s*\.action-dialog,\s*\.docs-dialog,\s*\.install-dialog \{[\s\S]*?border: 1px solid var\(--modal-outline\);/);
+    // Every locale ships the share strings (OPSEC key parity) — incl. the v793 copy-to-clipboard trio.
     for (const locale of Object.keys(I18N_STRINGS)) {
       const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
-      for (const key of ['public.share', 'public.sharedPost', 'composer.sharingPost', 'dialog.sharePost', 'dialog.shareToOwnChannel', 'dialog.shareNoTargets']) {
+      for (const key of ['public.share', 'public.sharedPost', 'composer.sharingPost', 'dialog.sharePost', 'dialog.shareToOwnChannel', 'dialog.shareNoTargets', 'dialog.shareCopyToClipboard', 'dialog.shareCopied', 'dialog.shareCopyFailed']) {
         expect(dict[key], `${locale}:${key}`).toBeTruthy();
       }
     }
@@ -6546,7 +6561,6 @@ describe('PWA runtime config guard', () => {
     // v775: a newline/attachment/word-toggle steps the caret OUT of a trailing .fmt-* span, so bold never swallows
     // a <br>/image atom (which would serialize to unbalanced ** across the marker -> literal ** at the recipient).
     expect(app).toMatch(/function composerEditorEscapeTrailingFmt\(el\)/);
-    expect(app).toMatch(/composerEditorEscapeTrailingFmt\(el\); \/\/ a newline after a bold word/);
     expect(app).toMatch(/composerEditorEscapeTrailingFmt\(el\); \/\/ never drop an attachment marker/);
     // escape steps out of the OUTERMOST .fmt-* ancestor (nested bold>italic), not just the innermost (else a marker
     // lands inside the still-open bold -> unbalanced ** on send). No `break` on the first fmt match.
@@ -6558,6 +6572,11 @@ describe('PWA runtime config guard', () => {
     // (the old always-after put the Enter's <br> below the bold heading = new line under it instead of over it).
     expect(escFn).toMatch(/const atLeadingEdge = before\.textContent === '' && !before\.querySelector\('br, \[data-marker\]'\);/);
     expect(escFn).toMatch(/if \(atLeadingEdge\) r\.setStartBefore\(span\); else r\.setStartAfter\(span\);/);
+    // v793 (owner): MID-word Enter in a bold/italic word SPLITS the span (second half wraps down, still formatted:
+    // **сло**\n**во**) instead of jumping the caret to the word end. Leading/trailing edges fall back to escapeTrailingFmt.
+    expect(app).toMatch(/function composerEditorSplitFmtForNewlineIfMidWord\(el\)/);
+    expect(app).toMatch(/if \(nothingBefore \|\| nothingAfter\) return false;[\s\S]*?composerEditorSplitFmtAtCaret\(el\); \/\/ MID-word/);
+    expect(app).toMatch(/if \(!composerEditorSplitFmtForNewlineIfMidWord\(el\)\) composerEditorEscapeTrailingFmt\(el\);/);
     // Toolbar-button :hover is gated behind @media (hover: hover) — on touch, :hover STICKS after a tap so Bold/
     // Italic stayed accent-green after pressing (owner report). No ungated :hover background rule.
     expect(css).toMatch(/@media \(hover: hover\) \{\s*\.composer-toolbar-button:hover:not\(:disabled\) \{/);
@@ -7873,19 +7892,19 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v867/);
+    expect(sw).toMatch(/platho-pwa-prototype-v868/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=274/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=275/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=792/);
+    expect(sw).toMatch(/\.\/app\.js\?v=793/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=32/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=32/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline

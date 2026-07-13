@@ -186,7 +186,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=32';
+} from './i18n.mjs?v=33';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -198,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v792';
+const PLATHO_APP_RUNTIME_VERSION = 'v793';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6843,6 +6843,7 @@ function sharePayloadFromPublicItem(item) {
     author: String(item.author ?? '').trim() || publicAuthorLabel(authorWallet) || shortAddress(authorWallet),
     title: String(item.title ?? ''),
     snippet,
+    fullText, // untruncated — used by the "copy to clipboard" share target (the wire SHARE block still uses snippet)
     hasImage: blocks.some((block) => block?.type === 'image' && block.url) || Boolean(item.imageUrl),
     textTruncated: snippet.length < fullText.length,
   };
@@ -6872,14 +6873,26 @@ function closeSharePostDialog() {
   if (sharePostDialog) sharePostDialog.hidden = true;
 }
 
-function buildShareTargetRow(label, sublabel, avatarUrl, onChoose) {
+// Clipboard-copy glyph for the "copy to clipboard" share target (same inline-SVG style as the Saved pencil).
+const SHARE_COPY_ICON_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+function buildShareTargetRow({ label, sublabel, avatarUrl, thread, icon, onChoose }) {
   const row = document.createElement('button');
   row.type = 'button';
   row.className = 'share-target-row';
   const avatar = document.createElement('div');
   avatar.className = 'avatar share-target-avatar';
   avatar.setAttribute('aria-hidden', 'true');
-  setAvatarNode(avatar, String(label ?? 'P').slice(0, 1), avatarUrl);
+  if (thread) {
+    setThreadAvatarNode(avatar, thread); // Saved (My notes) -> its pencil icon, not the wallet-letter avatar
+  } else if (icon === 'copy') {
+    avatar.classList.add('avatar-saved'); // reuse the icon-tinted avatar look
+    avatar.innerHTML = SHARE_COPY_ICON_SVG;
+  } else {
+    setAvatarNode(avatar, String(label ?? 'P').slice(0, 1), avatarUrl);
+  }
   const text = document.createElement('span');
   text.className = 'share-target-text';
   const name = document.createElement('span');
@@ -6900,41 +6913,47 @@ function buildShareTargetRow(label, sublabel, avatarUrl, onChoose) {
 function renderSharePostList() {
   if (!sharePostList) return;
   sharePostList.replaceChildren();
-  // Own channel first (a repost is the loudest action), then My notes, then private contacts by recency —
-  // the same order the thread list shows them.
+  // Order (owner v793): Copy to clipboard, then My notes, then the own public channel, then private contacts by recency.
+  sharePostList.append(buildShareTargetRow({
+    label: t('dialog.shareCopyToClipboard'),
+    icon: 'copy',
+    onChoose: () => chooseShareCopyToClipboard(),
+  }));
   const ownWallet = rawWalletAddress(plathoWallet?.address ?? storedPlathoWalletRecord()?.address);
   const own = ownPublicChannel();
-  if (own && ownWallet) {
-    sharePostList.append(buildShareTargetRow(
-      t('dialog.shareToOwnChannel'),
-      t('public.you'),
-      publicAvatarUrlForWallet(ownWallet),
-      () => chooseShareTargetOwnChannel(),
-    ));
-  }
   const visible = threads.filter((thread) => !thread.readOnly && !isTransientPendingResolutionThread(thread));
-  const ordered = [
-    ...visible.filter((thread) => isSavedMessagesThread(thread)),
-    ...visible
-      .filter((thread) => !isSavedMessagesThread(thread))
-      .sort((a, b) => threadLastActivityMs(b) - threadLastActivityMs(a)),
-  ];
-  for (const thread of ordered) {
+  // My notes (Saved) first — with its pencil icon, not the wallet-letter avatar.
+  for (const thread of visible.filter((thread) => isSavedMessagesThread(thread))) {
     const wallet = threadPrimaryWalletRaw(thread);
     if (!wallet) continue;
-    const label = isSavedMessagesThread(thread) ? t('chat.myNotes') : (thread.name || shortAddress(wallet));
-    sharePostList.append(buildShareTargetRow(
-      label,
-      isSavedMessagesThread(thread) ? '' : shortAddress(wallet),
-      publicAvatarUrlForWallet(wallet),
-      () => chooseShareTargetThread(thread),
-    ));
+    sharePostList.append(buildShareTargetRow({
+      label: t('chat.myNotes'),
+      thread,
+      onChoose: () => chooseShareTargetThread(thread),
+    }));
   }
-  if (sharePostList.childElementCount === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'share-target-empty';
-    empty.textContent = t('dialog.shareNoTargets');
-    sharePostList.append(empty);
+  // Then the own public channel (a repost).
+  if (own && ownWallet) {
+    sharePostList.append(buildShareTargetRow({
+      label: t('dialog.shareToOwnChannel'),
+      sublabel: t('public.you'),
+      avatarUrl: publicAvatarUrlForWallet(ownWallet),
+      onChoose: () => chooseShareTargetOwnChannel(),
+    }));
+  }
+  // Then private contacts by recency.
+  const contacts = visible
+    .filter((thread) => !isSavedMessagesThread(thread))
+    .sort((a, b) => threadLastActivityMs(b) - threadLastActivityMs(a));
+  for (const thread of contacts) {
+    const wallet = threadPrimaryWalletRaw(thread);
+    if (!wallet) continue;
+    sharePostList.append(buildShareTargetRow({
+      label: thread.name || shortAddress(wallet),
+      sublabel: shortAddress(wallet),
+      avatarUrl: publicAvatarUrlForWallet(wallet),
+      onChoose: () => chooseShareTargetThread(thread),
+    }));
   }
 }
 
@@ -6968,6 +6987,17 @@ function chooseShareTargetOwnChannel() {
   setPublicShareDraft(share);
   insertShareMarker(publicMessageInput);
   if (publicMessageInput && !publicMessageInput.disabled) publicMessageInput.focus();
+}
+
+// Copy the shared post's text to the clipboard (title + the UNTRUNCATED body) — a plain "take it elsewhere" affordance.
+function chooseShareCopyToClipboard() {
+  const share = pendingSharePayload;
+  closeSharePostDialog();
+  if (!share) return;
+  const text = [String(share.title ?? '').trim(), String(share.fullText ?? '').trim()].filter(Boolean).join('\n\n');
+  copyTextToClipboard(text)
+    .then(() => setPublicStatus(t('dialog.shareCopied')))
+    .catch((error) => { console.error(error); setPublicStatus(t('dialog.shareCopyFailed')); });
 }
 
 sharePostCloseButton?.addEventListener('click', () => closeSharePostDialog());
@@ -16631,10 +16661,38 @@ function composerEditorSplitFmtAtCaret(el) {
   sel.addRange(r);
 }
 
+// Enter INSIDE a bold/italic word must SPLIT the fmt span so the second half wraps to the new line KEEPING its format
+// (`**hel**\n**lo**` = two balanced spans), not jump the caret to the word end. Returns true if it split (caret was
+// MID-word). A leading/trailing edge (or no fmt span) returns false so composerEditorInsertLineBreak falls back to
+// composerEditorEscapeTrailingFmt (leading -> line ABOVE the word; trailing -> plain line below).
+function composerEditorSplitFmtForNewlineIfMidWord(el) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return false;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed) return false;
+  const isFmt = (n) => n && n.nodeType === 1 && /\bfmt-/.test(n.className || '');
+  let n = range.startContainer, span = null;
+  while (n && n !== el) { if (isFmt(n)) span = n; n = n.parentNode; } // outermost enclosing fmt span
+  if (!span) return false;
+  const emptyRun = (from, fromOff, to, toOff) => {
+    const r = document.createRange(); r.setStart(from, fromOff); r.setEnd(to, toOff);
+    const frag = r.cloneContents();
+    return frag.textContent === '' && !frag.querySelector('br, [data-marker]');
+  };
+  const nothingBefore = emptyRun(span, 0, range.startContainer, range.startOffset);
+  const nothingAfter = emptyRun(range.startContainer, range.startOffset, span, span.childNodes.length);
+  if (nothingBefore || nothingAfter) return false; // leading / trailing edge -> let escapeTrailingFmt place it
+  composerEditorSplitFmtAtCaret(el); // MID-word: split into two same-format halves, caret between them
+  return true;
+}
+
 function composerEditorInsertLineBreak(el) {
   if (!el || el.disabled) return;
   el.focus();
-  composerEditorEscapeTrailingFmt(el); // a newline after a bold word starts a PLAIN line, not more bold
+  // MID-word Enter in a bold/italic word SPLITS it (second half wraps down, still formatted); a leading/trailing edge
+  // (or plain text) falls back to escapeTrailingFmt (line ABOVE the word / plain line below) so a `<br>` never lands
+  // INSIDE the formatting (which would serialize to unbalanced ** across the newline).
+  if (!composerEditorSplitFmtForNewlineIfMidWord(el)) composerEditorEscapeTrailingFmt(el);
   const range = composerEditorRange(el);
   range.deleteContents();
   const br = document.createElement('br');
