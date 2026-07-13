@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v789';
+const PLATHO_APP_RUNTIME_VERSION = 'v790';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16528,12 +16528,14 @@ function composerEditorInsertText(el, text) {
   composerEditorAfterEdit(el);
 }
 
-// If the collapsed caret is ANYWHERE inside a .fmt-* span, move it to just AFTER the OUTERMOST such span. A newline
-// or an attachment marker inserted WHILE the caret is inside the span would otherwise be trapped in the formatting:
-// a marker inside bold serializes to `**…[image N]…**` which composerBlocksFromDraft splits into UNBALANCED `**`
-// blocks, and a `<br>` inside bold serializes to `**…\n…**` which the recipient can't match (bold cannot span a
-// newline) — both show literal asterisks. So Enter/attachment always land OUTSIDE the word's formatting. (Since
-// v779 the caret can rest MID-word after a toggle, so we escape the whole span, not just its trailing edge.)
+// If the collapsed caret is ANYWHERE inside a .fmt-* span, move it OUT of the OUTERMOST such span. A newline or an
+// attachment marker inserted WHILE the caret is inside the span would otherwise be trapped in the formatting: a marker
+// inside bold serializes to `**…[image N]…**` which composerBlocksFromDraft splits into UNBALANCED `**` blocks, and a
+// `<br>` inside bold serializes to `**…\n…**` which the recipient can't match (bold cannot span a newline) — both show
+// literal asterisks. So Enter/attachment always land OUTSIDE the word's formatting. (Since v779 the caret can rest
+// MID-word after a toggle, so we escape the whole span, not just its trailing edge.) DIRECTION: at the span's LEADING
+// edge (nothing before the caret inside it — e.g. Enter at the START of a bold heading) escape to BEFORE the span, so
+// the new line/marker lands ABOVE/before the word; otherwise (mid/trailing) escape to AFTER it.
 function composerEditorEscapeTrailingFmt(el) {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
@@ -16547,8 +16549,13 @@ function composerEditorEscapeTrailingFmt(el) {
     n = n.parentNode;
   }
   if (!span) return;
+  const lead = document.createRange(); // is there any content BEFORE the caret inside the span?
+  lead.setStart(span, 0);
+  lead.setEnd(range.startContainer, range.startOffset);
+  const before = lead.cloneContents();
+  const atLeadingEdge = before.textContent === '' && !before.querySelector('br, [data-marker]');
   const r = document.createRange();
-  r.setStartAfter(span);
+  if (atLeadingEdge) r.setStartBefore(span); else r.setStartAfter(span);
   r.collapse(true);
   sel.removeAllRanges();
   sel.addRange(r);
