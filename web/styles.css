@@ -4019,6 +4019,20 @@ button.feed-item:hover {
   border-color: rgba(48, 213, 176, 0.6);
 }
 
+/* Live field budget counter (e.g. an on-chain byte cap) — a small right-aligned hint below the input; red when over. */
+.action-dialog-field-counter {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.action-dialog-field-counter.is-over {
+  color: #ff7a7a;
+  font-weight: 600;
+}
+
 .action-fields {
   display: grid;
   gap: 10px;

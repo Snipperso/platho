@@ -283,8 +283,8 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=791" type="module">/);
-    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=273">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=792" type="module">/);
+    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=274">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -4780,7 +4780,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/content = encodeProfileBlockContent\(block\);/);
     expect(app).toMatch(/const profile = decodeProfileBlockContent\(content\);\s*if \(profile\) blocks\.push\(\{ type: 'profile', \.\.\.profile \}\);/);
     // Imported from the policy module (bumped ?v in lockstep with the codec change).
-    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,\s*\} from '\.\/capsule-part-policy\.mjs\?v=8';/);
+    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*PROFILE_DESCRIPTION_MAX_BYTES,\s*PROFILE_TAG_MAX_BYTES,\s*PROFILE_MAX_TAGS,\s*utf8ByteLength,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,\s*\} from '\.\/capsule-part-policy\.mjs\?v=9';/);
   });
 
   it('PWA-PROFILE-USERNAME-01: channel .ath username is claimed in the profile, verified on-chain, and only the verified name is shown', () => {
@@ -4861,6 +4861,24 @@ describe('PWA runtime config guard', () => {
     expect(dlg).toMatch(/label: t\('username\.gramHold'\), value: t\('username\.gramHoldValue', \{ amount: formatTonNanotons\(hold\) \}\)/);
     expect(EN_STRINGS['username.gramHold']).toBe('GRAM hold');
     expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');
+    // v792 (owner): the on-chain profile byte caps were raised (16 cyrillic chars/tag was too tight — long russian tags
+    // cut mid-word; 256-char descriptions too short), and the edit dialog shows a LIVE utf-8 byte budget so nothing
+    // truncates silently on save. Decode is unchanged (length fields carry any size) — backward-compatible.
+    const capsuleMjs = readFileSync('web/capsule-part-policy.mjs', 'utf8');
+    expect(capsuleMjs).toMatch(/export const PROFILE_DESCRIPTION_MAX_BYTES = 1536;/);
+    expect(capsuleMjs).toMatch(/export const PROFILE_TAG_MAX_BYTES = 64;/);
+    // The description + tags fields each carry a counter(value) -> { text, over } computing the UTF-8 byte budget.
+    expect(app).toMatch(/const used = utf8ByteLength\(value\);\s*return \{ text: t\('public\.profileDescriptionBudget', \{ used, max: PROFILE_DESCRIPTION_MAX_BYTES \}\), over: used > PROFILE_DESCRIPTION_MAX_BYTES \};/);
+    expect(app).toMatch(/const over = raw\.length > PROFILE_MAX_TAGS \|\| raw\.some\(\(tag\) => utf8ByteLength\(tag\) > PROFILE_TAG_MAX_BYTES\);/);
+    // The generic dialog field renderer appends a live counter span updated on every input.
+    expect(app).toMatch(/if \(typeof field\.counter === 'function'\) \{[\s\S]*?input\.addEventListener\('input', updateCounter\);[\s\S]*?wrapper\.append\(counter\);/);
+    // Counter i18n keys exist in EVERY locale (parity enforced elsewhere; presence pinned here) + the CSS is styled.
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      expect(I18N_STRINGS[locale]['public.profileDescriptionBudget'], `${locale}:descBudget`).toBeTruthy();
+      expect(I18N_STRINGS[locale]['public.profileTagsBudget'], `${locale}:tagsBudget`).toBeTruthy();
+    }
+    expect(css).toMatch(/\.action-dialog-field-counter \{[\s\S]*?text-align: right;/);
+    expect(css).toMatch(/\.action-dialog-field-counter\.is-over \{[\s\S]*?color: #ff7a7a;/);
   });
 
   it('PWA-POPOVER-SCROLL-01: the anchored identity/channel-about popover closes on scroll (not only outside-click)', () => {
@@ -7855,19 +7873,19 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v866/);
+    expect(sw).toMatch(/platho-pwa-prototype-v867/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=273/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=274/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=791/);
+    expect(sw).toMatch(/\.\/app\.js\?v=792/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);
+    expect(sw).toMatch(/\.\/i18n\.mjs\?v=32/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=32/);
     expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
