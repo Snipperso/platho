@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=798" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=799" type="module">/);
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=276">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
@@ -6893,6 +6893,27 @@ describe('PWA runtime config guard', () => {
     expect(norm).toContain('while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);');
   });
 
+  it('PWA-COMPOSER-NATIVE-FMT-01: the composer neutralizes native <b>/<strong>/inline-style the browser injects as a typing-style artifact (v799)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The composer uses ONLY .fmt-* class spans; a native <b>/<strong>/<i>/<em>/<u>/<font>/inline-style element is
+    // a contentEditable typing-style leak (typing right after deleting a bold word). Unwrap every such element on
+    // 'input' (keeping its text so the caret survives), NEVER our own .fmt-* spans.
+    expect(app).toContain('function composerEditorStripNativeFormatting(el)');
+    expect(app).toContain('el.querySelectorAll(\'b, strong, i, em, u, s, font, [style*="font-weight"], [style*="font-style"], [style*="text-decoration"]\');');
+    const strip = app.slice(app.indexOf('function composerEditorStripNativeFormatting('), app.indexOf('function composerEditorStripNativeFormatting(') + 700);
+    expect(strip).toContain("if (/\\bfmt-/.test(node.className || '')) continue;"); // keep our own toolbar spans
+    expect(strip).toContain('while (node.firstChild) node.parentNode.insertBefore(node.firstChild, node);');
+    // Wired into BOTH editors' 'input' listeners, before the empty-fmt normalize.
+    expect(app).toContain('if (!event.isComposing) composerEditorStripNativeFormatting(messageInput);');
+    expect(app).toContain('if (!event.isComposing) composerEditorStripNativeFormatting(publicMessageInput);');
+    // Belt-and-suspenders on the WIRE: serializeComposerEditor treats ONLY .fmt-* classes as format — a native
+    // <b>/<strong>/<i>/<em>/<code> tag (which the composer never creates) serializes as PLAIN, never as **.
+    const ser = app.slice(app.indexOf('function serializeComposerEditor('), app.indexOf('function serializeComposerEditor(') + 2600);
+    expect(ser).toContain("} else if (cls.contains('fmt-bold')) {");
+    expect(ser).not.toContain("tag === 'STRONG'");
+    expect(ser).not.toContain("tag === 'B' ||");
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -8031,7 +8052,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v873/);
+    expect(sw).toMatch(/platho-pwa-prototype-v874/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -8040,7 +8061,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=798/);
+    expect(sw).toMatch(/\.\/app\.js\?v=799/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);

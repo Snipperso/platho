@@ -198,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v798';
+const PLATHO_APP_RUNTIME_VERSION = 'v799';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16460,11 +16460,11 @@ function serializeComposerEditor(el, keepTrailingBr = false) {
           else { flush(); out += '\n'; }
         } else if (child.dataset && child.dataset.marker) {
           flush(); out += child.dataset.marker; // atomic attachment/link chip -> its [marker], never inside emphasis
-        } else if (tag === 'STRONG' || tag === 'B' || cls.contains('fmt-bold')) {
+        } else if (cls.contains('fmt-bold')) {
           seg += serChildren(child, '**');
-        } else if (tag === 'EM' || tag === 'I' || cls.contains('fmt-italic')) {
+        } else if (cls.contains('fmt-italic')) {
           seg += serChildren(child, '*');
-        } else if (tag === 'CODE' || cls.contains('fmt-code')) {
+        } else if (cls.contains('fmt-code')) {
           seg += serChildren(child, '`');
         } else if (tag === 'DIV' || tag === 'P') {
           // A block boundary (browser/paste inserted one despite the Enter intercept) -> newline before content.
@@ -16740,6 +16740,26 @@ function composerEditorPruneEmptyFmt(el) {
   for (const span of [...el.querySelectorAll('[class*="fmt-"]')]) {
     if (!span.isConnected) continue;
     if (/\bfmt-/.test(span.className || '') && span.textContent === '' && !span.querySelector('br, [data-marker]')) span.remove();
+  }
+}
+
+// Our composer expresses formatting ONLY as `.fmt-*` CLASS spans applied via the toolbar — it NEVER creates native
+// <b>/<strong>/<i>/<em>/<u>/<font> elements or inline font-weight/font-style styles. So any of those in the DOM is a
+// contentEditable "typing style" ARTIFACT: after Backspace-deleting a bold word the browser keeps queryCommandState
+// ('bold')===true, so the NEXT native keystroke wraps the char in the browser's OWN bold element. That looks bold,
+// serialized to `**` the user never asked for, AND the `.fmt-*` toggle can't SEE it (so pressing Bold ADDs a
+// `.fmt-bold` layer -> `****` instead of removing) — the owner bug "delete all, type -> bold, Bold does nothing".
+// Unwrap every native format element on `input`, keeping its text (moving the text nodes preserves the caret), so
+// typed text is PLAIN unless the toolbar formatted it as a `.fmt-*` span. Never touches our `.fmt-*` spans or chips.
+function composerEditorStripNativeFormatting(el) {
+  if (!el) return;
+  const natives = el.querySelectorAll('b, strong, i, em, u, s, font, [style*="font-weight"], [style*="font-style"], [style*="text-decoration"]');
+  for (const node of natives) {
+    if (!node.isConnected || node.nodeType !== 1) continue;
+    if (/\bfmt-/.test(node.className || '')) continue; // our own toolbar span — keep
+    if (node.closest && node.closest('[data-marker]')) continue; // inside an atom chip — leave it alone
+    while (node.firstChild) node.parentNode.insertBefore(node.firstChild, node);
+    node.remove();
   }
 }
 
@@ -20137,6 +20157,7 @@ registerVaultKeysButton?.addEventListener('click', async () => {
 });
 
 messageInput?.addEventListener('input', (event) => {
+  if (!event.isComposing) composerEditorStripNativeFormatting(messageInput); // unwrap browser <b>/inline-style typing-style artifacts
   if (!event.isComposing) composerEditorNormalizeEmptyFmt(messageInput); // drop a span a native delete emptied (S2)
   enforceComposerByteLimit();
   reconcileComposerAttachments(messageInput); // prune attachments whose atom a non-collapsed delete/paste removed
@@ -20370,6 +20391,7 @@ document.addEventListener('keydown', (event) => {
 });
 
 publicMessageInput?.addEventListener('input', (event) => {
+  if (!event.isComposing) composerEditorStripNativeFormatting(publicMessageInput); // unwrap browser <b>/inline-style typing-style artifacts
   if (!event.isComposing) composerEditorNormalizeEmptyFmt(publicMessageInput); // drop a span a native delete emptied (S2)
   enforcePublicComposerByteLimit();
   reconcileComposerAttachments(publicMessageInput); // prune attachments whose atom a non-collapsed delete/paste removed
