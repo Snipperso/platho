@@ -283,8 +283,8 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=796" type="module">/);
-    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=275">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=797" type="module">/);
+    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=276">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6842,6 +6842,33 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain("publicMessageInput?.addEventListener('compositionstart', () => composerEditorEscapeFmtForComposition(publicMessageInput));");
   });
 
+  it('PWA-SHARED-POST-IMAGE-01: a shared post shows the ORIGINAL image resolved by entryId from the local cache — no wire copy (v797)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const policy = readFileSync('web/capsule-part-policy.mjs', 'utf8');
+    // A SHARE is an internal REFERENCE (entryId): the image is resolved from LOCAL caches, never re-uploaded. The
+    // resolver finds the post in the feed cache by entryId and warms its stripped image from the durable media store.
+    expect(app).toContain('function findCachedPublicPostByEntryId(entryId)');
+    expect(app).toContain('async function resolveSharedPostImageUrl(entryId, expectedBodyHash)');
+    expect(app).toContain('const post = findCachedPublicPostByEntryId(entryId);');
+    expect(app).toContain('const store = await publicPostMediaStore();'); // warm the stripped image from the durable store
+    expect(app).toContain('applyPublicPostMediaRecord(post, media);');
+    // REFERENCE INTEGRITY: the SHARE block is sender-authored, so the resolved post's bodyHash must match the block's
+    // (content-addressed) — else a crafted entryId could show an unrelated cached post's image under a spoofed label.
+    expect(app).toContain('function normalizeBodyHashHex(value)');
+    expect(app).toContain('if (!want || want !== normalizeBodyHashHex(post.bodyHash)) return null;');
+    // buildSharedPostEmbed swaps the media hint for the real <img> (data-url .src, never innerHTML = XSS-safe).
+    expect(app).toContain('resolveSharedPostImageUrl(block.entryId, block.bodyHash).then((url) => {');
+    expect(app).toContain('mediaHint.replaceWith(img);');
+    expect(app).toContain('img.src = url;');
+    const embed = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildSharedPostEmbed(') + 2600);
+    expect(embed).not.toMatch(/innerHTML/);
+    // NO wire change: the SHARE block codec stays at version 1 (the reference — entryId + bodyHash — already rides it).
+    expect(policy).toContain('export const SHARE_BLOCK_CONTENT_VERSION = 1;');
+    // The resolved image has a feed-style image rule.
+    expect(css).toMatch(/\.shared-post-embed-image \{[\s\S]*?max-width: 100%;[\s\S]*?max-height: 260px;/);
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -7980,16 +8007,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v871/);
+    expect(sw).toMatch(/platho-pwa-prototype-v872/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=275/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=276/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=796/);
+    expect(sw).toMatch(/\.\/app\.js\?v=797/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);

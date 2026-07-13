@@ -198,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v796';
+const PLATHO_APP_RUNTIME_VERSION = 'v797';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -7246,10 +7246,75 @@ function wireClampToggleButton(root, body, inner, expandedSet, key) {
 // publicFeedExpandedPosts pattern one level down).
 const expandedSharedEmbeds = new Set();
 
+// The image of a resolved public post (the top-level imageUrl of an image-only post, or the first image block of
+// a text+image post), or null when it carries none / hasn't warmed its media yet.
+function sharedPostImageUrlFromPost(post) {
+  const media = publicPostRenderableImageMedia(post);
+  if (!media) return null;
+  if (media.imageUrl) return media.imageUrl;
+  const imageBlock = (media.blocks ?? []).find((b) => b?.type === 'image' && typeof b.url === 'string' && b.url.length > 0);
+  return imageBlock?.url ?? null;
+}
+
+// The original public post a SHARE embed references, found in the subscribed/viewed feed cache by entryId (posts
+// carry both id and entryId). null when the channel isn't cached locally.
+function findCachedPublicPostByEntryId(entryId) {
+  const target = String(entryId ?? '');
+  if (!target) return null;
+  let found = null;
+  eachCachedPublicPost((post) => {
+    if (found || !post) return;
+    if (String(post.entryId ?? '') === target || String(post.readEntryId ?? '') === target) found = post;
+  });
+  return found;
+}
+
+// Canonical 32-byte body hash (lowercase, no 0x), or null when malformed — for comparing a SHARE block's bodyHash
+// to a resolved post's, so both forms (with/without 0x, any case) match.
+function normalizeBodyHashHex(value) {
+  const hex = String(value ?? '').replace(/^0x/i, '').toLowerCase();
+  return /^[0-9a-f]{64}$/.test(hex) ? hex : null;
+}
+
+// v797: a SHARE is an internal REFERENCE (entryId), not a copy — the original post's image already lives on-chain
+// (retained >=1 year by CapsuleHub) and never rides the wire again. Resolve that image by entryId from LOCAL caches
+// only: the feed cache (subscribed/viewed channels), warming a stripped light item from the durable post-media
+// store. Returns the image data-url, or null when the post isn't cached (a cold recipient who never opened the
+// channel — the embed header still taps through to the live original). Best-effort + non-throwing (render backstop).
+// REFERENCE INTEGRITY: the whole SHARE block is sender-authored, so the resolved post's bodyHash must match the
+// block's expectedBodyHash (content-addressed) — else a crafted entryId could show an UNRELATED cached post's image
+// under the sender's claimed channel/label. No match -> null (keep the hint). Only the recipient's OWN decoded media
+// is ever shown; sender bytes never cross.
+async function resolveSharedPostImageUrl(entryId, expectedBodyHash) {
+  try {
+    const post = findCachedPublicPostByEntryId(entryId);
+    if (!post) return null;
+    const want = normalizeBodyHashHex(expectedBodyHash);
+    if (!want || want !== normalizeBodyHashHex(post.bodyHash)) return null; // reference must be content-authentic
+    const direct = sharedPostImageUrlFromPost(post);
+    if (direct) return direct;
+    // The localStorage feed cache STRIPS image data-urls on persist — warm the image back from the durable
+    // per-post media store (keyed by post.id) exactly like the feed's own load-time image warm.
+    const key = publicPostCacheKey(post);
+    if (!key) return null;
+    const store = await publicPostMediaStore();
+    const raw = await store?.get(key);
+    if (!raw) return null;
+    let media = null;
+    try { media = JSON.parse(raw); } catch { return null; }
+    applyPublicPostMediaRecord(post, media);
+    return sharedPostImageUrlFromPost(post);
+  } catch {
+    return null;
+  }
+}
+
 // The shared-post embed card (v766): source-channel header (recipient-resolved identity; the sender's snapshot
 // label only as fallback) + title/text snapshot, clamped with its own smaller max height and the same expand
 // machinery as long posts. Snippet renders as PLAIN TEXT (textContent, no linkify): the snapshot is
-// sender-authored/unverified — the tappable header leads to the REAL channel (chain truth) instead.
+// sender-authored/unverified — the tappable header leads to the REAL channel (chain truth) instead. v797: when the
+// referenced post's image is cached locally, the media hint is swapped for the real image (resolved by entryId, no
+// wire copy).
 function buildSharedPostEmbed(block) {
   const embed = document.createElement('div');
   embed.className = 'shared-post-embed';
@@ -7311,6 +7376,21 @@ function buildSharedPostEmbed(block) {
     mediaHint.className = 'shared-post-embed-media-hint';
     mediaHint.textContent = t('public.sharedPostImageHint');
     inner.append(mediaHint);
+    // v797: resolve the ORIGINAL post's image by entryId from the local cache (no re-upload, no wire copy) and
+    // swap the hint for the real image. A cold recipient (channel not cached) keeps the hint; the header still
+    // taps through to the live original. .src is a decoded data-url from our own store (never user HTML) — XSS-safe.
+    if (block.entryId) {
+      resolveSharedPostImageUrl(block.entryId, block.bodyHash).then((url) => {
+        if (!url || !mediaHint.isConnected) return;
+        const img = document.createElement('img');
+        img.className = 'shared-post-embed-image';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.alt = '';
+        img.src = url;
+        mediaHint.replaceWith(img);
+      }).catch(() => {});
+    }
   }
   body.append(inner);
   embed.append(body);
