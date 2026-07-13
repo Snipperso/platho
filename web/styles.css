@@ -1566,9 +1566,17 @@ a .avatar.has-image,
 }
 
 .composer-context .composer-reply-text {
+  display: block; /* block so text-overflow:ellipsis applies (an inline span ignores it), truncating the snippet */
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* The text-holder flex child (#…ContextText) must be allowed to SHRINK: a flex item defaults to min-width:auto = its
+   nowrap min-content width, so on a narrow screen it kept the FULL snippet width and pushed the Cancel button off the
+   edge. min-width:0 lets it shrink and the .composer-reply-text inside ellipsizes. The <button> sibling is unaffected. */
+.composer-context > span {
   min-width: 0;
 }
 

@@ -283,7 +283,8 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=788" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=789" type="module">/);
+    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=273">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6578,6 +6579,11 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?position: fixed;[\s\S]*?height: var\(--app-viewport-height-exact, var\(--app-viewport-height, 100dvh\)\);[\s\S]*?z-index: 30;/);
     expect(app).toMatch(/setProperty\('--app-viewport-height-exact'/); // the unfloored height var is published
     expect(css).toMatch(/\.composer\.is-maximized \.composer-input-row \{[\s\S]*?flex: 1 1 auto;[\s\S]*?align-items: stretch;/);
+    // v789 (owner): the reply/share quote strip must not overflow a narrow screen — the text-holder flex child gets
+    // min-width:0 (a flex item defaults to min-width:auto = its nowrap min-content width, which pushed the Cancel button
+    // off-edge), and the .composer-reply-text is display:block so text-overflow:ellipsis actually truncates the snippet.
+    expect(css).toMatch(/\.composer-context > span \{\s*min-width: 0;\s*\}/);
+    expect(css).toMatch(/\.composer-context \.composer-reply-text \{\s*display: block;[\s\S]*?text-overflow: ellipsis;/);
     // v781: distinct diagonal-arrow maximize icon (was a duplicate of the corner-bracket select-word icon); the ?v=2
     // busts the browser/Caddy cache for the same-URL asset whose CONTENT changed.
     expect(css).toMatch(/\.composer\.is-maximized \.composer-toolbar-maximize \.icon \{\s*--mask: url\("\.\/assets\/icons\/collapse\.svg\?v=2"\);/);
@@ -7839,16 +7845,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v863/);
+    expect(sw).toMatch(/platho-pwa-prototype-v864/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=272/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=273/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=788/);
+    expect(sw).toMatch(/\.\/app\.js\?v=789/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);
