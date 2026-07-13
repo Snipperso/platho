@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=799" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=800" type="module">/);
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=276">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
@@ -6914,6 +6914,20 @@ describe('PWA runtime config guard', () => {
     expect(ser).not.toContain("tag === 'B' ||");
   });
 
+  it('PWA-THREAD-PREVIEW-STRIP-01: the plain-text thread-list preview strips inline markdown markers (v800)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // thread.preview is shown via textContent (can't render bold), so raw **/*/`/[label](url) markers were noise
+    // (owner screenshot: "**пр** **ивет**"). stripInlineFormatting removes them; it's display-only (the bubble
+    // renders bold from the message's own blocks, and the wire is untouched).
+    expect(app).toContain('function stripInlineFormatting(text)');
+    expect(app).toContain("preview.textContent = stripInlineFormatting(thread.preview);");
+    const strip = app.slice(app.indexOf('function stripInlineFormatting('), app.indexOf('function stripInlineFormatting(') + 700);
+    expect(strip).toContain(".replace(/\\*\\*\\*([^*\\n]+)\\*\\*\\*/g, '$1')"); // ***bold+italic***
+    expect(strip).toContain(".replace(/\\*\\*([^*\\n]+)\\*\\*/g, '$1')");        // **bold**
+    expect(strip).toContain(".replace(/`([^`\\n]+)`/g, '$1')");                 // `code`
+    expect(strip).toContain(".replace(/\\[([^\\]\\n]{1,200})\\]\\(([^\\s()]{1,2000})\\)/g, '$1')"); // [label](url)
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -8052,7 +8066,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v874/);
+    expect(sw).toMatch(/platho-pwa-prototype-v875/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -8061,7 +8075,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=799/);
+    expect(sw).toMatch(/\.\/app\.js\?v=800/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);
