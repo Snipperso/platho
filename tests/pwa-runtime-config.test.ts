@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=794" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=795" type="module">/);
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=275">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
@@ -6786,6 +6786,36 @@ describe('PWA runtime config guard', () => {
     expect(dockFn).toMatch(/event\.propertyName !== 'transform'\) return; el\.style\.transition = ''; el\.style\.transform = ''/); // cleanup
   });
 
+  it('PWA-COMPOSER-WIRE-SAFE-01: the editor->wire serializer is balanced by construction, and Enter/Delete/typing never trap emphasis (v795 audit)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // FIX C — serializeComposerEditor emits `delim` around each maximal run of formattable text; a HARD boundary
+    // (a <br>, an atom marker, a DIV/P block) FLUSHES the run so a delimiter never spans a newline or straddles a
+    // marker, and an empty span (seg stays '') emits nothing. No editor DOM state can emit unbalanced/stray **.
+    const ser = app.slice(app.indexOf('function serializeComposerEditor('), app.indexOf('function serializeComposerEditor(') + 2400);
+    expect(ser).toContain('const serChildren = (node, delim) => {');
+    expect(ser).toContain("const flush = () => { if (seg !== '') { out += delim + seg + delim; seg = ''; } };");
+    expect(ser).toContain("else { flush(); out += '\\n'; }"); // a real <br> flushes then emits a raw newline
+    expect(ser).toContain('flush(); out += child.dataset.marker;'); // an atom marker flushes then emits raw (never inside emphasis)
+    expect(ser).toContain("seg += serChildren(child, '**');");
+    expect(app).toContain('return serChildren(el, \'\');');
+    // FIX A — Enter collapses a NON-collapsed selection to its END first (keeps the word), so escapeTrailingFmt puts
+    // the <br> OUTSIDE the fmt span instead of deleteContents stripping the word + trapping the <br> inside (**\n\n**).
+    const ins = app.slice(app.indexOf('function composerEditorInsertLineBreak('), app.indexOf('function composerEditorInsertLineBreak(') + 1400);
+    expect(ins).toContain('if (sel && sel.rangeCount && !sel.isCollapsed && el.contains(sel.getRangeAt(0).commonAncestorContainer)) {');
+    expect(ins).toContain('const r = sel.getRangeAt(0); r.collapse(false); sel.removeAllRanges(); sel.addRange(r);');
+    expect(ins).toContain('composerEditorPruneEmptyFmt(el); // drop any span a prior edit emptied');
+    // FIX B — a native delete that empties a fmt span is normalized on the 'input' event: the empty span is dropped
+    // and the caret relocated outside it (else typing inherits the format, the toggle no-ops, and it serializes ****).
+    expect(app).toContain('function composerEditorNormalizeEmptyFmt(el)');
+    expect(app).toContain('if (!event.isComposing) composerEditorNormalizeEmptyFmt(messageInput);');
+    expect(app).toContain('if (!event.isComposing) composerEditorNormalizeEmptyFmt(publicMessageInput);');
+    // FIX D — the trailing-fmt bleed guard climbs to the OUTERMOST enclosing fmt span, so typing after a nested
+    // bold-in-italic run lands fully plain instead of inheriting the outer format (unbalanced * on the wire).
+    const trail = app.slice(app.indexOf('function composerEditorTrailingFmtSpan('), app.indexOf('function composerEditorTrailingFmtSpan(') + 900);
+    expect(trail).toContain('while (span.parentNode && span.parentNode !== el && span.parentNode.nodeType === 1');
+    expect(trail).toContain('&& /\\bfmt-/.test(span.parentNode.className || \'\') && span === span.parentNode.lastChild) {');
+  });
+
   it('PWA-GLOBAL-SYNC-INDICATOR-01: a green sync spinner/check lives in every header; the dialog subtitle no longer carries sync status', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
@@ -7924,7 +7954,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v869/);
+    expect(sw).toMatch(/platho-pwa-prototype-v870/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7933,7 +7963,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=794/);
+    expect(sw).toMatch(/\.\/app\.js\?v=795/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);

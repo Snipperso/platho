@@ -198,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v794';
+const PLATHO_APP_RUNTIME_VERSION = 'v795';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16354,39 +16354,52 @@ function isFreshPublicTimestamp(value, cutoffMs = publicSyncCutoffMs()) {
 // serializes a cloned SELECTION where a trailing <br> is a REAL newline the user selected, so it passes true.
 function serializeComposerEditor(el, keepTrailingBr = false) {
   if (!el) return '';
-  let out = '';
-  const walk = (node) => {
+  // Serialize a node's children to markdown. `delim` is the emphasis delimiter that wraps the caller's
+  // formattable text runs (''=root/none). A .fmt-* span emits `delim` around each maximal run of formattable
+  // content, and a HARD boundary — a <br> (newline), an atom marker chip, or a DIV/P block — SPLITS that run
+  // (flush closes the open delimiter, the boundary is emitted RAW, a new run reopens after). This guarantees a
+  // delimiter never spans a newline or straddles a marker (both serialize to unbalanced `**` the recipient shows
+  // as literal asterisks), and an EMPTY span (seg stays '') emits NOTHING (no stray `****`). Balanced by
+  // construction — no editor DOM state, however it was produced (a caret-trapped <br>, a leftover empty span, a
+  // marker pasted inside bold), can emit corrupt emphasis on the wire. Byte-identical to the old serializer for
+  // any well-formed draft (a single-line, boundary-free span).
+  const serChildren = (node, delim) => {
+    let out = '';
+    let seg = '';
+    const flush = () => { if (seg !== '') { out += delim + seg + delim; seg = ''; } };
     for (const child of node.childNodes) {
       if (child.nodeType === 3) { // text
-        out += child.nodeValue;
+        seg += child.nodeValue;
       } else if (child.nodeType === 1) { // element
         const tag = child.tagName;
         const cls = child.classList;
         if (tag === 'BR') {
-          // A trailing <br> that is the editor's own last child is the "filler" break browsers (and our
-          // Enter handler) leave to make the final empty line visible — it is not real content, so drop it.
+          // A trailing <br> that is the editor's own last child is the "filler" break browsers (and our Enter
+          // handler) leave to make the final empty line visible — it is not real content, so drop it.
           if (!keepTrailingBr && node === el && !child.nextSibling) { /* filler trailing br */ }
-          else out += '\n';
+          else { flush(); out += '\n'; }
         } else if (child.dataset && child.dataset.marker) {
-          out += child.dataset.marker; // atomic attachment/link chip -> its [marker]
+          flush(); out += child.dataset.marker; // atomic attachment/link chip -> its [marker], never inside emphasis
         } else if (tag === 'STRONG' || tag === 'B' || cls.contains('fmt-bold')) {
-          out += '**'; walk(child); out += '**';
+          seg += serChildren(child, '**');
         } else if (tag === 'EM' || tag === 'I' || cls.contains('fmt-italic')) {
-          out += '*'; walk(child); out += '*';
+          seg += serChildren(child, '*');
         } else if (tag === 'CODE' || cls.contains('fmt-code')) {
-          out += '`'; walk(child); out += '`';
+          seg += serChildren(child, '`');
         } else if (tag === 'DIV' || tag === 'P') {
           // A block boundary (browser/paste inserted one despite the Enter intercept) -> newline before content.
+          flush();
           if (out && !out.endsWith('\n')) out += '\n';
-          walk(child);
+          out += serChildren(child, ''); // block content, no wrapping delimiter
         } else {
-          walk(child); // unknown wrapper (e.g. a plain <span> from paste) -> just its content
+          seg += serChildren(child, ''); // unknown wrapper (e.g. a plain <span> from paste) -> just its content
         }
       }
     }
+    flush();
+    return out;
   };
-  walk(el);
-  return out;
+  return serChildren(el, '');
 }
 
 // Build the EDITABLE DOM for a composer editor from a markdown+marker string (draft restore / share insertion).
@@ -16643,6 +16656,38 @@ function composerEditorPruneEmptyFmt(el) {
   }
 }
 
+// After a NATIVE edit (Backspace/Delete emptying a formatted word, or a selection-replace) an emptied .fmt-* span
+// can linger with the caret INSIDE it: subsequent typing then inherits the format, the word-toggle can't find a
+// word to un-format (composerEditorWordRangeAtCaret needs a text-node caret), and the span serializes to a stray
+// delimiter pair. Drop every empty fmt span and, when the caret was inside one, place the caret where the span
+// was so the next keystroke is plain. Called from the editors' 'input' listener (after the native edit lands).
+function composerEditorNormalizeEmptyFmt(el) {
+  if (!el) return;
+  const empties = [...el.querySelectorAll('[class*="fmt-"]')].filter((s) =>
+    s.isConnected && /\bfmt-/.test(s.className || '') && s.textContent === '' && !s.querySelector('br, [data-marker]'));
+  if (!empties.length) return;
+  const sel = window.getSelection();
+  let caretSpan = null; // the empty span the caret currently sits inside (if any)
+  if (sel && sel.rangeCount) {
+    let n = sel.getRangeAt(0).startContainer;
+    while (n && n !== el) { if (empties.includes(n)) { caretSpan = n; break; } n = n.parentNode; }
+  }
+  let anchorParent = null, anchorNext = null;
+  if (caretSpan) {
+    anchorParent = caretSpan.parentNode;
+    anchorNext = caretSpan.nextSibling;
+    while (anchorNext && empties.includes(anchorNext)) anchorNext = anchorNext.nextSibling; // skip siblings we also remove
+  }
+  empties.forEach((s) => s.remove());
+  if (caretSpan && anchorParent && anchorParent.isConnected && sel) {
+    const r = document.createRange();
+    if (anchorNext && anchorNext.parentNode === anchorParent) r.setStartBefore(anchorNext);
+    else r.setStart(anchorParent, anchorParent.childNodes.length);
+    r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+}
+
 // After a selection is deleted, the collapsed caret may sit inside a NON-empty fmt span (a partial selection of a
 // multi-word bold/italic run). Split that span at the caret — the text AFTER the caret moves into a sibling clone
 // with the same formatting — and leave the caret BETWEEN the two halves. So a link inserted here lands at the true
@@ -16701,10 +16746,20 @@ function composerEditorSplitFmtForNewlineIfMidWord(el) {
 function composerEditorInsertLineBreak(el) {
   if (!el || el.disabled) return;
   el.focus();
+  // A NON-COLLAPSED selection must be collapsed to its END first (mirrors composerEditorInsertChip). The common
+  // case is the whole word staying selected right after a Bold/Italic toggle: without this the split/escape guards
+  // both bail on !collapsed, then range.deleteContents() below STRIPS the word and drops the <br> INSIDE the now-
+  // empty .fmt-* span (`**\n\n**` = unbalanced bold + lost text). Collapse (not delete) so the word is KEPT — a
+  // post-toggle artifact selection is indistinguishable from a deliberate one, and losing text on Enter is worse.
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && !sel.isCollapsed && el.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    const r = sel.getRangeAt(0); r.collapse(false); sel.removeAllRanges(); sel.addRange(r);
+  }
   // MID-word Enter in a bold/italic word SPLITS it (second half wraps down, still formatted); a leading/trailing edge
   // (or plain text) falls back to escapeTrailingFmt (line ABOVE the word / plain line below) so a `<br>` never lands
   // INSIDE the formatting (which would serialize to unbalanced ** across the newline).
   if (!composerEditorSplitFmtForNewlineIfMidWord(el)) composerEditorEscapeTrailingFmt(el);
+  composerEditorPruneEmptyFmt(el); // drop any span a prior edit emptied so Enter never emits a stray `****` line
   const range = composerEditorRange(el);
   range.deleteContents();
   const br = document.createElement('br');
@@ -17111,9 +17166,16 @@ function composerEditorToggleFormat(el, className) {
 function composerEditorTrailingFmtSpan(range, el) {
   const node = range.startContainer;
   if (node.nodeType !== 3 || range.startOffset !== node.nodeValue.length) return null;
-  const span = node.parentNode;
-  if (span && span !== el && span.nodeType === 1 && /\bfmt-/.test(span.className || '') && node === span.lastChild) return span;
-  return null;
+  let span = node.parentNode;
+  if (!(span && span !== el && span.nodeType === 1 && /\bfmt-/.test(span.className || '') && node === span.lastChild)) return null;
+  // Climb to the OUTERMOST enclosing fmt span while the caret is still at its trailing edge (this span is its
+  // parent's last child): typing after a NESTED run (bold inside italic) must land OUTSIDE both spans, else it
+  // inherits the outer format and serializes to unbalanced emphasis (`*…*` straddling the new text).
+  while (span.parentNode && span.parentNode !== el && span.parentNode.nodeType === 1
+    && /\bfmt-/.test(span.parentNode.className || '') && span === span.parentNode.lastChild) {
+    span = span.parentNode;
+  }
+  return span;
 }
 
 // Shared beforeinput for both composer editors: (1) newline via insertParagraph/insertLineBreak so Android
@@ -19862,7 +19924,8 @@ registerVaultKeysButton?.addEventListener('click', async () => {
   }
 });
 
-messageInput?.addEventListener('input', () => {
+messageInput?.addEventListener('input', (event) => {
+  if (!event.isComposing) composerEditorNormalizeEmptyFmt(messageInput); // drop a span a native delete emptied (S2)
   enforceComposerByteLimit();
   reconcileComposerAttachments(messageInput); // prune attachments whose atom a non-collapsed delete/paste removed
   messageInput.classList.toggle('is-empty', serializeComposerEditor(messageInput).trim() === '');
@@ -20093,7 +20156,8 @@ document.addEventListener('keydown', (event) => {
   hidePublicComposerAddMenu();
 });
 
-publicMessageInput?.addEventListener('input', () => {
+publicMessageInput?.addEventListener('input', (event) => {
+  if (!event.isComposing) composerEditorNormalizeEmptyFmt(publicMessageInput); // drop a span a native delete emptied (S2)
   enforcePublicComposerByteLimit();
   reconcileComposerAttachments(publicMessageInput); // prune attachments whose atom a non-collapsed delete/paste removed
   publicMessageInput.classList.toggle('is-empty', serializeComposerEditor(publicMessageInput).trim() === '');
