@@ -198,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v797';
+const PLATHO_APP_RUNTIME_VERSION = 'v798';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16750,6 +16750,24 @@ function composerEditorPruneEmptyFmt(el) {
 // was so the next keystroke is plain. Called from the editors' 'input' listener (after the native edit lands).
 function composerEditorNormalizeEmptyFmt(el) {
   if (!el) return;
+  // If the editor has NO text at all (everything was deleted), strip EVERY lingering fmt span — even one holding
+  // just a <br>/whitespace — so the next keystroke types PLAIN. A native select-all+Delete on a bold message can
+  // leave a `<span class="fmt-bold"><br></span>` behind that captures new typing (owner bug: "delete everything,
+  // type again -> it types bold"). Then park the caret at the start of the now-clean empty editor.
+  if ((el.textContent || '').trim() === '') {
+    let strippedFmt = false;
+    el.querySelectorAll('[class*="fmt-"]').forEach((span) => {
+      if (!span.isConnected || !/\bfmt-/.test(span.className || '')) return;
+      while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+      span.remove();
+      strippedFmt = true;
+    });
+    if (strippedFmt) {
+      const sel = window.getSelection();
+      if (sel) { const r = document.createRange(); r.setStart(el, 0); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); }
+    }
+    return;
+  }
   const empties = [...el.querySelectorAll('[class*="fmt-"]')].filter((s) =>
     s.isConnected && /\bfmt-/.test(s.className || '') && s.textContent === '' && !s.querySelector('br, [data-marker]'));
   if (!empties.length) return;
@@ -16851,6 +16869,10 @@ function composerEditorInsertLineBreak(el) {
   range.deleteContents();
   const br = document.createElement('br');
   range.insertNode(br);
+  // A prior split/extract/escape can leave an EMPTY text node right after the caret. It makes br.nextSibling
+  // non-null, so the trailing filler <br> below is skipped and the new line never becomes VISIBLE (owner bug: the
+  // FIRST Enter did nothing, a SECOND added the line). Drop those empties so the filler check sees the <br> as last.
+  while (br.nextSibling && br.nextSibling.nodeType === 3 && br.nextSibling.nodeValue === '') br.nextSibling.remove();
   if (!br.nextSibling) br.after(document.createElement('br'));
   composerEditorPlaceCaretAfter(br);
   composerEditorAfterEdit(el);
@@ -17047,16 +17069,6 @@ function reconcileComposerAttachments(el) {
   return true;
 }
 
-// The ancestor format span of `className` fully enclosing the range (its common ancestor is inside it), else null.
-function composerEditorEnclosingFormat(range, className, el) {
-  let node = range.commonAncestorContainer;
-  while (node && node !== el) {
-    if (node.nodeType === 1 && node.classList && node.classList.contains(className)) return node;
-    node = node.parentNode;
-  }
-  return null;
-}
-
 // Toggle an inline format CLASS span (.fmt-bold / .fmt-italic) over the selection. Collapsed selection = no-op
 // (no stray markers on mobile). Never inline styles (prod CSP style-src 'self'), never execCommand.
 // The word (run of letters/digits/underscore, any script) the collapsed caret sits in, as offsets into its text
@@ -17126,6 +17138,81 @@ function composerEditorWordRangeAtCaret(range, el) {
   };
 }
 
+// The single ancestor format span of `className` that FULLY encloses the range (range.commonAncestorContainer is
+// inside it), else null. Finds the one-span case (a word, a partial run within one span) — a MULTI-span selection
+// (commonAncestorContainer is the editor) returns null and is handled by the fully-formatted path below.
+function composerEditorEnclosingFormat(range, className, el) {
+  let node = range.commonAncestorContainer;
+  while (node && node !== el) {
+    if (node.nodeType === 1 && node.classList && node.classList.contains(className)) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+// True when EVERY non-empty text run the selection covers already sits inside a `.className` span (so a toggle must
+// REMOVE the format); false if any covered text is unformatted (toggle must ADD it) or the selection holds no text.
+// Uses cloneContents so a multi-span / select-all / multi-line selection is judged correctly — the old ancestor-walk
+// (composerEditorEnclosingFormat) returned null whenever commonAncestorContainer was the editor (any select-all),
+// so the toggle could NEVER un-format more than a single enclosing span (owner bug: "select all + Bold stays bold").
+function composerEditorSelectionFullyFormatted(range, className, el) {
+  // Walk the ACTUAL text nodes the range covers in the live DOM — NOT cloneContents, which DROPS the enclosing span
+  // when both range endpoints sit in ONE text node (the collapsed word-toggle case), so it would wrongly report
+  // "not formatted" and the toggle would ADD another layer (`****word****`) instead of removing.
+  const overlaps = (n) => {
+    const nr = document.createRange();
+    nr.selectNodeContents(n);
+    // range covers >=1 char of n iff range.start < n.end AND range.end > n.start
+    return range.compareBoundaryPoints(Range.END_TO_START, nr) < 0
+      && range.compareBoundaryPoints(Range.START_TO_END, nr) > 0;
+  };
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => ((n.nodeValue || '') !== '' && !(n.parentElement && n.parentElement.closest('[data-marker]')) && overlaps(n))
+      ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
+  });
+  let n;
+  let any = false;
+  while ((n = walker.nextNode())) {
+    any = true;
+    if (!(n.parentElement && n.parentElement.closest('.' + className))) return false;
+  }
+  return any;
+}
+
+// Remove `className` formatting from the selection, however many spans / lines it crosses. extractContents SPLITS a
+// span at each range edge (so a partially-selected span keeps its unselected head/tail formatted), then every
+// `.className` span in the extracted fragment is unwrapped (its children — including any OTHER-format nested span —
+// survive) and the now-plain content is re-inserted and re-selected. Subsumes the old three-way-split + nested-unwrap.
+function composerEditorUnformatRange(range, className, el) {
+  const frag = range.extractContents();
+  frag.querySelectorAll('.' + className).forEach((span) => {
+    if (!/\bfmt-/.test(span.className || '')) return;
+    while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+    span.remove();
+  });
+  // When the range was wholly inside ONE span's text, extractContents leaves that span EMPTIED and collapses the
+  // insertion point INSIDE it — re-inserting there would RE-FORMAT the content (nested `****`). Hoist the insertion
+  // point OUT to after the (now-empty) enclosing span; the trailing composerEditorPruneEmptyFmt drops the shell.
+  let node = range.startContainer;
+  let encl = null;
+  while (node && node !== el) {
+    if (node.nodeType === 1 && /\bfmt-/.test(node.className || '') && node.classList.contains(className)) encl = node;
+    node = node.parentNode;
+  }
+  if (encl) { range.setStartAfter(encl); range.collapse(true); }
+  const first = frag.firstChild;
+  const last = frag.lastChild;
+  range.insertNode(frag);
+  const sel = window.getSelection();
+  if (sel && first && last && first.isConnected && last.isConnected) {
+    const r = document.createRange();
+    r.setStartBefore(first);
+    r.setEndAfter(last);
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+}
+
 function composerEditorToggleFormat(el, className) {
   if (!el || el.disabled) return;
   el.focus();
@@ -17155,9 +17242,9 @@ function composerEditorToggleFormat(el, className) {
   if (enclosing) {
     const hasElementChild = Array.from(enclosing.childNodes).some((n) => n.nodeType === 1);
     if (!hasElementChild) {
-      // Toggle OFF over the SELECTION ONLY (three-way split): the unselected head/tail of the span stay
-      // formatted, only the selected middle goes plain. (The old code unwrapped the WHOLE span — un-italic on
-      // one word of a two-word italic run cleared both.)
+      // Toggle OFF over the SELECTION ONLY within ONE span (three-way split): the unselected head/tail stay
+      // formatted, only the selected middle goes plain. Rebuilds from textContent + offsets so a range wholly
+      // inside a single text node splits cleanly (extractContents would merge the head+tail into one span).
       const spanText = enclosing.textContent;
       const pre = document.createRange();
       pre.selectNodeContents(enclosing);
@@ -17190,6 +17277,11 @@ function composerEditorToggleFormat(el, className) {
         sel.removeAllRanges(); sel.addRange(r);
       }
     }
+  } else if (composerEditorSelectionFullyFormatted(range, className, el)) {
+    // NO single enclosing span but the selection is ENTIRELY formatted — a MULTI-span / multi-line / select-all run.
+    // Unwrap the format from every span across it. (The old code had ONLY the enclosing branch, so a select-all —
+    // whose commonAncestorContainer is the editor — found no enclosing span and fell through to ADD: "stays bold".)
+    composerEditorUnformatRange(range, className, el);
   } else {
     const span = document.createElement('span');
     span.className = className;
