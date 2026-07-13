@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v786';
+const PLATHO_APP_RUNTIME_VERSION = 'v787';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1867,18 +1867,33 @@ function closeInstallDialog({ dismissed = true } = {}) {
   if (installDialog) installDialog.hidden = true;
 }
 
-let composerViewportMaxHeight = 0; // largest visible viewport height seen = the no-soft-keyboard baseline
+let composerViewportMaxHeight = 0; // largest visible viewport height seen AT THE CURRENT WIDTH = the no-soft-keyboard baseline
+let composerViewportBaselineWidth = 0; // width the baseline was captured at; a width change (orientation/resize) re-baselines
+let composerKeyboardWasOpen = false; // last-seen soft-keyboard state, to detect the up->down (dismissed) transition
 // The soft keyboard shrinks the visual viewport; "open" = the current visible height is meaningfully below the baseline.
-// Used so maximize/restore only RE-FOCUSES the editor (which re-summons the keyboard) when the keyboard is actually UP
-// (the user is typing). Hiding the keyboard with its own button leaves the field FOCUSED but the viewport back to full,
-// so this reads false and the re-focus is skipped — the dismissed keyboard is not re-popped. ~150px filters browser-
-// chrome (address bar) changes from a real keyboard (~250px+). A false positive only causes a harmless re-focus (focus
-// preserved, no keyboard to pop on desktop); we deliberately do NOT blur (no reliable signal that a soft keyboard will
-// re-pop, and blurring dropped the desktop/touch-laptop caret on any incidental viewport shrink).
+// ~150px filters browser-chrome (address bar) changes (~50-120px) from a real keyboard (~250px+). Used to (a) re-focus
+// on maximize only while the keyboard is UP (typing), and (b) detect when it is DISMISSED (see the hide-blur below).
 function composerKeyboardLikelyOpen() {
   const viewport = window.visualViewport;
   if (!viewport || composerViewportMaxHeight <= 0) return false;
   return (composerViewportMaxHeight - viewport.height) > 150;
+}
+
+// Blur the focused composer editor the moment the soft keyboard is DISMISSED. Root cause of the mobile keyboard re-pop:
+// hiding the keyboard with its own button leaves the field FOCUSED (caret visible) but the keyboard down, and then ANY
+// geometry change (maximize / restore, and other reflows) makes a touch browser re-show the keyboard for that still-
+// focused editable. Blurring on dismissal eliminates that "focused-but-keyboard-hidden" state at the source, so nothing
+// can re-pop it. Only on a coarse-pointer (touch) device with a real soft keyboard; desktop/mouse never blurs (no soft
+// keyboard, and a fine-pointer window resize must not drop the caret). Scoped to .composer-input so other fields are
+// untouched. keyboardWasOpen tracks the last state so this fires exactly on the up->down edge, not on every VV tick.
+function composerHandleKeyboardVisibility() {
+  const nowOpen = composerKeyboardLikelyOpen();
+  if (composerKeyboardWasOpen && !nowOpen) {
+    const active = document.activeElement;
+    const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    if (coarse && active && active.classList && active.classList.contains('composer-input')) active.blur();
+  }
+  composerKeyboardWasOpen = nowOpen;
 }
 
 function syncViewportCssVars() {
@@ -1895,7 +1910,20 @@ function syncViewportCssVars() {
   } else {
     height = visual;
   }
-  if (visual > 0) composerViewportMaxHeight = Math.max(composerViewportMaxHeight, visual); // baseline = tallest visible viewport (no soft keyboard)
+  // Key the no-keyboard baseline to the viewport WIDTH: a soft keyboard changes only the HEIGHT, but an orientation flip
+  // (or a desktop window resize) changes the WIDTH and brings a whole new baseline height. Without this the monotonic max
+  // keeps the taller PORTRAIT height as the baseline in LANDSCAPE, so composerKeyboardLikelyOpen() reads "open" forever
+  // there and the keyboard-hide blur never fires (the fix would be dead in landscape). On a width change, re-baseline to
+  // the current height and reset the keyboard edge so the flip itself doesn't read as a dismiss.
+  const visualWidth = Math.round(viewport?.width ?? window.innerWidth ?? 0);
+  if (visual > 0) {
+    if (visualWidth !== composerViewportBaselineWidth) {
+      composerViewportMaxHeight = visual; composerViewportBaselineWidth = visualWidth; composerKeyboardWasOpen = false;
+    } else {
+      composerViewportMaxHeight = Math.max(composerViewportMaxHeight, visual); // tallest at THIS width = no-soft-keyboard baseline
+    }
+  }
+  composerHandleKeyboardVisibility(); // blur the composer if the soft keyboard was just dismissed (kills the re-pop at its source)
   const rounded = Math.max(0, Math.round(height));
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.max(320, rounded)}px`);
   // Unclamped variant (no 320px floor) for the full-screen maximized composer only: on a short viewport (landscape or
@@ -19902,11 +19930,12 @@ function toggleComposerMaximize(form, button) {
     composerMaximizeButtonLabel(button, true);
     if (!composerReducedMotion()) composerRunMaximizeGeo(form, true);
   }
-  // Focus/keyboard across the state change. A geometry change can drop contenteditable focus in some browsers; re-focus
-  // ONLY when the keyboard was actually UP (the user is typing) so the keyboard stays. When the keyboard is DOWN — the
-  // user dismissed it with its own button but the field stays focused, OR there is no soft keyboard at all (desktop) —
-  // we do NOTHING: no re-focus (so a dismissed keyboard is not re-popped) and no blur (blurring dropped the desktop /
-  // touch-laptop caret on any incidental viewport shrink, and there is no reliable signal a soft keyboard will re-pop).
+  // Focus across the state change: re-focus ONLY when the keyboard was actually UP (the user is typing) so a geometry
+  // change that drops contenteditable focus doesn't hide the keyboard mid-type. When the keyboard is DOWN we do nothing —
+  // and the field is already NOT focused in that case, because composerHandleKeyboardVisibility() blurs the composer the
+  // moment the soft keyboard is dismissed (so this maximize/restore never faces a focused-but-keyboard-hidden field that
+  // the geometry change would re-pop the keyboard for). Desktop has no soft keyboard, so keyboardWasOpen is false and the
+  // caret is simply left untouched.
   if (wasFocused && keyboardWasOpen && editorEl && document.activeElement !== editorEl) editorEl.focus({ preventScroll: true });
 }
 // Collapse any maximized composer INSTANTLY (after a send clears the draft, or on navigation away — the overlay must
