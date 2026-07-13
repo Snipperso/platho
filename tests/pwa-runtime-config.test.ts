@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=785" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=786" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6516,7 +6516,11 @@ describe('PWA runtime config guard', () => {
     expect(toggleFn).toMatch(/if \(acc \+ len >= want\) \{ node = tn; off = from \+ \(want - acc\); placed = true; break; \}/);
     expect(toggleFn).not.toMatch(/composerEditorEscapeTrailingFmt/);
     // v774: Select-word button selects the word under the caret (start a selection without the OS menu).
+    // v786: it is a TOGGLE — if text is already selected the press DESELECTS (collapses to a caret); a second press
+    // re-selects the whole word (the word-range path below). So a partial-word selection isn't a dead button.
     expect(app).toMatch(/function composerEditorSelectWordAtCaret\(el\)/);
+    const selectFn = app.slice(app.indexOf('function composerEditorSelectWordAtCaret('), app.indexOf('function composerEditorSelectWordAtCaret(') + 900);
+    expect(selectFn).toMatch(/if \(!range\.collapsed\) \{[\s\S]*?range\.collapse\(true\);[\s\S]*?return;\s*\}/);
     // v775: a newline/attachment/word-toggle steps the caret OUT of a trailing .fmt-* span, so bold never swallows
     // a <br>/image atom (which would serialize to unbalanced ** across the marker -> literal ** at the recipient).
     expect(app).toMatch(/function composerEditorEscapeTrailingFmt\(el\)/);
@@ -6652,13 +6656,21 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/form\.classList\.remove\('is-maximized', 'is-restoring'\); composerReleaseSpacer\(form\)/); // shrink finish releases
     expect(app).toMatch(/composerCollapseMaximizeNow\(form\) \{[\s\S]*?composerReleaseSpacer\(form\)/); // instant collapse releases
     expect(app).toMatch(/composerCancelMaxFlip\(form\); \/\/ kill any in-flight[\s\S]*?composerReleaseSpacer\(form\)/); // exit releases
-    // v785 #4: maximize/restore must NOT change the editor's focus — force-focus pops the mobile keyboard, blur hides
-    // it. Capture wasFocused, never force .focus() on maximize (removed), only re-focus IF it was focused (a geometry
-    // change can drop contenteditable focus). The maximize button also joins the toolbar mousedown-preventDefault so a
-    // tap never blurs the editor in the first place.
+    // v785/v786 #4: maximize/restore must not pop or hide the mobile keyboard. The maximize button joins the toolbar
+    // mousedown-preventDefault so a tap never blurs the editor. v786 makes the RE-FOCUS keyboard-state-aware: a geometry
+    // change can drop contenteditable focus, so re-focus ONLY when the keyboard was actually UP (composerKeyboardLikelyOpen
+    // = visual-viewport shrunk >150px = the user is typing) — keeping the keyboard. When the keyboard is DOWN (dismissed
+    // with focus retained, OR desktop/no soft keyboard) we do NOTHING: no re-focus (a dismissed keyboard is not re-popped)
+    // and NO blur (blurring dropped the desktop/touch-laptop caret on any incidental viewport shrink, and there is no
+    // reliable signal a soft keyboard will re-pop). A false-positive keyboardWasOpen only causes a harmless re-focus.
     expect(app).toMatch(/const wasFocused = !!editorEl && document\.activeElement === editorEl;/);
-    expect(app).toMatch(/if \(wasFocused && editorEl && document\.activeElement !== editorEl\) editorEl\.focus\(\{ preventScroll: true \}\)/);
-    const maxFn = app.slice(app.indexOf('function toggleComposerMaximize('), app.indexOf('function toggleComposerMaximize(') + 1500);
+    expect(app).toMatch(/const keyboardWasOpen = composerKeyboardLikelyOpen\(\);/);
+    expect(app).toMatch(/if \(wasFocused && keyboardWasOpen && editorEl && document\.activeElement !== editorEl\) editorEl\.focus\(\{ preventScroll: true \}\);/);
+    expect(app).not.toMatch(/composerKeyboardEverOpened/); // the sticky latch + blur branch were removed (desktop caret regression)
+    expect(app).not.toMatch(/editorEl\.blur\(\)/); // no forced blur on maximize/restore
+    expect(app).toMatch(/function composerKeyboardLikelyOpen\(\)/);
+    expect(app).toMatch(/return \(composerViewportMaxHeight - viewport\.height\) > 150;/);
+    const maxFn = app.slice(app.indexOf('function toggleComposerMaximize('), app.indexOf('function toggleComposerMaximize(') + 1800);
     expect(maxFn).not.toMatch(/\.composer-input'\)\?\.focus\?\.\(\)/); // the old forced focus is gone
     expect(app).toMatch(/\.composer-toolbar-button, \.composer-toolbar-hide, \.composer-toolbar-dock, \.composer-toolbar-maximize'\)\) event\.preventDefault\(\)/);
     // v785 #3: the dock toggle FLIPs the composer's NON-toolbar children (the input row + panels) so the input row
@@ -7807,7 +7819,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v860/);
+    expect(sw).toMatch(/platho-pwa-prototype-v861/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7816,7 +7828,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=785/);
+    expect(sw).toMatch(/\.\/app\.js\?v=786/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);

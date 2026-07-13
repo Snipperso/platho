@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v785';
+const PLATHO_APP_RUNTIME_VERSION = 'v786';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1867,6 +1867,20 @@ function closeInstallDialog({ dismissed = true } = {}) {
   if (installDialog) installDialog.hidden = true;
 }
 
+let composerViewportMaxHeight = 0; // largest visible viewport height seen = the no-soft-keyboard baseline
+// The soft keyboard shrinks the visual viewport; "open" = the current visible height is meaningfully below the baseline.
+// Used so maximize/restore only RE-FOCUSES the editor (which re-summons the keyboard) when the keyboard is actually UP
+// (the user is typing). Hiding the keyboard with its own button leaves the field FOCUSED but the viewport back to full,
+// so this reads false and the re-focus is skipped — the dismissed keyboard is not re-popped. ~150px filters browser-
+// chrome (address bar) changes from a real keyboard (~250px+). A false positive only causes a harmless re-focus (focus
+// preserved, no keyboard to pop on desktop); we deliberately do NOT blur (no reliable signal that a soft keyboard will
+// re-pop, and blurring dropped the desktop/touch-laptop caret on any incidental viewport shrink).
+function composerKeyboardLikelyOpen() {
+  const viewport = window.visualViewport;
+  if (!viewport || composerViewportMaxHeight <= 0) return false;
+  return (composerViewportMaxHeight - viewport.height) > 150;
+}
+
 function syncViewportCssVars() {
   // Inside Telegram the WebView height is governed by the client (viewportStableHeight),
   // not window.visualViewport — using the latter alone clips content under Telegram's header.
@@ -1881,6 +1895,7 @@ function syncViewportCssVars() {
   } else {
     height = visual;
   }
+  if (visual > 0) composerViewportMaxHeight = Math.max(composerViewportMaxHeight, visual); // baseline = tallest visible viewport (no soft keyboard)
   const rounded = Math.max(0, Math.round(height));
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.max(320, rounded)}px`);
   // Unclamped variant (no 320px floor) for the full-screen maximized composer only: on a short viewport (landscape or
@@ -17529,8 +17544,10 @@ function applyComposerFormat(editor, format) {
   }
 }
 
-// Select the word under the caret (toolbar "Select" button). Gives a way to START a text selection precisely — the
-// native selection handles then appear and can be dragged to extend — without first summoning the OS selection menu.
+// Toolbar "Select" button — a TOGGLE. Gives a way to START a text selection precisely (the native selection handles
+// then appear and can be dragged to extend) without first summoning the OS selection menu. If text is ALREADY selected
+// (e.g. a partial-word selection), the press DESELECTS (collapses to a caret); a SECOND press then re-selects the whole
+// word under the caret. From a bare caret it selects the whole word directly.
 function composerEditorSelectWordAtCaret(el) {
   if (!el || el.disabled) return;
   el.focus();
@@ -17538,6 +17555,13 @@ function composerEditorSelectWordAtCaret(el) {
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
   if (!el.contains(range.commonAncestorContainer)) return;
+  if (!range.collapsed) {
+    // Something is selected -> clear it (collapse to the selection start). The next press re-selects the whole word.
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return;
+  }
   const word = composerEditorWordRangeAtCaret(range, el);
   if (!word) return;
   const r = document.createRange();
@@ -19861,10 +19885,9 @@ function toggleComposerMaximize(form, button) {
   const isRestoring = form.classList.contains('is-restoring');
   if (isMax && isRestoring) return; // mid-shrink FLIP — debounce the click
   closeEmojiPicker(); // the emoji button is inside the composer; a picker anchored to it goes stale across the FLIP
-  // Preserve the editor's focus across the state change: maximizing/restoring must NOT force-focus (which pops the
-  // mobile keyboard) NOR blur (which hides it) — if it was focused it stays, if not it stays not.
   const editorEl = form.querySelector('.composer-input');
   const wasFocused = !!editorEl && document.activeElement === editorEl;
+  const keyboardWasOpen = composerKeyboardLikelyOpen(); // soft keyboard actually UP (user typing) vs dismissed-but-focused
   if (isMax) {
     composerMaximizeButtonLabel(button, false);
     if (composerReducedMotion() || !form.__inlineRect) { composerCollapseMaximizeNow(form); }
@@ -19879,8 +19902,12 @@ function toggleComposerMaximize(form, button) {
     composerMaximizeButtonLabel(button, true);
     if (!composerReducedMotion()) composerRunMaximizeGeo(form, true);
   }
-  // Restore the pre-toggle focus state (a position/geometry change can drop contenteditable focus in some browsers).
-  if (wasFocused && editorEl && document.activeElement !== editorEl) editorEl.focus({ preventScroll: true });
+  // Focus/keyboard across the state change. A geometry change can drop contenteditable focus in some browsers; re-focus
+  // ONLY when the keyboard was actually UP (the user is typing) so the keyboard stays. When the keyboard is DOWN — the
+  // user dismissed it with its own button but the field stays focused, OR there is no soft keyboard at all (desktop) —
+  // we do NOTHING: no re-focus (so a dismissed keyboard is not re-popped) and no blur (blurring dropped the desktop /
+  // touch-laptop caret on any incidental viewport shrink, and there is no reliable signal a soft keyboard will re-pop).
+  if (wasFocused && keyboardWasOpen && editorEl && document.activeElement !== editorEl) editorEl.focus({ preventScroll: true });
 }
 // Collapse any maximized composer INSTANTLY (after a send clears the draft, or on navigation away — the overlay must
 // get out of the way at once, no shrink animation). Cancels any in-flight FLIP first. Returns true if it collapsed one.
