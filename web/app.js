@@ -198,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v793';
+const PLATHO_APP_RUNTIME_VERSION = 'v794';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2468,10 +2468,9 @@ function showExternalLinkConfirm(safeHref, host, displayText) {
   };
   cancelBtn.addEventListener('click', closeExternalLinkModal);
   openBtn.addEventListener('click', confirmOpen);
-  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) closeExternalLinkModal(); });
+  // v794: X-only — no outside/backdrop tap and no Escape dismiss; the user must choose Cancel or Open.
   const onKeydown = (event) => {
-    if (event.key === 'Escape') { event.preventDefault(); closeExternalLinkModal(); }
-    else if (event.key === 'Enter' && document.activeElement === openBtn) { event.preventDefault(); confirmOpen(); }
+    if (event.key === 'Enter' && document.activeElement === openBtn) { event.preventDefault(); confirmOpen(); }
   };
   document.addEventListener('keydown', onKeydown, true);
   activeExternalLinkModal = { backdrop, onKeydown, previousFocus };
@@ -2486,7 +2485,7 @@ let activeLinkComposerModal = null;
 function closeLinkComposerModal() {
   if (!activeLinkComposerModal) return;
   const { backdrop, onKeydown, previousFocus } = activeLinkComposerModal;
-  document.removeEventListener('keydown', onKeydown, true);
+  if (onKeydown) document.removeEventListener('keydown', onKeydown, true);
   backdrop.remove();
   activeLinkComposerModal = null;
   try { previousFocus?.focus?.(); } catch { /* detached */ }
@@ -2582,10 +2581,8 @@ function openLinkComposerDialog(targetInput, editChip = null) {
   insertBtn.addEventListener('click', doInsert);
   urlInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); doInsert(); } });
   textInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); urlInput.focus(); } });
-  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) closeLinkComposerModal(); });
-  const onKeydown = (event) => { if (event.key === 'Escape') { event.preventDefault(); closeLinkComposerModal(); } };
-  document.addEventListener('keydown', onKeydown, true);
-  activeLinkComposerModal = { backdrop, onKeydown, previousFocus };
+  // v794: X-only — no outside/backdrop tap and no Escape dismiss; the user must choose Cancel or Insert.
+  activeLinkComposerModal = { backdrop, onKeydown: null, previousFocus };
   // If the link text is already filled (a selected word, or the chip being edited), jump straight to the URL field.
   (prefilledText ? urlInput : textInput).focus();
 }
@@ -5556,7 +5553,12 @@ function createActionField(field) {
   return wrapper;
 }
 
-function closeOnBackdropClick(backdrop, close) {
+// v794: modals dismiss ONLY via their explicit ✕ / Cancel — an outside/backdrop tap no longer closes them (a
+// stray tap outside used to discard in-progress input). Default-deny: a plain backdrop never closes on tap.
+// Two deliberate exceptions keep the outside-tap gesture: the action dialog can opt in per-open via
+// dismissOnBackdrop:true (default false), and the image lightbox opts in via allowOutsideTap (a fullscreen
+// viewer, not a data dialog — tap-to-dismiss is the expected gesture there).
+function closeOnBackdropClick(backdrop, close, { allowOutsideTap = false } = {}) {
   if (!backdrop) return;
   let pointerStartedOnBackdrop = false;
   backdrop.addEventListener('pointerdown', (event) => {
@@ -5565,7 +5567,13 @@ function closeOnBackdropClick(backdrop, close) {
   backdrop.addEventListener('click', (event) => {
     if (event.target !== backdrop || !pointerStartedOnBackdrop) return;
     pointerStartedOnBackdrop = false;
-    if (backdrop === actionDialog && activeActionDialog?.dismissOnBackdrop === false) return;
+    if (backdrop === actionDialog) {
+      // Action dialogs are X-only unless a caller explicitly opted back into outside-dismiss.
+      if (activeActionDialog?.dismissOnBackdrop === false) return;
+      close(event);
+      return;
+    }
+    if (!allowOutsideTap) return; // every other modal: closes ONLY via its ✕ / Cancel control
     close(event);
   });
 }
@@ -5795,11 +5803,15 @@ async function openActionDialog(config = {}) {
   }
   if (activeActionDialog) closeActionDialog(null);
   return new Promise((resolve) => {
-    const dismissible = config.dismissOnBackdrop !== false;
+    // v794: X-only by default — outside-click / Escape no longer dismiss an action dialog unless the caller
+    // explicitly opts back in with dismissOnBackdrop:true. (Was: default true, so every dialog closed on an
+    // outside tap.)
+    const dismissible = config.dismissOnBackdrop === true;
     // `cancellable` (the explicit ✕ close button) is DECOUPLED from `dismissOnBackdrop` (click-outside /
-    // Escape dismiss). Defaults to dismissible for back-compat, but a caller can keep the ✕ working while
-    // forbidding outside-click/Escape dismissal (e.g. the Unlock-wallet dialog: closeable ONLY via the ✕).
-    const cancellable = config.cancellable ?? dismissible;
+    // Escape dismiss) and now defaults to ON so every dialog is closable via the ✕ — a caller can still force
+    // a decision (no ✕) with cancellable:false (e.g. the seed-backup hard gate). Decoupling matters: since
+    // dismissible now defaults false, tying the ✕ to it would have silently removed the ✕ from every dialog.
+    const cancellable = config.cancellable ?? true;
     activeActionDialog = {
       resolve,
       summary: config.summary,
@@ -7001,9 +7013,7 @@ function chooseShareCopyToClipboard() {
 }
 
 sharePostCloseButton?.addEventListener('click', () => closeSharePostDialog());
-sharePostDialog?.addEventListener('click', (event) => {
-  if (event.target === sharePostDialog) closeSharePostDialog();
-});
+// v794: X-only — the share dialog closes ONLY via its ✕ (an outside/backdrop tap no longer dismisses it).
 
 function renderPublicFeed(items, options = {}) {
   if (!publicFeed) return;
@@ -14718,7 +14728,9 @@ async function requestWalletPasswordInput({
   submitLabel,
   confirm = false,
   create = false,
-  dismissOnBackdrop = true,
+  // v794: password dialogs are X-only (outside-tap / Escape must not discard a half-typed password). The ✕
+  // stays (cancellable defaults true); the unlock flow already passes dismissOnBackdrop:false explicitly.
+  dismissOnBackdrop = false,
   cancellable = true,
   passwordManagerUsername = PLATHO_WALLET_PASSWORD_MANAGER_USERNAME,
   passwordManagerNetworkGlobalId = plathoWalletNetworkOptions().networkGlobalId,
@@ -19038,7 +19050,8 @@ actionCancelButton?.addEventListener('click', () => {
 closeOnBackdropClick(actionDialog, () => closeActionDialog(null));
 imageLightboxCloseButton?.addEventListener('click', closeImageLightbox);
 imageLightboxDownloadButton?.addEventListener('click', downloadImageLightboxImage);
-closeOnBackdropClick(imageLightboxDialog, closeImageLightbox);
+// The image lightbox is a fullscreen viewer (not a data dialog): keep the universal tap-outside-to-dismiss gesture.
+closeOnBackdropClick(imageLightboxDialog, closeImageLightbox, { allowOutsideTap: true });
 actionFields?.addEventListener('click', (event) => {
   const target = event.target instanceof Element ? event.target : event.target?.parentElement;
   const image = target?.closest?.('.image-preview-card img');
@@ -19408,10 +19421,10 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   hideIdentityPopover();
-  closeNewChatDialog();
+  // v794: dialogs are X-only — Escape no longer dismisses newChat / docs / install (nor an action dialog,
+  // unless it opted into dismissOnBackdrop:true). The image lightbox (a viewer, handled above) and the
+  // identity popover keep Escape; publicDiscovery is a full screen, so Escape acts as Back.
   if (activeActionDialog?.dismissOnBackdrop !== false) closeActionDialog(null);
-  closeDocsDialog();
-  closeInstallDialog({ dismissed: false });
   closePublicDiscovery();
 });
 
