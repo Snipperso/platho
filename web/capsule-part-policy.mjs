@@ -280,11 +280,14 @@ export function decodeFileBlockContent(content) {
 // public_author_index and ANY client can read it by walking that one author's chain — unlike PREFS, which is
 // encrypted to the owner and readable only by them. Latest profile post per author wins. Content layout:
 //   [version u8=1][descLen u16 BE][desc utf8][tagCount u8][ tagLen u8 | tag utf8 ]*
-// descLen is u16 (a cyrillic description hits 512 BYTES well before 512 chars); each tag length fits u8. Tags are
-// expected pre-normalized by the composer (lowercase/trim/dedupe), but encode defends the wire bounds anyway.
+// descLen is u16 (cyrillic is 2 bytes/char, so a byte cap hits well before the char count); each tag length fits u8.
+// Tags are expected pre-normalized by the composer (lowercase/trim/dedupe), but encode defends the wire bounds anyway.
+// v792 raised the caps (owner: 16 chars/tag was too tight for cyrillic — long russian tags cut mid-word; 256-char
+// descriptions were too short): tag 32->64 bytes (~32 cyrillic chars, still u8-safe), description 512->1536 bytes
+// (~768 cyrillic chars, still u16). DECODE is unchanged and backward-compatible — the length fields carry any size.
 export const PROFILE_BLOCK_CONTENT_VERSION = 1;
-export const PROFILE_DESCRIPTION_MAX_BYTES = 512;
-export const PROFILE_TAG_MAX_BYTES = 32;
+export const PROFILE_DESCRIPTION_MAX_BYTES = 1536;
+export const PROFILE_TAG_MAX_BYTES = 64;
 export const PROFILE_MAX_TAGS = 12;
 // The channel's SELF-DECLARED .ath owner username — carried the same way private messages carry senderUsername,
 // and verified the same way (against the on-chain username registry: owner == the channel's author wallet). The

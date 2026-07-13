@@ -96,10 +96,14 @@ import {
   encodeProfileBlockContent,
   decodeProfileBlockContent,
   normalizeProfileTags,
+  PROFILE_DESCRIPTION_MAX_BYTES,
+  PROFILE_TAG_MAX_BYTES,
+  PROFILE_MAX_TAGS,
+  utf8ByteLength,
   encodeShareBlockContent,
   decodeShareBlockContent,
   SHARE_SNIPPET_MAX_BYTES,
-} from './capsule-part-policy.mjs?v=8';
+} from './capsule-part-policy.mjs?v=9';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -182,7 +186,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=31';
+} from './i18n.mjs?v=32';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -194,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v791';
+const PLATHO_APP_RUNTIME_VERSION = 'v792';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4836,6 +4840,12 @@ async function openEditChannelProfileDialog() {
         placeholder: t('public.descriptionPlaceholder'),
         value: current?.description ?? '',
         required: false,
+        // Live UTF-8 BYTE budget (the on-chain field is byte-capped; cyrillic is 2 bytes/char) so nothing truncates
+        // silently on save. Red once over PROFILE_DESCRIPTION_MAX_BYTES.
+        counter: (value) => {
+          const used = utf8ByteLength(value);
+          return { text: t('public.profileDescriptionBudget', { used, max: PROFILE_DESCRIPTION_MAX_BYTES }), over: used > PROFILE_DESCRIPTION_MAX_BYTES };
+        },
       },
       {
         id: 'tags',
@@ -4844,6 +4854,12 @@ async function openEditChannelProfileDialog() {
         value: (current?.tags ?? []).join(', '),
         required: false,
         autocomplete: 'off',
+        // Count (≤PROFILE_MAX_TAGS) + per-tag byte cap; red if too many tags OR any tag exceeds PROFILE_TAG_MAX_BYTES.
+        counter: (value) => {
+          const raw = String(value).split(/[,\n]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+          const over = raw.length > PROFILE_MAX_TAGS || raw.some((tag) => utf8ByteLength(tag) > PROFILE_TAG_MAX_BYTES);
+          return { text: t('public.profileTagsBudget', { count: raw.length, max: PROFILE_MAX_TAGS, bytes: PROFILE_TAG_MAX_BYTES }), over };
+        },
       },
     ],
     validateSubmit: async (values) => {
@@ -5523,6 +5539,20 @@ function createActionField(field) {
   if (field.required !== false) input.required = true;
   input.value = field.value ?? '';
   wrapper.append(label, input);
+  // Optional live counter (e.g. UTF-8 byte budget for an on-chain field): field.counter(value) -> { text, over }.
+  // Recomputed on every input so nothing silently truncates on save; `is-over` flags an exceeded budget in red.
+  if (typeof field.counter === 'function') {
+    const counter = document.createElement('span');
+    counter.className = 'action-dialog-field-counter';
+    const updateCounter = () => {
+      const info = field.counter(input.value);
+      counter.textContent = info?.text ?? '';
+      counter.classList.toggle('is-over', Boolean(info?.over));
+    };
+    input.addEventListener('input', updateCounter);
+    updateCounter();
+    wrapper.append(counter);
+  }
   return wrapper;
 }
 
