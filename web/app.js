@@ -198,7 +198,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v799';
+const PLATHO_APP_RUNTIME_VERSION = 'v800';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -17925,6 +17925,22 @@ function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = nu
   return encodeMessageDocumentBlocks(blocks, options);
 }
 
+// Strip inline markdown MARKERS for a PLAIN-TEXT preview line (the thread list shows thread.preview via textContent,
+// which can't render bold, so the raw `**a** **b**` markers were just noise — owner screenshot). **bold**/
+// *italic*/`code`/***bi*** -> their text; a [label](url) -> its label; runs of whitespace/newlines collapse to one
+// space so a multi-line message previews as one clean line. Display-only (never touches the wire or the bubble
+// renderer, which formats from the message's own blocks).
+function stripInlineFormatting(text) {
+  return String(text ?? '')
+    .replace(/\*\*\*([^*\n]+)\*\*\*/g, '$1')
+    .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function messagePreviewFromBlocks(blocks = []) {
   const text = blocks.find((block) => block?.type === 'text' && String(block.text ?? '').trim())?.text;
   if (text) return String(text).trim();
@@ -18712,7 +18728,7 @@ function applyThreadRow(item, thread) {
   item.className = `thread-item${thread.id === activeThreadId ? ' is-selected' : ''}${unread > 0 ? ' has-unread' : ''}`;
   setThreadAvatarNode(avatar, thread);
   setIdentityLabel(name, thread, 'thread-name identity-label');
-  preview.textContent = thread.preview;
+  preview.textContent = stripInlineFormatting(thread.preview); // thread.preview is plain text — drop raw **/*/` markers
   state.textContent = thread.state;
   // Real last-message time, not the old constant 'now' word (v654). Computed at render (not cached on the
   // thread) so the today/weekday/date bucket stays correct as days roll over between re-renders.
