@@ -194,7 +194,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v784';
+const PLATHO_APP_RUNTIME_VERSION = 'v785';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16769,17 +16769,69 @@ function composerEditorEnclosingFormat(range, className, el) {
 // (no stray markers on mobile). Never inline styles (prod CSP style-src 'self'), never execCommand.
 // The word (run of letters/digits/underscore, any script) the collapsed caret sits in, as offsets into its text
 // node — so a format toggle with no selection acts on the whole word. Null if the caret is on whitespace/empty.
-function composerEditorWordRangeAtCaret(range) {
-  const node = range.startContainer;
-  if (node.nodeType !== 3) return null;
-  const text = node.nodeValue || '';
+// The word under the caret, as a range that SPANS fmt-* span / text-node boundaries WITHIN the word — so half a word
+// wrapped in bold still selects/toggles the WHOLE word (was single-text-node: it grabbed only the bold or the plain
+// half). A word = a run of letters/digits/_; it never crosses a <br>, block boundary, or atom chip. Returns
+// {startNode, startOffset, endNode, endOffset, caretInWord} or null.
+function composerEditorWordRangeAtCaret(range, el) {
+  const caretNode = range.startContainer;
+  if (caretNode.nodeType !== 3) return null;
+  const root = el || caretNode.parentNode;
+  if (!root || !root.contains(caretNode)) return null;
   const isWord = (ch) => ch !== undefined && /[\p{L}\p{N}_]/u.test(ch);
-  let start = range.startOffset;
-  let end = range.startOffset;
-  while (start > 0 && isWord(text[start - 1])) start--;
-  while (end < text.length && isWord(text[end])) end++;
-  if (start === end) return null;
-  return { node, start, end };
+  // Walk inline nodes in order: text nodes (word material) + <br>/atom chips (hard word boundaries). fmt spans are
+  // transparent (SKIP descends into their text), so a bold+plain word reads as one contiguous run.
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode(n) {
+      if (n.nodeType === 3) {
+        // A text node INSIDE an atom chip is the chip's own label (e.g. a link's visible text), NOT editable word
+        // material. Reject it — FILTER_ACCEPT on the atom element (below) does NOT prune its subtree, so without this
+        // a word abutting a chip (`[docs](…)world`, no separator) would merge the label into the word run: select-word
+        // would anchor inside the contenteditable=false chip and Bold/Italic would no-op (range intersects the atom).
+        // The atom ELEMENT itself is still accepted and stays a hard word boundary.
+        return (n.parentElement && n.parentElement.closest('[data-marker]')) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      }
+      // Hard word boundaries — mirror the set serializeComposerEditor turns into a NEWLINE (BR + DIV/P block wrappers)
+      // plus atom chips. ACCEPT keeps the element in `seq` (nodeType 1 breaks the contiguous text-run) so a word can't
+      // merge across it; the walker still descends into DIV/P (their text is real content on the next line, just not the
+      // caret's word). Without DIV/P here a stray block (a WebView inserted one despite the Enter intercept) would let a
+      // toggle span the boundary and serialize `**foo\nbar**` — a newline trapped in bold the recipient shows as `**`.
+      if (n.nodeName === 'BR' || n.nodeName === 'DIV' || n.nodeName === 'P' || (n.dataset && n.dataset.marker)) return NodeFilter.FILTER_ACCEPT;
+      return NodeFilter.FILTER_SKIP;
+    },
+  });
+  const seq = [];
+  let n;
+  while ((n = walker.nextNode())) seq.push(n);
+  const caretIdx = seq.indexOf(caretNode);
+  if (caretIdx === -1) return null;
+  // The contiguous TEXT-NODE run around the caret, bounded by any <br>/atom in seq.
+  let a = caretIdx;
+  let b = caretIdx;
+  while (a > 0 && seq[a - 1].nodeType === 3) a--;
+  while (b < seq.length - 1 && seq[b + 1].nodeType === 3) b++;
+  const textNodes = seq.slice(a, b + 1);
+  let concat = '';
+  const map = []; // global char index -> { node, local }
+  let caretGlobal = 0;
+  for (const tn of textNodes) {
+    if (tn === caretNode) caretGlobal = concat.length + range.startOffset;
+    const v = tn.nodeValue || '';
+    for (let i = 0; i < v.length; i++) map.push({ node: tn, local: i });
+    concat += v;
+  }
+  let s = caretGlobal;
+  let e = caretGlobal;
+  while (s > 0 && isWord(concat[s - 1])) s--;
+  while (e < concat.length && isWord(concat[e])) e++;
+  if (s === e) return null;
+  const startPos = map[s];
+  const lastPos = map[e - 1];
+  return {
+    startNode: startPos.node, startOffset: startPos.local,
+    endNode: lastPos.node, endOffset: lastPos.local + 1,
+    caretInWord: caretGlobal - s,
+  };
 }
 
 function composerEditorToggleFormat(el, className) {
@@ -16794,11 +16846,11 @@ function composerEditorToggleFormat(el, className) {
   if (range.collapsed) {
     // No selection: expand to the WORD under the caret so tapping into a word + B formats the whole word
     // (mobile-friendly — no precise selection, no native menu). Caret on whitespace/empty -> no-op.
-    const word = composerEditorWordRangeAtCaret(range);
+    const word = composerEditorWordRangeAtCaret(range, el);
     if (!word) return;
-    caretInWord = range.startOffset - word.start; // remember WHERE in the word the caret was, to restore it
-    range.setStart(word.node, word.start);
-    range.setEnd(word.node, word.end);
+    caretInWord = word.caretInWord; // remember WHERE in the word the caret was, to restore it
+    range.setStart(word.startNode, word.startOffset);
+    range.setEnd(word.endNode, word.endOffset);
     sel.removeAllRanges();
     sel.addRange(range);
   }
@@ -16853,6 +16905,7 @@ function composerEditorToggleFormat(el, className) {
     range.insertNode(span);
     // Flatten any same-class descendants so serialization doesn't emit doubled markers.
     span.querySelectorAll('.' + className).forEach((n) => { while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n); n.remove(); });
+    span.normalize(); // merge the adjacent text nodes flattening leaves behind so caret-restore by offset lands exactly
     const r = document.createRange();
     r.selectNodeContents(span);
     sel.removeAllRanges(); sel.addRange(r);
@@ -16865,19 +16918,41 @@ function composerEditorToggleFormat(el, className) {
   // the insertText bleed guard, so the caret can safely rest in the word.
   if (startedCollapsed && sel.rangeCount) {
     const r = sel.getRangeAt(0);
+    // The selection now spans exactly the (re)formatted word. Walk its text nodes IN ORDER (the word may span a nested
+    // other-format span — bold OVER a partially-italic word — so the caret's target offset can fall past the FIRST
+    // text node; clamping to that node alone lands the caret a char early). Place it at the caretInWord-th char.
+    const wordTexts = [];
+    const rootEl = r.commonAncestorContainer.nodeType === 1 ? r.commonAncestorContainer : r.commonAncestorContainer.parentNode;
+    if (rootEl) {
+      const tw = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, { acceptNode: (tn) => r.intersectsNode(tn) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP });
+      let tn; while ((tn = tw.nextNode())) wordTexts.push(tn);
+    }
     let node = r.startContainer, off = r.startOffset;
-    if (node.nodeType === 1) { // descend to the FIRST text node of the (re)formatted word
+    if (wordTexts.length) {
+      const want = caretInWord >= 0 ? caretInWord : Infinity; // no caretInWord -> land at the word END
+      let acc = 0, placed = false;
+      for (const tn of wordTexts) {
+        const from = tn === r.startContainer ? r.startOffset : 0;
+        const to = tn === r.endContainer ? r.endOffset : tn.nodeValue.length;
+        const len = to - from;
+        if (acc + len >= want) { node = tn; off = from + (want - acc); placed = true; break; }
+        acc += len;
+      }
+      if (!placed) { const last = wordTexts[wordTexts.length - 1]; node = last; off = last === r.endContainer ? r.endOffset : last.nodeValue.length; }
+    } else if (node.nodeType === 1) { // no text nodes matched (defensive) — descend to the first text child
       let c = node.childNodes[off] || node.firstChild;
       while (c && c.nodeType === 1) c = c.firstChild;
-      if (c && c.nodeType === 3) { node = c; off = 0; }
+      if (c && c.nodeType === 3) { node = c; off = caretInWord >= 0 ? Math.min(caretInWord, c.nodeValue.length) : c.nodeValue.length; }
     }
-    if (node.nodeType === 3) off = caretInWord >= 0 ? Math.min(caretInWord, node.nodeValue.length) : node.nodeValue.length;
     const r2 = document.createRange();
     r2.setStart(node, off);
     r2.collapse(true);
     sel.removeAllRanges();
     sel.addRange(r2);
   }
+  // Toggling a partially-formatted word (extractContents splits the old span across the word boundary) can leave an
+  // EMPTY .fmt-* span behind, which serializes to a stray `****`. Prune it (the caret already rests in the word).
+  composerEditorPruneEmptyFmt(el);
   composerEditorAfterEdit(el);
 }
 
@@ -17463,11 +17538,11 @@ function composerEditorSelectWordAtCaret(el) {
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
   if (!el.contains(range.commonAncestorContainer)) return;
-  const word = composerEditorWordRangeAtCaret(range);
+  const word = composerEditorWordRangeAtCaret(range, el);
   if (!word) return;
   const r = document.createRange();
-  r.setStart(word.node, word.start);
-  r.setEnd(word.node, word.end);
+  r.setStart(word.startNode, word.startOffset);
+  r.setEnd(word.endNode, word.endOffset);
   sel.removeAllRanges();
   sel.addRange(r);
 }
@@ -17480,7 +17555,7 @@ function setupComposerToolbar(toolbar, textarea, hideButton) {
   toolbar.addEventListener('mousedown', (event) => {
     // Keep the textarea focused + its selection intact when a toolbar button is pressed. File inputs / the emoji
     // picker / link dialog manage their own focus, so preventing the focus-shift here is safe for them too.
-    if (event.target.closest('.composer-toolbar-button, .composer-toolbar-hide, .composer-toolbar-dock')) event.preventDefault();
+    if (event.target.closest('.composer-toolbar-button, .composer-toolbar-hide, .composer-toolbar-dock, .composer-toolbar-maximize')) event.preventDefault();
   });
   toolbar.addEventListener('click', (event) => {
     const button = event.target.closest('[data-format]');
@@ -19672,10 +19747,27 @@ const composerReducedMotion = () => { try { return window.matchMedia('(prefers-r
 
 function toggleComposerDockPosition() {
   const next = !composerDockIsBelow();
+  const reduced = composerReducedMotion();
+  // FLIP the composer's NON-toolbar children (input row, attachment panels, cost status): FIRST record their tops so
+  // that after the toolbar's flex order flips they SLIDE to the new position instead of jumping (the toolbar keeps its
+  // own slide-in). "First" — measure before the order changes.
+  const rows = reduced ? [] : [...document.querySelectorAll('.composer > :not(.composer-toolbar)')].filter((el) => el.offsetParent !== null && !el.hidden);
+  const firstTops = rows.map((el) => el.getBoundingClientRect().top);
   try { localStorage.setItem(COMPOSER_DOCK_STORAGE_KEY, next ? '1' : '0'); } catch { /* private mode: session-only */ }
-  applyComposerDockPosition();
-  if (composerReducedMotion()) return;
-  // Animate the toolbar sliding back in on its NEW side (below -> drops down into place; above -> rises up).
+  applyComposerDockPosition(); // "Last": the flex order flips (instant)
+  if (reduced) return;
+  rows.forEach((el, i) => { // "Invert + Play": each child slides from its old top to its new one
+    const delta = firstTops[i] - el.getBoundingClientRect().top;
+    if (!delta) return;
+    el.style.transition = 'none';
+    el.style.transform = `translateY(${delta}px)`;
+    void el.offsetWidth;
+    el.style.transition = 'transform 0.48s cubic-bezier(0.16, 1, 0.3, 1)';
+    el.style.transform = 'none';
+    const done = (event) => { if (event.target !== el || event.propertyName !== 'transform') return; el.style.transition = ''; el.style.transform = ''; el.removeEventListener('transitionend', done); };
+    el.addEventListener('transitionend', done);
+  });
+  // The toolbar slides back in on its NEW side (below -> drops down; above -> rises up).
   const shift = next ? '-12px' : '12px';
   for (const tb of document.querySelectorAll('.composer-toolbar')) {
     tb.style.setProperty('--dock-shift', shift);
@@ -19713,9 +19805,25 @@ function composerCancelMaxFlip(form) {
   if (flip) { clearTimeout(flip.timer); form.removeEventListener('transitionend', flip.onEnd); form.__maxFlip = null; }
   if (form) composerClearMaxAnimStyles(form);
 }
+// While maximized the composer is position:fixed (out of flow), so its inline slot would collapse and the chat/feed
+// content would jump to fill it (and jump back on restore). A same-height spacer holds the slot until the composer
+// returns to the inline layout.
+function composerReserveSpacer(form, height) {
+  composerReleaseSpacer(form);
+  const spacer = document.createElement('div');
+  spacer.setAttribute('aria-hidden', 'true');
+  spacer.style.height = `${height}px`;
+  spacer.style.flexShrink = '0';
+  form.after(spacer);
+  form.__spacer = spacer;
+}
+function composerReleaseSpacer(form) {
+  if (form && form.__spacer) { form.__spacer.remove(); form.__spacer = null; }
+}
 function composerCollapseMaximizeNow(form) {
   composerCancelMaxFlip(form);
   form.classList.remove('is-maximized', 'is-restoring');
+  composerReleaseSpacer(form);
   composerMaximizeButtonLabel(form.querySelector('.composer-toolbar-maximize'), false);
 }
 // growing=true: animate the inline footprint -> full-screen (stays maximized). growing=false: full-screen -> the inline
@@ -19733,7 +19841,7 @@ function composerRunMaximizeGeo(form, growing) {
   const finish = () => {
     // On a shrink, drop .is-maximized WHILE the inline-footprint geometry is still applied (composer already at its
     // resting size -> no full-screen flash), THEN clear the inline geometry -> seamless hand-off to the inline layout.
-    if (!growing) { form.classList.remove('is-maximized', 'is-restoring'); composerMaximizeButtonLabel(form.querySelector('.composer-toolbar-maximize'), false); }
+    if (!growing) { form.classList.remove('is-maximized', 'is-restoring'); composerReleaseSpacer(form); composerMaximizeButtonLabel(form.querySelector('.composer-toolbar-maximize'), false); }
     composerCancelMaxFlip(form); // clears inline geometry + timer + listener
     if (emojiPicker && !emojiPicker.hidden && emojiPickerTargetButton) positionEmojiPicker(emojiPickerTargetButton);
   };
@@ -19753,22 +19861,26 @@ function toggleComposerMaximize(form, button) {
   const isRestoring = form.classList.contains('is-restoring');
   if (isMax && isRestoring) return; // mid-shrink FLIP — debounce the click
   closeEmojiPicker(); // the emoji button is inside the composer; a picker anchored to it goes stale across the FLIP
+  // Preserve the editor's focus across the state change: maximizing/restoring must NOT force-focus (which pops the
+  // mobile keyboard) NOR blur (which hides it) — if it was focused it stays, if not it stays not.
+  const editorEl = form.querySelector('.composer-input');
+  const wasFocused = !!editorEl && document.activeElement === editorEl;
   if (isMax) {
     composerMaximizeButtonLabel(button, false);
-    if (composerReducedMotion() || !form.__inlineRect) { composerCollapseMaximizeNow(form); return; }
-    form.classList.add('is-restoring'); // marker: a shrink FLIP is running (still full-screen until it finishes)
-    composerRunMaximizeGeo(form, false);
+    if (composerReducedMotion() || !form.__inlineRect) { composerCollapseMaximizeNow(form); }
+    else { form.classList.add('is-restoring'); composerRunMaximizeGeo(form, false); } // shrink FLIP still full-screen until it finishes
   } else {
     const r = form.getBoundingClientRect(); // the inline footprint to grow FROM / shrink back TO
     form.__inlineRect = { left: r.left, top: r.top, width: r.width, height: r.height };
     composerCancelMaxFlip(form);
     form.classList.remove('is-restoring');
+    composerReserveSpacer(form, r.height); // hold the inline slot so the chat/feed content doesn't jump
     form.classList.add('is-maximized');
     composerMaximizeButtonLabel(button, true);
-    form.querySelector('.composer-input')?.focus?.();
-    if (composerReducedMotion()) return;
-    composerRunMaximizeGeo(form, true);
+    if (!composerReducedMotion()) composerRunMaximizeGeo(form, true);
   }
+  // Restore the pre-toggle focus state (a position/geometry change can drop contenteditable focus in some browsers).
+  if (wasFocused && editorEl && document.activeElement !== editorEl) editorEl.focus({ preventScroll: true });
 }
 // Collapse any maximized composer INSTANTLY (after a send clears the draft, or on navigation away — the overlay must
 // get out of the way at once, no shrink animation). Cancels any in-flight FLIP first. Returns true if it collapsed one.
@@ -19778,6 +19890,7 @@ function exitComposerMaximize() {
     const form = document.getElementById(id);
     if (!form) continue;
     composerCancelMaxFlip(form); // kill any in-flight FLIP so its stale timer/listener can't fire on a changed composer
+    composerReleaseSpacer(form);
     if (!form.classList.contains('is-maximized')) continue;
     form.classList.remove('is-maximized', 'is-restoring');
     collapsed = true;
