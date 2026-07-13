@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=786" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=787" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6656,20 +6656,33 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/form\.classList\.remove\('is-maximized', 'is-restoring'\); composerReleaseSpacer\(form\)/); // shrink finish releases
     expect(app).toMatch(/composerCollapseMaximizeNow\(form\) \{[\s\S]*?composerReleaseSpacer\(form\)/); // instant collapse releases
     expect(app).toMatch(/composerCancelMaxFlip\(form\); \/\/ kill any in-flight[\s\S]*?composerReleaseSpacer\(form\)/); // exit releases
-    // v785/v786 #4: maximize/restore must not pop or hide the mobile keyboard. The maximize button joins the toolbar
-    // mousedown-preventDefault so a tap never blurs the editor. v786 makes the RE-FOCUS keyboard-state-aware: a geometry
-    // change can drop contenteditable focus, so re-focus ONLY when the keyboard was actually UP (composerKeyboardLikelyOpen
-    // = visual-viewport shrunk >150px = the user is typing) — keeping the keyboard. When the keyboard is DOWN (dismissed
-    // with focus retained, OR desktop/no soft keyboard) we do NOTHING: no re-focus (a dismissed keyboard is not re-popped)
-    // and NO blur (blurring dropped the desktop/touch-laptop caret on any incidental viewport shrink, and there is no
-    // reliable signal a soft keyboard will re-pop). A false-positive keyboardWasOpen only causes a harmless re-focus.
+    // v785-v787 #4: maximize/restore must not pop or hide the mobile keyboard. The maximize button joins the toolbar
+    // mousedown-preventDefault so a tap never blurs the editor. On maximize we re-focus ONLY when the keyboard was
+    // actually UP (composerKeyboardLikelyOpen = visual-viewport shrunk >150px = typing), keeping the keyboard; keyboard
+    // DOWN -> nothing (no re-focus of a dismissed keyboard, no maximize-time blur which dropped the desktop caret).
     expect(app).toMatch(/const wasFocused = !!editorEl && document\.activeElement === editorEl;/);
     expect(app).toMatch(/const keyboardWasOpen = composerKeyboardLikelyOpen\(\);/);
     expect(app).toMatch(/if \(wasFocused && keyboardWasOpen && editorEl && document\.activeElement !== editorEl\) editorEl\.focus\(\{ preventScroll: true \}\);/);
-    expect(app).not.toMatch(/composerKeyboardEverOpened/); // the sticky latch + blur branch were removed (desktop caret regression)
-    expect(app).not.toMatch(/editorEl\.blur\(\)/); // no forced blur on maximize/restore
+    expect(app).not.toMatch(/composerKeyboardEverOpened/); // the sticky latch + maximize-time blur were removed (desktop caret regression)
+    const maxFocusFn = app.slice(app.indexOf('function toggleComposerMaximize('), app.indexOf('function toggleComposerMaximize(') + 2200);
+    expect(maxFocusFn).not.toMatch(/editorEl\.blur\(\)/); // no forced blur inside maximize/restore itself
     expect(app).toMatch(/function composerKeyboardLikelyOpen\(\)/);
     expect(app).toMatch(/return \(composerViewportMaxHeight - viewport\.height\) > 150;/);
+    // v787 (owner): the ROOT-CAUSE fix for the mobile keyboard re-pop — hiding the keyboard with its own button leaves
+    // the field FOCUSED (caret) but the keyboard down, and any later geometry change (maximize/restore) makes a touch
+    // browser re-show the keyboard for that still-focused editable. composerHandleKeyboardVisibility() (called from
+    // syncViewportCssVars on every visual-viewport resize) detects the keyboard's up->down (dismissed) edge and BLURS a
+    // focused .composer-input, eliminating the "focused-but-keyboard-hidden" state at the source. Gated on (pointer:
+    // coarse) — a real touch device — so a fine-pointer desktop/touch-laptop window resize never drops the caret.
+    expect(app).toMatch(/function composerHandleKeyboardVisibility\(\)/);
+    expect(app).toMatch(/const nowOpen = composerKeyboardLikelyOpen\(\);\s*if \(composerKeyboardWasOpen && !nowOpen\)/);
+    expect(app).toMatch(/matchMedia\('\(pointer: coarse\)'\)\.matches[\s\S]*?active\.classList\.contains\('composer-input'\)\) active\.blur\(\);/);
+    expect(app).toMatch(/composerKeyboardWasOpen = nowOpen;/);
+    expect(app).toMatch(/composerHandleKeyboardVisibility\(\); \/\/ blur the composer if the soft keyboard was just dismissed/);
+    // v787 review fix: the no-keyboard baseline is keyed to the viewport WIDTH — a soft keyboard changes only HEIGHT, but
+    // an orientation flip changes WIDTH; without re-baselining on a width change the monotonic max kept the taller PORTRAIT
+    // height, so composerKeyboardLikelyOpen() read "open" forever in LANDSCAPE and the hide-blur never fired there.
+    expect(app).toMatch(/if \(visualWidth !== composerViewportBaselineWidth\) \{\s*composerViewportMaxHeight = visual; composerViewportBaselineWidth = visualWidth; composerKeyboardWasOpen = false;/);
     const maxFn = app.slice(app.indexOf('function toggleComposerMaximize('), app.indexOf('function toggleComposerMaximize(') + 1800);
     expect(maxFn).not.toMatch(/\.composer-input'\)\?\.focus\?\.\(\)/); // the old forced focus is gone
     expect(app).toMatch(/\.composer-toolbar-button, \.composer-toolbar-hide, \.composer-toolbar-dock, \.composer-toolbar-maximize'\)\) event\.preventDefault\(\)/);
@@ -7819,7 +7832,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v861/);
+    expect(sw).toMatch(/platho-pwa-prototype-v862/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7828,7 +7841,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=786/);
+    expect(sw).toMatch(/\.\/app\.js\?v=787/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);
