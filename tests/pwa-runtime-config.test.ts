@@ -283,7 +283,7 @@ describe('PWA runtime config guard', () => {
     // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
     // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
     // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=787" type="module">/);
+    expect(html).toMatch(/<script src="\.\/app\.js\?v=788" type="module">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6558,7 +6558,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="privateToolbarMaximize"[^>]*aria-pressed="false"[^>]*data-i18n-title="composer\.maximize"/);
     expect(html).toMatch(/id="publicToolbarMaximize"[^>]*aria-pressed="false"[^>]*data-i18n-title="composer\.maximize"/);
     expect(app).toMatch(/function toggleComposerMaximize\(form, button\) \{/);
-    expect(app).toMatch(/form\.classList\.add\('is-maximized'\);\s*composerMaximizeButtonLabel\(button, true\)/);
+    expect(app).toMatch(/form\.classList\.add\('is-maximized'\);[\s\S]*?composerMaximizeButtonLabel\(button, true\)/);
     expect(app).toMatch(/function exitComposerMaximize\(\) \{/);
     expect(app).toMatch(/#privateToolbarMaximize'\)\?\.addEventListener\('click', \(event\) => toggleComposerMaximize\(document\.getElementById\('composer'\), event\.currentTarget\)\)/);
     expect(app).toMatch(/#publicToolbarMaximize'\)\?\.addEventListener\('click', \(event\) => toggleComposerMaximize\(document\.getElementById\('publicComposer'\), event\.currentTarget\)\)/);
@@ -6656,6 +6656,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/form\.classList\.remove\('is-maximized', 'is-restoring'\); composerReleaseSpacer\(form\)/); // shrink finish releases
     expect(app).toMatch(/composerCollapseMaximizeNow\(form\) \{[\s\S]*?composerReleaseSpacer\(form\)/); // instant collapse releases
     expect(app).toMatch(/composerCancelMaxFlip\(form\); \/\/ kill any in-flight[\s\S]*?composerReleaseSpacer\(form\)/); // exit releases
+    // v788 (owner cosmetic): the app viewport can change between maximize and restore (the keyboard appeared/dismissed),
+    // so the inline TOP captured at maximize is stale — the composer would shrink to the OLD slot then JUMP. The spacer
+    // rides the layout, so the shrink shifts the captured top by how far the spacer MOVED since maximize (__spacerTop0),
+    // using the DELTA (not the spacer's absolute top, which sits at a small structural offset) so a no-change restore
+    // stays seamless. __spacerTop0 is captured in the maximized (form-out-of-flow) layout.
+    expect(app).toMatch(/form\.__spacerTop0 = form\.__spacer \? form\.__spacer\.getBoundingClientRect\(\)\.top : null;/);
+    expect(app).toMatch(/if \(!growing && inlineRect && form\.__spacer && form\.__spacerTop0 != null\) \{\s*const curTop = form\.__spacer\.getBoundingClientRect\(\)\.top;\s*inlineRect = \{ \.\.\.inlineRect, top: inlineRect\.top \+ \(curTop - form\.__spacerTop0\) \};/);
     // v785-v787 #4: maximize/restore must not pop or hide the mobile keyboard. The maximize button joins the toolbar
     // mousedown-preventDefault so a tap never blurs the editor. On maximize we re-focus ONLY when the keyboard was
     // actually UP (composerKeyboardLikelyOpen = visual-viewport shrunk >150px = typing), keeping the keyboard; keyboard
@@ -7832,7 +7839,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v862/);
+    expect(sw).toMatch(/platho-pwa-prototype-v863/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -7841,7 +7848,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=787/);
+    expect(sw).toMatch(/\.\/app\.js\?v=788/);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=31/);
