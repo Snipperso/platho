@@ -235,16 +235,14 @@ contract ProfileRegistry {
         if (creditAmount < PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE) {
             return;
         }
+        // clean-16 direct-pay: refund the TON excess straight to the PAYER (== owner_wallet, enforced at 21163),
+        // not to a Vault. Plain-TON transfer so the user's own wallet accepts it (no typed Vault receiver needed).
         message(MessageParameters {
-            to: self.vault_address,
-            value: refundValue,
+            to: owner_wallet,
+            value: creditAmount,
             bounce: false,
             mode: SendDefaultMode,
-            body: ProfileAvatarTonExcessRefund {
-                query_id: query_id,
-                owner_wallet: owner_wallet,
-                amount: creditAmount
-            }.toCell()
+            body: "platho-avatar-excess-refund".asComment()
         });
     }
 
@@ -381,11 +379,15 @@ contract ProfileRegistry {
         self.sealed = true;
     }
 
+    // clean-16 migration/Durable-Core: PAYER-AUTHENTICATED avatar update (owner decision 2026-07-15). No longer gated
+    // on a one-shot-bound Vault. The official ATH wallet unforgeably stamps payer_wallet=derive_wallet_address(real
+    // sender_owner); we require owner_wallet == payer_wallet so a payer can set ONLY THEIR OWN avatar — no Vault,
+    // controller, or third party can ever be another user's payer, so the delegated-consent hijack vector is gone.
+    // Vault-independent → the registry freezes once and survives every future Vault redeploy.
     receive(msg: AthTransferNotificationVaultProfileAvatar) {
         self.requireSealed();
         throwUnless(21160, sender() == self.official_ath_wallet_address);
-        throwUnless(21162, self.vault_bound);
-        throwUnless(21161, msg.payer_wallet == self.vault_address);
+        throwUnless(21163, msg.owner_wallet == msg.payer_wallet);
         self.acceptAvatarPayment(
             msg.query_id,
             msg.sender_key,

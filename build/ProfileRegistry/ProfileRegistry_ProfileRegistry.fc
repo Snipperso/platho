@@ -53,12 +53,6 @@ cell $ATHTransferRequest$_store_cell((int, int, slice, slice) v, builder b) inli
 ;; $ATHTransferRequest$_load_bounced
 (slice, ((int, int))) $ATHTransferRequest$_load_bounced(slice sc_0) inline;
 
-;; $ProfileAvatarTonExcessRefund$_store
-builder $ProfileAvatarTonExcessRefund$_store(builder build_0, (int, slice, int) v) inline;
-
-;; $ProfileAvatarTonExcessRefund$_store_cell
-cell $ProfileAvatarTonExcessRefund$_store_cell((int, slice, int) v, builder b) inline;
-
 ;; $ProfileAvatarRecord$_store
 builder $ProfileAvatarRecord$_store(builder build_0, (slice, int, int, int, int, int, int, int) v) inline;
 
@@ -193,9 +187,6 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 
 ;; $ProfileRegistry$_fun_sendAthNotificationAck
 ((slice, slice, slice, slice, int, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_sendAthNotificationAck((slice, slice, slice, slice, int, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id, int $sender_key, int $amount) impure inline_ref;
-
-;; $ProfileAvatarTonExcessRefund$_constructor_query_id_owner_wallet_amount
-((int, slice, int)) $ProfileAvatarTonExcessRefund$_constructor_query_id_owner_wallet_amount(int $query_id, slice $owner_wallet, int $amount) inline;
 
 ;; $ProfileRegistry$_fun_refundAvatarExcess
 ((slice, slice, slice, slice, int, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_refundAvatarExcess((slice, slice, slice, slice, int, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id, slice $owner_wallet, int $retained_value) impure inline_ref;
@@ -446,6 +437,12 @@ int $Cell$_fun_hash(cell $self) impure asm """
 
 slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
 
+;; ProfileRegistry_ProfileRegistry.constants.fc
+;; Cell WLs8svFIgsDkPk0m1xIncksDuX2dVLovy+3CKxfTEo0=
+cell __gen_cell_cell_58bb3cb2f14882c0e43e4d26d71227724b03b97d9d54ba2fcbedc22b17d3128d() asm """
+    B{b5ee9c7241010101002100003e00000000706c6174686f2d6176617461722d6578636573732d726566756e640274aa9a} B>boc PUSHREF
+""";
+
 ;; ProfileRegistry_ProfileRegistry.storage.fc
 ;;
 ;; Type: Context
@@ -550,29 +547,6 @@ cell $ATHTransferRequest$_store_cell((int, int, slice, slice) v, builder b) inli
 
 ((int, int, slice, slice)) $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination(int $query_id, int $amount, slice $recipient, slice $response_destination) inline {
     return ($query_id, $amount, $recipient, $response_destination);
-}
-
-;;
-;; Type: ProfileAvatarTonExcessRefund
-;; Header: 0x50a61121
-;; TLB: profile_avatar_ton_excess_refund#50a61121 query_id:uint64 owner_wallet:address amount:uint128 = ProfileAvatarTonExcessRefund
-;;
-
-builder $ProfileAvatarTonExcessRefund$_store(builder build_0, (int, slice, int) v) inline {
-    var (v'query_id, v'owner_wallet, v'amount) = v;
-    build_0 = store_uint(build_0, 1353060641, 32);
-    build_0 = build_0.store_uint(v'query_id, 64);
-    build_0 = build_0.store_slice(v'owner_wallet);
-    build_0 = build_0.store_uint(v'amount, 128);
-    return build_0;
-}
-
-cell $ProfileAvatarTonExcessRefund$_store_cell((int, slice, int) v, builder b) inline {
-    return $ProfileAvatarTonExcessRefund$_store(b, v).end_cell();
-}
-
-((int, slice, int)) $ProfileAvatarTonExcessRefund$_constructor_query_id_owner_wallet_amount(int $query_id, slice $owner_wallet, int $amount) inline {
-    return ($query_id, $owner_wallet, $amount);
 }
 
 ;;
@@ -998,7 +972,7 @@ builder $ProfileRegistry$_store(builder build_0, (slice, slice, slice, slice, in
     if (($creditAmount < 100000)) {
         return (($self'official_ath_wallet_address, $self'vault_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
     }
-    $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'vault_address, $refundValue, false, 0, $ProfileAvatarTonExcessRefund$_store_cell($ProfileAvatarTonExcessRefund$_constructor_query_id_owner_wallet_amount($query_id, $owner_wallet, $creditAmount), begin_cell())));
+    $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($owner_wallet, $creditAmount, false, 0, __gen_cell_cell_58bb3cb2f14882c0e43e4d26d71227724b03b97d9d54ba2fcbedc22b17d3128d()));
     return (($self'official_ath_wallet_address, $self'vault_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
 }
 
@@ -1324,8 +1298,7 @@ _ %get_pending_burn_flush(int $query_id) method_id(109631) {
         var $msg'media_format = sc_1~load_uint(8);
         ($self'official_ath_wallet_address, $self'vault_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
         throw_unless(21160, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
-        throw_unless(21162, $self'vault_bound);
-        throw_unless(21161, ( equal_slices_bits($msg'payer_wallet, $self'vault_address) ));
+        throw_unless(21163, ( equal_slices_bits($msg'owner_wallet, $msg'payer_wallet) ));
         ($self'official_ath_wallet_address, $self'vault_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_acceptAvatarPayment($msg'query_id, $msg'sender_key, $msg'amount, $msg'owner_wallet, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format);
         $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'vault_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
         return ();

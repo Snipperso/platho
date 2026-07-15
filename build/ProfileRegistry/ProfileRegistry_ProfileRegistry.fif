@@ -15,8 +15,6 @@ PROGRAM{
   DECLPROC $ATHTransferRequest$_store
   DECLPROC $ATHTransferRequest$_store_cell
   DECLPROC $ATHTransferRequest$_load_bounced
-  DECLPROC $ProfileAvatarTonExcessRefund$_store
-  DECLPROC $ProfileAvatarTonExcessRefund$_store_cell
   DECLPROC $ProfileAvatarRecord$_store
   DECLPROC $ProfileAvatarRecord$_store_cell
   DECLPROC $ProfileAvatarRecord$_load
@@ -62,7 +60,6 @@ PROGRAM{
   DECLPROC $ProfileRegistry$_fun_requireValidAvatarPointerFields
   DECLPROC $AthTransferNotificationAck$_constructor_query_id_sender_key_amount
   DECLPROC $ProfileRegistry$_fun_sendAthNotificationAck
-  DECLPROC $ProfileAvatarTonExcessRefund$_constructor_query_id_owner_wallet_amount
   DECLPROC $ProfileRegistry$_fun_refundAvatarExcess
   DECLPROC $ProfileRegistry$_fun_requireNoDueFlushQuery
   DECLPROC $ProfileRegistry$_fun_restoreTreasuryDue
@@ -212,20 +209,6 @@ PROGRAM{
     64 LDU
     128 LDU
     -ROT
-  }>
-  $ProfileAvatarTonExcessRefund$_store PROCINLINE:<{
-    1353060641 PUSHINT
-    s0 s4 XCHG2
-    32 STU
-    s1 s2 XCHG
-    64 STU
-    STSLICE
-    128 STU
-  }>
-  $ProfileAvatarTonExcessRefund$_store_cell PROCINLINE:<{
-    3 -ROLL
-    $ProfileAvatarTonExcessRefund$_store INLINECALLDICT
-    ENDC
   }>
   $ProfileAvatarRecord$_store PROCINLINE:<{
     s7 s8 XCHG2
@@ -713,45 +696,37 @@ PROGRAM{
         SWAP
         SENDRAWMSG
   }>
-  $ProfileAvatarTonExcessRefund$_constructor_query_id_owner_wallet_amount PROCINLINE:<{
-  }>
   $ProfileRegistry$_fun_refundAvatarExcess PROCREF:<{
+    s2 POP
     __tact_context_get INLINECALLDICT
     $Context$_get_value INLINECALLDICT
-    SWAP
+    ROT
     SUB
     DUP
     100000 PUSHINT
     LESS
     IFJMP:<{
-      3 BLKDROP
+      2DROP
     }>
     DUP
     2200000 PUSHINT
     LEQ
     IFJMP:<{
-      3 BLKDROP
+      2DROP
     }>
     200000 PUSHINT
     SUB
-    DUP
     2000000 PUSHINT
     SUB
     DUP
     100000 PUSHINT
     LESS
     IFJMP:<{
-      4 BLKDROP
+      2DROP
     }>
     FALSE
-    s4 s3 XCHG2
     0 PUSHINT
-    s0 s5 XCHG
-    $ProfileAvatarTonExcessRefund$_constructor_query_id_owner_wallet_amount INLINECALLDICT
-    NEWC
-    $ProfileAvatarTonExcessRefund$_store_cell INLINECALLDICT
-    22 s() PUSH
-    s3 s4 s4 XCHG3
+        B{b5ee9c7241010101002100003e00000000706c6174686f2d6176617461722d6578636573732d726566756e640274aa9a} B>boc PUSHREF
     $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
         NEWC
         b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -1835,12 +1810,9 @@ PROGRAM{
       21 s() PUSH
       SDEQ
       THROWANYIFNOT
-      21162 PUSHINT
-      s15 PUSH
-      THROWANYIFNOT
-      21161 PUSHINT
-      s0 23 s() XCHG
-      19 s() PUSH
+      21 s() PUSH
+      21163 PUSHINT
+      s0 24 s() XCHG
       SDEQ
       s1 23 s() XCHG
       THROWANYIFNOT
