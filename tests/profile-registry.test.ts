@@ -245,7 +245,7 @@ function avatarNotification(owner: Address, overrides: Partial<AthTransferNotifi
     query_id: overrides.query_id ?? 1n,
     amount: overrides.amount ?? PROFILE_AVATAR_PRICE_ATH,
     sender_key: overrides.sender_key ?? 77n,
-    payer_wallet: overrides.payer_wallet ?? fixtureAddress('PROFILE_VAULT'),
+    payer_wallet: overrides.payer_wallet ?? owner, // clean-16 direct-pay: payer == owner (you pay for your OWN avatar)
     owner_wallet: overrides.owner_wallet ?? owner,
     avatar_hash: overrides.avatar_hash ?? 0xabc123n,
     avatar_entry_id: overrides.avatar_entry_id ?? 0n,
@@ -280,7 +280,7 @@ async function sendAcceptedAvatar(
   owner: Address,
   queryId = 1n,
 ) {
-  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
+  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(owner, owner, {
     query_id: queryId,
   }));
 }
@@ -743,40 +743,39 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect((await ctx.registry.getGetPendingTreasuryFlush(904n)).exists).toBe(false);
   });
 
-  it('PROFILE-12: accepts Vault-funded avatar notification only from the bound Vault payer', async () => {
+  it('PROFILE-12: clean-16 direct-pay — a payer sets ONLY their own avatar (payer==owner); a mismatched payer (hijack) is rejected', async () => {
     const ctx = await deployProfileRegistryWithAthSystem({
       officialWalletBalance: 0n,
       deployMaster: true,
     });
     const owner = fixtureAddress('VAULT_FUNDED_AVATAR_OWNER');
-    const forgedOwner = fixtureAddress('VAULT_FUNDED_FORGED_OWNER');
-    const attackerVault = fixtureAddress('VAULT_FUNDED_ATTACKER_VAULT');
+    const attacker = fixtureAddress('VAULT_FUNDED_ATTACKER');
 
-    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
+    // valid: the owner pays for their OWN avatar (payer == owner)
+    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(owner, owner, {
       query_id: 1_201n,
       avatar_hash: 0x1201n,
     }));
 
-    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(attackerVault, forgedOwner, {
+    // hijack attempt: a DIFFERENT payer tries to set the owner's avatar (payer != owner) -> rejected (21163), no overwrite
+    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(attacker, owner, {
       query_id: 1_202n,
       avatar_hash: 0x1202n,
     }));
 
     const avatar = await ctx.registry.getGetAvatar(owner);
-    const forgedAvatar = await ctx.registry.getGetAvatar(forgedOwner);
     const global = await ctx.registry.getGetGlobal();
 
     expect(avatar.exists).toBe(true);
     expect(avatar.owner_wallet.equals(owner)).toBe(true);
-    expect(avatar.avatar_hash).toBe(0x1201n);
-    expect(forgedAvatar.exists).toBe(false);
+    expect(avatar.avatar_hash).toBe(0x1201n); // the owner's OWN update, NOT the hijack attempt (0x1202)
     expect(global.profile_count).toBe(1n);
     expect(global.avatar_record_count).toBe(1n);
     expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
     expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
   });
 
-  it('PROFILE-12B: wrong payer through real ATHWallet refunds ATH back to the source wallet', async () => {
+  it('PROFILE-12B: clean-16 direct-pay — a payer!=owner avatar via a real ATHWallet is rejected (21163) and the ATH is refunded to the source wallet', async () => {
     const ctx = await deployProfileRegistryWithAthSystem({
       officialWalletBalance: 0n,
       deployMaster: true,
@@ -817,7 +816,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       to: ctx.registry.address,
       op: OP_PROFILE_AVATAR_VAULT_NOTIFICATION,
       success: false,
-      exitCode: 21161,
+      exitCode: 21163,
     })).toBeDefined();
     expect(findTransaction(result.transactions, {
       from: ctx.officialAthWalletAddress,

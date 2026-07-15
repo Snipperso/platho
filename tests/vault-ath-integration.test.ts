@@ -1002,7 +1002,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(await contractBalance(blockchain, officialVaultAthWallet)).toBeLessThan(toNano('0.028'));
   });
 
-  it('VAULT-ATH-06: Vault-funded profile avatar registration spends internal Vault ATH, not the user ATH wallet', async () => {
+  it('VAULT-ATH-06: clean-16 direct-pay — the Vault-funded avatar path is RETIRED (registry rejects payer=Vault!=owner); custodial ATH is refunded, no avatar set, no loss', async () => {
     const ctx = await setupProfileAvatarRoute();
     const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
 
@@ -1019,115 +1019,28 @@ describe('Vault ATH integration with production ATHWallet', () => {
     });
 
     const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
-    const beforeSourceWallet = await ctx.userAthWallet.getGetWalletData();
     expect(beforeUser.ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH * 2n);
-    expect(beforeSourceWallet.balance).toBe(PROFILE_AVATAR_PRICE_ATH);
 
-    const avatarHash = 0x661122n;
+    // The legacy Vault-mediated avatar external still exists but is now INERT: the ProfileRegistry authenticates on
+    // payer==owner (direct-pay), and the Vault stamps payer=Vault != owner, so the registry rejects it (21163). The
+    // ATH round-trips back and the user's custodial balance is made whole. Real avatar-set now runs direct-pay
+    // (user's OWN ATH wallet) — covered by PROFILE-12/12B in tests/profile-registry.test.ts.
     const body = signedVaultProfileAvatarBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       profileRegistry: ctx.profileRegistry,
       clientNonce: beforeUser.publish_nonce,
       secretKey: keyPair.secretKey,
-      avatarHash,
+      avatarHash: 0x661122n,
       avatarEntryId: 71n,
       avatarStreamId: 0x11223344556677889900aabbccddeeffn,
       avatarPartCount: 2n,
     });
-    const result = await ctx.blockchain.sendMessage(external({
-      to: ctx.vault.address,
-      body,
-    }));
+    await ctx.blockchain.sendMessage(external({ to: ctx.vault.address, body }));
 
-    const avatar = await ctx.profileRegistry.getGetAvatar(ctx.user.address);
-    const afterUser = await ctx.vault.getGetUser(ctx.user.address);
-    const afterGlobal = await ctx.vault.getGetGlobal();
-    const afterSourceWallet = await ctx.userAthWallet.getGetWalletData();
-    const vaultOfficialWallet = ctx.blockchain.openContract(new ATHWallet(ctx.officialVaultAthWallet));
-    const profileOfficialWallet = ctx.blockchain.openContract(new ATHWallet(ctx.officialProfileAthWallet));
-    const rawAfterFirst = await contractBalance(ctx.blockchain, ctx.vault.address);
-
-    expect(avatar.exists).toBe(true);
-    expect(avatar.owner_wallet.equals(ctx.user.address)).toBe(true);
-    expect(avatar.avatar_hash).toBe(avatarHash);
-    expect(afterUser.ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH);
-    expect(afterUser.publish_nonce).toBe(beforeUser.publish_nonce + 1n);
-    expect(afterGlobal.pending_profile_avatar_payment_count).toBe(0n);
-    expect(afterSourceWallet.balance).toBe(beforeSourceWallet.balance);
-    expect((await vaultOfficialWallet.getGetWalletData()).balance).toBe(PROFILE_AVATAR_PRICE_ATH);
-    expect((await profileOfficialWallet.getGetWalletData()).balance).toBe(PROFILE_AVATAR_PRICE_ATH);
-    expect(findTransaction(result.transactions, {
-      from: ctx.vault.address,
-      to: ctx.officialVaultAthWallet,
-      op: OP_ATH_TRANSFER_REQUEST_VAULT_PROFILE_AVATAR,
-      success: true,
-    })).toBeDefined();
-    expect(findTransaction(result.transactions, {
-      from: ctx.officialProfileAthWallet,
-      to: ctx.profileRegistry.address,
-      op: OP_PROFILE_AVATAR_VAULT_NOTIFICATION,
-      success: true,
-    })).toBeDefined();
-    const firstExcessRefundTx = findTransaction(result.transactions, {
-      from: ctx.profileRegistry.address,
-      to: ctx.vault.address,
-      op: OP_PROFILE_AVATAR_TON_EXCESS_REFUND,
-      success: true,
-    });
-    expect(firstExcessRefundTx).toBeDefined();
-    const firstExcessCredit = profileAvatarExcessCredit(firstExcessRefundTx);
-    expect(firstExcessCredit).toBeGreaterThan(0n);
-    expect(afterUser.ton_balance).toBe(beforeUser.ton_balance - PROFILE_AVATAR_TON_CHARGE + firstExcessCredit);
-    expect(findTransaction(result.transactions, {
-      from: ctx.userAthWallet.address,
-    })).toBeUndefined();
-
-    await expect(ctx.blockchain.sendMessage(external({
-      to: ctx.vault.address,
-      body,
-    }))).rejects.toMatchObject({ exitCode: 16611 });
-    const afterReplay = await ctx.vault.getGetUser(ctx.user.address);
-    const rawAfterReplay = await contractBalance(ctx.blockchain, ctx.vault.address);
-    expect(afterReplay.ton_balance).toBe(afterUser.ton_balance);
-    expect(afterReplay.ath_balance).toBe(afterUser.ath_balance);
-    expect(afterReplay.publish_nonce).toBe(afterUser.publish_nonce);
-    expect(rawAfterReplay).toBe(rawAfterFirst);
-
-    const secondAvatarHash = 0x661133n;
-    const secondBody = signedVaultProfileAvatarBody({
-      vault: ctx.vault,
-      owner: ctx.user.address,
-      profileRegistry: ctx.profileRegistry,
-      clientNonce: afterReplay.publish_nonce,
-      secretKey: keyPair.secretKey,
-      avatarHash: secondAvatarHash,
-      avatarEntryId: 72n,
-      avatarStreamId: 0x21223344556677889900aabbccddeeffn,
-      avatarPartCount: 2n,
-    });
-    const secondResult = await ctx.blockchain.sendMessage(external({
-      to: ctx.vault.address,
-      body: secondBody,
-    }));
-    const secondExcessRefundTx = findTransaction(secondResult.transactions, {
-      from: ctx.profileRegistry.address,
-      to: ctx.vault.address,
-      op: OP_PROFILE_AVATAR_TON_EXCESS_REFUND,
-      success: true,
-    });
-    expect(secondExcessRefundTx).toBeDefined();
-    const secondExcessCredit = profileAvatarExcessCredit(secondExcessRefundTx);
-    expect(secondExcessCredit).toBeGreaterThan(firstExcessCredit);
-
-    const secondAvatar = await ctx.profileRegistry.getGetAvatar(ctx.user.address);
-    const afterSecond = await ctx.vault.getGetUser(ctx.user.address);
-    expect(secondAvatar.exists).toBe(true);
-    expect(secondAvatar.version).toBe(2n);
-    expect(secondAvatar.avatar_hash).toBe(secondAvatarHash);
-    expect(afterSecond.ath_balance).toBe(0n);
-    expect(afterSecond.ton_balance).toBe(afterReplay.ton_balance - PROFILE_AVATAR_TON_CHARGE + secondExcessCredit);
-    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n);
+    expect((await ctx.profileRegistry.getGetAvatar(ctx.user.address)).exists).toBe(false); // rejected -> no avatar
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH * 2n); // refunded in full
+    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n); // pending settled via reject/bounce
   });
 
   it('VAULT-ATH-06A: Profile avatar TON excess refund is bound to ProfileRegistry and capped by declared amount', async () => {
