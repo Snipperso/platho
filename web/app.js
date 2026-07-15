@@ -127,14 +127,12 @@ import {
   createUsernameRegistryMessage,
   createWalletTransaction,
   buildVaultProfileAvatarExternalBoc,
-  buildVaultReceiveIntentExternalBoc,
   buildVaultReplaceMessagingKeysExternalBoc,
   buildVaultWithdrawAthExternalBoc,
   buildVaultWithdrawTonExternalBoc,
   buildVaultUsernameMintExternalBoc,
   computePublicAuthorKeyId,
   computeVaultMessagingKeyId,
-  computeVaultReceiveIntentId,
   createVaultWalletMessage,
   estimateVaultAttachedValueNanotons,
   PROFILE_AVATAR_PRICE_ATH,
@@ -145,7 +143,6 @@ import {
   PUBLIC_POST_TEXT_MAX_BYTES,
   readPublicPostPayload,
   readPublicPartHeaderInfo,
-  RECEIVE_ASSETS,
   REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
   tonCell,
   USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
@@ -12640,24 +12637,20 @@ function prefsBytesFromOpenedCapsule(opened) {
 function messageFromOpenedCapsule(opened, meta, entry) {
   // A self message (Saved) always renders own-side — device A's echo and device B's chain restore agree.
   const isOutgoing = opened?.openedAs === 'sender' || isSelfOpenedCapsule(opened);
-  const payment = paymentFromCompactPayload(opened.payload);
   const isImage = opened.payload?.type === 'image';
   const isDocument = opened.payload?.type === 'document';
   // tolerateUnknownBlocks (v646): forward-compat for the private DISPLAY path — a future block kind degrades to
   // "block skipped" instead of throwing the WHOLE message into the sync's unknown-error strike machine (stuck
   // entry -> cross-session retries -> terminal undelivered). Funds/prefs parsing paths keep their own strictness.
   const documentBlocks = isDocument ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(opened.payload.bytes, { tolerateUnknownBlocks: true })) : [];
-  const documentPayment = paymentFromDocumentBlocks(documentBlocks);
-  const effectivePayment = payment ?? documentPayment;
   const text = isDocument
     ? messagePreviewFromBlocks(documentBlocks)
-    : (payment ? paymentMessageText(payment) : (isImage ? '' : opened.plaintext));
+    : (isImage ? '' : opened.plaintext);
   const message = {
     type: isOutgoing ? 'out' : 'in',
     text,
     meta,
     ...privateChainMessageOrderFields(entry),
-    payment: effectivePayment,
     blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
     capsule: opened.capsule,
     profileVersion: opened.capsule?.header0?.profileVersion ?? 0,
@@ -12719,7 +12712,6 @@ function messageFromOpenedPrivateParts(parts, meta) {
   }
   // Same forward-compat tolerance as the single-part path above (multipart private display decode).
   const documentBlocks = documentBytes ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes, { tolerateUnknownBlocks: true })) : [];
-  const documentPayment = paymentFromDocumentBlocks(documentBlocks);
   const text = ordered
     .filter((part) => part.opened?.payload?.type === 'text')
     .map((part) => part.opened?.payload?.text ?? part.opened?.plaintext ?? '')
@@ -12742,7 +12734,6 @@ function messageFromOpenedPrivateParts(parts, meta) {
     ...privateChainMessageOrderFields(firstEntry),
     capsule: first?.capsule,
     capsules: ordered.map((part) => part.opened?.capsule).filter(Boolean),
-    payment: documentPayment,
     blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
     profileVersion: first?.capsule?.header0?.profileVersion ?? 0,
     avatarHash: first?.capsule?.header0?.avatarHash ?? zeroAvatarHashHex(),
@@ -14067,9 +14058,6 @@ function serializeMessageForHistory(message) {
     chainLastEntryId: message.chainLastEntryId ?? null,
     localCreatedAtMs: message.localCreatedAtMs ?? null,
     localHistoryCreatedAt: message.localHistoryCreatedAt ?? null,
-    payment: paymentForHistory(message.payment),
-    paymentDraft: paymentDraftForHistory(message.paymentDraft),
-    paymentCheckLedgerId: message.paymentCheckLedgerId ?? null,
     blocks: messageBlocksForHistory(message),
     capsule: message.capsule ?? null,
     capsules: message.capsules ?? null,
@@ -14373,200 +14361,6 @@ async function restoreEncryptedMessageHistory() {
   }
 }
 
-function paymentCheckIntentIdText(payment) {
-  try {
-    return paymentIntentId(payment).toString();
-  } catch {
-    return String(payment?.intentId ?? payment?.intentIdHex ?? '');
-  }
-}
-
-function paymentCheckPendingLedgerId(payment) {
-  const hex = String(payment?.intentIdHex ?? '').replace(/^0x/i, '').toLowerCase();
-  if (/^[0-9a-f]{64}$/.test(hex)) return `payment-check:${hex}`;
-  return `payment-check:${paymentCheckIntentIdText(payment)}`;
-}
-
-function paymentCheckPendingLedgerStatusText(record) {
-  const status = String(record?.status ?? '').toLowerCase();
-  if (status.includes('cancel') && status.includes('submitted')) return 'check cancel submitted, confirming';
-  if (status.includes('cancel')) return 'check cancelled';
-  if (status.includes('claim') && status.includes('submitted')) return 'check claim submitted, confirming';
-  if (status.includes('claim')) return 'check claimed';
-  if (status.includes('publish') && status.includes('submitted')) return 'message submitted, confirming';
-  if (status.includes('publish') && status.includes('failed')) return 'check not delivered, refund required';
-  if (status.includes('publish') && status.includes('retry')) return 'checking RPC, retrying';
-  if (status.includes('publish') && status.includes('partial')) return 'submitted, retrying';
-  if (status.includes('publish')) return 'publishing message';
-  if (status.includes('intent') || status.includes('create')) return 'payment check created, publishing message';
-  return 'check recovery pending';
-}
-
-function isTerminalPaymentCheckLedgerRecord(record) {
-  return /^(published_confirmed|claim_confirmed|claimed|cancel_confirmed|cancelled|removed)$/i.test(String(record?.status ?? ''));
-}
-
-function findPaymentCheckMessageByIntentId(intentIdText) {
-  for (const thread of threads) {
-    for (const message of thread.messages ?? []) {
-      if (!message?.payment) continue;
-      if (paymentCheckIntentIdText(message.payment) === intentIdText) return { thread, message };
-    }
-  }
-  return null;
-}
-
-function ensurePendingPaymentCheckLedgerThread(record, payment) {
-  if (record?.threadId) return ensureHistoryThread(record.threadId, record.thread, record.message);
-  const recipientWallet = payment?.recipientWallet ?? record?.recipientWallet;
-  if (recipientWallet) {
-    const created = createRecipientThread(recipientWallet, {
-      preview: 'payment check recovery',
-      state: 'pending',
-      time: 'local',
-    });
-    if (created?.ok) {
-      const existing = threads.find((thread) => thread.id === created.thread.id);
-      if (existing) return existing;
-      threads.push(created.thread);
-      return created.thread;
-    }
-  }
-  return ensureHistoryThread(`payment-check:${record?.id ?? Date.now()}`, record?.thread, record?.message);
-}
-
-function upsertPendingPaymentCheckLedgerMessage(record) {
-  if (isTerminalPaymentCheckLedgerRecord(record)) return false;
-  const payment = normalizePaymentForMessage(record.payment ?? record);
-  const intentIdText = paymentCheckIntentIdText(payment);
-  const existing = findPaymentCheckMessageByIntentId(intentIdText);
-  if (existing) {
-    existing.message.paymentCheckLedgerId = record.id ?? record.ledgerId ?? existing.message.paymentCheckLedgerId;
-    existing.message.vaultCreateIntent = record.vaultCreateIntent ?? existing.message.vaultCreateIntent;
-    existing.message.vaultPublish = record.vaultPublish ?? existing.message.vaultPublish;
-    existing.message.vaultCancelIntent = record.vaultCancelIntent ?? existing.message.vaultCancelIntent;
-    if (!existing.message.meta || /recovery pending/i.test(existing.message.meta)) {
-      existing.message.meta = paymentCheckPendingLedgerStatusText(record);
-    }
-    refreshThreadAfterMessageChange(existing.thread);
-    return false;
-  }
-  const thread = ensurePendingPaymentCheckLedgerThread(record, payment);
-  const snapshot = record.message && typeof record.message === 'object'
-    ? (safeJsonClone(record.message) ?? {})
-    : {};
-  const message = {
-    ...snapshot,
-    type: snapshot.type ?? 'out',
-    text: snapshot.text ?? paymentMessageText(payment),
-    meta: paymentCheckPendingLedgerStatusText(record),
-    payment,
-    paymentDraft: null,
-    paymentCheckLedgerId: record.id ?? record.ledgerId ?? paymentCheckPendingLedgerId(payment),
-    recipientWallet: payment.recipientWallet ?? record.recipientWallet ?? snapshot.recipientWallet ?? null,
-    vaultCreateIntent: record.vaultCreateIntent ?? snapshot.vaultCreateIntent ?? null,
-    vaultPublish: record.vaultPublish ?? snapshot.vaultPublish ?? null,
-    vaultCancelIntent: record.vaultCancelIntent ?? snapshot.vaultCancelIntent ?? null,
-  };
-  ensureMessageOrderFields(message, Number(record.createdAtMs ?? record.createdAt) || Date.now());
-  insertThreadMessage(thread, message);
-  refreshThreadAfterMessageChange(thread);
-  return true;
-}
-
-async function restorePendingPaymentCheckLedger() {
-  if (!encryptedMessageStore?.listPendingPaymentChecks) return;
-  try {
-    const result = await encryptedMessageStore.listPendingPaymentChecks();
-    const records = result.records ?? [];
-    let restored = 0;
-    let skipped = 0;
-    for (const record of records) {
-      if (isTerminalPaymentCheckLedgerRecord(record)) {
-        skipped += 1;
-        continue;
-      }
-      if (upsertPendingPaymentCheckLedgerMessage(record)) restored += 1;
-    }
-    globalThis.plathoLastPaymentCheckPendingLedger = {
-      restored,
-      skipped,
-      failed: result.failed ?? [],
-      records: records.length,
-      dbName: currentMessageHistoryDbName(),
-      walletAddress: plathoWallet?.address ?? null,
-    };
-    if (restored > 0) {
-      renderThreads();
-      renderConversation();
-    }
-  } catch (error) {
-    globalThis.plathoLastPaymentCheckPendingLedger = {
-      error: String(error?.message ?? error ?? 'pending payment check ledger blocked'),
-      dbName: currentMessageHistoryDbName(),
-      walletAddress: plathoWallet?.address ?? null,
-    };
-    console.error(error);
-  }
-}
-
-async function rememberPendingPaymentCheckLedgerRecord(thread, message, payment, fields = {}, options = {}) {
-  if (!encryptedMessageStore?.putPendingPaymentCheck) return null;
-  const id = paymentCheckPendingLedgerId(payment);
-  if (message) message.paymentCheckLedgerId = id;
-  try {
-    const existing = encryptedMessageStore.getPendingPaymentCheck
-      ? await encryptedMessageStore.getPendingPaymentCheck(id).catch(() => null)
-      : null;
-    const fieldSnapshot = safeJsonClone(fields) ?? {};
-    const now = new Date().toISOString();
-    const record = {
-      ...(existing ?? {}),
-      kind: PAYMENT_CHECK_PENDING_LEDGER_KIND,
-      id,
-      ledgerId: id,
-      intentId: paymentCheckIntentIdText(payment),
-      intentIdHex: payment.intentIdHex ?? existing?.intentIdHex ?? null,
-      payment: normalizePaymentForMessage(payment),
-      senderWallet: payment.senderWallet ?? existing?.senderWallet ?? null,
-      recipientWallet: payment.recipientWallet ?? existing?.recipientWallet ?? null,
-      threadId: thread?.id ?? existing?.threadId ?? null,
-      thread: thread ? serializeThreadForHistory(thread) : existing?.thread ?? null,
-      messageLocalHistoryId: message?.localHistoryId ?? existing?.messageLocalHistoryId ?? null,
-      message: message ? serializeMessageForHistory(message) : existing?.message ?? null,
-      publishState: message?.publishState ?? fieldSnapshot.publishState ?? existing?.publishState ?? null,
-      vaultCreateIntent: message?.vaultCreateIntent ?? fieldSnapshot.vaultCreateIntent ?? existing?.vaultCreateIntent ?? null,
-      vaultPublish: message?.vaultPublish ?? fieldSnapshot.vaultPublish ?? existing?.vaultPublish ?? null,
-      vaultCancelIntent: message?.vaultCancelIntent ?? fieldSnapshot.vaultCancelIntent ?? existing?.vaultCancelIntent ?? null,
-      createdAt: existing?.createdAt ?? messageCreatedAtMs(message) ?? Date.now(),
-      updatedAt: now,
-      ...fieldSnapshot,
-      status: fieldSnapshot.status ?? existing?.status ?? 'prepared',
-    };
-    const stored = await encryptedMessageStore.putPendingPaymentCheck(record);
-    return { ...record, id: stored.id, createdAt: stored.createdAt };
-  } catch (error) {
-    if (options.required === true) throw error;
-    console.error(error);
-    return null;
-  }
-}
-
-async function markPendingPaymentCheckLedgerRecord(payment, fields = {}) {
-  return rememberPendingPaymentCheckLedgerRecord(null, null, payment, fields);
-}
-
-async function removePendingPaymentCheckLedgerRecord(payment, options = {}) {
-  if (!encryptedMessageStore?.removePendingPaymentCheck) return null;
-  try {
-    await encryptedMessageStore.removePendingPaymentCheck(paymentCheckPendingLedgerId(payment));
-    return true;
-  } catch (error) {
-    if (options.required === true) throw error;
-    console.error(error);
-    return null;
-  }
-}
 
 async function bootEncryptedMessageHistory() {
   if (!plathoWallet?.address) {
@@ -14588,7 +14382,6 @@ async function bootEncryptedMessageHistory() {
     }
   }
   await restoreEncryptedMessageHistory();
-  await restorePendingPaymentCheckLedger();
 }
 
 async function bootWalletScopedLocalStores() {
@@ -16296,10 +16089,7 @@ function refreshComposerCostStatus() {
           ignoreTonRpcLimit: true,
         },
       );
-    const paymentDraftText = privatePaymentCheckDraft
-      ? t('payment.checkDraftSuffix', { asset: paymentAssetLabel(privatePaymentCheckDraft.asset), amount: formatAtomicAmount(privatePaymentCheckDraft.amount) })
-      : '';
-    privateComposerCostStatus.textContent = `${status.text}${paymentDraftText}`;
+    privateComposerCostStatus.textContent = status.text;
     privateComposerCostStatus.dataset.state = status.state;
   }
   refreshPrivateSendButtonState();
@@ -16529,16 +16319,6 @@ function composerBlockInner(marker, ctx) {
     const size = document.createElement('span'); size.className = 'message-file-size'; size.textContent = imageByteCountLabel(att.bytes?.length ?? 0);
     chip.append(icon, name, size);
     return chip;
-  }
-  if (/^\[(?:check|payment)\]$/i.test(marker)) {
-    if (!ctx.payment) return null;
-    const box = document.createElement('div');
-    box.className = 'message-payment-block';
-    const label = document.createElement('span');
-    label.className = 'message-payment-label';
-    label.textContent = paymentMessageText(ctx.payment);
-    box.append(label);
-    return box;
   }
   if (/^\[post\]$/i.test(marker)) {
     if (!ctx.share?.entryId) return null;
@@ -16982,7 +16762,6 @@ function removeComposerAtom(el, atom) {
   let m;
   if ((m = marker.match(/^\[(?:image|img)\s+(\d+)\]$/i))) { removeComposerImageAt(kind, Number(m[1]) - 1); return; }
   if ((m = marker.match(/^\[file\s+(\d+)\]$/i))) { removeComposerFileAt(kind, Number(m[1]) - 1); return; }
-  if (/^\[(?:check|payment)\]$/i.test(marker)) { removeComposerPaymentAtom(kind); return; }
   if (/^\[post\]$/i.test(marker)) { removeComposerShareAtom(kind); return; }
   atom.remove(); // unknown atom: just drop the node
   composerEditorAfterEdit(el);
@@ -17021,17 +16800,6 @@ function removeComposerFileAt(kind, index) {
   refreshComposerCostStatus();
 }
 
-function removeComposerPaymentAtom(kind) {
-  const editor = kind === 'public' ? publicMessageInput : messageInput;
-  if (kind === 'private') privatePaymentCheckDraft = null; // payment checks are private-only
-  if (editor) {
-    let value = String(editor.value ?? '').replace(/\[(?:check|payment)\](?!\()/ig, '').replace(/\n{3,}/g, '\n\n');
-    if (!value.trim()) value = '';
-    editor.value = value;
-  }
-  updateImageAttachmentUi(kind);
-  refreshComposerCostStatus();
-}
 
 function removeComposerShareAtom(kind) {
   const editor = kind === 'public' ? publicMessageInput : messageInput;
@@ -17526,8 +17294,7 @@ function updatePrivateAttachmentUi() {
   const panel = privateAttachmentPanel;
   if (!panel) return;
   const imageAttachments = normalizePrivateImageAttachments(privateImageAttachments);
-  const hasPayment = Boolean(privatePaymentCheckDraft);
-  const hasAttachments = imageAttachments.length > 0 || hasPayment;
+  const hasAttachments = imageAttachments.length > 0;
   panel.hidden = !hasAttachments;
   panel.classList.toggle('is-list', hasAttachments);
   if (!hasAttachments) {
@@ -17551,30 +17318,6 @@ function updatePrivateAttachmentUi() {
     row.append(label, modeSelect, remove);
     rows.push(row);
   });
-  if (privatePaymentCheckDraft) {
-    const row = document.createElement('div');
-    row.className = 'composer-attachment-row';
-    const label = document.createElement('span');
-    label.className = 'composer-attachment-label';
-    label.textContent = t('composer.paymentCheckAttachment', { asset: paymentAssetLabel(privatePaymentCheckDraft.asset), amount: formatAtomicAmount(privatePaymentCheckDraft.amount) });
-    const edit = document.createElement('button');
-    edit.type = 'button';
-    edit.textContent = t('common.edit');
-    edit.addEventListener('click', async () => {
-      const paymentDetails = await requestPaymentCheckDetails(privatePaymentCheckDraft);
-      if (!paymentDetails) return;
-      privatePaymentCheckDraft = paymentDetails;
-      updateImageAttachmentUi('private');
-      refreshComposerEditorBlocks(messageInput); // re-render the inline payment card at the new amount
-      refreshComposerCostStatus();
-    });
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.textContent = t('common.remove');
-    remove.addEventListener('click', () => removeComposerPaymentAtom('private'));
-    row.append(label, edit, remove);
-    rows.push(row);
-  }
   panel.replaceChildren(...rows);
 }
 
@@ -17785,7 +17528,6 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
   const source = String(text ?? '');
   const images = normalizePrivateImageAttachments(attachments);
   const usedImages = new Set();
-  let usedPayment = false;
   const blocks = [];
   const pushText = (value) => {
     const trimmed = String(value ?? '').trim();
@@ -17808,12 +17550,7 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
       modeLabel: attachment.mode?.label,
     });
   };
-  const pushPayment = () => {
-    if (!paymentDraft || usedPayment) return;
-    usedPayment = true;
-    blocks.push({ type: 'payment', paymentDraft, payment: paymentDraft });
-  };
-  // Shared post (v766): positional via the [post] marker, single like the payment check.
+  // Shared post (v766): positional via the [post] marker.
   let usedShare = false;
   const pushShare = () => {
     if (!shareDraft?.entryId || usedShare) return;
@@ -17840,14 +17577,12 @@ function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, re
     if (match[1] !== undefined) pushImage(match[1]);
     else if (match[2] !== undefined) pushFile(match[2]);
     else if (match[3] !== undefined) pushShare();
-    else pushPayment();
     cursor = match.index + match[0].length;
   }
   pushText(source.slice(cursor));
   images.forEach((_, index) => {
     if (!usedImages.has(index)) pushImage(index + 1);
   });
-  if (paymentDraft && !usedPayment) pushPayment();
   files.forEach((_, index) => {
     if (!usedFiles.has(index)) pushFile(index + 1);
   });
@@ -17879,10 +17614,6 @@ function displayBlocksFromDocumentBlocks(blocks) {
         mode: block.mode,
         modeLabel: block.modeLabel,
       };
-    }
-    if (block.type === 'payment') {
-      const payment = block.payment ?? block.paymentDraft;
-      return { type: 'payment', payment, text: payment ? paymentMessageText(payment) : 'Payment check' };
     }
     // The quote strip data passes through verbatim (denormalized author+snippet; refEntryId for scroll-to-original).
     if (block.type === 'reply') {
@@ -17944,8 +17675,6 @@ function stripInlineFormatting(text) {
 function messagePreviewFromBlocks(blocks = []) {
   const text = blocks.find((block) => block?.type === 'text' && String(block.text ?? '').trim())?.text;
   if (text) return String(text).trim();
-  const payment = blocks.find((block) => block?.type === 'payment')?.payment;
-  if (payment) return paymentMessageText(payment);
   const imageCount = blocks.filter((block) => block?.type === 'image').length;
   if (imageCount > 0) return imageCount === 1 ? 'Image' : `${imageCount} images`;
   const fileBlocks = blocks.filter((block) => block?.type === 'file');
@@ -18086,13 +17815,6 @@ function removeImageMarkerForComposer(kind, removedIndex) {
   textarea.value = value;
 }
 
-function insertPaymentCheckMarker() {
-  if (!messageInput) return;
-  const value = messageInput.value ?? '';
-  COMPOSER_CHECK_MARKER_RE.lastIndex = 0;
-  if (COMPOSER_CHECK_MARKER_RE.test(value)) return;
-  insertComposerMarker(messageInput, '[check]');
-}
 
 function enforceComposerByteLimit() {
   return;
@@ -19006,7 +18728,6 @@ function renderConversation() {
     // its type); scroll target = the same messageStrip.
     const replyBlock = blocks.find((block) => block?.type === 'reply');
     if (replyBlock) bubble.append(buildReplyQuoteNode(replyBlock, messageStrip));
-    let paymentBlockElement = null;
     if (blocks.length > 0) {
       for (const block of blocks) {
         if (block?.type === 'text' && block.text) {
@@ -19035,16 +18756,6 @@ function renderConversation() {
             if (conversationStickToBottom && messageStrip) messageStrip.scrollTop = messageStrip.scrollHeight;
           }, { once: true });
           bubble.append(image);
-        } else if (block?.type === 'payment') {
-          const payment = block.payment ?? message.payment;
-          const paymentBlock = document.createElement('div');
-          paymentBlock.className = 'message-payment-block';
-          const paymentLabel = document.createElement('span');
-          paymentLabel.className = 'message-payment-label';
-          paymentLabel.textContent = payment ? paymentMessageText(payment) : t('payment.paymentCheck');
-          paymentBlock.append(paymentLabel);
-          paymentBlockElement = paymentBlock;
-          bubble.append(paymentBlock);
         } else if (block?.type === 'file' && block.url) {
           bubble.append(buildFileBlockChip(block));
         } else if (block?.type === 'share' && block.entryId) {
@@ -19075,100 +18786,6 @@ function renderConversation() {
         if (conversationStickToBottom && messageStrip) messageStrip.scrollTop = messageStrip.scrollHeight;
       }, { once: true });
       bubble.append(image);
-    }
-    if (message.payment) {
-      const actions = document.createElement('div');
-      actions.className = 'payment-actions';
-      const paymentMetaText = String(message.meta ?? '').toLowerCase();
-      const paymentActionPending = paymentMetaText.includes('claim submitted')
-        || paymentMetaText.includes('claim confirming')
-        || paymentMetaText.includes('claim signing')
-        || paymentMetaText.includes('cancel submitted')
-        || paymentMetaText.includes('cancel confirming')
-        || paymentMetaText.includes('cancel signing')
-        || paymentMetaText.includes('check claimed');
-      const paymentActionTerminal = paymentMetaText.includes('already claimed')
-        || paymentMetaText.includes('cancelled')
-        || paymentMetaText.includes('check cancelled')
-        || paymentMetaText.includes('another wallet')
-        || paymentMetaText.includes('another sender');
-      if (message.type !== 'out' && !paymentActionPending && !paymentActionTerminal) {
-        const claim = document.createElement('button');
-        claim.type = 'button';
-        claim.textContent = t('payment.claim');
-        claim.addEventListener('click', async () => {
-          claim.disabled = true;
-          try {
-            message.meta = 'check claim signing';
-            renderConversation();
-            await updateMessageInEncryptedHistory(thread, message);
-            await submitVaultClaimPaymentCheck(message.payment, {
-              onStatus: async (status) => {
-                message.meta = status;
-                await updateMessageInEncryptedHistory(thread, message);
-                renderConversation();
-              },
-            });
-            message.meta = 'check claimed';
-          } catch (error) {
-            rememberPaymentCheckActionError('claim', error, message.payment);
-            message.meta = isPaymentCheckClaimPending(error)
-              ? 'check claim submitted, confirming'
-              : paymentCheckClaimBlockedStatus(error);
-            if (!isPaymentCheckClaimPending(error)) console.error(error);
-          } finally {
-            await updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
-            queueVaultPostTransactionRefresh();
-            renderConversation();
-          }
-        });
-        actions.append(claim);
-      }
-      if (message.type === 'out' && !paymentActionPending && !paymentActionTerminal) {
-        const cancel = document.createElement('button');
-        cancel.type = 'button';
-        cancel.textContent = t('common.cancel');
-        cancel.addEventListener('click', async () => {
-          cancel.disabled = true;
-          try {
-            message.meta = 'check cancel signing';
-            renderConversation();
-            await updateMessageInEncryptedHistory(thread, message);
-            await submitVaultCancelPaymentCheck(message.payment, {
-              onStatus: async (status) => {
-                message.meta = status;
-                await updateMessageInEncryptedHistory(thread, message);
-                renderConversation();
-              },
-            });
-            message.meta = 'check cancelled';
-          } catch (error) {
-            rememberPaymentCheckActionError('cancel', error, message.payment);
-            message.meta = isPaymentCheckCancelPending(error)
-              ? 'check cancel submitted, confirming'
-              : paymentCheckCancelBlockedStatus(error);
-            if (!isPaymentCheckCancelPending(error)) console.error(error);
-          } finally {
-            await updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
-            queueVaultPostTransactionRefresh();
-            renderConversation();
-            if (message.meta === 'check cancelled') {
-              schedulePendingServiceWorkerAppShellReload();
-            }
-          }
-        });
-        actions.append(cancel);
-      }
-      if (!paymentBlockElement) {
-        paymentBlockElement = document.createElement('div');
-        paymentBlockElement.className = 'message-payment-block';
-        const paymentLabel = document.createElement('span');
-        paymentLabel.className = 'message-payment-label';
-        paymentLabel.textContent = paymentMessageText(message.payment);
-        paymentBlockElement.append(paymentLabel);
-        bubble.append(paymentBlockElement);
-      }
-      if (actions.children.length > 0) paymentBlockElement.append(actions);
     }
     const manualActions = privateMessageManualActionsElement(thread, message);
     const metaText = messageMetaText(message);
@@ -20110,28 +19727,6 @@ publicComposerCommentsCheckbox?.addEventListener('change', () => {
     : 'next post closes comments');
 });
 
-paymentCheckButton?.addEventListener('click', async () => {
-  try {
-    hidePrivateComposerAddMenu();
-    if (!canAttemptPrivateSend()) {
-      refreshComposerPublishPolicy();
-      return;
-    }
-    paymentCheckButton.disabled = true;
-    const paymentDetails = await requestPaymentCheckDetails(privatePaymentCheckDraft);
-    if (!paymentDetails) return;
-    privatePaymentCheckDraft = paymentDetails;
-    insertPaymentCheckMarker();
-    updateImageAttachmentUi('private');
-    refreshComposerCostStatus();
-  } catch (error) {
-    refreshMessagingControls();
-    console.error(error);
-  } finally {
-    paymentCheckButton.disabled = !canAttemptPrivateSend();
-  }
-});
-
 privateComposerAddButton?.addEventListener('click', (event) => {
   event.preventDefault();
   event.stopPropagation();
@@ -20881,9 +20476,6 @@ composer?.addEventListener('submit', async (event) => {
     privateCancelAvailable: false,
     ...localMessageOrderFields(),
   };
-  if (paymentDraft) {
-    message.paymentDraft = paymentDraftForHistory(paymentDraft);
-  }
   ownSendPendingRender = true; // the user just sent: the next render abandons any open-anchor and scrolls to their message
   insertThreadMessage(thread, message);
   const sendContext = {
@@ -20922,7 +20514,7 @@ composer?.addEventListener('submit', async (event) => {
 
   try {
     await assertVaultHasPrivatePublishHold(selectedSuite, sendPlan, {
-      allowOwnVaultActionReadFallback: Boolean(paymentDraft),
+      allowOwnVaultActionReadFallback: false,
     });
   } catch (error) {
     await settlePrivateComposerSendError(sendContext, error);
@@ -20933,11 +20525,7 @@ composer?.addEventListener('submit', async (event) => {
   }
 
   try {
-    if (sendContext.paymentDraft) {
-      await attemptPrivatePaymentCheckPublish(sendContext);
-    } else {
-      await attemptPrivateComposerMessagePublish(sendContext);
-    }
+    await attemptPrivateComposerMessagePublish(sendContext);
   } catch (error) {
     await settlePrivateComposerSendError(sendContext, error);
   }
@@ -22033,59 +21621,6 @@ async function requestProfileAvatarUploadDetails(file) {
   });
 }
 
-async function requestPaymentCheckDetails(initial = null) {
-  let feedback = t('payment.checkHint');
-  let tone = 'muted';
-  let assetValue = BigInt(initial?.asset ?? RECEIVE_ASSETS.TON) === RECEIVE_ASSETS.ATH ? 'ATH' : 'TON';
-  let amountValue = initial?.amount
-    ? (assetValue === 'TON' ? formatTonNanotons(initial.amount) : formatAtomicAmount(initial.amount))
-    : '';
-  while (true) {
-    const result = await openActionDialog({
-      title: initial ? t('payment.editCheck') : t('payment.createCheck'),
-      hint: feedback,
-      tone,
-      submitLabel: initial ? t('payment.saveCheck') : t('payment.createCheckShort'),
-      fields: [
-        {
-          id: 'asset',
-          label: t('common.asset'),
-          type: 'select',
-          options: [
-            { value: 'TON', label: 'GRAM' },
-            { value: 'ATH', label: 'ATH' },
-          ],
-          value: assetValue,
-        },
-        {
-          id: 'amount',
-          label: t('common.amount'),
-          inputMode: 'decimal',
-          placeholder: t('dialog.amountPlaceholder'),
-          autocomplete: 'off',
-          value: amountValue,
-        },
-      ],
-      summary: (values) => [
-        { label: t('common.asset'), value: values.asset === 'ATH' ? 'ATH' : 'GRAM' },
-        { label: t('common.amount'), value: values.amount?.trim() || t('common.notSet') },
-      ],
-    });
-    if (!result) return null;
-    assetValue = result.asset;
-    amountValue = result.amount;
-    try {
-      const asset = parsePaymentAsset(result.asset);
-      const amount = asset === RECEIVE_ASSETS.TON
-        ? parseTonAmountNanotons(result.amount)
-        : parseAthAmountAtomic(result.amount);
-      return { asset, amount };
-    } catch (error) {
-      feedback = error.message;
-      tone = 'error';
-    }
-  }
-}
 
 function nextQueryId() {
   const cryptoImpl = globalThis.crypto;
@@ -22250,115 +21785,12 @@ function formatAtomicAmount(amount, decimals = 9) {
   return `${whole}.${fraction.toString().padStart(decimals, '0').replace(/0+$/, '')}`;
 }
 
-function paymentAssetLabel(asset) {
-  const value = typeof asset === 'bigint' ? asset : BigInt(asset ?? 0);
-  if (value === RECEIVE_ASSETS.TON) return 'GRAM';
-  if (value === RECEIVE_ASSETS.ATH) return 'ATH';
-  return `asset ${value.toString()}`;
-}
-
-function parsePaymentAsset(input) {
-  const normalized = String(input ?? '').trim().toUpperCase();
-  if (normalized === 'TON' || normalized === 'GRAM') return RECEIVE_ASSETS.TON;
-  if (normalized === 'ATH') return RECEIVE_ASSETS.ATH;
-  throw new Error('Payment asset must be GRAM or ATH');
-}
-
-function paymentMessageText(payment) {
-  const amount = formatAtomicAmount(payment.amount);
-  return `${paymentAssetLabel(payment.asset)} check ${amount}`;
-}
-
-function paymentHasIntent(payment) {
-  return Boolean(payment && (
-    payment.intentId !== undefined
-    || payment.intentIdHex !== undefined
-    || payment.intent_id !== undefined
-  ));
-}
-
-function paymentDraftForHistory(paymentDraft) {
-  if (!paymentDraft) return null;
-  const draft = {
-    asset: String(paymentDraft.asset ?? paymentDraft.asset_id ?? RECEIVE_ASSETS.TON),
-    amount: String(paymentDraft.amount ?? 0n),
-  };
-  if (paymentDraft.senderWallet ?? paymentDraft.sender_wallet) {
-    draft.senderWallet = requireBasechainAddress(paymentDraft.senderWallet ?? paymentDraft.sender_wallet, 'Payment check sender');
-  }
-  if (paymentDraft.recipientWallet ?? paymentDraft.recipient_wallet) {
-    draft.recipientWallet = requireBasechainAddress(paymentDraft.recipientWallet ?? paymentDraft.recipient_wallet, 'Payment check recipient');
-  }
-  return draft;
-}
-
 function fixedHexBytes(value, length, name = 'hex bytes') {
   const text = String(value ?? '').trim().replace(/^0x/i, '');
   if (!/^[0-9a-fA-F]+$/.test(text) || text.length !== length * 2) {
     throw new Error(`${name} must be ${length} bytes`);
   }
   return hexToBytes(text);
-}
-
-function paymentSecret32Bytes(payment) {
-  const bytes = payment?.secret32Bytes ?? payment?.secret32_bytes;
-  if (bytes !== undefined && bytes !== null) {
-    const out = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-    if (out.length !== 32) throw new Error('Payment check claim secret must be 32 bytes');
-    return out;
-  }
-  const hex = payment?.secret32Hex ?? payment?.secret32_hex ?? payment?.secret_32_hex;
-  if (hex !== undefined && hex !== null) {
-    return fixedHexBytes(hex, 32, 'Payment check claim secret');
-  }
-  const value = payment?.secret32 ?? payment?.secret_32 ?? payment?.secret;
-  if (value !== undefined && value !== null) {
-    return bigIntToFixedBytes(value, 32, 'secret32');
-  }
-  throw new Error('Payment check claim secret is missing');
-}
-
-function normalizePaymentForMessage(payment) {
-  const intentId = payment.intentId ?? payment.intent_id;
-  const intentIdHex = payment.intentIdHex ?? payment.intent_id_hex;
-  const normalized = {
-    asset: String(payment.asset),
-    amount: String(payment.amount),
-    intentId: String(intentId ?? (intentIdHex ? BigInt(`0x${intentIdHex}`) : 0n)),
-    intentIdHex: intentIdHex ?? bytesToHex(bigIntToFixedBytes(intentId, 32, 'intent id')),
-    secret32Hex: bytesToHex(paymentSecret32Bytes(payment)),
-  };
-  if (payment.senderWallet ?? payment.sender_wallet) {
-    normalized.senderWallet = requireBasechainAddress(payment.senderWallet ?? payment.sender_wallet, 'Payment check sender');
-  }
-  if (payment.recipientWallet ?? payment.recipient_wallet) {
-    normalized.recipientWallet = requireBasechainAddress(payment.recipientWallet ?? payment.recipient_wallet, 'Payment check recipient');
-  }
-  if (payment.clientNonce !== undefined || payment.client_nonce !== undefined) {
-    normalized.clientNonce = String(payment.clientNonce ?? payment.client_nonce);
-  }
-  return normalized;
-}
-
-function paymentForHistory(payment) {
-  if (!payment) return null;
-  try {
-    return paymentHasIntent(payment) ? normalizePaymentForMessage(payment) : paymentDraftForHistory(payment);
-  } catch {
-    return safeJsonClone(payment);
-  }
-}
-
-function paymentFromCompactPayload(payload) {
-  if (payload?.type !== 'payment') return null;
-  const intentId = bytesToBigIntValue(payload.intentId);
-  return normalizePaymentForMessage({
-    asset: BigInt(payload.asset),
-    amount: payload.amount,
-    intentId,
-    intentIdHex: bytesToHex(payload.intentId),
-    secret32Hex: bytesToHex(payload.secret32),
-  });
 }
 
 const PLATHO_DOCUMENT_MAGIC = new Uint8Array([0x50, 0x44, 0x43, 0x31]); // "PDC1"
@@ -22368,7 +21800,7 @@ const PLATHO_DOCUMENT_BLOCK_HEADER_BYTES = 6;
 const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   TEXT: 1,
   IMAGE: 2,
-  PAYMENT: 3,
+  // 3 = PAYMENT (removed: in-app payment checks were not anonymous → misleading). Byte value reserved, never reused.
   // A self-addressed subscription snapshot (Phase 2): the body of a private capsule the user sends to THEMSELVES to
   // persist their public-channel subscriptions on-chain. Never rendered as chat — diverted in messageFromOpenedCapsule.
   PREFS: 4,
@@ -22443,38 +21875,6 @@ function readUint32FromBytes(bytes, offset, name = 'uint32') {
   return (((bytes[offset] << 24) >>> 0) + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) + bytes[offset + 3]) >>> 0;
 }
 
-function documentPaymentContent(payment, options = {}) {
-  let secret32Bytes;
-  try {
-    secret32Bytes = paymentSecret32Bytes(payment);
-  } catch (error) {
-    if (options.allowMissingPaymentSecret === true) {
-      secret32Bytes = new Uint8Array(32);
-    } else {
-      throw error;
-    }
-  }
-  return concatUint8Arrays([
-    new Uint8Array([Number(BigInt(payment.asset ?? 0n)), 0]),
-    bigIntToFixedBytes(BigInt(payment.amount ?? 0n), 16, 'payment amount'),
-    bigIntToFixedBytes(BigInt(payment.intentId ?? payment.intent_id ?? 0n), 32, 'intent id'),
-    secret32Bytes,
-  ]);
-}
-
-function paymentFromDocumentContent(content) {
-  if (content.length !== 82) throw new Error('Document payment block has invalid length');
-  const intentIdBytes = content.subarray(18, 50);
-  const secret32Bytes = content.subarray(50, 82);
-  return normalizePaymentForMessage({
-    asset: BigInt(content[0]),
-    amount: bytesToBigIntValue(content.subarray(2, 18)),
-    intentId: bytesToBigIntValue(intentIdBytes),
-    intentIdHex: bytesToHex(intentIdBytes),
-    secret32Hex: bytesToHex(secret32Bytes),
-  });
-}
-
 function encodeMessageDocumentBlocks(blocks, options = {}) {
   const normalized = (blocks ?? []).filter((block) => block && block.type);
   if (normalized.length <= 0) throw new Error('Document message is empty');
@@ -22495,9 +21895,6 @@ function encodeMessageDocumentBlocks(blocks, options = {}) {
         uint16Bytes(block.height ?? 0, 'image height'),
         bytes,
       ]);
-    } else if (block.type === 'payment') {
-      type = PLATHO_DOCUMENT_BLOCK_TYPES.PAYMENT;
-      content = documentPaymentContent(block.payment ?? block, options);
     } else if (block.type === 'prefs') {
       type = PLATHO_DOCUMENT_BLOCK_TYPES.PREFS;
       content = block.bytes instanceof Uint8Array ? block.bytes : new Uint8Array(block.bytes ?? []);
@@ -22567,8 +21964,6 @@ function decodeMessageDocumentBlocks(bytesLike, options = {}) {
         width: readUint16FromBytes(content, 0, 'image width'),
         height: readUint16FromBytes(content, 2, 'image height'),
       });
-    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.PAYMENT) {
-      blocks.push({ type: 'payment', payment: paymentFromDocumentContent(content) });
     } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.PREFS) {
       blocks.push({ type: 'prefs', bytes: content.slice() });
     } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.REPLY) {
@@ -22599,72 +21994,6 @@ function decodeMessageDocumentBlocks(bytesLike, options = {}) {
   return blocks;
 }
 
-function paymentFromDocumentBlocks(blocks) {
-  return (blocks ?? []).find((block) => block?.type === 'payment' && block.payment)?.payment ?? null;
-}
-
-function paymentIntentId(payment) {
-  return BigInt(payment.intentId ?? `0x${payment.intentIdHex}`);
-}
-
-function paymentSecret32(payment) {
-  return bytesToBigIntValue(paymentSecret32Bytes(payment));
-}
-
-function paymentAssetVaultBalance(user, asset) {
-  const value = typeof asset === 'bigint' ? asset : BigInt(asset ?? 0);
-  return value === RECEIVE_ASSETS.ATH
-    ? nonNegativeBigInt(user?.ath_balance ?? user?.athBalance ?? user?.ath)
-    : vaultTonBalanceNanotons(user);
-}
-
-function paymentCheckClaimPendingError(message = 'Payment check claim submitted; Vault confirmation is still pending') {
-  const error = new Error(message);
-  error.code = 'PLATHO_PAYMENT_CHECK_CLAIM_PENDING';
-  return error;
-}
-
-function isPaymentCheckClaimPending(error) {
-  return error?.code === 'PLATHO_PAYMENT_CHECK_CLAIM_PENDING';
-}
-
-function paymentCheckClaimBlockedStatus(error) {
-  const text = String(error?.message ?? error ?? '');
-  if (/already claimed|cancelled|does not exist|not found/i.test(text)) return 'check already claimed or cancelled';
-  if (/another wallet|recipient/i.test(text)) return 'check is for another wallet';
-  if (/data mismatch|claim secret|commitment|exitcode=16280|exit code 16280/i.test(text)) return 'check data mismatch';
-  if (noteTonRpcRateLimit(error)) return TON_RPC_CONNECTING_STATUS;
-  return `check claim blocked: ${shortUiErrorText(error, 'blocked')}`;
-}
-
-function paymentCheckCancelPendingError(message = 'Payment check cancel submitted; Vault confirmation is still pending') {
-  const error = new Error(message);
-  error.code = 'PLATHO_PAYMENT_CHECK_CANCEL_PENDING';
-  return error;
-}
-
-function isPaymentCheckCancelPending(error) {
-  return error?.code === 'PLATHO_PAYMENT_CHECK_CANCEL_PENDING';
-}
-
-function rememberPaymentCheckActionError(action, error, payment = null) {
-  globalThis.plathoLastPaymentCheckActionError = {
-    action,
-    message: String(error?.message ?? error ?? ''),
-    code: error?.code ?? null,
-    payment: paymentForHistory(payment),
-    at: new Date().toISOString(),
-  };
-}
-
-function paymentCheckCancelBlockedStatus(error) {
-  const text = String(error?.message ?? error ?? '');
-  if (/already claimed|cancelled|does not exist|not found|disappeared/i.test(text)) return 'check already claimed or cancelled';
-  if (/another wallet|sender/i.test(text)) return 'check belongs to another sender';
-  if (noteTonRpcRateLimit(error)) return TON_RPC_CONNECTING_STATUS;
-  return `check cancel blocked: ${shortUiErrorText(error, 'blocked')}`;
-}
-
 function isTonRpcVerificationUnavailableForOwnVaultActionError(error) {
   const message = String(error?.message ?? error ?? '');
   return error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
@@ -22690,65 +22019,6 @@ function isTonRpcVerificationSoftReadError(error) {
 
 function isTonRpcRecoverableReadError(error) {
   return isTonRpcVerificationSoftReadError(error) || isTonRpcTransientError(error);
-}
-
-function assertReceiveIntentMatchesPayment(intent, payment) {
-  if (intent?.exists !== true) throw new Error('Payment check is already claimed or cancelled');
-  const connectedWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  if (!sameWalletAddress(intent.recipient_wallet, connectedWallet)) {
-    throw new Error('Payment check is for another wallet');
-  }
-  if (BigInt(intent.asset ?? 0n) !== BigInt(payment.asset ?? 0n)) {
-    throw new Error('Payment check asset mismatch');
-  }
-  if (BigInt(intent.amount ?? 0n) !== BigInt(payment.amount ?? 0n)) {
-    throw new Error('Payment check amount mismatch');
-  }
-  if (BigInt(intent.commitment ?? -1n) !== paymentSecret32(payment)) {
-    throw new Error('Payment check data mismatch; this check cannot be claimed');
-  }
-}
-
-function assertReceiveIntentCancelableBySender(intent, payment) {
-  if (intent?.exists !== true) throw new Error('Payment check is already claimed or cancelled');
-  const connectedWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  if (!sameWalletAddress(intent.sender_wallet, connectedWallet)) {
-    throw new Error('Payment check belongs to another sender');
-  }
-  if (payment.senderWallet && !sameWalletAddress(payment.senderWallet, connectedWallet)) {
-    throw new Error('Payment check local sender mismatch');
-  }
-  if (payment.recipientWallet && !sameWalletAddress(intent.recipient_wallet, payment.recipientWallet)) {
-    throw new Error('Payment check recipient mismatch');
-  }
-  if (BigInt(intent.asset ?? 0n) !== BigInt(payment.asset ?? 0n)) {
-    throw new Error('Payment check asset mismatch');
-  }
-  if (BigInt(intent.amount ?? 0n) !== BigInt(payment.amount ?? 0n)) {
-    throw new Error('Payment check amount mismatch');
-  }
-}
-
-async function readFreshReceiveIntent(provider, intentId, options = {}) {
-  if (!provider?.getReceiveIntent) throw new Error('Vault provider cannot confirm payment checks');
-  return provider.getReceiveIntent(intentId, {
-    vaultAddress: requireVaultAddress(),
-    verify: options.verify !== false,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
-}
-
-async function readFreshReceiveIntentForOwnVaultAction(provider, intentId) {
-  return callWithDegradedTransportReadFallback(
-    () => readFreshReceiveIntent(provider, intentId),
-    () => readFreshReceiveIntent(provider, intentId, unverifiedCriticalChainReadOptions()),
-  );
-}
-
-async function readFreshReceiveIntentForCancel(provider, intentId) {
-  return readFreshReceiveIntentForOwnVaultAction(provider, intentId);
 }
 
 async function readFreshConnectedVaultUser(provider, options = {}) {
@@ -22833,79 +22103,6 @@ async function readCanonicalPublishChargeForOwnVaultAction(provider, owner, publ
     () => readCharge({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
     () => readCharge(unverifiedCriticalChainReadOptions()),
   );
-}
-
-async function waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser) {
-  const intentId = paymentIntentId(payment);
-  const asset = BigInt(payment.asset ?? 0n);
-  const amount = BigInt(payment.amount ?? 0n);
-  const beforeBalance = paymentAssetVaultBalance(beforeUser, asset);
-  const expectedBalance = beforeBalance + amount;
-  const deadline = Date.now() + PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS;
-  let lastIntent = null;
-  let lastUser = beforeUser;
-  while (Date.now() <= deadline) {
-    try {
-      lastIntent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId);
-      lastUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
-      const balance = paymentAssetVaultBalance(lastUser, asset);
-      if (lastIntent?.exists === false && balance >= expectedBalance) {
-        rememberConnectedVaultUser(lastUser);
-        return { intent: lastIntent, user: lastUser, balance };
-      }
-    } catch (error) {
-      if (!noteTonRpcRateLimit(error)) throw error;
-    }
-    await delay(PAYMENT_CHECK_CLAIM_POLL_MS);
-  }
-  if (lastIntent?.exists === false) {
-    throw new Error('Payment check disappeared but Vault balance did not update');
-  }
-  throw paymentCheckClaimPendingError();
-}
-
-async function waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser) {
-  const intentId = paymentIntentId(payment);
-  const asset = BigInt(payment.asset ?? 0n);
-  const amount = BigInt(payment.amount ?? 0n);
-  const beforeBalance = paymentAssetVaultBalance(beforeUser, asset);
-  const expectedBalance = beforeBalance + amount;
-  const deadline = Date.now() + PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS;
-  let lastIntent = null;
-  let lastUser = beforeUser;
-  while (Date.now() <= deadline) {
-    try {
-      lastIntent = await readFreshReceiveIntentForCancel(provider, intentId);
-      lastUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
-      const balance = paymentAssetVaultBalance(lastUser, asset);
-      if (lastIntent?.exists === false && balance >= expectedBalance) {
-        rememberConnectedVaultUser(lastUser);
-        return { intent: lastIntent, user: lastUser, balance };
-      }
-    } catch (error) {
-      if (!noteTonRpcRateLimit(error)) throw error;
-    }
-    await delay(PAYMENT_CHECK_CLAIM_POLL_MS);
-  }
-  if (lastIntent?.exists === false) {
-    throw new Error('Payment check disappeared but sender Vault balance was not restored');
-  }
-  throw paymentCheckCancelPendingError();
-}
-
-async function waitForPaymentCheckCreateConfirmation(provider, payment) {
-  const intentId = paymentIntentId(payment);
-  const deadline = Date.now() + PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS;
-  while (Date.now() <= deadline) {
-    try {
-      const intent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId);
-      if (intent?.exists === true) return intent;
-    } catch (error) {
-      if (!noteTonRpcRateLimit(error)) throw error;
-    }
-    await delay(PAYMENT_CHECK_CLAIM_POLL_MS);
-  }
-  throw paymentCheckClaimPendingError('Payment check create submitted; Vault confirmation is still pending');
 }
 
 function delay(ms) {
@@ -25332,83 +24529,6 @@ async function waitForVaultAthWithdrawalCompletion(provider, owner, clientNonce)
   };
 }
 
-async function submitVaultReceiveIntentExternal(type, params, options = {}) {
-  if (options.allowPendingServiceWorkerUpdate !== true) {
-    requireNoPendingServiceWorkerAppShellReload();
-  }
-  const provider = options.provider ?? await resolveVaultChainProvider();
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const user = options.user ?? await readFreshConnectedVaultUser(provider);
-  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate Platho account before using payment checks');
-  }
-  requireVaultAuthSecretKey();
-  let clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
-  const nonceFloor = vaultPublishNonceFloor(owner);
-  if (clientNonce < nonceFloor) clientNonce = nonceFloor;
-  const external = await buildVaultReceiveIntentExternalBoc(type, {
-    ...params,
-    owner_wallet: owner,
-    client_nonce: clientNonce,
-    signingSecretKey: requireVaultAuthSecretKey(),
-  }, {
-    vaultAddress: requireVaultAddress(),
-    deploymentManifestHash: requireVaultDeploymentManifestHash(),
-  });
-  let result = null;
-  let ambiguousBroadcast = false;
-  let broadcastError = null;
-  try {
-    result = await sendVaultExternalBoc(external);
-    raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
-  } catch (error) {
-    // Surface WHY toncenter rejected the Vault RECEIVE-INTENT external (payment intents) — the other broadcast
-    // path that lacked a [platho] warn, so a bare "500" here is diagnosable instead of a mystery.
-    console.warn('[platho] vault receive-intent external broadcast failed', {
-      status: error?.status ?? null,
-      code: error?.code ?? null,
-      detail: error?.responseBody ?? shortUiErrorText(error, 'receive-intent broadcast failed'),
-      clientNonce: String(clientNonce),
-    });
-    // Same rule as the auth-external path above: a 500 carrying this path's per-receiver Vault
-    // pre-accept nonce reject (see isDefinitiveVaultSingleExternalNonceReject — strict matcher, refuses
-    // after an ambiguous-delivery prior attempt) is a DEFINITIVE not-relayed verdict on this
-    // no-retained-external path — throw instead of raising the floor (floor overshoot here wedges every
-    // later single-external action) or reporting a maybe-landed intent that never executed.
-    if (!isAmbiguousTonRpcBroadcastError(error) || isDefinitiveVaultSingleExternalNonceReject(error)) throw error;
-    ambiguousBroadcast = true;
-    broadcastError = error;
-    raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
-  }
-  globalThis.plathoLastVaultReceiveIntentExternal = {
-    type,
-    params,
-    external,
-    result,
-    clientNonce,
-    ambiguousBroadcast,
-    broadcastError: broadcastError ? String(broadcastError?.message ?? broadcastError) : null,
-  };
-  let nonceWaitError = null;
-  try {
-    await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
-  } catch (error) {
-    if (ambiguousBroadcast || result) {
-      nonceWaitError = error;
-    } else {
-      throw error;
-    }
-  }
-  return {
-    external,
-    result,
-    clientNonce,
-    ambiguousBroadcast,
-    confirmationPending: Boolean(nonceWaitError),
-    nonceWaitError: nonceWaitError ? String(nonceWaitError?.message ?? nonceWaitError) : null,
-  };
-}
-
 async function submitAthWalletMessage(type, params, options = {}) {
   requireNoPendingServiceWorkerAppShellReload();
   requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
@@ -26066,347 +25186,6 @@ async function runProfileAvatarSubmitPhase(owner, avatar, avatarHash) {
   return finality?.result ?? finality;
 }
 
-async function attemptPrivatePaymentCheckPublish(context) {
-  const endPrivateOutboundWork = beginPrivateOutboundWork();
-  try {
-  const { thread, message, paymentDraft, selectedSuite, senderOptions = currentPrivateSenderOptions() } = context;
-  clearPrivateMessageManualRecovery(message);
-  if (!thread || thread.readOnly) throw new Error('Payment checks are only available in private chats');
-  if (!paymentDraft) throw new Error('Payment check draft is missing');
-  if (!localIdentity) throw new Error('Local encryption identity is not ready');
-  const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite ?? currentOutgoingPrivateSuite() });
-  refreshThreadIdentityFromVariants(thread, privateWalletIdentityVariants(recipientEntry.walletAddress));
-  const recipientWallet = recipientEntry.walletAddress;
-  const { asset, amount } = paymentDraft;
-  const provider = await resolveVaultChainProvider();
-  const initialUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
-  if (initialUser.exists !== true || BigInt(initialUser.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate Platho account before using payment checks');
-  }
-
-  const senderWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const clientNonce = BigInt(initialUser.publish_nonce ?? initialUser.publishNonce ?? 0n);
-  const secret32Bytes = randomBytes(32);
-  const secret32 = bytesToBigIntValue(secret32Bytes);
-  const intentId = await computeVaultReceiveIntentId({
-    senderWallet,
-    recipientWallet,
-    asset,
-    amount,
-    clientNonce,
-  });
-  const commitment = secret32;
-  const payment = normalizePaymentForMessage({
-    asset,
-    amount,
-    intentId,
-    secret32Bytes,
-    senderWallet,
-    recipientWallet,
-    clientNonce,
-  });
-  const contextReplyDraft = context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null;
-  const contextShareDraft = context.shareDraft ?? context.message?.privateDraft?.shareDraft ?? null;
-  const contextFileAttachments = context.fileAttachments ?? context.message?.privateDraft?.fileAttachments ?? [];
-  const capsules = await createPrivateComposerCapsules(context.text ?? '', context.attachments ?? [], recipientEntry, thread.id, senderOptions, { payment, replyDraft: contextReplyDraft, shareDraft: contextShareDraft, fileAttachments: contextFileAttachments });
-  const publishState = createCapsulePublishState(capsules);
-  const displayBlocks = displayBlocksFromDocumentBlocks(composerBlocksFromDraft(context.text ?? '', context.attachments ?? [], payment, contextReplyDraft, contextFileAttachments, contextShareDraft));
-  message.text = messagePreviewFromBlocks(displayBlocks) || paymentMessageText(payment);
-  message.blocks = displayBlocks;
-  message.payment = payment;
-  message.paymentDraft = paymentDraftForHistory(paymentDraft);
-  message.capsule = capsules[0];
-  message.capsules = capsules;
-  message.publishState = publishState;
-  message.recipientWallet = recipientWallet;
-  message.meta = 'message pricing';
-  refreshThreadAfterMessageChange(thread);
-  renderThreads();
-  renderConversation();
-
-  try {
-    if (!encryptedMessageStore || encryptedMessageStore.persistent === false) {
-      throw new Error('Persistent encrypted local history is required before creating a payment check');
-    }
-    const quotedPublish = await prepareCapsulesThroughVault(capsules, {
-      publishState,
-      allowOwnVaultActionReadFallback: true,
-    });
-    const createReserve = estimateVaultAttachedValueNanotons('CreateReceiveIntent');
-    const preparedUser = quotedPublish.user ?? initialUser;
-    const tonBalance = BigInt(preparedUser.ton_balance ?? preparedUser.tonBalance ?? 0n);
-    const athBalance = BigInt(preparedUser.ath_balance ?? preparedUser.athBalance ?? 0n);
-    if (asset === RECEIVE_ASSETS.TON) {
-      if (tonBalance < amount + createReserve + quotedPublish.totalMaxCharge) {
-        throw new Error('Not enough Vault GRAM for payment check and private publish hold');
-      }
-    } else {
-      if (athBalance < amount) throw new Error(`Not enough ${paymentAssetLabel(asset)} in Vault`);
-      if (tonBalance < createReserve + quotedPublish.totalMaxCharge) {
-        throw new Error('Not enough Vault GRAM for payment check private publish hold');
-      }
-    }
-    const storedRecovery = await persistMessageToEncryptedHistory(thread, message);
-    if (!storedRecovery && !message.localHistoryId) {
-      throw new Error('Payment check recovery record could not be saved');
-    }
-    const pendingLedger = await rememberPendingPaymentCheckLedgerRecord(
-      thread,
-      message,
-      payment,
-      { status: 'prepared' },
-      { required: true },
-    );
-    if (!pendingLedger) {
-      throw new Error('Payment check pending ledger could not be saved');
-    }
-  } catch (error) {
-    rememberPaymentCheckActionError('pre-create', error, payment);
-    throw error;
-  }
-
-  let createResult = null;
-  let intentCreateSubmitted = false;
-  try {
-    message.meta = 'creating payment check';
-    await updateMessageInEncryptedHistory(thread, message);
-    createResult = await submitVaultReceiveIntentExternal('CreateReceiveIntent', {
-      asset,
-      amount,
-      recipient_wallet: recipientWallet,
-      commitment,
-    }, {
-      provider,
-      user: initialUser,
-      });
-    intentCreateSubmitted = true;
-    context.paymentIntentCreated = true;
-    message.paymentIntentCreated = true;
-    message.vaultCreateIntent = createResult;
-    message.meta = 'check created, confirming';
-    await updateMessageInEncryptedHistory(thread, message);
-    await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
-      status: 'intent_create_submitted',
-      vaultCreateIntent: createResult,
-    });
-    await waitForPaymentCheckCreateConfirmation(provider, payment);
-    message.meta = 'payment check created, publishing message';
-    await updateMessageInEncryptedHistory(thread, message);
-    await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
-      status: 'intent_confirmed',
-      vaultCreateIntent: createResult,
-    });
-    const preparedPublish = await prepareCapsulesThroughVault(capsules, {
-      publishState,
-      allowOwnVaultActionReadFallback: true,
-    });
-    const publishResult = await sendPreparedCapsulesThroughVault(preparedPublish, {
-      publishState,
-      confirmFinalNonce: true,
-      onPartState: () => {
-        message.meta = publishStateMeta(publishState);
-        updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
-        renderConversation();
-      },
-    });
-    clearPrivateSendRetry(message);
-    clearPrivateMessageManualRecovery(message);
-    message.vaultPublish = publishResult;
-    message.publishState = publishResult.publishState ?? publishState;
-    message.meta = publishStateMeta(message.publishState);
-    thread.state = publishResult.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
-    await updateMessageInEncryptedHistory(thread, message);
-    if (publishResult.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-      await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
-        status: 'publish_submitted',
-        vaultPublish: publishResult,
-        publishState: message.publishState,
-      });
-      schedulePrivatePublishConfirmationRetry(context);
-    } else {
-      message.privatePublishConfirmAttempt = 0;
-      message.privatePublishConfirmStopped = false;
-      message.privatePublishConfirmStoppedAt = null;
-      clearPrivatePublishConfirmRetry(message);
-      await removePendingPaymentCheckLedgerRecord(payment);
-    }
-    refreshMessagingControls();
-    return { createResult, payment, capsule: capsules[0], capsules, publishResult };
-  } catch (error) {
-    const cancelled = isPublishPriceChangeCancelled(error);
-    const partial = isVaultPublishPartialError(error);
-    if (!intentCreateSubmitted) {
-      if (cancelled) context.cancelled = true;
-      await removePendingPaymentCheckLedgerRecord(payment);
-      if (isRecoverablePrivateSendError(error)) {
-        message.meta = privateSendRetryMeta(error);
-        thread.state = 'pending';
-        schedulePrivateSendRetry(context, error);
-      } else {
-        markPrivateMessageManualRecovery(context, error, cancelled ? 'not sent: cancelled' : privateSendBlockedStatusText(error));
-      }
-    } else if (partial) {
-      message.vaultPublish = error.publishResult;
-      message.publishState = error.publishResult?.publishState ?? message.publishState;
-      message.meta = publishStateMeta(message.publishState);
-      thread.state = privateMessageHasPublishAttempt(message) ? 'pending' : 'blocked';
-      await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
-        status: 'publish_partial',
-        vaultPublish: error.publishResult,
-        publishState: message.publishState,
-      });
-      schedulePrivatePublishConfirmationRetry(context, error);
-    } else if (isRecoverablePrivateSendError(error)) {
-      message.meta = privateSendRetryMeta(error);
-      thread.state = 'pending';
-      context.payment = payment;
-      context.paymentIntentCreated = true;
-      await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
-        status: 'publish_retry_pending',
-        publishState: message.publishState,
-      });
-      schedulePrivateSendRetry(context, error);
-    } else {
-      rememberPaymentCheckActionError('publish', error, payment);
-      const cancelResult = await attemptCancelPaymentCheckAfterPublishFailure(payment).catch((cancelError) => {
-        rememberPaymentCheckActionError('auto-cancel', cancelError, payment);
-        if (isPaymentCheckCancelPending(cancelError)) return { pending: true };
-        console.error(cancelError);
-        return null;
-      });
-      message.vaultCancelIntent = cancelResult;
-      const publishErrorText = privateSendPreflightStatusText(error);
-      message.meta = cancelResult?.pending
-        ? 'check cancel submitted, confirming'
-        : cancelResult
-        ? (cancelled ? 'check cancelled before publish' : `check publish failed, intent cancelled: ${publishErrorText}`)
-        : (cancelled ? 'check publish cancelled, refund required' : 'check not delivered, refund required');
-      thread.state = 'blocked';
-      if (cancelResult?.pending) {
-        await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
-          status: 'cancel_submitted',
-          vaultCancelIntent: cancelResult,
-        });
-      } else if (cancelResult) {
-        await removePendingPaymentCheckLedgerRecord(payment);
-      } else {
-        await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
-          status: 'publish_failed_refund_required',
-          publishError: privateSendPreflightStatusText(error),
-        });
-      }
-    }
-    refreshMessagingControls();
-    if (!cancelled && !partial) console.error(error);
-    await updateMessageInEncryptedHistory(thread, message);
-    return { createResult, payment, capsule: capsules[0], capsules, error };
-  } finally {
-    refreshThreadAfterMessageChange(thread);
-    renderThreads();
-    renderConversation();
-  }
-  } finally {
-    endPrivateOutboundWork();
-  }
-}
-
-async function submitCreatePaymentCheck(options = {}) {
-  const thread = options.thread ?? activeThread();
-  if (!thread || thread.readOnly) throw new Error('Payment checks are only available in private chats');
-  const paymentDetails = options.paymentDetails ?? (await requestPaymentCheckDetails());
-  if (!paymentDetails) return null;
-  const message = {
-    type: 'out',
-    text: paymentMessageText(paymentDetails),
-    meta: 'check preparing',
-    ...localMessageOrderFields(),
-    paymentDraft: paymentDraftForHistory(paymentDetails),
-  };
-  ownSendPendingRender = true; // own-send (payment check): the next render scrolls to it + abandons any open-anchor
-  insertThreadMessage(thread, message);
-  refreshThreadAfterMessageChange(thread);
-  renderThreads();
-  renderConversation();
-  const context = {
-    thread,
-    message,
-    paymentDraft: paymentDetails,
-    selectedSuite: currentOutgoingPrivateSuite(),
-    senderOptions: currentPrivateSenderOptions(),
-    retryAttempt: 0,
-    confirmAttempt: 0,
-  };
-  return attemptPrivatePaymentCheckPublish(context);
-}
-
-async function submitVaultClaimPaymentCheck(payment, options = {}) {
-  const provider = await resolveVaultChainProvider();
-  if (!provider?.getReceiveIntent || !provider?.getUser) {
-    throw new Error('Vault provider cannot confirm payment checks');
-  }
-  const intentId = paymentIntentId(payment);
-  const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
-  const intent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId);
-  assertReceiveIntentMatchesPayment(intent, payment);
-  await options.onStatus?.('check claim signing');
-  const result = await submitVaultReceiveIntentExternal('ClaimReceiveIntent', {
-    intent_id: intentId,
-    secret32: paymentSecret32(payment),
-  }, {
-    provider,
-    user: beforeUser,
-    allowPendingServiceWorkerUpdate: true,
-  });
-  await options.onStatus?.('check claim submitted, confirming');
-  await markPendingPaymentCheckLedgerRecord(payment, {
-    status: 'claim_submitted',
-    vaultClaimIntent: result,
-  });
-  const confirmed = await waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser);
-  await removePendingPaymentCheckLedgerRecord(payment);
-  const claimedAmountText = BigInt(payment.asset ?? 0n) === RECEIVE_ASSETS.TON
-    ? formatTonNanotons(BigInt(payment.amount ?? 0n))
-    : formatAtomicAmount(payment.amount);
-  flashWalletIdentityStatus(t('payment.checkClaimed', { amount: claimedAmountText, asset: paymentAssetLabel(payment.asset) }));
-  queueVaultPostTransactionRefresh();
-  return { result, confirmed };
-}
-
-async function submitVaultCancelPaymentCheck(payment, options = {}) {
-  const provider = await resolveVaultChainProvider();
-  if (!provider?.getReceiveIntent || !provider?.getUser) {
-    throw new Error('Vault provider cannot confirm payment checks');
-  }
-  const intentId = paymentIntentId(payment);
-  const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
-  const intent = await readFreshReceiveIntentForCancel(provider, intentId);
-  assertReceiveIntentCancelableBySender(intent, payment);
-  await options.onStatus?.('check cancel signing');
-  const result = await submitVaultReceiveIntentExternal('CancelReceiveIntent', {
-    intent_id: intentId,
-  }, {
-    provider,
-    user: beforeUser,
-    allowPendingServiceWorkerUpdate: true,
-  });
-  await options.onStatus?.('check cancel submitted, confirming');
-  await markPendingPaymentCheckLedgerRecord(payment, {
-    status: 'cancel_submitted',
-    vaultCancelIntent: result,
-  });
-  const confirmed = await waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser);
-  await removePendingPaymentCheckLedgerRecord(payment);
-  flashWalletIdentityStatus(t('payment.checkCancelled'));
-  queueVaultPostTransactionRefresh();
-  return { result, confirmed };
-}
-
-async function attemptCancelPaymentCheckAfterPublishFailure(payment) {
-  if (!payment) return null;
-  setText(identitySubtitle, t('payment.checkAutoCancelling'));
-  return submitVaultCancelPaymentCheck(payment);
-}
-
 async function submitVaultRegisterMessagingKeys() {
   if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
   const provider = await resolveVaultChainProvider();
@@ -26902,9 +25681,6 @@ async function confirmPendingPrivatePublishMessagesFromEntries(entries, confirme
         message.privatePublishConfirmStopped = false;
         message.privatePublishConfirmStoppedAt = null;
         clearPrivatePublishConfirmRetry(message);
-        if (message.payment) {
-          updates.push(removePendingPaymentCheckLedgerRecord(message.payment).catch((error) => console.error(error)));
-        }
       }
       updates.push(updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error)));
     }
@@ -28989,21 +27765,16 @@ function schedulePrivateSendRetry(context, error) {
 
 function privateSendRetryContextForMessage(thread, message) {
   const draft = message?.privateDraft ?? {};
-  const payment = message?.payment ?? null;
-  const hasPaymentIntent = paymentHasIntent(payment) || message?.paymentIntentCreated === true;
   return {
     thread,
     message,
     text: draft.text ?? message?.text ?? '',
     attachments: normalizePrivateImageAttachments(draft.attachments ?? []),
-    paymentDraft: hasPaymentIntent ? null : (draft.paymentDraft ?? message?.paymentDraft ?? null),
     selectedSuite: draft.selectedSuite ?? VAULT_RECEIVE_CRYPTO_SUITE,
     senderOptions: draft.senderOptions ?? message?.senderOptions ?? null,
     replyDraft: draft.replyDraft ?? null,
     shareDraft: draft.shareDraft ?? null,
     fileAttachments: normalizePrivateFileAttachments(draft.fileAttachments ?? []),
-    payment,
-    paymentIntentCreated: hasPaymentIntent,
     retryAttempt: Number(message?.privateSendRetryAttempt ?? 0) || 0,
     confirmAttempt: Number(message?.privatePublishConfirmAttempt ?? 0) || 0,
   };
@@ -29408,7 +28179,6 @@ async function runPrivatePublishConfirmationRetryPass(context) {
       message.privatePublishConfirmStopped = false;
       message.privatePublishConfirmStoppedAt = null;
       clearPrivatePublishConfirmRetry(message);
-      if (message.payment) await removePendingPaymentCheckLedgerRecord(message.payment);
     }
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
@@ -29567,9 +28337,7 @@ function clearPrivateMessageManualRecovery(message) {
 function privateMessageCanLocalCancel(message) {
   return Boolean(message)
     && !privateMessageHasPublishAttempt(message)
-    && !message.localHistoryId
-    && message.paymentIntentCreated !== true
-    && !paymentHasIntent(message.payment);
+    && !message.localHistoryId;
 }
 
 function markPrivateMessageManualRecovery(context, error = null, metaText = null) {
@@ -29813,17 +28581,10 @@ async function settlePrivateComposerSendError(context, error) {
     message: String(error?.message ?? error ?? ''),
     code: error?.code ?? null,
     phase: message?.meta ?? null,
-    hasPaymentDraft: Boolean(context.paymentDraft),
-    paymentDraft: paymentDraftForHistory(context.paymentDraft),
-    payment: paymentForHistory(message?.payment),
-    paymentIntentCreated: context.paymentIntentCreated === true,
     hasPublishAttempt: privateMessageHasPublishAttempt(message),
     hasLocalHistory: Boolean(message?.localHistoryId),
     at: new Date().toISOString(),
   };
-  if (context.paymentDraft && context.paymentIntentCreated !== true && !privateMessageHasPublishAttempt(message)) {
-    rememberPaymentCheckActionError('pre-create', error, message?.payment ?? context.paymentDraft);
-  }
   if (partial) {
     clearPrivateSendRetry(message);
     message.vaultPublish = error.publishResult;
@@ -29838,46 +28599,6 @@ async function settlePrivateComposerSendError(context, error) {
     }
   } else if (cancelled) {
     markPrivateMessageManualRecovery(context, error, 'not sent: cancelled');
-  } else if (context.paymentIntentCreated && message.payment && !privateMessageHasPublishAttempt(message)) {
-    if (isRecoverablePrivateSendError(error)) {
-      message.meta = privateSendRetryMeta(error);
-      thread.state = 'pending';
-      await updateMessageInEncryptedHistory(thread, message);
-      await rememberPendingPaymentCheckLedgerRecord(thread, message, message.payment, {
-        status: 'publish_retry_pending',
-        publishState: message.publishState,
-      });
-      schedulePrivateSendRetry(context, error);
-    } else {
-      rememberPaymentCheckActionError('publish', error, message.payment);
-      const cancelResult = await attemptCancelPaymentCheckAfterPublishFailure(message.payment).catch((cancelError) => {
-        rememberPaymentCheckActionError('auto-cancel', cancelError, message.payment);
-        if (isPaymentCheckCancelPending(cancelError)) return { pending: true };
-        console.error(cancelError);
-        return null;
-      });
-      message.vaultCancelIntent = cancelResult;
-      message.meta = cancelResult?.pending
-        ? 'check cancel submitted, confirming'
-        : cancelResult
-        ? `check publish failed, intent cancelled: ${privateSendPreflightStatusText(error)}`
-        : 'check not delivered, refund required';
-      thread.state = 'blocked';
-      if (cancelResult?.pending) {
-        await rememberPendingPaymentCheckLedgerRecord(thread, message, message.payment, {
-          status: 'cancel_submitted',
-          vaultCancelIntent: cancelResult,
-        });
-      } else if (cancelResult) {
-        await removePendingPaymentCheckLedgerRecord(message.payment);
-      } else {
-        await rememberPendingPaymentCheckLedgerRecord(thread, message, message.payment, {
-          status: 'publish_failed_refund_required',
-          publishError: privateSendPreflightStatusText(error),
-        });
-      }
-      await updateMessageInEncryptedHistory(thread, message);
-    }
   } else if (isRecoverablePrivateSendError(error) && !privateMessageHasPublishAttempt(message)) {
     schedulePrivateSendRetry(context, error);
   } else if (isRecoverablePrivateSendError(error) && privateMessageHasPublishAttempt(message)) {
@@ -29924,15 +28645,11 @@ async function runPrivateSendRetry(context) {
     return;
   }
   try {
-    if (context.paymentDraft && !(context.paymentIntentCreated && message.payment && Array.isArray(message.capsules))) {
-      await attemptPrivatePaymentCheckPublish(context);
-    } else {
-      await attemptPrivateComposerMessagePublish({
-        ...context,
-        payment: context.payment ?? message.payment ?? null,
-        paymentDraft: null,
-      });
-    }
+    await attemptPrivateComposerMessagePublish({
+      ...context,
+      payment: context.payment ?? message.payment ?? null,
+      paymentDraft: null,
+    });
   } catch (error) {
     await settlePrivateComposerSendError(context, error);
   } finally {
@@ -30864,9 +29581,6 @@ globalThis.plathoVaultTransactions = {
   submitVaultUsernameMint,
   submitAthDueFlush,
   submitProfileAvatarUpdate,
-  submitCreatePaymentCheck,
-  submitVaultClaimPaymentCheck,
-  submitVaultCancelPaymentCheck,
   submitVaultRegisterMessagingKeys,
   submitVaultReplaceMessagingKeys,
   refreshVaultDashboard,

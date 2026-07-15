@@ -16,12 +16,10 @@ import {
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import {
   registerVaultSigningKeys,
-  sendVaultReceiveIntentExternal,
   sendVaultWithdrawAthExternal,
-} from './helpers/vault-receive-intent-external';
+} from './helpers/vault-external';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
-const RECEIVE_INTENT_CREATE_RESERVE = 9_000_000n;
 
 function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
@@ -272,56 +270,4 @@ describe('Vault ATH accounting invariants', () => {
       }
     }
   }, 60_000);
-
-  it('VAULT-INV-ATH-02: ATH receive intent claim and cancel preserve total internal ATH and official backing', async () => {
-    const { blockchain, vault, users, userAthWallets, officialVaultAthWallet } = await setup(2);
-    const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
-    const senderKey = await registerVaultSigningKeys(vault, users[0], 61);
-    const recipientKey = await registerVaultSigningKeys(vault, users[1], 62);
-    await depositAth({ vault, user: users[0], userAthWallet: userAthWallets[0], amount: 1_200n, queryId: 501n });
-    await depositAth({ vault, user: users[1], userAthWallet: userAthWallets[1], amount: 300n, queryId: 502n });
-    await depositTon(vault, users[0], RECEIVE_INTENT_CREATE_RESERVE * 2n);
-    expect((await officialWallet.getGetWalletData()).balance).toBe(1_500n);
-
-    const claimNonce = (await vault.getGetUser(users[0].address)).publish_nonce;
-    const claimIntentId = await vault.getGetReceiveIntentId(users[0].address, users[1].address, 2n, 500n, claimNonce);
-    const claimSecret = 0xabcdefn;
-    const claimCommitment = await vault.getGetReceiveIntentCommitment(claimIntentId, users[1].address, claimSecret);
-    await sendVaultReceiveIntentExternal(blockchain, vault, 'CreateReceiveIntent', users[0], senderKey, MANIFEST_HASH, {
-      asset: 2n,
-      amount: 500n,
-      recipient_wallet: users[1].address,
-      commitment: claimCommitment,
-    });
-    expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(700n);
-    expect((await vault.getGetGlobal()).receive_intent_count).toBe(1n);
-
-    await sendVaultReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', users[1], recipientKey, MANIFEST_HASH, {
-      intent_id: claimIntentId,
-      secret32: claimSecret,
-    });
-    expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(700n);
-    expect((await vault.getGetUser(users[1].address)).ath_balance).toBe(800n);
-    expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
-    expect((await officialWallet.getGetWalletData()).balance).toBe(1_500n);
-
-    const cancelNonce = (await vault.getGetUser(users[0].address)).publish_nonce;
-    const cancelIntentId = await vault.getGetReceiveIntentId(users[0].address, users[1].address, 2n, 250n, cancelNonce);
-    const cancelCommitment = await vault.getGetReceiveIntentCommitment(cancelIntentId, users[1].address, 0x1234n);
-    await sendVaultReceiveIntentExternal(blockchain, vault, 'CreateReceiveIntent', users[0], senderKey, MANIFEST_HASH, {
-      asset: 2n,
-      amount: 250n,
-      recipient_wallet: users[1].address,
-      commitment: cancelCommitment,
-    });
-    expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(450n);
-
-    await sendVaultReceiveIntentExternal(blockchain, vault, 'CancelReceiveIntent', users[0], senderKey, MANIFEST_HASH, {
-      intent_id: cancelIntentId,
-    });
-    expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(700n);
-    expect((await vault.getGetUser(users[1].address)).ath_balance).toBe(800n);
-    expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
-    expect((await officialWallet.getGetWalletData()).balance).toBe(1_500n);
-  });
 });

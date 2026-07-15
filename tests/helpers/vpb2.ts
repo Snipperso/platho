@@ -51,6 +51,8 @@ export const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN = 0x45504931n;    // EPI1 (per-entr
 
 export const KIND_PRIVATE = 1n;
 export const KIND_PUBLIC = 2n;
+export const KIND_INTRO = 3n; // clean-16 ИНК4: first-contact stealth lane
+export const KIND_RECOVERY = 4n; // clean-16 ИНК6: K_root durability lane (self-recovery, latest-wins slot map)
 export const VPB2_VERSION = 1n;
 export const SUITE_HYBRID = 2n;
 export const SIZE_1K = 1n;
@@ -477,7 +479,6 @@ export async function setupVaultAirdrop(opts: { airdropRemaining: bigint; balanc
     genesis_config_hash: opts.airdropRemaining,
     users: Dictionary.empty(),
     key_records: Dictionary.empty(),
-    receive_intents: Dictionary.empty(),
     processed_ath_deposits: Dictionary.empty(),
     pending_ath_withdrawals: Dictionary.empty(),
     pending_batch_publishes: Dictionary.empty(),
@@ -485,7 +486,6 @@ export async function setupVaultAirdrop(opts: { airdropRemaining: bigint; balanc
     pending_username_mint_payments: Dictionary.empty(),
     user_count: 0n,
     key_record_count: 0n,
-    receive_intent_count: 0n,
     processed_ath_deposit_count: 0n,
     pending_ath_withdrawal_count: 0n,
     pending_publish_count: 0n,

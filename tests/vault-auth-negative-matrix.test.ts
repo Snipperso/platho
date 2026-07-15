@@ -13,7 +13,7 @@ import {
 import {
   registerVaultSigningKeys,
   sendVaultWithdrawAthExternal,
-} from './helpers/vault-receive-intent-external';
+} from './helpers/vault-external';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const ATH_WITHDRAWAL_ID_DOMAIN = 0x41574944n; // "AWID"

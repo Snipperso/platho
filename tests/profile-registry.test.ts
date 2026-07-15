@@ -491,10 +491,11 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     const global = await registry.getGetGlobal();
     expect(current.version).toBe(2n);
     expect(current.avatar_hash).toBe(0x22n);
-    expect(first.exists).toBe(true);
-    expect(first.avatar_hash).toBe(0x11n);
+    // clean-16 L2/#13: the previous version's record is DELETED on update (only `current` is ever read). Old
+    // versions were dead, unbounded state. avatar_records is now O(profiles), net-flat on an update.
+    expect(first.exists).toBe(false);
     expect(global.profile_count).toBe(1n);
-    expect(global.avatar_record_count).toBe(2n);
+    expect(global.avatar_record_count).toBe(1n);
   });
 
   it('PROFILE-04: burn finalization must be for the ProfileRegistry owner address', async () => {

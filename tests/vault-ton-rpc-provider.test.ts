@@ -843,7 +843,7 @@ describe('Vault TON RPC provider', () => {
 
     await expect(transport?.runGetMethod({
       address: VAULT,
-      method: 'get_receive_intent',
+      method: 'get_key_record',
       stack: [],
     })).resolves.toMatchObject({ stack: [num(9n)] });
     await expect(transport?.runGetMethod({
@@ -854,7 +854,7 @@ describe('Vault TON RPC provider', () => {
     })).resolves.toMatchObject({ stack: [num(7n)] });
 
     expect(calls).toEqual([
-      'https://toncenter.example/api/v3/runGetMethod:get_receive_intent',
+      'https://toncenter.example/api/v3/runGetMethod:get_key_record',
       'https://rpc.platho.example/api/v3/runGetMethod:get_user',
       'https://toncenter.example/api/v3/runGetMethod:get_user',
     ]);
@@ -899,7 +899,7 @@ describe('Vault TON RPC provider', () => {
         }
         const method = JSON.parse(String(init?.body ?? '{}')).method;
         calls.push(`${endpoint}:${method}`);
-        if (endpoint.includes('rpc.platho.example') && method === 'get_receive_intent') {
+        if (endpoint.includes('rpc.platho.example') && method === 'get_key_record') {
           return {
             ok: false,
             status: 503,
@@ -933,7 +933,7 @@ describe('Vault TON RPC provider', () => {
     // fallback (the censorship-survival path), not as a verifier.
     await expect(transport?.runGetMethod({
       address: VAULT,
-      method: 'get_receive_intent',
+      method: 'get_key_record',
       stack: [],
     })).resolves.toMatchObject({ stack: [num(7n)] });
     // Sends still prefer the healthy primary; the emergency transport stays out of normal
@@ -941,11 +941,11 @@ describe('Vault TON RPC provider', () => {
     await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
 
     // The keyless emergency transport is NEVER consulted for verification (no toncenter get_user);
-    // it appears only as the primary-read fallback for the 503'd get_receive_intent.
+    // it appears only as the primary-read fallback for the 503'd get_key_record.
     expect(calls).toEqual([
       'https://rpc.platho.example/api/v3/runGetMethod:get_user',
-      'https://rpc.platho.example/api/v3/runGetMethod:get_receive_intent',
-      'https://toncenter.example/api/v3/runGetMethod:get_receive_intent',
+      'https://rpc.platho.example/api/v3/runGetMethod:get_key_record',
+      'https://toncenter.example/api/v3/runGetMethod:get_key_record',
       'https://rpc.platho.example/api/v3/message',
     ]);
   });
@@ -1053,7 +1053,7 @@ describe('Vault TON RPC provider', () => {
       },
     });
 
-    const call = { address: VAULT, method: 'get_receive_intent', stack: [], cacheTtlMs: 0 };
+    const call = { address: VAULT, method: 'get_key_record', stack: [], cacheTtlMs: 0 };
     // Two consecutive hard failures fall through to the emergency transport.
     await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(9n)] });
     await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(9n)] });
@@ -1973,24 +1973,6 @@ describe('Vault TON RPC provider', () => {
     const transport = {
       async runGetMethod(call: { method: string; address: string; stack: any[] }) {
         calls.push(call);
-        if (call.method === 'get_receive_intent') {
-          return {
-            stack: [
-              num(-1n),
-              { type: 'slice', value: encodeTonAddressSliceBoc(OWNER) },
-              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'44'.repeat(32)}`) },
-              num(1n),
-              num(100n),
-              num(0xabcdn),
-              num(77n),
-              num(2_000_000n),
-              num(1_700_000_000n),
-              num(0n),
-            ],
-          };
-        }
-        if (call.method === 'get_receive_intent_id') return { stack: [num(0x1010n)] };
-        if (call.method === 'get_receive_intent_commitment') return { stack: [num(0x2020n)] };
         if (call.method === 'get_ath_withdrawal_id') return { stack: [num(0x3030n)] };
         if (call.method === 'get_pending_ath_withdrawal_for') {
           return {
@@ -2019,7 +2001,6 @@ describe('Vault TON RPC provider', () => {
               { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'99'.repeat(32)}`) },
               num(1n),
               num(2n),
-              num(3n),
               num(4n),
               num(5n),
               num(6n),
@@ -2038,16 +2019,6 @@ describe('Vault TON RPC provider', () => {
     };
     const provider = createVaultTonRpcProvider({ vaultAddress: VAULT, transport });
 
-    await expect(provider.getReceiveIntent(0x999n)).resolves.toMatchObject({
-      exists: true,
-      sender_wallet: OWNER,
-      asset: 1n,
-      amount: 100n,
-      settlement_reserve_ton: 2_000_000n,
-      claimed: false,
-    });
-    await expect(provider.getReceiveIntentId(OWNER, `0:${'44'.repeat(32)}`, 1n, 100n, 77n)).resolves.toBe(0x1010n);
-    await expect(provider.getReceiveIntentCommitment(0x1010n, `0:${'44'.repeat(32)}`, 0x7777n)).resolves.toBe(0x2020n);
     await expect(provider.getAthWithdrawalId(OWNER, 12n)).resolves.toBe(0x3030n);
     await expect(provider.getPendingAthWithdrawalFor(OWNER, 12n)).resolves.toMatchObject({
       exists: true,
@@ -2067,16 +2038,12 @@ describe('Vault TON RPC provider', () => {
     });
 
     expect(calls.map((call) => call.method)).toEqual([
-      'get_receive_intent',
-      'get_receive_intent_id',
-      'get_receive_intent_commitment',
       'get_ath_withdrawal_id',
       'get_pending_ath_withdrawal_for',
       'get_global',
     ]);
-    // get_pending_ath_withdrawal_for (now index 4 after get_canonical_publish_charge stopped hitting the RPC)
-    // passes the owner address as its first stack arg.
-    expect(decodeTonAddressSliceBoc(calls[4].stack[0].value)).toBe(OWNER);
+    // get_pending_ath_withdrawal_for passes the owner address as its first stack arg.
+    expect(decodeTonAddressSliceBoc(calls[1].stack[0].value)).toBe(OWNER);
   });
 
   it('VAULT-RPC-06: decodes the Vault registry binding fields from new get_global stacks', () => {
@@ -2096,7 +2063,6 @@ describe('Vault TON RPC provider', () => {
         { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'88'.repeat(32)}`) },
         num(1n),
         num(2n),
-        num(3n),
         num(4n),
         num(5n),
         num(6n),

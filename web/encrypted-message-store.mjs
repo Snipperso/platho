@@ -1,13 +1,12 @@
 const DEFAULT_DB_NAME = 'platho-local-message-history-v1';
 const KEY_STORE_NAME = 'historyKeys';
 const MESSAGE_STORE_NAME = 'encryptedMessages';
-const PENDING_PAYMENT_CHECK_STORE_NAME = 'pendingPaymentChecks';
 const DEFAULT_KEY_ID = 'device-history-key-v1';
 const MESSAGE_HISTORY_VERSION = 1;
+// DB stays at version 2: v2 added a now-removed pending-payment-check object store. The version is never
+// lowered (IndexedDB throws VersionError on downgrade); fresh installs simply open v2 with key+message stores.
 const MESSAGE_HISTORY_DB_VERSION = 2;
 const MESSAGE_HISTORY_DOMAIN = 'PLATHO.LOCAL.MESSAGE_HISTORY.V1';
-const PENDING_PAYMENT_CHECK_THREAD_ID = 'pending-payment-check-ledger';
-const PENDING_PAYMENT_CHECK_MESSAGE_TYPE = 'payment-check-pending';
 const AES_GCM_NONCE_BYTES = 12;
 export const DEFAULT_MESSAGE_HISTORY_MAX_RECORDS = 500;
 
@@ -26,8 +25,8 @@ function assertString(value, name) {
 }
 
 function safeClone(value) {
-  // BigInt-safe deep clone. Persisted records (pending payment checks, message history) can carry BigInt
-  // fields — e.g. a publishResult/vaultPublish max_charge, which the batch-pricing rework made a BigInt.
+  // BigInt-safe deep clone. Persisted message-history records can carry BigInt fields — e.g. a
+  // publishResult/vaultPublish max_charge, which the batch-pricing rework made a BigInt.
   // Plain JSON.stringify throws "Do not know how to serialize a BigInt", which silently stranded the
   // ledger write (the send itself still went through). Stringify BigInts exactly as app.js safeJsonClone
   // does — the project-wide convention is to store BigInts as decimal strings (nonces, max_charge in
@@ -108,29 +107,6 @@ function normalizeMessageRecordInput(input) {
     type: assertString(message.type, 'message.type'),
     capsuleId: message.capsule?.id ?? null,
     message: safeClone(message),
-  };
-}
-
-function normalizePendingPaymentCheckInput(input) {
-  const record = safeClone(assertObject(input, 'pending payment check input'));
-  const id = assertString(
-    record.id ?? record.ledgerId ?? record.intentIdHex ?? record.intentId,
-    'pending payment check id',
-  );
-  const createdAtInput = Number(record.createdAtMs ?? record.createdAt);
-  const createdAt = Number.isFinite(createdAtInput) && createdAtInput > 0 ? createdAtInput : Date.now();
-  return {
-    id,
-    threadId: PENDING_PAYMENT_CHECK_THREAD_ID,
-    createdAt,
-    thread: null,
-    message: {
-      ...record,
-      type: PENDING_PAYMENT_CHECK_MESSAGE_TYPE,
-      id,
-      ledgerId: id,
-      createdAt,
-    },
   };
 }
 
@@ -235,16 +211,6 @@ async function openMessageHistoryRecords(key, records) {
   return { messages: opened, failed };
 }
 
-function pendingPaymentCheckFromOpenedRecord(record) {
-  const message = assertObject(record.message, 'pending payment check record');
-  return {
-    ...safeClone(message),
-    id: record.id,
-    ledgerId: record.id,
-    createdAt: message.createdAt ?? record.createdAt,
-  };
-}
-
 function requestToPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -271,10 +237,6 @@ async function openHistoryDb(dbName) {
     if (!db.objectStoreNames.contains(MESSAGE_STORE_NAME)) {
       const store = db.createObjectStore(MESSAGE_STORE_NAME, { keyPath: 'id' });
       store.createIndex('threadId', 'threadId');
-      store.createIndex('createdAt', 'createdAt');
-    }
-    if (!db.objectStoreNames.contains(PENDING_PAYMENT_CHECK_STORE_NAME)) {
-      const store = db.createObjectStore(PENDING_PAYMENT_CHECK_STORE_NAME, { keyPath: 'id' });
       store.createIndex('createdAt', 'createdAt');
     }
   };
@@ -346,35 +308,6 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
       await transactionDone(tx);
       return openMessageHistoryRecords(key, records);
     },
-    async putPendingPaymentCheck(input) {
-      const record = await sealMessageHistoryRecord(key, normalizePendingPaymentCheckInput(input));
-      const tx = db.transaction(PENDING_PAYMENT_CHECK_STORE_NAME, 'readwrite');
-      tx.objectStore(PENDING_PAYMENT_CHECK_STORE_NAME).put(record);
-      await transactionDone(tx);
-      return { id: record.id, createdAt: record.createdAt };
-    },
-    async getPendingPaymentCheck(id) {
-      const tx = db.transaction(PENDING_PAYMENT_CHECK_STORE_NAME, 'readonly');
-      const record = await requestToPromise(tx.objectStore(PENDING_PAYMENT_CHECK_STORE_NAME).get(id));
-      await transactionDone(tx);
-      if (!record) return null;
-      return pendingPaymentCheckFromOpenedRecord(await openMessageHistoryRecord(key, record));
-    },
-    async listPendingPaymentChecks() {
-      const tx = db.transaction(PENDING_PAYMENT_CHECK_STORE_NAME, 'readonly');
-      const records = await requestToPromise(tx.objectStore(PENDING_PAYMENT_CHECK_STORE_NAME).getAll());
-      await transactionDone(tx);
-      const opened = await openMessageHistoryRecords(key, records);
-      return {
-        records: opened.messages.map(pendingPaymentCheckFromOpenedRecord),
-        failed: opened.failed,
-      };
-    },
-    async removePendingPaymentCheck(id) {
-      const tx = db.transaction(PENDING_PAYMENT_CHECK_STORE_NAME, 'readwrite');
-      tx.objectStore(PENDING_PAYMENT_CHECK_STORE_NAME).delete(id);
-      await transactionDone(tx);
-    },
     get type() {
       return 'indexeddb';
     },
@@ -390,7 +323,6 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
 export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
   const key = options.key ?? await createHistoryKey();
   const records = new Map();
-  const pendingPaymentChecks = new Map();
   const maxRecords = options.maxRecords ?? DEFAULT_MESSAGE_HISTORY_MAX_RECORDS;
 
   function prune() {
@@ -426,36 +358,6 @@ export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
         records.set(record.id, safeClone(record));
       }
       prune();
-    },
-    async putPendingPaymentCheck(input) {
-      const record = await sealMessageHistoryRecord(key, normalizePendingPaymentCheckInput(input));
-      pendingPaymentChecks.set(record.id, record);
-      return { id: record.id, createdAt: record.createdAt };
-    },
-    async getPendingPaymentCheck(id) {
-      const record = pendingPaymentChecks.get(id);
-      if (!record) return null;
-      return pendingPaymentCheckFromOpenedRecord(await openMessageHistoryRecord(key, record));
-    },
-    async listPendingPaymentChecks() {
-      const opened = await openMessageHistoryRecords(key, [...pendingPaymentChecks.values()]);
-      return {
-        records: opened.messages.map(pendingPaymentCheckFromOpenedRecord),
-        failed: opened.failed,
-      };
-    },
-    async removePendingPaymentCheck(id) {
-      pendingPaymentChecks.delete(id);
-    },
-    dumpEncryptedPendingPaymentCheckRecords() {
-      return safeClone([...pendingPaymentChecks.values()]);
-    },
-    replaceEncryptedPendingPaymentCheckRecords(recordsInput = []) {
-      pendingPaymentChecks.clear();
-      for (const record of recordsInput ?? []) {
-        if (!record?.id) continue;
-        pendingPaymentChecks.set(record.id, safeClone(record));
-      }
     },
     get type() {
       return 'memory';

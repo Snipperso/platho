@@ -372,8 +372,9 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
 }
 
 async function mintValidName(blockchain: Blockchain, registry: any, officialAthWalletAddress: Address, ownerWallet: Address, name: string, payerWallet: Address) {
-  // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M); the mint notification must carry >= that.
-  const value = toNano('0.6');
+  // clean-16 L2/#14: registry now retains ~911M (6M + 800M item deploy + 1M + 4M + 100M name-record, 100-year
+  // endowments); the mint notification must carry >= that.
+  const value = toNano('1.2');
   const res = await registry.send(blockchain.sender(officialAthWalletAddress), { value }, {
     $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 17701n,

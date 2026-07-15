@@ -12,14 +12,15 @@ const USERNAME_PRICE_5_CHARS: Int = 1000000000000;       // 1,000 ATH atomic uni
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;   // 100 ATH atomic units
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT: Int = 6000000;
 const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 4000000;
-// The name_records ownership entry (~2 cells) is created at finalization and NEVER evicted (a username's owner
-// record must persist for the life of the collection). This dedicated endowment stays in the registry's single
-// balance to self-fund that entry's storage rent for ~250+ yr at config-18 (~67k nanoton/cell/yr) + a thick cushion
-// against storage-price growth. Mirrors ProfileRegistry's PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT for the identical
-// never-pruned-record case, and is folded into retainedValue so the FLOOR guarantees it — century survival no longer
-// depends on client-supplied forward_ton generosity.
-const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT: Int = 36000000;
-const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 500000000; // 0.5 TON prepaid storage: ~250+ years at mainnet config-18 (~2M nanoton/yr for the ~30-cell item), with a thick cushion against storage-price growth. The minter funds it once; the NFT lives for centuries.
+// The name_records ownership entry (~2-4 cells) is created at finalization and NEVER evicted (a username's owner
+// record must persist for the life of the collection — owner-decided 2026-07-15: usernames are the eviction
+// EXCEPTION, guaranteed 100+ years, effectively forever when actively used). This dedicated endowment stays in the
+// registry's single balance to self-fund that entry's rent, folded into retainedValue so the FLOOR guarantees it.
+// clean-16 L2/#14/#7-fix: the old 36M was sized at a WRONG rate (~67k nanoton/cell/yr; the CANONICAL basechain rate
+// is 240,631/cell/yr — ×3.6, so 36M was really only ~40 years, NOT "250+"). Raised to a true 100-year figure.
+// G8-provisional: finalize from measured cell.computeDataSize().
+const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT: Int = 100000000; // 0.1 TON: ~385 yr at the REAL basechain rate 64962 nanoton/cell/yr, bit=0 (~4-cell record). See [[ton-storage-rate-frozen]].
+const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 829000000; // clean-16 L2/#14 (owner: mint = EXACTLY 1 TON): sized so client usernameMintTonCharge = 1_000_000_000 exactly. ~412 yr at the REAL rate 64962/cell/yr for the ~31-cell item (the earlier 240,631-rate figures were the STALE pre-2026 config-18 — corrected 2026-07-15). Minter funds once; NFT lives centuries, forever when used. G8-provisional (finalize NFT cell count via computeDataSize). (A masterchain library code-cell would cut per-item rent ~7× — deferred, Фаза-5.)
 const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 48000000; // raised 30M->48M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the official ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M.
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;

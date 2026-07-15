@@ -40,7 +40,8 @@ function bufferedStorage(unbuffered: bigint): bigint {
   return unbuffered * STORAGE_RESERVE_BUFFER_NUMERATOR / STORAGE_RESERVE_BUFFER_DENOMINATOR;
 }
 
-const HEADER0_BYTES = 140;
+// clean-16 ИНК2: the CONV private header0 is 40 bytes (320 bits), was 140 pre-clean-16.
+const HEADER0_BYTES = 40;
 const HEADER1_BYTES = 30;
 const HYBRID_BODY_BYTES = 2228;
 const PUBLIC_HEADER_BYTES = 68;

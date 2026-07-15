@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: CapsuleHub
-BoC Size: 14896 bytes
+BoC Size: 24768 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 29
+Total structures: 38
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -69,6 +69,14 @@ Signature: `SweepExcessReserve{amount:uint128}`
 TL-B: `deposit_protocol_fee#ff775609 amount:uint128 = DepositProtocolFee`
 Signature: `DepositProtocolFee{amount:uint128}`
 
+### EvictExpiredRecoverySlot
+TL-B: `evict_expired_recovery_slot#52454332 slot_key:uint256 = EvictExpiredRecoverySlot`
+Signature: `EvictExpiredRecoverySlot{slot_key:uint256}`
+
+### EvictExpiredCapsules
+TL-B: `evict_expired_capsules#45564343 kind:uint8 max_count:uint16 = EvictExpiredCapsules`
+Signature: `EvictExpiredCapsules{kind:uint8,max_count:uint16}`
+
 ### PublishBatchToHub
 TL-B: `publish_batch_to_hub#a4f862d1 bounce_id:uint64 bounce_tag:uint160 publish_id:uint256 publish_kind:uint8 part_count:uint8 protocol_fee_total:uint128 author_wallet:address parts:^cell marketing:Maybe ^cell = PublishBatchToHub`
 Signature: `PublishBatchToHub{bounce_id:uint64,bounce_tag:uint160,publish_id:uint256,publish_kind:uint8,part_count:uint8,protocol_fee_total:uint128,author_wallet:address,parts:^cell,marketing:Maybe ^cell}`
@@ -78,32 +86,60 @@ TL-B: `capsule_hub_batch_ack#874e5771 publish_id:uint256 first_entry_id:uint64 p
 Signature: `CapsuleHubBatchAck{publish_id:uint256,first_entry_id:uint64,part_count:uint8,batch_uid:uint256}`
 
 ### CapsuleHubStateView
-TL-B: `_ sealed:bool vault_bound:bool deployment_manifest_hash:int257 private_latest_id:int257 public_latest_id:int257 private_page_count:int257 public_page_count:int257 page_size:int257 index_storage_years:int257 index_retention_seconds:int257 accrued_plato_fee_ton:int257 fee_accumulator_address:address vault_address:address genesis_controller_address:address private_live_count:int257 public_live_count:int257 index_storage_reserve_ton:int257 protected_reserve_ton:int257 reserve_floor_ton:int257 reserve_buffer_numerator:int257 reserve_buffer_denominator:int257 = CapsuleHubStateView`
-Signature: `CapsuleHubStateView{sealed:bool,vault_bound:bool,deployment_manifest_hash:int257,private_latest_id:int257,public_latest_id:int257,private_page_count:int257,public_page_count:int257,page_size:int257,index_storage_years:int257,index_retention_seconds:int257,accrued_plato_fee_ton:int257,fee_accumulator_address:address,vault_address:address,genesis_controller_address:address,private_live_count:int257,public_live_count:int257,index_storage_reserve_ton:int257,protected_reserve_ton:int257,reserve_floor_ton:int257,reserve_buffer_numerator:int257,reserve_buffer_denominator:int257}`
+TL-B: `_ sealed:bool vault_bound:bool deployment_manifest_hash:int257 private_latest_id:int257 public_latest_id:int257 private_page_count:int257 public_page_count:int257 page_size:int257 index_storage_years:int257 index_retention_seconds:int257 accrued_plato_fee_ton:int257 fee_accumulator_address:address vault_address:address genesis_controller_address:address private_live_count:int257 public_live_count:int257 intro_latest_id:int257 intro_oldest_live_id:int257 intro_live_count:int257 recovery_live_count:int257 index_storage_reserve_ton:int257 protected_reserve_ton:int257 reserve_floor_ton:int257 reserve_buffer_numerator:int257 reserve_buffer_denominator:int257 = CapsuleHubStateView`
+Signature: `CapsuleHubStateView{sealed:bool,vault_bound:bool,deployment_manifest_hash:int257,private_latest_id:int257,public_latest_id:int257,private_page_count:int257,public_page_count:int257,page_size:int257,index_storage_years:int257,index_retention_seconds:int257,accrued_plato_fee_ton:int257,fee_accumulator_address:address,vault_address:address,genesis_controller_address:address,private_live_count:int257,public_live_count:int257,intro_latest_id:int257,intro_oldest_live_id:int257,intro_live_count:int257,recovery_live_count:int257,index_storage_reserve_ton:int257,protected_reserve_ton:int257,reserve_floor_ton:int257,reserve_buffer_numerator:int257,reserve_buffer_denominator:int257}`
 
 ### CapsuleHubPageView
 TL-B: `_ exists:bool page_id:int257 first_entry_id:int257 next_entry_id:int257 entry_count:int257 opened_at:int257 updated_at:int257 = CapsuleHubPageView`
 Signature: `CapsuleHubPageView{exists:bool,page_id:int257,first_entry_id:int257,next_entry_id:int257,entry_count:int257,opened_at:int257,updated_at:int257}`
 
 ### PrivateCapsuleEntry
-TL-B: `_ publish_id:uint256 created_at:uint64 body_hash:uint256 sender_prev_link:uint64 recipient_prev_link:uint64 header_0:^cell header_1:^cell = PrivateCapsuleEntry`
-Signature: `PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,sender_prev_link:uint64,recipient_prev_link:uint64,header_0:^cell,header_1:^cell}`
+TL-B: `_ publish_id:uint256 created_at:uint64 body_hash:uint256 bucket_prev_link:uint64 header_0:^cell header_1:^cell = PrivateCapsuleEntry`
+Signature: `PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,bucket_prev_link:uint64,header_0:^cell,header_1:^cell}`
 
 ### PublicCapsuleEntry
 TL-B: `_ publish_id:uint256 created_at:uint64 author_wallet:address body_hash:uint256 parent_link:uint64 prev_link:uint64 profile_prev_link:uint64 header:^cell = PublicCapsuleEntry`
 Signature: `PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}`
 
 ### PrivateCapsuleEntryView
-TL-B: `_ exists:bool entry_id:int257 sender_prev_link:int257 recipient_prev_link:int257 entry_uid:int257 publish_id:int257 author_wallet:address page_id:int257 page_offset:int257 created_at:int257 header_0_hash:int257 header_1_hash:int257 body_hash:int257 header_0:^cell header_1:^cell = PrivateCapsuleEntryView`
-Signature: `PrivateCapsuleEntryView{exists:bool,entry_id:int257,sender_prev_link:int257,recipient_prev_link:int257,entry_uid:int257,publish_id:int257,author_wallet:address,page_id:int257,page_offset:int257,created_at:int257,header_0_hash:int257,header_1_hash:int257,body_hash:int257,header_0:^cell,header_1:^cell}`
+TL-B: `_ exists:bool entry_id:int257 bucket_prev_link:int257 entry_uid:int257 publish_id:int257 author_wallet:address page_id:int257 page_offset:int257 created_at:int257 header_0_hash:int257 header_1_hash:int257 body_hash:int257 header_0:^cell header_1:^cell = PrivateCapsuleEntryView`
+Signature: `PrivateCapsuleEntryView{exists:bool,entry_id:int257,bucket_prev_link:int257,entry_uid:int257,publish_id:int257,author_wallet:address,page_id:int257,page_offset:int257,created_at:int257,header_0_hash:int257,header_1_hash:int257,body_hash:int257,header_0:^cell,header_1:^cell}`
 
 ### PrivateCapsuleKeyIndex
 TL-B: `_ latest_entry_link:uint64 entry_count:uint64 = PrivateCapsuleKeyIndex`
 Signature: `PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}`
 
-### PrivateCapsuleKeyIndexView
-TL-B: `_ exists:bool key_id:int257 latest_entry_id:int257 latest_entry_link:int257 entry_count:int257 = PrivateCapsuleKeyIndexView`
-Signature: `PrivateCapsuleKeyIndexView{exists:bool,key_id:int257,latest_entry_id:int257,latest_entry_link:int257,entry_count:int257}`
+### PrivateBucketIndexView
+TL-B: `_ exists:bool bucket_key:int257 latest_entry_id:int257 latest_entry_link:int257 entry_count:int257 = PrivateBucketIndexView`
+Signature: `PrivateBucketIndexView{exists:bool,bucket_key:int257,latest_entry_id:int257,latest_entry_link:int257,entry_count:int257}`
+
+### IntroCapsuleEntry
+TL-B: `_ publish_id:uint256 created_at:uint64 body_hash:uint256 header_0:^cell header_1:^cell = IntroCapsuleEntry`
+Signature: `IntroCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,header_0:^cell,header_1:^cell}`
+
+### IntroCapsuleEntryView
+TL-B: `_ exists:bool entry_id:int257 entry_uid:int257 publish_id:int257 created_at:int257 header_0_hash:int257 header_1_hash:int257 body_hash:int257 header_0:^cell header_1:^cell = IntroCapsuleEntryView`
+Signature: `IntroCapsuleEntryView{exists:bool,entry_id:int257,entry_uid:int257,publish_id:int257,created_at:int257,header_0_hash:int257,header_1_hash:int257,body_hash:int257,header_0:^cell,header_1:^cell}`
+
+### IntroScanRecord
+TL-B: `_ entry_id:int257 created_at:int257 view_tag:int257 ephemeral_r:int257 = IntroScanRecord`
+Signature: `IntroScanRecord{entry_id:int257,created_at:int257,view_tag:int257,ephemeral_r:int257}`
+
+### IntroScanBoundsView
+TL-B: `_ oldest_live_id:int257 latest_id:int257 live_count:int257 = IntroScanBoundsView`
+Signature: `IntroScanBoundsView{oldest_live_id:int257,latest_id:int257,live_count:int257}`
+
+### IntroScanPageView
+TL-B: `_ from_entry_id:int257 count:int257 records:dict<uint16, ^IntroScanRecord{entry_id:int257,created_at:int257,view_tag:int257,ephemeral_r:int257}> = IntroScanPageView`
+Signature: `IntroScanPageView{from_entry_id:int257,count:int257,records:dict<uint16, ^IntroScanRecord{entry_id:int257,created_at:int257,view_tag:int257,ephemeral_r:int257}>}`
+
+### RecoveryCapsuleRecord
+TL-B: `_ publish_id:uint256 updated_at:uint64 body_hash:uint256 author_wallet:address header_0:^cell header_1:^cell body:^cell = RecoveryCapsuleRecord`
+Signature: `RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,author_wallet:address,header_0:^cell,header_1:^cell,body:^cell}`
+
+### RecoveryCapsuleView
+TL-B: `_ exists:bool slot_key:int257 updated_at:int257 body_hash:int257 author_wallet:address header_0:^cell header_1:^cell body:^cell = RecoveryCapsuleView`
+Signature: `RecoveryCapsuleView{exists:bool,slot_key:int257,updated_at:int257,body_hash:int257,author_wallet:address,header_0:^cell,header_1:^cell,body:^cell}`
 
 ### PublicCapsuleEntryView
 TL-B: `_ exists:bool entry_id:int257 entry_uid:int257 publish_id:int257 author_wallet:address page_id:int257 page_offset:int257 created_at:int257 header_hash:int257 body_hash:int257 parent_link:int257 prev_link:int257 profile_prev_link:int257 header:^cell = PublicCapsuleEntryView`
@@ -118,20 +154,30 @@ TL-B: `_ exists:bool key_id:int257 latest_entry_id:int257 latest_entry_link:int2
 Signature: `PublicCapsuleKeyIndexView{exists:bool,key_id:int257,latest_entry_id:int257,latest_entry_link:int257,entry_count:int257}`
 
 ### CapsuleHub$Data
-TL-B: `_ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 private_live_count:uint64 public_live_count:uint64 accrued_plato_fee_ton:uint128 private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,sender_prev_link:uint64,recipient_prev_link:uint64,header_0:^cell,header_1:^cell}> public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}> private_sender_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> private_recipient_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_author_index:dict<uint256, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_parent_index:dict<uint64, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_oldest_live_id:uint64 private_oldest_live_id:uint64 public_profile_index:dict<uint256, uint64> public_profile_head:uint64 = CapsuleHub`
-Signature: `CapsuleHub{fee_accumulator_address:address,vault_address:address,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_controller_address:address,private_latest_id:uint64,public_latest_id:uint64,private_live_count:uint64,public_live_count:uint64,accrued_plato_fee_ton:uint128,private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,sender_prev_link:uint64,recipient_prev_link:uint64,header_0:^cell,header_1:^cell}>,public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}>,private_sender_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,private_recipient_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_author_index:dict<uint256, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_parent_index:dict<uint64, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_oldest_live_id:uint64,private_oldest_live_id:uint64,public_profile_index:dict<uint256, uint64>,public_profile_head:uint64}`
+TL-B: `_ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 private_live_count:uint64 public_live_count:uint64 accrued_plato_fee_ton:uint128 private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,bucket_prev_link:uint64,header_0:^cell,header_1:^cell}> public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}> private_bucket_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_author_index:dict<uint256, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_parent_index:dict<uint64, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_oldest_live_id:uint64 private_oldest_live_id:uint64 public_profile_index:dict<uint256, uint64> public_profile_head:uint64 intro_entries:dict<uint64, ^IntroCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,header_0:^cell,header_1:^cell}> intro_latest_id:uint64 intro_oldest_live_id:uint64 intro_live_count:uint64 recovery_slots:dict<uint256, ^RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,author_wallet:address,header_0:^cell,header_1:^cell,body:^cell}> recovery_live_count:uint64 = CapsuleHub`
+Signature: `CapsuleHub{fee_accumulator_address:address,vault_address:address,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_controller_address:address,private_latest_id:uint64,public_latest_id:uint64,private_live_count:uint64,public_live_count:uint64,accrued_plato_fee_ton:uint128,private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,bucket_prev_link:uint64,header_0:^cell,header_1:^cell}>,public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}>,private_bucket_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_author_index:dict<uint256, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_parent_index:dict<uint64, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_oldest_live_id:uint64,private_oldest_live_id:uint64,public_profile_index:dict<uint256, uint64>,public_profile_head:uint64,intro_entries:dict<uint64, ^IntroCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,header_0:^cell,header_1:^cell}>,intro_latest_id:uint64,intro_oldest_live_id:uint64,intro_live_count:uint64,recovery_slots:dict<uint256, ^RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,author_wallet:address,header_0:^cell,header_1:^cell,body:^cell}>,recovery_live_count:uint64}`
 
 ## Get methods
-Total get methods: 11
+Total get methods: 14
+
+## get_recovery_capsule
+Argument: slotKey
 
 ## get_private_entry
 Argument: entryId
 
-## get_private_sender_index
-Argument: keyId
+## get_private_bucket_index
+Argument: bucketKey
 
-## get_private_recipient_index
-Argument: keyId
+## get_intro_entry
+Argument: entryId
+
+## get_intro_scan_bounds
+No arguments
+
+## get_intro_scan_page
+Argument: fromEntryId
+Argument: count
 
 ## get_public_author_index
 Argument: keyId

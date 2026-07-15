@@ -24,8 +24,8 @@ const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 // receives must clear that floor. The ATHWallet vault-notify path adds ~15M ack/exec/storage overhead on top of
 // notify_value, plus gas; the request value carried into the wallet must comfortably exceed notify_value by that
 // overhead (with margin) so the official wallet stays active after forwarding the notification.
-const USERNAME_MINT_NOTIFY_VALUE = 600_000_000n;
-const USERNAME_MINT_VAULT_REQUEST_VALUE = 660_000_000n;
+const USERNAME_MINT_NOTIFY_VALUE = 1_000_000_000n; // clean-16 L2/#14: covers the 100-year username endowment (~0.91 TON retainedValue)
+const USERNAME_MINT_VAULT_REQUEST_VALUE = 1_100_000_000n; // > notify_value + forward fees
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -49,7 +49,7 @@ async function deployAthWallet(
   owner: Address,
   athMaster: Address,
   athBalance: bigint,
-  tonBalance = toNano('1'),
+  tonBalance = toNano('2'), // clean-16 L2/#14: raised to cover the 100-year username endowment (~0.9 TON reserve)
 ) {
   const zeroInit = await ATHWallet.init(0n, owner, athMaster);
   const dataInit = await ATHWallet.init(athBalance, owner, athMaster);

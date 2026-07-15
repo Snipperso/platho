@@ -2994,6 +2994,59 @@ export function dictValueParserBindBuybackOfficialAthWallet(): DictionaryValue<B
     }
 }
 
+export type BindBuybackTreasury = {
+    $$type: 'BindBuybackTreasury';
+    deployment_manifest_hash: bigint;
+    treasury_address: Address;
+}
+
+export function storeBindBuybackTreasury(src: BindBuybackTreasury) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1113146196, 32);
+        b_0.storeUint(src.deployment_manifest_hash, 256);
+        b_0.storeAddress(src.treasury_address);
+    };
+}
+
+export function loadBindBuybackTreasury(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1113146196) { throw Error('Invalid prefix'); }
+    const _deployment_manifest_hash = sc_0.loadUintBig(256);
+    const _treasury_address = sc_0.loadAddress();
+    return { $$type: 'BindBuybackTreasury' as const, deployment_manifest_hash: _deployment_manifest_hash, treasury_address: _treasury_address };
+}
+
+export function loadTupleBindBuybackTreasury(source: TupleReader) {
+    const _deployment_manifest_hash = source.readBigNumber();
+    const _treasury_address = source.readAddress();
+    return { $$type: 'BindBuybackTreasury' as const, deployment_manifest_hash: _deployment_manifest_hash, treasury_address: _treasury_address };
+}
+
+export function loadGetterTupleBindBuybackTreasury(source: TupleReader) {
+    const _deployment_manifest_hash = source.readBigNumber();
+    const _treasury_address = source.readAddress();
+    return { $$type: 'BindBuybackTreasury' as const, deployment_manifest_hash: _deployment_manifest_hash, treasury_address: _treasury_address };
+}
+
+export function storeTupleBindBuybackTreasury(source: BindBuybackTreasury) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.deployment_manifest_hash);
+    builder.writeAddress(source.treasury_address);
+    return builder.build();
+}
+
+export function dictValueParserBindBuybackTreasury(): DictionaryValue<BindBuybackTreasury> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeBindBuybackTreasury(src)).endCell());
+        },
+        parse: (src) => {
+            return loadBindBuybackTreasury(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type FreezeBuybackRoute = {
     $$type: 'FreezeBuybackRoute';
     deployment_manifest_hash: bigint;
@@ -3407,6 +3460,47 @@ export function dictValueParserRecoverStuckStonfiSwap(): DictionaryValue<Recover
     }
 }
 
+export type SweepStuckReserveToTreasury = {
+    $$type: 'SweepStuckReserveToTreasury';
+}
+
+export function storeSweepStuckReserveToTreasury(src: SweepStuckReserveToTreasury) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1113150295, 32);
+    };
+}
+
+export function loadSweepStuckReserveToTreasury(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1113150295) { throw Error('Invalid prefix'); }
+    return { $$type: 'SweepStuckReserveToTreasury' as const };
+}
+
+export function loadTupleSweepStuckReserveToTreasury(source: TupleReader) {
+    return { $$type: 'SweepStuckReserveToTreasury' as const };
+}
+
+export function loadGetterTupleSweepStuckReserveToTreasury(source: TupleReader) {
+    return { $$type: 'SweepStuckReserveToTreasury' as const };
+}
+
+export function storeTupleSweepStuckReserveToTreasury(source: SweepStuckReserveToTreasury) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserSweepStuckReserveToTreasury(): DictionaryValue<SweepStuckReserveToTreasury> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeSweepStuckReserveToTreasury(src)).endCell());
+        },
+        parse: (src) => {
+            return loadSweepStuckReserveToTreasury(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type TopUpStorageReserve = {
     $$type: 'TopUpStorageReserve';
 }
@@ -3506,7 +3600,9 @@ export type BuybackBurnConfigView = {
     sealed: boolean;
     fee_bound: boolean;
     official_ath_wallet_bound: boolean;
+    treasury_bound: boolean;
     route_frozen: boolean;
+    treasury_address: Address;
     deployment_manifest_hash: bigint;
     genesis_config_hash: bigint;
     ath_master_address: Address;
@@ -3531,27 +3627,29 @@ export function storeBuybackBurnConfigView(src: BuybackBurnConfigView) {
         b_0.storeBit(src.sealed);
         b_0.storeBit(src.fee_bound);
         b_0.storeBit(src.official_ath_wallet_bound);
+        b_0.storeBit(src.treasury_bound);
         b_0.storeBit(src.route_frozen);
+        b_0.storeAddress(src.treasury_address);
         b_0.storeInt(src.deployment_manifest_hash, 257);
         b_0.storeInt(src.genesis_config_hash, 257);
-        b_0.storeAddress(src.ath_master_address);
         const b_1 = new Builder();
+        b_1.storeAddress(src.ath_master_address);
         b_1.storeAddress(src.fee_accumulator_address);
         b_1.storeAddress(src.official_ath_wallet_address);
-        b_1.storeAddress(src.stonfi_router_address);
         const b_2 = new Builder();
+        b_2.storeAddress(src.stonfi_router_address);
         b_2.storeAddress(src.stonfi_pool_address_ton_ath);
         b_2.storeAddress(src.stonfi_ath_source_owner_address);
-        b_2.storeAddress(src.stonfi_pton_wallet_address);
         const b_3 = new Builder();
+        b_3.storeAddress(src.stonfi_pton_wallet_address);
         b_3.storeAddress(src.ask_jetton_wallet_address);
         b_3.storeAddress(src.stonfi_referral_address);
-        b_3.storeInt(src.referral_value_bps, 257);
         const b_4 = new Builder();
+        b_4.storeInt(src.referral_value_bps, 257);
         b_4.storeInt(src.buyback_min_ath_out_per_50_ton_atomic, 257);
         b_4.storeInt(src.evidence_quote_out_atomic_ath, 257);
-        b_4.storeInt(src.evidence_dex_min_out_atomic_ath, 257);
         const b_5 = new Builder();
+        b_5.storeInt(src.evidence_dex_min_out_atomic_ath, 257);
         b_5.storeInt(src.route_evidence_hash, 257);
         b_4.storeRef(b_5.endCell());
         b_3.storeRef(b_4.endCell());
@@ -3566,36 +3664,40 @@ export function loadBuybackBurnConfigView(slice: Slice) {
     const _sealed = sc_0.loadBit();
     const _fee_bound = sc_0.loadBit();
     const _official_ath_wallet_bound = sc_0.loadBit();
+    const _treasury_bound = sc_0.loadBit();
     const _route_frozen = sc_0.loadBit();
+    const _treasury_address = sc_0.loadAddress();
     const _deployment_manifest_hash = sc_0.loadIntBig(257);
     const _genesis_config_hash = sc_0.loadIntBig(257);
-    const _ath_master_address = sc_0.loadAddress();
     const sc_1 = sc_0.loadRef().beginParse();
+    const _ath_master_address = sc_1.loadAddress();
     const _fee_accumulator_address = sc_1.loadAddress();
     const _official_ath_wallet_address = sc_1.loadAddress();
-    const _stonfi_router_address = sc_1.loadAddress();
     const sc_2 = sc_1.loadRef().beginParse();
+    const _stonfi_router_address = sc_2.loadAddress();
     const _stonfi_pool_address_ton_ath = sc_2.loadAddress();
     const _stonfi_ath_source_owner_address = sc_2.loadAddress();
-    const _stonfi_pton_wallet_address = sc_2.loadAddress();
     const sc_3 = sc_2.loadRef().beginParse();
+    const _stonfi_pton_wallet_address = sc_3.loadAddress();
     const _ask_jetton_wallet_address = sc_3.loadAddress();
     const _stonfi_referral_address = sc_3.loadAddress();
-    const _referral_value_bps = sc_3.loadIntBig(257);
     const sc_4 = sc_3.loadRef().beginParse();
+    const _referral_value_bps = sc_4.loadIntBig(257);
     const _buyback_min_ath_out_per_50_ton_atomic = sc_4.loadIntBig(257);
     const _evidence_quote_out_atomic_ath = sc_4.loadIntBig(257);
-    const _evidence_dex_min_out_atomic_ath = sc_4.loadIntBig(257);
     const sc_5 = sc_4.loadRef().beginParse();
+    const _evidence_dex_min_out_atomic_ath = sc_5.loadIntBig(257);
     const _route_evidence_hash = sc_5.loadIntBig(257);
-    return { $$type: 'BuybackBurnConfigView' as const, sealed: _sealed, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash };
+    return { $$type: 'BuybackBurnConfigView' as const, sealed: _sealed, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, route_frozen: _route_frozen, treasury_address: _treasury_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash };
 }
 
 export function loadTupleBuybackBurnConfigView(source: TupleReader) {
     const _sealed = source.readBoolean();
     const _fee_bound = source.readBoolean();
     const _official_ath_wallet_bound = source.readBoolean();
+    const _treasury_bound = source.readBoolean();
     const _route_frozen = source.readBoolean();
+    const _treasury_address = source.readAddress();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
     const _ath_master_address = source.readAddress();
@@ -3604,23 +3706,25 @@ export function loadTupleBuybackBurnConfigView(source: TupleReader) {
     const _stonfi_router_address = source.readAddress();
     const _stonfi_pool_address_ton_ath = source.readAddress();
     const _stonfi_ath_source_owner_address = source.readAddress();
+    source = source.readTuple();
     const _stonfi_pton_wallet_address = source.readAddress();
     const _ask_jetton_wallet_address = source.readAddress();
-    source = source.readTuple();
     const _stonfi_referral_address = source.readAddress();
     const _referral_value_bps = source.readBigNumber();
     const _buyback_min_ath_out_per_50_ton_atomic = source.readBigNumber();
     const _evidence_quote_out_atomic_ath = source.readBigNumber();
     const _evidence_dex_min_out_atomic_ath = source.readBigNumber();
     const _route_evidence_hash = source.readBigNumber();
-    return { $$type: 'BuybackBurnConfigView' as const, sealed: _sealed, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash };
+    return { $$type: 'BuybackBurnConfigView' as const, sealed: _sealed, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, route_frozen: _route_frozen, treasury_address: _treasury_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash };
 }
 
 export function loadGetterTupleBuybackBurnConfigView(source: TupleReader) {
     const _sealed = source.readBoolean();
     const _fee_bound = source.readBoolean();
     const _official_ath_wallet_bound = source.readBoolean();
+    const _treasury_bound = source.readBoolean();
     const _route_frozen = source.readBoolean();
+    const _treasury_address = source.readAddress();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
     const _ath_master_address = source.readAddress();
@@ -3637,7 +3741,7 @@ export function loadGetterTupleBuybackBurnConfigView(source: TupleReader) {
     const _evidence_quote_out_atomic_ath = source.readBigNumber();
     const _evidence_dex_min_out_atomic_ath = source.readBigNumber();
     const _route_evidence_hash = source.readBigNumber();
-    return { $$type: 'BuybackBurnConfigView' as const, sealed: _sealed, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash };
+    return { $$type: 'BuybackBurnConfigView' as const, sealed: _sealed, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, route_frozen: _route_frozen, treasury_address: _treasury_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash };
 }
 
 export function storeTupleBuybackBurnConfigView(source: BuybackBurnConfigView) {
@@ -3645,7 +3749,9 @@ export function storeTupleBuybackBurnConfigView(source: BuybackBurnConfigView) {
     builder.writeBoolean(source.sealed);
     builder.writeBoolean(source.fee_bound);
     builder.writeBoolean(source.official_ath_wallet_bound);
+    builder.writeBoolean(source.treasury_bound);
     builder.writeBoolean(source.route_frozen);
+    builder.writeAddress(source.treasury_address);
     builder.writeNumber(source.deployment_manifest_hash);
     builder.writeNumber(source.genesis_config_hash);
     builder.writeAddress(source.ath_master_address);
@@ -3688,6 +3794,7 @@ export type BuybackBurnStateView = {
     route_refund_due_ton: bigint;
     ath_burn_retry_due_atomic: bigint;
     last_terminal_query_id: bigint;
+    last_burn_at: bigint;
 }
 
 export function storeBuybackBurnStateView(src: BuybackBurnStateView) {
@@ -3706,6 +3813,7 @@ export function storeBuybackBurnStateView(src: BuybackBurnStateView) {
         b_2.storeInt(src.ath_burn_retry_due_atomic, 257);
         const b_3 = new Builder();
         b_3.storeInt(src.last_terminal_query_id, 257);
+        b_3.storeInt(src.last_burn_at, 257);
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
@@ -3727,7 +3835,8 @@ export function loadBuybackBurnStateView(slice: Slice) {
     const _ath_burn_retry_due_atomic = sc_2.loadIntBig(257);
     const sc_3 = sc_2.loadRef().beginParse();
     const _last_terminal_query_id = sc_3.loadIntBig(257);
-    return { $$type: 'BuybackBurnStateView' as const, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id };
+    const _last_burn_at = sc_3.loadIntBig(257);
+    return { $$type: 'BuybackBurnStateView' as const, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, last_burn_at: _last_burn_at };
 }
 
 export function loadTupleBuybackBurnStateView(source: TupleReader) {
@@ -3741,7 +3850,8 @@ export function loadTupleBuybackBurnStateView(source: TupleReader) {
     const _route_refund_due_ton = source.readBigNumber();
     const _ath_burn_retry_due_atomic = source.readBigNumber();
     const _last_terminal_query_id = source.readBigNumber();
-    return { $$type: 'BuybackBurnStateView' as const, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id };
+    const _last_burn_at = source.readBigNumber();
+    return { $$type: 'BuybackBurnStateView' as const, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, last_burn_at: _last_burn_at };
 }
 
 export function loadGetterTupleBuybackBurnStateView(source: TupleReader) {
@@ -3755,7 +3865,8 @@ export function loadGetterTupleBuybackBurnStateView(source: TupleReader) {
     const _route_refund_due_ton = source.readBigNumber();
     const _ath_burn_retry_due_atomic = source.readBigNumber();
     const _last_terminal_query_id = source.readBigNumber();
-    return { $$type: 'BuybackBurnStateView' as const, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id };
+    const _last_burn_at = source.readBigNumber();
+    return { $$type: 'BuybackBurnStateView' as const, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, last_burn_at: _last_burn_at };
 }
 
 export function storeTupleBuybackBurnStateView(source: BuybackBurnStateView) {
@@ -3770,6 +3881,7 @@ export function storeTupleBuybackBurnStateView(source: BuybackBurnStateView) {
     builder.writeNumber(source.route_refund_due_ton);
     builder.writeNumber(source.ath_burn_retry_due_atomic);
     builder.writeNumber(source.last_terminal_query_id);
+    builder.writeNumber(source.last_burn_at);
     return builder.build();
 }
 
@@ -3858,6 +3970,9 @@ export type BuybackBurn$Data = {
     official_ath_wallet_bound: boolean;
     route_frozen: boolean;
     sealed: boolean;
+    treasury_address: Address;
+    treasury_bound: boolean;
+    last_burn_at: bigint;
     referral_value_bps: bigint;
     buyback_min_ath_out_per_50_ton_atomic: bigint;
     evidence_quote_out_atomic_ath: bigint;
@@ -3899,20 +4014,23 @@ export function storeBuybackBurn$Data(src: BuybackBurn$Data) {
         b_3.storeBit(src.official_ath_wallet_bound);
         b_3.storeBit(src.route_frozen);
         b_3.storeBit(src.sealed);
+        b_3.storeAddress(src.treasury_address);
+        b_3.storeBit(src.treasury_bound);
+        b_3.storeUint(src.last_burn_at, 64);
         b_3.storeUint(src.referral_value_bps, 16);
         b_3.storeUint(src.buyback_min_ath_out_per_50_ton_atomic, 128);
-        b_3.storeUint(src.evidence_quote_out_atomic_ath, 128);
-        b_3.storeUint(src.evidence_dex_min_out_atomic_ath, 128);
         const b_4 = new Builder();
+        b_4.storeUint(src.evidence_quote_out_atomic_ath, 128);
+        b_4.storeUint(src.evidence_dex_min_out_atomic_ath, 128);
         b_4.storeUint(src.route_evidence_hash, 256);
         b_4.storeUint(src.phase, 8);
         b_4.storeUint(src.reserve_due_ton, 128);
         b_4.storeUint(src.pending_query_id, 64);
         b_4.storeUint(src.pending_deadline, 64);
         b_4.storeUint(src.pending_route_refund_start_ton, 128);
-        b_4.storeUint(src.pending_dex_min_out_atomic_ath, 128);
-        b_4.storeUint(src.pending_received_ath_atomic, 128);
         const b_5 = new Builder();
+        b_5.storeUint(src.pending_dex_min_out_atomic_ath, 128);
+        b_5.storeUint(src.pending_received_ath_atomic, 128);
         b_5.storeUint(src.route_refund_due_ton, 128);
         b_5.storeUint(src.ath_burn_retry_due_atomic, 128);
         b_5.storeUint(src.last_terminal_query_id, 64);
@@ -3947,27 +4065,30 @@ export function loadBuybackBurn$Data(slice: Slice) {
     const _official_ath_wallet_bound = sc_3.loadBit();
     const _route_frozen = sc_3.loadBit();
     const _sealed = sc_3.loadBit();
+    const _treasury_address = sc_3.loadAddress();
+    const _treasury_bound = sc_3.loadBit();
+    const _last_burn_at = sc_3.loadUintBig(64);
     const _referral_value_bps = sc_3.loadUintBig(16);
     const _buyback_min_ath_out_per_50_ton_atomic = sc_3.loadUintBig(128);
-    const _evidence_quote_out_atomic_ath = sc_3.loadUintBig(128);
-    const _evidence_dex_min_out_atomic_ath = sc_3.loadUintBig(128);
     const sc_4 = sc_3.loadRef().beginParse();
+    const _evidence_quote_out_atomic_ath = sc_4.loadUintBig(128);
+    const _evidence_dex_min_out_atomic_ath = sc_4.loadUintBig(128);
     const _route_evidence_hash = sc_4.loadUintBig(256);
     const _phase = sc_4.loadUintBig(8);
     const _reserve_due_ton = sc_4.loadUintBig(128);
     const _pending_query_id = sc_4.loadUintBig(64);
     const _pending_deadline = sc_4.loadUintBig(64);
     const _pending_route_refund_start_ton = sc_4.loadUintBig(128);
-    const _pending_dex_min_out_atomic_ath = sc_4.loadUintBig(128);
-    const _pending_received_ath_atomic = sc_4.loadUintBig(128);
     const sc_5 = sc_4.loadRef().beginParse();
+    const _pending_dex_min_out_atomic_ath = sc_5.loadUintBig(128);
+    const _pending_received_ath_atomic = sc_5.loadUintBig(128);
     const _route_refund_due_ton = sc_5.loadUintBig(128);
     const _ath_burn_retry_due_atomic = sc_5.loadUintBig(128);
     const _last_terminal_query_id = sc_5.loadUintBig(64);
     const _accepted_reserve_count = sc_5.loadUintBig(64);
     const _executed_buyback_count = sc_5.loadUintBig(64);
     const _burned_ath_total_atomic = sc_5.loadUintBig(128);
-    return { $$type: 'BuybackBurn$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, sealed: _sealed, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, accepted_reserve_count: _accepted_reserve_count, executed_buyback_count: _executed_buyback_count, burned_ath_total_atomic: _burned_ath_total_atomic };
+    return { $$type: 'BuybackBurn$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, sealed: _sealed, treasury_address: _treasury_address, treasury_bound: _treasury_bound, last_burn_at: _last_burn_at, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, accepted_reserve_count: _accepted_reserve_count, executed_buyback_count: _executed_buyback_count, burned_ath_total_atomic: _burned_ath_total_atomic };
 }
 
 export function loadTupleBuybackBurn$Data(source: TupleReader) {
@@ -3987,6 +4108,9 @@ export function loadTupleBuybackBurn$Data(source: TupleReader) {
     const _route_frozen = source.readBoolean();
     source = source.readTuple();
     const _sealed = source.readBoolean();
+    const _treasury_address = source.readAddress();
+    const _treasury_bound = source.readBoolean();
+    const _last_burn_at = source.readBigNumber();
     const _referral_value_bps = source.readBigNumber();
     const _buyback_min_ath_out_per_50_ton_atomic = source.readBigNumber();
     const _evidence_quote_out_atomic_ath = source.readBigNumber();
@@ -3997,16 +4121,16 @@ export function loadTupleBuybackBurn$Data(source: TupleReader) {
     const _pending_query_id = source.readBigNumber();
     const _pending_deadline = source.readBigNumber();
     const _pending_route_refund_start_ton = source.readBigNumber();
+    source = source.readTuple();
     const _pending_dex_min_out_atomic_ath = source.readBigNumber();
     const _pending_received_ath_atomic = source.readBigNumber();
     const _route_refund_due_ton = source.readBigNumber();
-    source = source.readTuple();
     const _ath_burn_retry_due_atomic = source.readBigNumber();
     const _last_terminal_query_id = source.readBigNumber();
     const _accepted_reserve_count = source.readBigNumber();
     const _executed_buyback_count = source.readBigNumber();
     const _burned_ath_total_atomic = source.readBigNumber();
-    return { $$type: 'BuybackBurn$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, sealed: _sealed, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, accepted_reserve_count: _accepted_reserve_count, executed_buyback_count: _executed_buyback_count, burned_ath_total_atomic: _burned_ath_total_atomic };
+    return { $$type: 'BuybackBurn$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, sealed: _sealed, treasury_address: _treasury_address, treasury_bound: _treasury_bound, last_burn_at: _last_burn_at, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, accepted_reserve_count: _accepted_reserve_count, executed_buyback_count: _executed_buyback_count, burned_ath_total_atomic: _burned_ath_total_atomic };
 }
 
 export function loadGetterTupleBuybackBurn$Data(source: TupleReader) {
@@ -4025,6 +4149,9 @@ export function loadGetterTupleBuybackBurn$Data(source: TupleReader) {
     const _official_ath_wallet_bound = source.readBoolean();
     const _route_frozen = source.readBoolean();
     const _sealed = source.readBoolean();
+    const _treasury_address = source.readAddress();
+    const _treasury_bound = source.readBoolean();
+    const _last_burn_at = source.readBigNumber();
     const _referral_value_bps = source.readBigNumber();
     const _buyback_min_ath_out_per_50_ton_atomic = source.readBigNumber();
     const _evidence_quote_out_atomic_ath = source.readBigNumber();
@@ -4043,7 +4170,7 @@ export function loadGetterTupleBuybackBurn$Data(source: TupleReader) {
     const _accepted_reserve_count = source.readBigNumber();
     const _executed_buyback_count = source.readBigNumber();
     const _burned_ath_total_atomic = source.readBigNumber();
-    return { $$type: 'BuybackBurn$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, sealed: _sealed, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, accepted_reserve_count: _accepted_reserve_count, executed_buyback_count: _executed_buyback_count, burned_ath_total_atomic: _burned_ath_total_atomic };
+    return { $$type: 'BuybackBurn$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, fee_accumulator_address: _fee_accumulator_address, official_ath_wallet_address: _official_ath_wallet_address, stonfi_router_address: _stonfi_router_address, stonfi_pool_address_ton_ath: _stonfi_pool_address_ton_ath, stonfi_ath_source_owner_address: _stonfi_ath_source_owner_address, stonfi_pton_wallet_address: _stonfi_pton_wallet_address, ask_jetton_wallet_address: _ask_jetton_wallet_address, stonfi_referral_address: _stonfi_referral_address, fee_bound: _fee_bound, official_ath_wallet_bound: _official_ath_wallet_bound, route_frozen: _route_frozen, sealed: _sealed, treasury_address: _treasury_address, treasury_bound: _treasury_bound, last_burn_at: _last_burn_at, referral_value_bps: _referral_value_bps, buyback_min_ath_out_per_50_ton_atomic: _buyback_min_ath_out_per_50_ton_atomic, evidence_quote_out_atomic_ath: _evidence_quote_out_atomic_ath, evidence_dex_min_out_atomic_ath: _evidence_dex_min_out_atomic_ath, route_evidence_hash: _route_evidence_hash, phase: _phase, reserve_due_ton: _reserve_due_ton, pending_query_id: _pending_query_id, pending_deadline: _pending_deadline, pending_route_refund_start_ton: _pending_route_refund_start_ton, pending_dex_min_out_atomic_ath: _pending_dex_min_out_atomic_ath, pending_received_ath_atomic: _pending_received_ath_atomic, route_refund_due_ton: _route_refund_due_ton, ath_burn_retry_due_atomic: _ath_burn_retry_due_atomic, last_terminal_query_id: _last_terminal_query_id, accepted_reserve_count: _accepted_reserve_count, executed_buyback_count: _executed_buyback_count, burned_ath_total_atomic: _burned_ath_total_atomic };
 }
 
 export function storeTupleBuybackBurn$Data(source: BuybackBurn$Data) {
@@ -4063,6 +4190,9 @@ export function storeTupleBuybackBurn$Data(source: BuybackBurn$Data) {
     builder.writeBoolean(source.official_ath_wallet_bound);
     builder.writeBoolean(source.route_frozen);
     builder.writeBoolean(source.sealed);
+    builder.writeAddress(source.treasury_address);
+    builder.writeBoolean(source.treasury_bound);
+    builder.writeNumber(source.last_burn_at);
     builder.writeNumber(source.referral_value_bps);
     builder.writeNumber(source.buyback_min_ath_out_per_50_ton_atomic);
     builder.writeNumber(source.evidence_quote_out_atomic_ath);
@@ -4244,6 +4374,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"AcceptBurnReserve","header":1498129669,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"BindBuybackFeeAccumulator","header":1113146945,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"fee_accumulator_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"BindBuybackOfficialAthWallet","header":1113145687,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"BindBuybackTreasury","header":1113146196,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"treasury_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"FreezeBuybackRoute","header":1113150022,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"stonfi_router_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pool_address_ton_ath","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_ath_source_owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ask_jetton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_referral_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"referral_value_bps","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"buyback_min_ath_out_per_50_ton_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_quote_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"route_evidence_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"SealBuybackBurnGenesis","header":1113150284,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"ExecuteBuybackChunk","header":1113146712,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"quote_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
@@ -4251,12 +4382,13 @@ const ATHWallet_types: ABIType[] = [
     {"name":"RecoverStonfiRouteRefund","header":1113150019,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"RecycleRouteRefundReserve","header":1113150034,"fields":[]},
     {"name":"RecoverStuckStonfiSwap","header":1113150291,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"SweepStuckReserveToTreasury","header":1113150295,"fields":[]},
     {"name":"TopUpStorageReserve","header":2422309586,"fields":[]},
     {"name":"StonfiPtonTonTransferBounce","header":32736093,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
-    {"name":"BuybackBurnConfigView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"fee_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"route_frozen","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"fee_accumulator_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_router_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pool_address_ton_ath","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_ath_source_owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ask_jetton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_referral_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"referral_value_bps","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_min_ath_out_per_50_ton_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evidence_quote_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evidence_dex_min_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"route_evidence_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"BuybackBurnStateView","header":null,"fields":[{"name":"phase","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"reserve_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_deadline","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_route_refund_start_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_dex_min_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_received_ath_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"route_refund_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_burn_retry_due_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_terminal_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"BuybackBurnConfigView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"fee_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"route_frozen","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"fee_accumulator_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_router_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pool_address_ton_ath","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_ath_source_owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ask_jetton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_referral_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"referral_value_bps","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_min_ath_out_per_50_ton_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evidence_quote_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evidence_dex_min_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"route_evidence_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"BuybackBurnStateView","header":null,"fields":[{"name":"phase","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"reserve_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_deadline","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_route_refund_start_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_dex_min_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_received_ath_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"route_refund_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_burn_retry_due_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_terminal_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_burn_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"BuybackBurnTotalsView","header":null,"fields":[{"name":"accepted_reserve_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"executed_buyback_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burned_ath_total_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"BuybackBurn$Data","header":null,"fields":[{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"fee_accumulator_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_router_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pool_address_ton_ath","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_ath_source_owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ask_jetton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_referral_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"fee_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"route_frozen","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"referral_value_bps","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"buyback_min_ath_out_per_50_ton_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_quote_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"route_evidence_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"phase","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"reserve_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_deadline","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_route_refund_start_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_received_ath_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"route_refund_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_burn_retry_due_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"last_terminal_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"accepted_reserve_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"executed_buyback_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"burned_ath_total_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"BuybackBurn$Data","header":null,"fields":[{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"fee_accumulator_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_router_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pool_address_ton_ath","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_ath_source_owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ask_jetton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_referral_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"fee_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"route_frozen","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"last_burn_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"referral_value_bps","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"buyback_min_ath_out_per_50_ton_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_quote_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"route_evidence_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"phase","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"reserve_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_deadline","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_route_refund_start_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_received_ath_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"route_refund_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_burn_retry_due_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"last_terminal_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"accepted_reserve_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"executed_buyback_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"burned_ath_total_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
 ]
 
 const ATHWallet_opcodes = {
@@ -4290,6 +4422,7 @@ const ATHWallet_opcodes = {
     "AcceptBurnReserve": 1498129669,
     "BindBuybackFeeAccumulator": 1113146945,
     "BindBuybackOfficialAthWallet": 1113145687,
+    "BindBuybackTreasury": 1113146196,
     "FreezeBuybackRoute": 1113150022,
     "SealBuybackBurnGenesis": 1113150284,
     "ExecuteBuybackChunk": 1113146712,
@@ -4297,6 +4430,7 @@ const ATHWallet_opcodes = {
     "RecoverStonfiRouteRefund": 1113150019,
     "RecycleRouteRefundReserve": 1113150034,
     "RecoverStuckStonfiSwap": 1113150291,
+    "SweepStuckReserveToTreasury": 1113150295,
     "TopUpStorageReserve": 2422309586,
     "StonfiPtonTonTransferBounce": 32736093,
 }
@@ -4379,6 +4513,8 @@ export const UINT64_MAX = 18446744073709551615n;
 export const STONFI_V2_1_DEX_OP_SWAP = 1717886506n;
 export const STONFI_V2_1_PTON_OP_TON_TRANSFER = 32736093n;
 export const BUYBACK_ROUTE_NOTIFY_PAYLOAD_DOMAIN = 1113148998n;
+export const BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS = 31536000n;
+export const BUYBACK_SWEEP_STORAGE_FLOOR_NANOTONS = 100000000n;
 
 export class ATHWallet implements Contract {
     

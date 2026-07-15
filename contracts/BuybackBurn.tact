@@ -34,6 +34,13 @@ const UINT64_MAX: Int = 18446744073709551615;
 const STONFI_V2_1_DEX_OP_SWAP: Int = 0x6664de2a;
 const STONFI_V2_1_PTON_OP_TON_TRANSFER: Int = 0x01f3835d;
 const BUYBACK_ROUTE_NOTIFY_PAYLOAD_DOMAIN: Int = 0x42594E46; // "BYNF"
+// clean-16 L6/#15 (sweep-only, owner decision 2026-07-15): the STON.fi route is INTENTIONALLY NOT rebindable —
+// a rebindable route cannot be made zero-theft (whoever re-points the 50-TON envelope or lowers the slippage floor
+// captures it), so buyback DEATH on a DEX migration is the accepted non-fatal outcome. What we add instead is a
+// PERMISSIONLESS dead-man that returns the STRANDED reserve to an IMMUTABLE, genesis-bound treasury when no
+// successful burn has landed for a long grace (the route is then presumed dead). Zero new trust, fixed destination.
+const BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS: Int = 31536000;      // ~365d with no successful burn => route presumed dead
+const BUYBACK_SWEEP_STORAGE_FLOOR_NANOTONS: Int = 100000000;    // 0.1 TON kept for storage across a dead-man sweep
 
 message(0x594BA505) AcceptBurnReserve {
     amount: Int as uint128;
@@ -47,6 +54,13 @@ message(0x42594641) BindBuybackFeeAccumulator { // "BYFA"
 message(0x42594157) BindBuybackOfficialAthWallet { // "BYAW"
     deployment_manifest_hash: Int as uint256;
     official_ath_wallet_address: Address;
+}
+
+// clean-16 L6/#15: bind the IMMUTABLE dead-man sweep destination (a genesis-chosen protocol treasury). One-shot,
+// pre-seal, genesis-controller-gated — after seal it can never change, so the dead-man can never be redirected.
+message(0x42594354) BindBuybackTreasury { // "BYCT"
+    deployment_manifest_hash: Int as uint256;
+    treasury_address: Address;
 }
 
 message(0x42595246) FreezeBuybackRoute { // "BYRF"
@@ -89,6 +103,11 @@ message(0x42595353) RecoverStuckStonfiSwap { // "BYSS" — F11 time-only dead-ma
     query_id: Int as uint64;
 }
 
+// clean-16 L6/#15: permissionless dead-man that returns the STRANDED reserve to the immutable treasury once the
+// route is presumed dead (no successful burn for BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS). No params: the destination is
+// the genesis-bound treasury, never caller-chosen — so this can recover funds but can never steal or redirect them.
+message(0x42595357) SweepStuckReserveToTreasury {} // "BYSW"
+
 message(0x906182D2) TopUpStorageReserve {}
 
 // Prefix-compatible with STON.fi pTON v2.1 TON transfer body for bounce recovery.
@@ -101,7 +120,9 @@ struct BuybackBurnConfigView {
     sealed: Bool;
     fee_bound: Bool;
     official_ath_wallet_bound: Bool;
+    treasury_bound: Bool;
     route_frozen: Bool;
+    treasury_address: Address;
     deployment_manifest_hash: Int;
     genesis_config_hash: Int;
     ath_master_address: Address;
@@ -131,6 +152,7 @@ struct BuybackBurnStateView {
     route_refund_due_ton: Int;
     ath_burn_retry_due_atomic: Int;
     last_terminal_query_id: Int;
+    last_burn_at: Int;
 }
 
 struct BuybackBurnTotalsView {
@@ -155,6 +177,10 @@ contract BuybackBurn {
     official_ath_wallet_bound: Bool;
     route_frozen: Bool;
     sealed: Bool;
+    // clean-16 L6/#15 (sweep-only): immutable dead-man sweep sink + liveness clock.
+    treasury_address: Address;
+    treasury_bound: Bool;
+    last_burn_at: Int as uint64; // set at seal + on every successful ATH burn; drives the dead-man grace
     referral_value_bps: Int as uint16;
     buyback_min_ath_out_per_50_ton_atomic: Int as uint128;
     evidence_quote_out_atomic_ath: Int as uint128;
@@ -191,6 +217,9 @@ contract BuybackBurn {
         self.official_ath_wallet_bound = false;
         self.route_frozen = false;
         self.sealed = false;
+        self.treasury_address = ath_master_address; // placeholder until BindBuybackTreasury; seal requires the real bind
+        self.treasury_bound = false;
+        self.last_burn_at = 0;
         self.referral_value_bps = 0;
         self.buyback_min_ath_out_per_50_ton_atomic = 0;
         self.evidence_quote_out_atomic_ath = 0;
@@ -372,6 +401,17 @@ contract BuybackBurn {
         self.official_ath_wallet_bound = true;
     }
 
+    receive(msg: BindBuybackTreasury) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        self.acceptManifestHash(msg.deployment_manifest_hash);
+        throwUnless(22505, !self.treasury_bound);
+        throwUnless(22506, self.isBasechainAddress(msg.treasury_address));
+        throwUnless(22507, msg.treasury_address != myAddress());
+        self.treasury_address = msg.treasury_address;
+        self.treasury_bound = true;
+    }
+
     receive(msg: FreezeBuybackRoute) {
         self.requireGenesisController();
         self.acceptManifestHash(msg.deployment_manifest_hash);
@@ -417,10 +457,12 @@ contract BuybackBurn {
         self.acceptManifestHash(msg.deployment_manifest_hash);
         throwUnless(22130, self.fee_bound);
         throwUnless(22131, self.official_ath_wallet_bound);
+        throwUnless(22509, self.treasury_bound); // L6/#15: the dead-man sweep sink must be locked before seal
         if (self.route_frozen) {
             self.genesis_config_hash = 0;
         }
         self.sealed = true;
+        self.last_burn_at = now(); // start the dead-man grace clock at seal (no burns yet)
     }
 
     receive(msg: AcceptBurnReserve) {
@@ -503,6 +545,7 @@ contract BuybackBurn {
 
         self.burned_ath_total_atomic += msg.amount;
         self.executed_buyback_count += 1;
+        self.last_burn_at = now(); // L6/#15: a successful burn proves the route is alive -> resets the dead-man grace
         self.finishPendingCycle();
     }
 
@@ -573,6 +616,31 @@ contract BuybackBurn {
         self.reserve_due_ton += BUYBACK_FUNDING_ENVELOPE_NANOTONS;
     }
 
+    // clean-16 L6/#15: permissionless dead-man. When no successful burn has landed for BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS
+    // the STON.fi route is presumed dead (a live route burns; every burn resets last_burn_at). Anyone may then return the
+    // stranded reserve to the IMMUTABLE genesis-bound treasury — the destination is not caller-chosen, so this recovers
+    // funds but can never steal or redirect them. phase==IDLE guarantees no in-flight swap/burn references live state.
+    // Terminal: the stranded accounting is zeroed; a late bounce/refund re-credits route_refund_due_ton and is re-sweepable
+    // (a fresh grace is NOT required once the route is already past the dead-man threshold).
+    receive(msg: SweepStuckReserveToTreasury) {
+        self.requireSealed();
+        throwUnless(22541, self.treasury_bound);
+        throwUnless(22540, self.phase == BUYBACK_PHASE_IDLE);
+        throwUnless(22542, now() > self.last_burn_at + BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS);
+        let bal: Int = myBalance();
+        throwUnless(22545, bal > BUYBACK_SWEEP_STORAGE_FLOOR_NANOTONS);
+        let payable: Int = bal - BUYBACK_SWEEP_STORAGE_FLOOR_NANOTONS;
+        self.reserve_due_ton = 0;
+        self.route_refund_due_ton = 0;
+        message(MessageParameters {
+            to: self.treasury_address,
+            value: payable,
+            bounce: true,
+            mode: SendPayFwdFeesSeparately,
+            body: "buyback-deadman-sweep".asComment()
+        });
+    }
+
     bounced(msg: bounced<StonfiPtonTonTransferBounce>) {
         self.requireSealed();
         throwUnless(22400, sender() == self.stonfi_pton_wallet_address);
@@ -612,7 +680,9 @@ contract BuybackBurn {
             sealed: self.sealed,
             fee_bound: self.fee_bound,
             official_ath_wallet_bound: self.official_ath_wallet_bound,
+            treasury_bound: self.treasury_bound,
             route_frozen: self.route_frozen,
+            treasury_address: self.treasury_address,
             deployment_manifest_hash: self.deployment_manifest_hash,
             genesis_config_hash: self.genesis_config_hash,
             ath_master_address: self.ath_master_address,
@@ -643,7 +713,8 @@ contract BuybackBurn {
             pending_received_ath_atomic: self.pending_received_ath_atomic,
             route_refund_due_ton: self.route_refund_due_ton,
             ath_burn_retry_due_atomic: self.ath_burn_retry_due_atomic,
-            last_terminal_query_id: self.last_terminal_query_id
+            last_terminal_query_id: self.last_terminal_query_id,
+            last_burn_at: self.last_burn_at
         };
     }
 

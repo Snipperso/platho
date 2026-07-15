@@ -228,13 +228,12 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     expect((await vault.getGetGlobal()).key_record_count).toBe(0n);
   });
 
-  it('VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1', async () => {
+  it('VAULT-HAPPY-07: key replacement DELETES the previous key record (bounded O(1)/user) and creates generation 1', async () => {
     const { blockchain, vault, user } = await setup();
 
     await registerHybrid(vault, user);
     await depositTon(vault, user);
     const oldKeyId = (await vault.getGetUser(user.address)).current_key_id;
-    const oldRecordBefore = await vault.getGetKeyRecord(oldKeyId);
 
     await replaceHybrid(blockchain, vault, user);
 
@@ -246,11 +245,9 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     const oldRecord = await vault.getGetKeyRecord(oldKeyId);
     const newRecord = await vault.getGetKeyRecord(newKeyId);
 
-    expect(oldRecord.exists).toBe(true);
-    expect(oldRecord.key_generation).toBe(0n);
-    expect(oldRecord.revoked_lt).toBeGreaterThan(0n);
-    expect(oldRecord.revoked_at).toBeGreaterThan(0n);
-    expect(oldRecord.created_lt).toBe(oldRecordBefore.created_lt);
+    // clean-16 L2/#3: rotation DELETES the old record (was: kept revoked forever = unbounded 1.2KB-ML-KEM growth
+    // bomb). Recipient decrypts with the seed-derived secret; senders re-resolve current via get_user.
+    expect(oldRecord.exists).toBe(false);
 
     expect(newRecord.exists).toBe(true);
     expect(newRecord.key_generation).toBe(1n);
@@ -263,7 +260,8 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     expect(newRecord.revoked_lt).toBe(0n);
     expect(userState.ton_balance).toBe(toNano('0.1') - 32_000_000n);
     expect(userState.publish_nonce).toBe(1n);
-    expect((await vault.getGetGlobal()).key_record_count).toBe(2n);
+    // net-zero on rotation: old record deleted, new added → key_record_count = LIVE records (= user_count).
+    expect((await vault.getGetGlobal()).key_record_count).toBe(1n);
   });
 
   it('VAULT-REJECT: cannot register twice and cannot replace before registration', async () => {

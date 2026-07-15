@@ -1,6 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { Cell, beginCell, external, toNano } from '@ton/core';
+import { Cell, Dictionary, beginCell, external, toNano } from '@ton/core';
 import { internal } from '@ton/sandbox';
+
+// clean-16 L6/#10: raise the workchain MsgForwardPrices (config param 25) by `factor` to simulate a post-deploy
+// TON governance fee increase. Used to prove the batch reject recovers the REAL (risen) import, not the stale pin.
+function raiseForwardFeeConfig(blockchain: any, factor: bigint) {
+  const dict = Dictionary.loadDirect(Dictionary.Keys.Int(32), Dictionary.Values.Cell(), blockchain.config);
+  const s = dict.get(25)!.beginParse();
+  const tag = s.loadUint(8);          // 0xea
+  const lump = s.loadUintBig(64);
+  const bit = s.loadUintBig(64);
+  const cell = s.loadUintBig(64);
+  const ihr = s.loadUint(32);
+  const firstFrac = s.loadUint(16);
+  const nextFrac = s.loadUint(16);
+  dict.set(25, beginCell()
+    .storeUint(tag, 8)
+    .storeUint(lump * factor, 64)
+    .storeUint(bit * factor, 64)
+    .storeUint(cell * factor, 64)
+    .storeUint(ihr, 32)
+    .storeUint(firstFrac, 16)
+    .storeUint(nextFrac, 16)
+    .endCell());
+  blockchain.setConfig(beginCell().storeDictDirect(dict).endCell());
+}
 import { CapsuleHubBatchAck } from '../build/Vault/Vault_Vault';
 import {
   OP_PUBLISH_BATCH_TO_HUB,
@@ -138,6 +162,42 @@ describe('Vault VPB2: batch publish path', () => {
     const charged = balanceBefore - afterUser.ton_balance;
     expect(charged).toBeGreaterThan(0n);
     expect(charged).toBeLessThan(maxCharge);
+  });
+
+  it('BATCH-REJECT-DRAIN-01 (L6/#10): a post-deploy forward-fee spike is recovered on reject — the pinned floor never drains the Vault', async () => {
+    const { blockchain, vault, user } = await setup();
+    await registerHybrid(vault, user);
+    await depositTon(vault, user, toNano('5'));
+
+    // Reject a malformed 1-part batch and return the amount the Vault kept (== reject_fee).
+    async function rejectAndCharge(maxCharge: bigint): Promise<bigint> {
+      const nonce = (await vault.getGetUser(user.address)).publish_nonce;
+      const before = (await vault.getGetUser(user.address)).ton_balance;
+      const badPart = beginCell().storeUint(0, 100).endCell(); // wrong bit width -> post-accept reject
+      await blockchain.sendMessage(external({ to: vault.address, body: batchExternalBody({
+        vaultAddr: vault.address, owner: user.address, maxCharge, partCount: 1n, partsRoot: badPart, nonce,
+      }) }));
+      return before - (await vault.getGetUser(user.address)).ton_balance;
+    }
+
+    const maxCharge = toNano('1');
+    // At the pinned config the runtime import << floor, so the reject keeps exactly the pinned floor.
+    const chargedDefault = await rejectAndCharge(maxCharge);
+    expect(chargedDefault).toBeGreaterThan(0n);
+
+    // Simulate a large TON governance forward-fee increase AFTER deploy (the pins are immutable).
+    // A large factor so even a small external's runtime import clears the max-size pinned floor.
+    const fwdBefore = await vault.getDiagForwardFee(3n, 1000n);
+    raiseForwardFeeConfig(blockchain, 2000n);
+    const fwdAfter = await vault.getDiagForwardFee(3n, 1000n);
+    expect(fwdAfter).toBeGreaterThan(fwdBefore * 1000n); // config really rose (getForwardFee tracks it)
+
+    // #10: the reject now recovers the REAL (risen) import instead of the stale pin — the Vault keeps MORE,
+    // so a fee spike can never make a reject net-drain the Vault. Still capped at max_charge (refund >= 0).
+    const chargedRaised = await rejectAndCharge(maxCharge);
+    expect(chargedRaised).toBeGreaterThan(chargedDefault);       // tracks the real import UP (no drain)
+    expect(chargedRaised).toBeGreaterThan(chargedDefault + toNano('0.05')); // materially above the stale pin
+    expect(chargedRaised).toBeLessThanOrEqual(maxCharge);        // capped -> refund never negative
   });
 
   it('BATCH-SUCCESS-01: a valid 1-part private batch hands off to the Hub and leaves the receipt PROCESSING', async () => {

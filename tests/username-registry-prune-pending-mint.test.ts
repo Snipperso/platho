@@ -101,7 +101,7 @@ async function createStuckPendingMint(ctx: Awaited<ReturnType<typeof deploySeale
   const noAckItem = await installNoAckAt(ctx.blockchain, itemAddress);
 
   // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M), so the mint notification must carry >= that.
-  await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('0.6') }, {
+  await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('1.2') }, {
     $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 13001n,
     amount: PRICE_6_PLUS,
@@ -210,7 +210,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
     expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
 
-    await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('0.6') }, {
+    await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('1.2') }, {
       $$type: 'AthTransferNotificationVaultMintUsername',
       query_id: 13002n,
       amount: PRICE_6_PLUS,

@@ -908,36 +908,35 @@ PROGRAM{
       32 PUSHPOW2DEC
       LESS
       THROWANYIFNOT
-      SWAP
+      OVER
       INC
     }>ELSE<{
-      s2 POP
-      s0 s11 XCHG
+      s0 s12 XCHG
       INC
-      s11 s11 XCHG2
+      s0 s12 XCHG
     }>
-    19 s() 21 s() XCHG
-    18 s() 20 s() XCHG
-    17 s() 21 s() XCHG
-    16 s() 20 s() XCHG
+    19 s() 22 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 20 s() XCHG
+    16 s() 22 s() XCHG
     s15 21 s() XCHG
     s14 20 s() XCHG
-    s13 21 s() XCHG
-    s12 20 s() XCHG
-    s11 21 s() XCHG
-    s10 20 s() XCHG
+    s13 22 s() XCHG
+    s12 21 s() XCHG
+    s11 20 s() XCHG
+    s10 22 s() XCHG
     s9 21 s() XCHG
     s8 20 s() XCHG
-    s7 21 s() XCHG
-    s6 20 s() XCHG
-    s5 21 s() XCHG
-    s4 20 s() XCHG
+    s7 22 s() XCHG
+    s6 21 s() XCHG
+    s5 20 s() XCHG
+    s4 22 s() XCHG
     s3 21 s() XCHG
     s2 20 s() XCHG
-    s1 21 s() XCHG
-    s0 20 s() XCHG
-    25 s() PUSH
-    21 s() PUSH
+    s1 22 s() XCHG
+    s0 21 s() XCHG
+    26 s() PUSH
+    22 s() PUSH
     $ProfileRegistry$_fun_computeAvatarRecordId INLINECALLDICT
     21114 PUSHINT
     s6 PUSH
@@ -948,33 +947,91 @@ PROGRAM{
     THROWANYIFNOT
     257 PUSHINT
         NOW
-    28 s() PUSH
+    29 s() PUSH
     s0 s6 XCHG
-    24 s() PUSH
+    25 s() PUSH
     s0 s6 XCHG
-    s5 29 s() XCHG
-    s4 28 s() XCHG
-    s3 27 s() XCHG
-    s2 35 s() XCHG
-    s1 34 s() XCHG
-    s0 35 s() XCHG
+    s5 30 s() XCHG
+    s4 29 s() XCHG
+    s3 28 s() XCHG
+    s2 36 s() XCHG
+    s1 35 s() XCHG
+    s0 36 s() XCHG
     $ProfileAvatarRecord$_constructor_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at INLINECALLDICT
     NEWC
     $ProfileAvatarRecord$_store_cell INLINECALLDICT
     s2 s3 XCHG
-    s2 20 s() XCHG
-    s1 21 s() XCHG
+    s2 21 s() XCHG
+    s1 22 s() XCHG
     __tact_dict_set_int_cell INLINECALLDICT
-    s1 17 s() XCHG
+    s1 18 s() XCHG
     267 PUSHINT
     SWAP
-    21 s() PUSH
+    22 s() PUSH
     SWAP
-    s0 17 s() XCHG
+    s0 18 s() XCHG
     257 PUSHINT
     __tact_dict_set_slice_int INLINECALLDICT
     s0 s2 XCHG
     INC
+    s14 PUSH
+    ISNULL
+    NOT
+    IF:<{
+      s13 20 s() XCHG
+      s12 19 s() XCHG
+      s11 18 s() XCHG
+      s10 17 s() XCHG
+      s9 16 s() XCHG
+      s8 s15 XCHG
+      s7 s14 XCHG
+      s6 s13 XCHG
+      s5 s12 XCHG
+      s4 s11 XCHG
+      s3 s10 XCHG
+      s8 s9 XCHG2
+      s3 s7 XCHG
+      s6 s5 s0 XCHG3
+      s3 24 s() XCHG
+      s2 25 s() XCHG
+      25 s() PUSH
+      SWAP
+      s0 25 s() XCHG
+      $ProfileRegistry$_fun_computeAvatarRecordId INLINECALLDICT
+      s5 PUSH
+      257 PUSHINT
+      s2 PUSH
+      __tact_dict_exists_int INLINECALLDICT
+      IF:<{
+        s0 s5 XCHG2
+        257 PUSHINT
+            DICTIDEL
+        DROP
+        s0 s8 XCHG
+        DEC
+        s0 s8 XCHG
+        s0 s4 XCHG
+      }>ELSE<{
+        DROP
+      }>
+      s1 24 s() XCHG
+      s2 23 s() XCHG
+      s1 19 s() XCHG
+      s0 18 s() XCHG
+      s3 17 s() XCHG
+      s6 16 s() XCHG
+      s2 s15 XCHG
+      s4 s14 XCHG
+      s8 s13 XCHG
+      s12 s11 XCHG2
+      s3 s10 XCHG
+      s6 s9 XCHG
+      s2 s8 XCHG
+      s4 s7 XCHG
+      s6 s5 s4 XCHG3
+    }>ELSE<{
+      s14 POP
+    }>
     20 s() PUSH
     5000 PUSHINT
     MUL
@@ -983,31 +1040,33 @@ PROGRAM{
     21 s() PUSH
     OVER
     SUB
-    s3 s3 XCHG2
+    -ROT
     ADD
-    s1 17 s() XCHG
-    s0 s2 XCHG
+    s0 17 s() XCHG
+    SWAP
     ADD
-    s13 21 s() XCHG
-    s12 20 s() XCHG
-    s11 19 s() XCHG
-    s10 18 s() XCHG
-    s9 17 s() XCHG
-    s8 16 s() XCHG
-    s7 s15 XCHG
-    s6 s14 XCHG
-    s5 s13 XCHG
-    s4 s12 XCHG
-    s3 s11 XCHG
+    s12 21 s() XCHG
+    s11 20 s() XCHG
+    s10 19 s() XCHG
+    s9 18 s() XCHG
+    s8 17 s() XCHG
+    s7 16 s() XCHG
+    s6 s15 XCHG
+    s5 s14 XCHG
+    s4 s13 XCHG
+    s3 s12 XCHG
+    s2 s11 XCHG
+    s4 s10 XCHG
+    s7 s9 XCHG
     s0 s8 XCHG
-    s7 s9 s10 XCHG3
-    s1 s5 XCHG
+    s0 s5 XCHG
+    s7 s6 XCHG2
     s4 23 s() XCHG
     s3 24 s() XCHG
-    s0 s2 XCHG
+    s1 s2 XCHG
     22 s() PUSH
-    -ROT
-    s0 24 s() XCHG
+    s0 s2 XCHG
+    s1 25 s() XCHG
     $ProfileRegistry$_fun_sendAthNotificationAck INLINECALLDICT
     19 s() 22 s() XCHG
     18 s() 21 s() XCHG
@@ -1017,7 +1076,17 @@ PROGRAM{
     s14 17 s() XCHG
     s13 16 s() XCHG
     s12 s15 XCHG
-    3 12 BLKSWAP
+    s11 s14 XCHG
+    s10 s13 XCHG
+    s9 s12 XCHG
+    s8 s11 XCHG
+    s7 s10 XCHG
+    s6 s9 XCHG
+    s5 s8 XCHG
+    s4 s7 XCHG
+    s3 s6 XCHG
+    s5 s3 s3 XCHG3
+    s0 s4 XCHG
     $ProfileRegistry$_fun_refundAvatarExcess INLINECALLDICT
   }>
   $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_vault_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_vault_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count PROCINLINE:<{

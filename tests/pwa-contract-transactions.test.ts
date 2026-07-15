@@ -29,14 +29,11 @@ import {
   PUBLIC_POST_TEXT_MAX_BYTES,
   PROFILE_AVATAR_PRICE_ATH,
   PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
-  RECEIVE_ASSETS,
-  RECEIVE_INTENT_ID_DOMAIN,
   USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
   VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN,
   VAULT_CRYPTO_SUITE,
   VAULT_PROFILE_AVATAR_SIGNING_DOMAIN,
   VAULT_PUBLISH_KIND,
-  VAULT_RECEIVE_INTENT_SIGNING_DOMAIN,
   VAULT_SIZE_CLASS,
   VAULT_WITHDRAW_ATH_SIGNING_DOMAIN,
   VAULT_WITHDRAW_TON_SIGNING_DOMAIN,
@@ -48,13 +45,11 @@ import {
   buildVaultBalancePublishExternalBoc,
   buildVaultProfileAvatarBodyCell,
   buildVaultProfileAvatarExternalBoc,
-  buildVaultReceiveIntentExternalBoc,
   buildVaultReplaceMessagingKeysExternalBoc,
   buildVaultWithdrawAthExternalBoc,
   buildVaultWithdrawTonExternalBoc,
   buildVaultUsernameMintBodyCell,
   buildVaultUsernameMintExternalBoc,
-  computeVaultReceiveIntentId,
   buildVaultMessageBody,
   createAthWalletMessage,
   createProfileRegistryMessage,
@@ -99,15 +94,6 @@ function tonCellToCoreCell(cell: any) {
     tonCell.bytesToBase64(tonCell.serializeBoc(cell)),
     'base64',
   ))[0];
-}
-
-function expectReceiveSignedDataEnvelope(cell: any, domain: bigint, owner: string) {
-  const slice = tonCellToCoreCell(cell).beginParse();
-  expect(slice.loadUintBig(32)).toBe(domain);
-  expect(slice.loadUintBig(256)).toBe(BigInt(DEPLOYMENT_MANIFEST_HASH));
-  expect(slice.loadUintBig(256)).toBe(addressHashValue(VAULT));
-  expect(slice.loadUintBig(256)).toBe(addressHashValue(owner));
-  return slice;
 }
 
 function expectVaultAddressSignedDataEnvelope(cell: any, domain: bigint, owner: string) {
@@ -239,43 +225,12 @@ describe('PWA contract transaction builders', () => {
     expect(buildVaultMessageBody(type, params)).toBe(generatedBody(store));
   });
 
-  it('PWA-TX-01B: payment checks, TON withdrawal, and key rotation are signed Vault external BOCs, not wallet message bodies', async () => {
+  it('PWA-TX-01B: TON withdrawal and key rotation are signed Vault external BOCs, not wallet message bodies', async () => {
     const signingSecretKey = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
-    expect(() => buildVaultMessageBody('CreateReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
-    expect(() => buildVaultMessageBody('ClaimReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
-    expect(() => buildVaultMessageBody('CancelReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
     expect(() => buildVaultMessageBody('ReplaceMessagingKeys', {})).toThrow(/Unsupported Vault message type/);
     expect(() => buildVaultMessageBody('WithdrawTonFromVaultBalance', {})).toThrow(/Unsupported Vault message type/);
     expect(() => buildVaultMessageBody('WithdrawAthFromVaultBalance', {})).toThrow(/Unsupported Vault message type/);
 
-    const createExternal = await buildVaultReceiveIntentExternalBoc('CreateReceiveIntent', {
-      owner_wallet: OWNER,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      signingSecretKey,
-      client_nonce: 9n,
-      asset: RECEIVE_ASSETS.TON,
-      amount: 120_000_000n,
-      recipient_wallet: RECIPIENT,
-      commitment: 0x7777n,
-    });
-    const claimExternal = await buildVaultReceiveIntentExternalBoc('ClaimReceiveIntent', {
-      owner_wallet: RECIPIENT,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      signingSecretKey,
-      client_nonce: 10n,
-      intent_id: 0x8888n,
-      secret32: 0x9999n,
-    });
-    const cancelExternal = await buildVaultReceiveIntentExternalBoc('CancelReceiveIntent', {
-      owner_wallet: OWNER,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      signingSecretKey,
-      client_nonce: 11n,
-      intent_id: 0x8888n,
-    });
     const replaceExternal = await buildVaultReplaceMessagingKeysExternalBoc({
       owner_wallet: OWNER,
       vaultAddress: VAULT,
@@ -308,9 +263,6 @@ describe('PWA contract transaction builders', () => {
       recipient: RECIPIENT,
     });
 
-    expectReceiveSignedDataEnvelope(createExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, OWNER);
-    expectReceiveSignedDataEnvelope(claimExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, RECIPIENT);
-    expectReceiveSignedDataEnvelope(cancelExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, OWNER);
     const withdrawSlice = expectVaultAddressSignedDataEnvelope(withdrawExternal.signedData, VAULT_WITHDRAW_TON_SIGNING_DOMAIN, OWNER);
     expect(withdrawSlice.loadUintBig(64)).toBe(13n);
     expect(withdrawSlice.remainingBits).toBe(0);
@@ -330,7 +282,7 @@ describe('PWA contract transaction builders', () => {
     expect(withdrawAthAction.remainingBits).toBe(0);
     expect(withdrawAthAction.remainingRefs).toBe(0);
 
-    for (const external of [createExternal, claimExternal, cancelExternal, replaceExternal, withdrawExternal, withdrawAthExternal]) {
+    for (const external of [replaceExternal, withdrawExternal, withdrawAthExternal]) {
       expect(external.vaultAddress).toBe(VAULT);
       expect(external.boc).toMatch(/^te6/);
       expect(external.signedDataHash).toMatch(/^[0-9a-f]{64}$/);
@@ -343,45 +295,11 @@ describe('PWA contract transaction builders', () => {
     }
   });
 
-  it('PWA-TX-01C: computes receive-intent id locally with the Vault RCID formula', async () => {
-    const intentId = await computeVaultReceiveIntentId({
-      senderWallet: OWNER,
-      recipientWallet: RECIPIENT,
-      asset: RECEIVE_ASSETS.TON,
-      amount: 120_000_000n,
-      clientNonce: 9n,
-    });
-    const expectedHash = BigInt(`0x${beginCell()
-      .storeUint(RECEIVE_INTENT_ID_DOMAIN, 32)
-      .storeAddress(Address.parseRaw(OWNER))
-      .storeAddress(Address.parseRaw(RECIPIENT))
-      .storeUint(RECEIVE_ASSETS.TON, 8)
-      .storeUint(120_000_000n, 128)
-      .storeUint(9n, 64)
-      .endCell()
-      .hash()
-      .toString('hex')}`);
-    const expected = expectedHash % (1n << 128n);
-    const otherNonce = await computeVaultReceiveIntentId({
-      senderWallet: OWNER,
-      recipientWallet: RECIPIENT,
-      asset: RECEIVE_ASSETS.TON,
-      amount: 120_000_000n,
-      clientNonce: 10n,
-    });
-
-    expect(intentId).toBe(expected);
-    expect(intentId).toBeLessThan(1n << 128n);
-    expect(otherNonce).not.toBe(intentId);
-  });
-
   it('PWA-TX-02: quotes exact explicit Vault reserve values used by the PWA', () => {
     expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: false })).toBe(12_001_000n);
     expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: true })).toBe(2_001_000n);
     expect(() => estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 1n }, { userExists: false })).toThrow(/hybrid-v1/);
     expect(estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 2n }, { userExists: true })).toBe(32_000_000n);
-    expect(estimateVaultAttachedValueNanotons('CreateReceiveIntent')).toBe(9_000_000n);
-    expect(estimateVaultAttachedValueNanotons('ClaimReceiveIntent')).toBe(0n);
   });
 
   it('PWA-TX-03: creates embedded wallet transaction messages with decimal nanotons and payload', () => {

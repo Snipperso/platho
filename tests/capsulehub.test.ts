@@ -88,11 +88,17 @@ async function contractBalance(blockchain: Blockchain, address: Address): Promis
 // A private header_0 whose first 64 bits are the PLTHPRIV magic and whose two 256-bit fields are the sender
 // and recipient key ids the Hub's index reader extracts. Built to the EXACT 140-byte (1120-bit, 2-cell, 1-ref)
 // shape requireExactPayloadCell enforces, so the part validates AND the index links resolve to our key ids.
-function privateHeader0WithKeyIds(senderKeyId: bigint, recipientKeyId: bigint): Cell {
-  const bytes = Buffer.alloc(140, 0x44);
-  bytes.writeBigUInt64BE(0x504c544850524956n, 0); // "PLTHPRIV"
-  uint256Buffer(senderKeyId).copy(bytes, 8);
-  uint256Buffer(recipientKeyId).copy(bytes, 40);
+// clean-16 CONV header0 (40 bytes / 320 bits, 1 cell, 0 refs): magic'PH0C' + version(1) + publishKind(1)=1
+// (PRIVATE/CONV) + sizeClass(1) + cryptoSuite(1)=2(HYBRID) + opaque bucketKey(32 @ byte 8, bits[64,320)).
+// byte@5 = publishKind is set to 1 so this fixture already satisfies the ИНК3 meta-assert.
+function convHeader0WithBucketKey(bucketKey: bigint): Cell {
+  const bytes = Buffer.alloc(40, 0x44);
+  bytes.write('PH0C', 0, 'ascii');
+  bytes[4] = 1; // version
+  bytes[5] = 1; // publishKind = PRIVATE/CONV
+  bytes[6] = 1; // sizeClass
+  bytes[7] = 2; // cryptoSuite = HYBRID
+  uint256Buffer(bucketKey).copy(bytes, 8);
   return snakeCellFromBytes(bytes);
 }
 
@@ -398,13 +404,13 @@ describe('CapsuleHub v1 milestone 1 (VPB2 batch path)', () => {
     expect((await hub.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
   });
 
-  it('CAPSULE-PRIVATE-INDEX-01: private publishes maintain sender and recipient linked indexes', async () => {
+  it('CAPSULE-PRIVATE-INDEX-01: private (CONV) publishes maintain ONE opaque bucket linked index, no directional graph', async () => {
     const { blockchain, hub, vault, operator } = await setupHubFee({ feeAccumulatorDeployed: true });
-    const senderKeyId = hash256('capsule-private-index-sender');
-    const recipientKeyId = hash256('capsule-private-index-recipient');
-    const header0 = privateHeader0WithKeyIds(senderKeyId, recipientKeyId);
+    // clean-16: a private (CONV) capsule carries ONE opaque bucketKey in header0[8..40); there is no
+    // sender/recipient keyId anymore. Two batches under the same bucketKey chain into one bucket index.
+    const bucketKey = hash256('capsule-conv-bucket');
+    const header0 = convHeader0WithBucketKey(bucketKey);
 
-    // Two private batches sharing the same sender/recipient key ids -> two linked index entries (ids 0,1).
     const firstId = hash256('indexed-private-publish-1');
     const secondId = hash256('indexed-private-publish-2');
     await seedAccruedFee(hub, vault, {
@@ -414,29 +420,23 @@ describe('CapsuleHub v1 milestone 1 (VPB2 batch path)', () => {
       feeTotal: PLATO_PRIVATE_HYBRID_FEE, publishId: secondId, kind: KIND_PRIVATE, header0, bodyFill: 0x42,
     });
 
-    const senderIndex = await hub.getGetPrivateSenderIndex(senderKeyId);
-    const recipientIndex = await hub.getGetPrivateRecipientIndex(recipientKeyId);
-    expect(senderIndex).toMatchObject({
+    const bucketIndex = await hub.getGetPrivateBucketIndex(bucketKey);
+    expect(bucketIndex).toMatchObject({
       exists: true,
-      key_id: senderKeyId,
-      latest_entry_id: 1n,
-      latest_entry_link: 2n,
-      entry_count: 2n,
-    });
-    expect(recipientIndex).toMatchObject({
-      exists: true,
-      key_id: recipientKeyId,
+      bucket_key: bucketKey,
       latest_entry_id: 1n,
       latest_entry_link: 2n,
       entry_count: 2n,
     });
 
+    // D7-override: there is no sender-keyed or recipient-keyed getter to reconstruct a who-to-whom edge; the
+    // only private-lane index getter is the opaque bucket one. Entries carry a single backward bucket link.
     const firstEntry = await hub.getGetPrivateEntry(0n);
     const secondEntry = await hub.getGetPrivateEntry(1n);
-    expect(firstEntry.sender_prev_link).toBe(0n);
-    expect(firstEntry.recipient_prev_link).toBe(0n);
-    expect(secondEntry.sender_prev_link).toBe(1n);
-    expect(secondEntry.recipient_prev_link).toBe(1n);
+    expect(firstEntry.bucket_prev_link).toBe(0n);
+    expect(secondEntry.bucket_prev_link).toBe(1n);
+    expect((hub as unknown as Record<string, unknown>).getGetPrivateRecipientIndex).toBeUndefined();
+    expect((hub as unknown as Record<string, unknown>).getGetPrivateSenderIndex).toBeUndefined();
   });
 
   it('CAPSULE-VAULT-BACKING-01: Vault publish retains protocol fee backing instead of returning it as ACK excess', async () => {

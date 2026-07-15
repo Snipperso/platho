@@ -7,10 +7,13 @@ import { keyPairFromSeed, sign } from '@ton/crypto';
 import {
   Vault,
   AthTransferNotification,
+  ATHTransferAck,
+  ATHTransferFailed,
   BindProfileRegistry,
   BindUsernameRegistry,
   BindOfficialAthWallet,
   ProfileAvatarTonExcessRefund,
+  PruneStuckAthPending,
   storeDepositTon,
   storeMintUsernameFromVaultBalance,
   RegisterMessagingKeys,
@@ -25,6 +28,7 @@ import {
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { MockRegistryNotificationNoAck } from '../build/MockRegistryNotificationNoAck/MockRegistryNotificationNoAck_MockRegistryNotificationNoAck';
 import { MockUsernameNFTItemNoAck } from '../build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck';
+import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 import {
   BindProfileOfficialAthWallet,
   BindProfileVault,
@@ -39,13 +43,24 @@ import {
   UsernameRegistry,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { hybridMessagingKeyFields } from './helpers/vault-hybrid-key';
-import { sendVaultWithdrawAthExternal } from './helpers/vault-receive-intent-external';
+import { sendVaultWithdrawAthExternal } from './helpers/vault-external';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544E49n;
 const ATH_SENDER_KEY_MOD = 1n << 160n;
 const ATH_PENDING_NOTIFICATION_TTL = 86_400;
+// clean-16 L6/#18: Vault-side stuck-pending prune windows (must match VAULT_PENDING_PUBLISH_STALE_TTL /
+// VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL in Vault.tact).
+const VAULT_PENDING_STALE_TTL = 86_400;
+const VAULT_PRUNED_TOMBSTONE_TTL = 86_400;
+function vaultInternalExitCode(res: any, vaultAddress: Address): number {
+  const tx: any = res.transactions.find(
+    (t: any) => t.inMessage?.info?.type === 'internal'
+      && t.inMessage?.info?.dest?.toString() === vaultAddress.toString(),
+  );
+  return Number(tx?.description?.computePhase?.exitCode ?? -1);
+}
 const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1_000_000n;
 const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1_000_000n;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 7_000_000n;
@@ -56,7 +71,7 @@ const PROFILE_AVATAR_TON_CHARGE = 115_000_000n;
 const PROFILE_AVATAR_LOCAL_EXEC_RESERVE = 6_000_000n;
 const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n;
 const USERNAME_PRICE_6_PLUS = 100_000_000_000n;
-const USERNAME_MINT_TON_CHARGE = 617_000_000n; // clean-11: +36M name-record endowment (6M local exec + 611M ATH-wallet request)
+const USERNAME_MINT_TON_CHARGE = 1_000_000_000n; // clean-16 L2/#14 (owner): EXACTLY 1 TON (6M local exec + 994M ATH-wallet request); storage funded centuries at the real 64962/cell/yr rate
 const USERNAME_MINT_LOCAL_EXEC_RESERVE = 6_000_000n;
 const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n;
 const USERNAME_NAME_HASH_DOMAIN = 0xC5CC7CD6n;
@@ -2207,5 +2222,154 @@ describe('Vault ATH integration with production ATHWallet', () => {
       to: ctx.vault.address,
       op: OP_ATH_TRANSFER_FAILED,
     })).toBeUndefined();
+  });
+
+  // clean-16 L6/#18: PruneStuckAthPending — fail-closed tombstone lifecycle for a STUCK ATH-settlement pending
+  // (frozen downstream never sent an ACK/bounce). Mirrors PruneBatchPublish: prune NEVER refunds; a late in-window
+  // ACK/bounce is the only refund path; the tombstone flag makes the count decrement exactly-once.
+  async function stuckProfileAvatarPending(ctx: any, keyPair: any, opts: { queryId: bigint; avatarHash: bigint; entryId: bigint; streamId: bigint }) {
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, { $$type: 'DepositTon', amount: toNano('0.2') });
+    await depositAth({ vault: ctx.vault, user: ctx.user, userAthWallet: ctx.userAthWallet, amount: PROFILE_AVATAR_PRICE_ATH * 2n, queryId: opts.queryId });
+    const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
+    await ctx.blockchain.sendMessage(external({
+      to: ctx.vault.address,
+      body: signedVaultProfileAvatarBody({
+        vault: ctx.vault, owner: ctx.user.address, profileRegistry: ctx.profileRegistry,
+        clientNonce: beforeUser.publish_nonce, secretKey: keyPair.secretKey,
+        avatarHash: opts.avatarHash, avatarEntryId: opts.entryId, avatarStreamId: opts.streamId, avatarPartCount: 2n,
+      }),
+    }));
+    const pendingState = await ctx.profileRegistry.getGetState();
+    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(1n);
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH); // debited by the mint
+    return pendingState.last_query_id as bigint;
+  }
+
+  function prune(ctx: any, kind: bigint, queryId: bigint, value = '0.05') {
+    return ctx.vault.send(ctx.user.getSender(), { value: toNano(value) },
+      { $$type: 'PruneStuckAthPending', kind, query_id: queryId } as PruneStuckAthPending);
+  }
+
+  it('PRUNE-ATH-01: a stuck profile-avatar pending prunes stale -> tombstone -> delete after the window (kind=2)', async () => {
+    const ctx = await setupProfileAvatarNoAckRoute();
+    const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
+    const queryId = await stuckProfileAvatarPending(ctx, keyPair, { queryId: 6611n, avatarHash: 0x18a1ffn, entryId: 91n, streamId: 0x41223344556677889900aabbccddeeffn });
+
+    // before STALE_TTL -> reject 16571, pending untouched
+    expect(vaultInternalExitCode(await prune(ctx, 2n, queryId), ctx.vault.address)).toBe(16571);
+    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(1n);
+
+    // after STALE_TTL -> tombstone: count freed, NO ath refund (fail-closed)
+    ctx.blockchain.now = (ctx.blockchain.now ?? 0) + VAULT_PENDING_STALE_TTL + 10;
+    expect(vaultInternalExitCode(await prune(ctx, 2n, queryId), ctx.vault.address)).toBe(0);
+    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n);
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH); // not refunded
+
+    // still inside the tombstone window -> a second prune rejects 16574 (not yet deletable)
+    expect(vaultInternalExitCode(await prune(ctx, 2n, queryId), ctx.vault.address)).toBe(16574);
+
+    // after the tombstone window -> deletes cleanly; a further prune then hits not-found (16570)
+    ctx.blockchain.now = (ctx.blockchain.now ?? 0) + VAULT_PRUNED_TOMBSTONE_TTL + 10;
+    expect(vaultInternalExitCode(await prune(ctx, 2n, queryId), ctx.vault.address)).toBe(0);
+    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n);
+    expect(vaultInternalExitCode(await prune(ctx, 2n, queryId), ctx.vault.address)).toBe(16570);
+  });
+
+  it('PRUNE-ATH-02: a late FAILED inside the tombstone window still REFUNDS and never double-decrements (kind=2)', async () => {
+    const ctx = await setupProfileAvatarNoAckRoute();
+    const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
+    const queryId = await stuckProfileAvatarPending(ctx, keyPair, { queryId: 6621n, avatarHash: 0x18a2ffn, entryId: 92n, streamId: 0x42223344556677889900aabbccddeeffn });
+
+    ctx.blockchain.now = (ctx.blockchain.now ?? 0) + VAULT_PENDING_STALE_TTL + 10;
+    await prune(ctx, 2n, queryId); // tombstone (count 0, no refund)
+    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n);
+
+    // downstream un-freezes late (still in window) and reports FAILED: the user is REFUNDED, count stays 0 (no -1).
+    await ctx.vault.send(ctx.blockchain.sender(ctx.officialVaultAthWallet), { value: toNano('0.1') },
+      { $$type: 'ATHTransferFailed', query_id: queryId, amount: PROFILE_AVATAR_PRICE_ATH } as ATHTransferFailed);
+
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH * 2n); // refunded
+    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n); // exactly-once
+    // pending is gone -> a further prune hits not-found
+    expect(vaultInternalExitCode(await prune(ctx, 2n, queryId), ctx.vault.address)).toBe(16570);
+  });
+
+  it('PRUNE-ATH-03: a late SUCCESS ACK inside the tombstone window deletes without refunding and never double-decrements (kind=1)', async () => {
+    const ctx = await setupUsernameMintNoAckRoute();
+    const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('1.05') }, { $$type: 'DepositTon', amount: toNano('1') });
+    await depositAth({ vault: ctx.vault, user: ctx.user, userAthWallet: ctx.userAthWallet, amount: USERNAME_PRICE_6_PLUS * 2n, queryId: 6631n });
+
+    const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
+    await ctx.blockchain.sendMessage(external({
+      to: ctx.vault.address,
+      body: signedVaultUsernameMintBody({
+        vault: ctx.vault, owner: ctx.user.address, usernameRegistry: ctx.usernameRegistry,
+        clientNonce: beforeUser.publish_nonce, secretKey: keyPair.secretKey, username: 'platho_9',
+      }),
+    }));
+    const queryId = (await ctx.usernameRegistry.getGetState()).last_query_id as bigint;
+    expect((await ctx.vault.getGetGlobal()).pending_username_mint_payment_count).toBe(1n);
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(USERNAME_PRICE_6_PLUS);
+
+    ctx.blockchain.now = (ctx.blockchain.now ?? 0) + VAULT_PENDING_STALE_TTL + 10;
+    expect(vaultInternalExitCode(await prune(ctx, 1n, queryId), ctx.vault.address)).toBe(0); // tombstone
+    expect((await ctx.vault.getGetGlobal()).pending_username_mint_payment_count).toBe(0n);
+
+    // the mint actually SUCCEEDED late: the registry ATH wallet ACKs. Delete, NO refund (ath consumed), count stays 0.
+    await ctx.vault.send(ctx.blockchain.sender(ctx.officialUsernameAthWallet), { value: toNano('0.1') },
+      { $$type: 'ATHTransferAck', query_id: queryId, amount: USERNAME_PRICE_6_PLUS } as ATHTransferAck);
+
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(USERNAME_PRICE_6_PLUS); // NOT refunded
+    expect((await ctx.vault.getGetGlobal()).pending_username_mint_payment_count).toBe(0n); // exactly-once
+    expect(vaultInternalExitCode(await prune(ctx, 1n, queryId), ctx.vault.address)).toBe(16570); // pending gone
+  });
+
+  it('PRUNE-ATH-04: prune rejects an unknown kind (16572), a missing pending (16570), and an underfunded call (16573)', async () => {
+    const ctx = await setupProfileAvatarNoAckRoute();
+    expect(vaultInternalExitCode(await prune(ctx, 5n, 0n), ctx.vault.address)).toBe(16572);      // unknown kind
+    expect(vaultInternalExitCode(await prune(ctx, 2n, 999999n), ctx.vault.address)).toBe(16570); // no such pending
+    expect(vaultInternalExitCode(await prune(ctx, 2n, 999999n, '0.0015'), ctx.vault.address)).toBe(16573); // < exec reserve
+  });
+
+  it('PRUNE-ATH-05: a stuck ath-withdrawal prunes stale -> tombstone; a late FAILED in-window still refunds and never double-decrements (kind=3)', async () => {
+    const ctx = await setupProfileAvatarNoAckRoute();
+    const authKeyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
+    // fund the user's INTERNAL ath balance (this also deploys a real Vault ATH wallet at officialVaultAthWallet)...
+    await depositAth({ vault: ctx.vault, user: ctx.user, userAthWallet: ctx.userAthWallet, amount: PROFILE_AVATAR_PRICE_ATH * 2n, queryId: 6641n });
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('1.05') }, { $$type: 'DepositTon', amount: toNano('1') });
+
+    // ...then FREEZE the downstream: overwrite the Vault's OWN ATH wallet with a no-ACK sink so the outbound
+    // ATHTransferRequest is accepted but never ACKs/bounces -> the withdrawal pending is stuck open.
+    const noAck = await MockAthWalletNoAck.init();
+    await ctx.blockchain.setShardAccount(ctx.officialVaultAthWallet, createShardAccount({
+      address: ctx.officialVaultAthWallet, code: noAck.code, data: noAck.data,
+      balance: toNano('1'), workchain: ctx.officialVaultAthWallet.workChain,
+    }));
+
+    const amount = PROFILE_AVATAR_PRICE_ATH;
+    const before = await ctx.vault.getGetUser(ctx.user.address);
+    const withdrawalId = await ctx.vault.getGetAthWithdrawalId(ctx.user.address, before.publish_nonce);
+    await sendVaultWithdrawAthExternal(ctx.blockchain, ctx.vault, ctx.user, authKeyPair, MANIFEST_HASH, amount, ctx.user.address);
+
+    expect((await ctx.vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(1n);
+    expect((await ctx.vault.getGetPendingAthWithdrawal(withdrawalId)).exists).toBe(true);
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH); // 2*PRICE debited by PRICE
+
+    // before STALE_TTL -> reject 16571
+    expect(vaultInternalExitCode(await prune(ctx, 3n, withdrawalId), ctx.vault.address)).toBe(16571);
+
+    // after STALE_TTL -> tombstone: count freed, NO ath refund (fail-closed)
+    ctx.blockchain.now = (ctx.blockchain.now ?? 0) + VAULT_PENDING_STALE_TTL + 10;
+    expect(vaultInternalExitCode(await prune(ctx, 3n, withdrawalId), ctx.vault.address)).toBe(0);
+    expect((await ctx.vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH); // not refunded
+
+    // downstream un-freezes late (still in window) reporting FAILED: user REFUNDED, count stays 0 (exactly-once).
+    await ctx.vault.send(ctx.blockchain.sender(ctx.officialVaultAthWallet), { value: toNano('0.2') },
+      { $$type: 'ATHTransferFailed', query_id: withdrawalId, amount } as ATHTransferFailed);
+    expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH * 2n); // refunded
+    expect((await ctx.vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
+    expect((await ctx.vault.getGetPendingAthWithdrawal(withdrawalId)).exists).toBe(false);
   });
 });

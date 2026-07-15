@@ -1617,7 +1617,7 @@ PROGRAM{
     30 s() PUSH
     __tact_dict_exists_int INLINECALLDICT
     THROWANYIF
-    547000000 PUSHINT
+    940000000 PUSHINT
     19122 PUSHINT
     __tact_context_get INLINECALLDICT
     $Context$_get_value INLINECALLDICT
@@ -1634,7 +1634,7 @@ PROGRAM{
     NOT
     THROWANYIFNOT
     257 PUSHINT
-    500000000 PUSHINT
+    829000000 PUSHINT
         NOW
     s4 32 s() XCHG
     s3 37 s() XCHG
@@ -1666,7 +1666,7 @@ PROGRAM{
     SWAP
     s0 26 s() XCHG
     $UsernameNFTItem$_init_child INLINECALLDICT
-    500000000 PUSHINT
+    829000000 PUSHINT
     s0 31 s() XCHG
     TRUE
     s0 31 s() XCHG

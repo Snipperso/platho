@@ -9,7 +9,6 @@ import "./ATHWallet.tact";
 const VAULT_USER_STATE_STORAGE_ENDOWMENT: Int = 10000000;
 const VAULT_KEY_RECORD_STANDARD_STORAGE_ENDOWMENT: Int = 5000000;
 const VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT: Int = 30000000;
-const VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT: Int = 5000000;
 const VAULT_PENDING_PUBLISH_STALE_TTL: Int = 86400;          // 24h: a stuck pending batch becomes prunable
 const VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL: Int = 86400;       // 24h tombstone window after prune, then deletable
 const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE: Int = 2000000; // min inbound value to drive a prune
@@ -21,17 +20,9 @@ const VAULT_WITHDRAW_TON_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_WITHDRAW_REFUND_EXEC_RESERVE: Int = 2000000;
 const ASSET_TON: Int = 1;
 const ASSET_ATH: Int = 2;
-const RECEIVE_INTENT_ID_DOMAIN: Int = 0x52434944; // "RCID"
-// Reserved for a future hash-commitment variant. Current receive intents store secret32 directly as the recipient-authenticated claim gate, not as a hiding commitment.
-const RECEIVE_INTENT_COMMITMENT_DOMAIN: Int = 0x5243434d; // "RCCM"
-const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN: Int = 0x56524331; // "VRC1"
 const VAULT_WITHDRAW_TON_SIGNING_DOMAIN: Int = 0x56545731; // "VTW1"
 const VAULT_WITHDRAW_ATH_SIGNING_DOMAIN: Int = 0x56574131; // "VWA1"
-const VAULT_RECEIVE_INTENT_ACTION_CREATE: Int = 1;
-const VAULT_RECEIVE_INTENT_ACTION_CLAIM: Int = 2;
-const VAULT_RECEIVE_INTENT_ACTION_CANCEL: Int = 3;
 const VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN: Int = 0x56524B31; // "VRK1"
-const VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE: Int = 2000000;
 const VAULT_PENDING_PUBLISH_COUNT_UNIT: Int = 1;
 const VAULT_PENDING_PROFILE_COUNT_UNIT: Int = 4294967296;
 const VAULT_PENDING_USERNAME_COUNT_UNIT: Int = 281474976710656;
@@ -55,6 +46,9 @@ const ATH_WITHDRAWAL_ID_DOMAIN: Int = 0x41574944; // "AWID"
 const KEY_ID_DOMAIN: Int = 0x4b455949; // "KEYI"
 const PUBLISH_KIND_PRIVATE: Int = 1;
 const PUBLISH_KIND_PUBLIC: Int = 2;
+const PUBLISH_KIND_INTRO: Int = 3; // clean-16 ИНК4: first-contact stealth lane (mirror CapsuleHub)
+const PUBLISH_KIND_RECOVERY: Int = 4; // clean-16 ИНК6: K_root durability lane (mirror CapsuleHub); reuses the CONV 784-frame + 320-bit header0
+const RECOVERY_MAX_SIZE_CLASS: Int = 8; // clean-16 ИНК6-fix: mirror the Hub RECOVERY body cap (8K). Reject oversize pre-forward so the user isn't charged for a guaranteed Hub bounce (13560)
 const VAULT_BATCH_PUBLISH_SIGNING_DOMAIN: Int = 0x56504232; // "VPB2" (retires VPB1 for publishing)
 const VAULT_BATCH_PUBLISH_ID_DOMAIN: Int = 0x42504931;      // "BPI1" batch publish_id derivation
 const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN: Int = 0x45504931;    // "EPI1" per-entry publish_id derivation
@@ -75,13 +69,17 @@ const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 15000000000000000;
 const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH: Int = 0;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
-const CAPSULEHUB_PRIVATE_HEADER0_BITS: Int = 1120;
+// clean-16 ИНК2: mirror of the Hub header0 fork. CONV=320 (40B), INTRO=336 (42B), single cell, zero refs;
+// RECOVERY reuses CONV 320. Replaces the pre-clean-16 1120-bit / 2-cell / 1-ref private header0.
+const CAPSULEHUB_CONV_HEADER0_BITS: Int = 320;
+const CAPSULEHUB_INTRO_HEADER0_BITS: Int = 336;
 const CAPSULEHUB_PRIVATE_HEADER1_BITS: Int = 240;
-const CAPSULEHUB_PRIVATE_HEADER0_CELLS: Int = 2;
-const CAPSULEHUB_PRIVATE_HEADER0_REFS: Int = 1;
+const CAPSULEHUB_PRIVATE_HEADER0_CELLS: Int = 1;
+const CAPSULEHUB_PRIVATE_HEADER0_REFS: Int = 0;
 const CAPSULEHUB_PRIVATE_HEADER1_CELLS: Int = 1;
 const CAPSULEHUB_PRIVATE_HEADER1_REFS: Int = 0;
 const CAPSULEHUB_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES: Int = 1204;
+const CAPSULEHUB_INTRO_HYBRID_BODY_OVERHEAD_BYTES: Int = 2388; // clean-16 ИНК4 (G8-provisional): ct_root + handshake; mirror CapsuleHub
 const CAPSULEHUB_PUBLIC_HEADER_MAX_BITS: Int = 576;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS: Int = 1;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
@@ -95,11 +93,11 @@ const VAULT_PROFILE_AVATAR_EXCESS_REFUND_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRICE_4_CHARS: Int = 10000000000000;
 const USERNAME_PRICE_5_CHARS: Int = 1000000000000;
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;
-const USERNAME_NOTIFY_VALUE: Int = 568000000; // >= UsernameRegistry mint retainedValue (6M endowment + 500M NFT deploy reserve + 1M ack + 4M state-growth + 36M clean-11 name-record endowment = 547M); the Vault forwards this to the registry via the ATH wallet to fund a username mint + its ~250yr NFT storage. 21M cushion over the floor covers the ATH-wallet->registry fwd fee.
+const USERNAME_NOTIFY_VALUE: Int = 951000000; // clean-16 L2/#14 (rate-corrected + owner: mint = exactly 1 TON): >= UsernameRegistry mint retainedValue (6M pending + 829M NFT deploy + 1M ack + 4M state-growth + 100M name-record = 940M; sized at the REAL basechain rate 64962/cell/yr [[ton-storage-rate-frozen]] → ~412yr NFT / ~385yr record). ~11M cushion covers the ATH-wallet->registry fwd fee. MUST TRACK UsernameRegistry retainedValue.
 const USERNAME_MAX_LENGTH: Int = 16;
 const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
 const VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE: Int = 6000000;
-const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 611000000; // raised 575M->611M to track the clean-11 name-record endowment (USERNAME_NOTIFY_VALUE 532M->568M, +36M). USERNAME_NOTIFY_VALUE (568M) + ATH-wallet downstream/exec overhead (VAULT_RESPONSE_ACK 3M + SOURCE_ACK 1M + NOTIFY_EXEC 7M + STORAGE_ENDOWMENT 20M + AVATAR_FWD_FEE 2M + NOTIFY_OWNER_REQUEST_EXEC 10M = 43M) = 611M. usernameMintTonCharge = 6M local exec + this = 617M (the client mint TON charge).
+const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 994000000; // clean-16 L2/#14 (owner: mint = exactly 1 TON): USERNAME_NOTIFY_VALUE (951M) + ATH-wallet downstream/exec overhead (VAULT_RESPONSE_ACK 3M + SOURCE_ACK 1M + NOTIFY_EXEC 7M + STORAGE_ENDOWMENT 20M + AVATAR_FWD_FEE 2M + NOTIFY_OWNER_REQUEST_EXEC 10M = 43M) = 994M. usernameMintTonCharge = 6M local exec + this = 1_000_000_000 = EXACTLY 1 TON client mint charge (premium permanent-username price; storage funded for centuries at the real 64962/cell/yr rate).
 const VAULT_BINDING_CAPSULE_HUB: Int = 1;
 const VAULT_BINDING_PROFILE_REGISTRY: Int = 2;
 const VAULT_BINDING_USERNAME_REGISTRY: Int = 4;
@@ -149,27 +147,6 @@ message(0x52705EDA) RegisterMessagingKeys {
 }
 
 message(0x89D648BB) ReplaceMessagingKeys {
-    owner_wallet: Address;
-    signature: Slice as bytes64;
-    signed_payload: Cell;
-    envelope_padding: Slice as remaining;
-}
-
-message(0x7E1F5035) CreateReceiveIntent {
-    owner_wallet: Address;
-    signature: Slice as bytes64;
-    signed_payload: Cell;
-    envelope_padding: Slice as remaining;
-}
-
-message(0x7E1F5036) ClaimReceiveIntent {
-    owner_wallet: Address;
-    signature: Slice as bytes64;
-    signed_payload: Cell;
-    envelope_padding: Slice as remaining;
-}
-
-message(0x7E1F5037) CancelReceiveIntent {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
@@ -234,12 +211,27 @@ message(0x720BDD6E) PruneBatchPublish {
     publish_id: Int as uint256;
 }
 
+// clean-16 L6/#18: permissionless prune of a STUCK ATH-settlement pending (username-mint / profile-avatar /
+// ath-withdrawal) whose downstream ATH-wallet or registry froze and never sent an ACK/bounce. Same fail-closed
+// tombstone lifecycle as PruneBatchPublish: NEVER refunds (a late in-window ACK/bounce is the only refund path).
+// kind: 1 = username-mint, 2 = profile-avatar, 3 = ath-withdrawal.
+message(0x720BDD6F) PruneStuckAthPending {
+    kind: Int as uint8;
+    query_id: Int as uint64;
+}
+
 message(0x5355434D) AnnounceSuccessorManifest {
     successor_manifest_hash: Int as uint256;
     successor_vault: Address;
 }
 
 message(0x3215B5FD) TopUpStorageReserve {}
+
+// clean-16 L2/#4: permissionless reclaim of a dormant, ZERO-balance account (users + its key record) after
+// VAULT_DORMANT_EVICTION_SECONDS of inactivity. No auth: the dormancy + zero-balance gates ARE the gate.
+message(0x45564454) EvictDormantUser {
+    owner_wallet: Address;
+}
 
 message(0x50A61121) ProfileAvatarTonExcessRefund {
     query_id: Int as uint64;
@@ -250,6 +242,7 @@ message(0x50A61121) ProfileAvatarTonExcessRefund {
 
 struct PendingAthWithdrawal {
     owner_wallet: Address;
+    tombstone: Bool;            // clean-16 L6/#18: set by PruneStuckAthPending on a stuck (frozen-downstream) pending
     recipient: Address;
     recipient_ath_wallet: Address;
     amount: Int as uint128;
@@ -271,26 +264,16 @@ struct PendingBatchPublish {
 
 struct PendingProfileAvatarPayment {
     owner_wallet: Address;
+    tombstone: Bool;            // clean-16 L6/#18
     amount: Int as uint128;
     created_at: Int as uint64;
 }
 
 struct PendingUsernameMintPayment {
     owner_wallet: Address;
+    tombstone: Bool;            // clean-16 L6/#18
     amount: Int as uint128;
     created_at: Int as uint64;
-}
-
-struct ReceiveIntent {
-    sender_wallet: Address;
-    recipient_wallet: Address;
-    asset: Int as uint8;
-    amount: Int as uint128;
-    commitment: Int as uint256;
-    client_nonce: Int as uint64;
-    settlement_reserve_ton: Int as uint128;
-    created_at: Int as uint64;
-    claimed: Bool;
 }
 
 struct KeyRecord {
@@ -313,9 +296,6 @@ const RECEIPT_RING_K: Int = 20;
 const ACT_WITHDRAW_TON: Int = 1;
 const ACT_WITHDRAW_ATH: Int = 2;
 const ACT_REPLACE_KEYS: Int = 3;
-const ACT_CREATE_INTENT: Int = 4;
-const ACT_CLAIM_INTENT: Int = 5;
-const ACT_CANCEL_INTENT: Int = 6;
 const ACT_PUBLISH_BATCH: Int = 7;
 const ACT_SET_AVATAR: Int = 8;
 const ACT_MINT_USERNAME: Int = 9;
@@ -357,15 +337,25 @@ const BATCH_FLOOR_PER_PART_PIN: Int = 6200000; // per-part walk compute (getComp
 const PROTOCOL_FEE_TON_BATCH: Int = 10000000; // 0.01 TON per part
 const STORAGE_RESERVE_PRIVATE: Int = 4300000; // 1M keepalive + 3.3M endowment
 const STORAGE_RESERVE_PUBLIC: Int = 10400000;  // 1M keepalive + 9.4M endowment (raised for the author/parent index slot)
+const STORAGE_RESERVE_INTRO: Int = 3000000; // clean-16 ИНК4 (G8-provisional): 1M keepalive + 2M endowment; mirrors the Hub INTRO endowment
+const STORAGE_RESERVE_RECOVERY: Int = 201000000; // clean-16 ИНК6 (G8-provisional, review-fix): 1M keepalive + 200M endowment (real worst-case 3yr on-chain body rent ≈166M); mirrors the Hub RECOVERY endowment. FINALIZE in Фаза-5
+// clean-16 L2/#4 (storage-solvency): a dormant, ZERO-balance account is permissionlessly evictable after this much
+// inactivity (owner-decided 2026-07-15 = 2 years). Bounds the never-pruned users/key_records state → self-financing.
+// A returning user simply re-registers (keys are seed-deterministic → zero crypto loss).
+const VAULT_DORMANT_EVICTION_SECONDS: Int = 63072000; // 2 years (= 2 × 31536000)
 // Structural GAS constants (runtime-priced via getComputeFee). CALIBRATED 2026-06-13 from sandbox worst-case:
 // per-part is the 32K measurement (Vault ~81,452 / Hub ~69,289) + margin; bases from the count-sweep intercept.
 // MAX_BATCH_PARTS=8 keeps the worst sendable batch (8x4K ~471k) under 50% of the 1M tx limit (gate GAS-GATE-G8).
 const VAULT_BATCH_BASE_GAS: Int = 50000;
 const VAULT_PART_GAS_PRIVATE: Int = 90000;
 const VAULT_PART_GAS_PUBLIC: Int = 90000;
+const VAULT_PART_GAS_INTRO: Int = 90000; // clean-16 ИНК4 (G8-provisional)
+const VAULT_PART_GAS_RECOVERY: Int = 90000; // clean-16 ИНК6 (G8-provisional): same 784-frame walk as CONV
 const HUB_BATCH_BASE_GAS: Int = 14000;
 const HUB_PART_GAS_PRIVATE: Int = 170000; // mirror CapsuleHub: private add (2 index pushes) + auto-evict one (2 index un-pushes)
 const HUB_PART_GAS_PUBLIC: Int = 180000; // mirror CapsuleHub: public add (index push + author-key hash) + auto-evict one
+const HUB_PART_GAS_INTRO: Int = 120000; // clean-16 ИНК4 (G8-provisional): mirror CapsuleHub HUB_PART_GAS_INTRO (store-only, no index push)
+const HUB_PART_GAS_RECOVERY: Int = 150000; // clean-16 ИНК6 (G8-provisional): mirror CapsuleHub HUB_PART_GAS_RECOVERY (keyed slot set + on-chain body write)
 const WALK_GAS_PER_PART_MAX: Int = 90000;
 const REJECT_BASE_GAS: Int = 10000;
 const ACK_GAS: Int = 9000;
@@ -395,24 +385,16 @@ struct UserState {
     current_key_id: Int as uint256;
     auth_pubkey: Int as uint256;
     publish_nonce: Int as uint64;
+    // clean-16 L2/#4 (storage-solvency): last time this account did ANYTHING (register/deposit/withdraw/rotate/
+    // publish). Bumped on every user-touching write; drives permissionless dormant eviction (EvictDormantUser).
+    // clean-16 L7/#17: uint64 (not uint32) so storing now() never overflows past ~2106 (Y2106); forward-compatible
+    // with TON extending gen_utime to uint64. The `now() - last_active` compare is exact Int math (no wrap hack).
+    last_active: Int as uint64;
     // Ring of the last RECEIPT_RING_K receipts, keyed by nonce mod RECEIPT_RING_K. Discovery
     // accelerator only (NOT a trust anchor): "delivered" still needs self-authenticated entry match.
     receipts: map<Int as uint8, ReceiptSlot>;
 }
 
-
-struct VaultReceiveIntentView {
-    exists: Bool;
-    sender_wallet: Address;
-    recipient_wallet: Address;
-    asset: Int;
-    amount: Int;
-    commitment: Int;
-    client_nonce: Int;
-    settlement_reserve_ton: Int;
-    created_at: Int;
-    claimed: Bool;
-}
 
 struct VaultKeyRecordView {
     exists: Bool;
@@ -437,6 +419,18 @@ struct VaultUserView {
     current_key_id: Int;
     auth_pubkey: Int;
     publish_nonce: Int;
+    last_active: Int;
+}
+
+// clean-16 L2/#5: off-chain solvency monitoring. `surplus < 0` means accrued storage rent has eroded the balance
+// below the reserve the never-pruned state needs → keeper must TopUpStorageReserve (the sweep flagged the absence
+// of any deficit getter). `surplus` also bounds how much TON is genuinely free of storage obligations.
+struct VaultStorageHealthView {
+    balance: Int;
+    storage_reserve: Int;
+    user_count: Int;
+    key_record_count: Int;
+    surplus: Int;
 }
 
 struct VaultUserReceiptsView {
@@ -486,7 +480,6 @@ struct VaultGlobalView {
     ath_master_address: Address;
     user_count: Int;
     key_record_count: Int;
-    receive_intent_count: Int;
     pending_ath_withdrawal_count: Int;
     pending_publish_count: Int;
     pending_profile_avatar_payment_count: Int;
@@ -513,7 +506,6 @@ contract Vault {
     genesis_config_hash: Int as uint256;
     users: map<Address, UserState>;
     key_records: map<Int, KeyRecord>;
-    receive_intents: map<Int as uint128, ReceiveIntent>;
     processed_ath_deposits: map<Int, Int>;
     pending_ath_withdrawals: map<Int, PendingAthWithdrawal>;
     pending_batch_publishes: map<Int, PendingBatchPublish>;
@@ -521,7 +513,6 @@ contract Vault {
     pending_username_mint_payments: map<Int, PendingUsernameMintPayment>;
     user_count: Int as uint64;
     key_record_count: Int as uint64;
-    receive_intent_count: Int as uint64;
     processed_ath_deposit_count: Int as uint64;
     pending_ath_withdrawal_count: Int as uint64;
     // Packed pending counters: low 32 bits = publish, next 16 = profile avatar, next 16 = username mint.
@@ -559,7 +550,6 @@ contract Vault {
         }
         self.users = emptyMap();
         self.key_records = emptyMap();
-        self.receive_intents = emptyMap();
         self.processed_ath_deposits = emptyMap();
         self.pending_ath_withdrawals = emptyMap();
         self.pending_batch_publishes = emptyMap();
@@ -567,7 +557,6 @@ contract Vault {
         self.pending_username_mint_payments = emptyMap();
         self.user_count = 0;
         self.key_record_count = 0;
-        self.receive_intent_count = 0;
         self.processed_ath_deposit_count = 0;
         self.pending_ath_withdrawal_count = 0;
         self.pending_publish_count = 0;
@@ -630,6 +619,7 @@ contract Vault {
             current_key_id: 0,
             auth_pubkey: 0,
             publish_nonce: 0,
+            last_active: 0,
             receipts: emptyMap()
         };
     }
@@ -653,6 +643,9 @@ contract Vault {
             part_count: part_count,
             at: now()
         });
+        // clean-16 L2/#4: every nonce-consuming action (withdraw/publish/rotate) flows through here → keeps the
+        // dormant-eviction clock fresh for any active account.
+        user.last_active = now();
         return user;
     }
 
@@ -864,10 +857,13 @@ contract Vault {
     }
 
     fun isPublishProfileValid(publishKind: Int, sizeClass: Int, cryptoSuite: Int, header0: Int, header1: Int): Bool {
-        if (publishKind == PUBLISH_KIND_PRIVATE) {
+        if ((publishKind == PUBLISH_KIND_PRIVATE) || (publishKind == PUBLISH_KIND_INTRO) || (publishKind == PUBLISH_KIND_RECOVERY)) {
             if (header0 == 0) { return false; }
             if (header1 == 0) { return false; }
             if (!self.isAllowedPrivateSizeClass(sizeClass)) { return false; }
+            // clean-16 ИНК6-fix: mirror the Hub RECOVERY body cap so an oversize recovery batch rejects cleanly
+            // (RJ_CLASS_OR_SUITE) pre-forward instead of being charged and then bounced by the Hub (13560).
+            if ((publishKind == PUBLISH_KIND_RECOVERY) && (sizeClass > RECOVERY_MAX_SIZE_CLASS)) { return false; }
             return cryptoSuite == CRYPTO_SUITE_HYBRID;
         }
         if (publishKind == PUBLISH_KIND_PUBLIC) {
@@ -919,6 +915,23 @@ contract Vault {
         return self.privateBodyCells(sizeClass, cryptoSuite) - 1;
     }
 
+    // clean-16 ИНК4: INTRO body shape uses the larger INTRO overhead (mirror CapsuleHub). INTRO is hybrid-only.
+    fun introBodyBytes(sizeClass: Int): Int {
+        return CAPSULEHUB_INTRO_HYBRID_BODY_OVERHEAD_BYTES + self.privateUsefulBytes(sizeClass);
+    }
+
+    fun introBodyBits(sizeClass: Int): Int {
+        return self.introBodyBytes(sizeClass) * 8;
+    }
+
+    fun introBodyCells(sizeClass: Int): Int {
+        return (self.introBodyBytes(sizeClass) + 126) / 127;
+    }
+
+    fun introBodyRefs(sizeClass: Int): Int {
+        return self.introBodyCells(sizeClass) - 1;
+    }
+
     fun publicBodyBytes(sizeClass: Int): Int {
         throwUnless(16330, self.isAllowedPublicSizeClass(sizeClass));
         return sizeClass * 1024;
@@ -959,14 +972,28 @@ contract Vault {
         }
     }
 
-    fun isPrivateCapsuleShapeValid(sizeClass: Int, cryptoSuite: Int, header0: Cell, header1: Cell, body: Cell): Bool {
-        if (!self.isExactCapsuleCell(header0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_PRIVATE_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS)) {
+    // clean-16 ИНК2: the CONV (ordinary-conversation, publish_kind=PRIVATE) shape validator — 320-bit header0.
+    // INTRO (isIntroCapsuleShapeValid, 336) and RECOVERY (reuses this CONV 320) land in later increments.
+    fun isConvCapsuleShapeValid(sizeClass: Int, cryptoSuite: Int, header0: Cell, header1: Cell, body: Cell): Bool {
+        if (!self.isExactCapsuleCell(header0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_CONV_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS)) {
             return false;
         }
         if (!self.isExactCapsuleCell(header1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS)) {
             return false;
         }
         return self.isExactCapsuleCell(body, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite));
+    }
+
+    // clean-16 ИНК4: the INTRO (first-contact) shape validator — 336-bit header0 + the larger INTRO body. Mirrors
+    // the Hub's INTRO receive shape checks so the Vault never forwards a shape the Hub would reject (13544/13548).
+    fun isIntroCapsuleShapeValid(sizeClass: Int, cryptoSuite: Int, header0: Cell, header1: Cell, body: Cell): Bool {
+        if (!self.isExactCapsuleCell(header0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_INTRO_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS)) {
+            return false;
+        }
+        if (!self.isExactCapsuleCell(header1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS)) {
+            return false;
+        }
+        return self.isExactCapsuleCell(body, self.introBodyCells(sizeClass), self.introBodyBits(sizeClass), self.introBodyRefs(sizeClass));
     }
 
     fun isPublicCapsuleShapeValid(sizeClass: Int, header: Cell, body: Cell): Bool {
@@ -988,18 +1015,30 @@ contract Vault {
     }
 
     // --- VPB2 batch helpers (bounce_id/tag reuse computePublishBounceId/computePublishBounceTag) ---
+    // clean-16 ИНК5: exhaustive per-kind reserve/gas; an unknown kind THROWS instead of the old silent PRIVATE
+    // fall-through (SAFETY #3 — a forgotten branch must never silently under-reserve/under-fund a new lane, which
+    // on immutable genesis would either drain the reserve or bounce every batch of that kind forever).
     fun batchStorageReserve(kind: Int): Int {
         if (kind == PUBLISH_KIND_PUBLIC) { return STORAGE_RESERVE_PUBLIC; }
+        if (kind == PUBLISH_KIND_INTRO) { return STORAGE_RESERVE_INTRO; }
+        if (kind == PUBLISH_KIND_RECOVERY) { return STORAGE_RESERVE_RECOVERY; }
+        throwUnless(16360, kind == PUBLISH_KIND_PRIVATE); // fail-closed on any unknown kind
         return STORAGE_RESERVE_PRIVATE;
     }
 
     fun batchHubPartGas(kind: Int): Int {
         if (kind == PUBLISH_KIND_PUBLIC) { return HUB_PART_GAS_PUBLIC; }
+        if (kind == PUBLISH_KIND_INTRO) { return HUB_PART_GAS_INTRO; }
+        if (kind == PUBLISH_KIND_RECOVERY) { return HUB_PART_GAS_RECOVERY; }
+        throwUnless(16360, kind == PUBLISH_KIND_PRIVATE);
         return HUB_PART_GAS_PRIVATE;
     }
 
     fun batchVaultPartGas(kind: Int): Int {
         if (kind == PUBLISH_KIND_PUBLIC) { return VAULT_PART_GAS_PUBLIC; }
+        if (kind == PUBLISH_KIND_INTRO) { return VAULT_PART_GAS_INTRO; }
+        if (kind == PUBLISH_KIND_RECOVERY) { return VAULT_PART_GAS_RECOVERY; }
+        throwUnless(16360, kind == PUBLISH_KIND_PRIVATE);
         return VAULT_PART_GAS_PRIVATE;
     }
 
@@ -1047,7 +1086,11 @@ contract Vault {
         user.ath_balance += pending.amount;
         self.users.set(pending.owner_wallet, user);
         self.pending_profile_avatar_payments.del(queryId);
-        self.decrementPendingProfileAvatarPaymentCount();
+        // L6/#18: a tombstoned pending was already decremented by PruneStuckAthPending — a late settlement
+        // still REFUNDS (credits ath_balance above) but must NOT decrement the count twice.
+        if (!pending.tombstone) {
+            self.decrementPendingProfileAvatarPaymentCount();
+        }
     }
 
     fun restorePendingUsernameMintPayment(queryId: Int, pending: PendingUsernameMintPayment) {
@@ -1055,7 +1098,9 @@ contract Vault {
         user.ath_balance += pending.amount;
         self.users.set(pending.owner_wallet, user);
         self.pending_username_mint_payments.del(queryId);
-        self.decrementPendingUsernameMintPaymentCount();
+        if (!pending.tombstone) {
+            self.decrementPendingUsernameMintPaymentCount();
+        }
     }
 
     // Credits the community-activity airdrop for `count` confirmed capsules (owner decision Q2: 10 ATH per
@@ -1081,6 +1126,16 @@ contract Vault {
     fun keyRecordStorageEndowment(cryptoSuiteMask: Int): Int {
         throwUnless(16100, cryptoSuiteMask == CRYPTO_SUITE_HYBRID);
         return VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT;
+    }
+
+    // clean-16 L2/#5 (storage-solvency): the TON the Vault MUST retain to fund its never-pruned state's rent. Mirrors
+    // the per-account endowment collected at registration (10M UserState + 30M HYBRID key record), scaled by the live
+    // counts. With the 2-year dormant eviction (#4) each account is funded for its whole on-chain life → this reserve
+    // is self-financing by construction. Withdrawals fail-loud rather than draining below it (else rent would silently
+    // eat custodial balances = hidden insolvency). G8-provisional: finalize the per-entry terms from measured DataSize.
+    fun vaultStorageReserve(): Int {
+        return self.user_count * VAULT_USER_STATE_STORAGE_ENDOWMENT
+            + self.key_record_count * VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT;
     }
 
     fun validatePqPubkeyCell(pqLen: Int, cryptoSuiteMask: Int, pqPubkey: Cell) {
@@ -1203,25 +1258,6 @@ contract Vault {
             .hash();
     }
 
-    fun computeReceiveIntentId(senderWallet: Address, recipientWallet: Address, asset: Int, amount: Int, clientNonce: Int): Int {
-        // Keep receive-intent lookups cheap enough for pre-accept external claims.
-        // The id is still hash-derived, but truncated to the uint128 storage key.
-        return beginCell()
-            .storeUint(RECEIVE_INTENT_ID_DOMAIN, 32)
-            .storeAddress(senderWallet)
-            .storeAddress(recipientWallet)
-            .storeUint(asset, 8)
-            .storeUint(amount, 128)
-            .storeUint(clientNonce, 64)
-            .endCell()
-            .hash() % UINT128_MOD;
-    }
-
-    fun computeReceiveIntentCommitment(intentId: Int, recipientWallet: Address, secret32: Int): Int {
-        // Protocol v1 intentionally exposes the secret gate value; claim still requires the recipient wallet signature.
-        return secret32;
-    }
-
     receive(msg: BindDeploymentManifest) {
         self.requireUnsealed();
         self.requireGenesisController();
@@ -1289,18 +1325,21 @@ contract Vault {
         self.sealed = true;
     }
 
-    // Spec 6: one-shot, genesis-controller-only, post-seal announcement of a future successor deployment. It is a
-    // DATA RECORD only — no auto-switch semantics (clients verify out-of-band and never migrate automatically), so
-    // immutability is preserved. The unset guard makes it irreversible: a set record can never be changed, so this
-    // is the migration trust-root hint, never an upgrade path. (The announcement key is the controller's sole
-    // standing post-seal power; custody/retirement is an operational mandate — see spec 6.)
+    // Spec 6 (clean-16 L4/#9): genesis-controller-only, post-seal announcement of a future successor deployment. It
+    // is a DATA RECORD only — no auto-switch semantics (clients verify out-of-band and never migrate automatically),
+    // so immutability is preserved; it is the migration trust-root HINT, never an upgrade path.
+    // REPLACEABLE (was one-shot): the controller may OVERWRITE the successor record — so a mistaken/griefed
+    // announcement can be corrected, and the migration path stays open across multiple hops (clean-16 → clean-17 …).
+    // Safe because the controller is a 3-of-5 multisig with a ~14-day timelock (controller-side), and the record is
+    // non-coercive. The controller (genesis_controller_address) is the sole caller; a quantum-safe controller is not
+    // required because the migration is executed BEFORE the ed25519 quantum horizon (#6 = ed25519 + migration plan).
     receive(msg: AnnounceSuccessorManifest) {
         self.requireSealed();
         let ext: Slice = self.genesis_ext.beginParse();
         let controllerHash: Int = ext.loadUint(256);
         throwUnless(15050, controllerHash != 0);
         throwUnless(15051, beginCell().storeAddress(sender()).endCell().hash() == controllerHash);
-        throwUnless(15052, !ext.loadBool()); // one-shot: a record already present is irreversible
+        // (no one-shot guard — the successor slot is REPLACEABLE by the controller, see above.)
         self.genesis_ext = beginCell()
             .storeUint(controllerHash, 256)
             .storeBool(true)
@@ -1323,7 +1362,28 @@ contract Vault {
 
         let user: UserState = self.getUserOrEmpty(sender());
         user.ton_balance += msg.amount;
+        user.last_active = now(); // L2/#4: a TON deposit is account activity → refresh dormant-eviction clock
         self.users.set(sender(), user);
+    }
+
+    // clean-16 L2/#4: permissionless reclaim of a dormant, ZERO-balance account. Bounds the never-pruned
+    // users/key_records maps (endowment funds each account for its dormancy window → self-financing). A returning
+    // user re-registers (keys seed-deterministic → zero crypto loss). The dormancy + zero-balance gates ARE the
+    // authorization; no signature needed. Custody is safe: an account holding ANY ton/ath balance is not evictable.
+    receive(msg: EvictDormantUser) {
+        self.requireSealed();
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16900, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16901, user.ton_balance == 0);
+        throwUnless(16902, user.ath_balance == 0);
+        throwUnless(16903, (now() - user.last_active) > VAULT_DORMANT_EVICTION_SECONDS);
+        if (user.current_key_id != 0) {
+            self.key_records.del(user.current_key_id);
+            self.key_record_count -= 1;
+        }
+        self.users.del(msg.owner_wallet);
+        self.user_count -= 1;
     }
 
     // clean-12: Vault deposits stay on Lane B (custom AthTransferNotification). This is an INTERNAL, app-controlled
@@ -1436,6 +1496,13 @@ contract Vault {
         if (!(user.ton_balance >= amount)) {
             return;
         }
+        // clean-16 L2/#5: fail-loud reserve floor — never let a withdrawal drain myBalance below the storage reserve
+        // the never-pruned state needs. If accrued rent has eroded the balance, the withdrawal is a safe no-op (funds
+        // NOT debited, nothing sent) and the shortfall is visible via get_storage_health — rather than silently eating
+        // custody. A keeper TopUpStorageReserve restores headroom.
+        if (!(myBalance() >= amount + self.vaultStorageReserve())) {
+            return;
+        }
         user.ton_balance -= amount;
         self.users.set(msg.owner_wallet, user);
 
@@ -1510,11 +1577,19 @@ contract Vault {
         if (self.pending_ath_withdrawals.exists(withdrawalId)) {
             return;
         }
+        // clean-16 L2/#5: fail-loud reserve floor (mirror WithdrawTon). The ATH transfer costs the Vault
+        // VAULT_ATH_WITHDRAW_MIN_VALUE of TON to forward; never let it drain myBalance below the storage reserve.
+        // Placed BEFORE the ath_balance debit so a breach is a safe no-op (ATH custody preserved), surfaced via
+        // get_storage_health, not a silent loss.
+        if (!(myBalance() >= VAULT_ATH_WITHDRAW_MIN_VALUE + self.vaultStorageReserve())) {
+            return;
+        }
         user.ath_balance -= amount;
         self.users.set(msg.owner_wallet, user);
         let recipientAthWallet: Address = self.deriveAthWalletAddress(recipient);
         self.pending_ath_withdrawals.set(withdrawalId, PendingAthWithdrawal {
             owner_wallet: msg.owner_wallet,
+            tombstone: false,
             recipient: recipient,
             recipient_ath_wallet: recipientAthWallet,
             amount: amount,
@@ -1545,7 +1620,7 @@ contract Vault {
             throwUnless(16660, pendingUsername.amount == msg.amount);
             if (sender() == self.usernameRegistryAthWalletAddress()) {
                 self.pending_username_mint_payments.del(msg.query_id);
-                self.decrementPendingUsernameMintPaymentCount();
+                if (!pendingUsername.tombstone) { self.decrementPendingUsernameMintPaymentCount(); }
             } else {
                 throwUnless(16661, sender() == self.vault_ath_wallet_address);
                 self.restorePendingUsernameMintPayment(msg.query_id, pendingUsername);
@@ -1559,7 +1634,7 @@ contract Vault {
             throwUnless(16620, pendingProfile.amount == msg.amount);
             if (sender() == self.profileRegistryAthWalletAddress()) {
                 self.pending_profile_avatar_payments.del(msg.query_id);
-                self.decrementPendingProfileAvatarPaymentCount();
+                if (!pendingProfile.tombstone) { self.decrementPendingProfileAvatarPaymentCount(); }
             } else {
                 throwUnless(16621, sender() == self.vault_ath_wallet_address);
                 self.restorePendingProfileAvatarPayment(msg.query_id, pendingProfile);
@@ -1578,7 +1653,7 @@ contract Vault {
         throwUnless(16030, sender() == pending.recipient_ath_wallet);
         self.refundPendingAthWithdrawalTon(pending, context().value);
         self.pending_ath_withdrawals.del(msg.query_id);
-        self.pending_ath_withdrawal_count -= 1;
+        if (!pending.tombstone) { self.pending_ath_withdrawal_count -= 1; } // L6/#18: tombstone already decremented
     }
 
     receive(msg: ATHTransferFailed) {
@@ -1612,7 +1687,7 @@ contract Vault {
         self.users.set(pending.owner_wallet, user);
         self.refundPendingAthWithdrawalTon(pending, context().value);
         self.pending_ath_withdrawals.del(msg.query_id);
-        self.pending_ath_withdrawal_count -= 1;
+        if (!pending.tombstone) { self.pending_ath_withdrawal_count -= 1; } // L6/#18: tombstone already decremented
     }
 
     bounced(msg: bounced<ATHTransferRequest>) {
@@ -1628,7 +1703,7 @@ contract Vault {
         self.users.set(pending.owner_wallet, user);
         self.refundPendingAthWithdrawalTon(pending, context().value);
         self.pending_ath_withdrawals.del(msg.query_id);
-        self.pending_ath_withdrawal_count -= 1;
+        if (!pending.tombstone) { self.pending_ath_withdrawal_count -= 1; } // L6/#18: tombstone already decremented
     }
 
     bounced(msg: bounced<ATHTransferRequestVaultProfileAvatar>) {
@@ -1723,6 +1798,7 @@ contract Vault {
         self.key_record_count += 1;
         user.current_key_id = keyId;
         user.auth_pubkey = msg.auth_pubkey;
+        user.last_active = now(); // L2/#4: fresh account starts its dormant-eviction clock
         self.users.set(sender(), user);
     }
 
@@ -1820,9 +1896,15 @@ contract Vault {
             return;
         }
 
-        oldRecord.revoked_at = now();
-        oldRecord.revoked_lt = curLt();
-        self.key_records.set(user.current_key_id, oldRecord);
+        // clean-16 L2/#3 (storage-solvency): DELETE the old record instead of keeping it revoked FOREVER. The old
+        // behaviour accumulated a 1.2KB ML-KEM record per rotation, never pruned (key_records had no .del) → an
+        // unbounded, under-funded state bomb, AND left old key_ids untrackable so a dormant user could never be
+        // fully evicted. The recipient decrypts with the seed-derived secret and senders re-resolve the current key
+        // via get_user, so the on-chain old record is not needed after rotation. Each user now holds exactly ONE
+        // live key record → O(1) per user, evictable. (The client checks revoked_lt only on the CURRENT record it
+        // fetches by current_key_id; a historical revoked_lt message-time check is NOT implemented — flagged for the
+        // external audit before seal.)
+        self.key_records.del(user.current_key_id);
 
         self.key_records.set(newKeyId, KeyRecord {
             owner_wallet: msg.owner_wallet,
@@ -1838,7 +1920,8 @@ contract Vault {
             revoked_at: 0,
             revoked_lt: 0
         });
-        self.key_record_count += 1;
+        // NET-ZERO on rotation: one record deleted above + one added here → key_record_count stays the number of
+        // LIVE records (= one per registered user). (Registration is the only path that increments it.)
         user.current_key_id = newKeyId;
         user.ton_balance -= remainingRequired;
         self.users.set(msg.owner_wallet, user);
@@ -1846,234 +1929,6 @@ contract Vault {
 
 
 
-    external(msg: CreateReceiveIntent) {
-        self.requireNoEnvelopePaddingRefs(msg.envelope_padding);
-        self.requireSealed();
-        let userOpt: UserState? = self.users.get(msg.owner_wallet);
-        throwUnless(16214, userOpt != null);
-        let user: UserState = userOpt!!;
-        throwUnless(16221, user.auth_pubkey != 0);
-        throwUnless(16222, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
-
-        let signedPayload: Slice = msg.signed_payload.beginParse();
-        let signedDomain: Int = signedPayload.loadUint(32);
-        throwUnless(16223, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
-        let signedManifestHash: Int = signedPayload.loadUint(256);
-        throwUnless(16224, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
-        vaultAddressSlice.skipBits(11);
-        throwUnless(16225, signedVaultHash == vaultAddressSlice.loadUint(256));
-        signedPayload.skipBits(256); // owner hash: re-validated post-accept (publish-external pattern) to fit the 10k pre-accept credit without a stack carry
-        throwUnless(16226, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CREATE);
-        let clientNonce: Int = signedPayload.loadUint(64);
-        throwUnless(16233, clientNonce == user.publish_nonce);
-        let createLocalReserve: Int = VAULT_STATE_GROWTH_EXEC_RESERVE;
-        throwUnless(16265, user.ton_balance >= createLocalReserve);
-        acceptMessage();
-        // Owner-domain binding re-validated post-accept by re-parsing the signed payload (publish-external
-        // pattern): skipped pre-accept to fit the 10k credit, re-parsed here to avoid a pre-accept stack carry.
-        // Sig-authenticated, so a mismatch is the owner's own misrouted request; no state has mutated yet so it
-        // reverts cleanly. Keeps same-auth two-wallet domain separation.
-        let createOwnerReparse: Slice = msg.signed_payload.beginParse();
-        createOwnerReparse.skipBits(32 + 256 + 256); // domain + manifest + vault -> owner hash
-        let createOwnerSlice: Slice = msg.owner_wallet.asSlice();
-        createOwnerSlice.skipBits(11);
-        throwUnless(16288, createOwnerReparse.loadUint(256) == createOwnerSlice.loadUint(256));
-        user.publish_nonce += 1;
-        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CREATE_INTENT, RES_PROCESSING, 0, 0);
-        user.ton_balance -= createLocalReserve;
-        self.users.set(msg.owner_wallet, user);
-        commit();
-
-        if (!(signedPayload.bits() == 0)) {
-            return;
-        }
-        if (!(signedPayload.refs() == 1)) {
-            return;
-        }
-        let actionPayload: Slice = signedPayload.loadRef().beginParse();
-        let asset: Int = actionPayload.loadUint(8);
-        let amount: Int = actionPayload.loadUint(128);
-        let recipientWallet: Address = actionPayload.loadAddress();
-        let commitment: Int = actionPayload.loadUint(256);
-        if (!(actionPayload.bits() == 0)) {
-            return;
-        }
-        if (!(actionPayload.refs() == 0)) {
-            return;
-        }
-        if (!((asset == ASSET_TON) || (asset == ASSET_ATH))) {
-            return;
-        }
-        if (!(amount > 0)) {
-            return;
-        }
-        if (!(commitment != 0)) {
-            return;
-        }
-
-        let tonReserve: Int = VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT + VAULT_STATE_GROWTH_EXEC_RESERVE + VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE;
-        let remainingTonReserve: Int = tonReserve - createLocalReserve;
-        if (asset == ASSET_TON) {
-            if (!(user.ton_balance >= amount + remainingTonReserve)) {
-                return;
-            }
-            let intentId: Int = self.computeReceiveIntentId(msg.owner_wallet, recipientWallet, asset, amount, clientNonce);
-            if (self.receive_intents.exists(intentId)) {
-                return;
-            }
-            user.ton_balance -= (amount + remainingTonReserve);
-            self.users.set(msg.owner_wallet, user);
-            self.receive_intents.set(intentId, ReceiveIntent {
-                sender_wallet: msg.owner_wallet,
-                recipient_wallet: recipientWallet,
-                asset: asset,
-                amount: amount,
-                commitment: commitment,
-                client_nonce: clientNonce,
-                settlement_reserve_ton: VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE,
-                created_at: now(),
-                claimed: false
-            });
-            self.receive_intent_count += 1;
-        } else {
-            if (!(self.isBasechainAddress(msg.owner_wallet))) {
-                return;
-            }
-            if (!(self.isBasechainAddress(recipientWallet))) {
-                return;
-            }
-            if (!(user.ath_balance >= amount)) {
-                return;
-            }
-            if (!(user.ton_balance >= remainingTonReserve)) {
-                return;
-            }
-            let intentId: Int = self.computeReceiveIntentId(msg.owner_wallet, recipientWallet, asset, amount, clientNonce);
-            if (self.receive_intents.exists(intentId)) {
-                return;
-            }
-            user.ath_balance -= amount;
-            user.ton_balance -= remainingTonReserve;
-            self.users.set(msg.owner_wallet, user);
-            self.receive_intents.set(intentId, ReceiveIntent {
-                sender_wallet: msg.owner_wallet,
-                recipient_wallet: recipientWallet,
-                asset: asset,
-                amount: amount,
-                commitment: commitment,
-                client_nonce: clientNonce,
-                settlement_reserve_ton: VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE,
-                created_at: now(),
-                claimed: false
-            });
-            self.receive_intent_count += 1;
-        }
-    }
-
-    external(msg: ClaimReceiveIntent) {
-        self.requireNoEnvelopePaddingRefs(msg.envelope_padding);
-        // Valid users/intents are created only by sealed flows; auth, manifest, vault binding, and intent checks stay pre-accept here.
-        let userOpt: UserState? = self.users.get(msg.owner_wallet);
-        throwUnless(16239, userOpt != null);
-        let user: UserState = userOpt!!;
-        throwUnless(16240, user.auth_pubkey != 0);
-        throwUnless(16241, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
-
-        let signedPayload: Slice = msg.signed_payload.beginParse();
-        let signedDomain: Int = signedPayload.loadUint(32);
-        throwUnless(16242, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
-        let signedManifestHash: Int = signedPayload.loadUint(256);
-        throwUnless(16243, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
-        vaultAddressSlice.skipBits(11);
-        throwUnless(16244, signedVaultHash == vaultAddressSlice.loadUint(256));
-        signedPayload.skipBits(256); // owner hash: owner-domain separation enforced by intent.recipient_wallet below
-        throwUnless(16245, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CLAIM);
-        let clientNonce: Int = signedPayload.loadUint(64);
-        throwUnless(16249, clientNonce == user.publish_nonce);
-        acceptMessage();
-        // Intent lookup + recipient + 256-bit secret moved post-accept (publish-external pattern) to fit the
-        // 10k pre-accept credit; re-parsed from a fresh slice to avoid a pre-accept stack carry. The secret is
-        // unguessable so post-accept gating is safe, the recipient check enforces owner-domain separation
-        // (incl. same-auth two-wallet), and a miss is the owner's own bad claim that reverts (nothing committed).
-        let claimRoot: Slice = msg.signed_payload.beginParse();
-        claimRoot.skipBits(32 + 256 + 256 + 256 + 8 + 64); // domain+manifest+vault+owner+action+nonce
-        let actionPayload: Slice = claimRoot.loadRef().beginParse();
-        let intentId: Int = actionPayload.loadUint(256);
-        let secret32: Int = actionPayload.loadUint(256);
-        let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
-        throwUnless(16276, intentOpt != null);
-        let intent: ReceiveIntent = intentOpt!!;
-        throwUnless(16278, msg.owner_wallet == intent.recipient_wallet);
-        throwUnless(16280, secret32 == intent.commitment);
-        user.publish_nonce += 1;
-        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CLAIM_INTENT, RES_PROCESSING, 0, 0);
-
-        if (intent.asset == ASSET_TON) {
-            user.ton_balance += intent.amount;
-        } else {
-            user.ath_balance += intent.amount;
-        }
-
-        self.users.set(msg.owner_wallet, user);
-        self.receive_intents.del(intentId);
-        self.receive_intent_count -= 1;
-    }
-
-    external(msg: CancelReceiveIntent) {
-        self.requireNoEnvelopePaddingRefs(msg.envelope_padding);
-        // Valid users/intents are created only by sealed flows; auth, manifest, vault binding, and intent checks stay pre-accept here.
-        let userOpt: UserState? = self.users.get(msg.owner_wallet);
-        throwUnless(16252, userOpt != null);
-        let user: UserState = userOpt!!;
-        throwUnless(16253, user.auth_pubkey != 0);
-        throwUnless(16254, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
-
-        let signedPayload: Slice = msg.signed_payload.beginParse();
-        let signedDomain: Int = signedPayload.loadUint(32);
-        throwUnless(16255, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
-        let signedManifestHash: Int = signedPayload.loadUint(256);
-        throwUnless(16256, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
-        vaultAddressSlice.skipBits(11);
-        throwUnless(16257, signedVaultHash == vaultAddressSlice.loadUint(256));
-        signedPayload.skipBits(256); // owner hash: owner-domain separation enforced by intent.sender_wallet below
-        throwUnless(16258, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CANCEL);
-        let clientNonce: Int = signedPayload.loadUint(64);
-        throwUnless(16262, clientNonce == user.publish_nonce);
-        acceptMessage();
-        // Intent lookup + sender check moved post-accept (publish-external pattern) to fit the 10k pre-accept
-        // credit; re-parsed from a fresh slice to avoid a pre-accept stack carry. The sender check enforces
-        // owner-domain separation (incl. same-auth two-wallet); a miss is the owner's own bad cancel that
-        // reverts (nothing committed).
-        let cancelRoot: Slice = msg.signed_payload.beginParse();
-        cancelRoot.skipBits(32 + 256 + 256 + 256 + 8 + 64); // domain+manifest+vault+owner+action+nonce
-        let actionPayload: Slice = cancelRoot.loadRef().beginParse();
-        let intentId: Int = actionPayload.loadUint(256);
-        let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
-        throwUnless(16285, intentOpt != null);
-        let intent: ReceiveIntent = intentOpt!!;
-        throwUnless(16286, msg.owner_wallet == intent.sender_wallet);
-        user.publish_nonce += 1;
-        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CANCEL_INTENT, RES_PROCESSING, 0, 0);
-
-        if (intent.asset == ASSET_TON) {
-            user.ton_balance += intent.amount;
-        } else {
-            user.ath_balance += intent.amount;
-        }
-
-        self.users.set(msg.owner_wallet, user);
-        self.receive_intents.del(intentId);
-        self.receive_intent_count -= 1;
-    }
 
     external(msg: PublishBatchFromVaultBalance) {
         // Pre-accept (O(1), inside the 10k credit): envelope strictness + binding + worst-case floor.
@@ -2121,7 +1976,7 @@ contract Vault {
             && (vroot.loadUint(256) == vAddr.loadUint(256));
         let kind: Int = vroot.loadUint(8);
         structuralOk = structuralOk
-            && ((kind == PUBLISH_KIND_PRIVATE) || (kind == PUBLISH_KIND_PUBLIC))
+            && ((kind == PUBLISH_KIND_PRIVATE) || (kind == PUBLISH_KIND_PUBLIC) || (kind == PUBLISH_KIND_INTRO) || (kind == PUBLISH_KIND_RECOVERY))
             && (oAddr.loadUint(11) == 1024)
             && (vroot.loadUint(256) == oAddr.loadUint(256));
         vroot.skipBits(64 + 128 + 8); // nonce + max_charge + part_count (all validated pre-accept)
@@ -2156,7 +2011,7 @@ contract Vault {
             let h1: Int = 0;
             let bh: Int = 0;
             let nextCell: Cell = partsRoot; // overwritten when not last; unused on the last iteration
-            if (kind == PUBLISH_KIND_PRIVATE) {
+            if ((kind == PUBLISH_KIND_PRIVATE) || (kind == PUBLISH_KIND_INTRO) || (kind == PUBLISH_KIND_RECOVERY)) {
                 let wantRefs: Int = 3;
                 if (!isLast) { wantRefs = 4; }
                 if (!((part.bits() == 784) && (part.refs() == wantRefs))) {
@@ -2171,12 +2026,23 @@ contract Vault {
                     let header1: Cell = part.loadRef();
                     let body: Cell = part.loadRef();
                     if (!isLast) { nextCell = part.loadRef(); }
-                    if (!self.isPublishProfileValid(PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite, h0, h1)) {
+                    // clean-16 ИНК4: CONV and INTRO share the 784 frame; INTRO validates the 336-bit header0 + the
+                    // larger INTRO body. The profile check (which validates suite==HYBRID) MUST run BEFORE the shape
+                    // validator: the shape/body helpers assume HYBRID and throw on a non-hybrid suite, so a bad suite
+                    // must reject cleanly as RJ_CLASS_OR_SUITE, never throw. The shape validator is selected by kind
+                    // (Vault↔Hub mirror; a desync would bounce every batch of that size).
+                    if (!self.isPublishProfileValid(kind, sizeClass, cryptoSuite, h0, h1)) {
                         rejectCode = RJ_CLASS_OR_SUITE; failIdx = i;
-                    } else if (!self.isPrivateCapsuleShapeValid(sizeClass, cryptoSuite, header0, header1, body)) {
-                        rejectCode = RJ_PAYLOAD_SHAPE; failIdx = i;
-                    } else if (!((header0.hash() == h0) && (header1.hash() == h1) && (body.hash() == bh))) {
-                        rejectCode = RJ_HASH_MISMATCH; failIdx = i;
+                    } else {
+                        let shapeOk: Bool = self.isConvCapsuleShapeValid(sizeClass, cryptoSuite, header0, header1, body);
+                        if (kind == PUBLISH_KIND_INTRO) {
+                            shapeOk = self.isIntroCapsuleShapeValid(sizeClass, cryptoSuite, header0, header1, body);
+                        }
+                        if (!shapeOk) {
+                            rejectCode = RJ_PAYLOAD_SHAPE; failIdx = i;
+                        } else if (!((header0.hash() == h0) && (header1.hash() == h1) && (body.hash() == bh))) {
+                            rejectCode = RJ_HASH_MISMATCH; failIdx = i;
+                        }
                     }
                 }
             } else {
@@ -2253,31 +2119,50 @@ contract Vault {
             hubMsgBits += 152;
         }
         let hubFwd: Int = getForwardFee(hubMsgCells, hubMsgBits, false);
-        let vaultCompute: Int = getComputeFee(VAULT_BATCH_BASE_GAS + self.batchVaultPartGas(kind) * partCount, false);
-
+        // clean-16 ИНК5: batchVaultPartGas throws on an unknown kind (SAFETY #3 — a forgotten kind branch must
+        // fail loud, not silently mis-price). On the reject path the signed kind may be an INVALID value that
+        // already set RJ_BINDING, so the kind-dependent Vault cost + canonical_total are computed ONLY for a batch
+        // that passed the gate (rejectCode == 0). The reject fee below is a flat floor that needs neither — so an
+        // invalid kind never reaches the throwing helper, while a VALID-but-unhandled kind still throws here.
+        //
         // canonical_total (the signed hold): the import term is the EXT_HARD worst case (== floor import, so an
         // honest send clears the floor gate too — G10); every other term is the runtime-priced REAL cost,
-        // including the Vault->Hub forward (hubFwd) so the Hub leg is funded even when the import over-hold is
-        // small. Success retention below uses the MEASURED import; the import over-hold (~0.07 TON snapshot)
-        // rides to the Hub and returns via the mode-128 ACK (Q4: protocol margin lives only in the per-part fee).
-        let canonicalTotal: Int = getForwardFee(EXT_HARD_CELLS, EXT_HARD_BITS, false)
-            + vaultCompute
-            + hubFwd
-            + totalFee
-            + getComputeFee(totalHubGas, false)
-            + totalStorage * 125 / 100
-            + getComputeFee(HUB_BATCH_BASE_GAS, false)
-            + ACK_MIN_FORWARD;
-        if ((rejectCode == 0) && (maxCharge < canonicalTotal)) {
-            rejectCode = RJ_UNDERPRICED;
+        // including the Vault->Hub forward (hubFwd) so the Hub leg is funded even when the import over-hold is small.
+        let vaultCompute: Int = 0;
+        if (rejectCode == 0) {
+            vaultCompute = getComputeFee(VAULT_BATCH_BASE_GAS + self.batchVaultPartGas(kind) * partCount, false);
+            let canonicalTotal: Int = getForwardFee(EXT_HARD_CELLS, EXT_HARD_BITS, false)
+                + vaultCompute
+                + hubFwd
+                + totalFee
+                + getComputeFee(totalHubGas, false)
+                + totalStorage * 125 / 100
+                + getComputeFee(HUB_BATCH_BASE_GAS, false)
+                + ACK_MIN_FORWARD;
+            if (maxCharge < canonicalTotal) {
+                rejectCode = RJ_UNDERPRICED;
+            }
         }
 
         if (rejectCode != 0) {
-            // Atomic reject WITH refund. reject_fee IS the pinned floor (worst-case import + bounded reject
-            // compute), so reject_fee == floor <= max_charge (pre-accept gate) => refund >= 0 ALWAYS, and the
-            // Vault recovers its real import (pin >= runtime import, gate G2). The user loses the worst-case
-            // import their padded/malformed external could have caused, plus one nonce; the receipt names the part.
+            // Atomic reject WITH refund. The pinned floor is the anti-grief minimum + the pre-accept gate; it is a
+            // config SNAPSHOT, so the drain-safety comment below matters.
             let rejectFee: Int = self.batchChargeFloor(partCount);
+            // clean-16 L6/#10 (config-staleness drain fix): the pinned floor could under-recover the Vault's REAL
+            // import if TON raises forward/gas fees above the snapshot post-deploy. We are POST-acceptMessage here
+            // (gas-ample) and measuredImport is the runtime import the Vault actually paid, so track the real cost
+            // UP: reject_fee = max(pinned floor, runtime import + runtime reject/walk compute). This removes the
+            // drain WITHOUT inflating the pre-accept hold (the gate/floor is unchanged); only a reject during a
+            // genuine fee spike costs more, recovering exactly what the Vault spent.
+            let runtimeReject: Int = measuredImport + getComputeFee(REJECT_BASE_GAS + WALK_GAS_PER_PART_MAX * partCount, false);
+            if (runtimeReject > rejectFee) {
+                rejectFee = runtimeReject;
+            }
+            // Cap at max_charge so the refund is never negative: an extreme spike past the user's pre-accept hold
+            // self-limits to keeping max_charge (still strictly better recovery than the stale pin would give).
+            if (rejectFee > maxCharge) {
+                rejectFee = maxCharge;
+            }
             user = self.updateReceipt(user, clientNonce, rejectCode, failIdx);
             user.ton_balance += maxCharge - rejectFee;
             self.users.set(msg.owner_wallet, user);
@@ -2410,6 +2295,7 @@ contract Vault {
         self.users.set(msg.owner_wallet, user);
         self.pending_profile_avatar_payments.set(queryId, PendingProfileAvatarPayment {
             owner_wallet: msg.owner_wallet,
+            tombstone: false,
             amount: PROFILE_AVATAR_PRICE_ATH,
             created_at: now()
         });
@@ -2521,6 +2407,7 @@ contract Vault {
         self.users.set(msg.owner_wallet, user);
         self.pending_username_mint_payments.set(queryId, PendingUsernameMintPayment {
             owner_wallet: msg.owner_wallet,
+            tombstone: false,
             amount: price,
             created_at: now()
         });
@@ -2647,6 +2534,78 @@ contract Vault {
         self.decrementPendingPublishCount();
     }
 
+    // clean-16 L6/#18: prune a STUCK ATH-settlement pending (frozen downstream, no ACK/bounce for
+    // VAULT_PENDING_PUBLISH_STALE_TTL) -> tombstone (a VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL window in which a late
+    // ACK/bounce can still REFUND) -> delete. Fail-closed: prune NEVER refunds; it only frees the pending-count so
+    // a frozen ATH wallet/registry can't jam the Vault forever. Decrement happens at tombstone (once); the late
+    // settlement handlers skip the decrement when pending.tombstone is set (belt-and-suspenders: exactly-once).
+    receive(msg: PruneStuckAthPending) {
+        self.requireSealed();
+        throwUnless(16573, context().value >= VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE);
+        let tombstoneExpiresAt: Int = now() + VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL;
+        if (msg.kind == 1) {
+            let opt: PendingUsernameMintPayment? = self.pending_username_mint_payments.get(msg.query_id);
+            throwUnless(16570, opt != null);
+            let p: PendingUsernameMintPayment = opt!!;
+            if (p.tombstone) {
+                throwUnless(16574, now() >= p.created_at);
+                self.pending_username_mint_payments.del(msg.query_id);
+                return;
+            }
+            throwUnless(16571, now() >= p.created_at + VAULT_PENDING_PUBLISH_STALE_TTL);
+            self.pending_username_mint_payments.set(msg.query_id, PendingUsernameMintPayment {
+                owner_wallet: p.owner_wallet,
+                tombstone: true,
+                amount: p.amount,
+                created_at: tombstoneExpiresAt
+            });
+            self.decrementPendingUsernameMintPaymentCount();
+            return;
+        }
+        if (msg.kind == 2) {
+            let opt: PendingProfileAvatarPayment? = self.pending_profile_avatar_payments.get(msg.query_id);
+            throwUnless(16570, opt != null);
+            let p: PendingProfileAvatarPayment = opt!!;
+            if (p.tombstone) {
+                throwUnless(16574, now() >= p.created_at);
+                self.pending_profile_avatar_payments.del(msg.query_id);
+                return;
+            }
+            throwUnless(16571, now() >= p.created_at + VAULT_PENDING_PUBLISH_STALE_TTL);
+            self.pending_profile_avatar_payments.set(msg.query_id, PendingProfileAvatarPayment {
+                owner_wallet: p.owner_wallet,
+                tombstone: true,
+                amount: p.amount,
+                created_at: tombstoneExpiresAt
+            });
+            self.decrementPendingProfileAvatarPaymentCount();
+            return;
+        }
+        if (msg.kind == 3) {
+            let opt: PendingAthWithdrawal? = self.pending_ath_withdrawals.get(msg.query_id);
+            throwUnless(16570, opt != null);
+            let p: PendingAthWithdrawal = opt!!;
+            if (p.tombstone) {
+                throwUnless(16574, now() >= p.created_at);
+                self.pending_ath_withdrawals.del(msg.query_id);
+                return;
+            }
+            throwUnless(16571, now() >= p.created_at + VAULT_PENDING_PUBLISH_STALE_TTL);
+            self.pending_ath_withdrawals.set(msg.query_id, PendingAthWithdrawal {
+                owner_wallet: p.owner_wallet,
+                tombstone: true,
+                recipient: p.recipient,
+                recipient_ath_wallet: p.recipient_ath_wallet,
+                amount: p.amount,
+                refundable_ton_amount: p.refundable_ton_amount,
+                created_at: tombstoneExpiresAt
+            });
+            self.pending_ath_withdrawal_count -= 1;
+            return;
+        }
+        throwUnless(16572, false); // unknown kind
+    }
+
     get fun get_user(owner: Address): VaultUserView {
         let userOpt: UserState? = self.users.get(owner);
         if (userOpt == null) {
@@ -2656,7 +2615,8 @@ contract Vault {
                 ath_balance: 0,
                 current_key_id: 0,
                 auth_pubkey: 0,
-                publish_nonce: 0
+                publish_nonce: 0,
+                last_active: 0
             };
         }
         let user: UserState = userOpt!!;
@@ -2666,7 +2626,19 @@ contract Vault {
             ath_balance: user.ath_balance,
             current_key_id: user.current_key_id,
             auth_pubkey: user.auth_pubkey,
-            publish_nonce: user.publish_nonce
+            publish_nonce: user.publish_nonce,
+            last_active: user.last_active
+        };
+    }
+
+    get fun get_storage_health(): VaultStorageHealthView {
+        let reserve: Int = self.vaultStorageReserve();
+        return VaultStorageHealthView {
+            balance: myBalance(),
+            storage_reserve: reserve,
+            user_count: self.user_count,
+            key_record_count: self.key_record_count,
+            surplus: myBalance() - reserve
         };
     }
 
@@ -2737,44 +2709,6 @@ contract Vault {
 
 
 
-    get fun get_receive_intent(intentId: Int): VaultReceiveIntentView {
-        let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
-        if (intentOpt == null) {
-            return VaultReceiveIntentView {
-                exists: false,
-                sender_wallet: myAddress(),
-                recipient_wallet: myAddress(),
-                asset: 0,
-                amount: 0,
-                commitment: 0,
-                client_nonce: 0,
-                settlement_reserve_ton: 0,
-                created_at: 0,
-                claimed: false
-            };
-        }
-        let intent: ReceiveIntent = intentOpt!!;
-        return VaultReceiveIntentView {
-            exists: true,
-            sender_wallet: intent.sender_wallet,
-            recipient_wallet: intent.recipient_wallet,
-            asset: intent.asset,
-            amount: intent.amount,
-            commitment: intent.commitment,
-            client_nonce: intent.client_nonce,
-            settlement_reserve_ton: intent.settlement_reserve_ton,
-            created_at: intent.created_at,
-            claimed: intent.claimed
-        };
-    }
-
-    get fun get_receive_intent_id(senderWallet: Address, recipientWallet: Address, asset: Int, amount: Int, clientNonce: Int): Int {
-        return self.computeReceiveIntentId(senderWallet, recipientWallet, asset, amount, clientNonce);
-    }
-
-    get fun get_receive_intent_commitment(intentId: Int, recipientWallet: Address, secret32: Int): Int {
-        return self.computeReceiveIntentCommitment(intentId, recipientWallet, secret32);
-    }
 
     // Pending batch-publish observability (spec 3.5). Key = bounce_id = publish_id mod 2^64; the client
     // computes it locally (it knows all publish_id inputs). Enables the diagnosis matrix without a backend.
@@ -2872,7 +2806,6 @@ contract Vault {
             ath_master_address: self.ath_master_address,
             user_count: self.user_count,
             key_record_count: self.key_record_count,
-            receive_intent_count: self.receive_intent_count,
             pending_ath_withdrawal_count: self.pending_ath_withdrawal_count,
             pending_publish_count: self.pendingPublishCount(),
             pending_profile_avatar_payment_count: self.pendingProfileAvatarPaymentCount(),

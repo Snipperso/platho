@@ -283,7 +283,7 @@ describe('Platho compact byte layout v1', () => {
     )).rejects.toThrow(/largest capsule size/i);
   });
 
-  it('COMPACT-06: encodes image and payment payloads without verbose JSON keys', () => {
+  it('COMPACT-06: encodes image and document payloads without verbose JSON keys', () => {
     const image = encodeCompactPayload({
       type: 'image',
       format: PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
@@ -295,22 +295,6 @@ describe('Platho compact byte layout v1', () => {
       format: PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
     });
     expect([...decodedImage.bytes]).toEqual([1, 2, 3, 4]);
-
-    const payment = encodeCompactPayload({
-      type: 'payment',
-      asset: 1,
-      amount: 123456789n,
-      intentId: new Uint8Array(32).fill(7),
-      secret32: new Uint8Array(32).fill(9),
-    });
-    const decodedPayment = decodeCompactPayload(payment);
-    expect(decodedPayment).toMatchObject({
-      type: 'payment',
-      asset: 1,
-      amount: 123456789n,
-    });
-    expect([...decodedPayment.intentId]).toEqual([...new Uint8Array(32).fill(7)]);
-    expect([...decodedPayment.secret32]).toEqual([...new Uint8Array(32).fill(9)]);
 
     const documentBytes = new Uint8Array([0x50, 0x44, 0x43, 0x31, 1, 0, 0, 1, 1, 0, 0, 0, 0, 2, 0x68, 0x69]);
     const document = encodeCompactPayload({

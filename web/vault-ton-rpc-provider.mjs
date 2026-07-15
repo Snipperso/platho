@@ -63,9 +63,6 @@ const TONCENTER_RUN_GET_METHOD_CACHE_TTLS_MS = Object.freeze({
   get_user_receipts: 5_000,
   get_wallet_data: 10_000,
   get_key_record: 300_000,
-  get_receive_intent: 120_000,
-  get_receive_intent_id: 120_000,
-  get_receive_intent_commitment: 120_000,
   get_ath_withdrawal_id: 120_000,
   get_pending_ath_withdrawal_for: 10_000,
   get_canonical_publish_charge: 60_000,
@@ -1205,22 +1202,6 @@ export function decodeVaultKeyRecordViewStack(result) {
   };
 }
 
-export function decodeVaultReceiveIntentViewStack(result) {
-  const stack = extractStack(result);
-  return {
-    exists: readStackBool(stack, 0, 'Vault receive intent exists'),
-    sender_wallet: readStackAddress(stack, 1, 'Vault receive intent sender_wallet'),
-    recipient_wallet: readStackAddress(stack, 2, 'Vault receive intent recipient_wallet'),
-    asset: readStackInt(stack, 3, 'Vault receive intent asset'),
-    amount: readStackInt(stack, 4, 'Vault receive intent amount'),
-    commitment: readStackInt(stack, 5, 'Vault receive intent commitment'),
-    client_nonce: readStackInt(stack, 6, 'Vault receive intent client_nonce'),
-    settlement_reserve_ton: readStackInt(stack, 7, 'Vault receive intent settlement_reserve_ton'),
-    created_at: readStackInt(stack, 8, 'Vault receive intent created_at'),
-    claimed: readStackBool(stack, 9, 'Vault receive intent claimed'),
-  };
-}
-
 export function decodeVaultPendingAthWithdrawalViewStack(result) {
   const stack = extractStack(result);
   return {
@@ -1235,8 +1216,8 @@ export function decodeVaultPendingAthWithdrawalViewStack(result) {
 
 export function decodeVaultGlobalViewStack(result) {
   const stack = extractStack(result);
-  if (stack.length !== 23) {
-    throw new VaultTonRpcProviderError(`Vault global stack layout mismatch: expected 23 fields, got ${stack.length}`, {
+  if (stack.length !== 22) {
+    throw new VaultTonRpcProviderError(`Vault global stack layout mismatch: expected 22 fields, got ${stack.length}`, {
       code: 'VAULT_GLOBAL_STACK_MISMATCH',
       stackLength: stack.length,
     });
@@ -1254,17 +1235,16 @@ export function decodeVaultGlobalViewStack(result) {
     ath_master_address: readStackAddress(stack, 9, 'Vault global ath_master_address'),
     user_count: readStackInt(stack, 10, 'Vault global user_count'),
     key_record_count: readStackInt(stack, 11, 'Vault global key_record_count'),
-    receive_intent_count: readStackInt(stack, 12, 'Vault global receive_intent_count'),
-    pending_ath_withdrawal_count: readStackInt(stack, 13, 'Vault global pending_ath_withdrawal_count'),
-    pending_publish_count: readStackInt(stack, 14, 'Vault global pending_publish_count'),
-    pending_profile_avatar_payment_count: readStackInt(stack, 15, 'Vault global pending_profile_avatar_payment_count'),
-    pending_username_mint_payment_count: readStackInt(stack, 16, 'Vault global pending_username_mint_payment_count'),
-    processed_ath_deposit_count: readStackInt(stack, 17, 'Vault global processed_ath_deposit_count'),
-    pending_publish_stale_ttl: readStackInt(stack, 18, 'Vault global pending_publish_stale_ttl'),
-    airdrop_remaining_ath: readStackInt(stack, 19, 'Vault global airdrop_remaining_ath'),
-    airdrop_distributed_ath: readStackInt(stack, 20, 'Vault global airdrop_distributed_ath'),
-    airdrop_reward_per_message_ath: readStackInt(stack, 21, 'Vault global airdrop_reward_per_message_ath'),
-    airdrop_total_allocation_ath: readStackInt(stack, 22, 'Vault global airdrop_total_allocation_ath'),
+    pending_ath_withdrawal_count: readStackInt(stack, 12, 'Vault global pending_ath_withdrawal_count'),
+    pending_publish_count: readStackInt(stack, 13, 'Vault global pending_publish_count'),
+    pending_profile_avatar_payment_count: readStackInt(stack, 14, 'Vault global pending_profile_avatar_payment_count'),
+    pending_username_mint_payment_count: readStackInt(stack, 15, 'Vault global pending_username_mint_payment_count'),
+    processed_ath_deposit_count: readStackInt(stack, 16, 'Vault global processed_ath_deposit_count'),
+    pending_publish_stale_ttl: readStackInt(stack, 17, 'Vault global pending_publish_stale_ttl'),
+    airdrop_remaining_ath: readStackInt(stack, 18, 'Vault global airdrop_remaining_ath'),
+    airdrop_distributed_ath: readStackInt(stack, 19, 'Vault global airdrop_distributed_ath'),
+    airdrop_reward_per_message_ath: readStackInt(stack, 20, 'Vault global airdrop_reward_per_message_ath'),
+    airdrop_total_allocation_ath: readStackInt(stack, 21, 'Vault global airdrop_total_allocation_ath'),
   };
 }
 
@@ -2215,51 +2195,6 @@ export function createVaultTonRpcProvider(options = {}) {
         stack: [stackNumber(keyId)],
         ...runGetCallOptions(callOptions),
       }));
-    },
-    async getReceiveIntent(intentId, callOptions = {}) {
-      const transport = resolveTransport(options);
-      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
-      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      return decodeVaultReceiveIntentViewStack(await transport.runGetMethod({
-        address: vaultAddress,
-        method: 'get_receive_intent',
-        stack: [stackNumber(intentId)],
-        ...runGetCallOptions(callOptions),
-      }));
-    },
-    async getReceiveIntentId(senderWallet, recipientWallet, asset, amount, clientNonce, callOptions = {}) {
-      const transport = resolveTransport(options);
-      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
-      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      const result = await transport.runGetMethod({
-        address: vaultAddress,
-        method: 'get_receive_intent_id',
-        stack: [
-          stackAddress(senderWallet),
-          stackAddress(recipientWallet),
-          stackNumber(asset),
-          stackNumber(amount),
-          stackNumber(clientNonce),
-        ],
-        ...runGetCallOptions(callOptions),
-      });
-      return readStackInt(extractStack(result), 0, 'Vault receive intent id');
-    },
-    async getReceiveIntentCommitment(intentId, recipientWallet, secret32, callOptions = {}) {
-      const transport = resolveTransport(options);
-      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
-      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      const result = await transport.runGetMethod({
-        address: vaultAddress,
-        method: 'get_receive_intent_commitment',
-        stack: [
-          stackNumber(intentId),
-          stackAddress(recipientWallet),
-          stackNumber(secret32),
-        ],
-        ...runGetCallOptions(callOptions),
-      });
-      return readStackInt(extractStack(result), 0, 'Vault receive intent commitment');
     },
     async getAthWithdrawalId(ownerWallet, queryId, callOptions = {}) {
       const transport = resolveTransport(options);
