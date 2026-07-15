@@ -64,6 +64,10 @@ describe('embedded Platho wallet', () => {
     expect(imported.address).toBe(wallet.address);
     expect(second.encryptionKeyPair.keyId).toBe(first.encryptionKeyPair.keyId);
     expect(Buffer.from(second.signingPublicKey).toString('hex')).toBe(Buffer.from(first.signingPublicKey).toString('hex'));
+    // clean-16 hybrid: the stealth scan key MUST derive deterministically from the seed (frozen info
+    // 'messaging.hybrid-v1.scan.x25519'). A random scan secret desyncs the advertised scan_pubkey from the one
+    // registered in the Vault between sessions/devices, so no INTRO capsule would ever be accepted after reinstall.
+    expect(Buffer.from(second.scanPublicKey).toString('hex')).toBe(Buffer.from(first.scanPublicKey).toString('hex'));
     await expect(importPlathoWallet(`platho1.${'00'.repeat(32)}`)).rejects.toThrow(/24 words|checksum|word/i);
   });
 
@@ -324,6 +328,7 @@ describe('embedded Platho wallet', () => {
       pq_kem_pubkey_len: draft.message.pq_kem_pubkey_len,
       pq_kem_pubkey: draft.message.pq_kem_pubkey,
       crypto_suite_mask: draft.message.crypto_suite_mask,
+      scan_pubkey: draft.message.scan_pubkey,
       created_at: 1_700_000_000n,
       created_lt: 1n,
       revoked_at: 0n,
@@ -341,7 +346,10 @@ describe('embedded Platho wallet', () => {
       replayCache: new Set(),
     });
 
-    expect(capsule.header0.recipientKeyId).toBe(bobIdentity.encryptionKeyPair.keyId);
+    // clean-16 PH0C: recipient_key_id was REMOVED from header0 (stealth). The recipient is confirmed by a
+    // successful ML-KEM decrypt instead; opened.openedAs === 'recipient' proves the routing resolved correctly.
+    expect(capsule.header0.recipientKeyId).toBeUndefined();
+    expect(opened.openedAs).toBe('recipient');
     expect(opened.plaintext).toBe('hello bob');
     await expect(publicKeyBundleFromVaultKeyRecord({
       ...keyRecord,

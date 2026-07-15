@@ -1,0 +1,641 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/PlathoController/PlathoController_PlathoController.fc` 
+PROGRAM{
+  DECLPROC __tact_dict_get_int_int
+  DECLPROC __tact_dict_set_int_int
+  DECLPROC $AnnounceSuccessorManifest$_store
+  DECLPROC $AnnounceSuccessorManifest$_store_cell
+  DECLPROC $PlathoController$_store
+  DECLPROC $PlathoController$_load
+  DECLPROC $ControllerStateView$_to_external
+  DECLPROC $PlathoController$init$_load
+  DECLPROC $PlathoController$_contract_init
+  DECLPROC $PlathoController$_contract_load
+  DECLPROC $PlathoController$_contract_store
+  DECLPROC $PlathoController$_fun_requireThreshold
+  DECLPROC $PlathoController$_fun_actionDigest
+  DECLPROC $PlathoController$_fun_setPendingCommon
+  DECLPROC $ControllerStateView$_constructor_threshold_signer_count_nonce_timelock_seconds_has_pending_pending_kind_pending_effective_at_pending_manifest_hash_pending_target_vault_pending_successor_vault_pending_rotate_slot_pending_rotate_pubkey
+  DECLPROC $PlathoController$_fun_get_controller_state
+  DECLPROC $PlathoController$_fun_get_signer
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
+  DECLPROC $AnnounceSuccessorManifest$_constructor_successor_manifest_hash_successor_vault
+  69184 DECLMETHOD %get_controller_state
+  73560 DECLMETHOD %get_signer
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_dict_get_int_int PROCINLINE:<{
+    s1 s3 s3 XCHG3
+    DICTIGET
+    NULLSWAPIFNOT
+    IF:<{
+      SWAP
+      LDIX
+      DROP
+    }>ELSE<{
+      2DROP
+      PUSHNULL
+    }>
+  }>
+  __tact_dict_set_int_int PROCINLINE:<{
+    OVER
+    ISNULL
+    IF:<{
+      2DROP
+      -ROT
+      DICTIDEL
+      DROP
+    }>ELSE<{
+      NEWC
+      SWAP
+      STIX
+      s1 s3 s3 XCHG3
+      DICTISETB
+    }>
+  }>
+  $AnnounceSuccessorManifest$_store PROCINLINE:<{
+    1398096717 PUSHINT
+    s0 s3 XCHG2
+    32 STU
+    256 STU
+    STSLICE
+  }>
+  $AnnounceSuccessorManifest$_store_cell PROCINLINE:<{
+    -ROT
+    $AnnounceSuccessorManifest$_store INLINECALLDICT
+    ENDC
+  }>
+  $PlathoController$_store PROCINLINE:<{
+    s9 s10 XCHG2
+    STDICT
+    s1 s7 XCHG
+    64 STU
+    s1 s5 XCHG
+    1 STI
+    s1 s3 XCHG
+    8 STU
+    64 STU
+    256 STU
+    STSLICE
+    STSLICE
+    8 STU
+    SWAP
+    NEWC
+    256 STU
+    STBREFR
+  }>
+  $PlathoController$_load PROCINLINE:<{
+    LDDICT
+    64 LDU
+    1 LDI
+    8 LDU
+    64 LDU
+    256 LDU
+    LDMSGADDR
+    LDMSGADDR
+    8 LDU
+    LDREF
+    SWAP
+    CTOS
+    256 LDU
+    DROP
+    s1 s10 XCHG
+    s1 s9 XCHG
+    s1 s8 XCHG
+    s1 s7 XCHG
+    s1 s6 XCHG
+    s1 s5 XCHG
+    s1 s4 XCHG
+    s3 s3 s0 XCHG3
+  }>
+  $ControllerStateView$_to_external PROCINLINE:<{
+  }>
+  $PlathoController$init$_load PROCINLINE:<{
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    LDREF
+    SWAP
+    CTOS
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    DROP
+    s2 s5 XCHG
+    s2 s4 XCHG
+    s2 s3 XCHG
+  }>
+  $PlathoController$_contract_init PROCINLINE:<{
+    PUSHNULL
+    257 PUSHINT
+    0 PUSHINT
+    OVER
+    s3 s4 XCHG
+    s1 s3 s0 XCHG3
+    s1 s8 XCHG
+    __tact_dict_set_int_int INLINECALLDICT
+    257 PUSHINT
+    1 PUSHINT
+    OVER
+    s3 s4 XCHG
+    s1 s3 s0 XCHG3
+    s1 s6 XCHG
+    __tact_dict_set_int_int INLINECALLDICT
+    257 PUSHINT
+    2 PUSHINT
+    OVER
+    s3 s4 XCHG
+    s1 s3 s0 XCHG3
+    __tact_dict_set_int_int INLINECALLDICT
+    257 PUSHINT
+    3 PUSHINT
+    OVER
+    s3 s4 XCHG
+    s1 s3 s0 XCHG3
+    __tact_dict_set_int_int INLINECALLDICT
+    257 PUSHINT
+    4 PUSHINT
+    OVER
+    s3 s4 XCHG
+    s1 s3 s0 XCHG3
+    __tact_dict_set_int_int INLINECALLDICT
+    0 PUSHINT
+    FALSE
+    s1 s1 s1 PUSH3
+        MYADDR
+        MYADDR
+    s2 s2 PUSH2
+  }>
+  $PlathoController$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $PlathoController$_load INLINECALLDICT
+      1 10 BLKDROP2
+    }>ELSE<{
+      $PlathoController$init$_load INLINECALLDICT
+      s0 s5 XCHG
+      ENDS
+      4 ROLL
+      $PlathoController$_contract_init INLINECALLDICT
+    }>
+  }>
+  $PlathoController$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    10 -ROLL
+    $PlathoController$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $PlathoController$_fun_requireThreshold PROCREF:<{
+    0 PUSHINT
+    -1 PUSHINT
+    TRUE
+    s2 PUSH
+    WHILE:<{
+      OVER
+      IF:<{
+        DUP
+        5 LESSINT
+      }>ELSE<{
+        FALSE
+      }>
+    }>DO<{
+      s4 PUSH
+          CTOS
+      8 LDU
+      9 PUSHPOW2
+      LDSLICEX
+      s2 PUSH
+      25010 PUSHINT
+      s0 s7 XCHG
+      GREATER
+      s1 s6 XCHG
+      THROWANYIFNOT
+      25011 PUSHINT
+      s2 PUSH
+      5 LESSINT
+      THROWANYIFNOT
+      257 PUSHINT
+      DUP
+      19 s() PUSH
+      s2 s4 s2 XCPUXC
+      __tact_dict_get_int_int INLINECALLDICT
+      25012 PUSHINT
+      OVER
+      ISNULL
+      NOT
+      THROWANYIFNOT
+      25013 PUSHINT
+      s9 s2 s(-1) PUXC2
+          CHKSIGNU
+      THROWANYIFNOT
+      s0 s4 XCHG
+      INC
+      s3 PUSH
+          SREFS
+      1 EQINT
+      IF:<{
+        s5 POP
+        s0 s2 XCHG
+            LDREF
+        DROP
+      }>ELSE<{
+        2 2 BLKDROP2
+        s0 s3 XCHG
+        FALSE
+        SWAP
+      }>
+      s0 s2 XCHG
+      INC
+      s2 s4 XCHG
+      s2 s3 XCHG
+    }>
+    s3 s4 XCHG
+    4 BLKDROP
+    25014 PUSHINT
+    s2 POP
+    2 GTINT
+    THROWANYIFNOT
+  }>
+  $PlathoController$_fun_actionDigest PROCREF:<{
+        NEWC
+    1347175217 PUSHINT
+    SWAP
+    32 STU
+        MYADDR
+        STSLICER
+    s11 s(-1) PUXC
+    64 STU
+    s1 s2 XCHG
+    8 STU
+    256 STU
+        ENDC
+        HASHCU
+  }>
+  $PlathoController$_fun_setPendingCommon PROCREF:<{
+    s6 POP
+    s6 POP
+    25020 PUSHINT
+    s0 s7 XCHG
+    NOT
+    s1 s7 XCHG
+    THROWANYIFNOT
+    TRUE
+        NOW
+    1209600 PUSHINT
+    ADD
+    s0 s8 XCHG
+    INC
+    s0 s8 XCHG
+    s0 s5 XCHG
+    s7 s6 XCHG2
+  }>
+  $ControllerStateView$_constructor_threshold_signer_count_nonce_timelock_seconds_has_pending_pending_kind_pending_effective_at_pending_manifest_hash_pending_target_vault_pending_successor_vault_pending_rotate_slot_pending_rotate_pubkey PROCINLINE:<{
+  }>
+  $PlathoController$_fun_get_controller_state PROCREF:<{
+    3 PUSHINT
+    5 PUSHINT
+    s10 PUSH
+    1209600 PUSHINT
+    s11 s10 s9 PUSH3
+    s11 s10 s9 PUSH3
+    s11 s10 PUSH2
+    $ControllerStateView$_constructor_threshold_signer_count_nonce_timelock_seconds_has_pending_pending_kind_pending_effective_at_pending_manifest_hash_pending_target_vault_pending_successor_vault_pending_rotate_slot_pending_rotate_pubkey INLINECALLDICT
+  }>
+  $PlathoController$_fun_get_signer PROCREF:<{
+    257 PUSHINT
+    s0 s11 PUSH2
+    s3 s3 XCHG2
+    __tact_dict_get_int_int INLINECALLDICT
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      0 PUSHINT
+    }>
+  }>
+  $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
+    s3 s4 s3 XCHG3
+  }>
+  $AnnounceSuccessorManifest$_constructor_successor_manifest_hash_successor_vault PROCINLINE:<{
+  }>
+  %get_controller_state PROC:<{
+    $PlathoController$_contract_load INLINECALLDICT
+    $PlathoController$_fun_get_controller_state INLINECALLDICT
+    10 12 BLKDROP2
+    $ControllerStateView$_to_external INLINECALLDICT
+  }>
+  %get_signer PROC:<{
+    $PlathoController$_contract_load INLINECALLDICT
+    10 ROLL
+    $PlathoController$_fun_get_signer INLINECALLDICT
+    10 1 BLKDROP2
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $PlathoController$_contract_load INLINECALLDICT
+    s0 s11 XCHG
+    IFJMP:<{
+      11 BLKDROP
+    }>
+    0 PUSHINT
+    s10 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s10 XCHG
+      32 LDU
+      s0 s11 XCHG
+    }>
+    OVER
+    3235774465 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s9 XCHG
+      64 LDU
+      LDMSGADDR
+      256 LDU
+      LDMSGADDR
+      LDREF
+      DROP
+          NEWC
+      s4 PUSH
+          STSLICER
+      s3 s(-1) PUXC
+      256 STU
+      s2 PUSH
+          STSLICER
+          ENDC
+          HASHCU
+      25001 PUSHINT
+      s6 s13 XCPU
+      EQUAL
+      s1 s6 XCHG
+      THROWANYIFNOT
+      s12 s11 s10 PUSH3
+      s12 s11 s10 PUSH3
+      s12 s11 PUSH2
+      21 s() PUSH
+      23 s() PUSH
+      s10 22 s() XCHG
+      s9 21 s() XCHG
+      s8 20 s() XCHG
+      s7 19 s() XCHG
+      s6 18 s() XCHG
+      s5 17 s() XCHG
+      s4 16 s() XCHG
+      s3 s15 XCHG
+      s2 23 s() XCHG
+      s1 24 s() XCHG
+      1 PUSHINT
+      s0 s15 XCHG2
+      $PlathoController$_fun_actionDigest INLINECALLDICT
+      10 1 BLKDROP2
+      s4 s13 XCHG
+      s3 s14 XCHG
+      s13 s0 s12 XCHG3
+      $PlathoController$_fun_requireThreshold INLINECALLDICT
+      1 PUSHINT
+      $PlathoController$_fun_setPendingCommon INLINECALLDICT
+      2 2 BLKDROP2
+      s2 POP
+      s6 s9 XCHG
+      s5 s8 XCHG
+      s4 s7 XCHG
+      s3 s6 XCHG
+      s2 s5 XCHG
+      s4 s0 s0 XCHG3
+      $PlathoController$_contract_store INLINECALLDICT
+    }>
+    OVER
+    3235774466 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s9 XCHG
+      64 LDU
+      8 LDU
+      256 LDU
+      LDREF
+      DROP
+      25002 PUSHINT
+      s3 PUSH
+      5 LESSINT
+      THROWANYIFNOT
+      25003 PUSHINT
+      s2 PUSH
+      0 NEQINT
+      THROWANYIFNOT
+          NEWC
+      s3 s(-1) PUXC
+      8 STU
+      s2 s(-1) PUXC
+      256 STU
+          ENDC
+          HASHCU
+      25004 PUSHINT
+      s5 s12 XCPU
+      EQUAL
+      s1 s5 XCHG
+      THROWANYIFNOT
+      s11 s10 s9 PUSH3
+      s11 s10 s9 PUSH3
+      s11 s10 PUSH2
+      20 s() PUSH
+      22 s() PUSH
+      s10 21 s() XCHG
+      s9 20 s() XCHG
+      s8 19 s() XCHG
+      s7 18 s() XCHG
+      s6 17 s() XCHG
+      s5 16 s() XCHG
+      s4 s15 XCHG
+      s3 s14 XCHG
+      s2 22 s() XCHG
+      s1 23 s() XCHG
+      2 PUSHINT
+      s0 s14 XCHG2
+      $PlathoController$_fun_actionDigest INLINECALLDICT
+      10 1 BLKDROP2
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s4 s12 XCHG
+      s3 s13 XCHG
+      s13 s0 s12 XCHG3
+      $PlathoController$_fun_requireThreshold INLINECALLDICT
+      2 PUSHINT
+      $PlathoController$_fun_setPendingCommon INLINECALLDICT
+      2DROP
+      2 8 BLKSWAP
+      $PlathoController$_contract_store INLINECALLDICT
+    }>
+    OVER
+    3235774467 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s9 XCHG
+      64 LDU
+      LDREF
+      DROP
+      25005 PUSHINT
+      s8 PUSH
+      THROWANYIFNOT
+      25006 PUSHINT
+      s2 s9 XCPU
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      s8 s7 s6 PUSH3
+      s8 s7 s6 PUSH3
+      s8 s7 s15 PUSH3
+      19 s() PUSH
+      s9 18 s() XCHG
+      s8 17 s() XCHG
+      s7 16 s() XCHG
+      s6 s15 XCHG
+      s5 s14 XCHG
+      s4 s13 XCHG
+      s3 s12 XCHG
+      s2 s11 XCHG
+      s1 19 s() XCHG
+      s0 20 s() XCHG
+      3 PUSHINT
+      0 PUSHINT
+      $PlathoController$_fun_actionDigest INLINECALLDICT
+      10 1 BLKDROP2
+      s9 s11 XCHG
+      s8 s10 XCHG
+      s7 s9 XCHG
+      s6 s8 XCHG
+      s5 s7 XCHG
+      s4 s6 XCHG
+      s3 s5 XCHG
+      s2 s4 XCHG
+      s3 s0 s0 XCHG3
+      $PlathoController$_fun_requireThreshold INLINECALLDICT
+      s6 POP
+      s6 POP
+      FALSE
+      0 PUSHINT
+      s0 s8 XCHG
+      INC
+      s0 s8 XCHG
+      s7 s6 XCHG2
+      $PlathoController$_contract_store INLINECALLDICT
+    }>
+    s11 POP
+    DUP
+    3235774468 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s9 POP
+      25030 PUSHINT
+      s0 s6 XCHG2
+      THROWANYIFNOT
+      25031 PUSHINT
+          NOW
+      s4 PUSH
+      GEQ
+      THROWANYIFNOT
+      s3 PUSH
+      1 EQINT
+      IF:<{
+        s3 POP
+        0 PUSHINT
+        TRUE
+        64 PUSHINT
+        s3 s6 PUSH2
+        $AnnounceSuccessorManifest$_constructor_successor_manifest_hash_successor_vault INLINECALLDICT
+        NEWC
+        $AnnounceSuccessorManifest$_store_cell INLINECALLDICT
+        s6 PUSH
+        4 -ROLL
+        $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+            STZEROES
+            // → Stack state
+            // s0: Builder
+            // s1: `body`
+            // s2: `mode`
+            STDICT
+            ENDC
+            SWAP
+            SENDRAWMSG
+      }>ELSE<{
+        s0 s3 XCHG
+        2 EQINT
+        IF:<{
+          257 PUSHINT
+          s6 s0 s0 XC2PU
+          s8 s9 s(-2) PU2XC
+          __tact_dict_set_int_int INLINECALLDICT
+          s0 s5 XCHG
+        }>
+      }>
+      s5 s7 XCHG
+      s4 s6 XCHG
+      FALSE
+      s0 s6 XCHG
+      0 PUSHINT
+      s0 s6 XCHG
+      s3 s5 XCHG
+      s2 s4 XCHG
+      s3 s0 s0 XCHG3
+      $PlathoController$_contract_store INLINECALLDICT
+    }>
+    0 EQINT
+    s0 s10 XCHG
+    33 LESSINT
+    s1 s10 XCHG
+    AND
+    IFJMP:<{
+      s7 s9 XCHG
+      2 7 BLKSWAP
+      $PlathoController$_contract_store INLINECALLDICT
+    }>
+    10 BLKDROP
+    130 THROW
+  }>
+}END>c

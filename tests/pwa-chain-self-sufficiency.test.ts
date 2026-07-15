@@ -21,9 +21,6 @@ describe('PWA on-chain self-sufficiency', () => {
       'get_global',
       'get_user',
       'get_key_record',
-      'get_receive_intent',
-      'get_receive_intent_id',
-      'get_receive_intent_commitment',
     ]) {
       expect(vault, `Vault must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
     }

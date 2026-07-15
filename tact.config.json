@@ -66,6 +66,11 @@
       "output": "build/Vault"
     },
     {
+      "name": "PlathoController",
+      "path": "contracts/PlathoController.tact",
+      "output": "build/PlathoController"
+    },
+    {
       "name": "UsernameNFTItem",
       "path": "contracts/UsernameNFTItem.tact",
       "output": "build/UsernameNFTItem"

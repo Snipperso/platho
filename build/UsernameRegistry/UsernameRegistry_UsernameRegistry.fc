@@ -2384,15 +2384,15 @@ builder $UsernameRegistry$_store(builder build_0, (slice, slice, slice, slice, i
     throw_if(19171, ($amount != $price));
     throw_if(19172, __tact_dict_exists_int($self'name_records, 257, $name_hash));
     throw_if(19173, __tact_dict_exists_int($self'pending_mints, 257, $name_hash));
-    int $retainedValue = 547000000;
+    int $retainedValue = 940000000;
     throw_unless(19122, ($Context$_get_value(__tact_context_get()) >= $retainedValue));
     slice $item_address = ($self'official_ath_wallet_address, $self'vault_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'name_record_count, $self'pending_mint_count, $self'treasury_due_ath, $self'burn_due_ath, $self'name_records, $self'pending_mints, $self'pending_item_to_name_hash, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count, $self'genesis_controller_address, $self'art, $self'art_count, $self'art_sealed, $self'meta, $self'meta_count, $self'meta_sealed)~$UsernameRegistry$_fun_deriveItemAddress($name_hash);
     throw_unless(19123, (~ __tact_dict_exists_slice($self'pending_item_to_name_hash, 267, $item_address)));
-    $self'pending_mints~__tact_dict_set_int_cell(257, $name_hash, $PendingUsernameMint$_store_cell($PendingUsernameMint$_constructor_query_id_sender_key_owner_wallet_name_hash_price_paid_item_address_item_deploy_value_created_at($query_id, $sender_key, $owner_wallet, $name_hash, $amount, $item_address, 500000000, $global_now()), begin_cell()));
+    $self'pending_mints~__tact_dict_set_int_cell(257, $name_hash, $PendingUsernameMint$_store_cell($PendingUsernameMint$_constructor_query_id_sender_key_owner_wallet_name_hash_price_paid_item_address_item_deploy_value_created_at($query_id, $sender_key, $owner_wallet, $name_hash, $amount, $item_address, 829000000, $global_now()), begin_cell()));
     $self'pending_item_to_name_hash~__tact_dict_set_slice_int(267, $item_address, $name_hash, 257);
     $self'pending_mint_count = $self'pending_mint_count + 1;
     var ($item_init'code, $item_init'data) = $UsernameNFTItem$_init_child($global_myAddress(), $name_hash);
-    $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($item_address, 500000000, true, 1, $item_init'code, $item_init'data, $InitializeUsernameItem$_store_cell($InitializeUsernameItem$_constructor_owner_wallet_username_len_username($owner_wallet, $username_len, $username), begin_cell())));
+    $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($item_address, 829000000, true, 1, $item_init'code, $item_init'data, $InitializeUsernameItem$_store_cell($InitializeUsernameItem$_constructor_owner_wallet_username_len_username($owner_wallet, $username_len, $username), begin_cell())));
     return (($self'official_ath_wallet_address, $self'vault_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'name_record_count, $self'pending_mint_count, $self'treasury_due_ath, $self'burn_due_ath, $self'name_records, $self'pending_mints, $self'pending_item_to_name_hash, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count, $self'genesis_controller_address, $self'art, $self'art_count, $self'art_sealed, $self'meta, $self'meta_count, $self'meta_sealed), ());
 }
 

@@ -19,6 +19,21 @@ const CAPSULEHUB_PAGE_SIZE: Int = 256;
 const CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
 const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 3300000;
 const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 9400000; // 7.4M header/entry + ~2M author/parent index slot
+// clean-16 ИНК4 INTRO lane (G8-provisional; finalized at ИНК8). INTRO entries store header0(42B)+header1(30B)
+// + body_hash with NO index links. CAPSULEHUB_INTRO_SWEEP_CAP bounds the per-batch INTRO eviction, decoupled
+// from part_count, so the hot PUBLIC/CONV path pays a fixed, small unconditional intro-sweep cost.
+const CAPSULEHUB_INTRO_ENTRY_STORAGE_ENDOWMENT: Int = 2000000;
+const CAPSULEHUB_INTRO_SWEEP_CAP: Int = 4;
+// clean-16 L6/#11: max entries a single permissionless EvictExpiredCapsules call may sweep (bounds gas per call;
+// keepers repeat it to drain a backlog). Lets a QUIET private/public lane shed expired entries without waiting for
+// its own next publish (own-kind FIFO eviction was otherwise coupled to publish traffic).
+const CAPSULEHUB_STANDALONE_EVICT_CAP: Int = 32;
+// clean-16 ИНК6 RECOVERY durability lane (Variant-B). The K_root self-recovery blob is stored ON-CHAIN for the
+// full retention (owner: 3 years) so it survives even if archive nodes drop old history; the endowment is prepaid
+// once at conversation start. RECOVERY_MAX_SIZE_CLASS caps the on-chain blob. All G8-provisional (finalized ИНК8).
+const CAPSULEHUB_RECOVERY_POOL_RETENTION_SECONDS: Int = 94608000; // owner 2026-07-15: 3 years (= 3 × 31536000)
+const CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT: Int = 200000000; // G8-provisional (ИНК6-fix): worst-case RecoveryCapsuleRecord (8K body ~74 cells/75168 bits + headers + wallet) 3yr rent ≈166M nanoTON; (1M keepalive + this) ×1.25 ≈251M ≈1.5× cover. FINALIZE from measured cell.computeDataSize() in Фаза-5
+const RECOVERY_MAX_SIZE_CLASS: Int = 8; // 8K cap on the recovery blob
 const CAPSULEHUB_ACK_FORWARD_RESERVE: Int = 30000000;
 const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE: Int = 2000000;
@@ -32,13 +47,22 @@ const CAPSULEHUB_MIN_RESERVE_SWEEP_TON: Int = PLATO_PUBLIC_POST_FEE_TON;
 // evicts up to part_count entries of its own kind that are past CAPSULEHUB_INDEX_RETENTION_SECONDS, bounding
 // live state by construction. CAPSULEHUB_EVICT_PER_PART_GAS is the per-evicted-entry compute folded into the
 // publisher's HUB_PART_GAS_* hold (see HUB_PART_GAS_PUBLIC/PRIVATE below).
-const CAPSULEHUB_PRIVATE_HEADER0_BITS: Int = 1120; // 140 bytes
+// clean-16 ИНК2: the private lane splits by header0 shape. CONV (publish_kind=PRIVATE, the ordinary-conversation
+// lane) carries a 320-bit / 40-byte header0 = meta(64) + opaque bucketKey(256). INTRO (first contact, wired in
+// ИНК4) carries 336 bits / 42 bytes = meta(64) + ephemeral_R(256) + view_tag(16). RECOVERY (ИНК6) reuses the
+// CONV 320-bit shape. All private-lane header0s are a single cell with no refs (each fits one 1023-bit cell),
+// replacing the pre-clean-16 1120-bit / 2-cell / 1-ref shape. The 784-bit part frame + header1 (240) are unchanged.
+const CAPSULEHUB_CONV_HEADER0_BITS: Int = 320; // 40 bytes: meta64 + bucketKey256
+const CAPSULEHUB_INTRO_HEADER0_BITS: Int = 336; // 42 bytes: meta64 + ephemeral_R256 + view_tag16
 const CAPSULEHUB_PRIVATE_HEADER1_BITS: Int = 240; // 30 bytes
-const CAPSULEHUB_PRIVATE_HEADER0_CELLS: Int = 2;
-const CAPSULEHUB_PRIVATE_HEADER0_REFS: Int = 1;
+const CAPSULEHUB_PRIVATE_HEADER0_CELLS: Int = 1;
+const CAPSULEHUB_PRIVATE_HEADER0_REFS: Int = 0;
 const CAPSULEHUB_PRIVATE_HEADER1_CELLS: Int = 1;
 const CAPSULEHUB_PRIVATE_HEADER1_REFS: Int = 0;
 const CAPSULEHUB_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES: Int = 1204;
+// clean-16 ИНК4 (G8-provisional): the INTRO body carries the ML-KEM ct_root (1088B) + handshake identity fields
+// on top of the CONV overhead, so its fixed overhead is larger. A wrong value here rejects every valid INTRO.
+const CAPSULEHUB_INTRO_HYBRID_BODY_OVERHEAD_BYTES: Int = 2388;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_BITS: Int = 576; // 72 bytes
 const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS: Int = 1;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
@@ -46,8 +70,12 @@ const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
 
 const ENTRY_UID_DOMAIN_VAULT_PRIVATE: Int = 0xD1190201;
 const ENTRY_UID_DOMAIN_VAULT_PUBLIC: Int = 0xD1190202;
+const ENTRY_UID_DOMAIN_VAULT_INTRO: Int = 0xD1190203; // clean-16 ИНК4
+const ENTRY_UID_DOMAIN_VAULT_RECOVERY: Int = 0xD1190204; // clean-16 ИНК6
 const CAPSULEHUB_ENTRY_KIND_PRIVATE: Int = 1;
 const CAPSULEHUB_ENTRY_KIND_PUBLIC: Int = 2;
+const CAPSULEHUB_ENTRY_KIND_INTRO: Int = 3; // clean-16 ИНК4: first-contact stealth lane
+const CAPSULEHUB_ENTRY_KIND_RECOVERY: Int = 4; // clean-16 ИНК6: K_root self-recovery durability lane
 
 // --- VPB2 batch ingest (mirror the Vault's batch constants so the value model is consistent end-to-end;
 // the Session-5 generator pins both sides from one source) ---
@@ -55,6 +83,8 @@ const MAX_BATCH_PARTS: Int = 8;
 const HUB_BATCH_BASE_GAS: Int = 14000;
 const HUB_PART_GAS_PRIVATE: Int = 170000; // add (2 index pushes + payload validation) + auto-evict one (2 index un-pushes + header parse + del); provisional, measured-tightened
 const HUB_PART_GAS_PUBLIC: Int = 180000;  // add (1 index push + author-key hash; clean-11 is_profile: +1 profile-index set + head store) + auto-evict one (1 index un-push + del; clean-11: +1 profile-index get, occasional del); provisional, measured-tightened
+const HUB_PART_GAS_INTRO: Int = 120000; // clean-16 ИНК4 (G8-provisional): store-only, no index push; cheaper than PRIVATE, plus its own capped intro-sweep
+const HUB_PART_GAS_RECOVERY: Int = 150000; // clean-16 ИНК6 (G8-provisional): keyed slot set + on-chain body write, no index push
 const HUB_MIN_PER_PART_VALUE: Int = 1000000; // loose O(1) Phase-A lower bound (gross-underfunding early bounce)
 const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN: Int = 0x45504931; // "EPI1" per-entry publish_id derivation
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
@@ -80,6 +110,20 @@ message(0x53575052) SweepExcessReserve {
 
 message(0xFF775609) DepositProtocolFee {
     amount: Int as uint128;
+}
+
+// clean-16 ИНК6: permissionless reclaim of an expired RECOVERY slot. Anyone may call it once the slot's
+// updated_at + CAPSULEHUB_RECOVERY_POOL_RETENTION_SECONDS is in the past; the slot is deleted and its
+// live-count term is released so the endowment it held stops being protected.
+message(0x52454332) EvictExpiredRecoverySlot {
+    slot_key: Int as uint256;
+}
+
+// clean-16 L6/#11: permissionless standalone eviction of expired PRIVATE/PUBLIC/INTRO index entries — decoupled from
+// publish traffic so a quiet lane still gets reclaimed. Anyone may call it; the dormancy check IS the gate.
+message(0x45564343) EvictExpiredCapsules {
+    kind: Int as uint8;      // 1=private, 2=public, 3=intro
+    max_count: Int as uint16;
 }
 
 // VPB2: the Vault forwards one signed batch (1..MAX_BATCH_PARTS parts) under this op. Wire format mirrors the
@@ -121,6 +165,10 @@ struct CapsuleHubStateView {
     genesis_controller_address: Address;
     private_live_count: Int;
     public_live_count: Int;
+    intro_latest_id: Int;
+    intro_oldest_live_id: Int;
+    intro_live_count: Int;
+    recovery_live_count: Int;
     index_storage_reserve_ton: Int;
     protected_reserve_ton: Int;
     reserve_floor_ton: Int;
@@ -143,8 +191,10 @@ struct PrivateCapsuleEntry {
     publish_id: Int as uint256;
     created_at: Int as uint64;
     body_hash: Int as uint256;
-    sender_prev_link: Int as uint64;
-    recipient_prev_link: Int as uint64;
+    // clean-16 ИНК1: single backward link in the opaque bucket chain (reuses the old per-publisher link slot).
+    // The second, recipient-directed backlink is gone with the recipient graph — a private entry now carries
+    // only its position in the opaque bucket chain, no directional link.
+    bucket_prev_link: Int as uint64;
     header_0: Cell;
     header_1: Cell;
 }
@@ -158,7 +208,7 @@ struct PublicCapsuleEntry {
     // (indexed by parent). Reuses the entryLink convention so entry 0 is unambiguous.
     parent_link: Int as uint64;
     // Backward link in whichever public index this entry lives in (author chain for posts,
-    // parent chain for comments). Mirrors PrivateCapsuleEntry.recipient_prev_link.
+    // parent chain for comments). Analogous to the private entry's backward bucket link.
     prev_link: Int as uint64;
     // clean-11: backward link in the GLOBAL profile chain (0 for non-profile posts and for the first profile
     // ever). Threaded ONLY when is_profile is set; lets a client walk EVERY described channel newest-first from
@@ -170,8 +220,7 @@ struct PublicCapsuleEntry {
 struct PrivateCapsuleEntryView {
     exists: Bool;
     entry_id: Int;
-    sender_prev_link: Int;
-    recipient_prev_link: Int;
+    bucket_prev_link: Int;
     entry_uid: Int;
     publish_id: Int;
     author_wallet: Address;
@@ -190,12 +239,87 @@ struct PrivateCapsuleKeyIndex {
     entry_count: Int as uint64;
 }
 
-struct PrivateCapsuleKeyIndexView {
+struct PrivateBucketIndexView {
     exists: Bool;
-    key_id: Int;
+    bucket_key: Int;
     latest_entry_id: Int;
     latest_entry_link: Int;
     entry_count: Int;
+}
+
+// clean-16 ИНК4 INTRO lane. First-contact capsules land here with NO index (the recipient scans ephemeral_R +
+// view_tag out of header_0 and trial-decrypts). No author_wallet is stored: identity lives inside the encrypted
+// body and is bound by the handshake transcript, verified after decrypt (impersonation is not checkable on-chain).
+struct IntroCapsuleEntry {
+    publish_id: Int as uint256;
+    created_at: Int as uint64;
+    body_hash: Int as uint256;
+    header_0: Cell;
+    header_1: Cell;
+}
+
+struct IntroCapsuleEntryView {
+    exists: Bool;
+    entry_id: Int;
+    entry_uid: Int;
+    publish_id: Int;
+    created_at: Int;
+    header_0_hash: Int;
+    header_1_hash: Int;
+    body_hash: Int;
+    header_0: Cell;
+    header_1: Cell;
+}
+
+// One row of the INTRO scan stream: the client walks [oldest_live_id, latest_id) reading ONLY header_0 to get the
+// stealth scan fields (ephemeral_R + view_tag) and trial-decrypts matches; it never needs the body on-chain.
+struct IntroScanRecord {
+    entry_id: Int;
+    created_at: Int;
+    view_tag: Int;
+    ephemeral_r: Int;
+}
+
+struct IntroScanBoundsView {
+    oldest_live_id: Int;
+    latest_id: Int;
+    live_count: Int;
+}
+
+struct IntroScanPageView {
+    from_entry_id: Int;
+    count: Int;
+    records: map<Int as uint16, IntroScanRecord>;
+}
+
+// clean-16 ИНК6 RECOVERY (Variant-B, keyed latest-wins). One slot per self-bucketKey holds the user's CURRENT
+// K_root recovery blob. The body is stored ON-CHAIN (durability) — unlike CONV/INTRO/PUBLIC which keep only a hash
+// — so recovery survives even if archive nodes drop old history. updated_at drives the permissionless expiry: a
+// fresh publish resets it, so an active user's slot never expires.
+struct RecoveryCapsuleRecord {
+    publish_id: Int as uint256;
+    updated_at: Int as uint64;
+    body_hash: Int as uint256;
+    // clean-16 ИНК6-fix (adversarial review): the slot is bound to its FIRST publisher's wallet (Variant-B).
+    // slotKey is a self-derived value that becomes public on-chain once published; without this bind ANY third
+    // party could re-publish the same slotKey with garbage and destroy the owner's K_root recovery blob forever.
+    // Only msg.author_wallet == this field may overwrite. Self-recovery has no dialogue partner, so storing the
+    // owner's own wallet leaks nothing about the who-to-whom graph (and it is already in the publish tx).
+    author_wallet: Address;
+    header_0: Cell;
+    header_1: Cell;
+    body: Cell;
+}
+
+struct RecoveryCapsuleView {
+    exists: Bool;
+    slot_key: Int;
+    updated_at: Int;
+    body_hash: Int;
+    author_wallet: Address;
+    header_0: Cell;
+    header_1: Cell;
+    body: Cell;
 }
 
 struct PublicCapsuleEntryView {
@@ -242,9 +366,12 @@ contract CapsuleHub {
     accrued_plato_fee_ton: Int as uint128;
     private_entries: map<Int as uint64, PrivateCapsuleEntry>;
     public_entries: map<Int as uint64, PublicCapsuleEntry>;
-    private_sender_index: map<Int as uint256, PrivateCapsuleKeyIndex>;
-    private_recipient_index: map<Int as uint256, PrivateCapsuleKeyIndex>;
-    // Public read-side indexes (symmetric with the private sender/recipient indexes): posts indexed by
+    // clean-16 ИНК1: the opaque CONV bucket index. Keyed by the client's HKDF bucketKey (header0 bits[64,320)),
+    // stored/looked-up purely as an opaque 256-bit map key — the contract derives NO sender/recipient/direction
+    // from it (D7-override). Replaces the old per-publisher private index; the open who-to-whom recipient
+    // index is deleted, so the on-chain private lane exposes NO directed graph.
+    private_bucket_index: map<Int as uint256, PrivateCapsuleKeyIndex>;
+    // Public read-side indexes: posts indexed by
     // hashed author wallet, comments indexed by parent entry id. Each lets a client walk only the entries
     // it cares about (a subscribed author's posts, or one post's comments) without a global scan.
     public_author_index: map<Int as uint256, PublicCapsuleKeyIndex>;
@@ -261,6 +388,19 @@ contract CapsuleHub {
     //    global chain threaded through PublicCapsuleEntry.profile_prev_link, walked newest-first for COMPLETE discovery.
     public_profile_index: map<Int as uint256, Int as uint64>;
     public_profile_head: Int as uint64;
+    // clean-16 ИНК4 INTRO first-contact pool. A separate FIFO map with NO index (the recipient scans header_0's
+    // ephemeral_R + view_tag). The triplet mirrors the private/public counters: latest id (next entry id), oldest
+    // live id (FIFO low-water), live count. Swept a capped amount by EVERY batch (own-kind on an INTRO batch, or
+    // the unconditional intro-sweep on CONV/PUBLIC batches) so this low-frequency lane still bounds its state.
+    intro_entries: map<Int as uint64, IntroCapsuleEntry>;
+    intro_latest_id: Int as uint64;
+    intro_oldest_live_id: Int as uint64;
+    intro_live_count: Int as uint64;
+    // clean-16 ИНК6 RECOVERY pool: keyed latest-wins slot map (key = self-bucketKey). NO sequential id; a slot is
+    // OVERWRITTEN in place by a fresh recovery publish (live_count grows only on the first insert). Reclaimed via
+    // the permissionless EvictExpiredRecoverySlot once a slot's updated_at + retention is in the past.
+    recovery_slots: map<Int as uint256, RecoveryCapsuleRecord>;
+    recovery_live_count: Int as uint64;
 
     init(fee_accumulator_address: Address, vault_address: Address, vault_bound: Bool, sealed: Bool, deployment_manifest_hash: Int, genesis_controller_address: Address) {
         self.fee_accumulator_address = fee_accumulator_address;
@@ -276,14 +416,19 @@ contract CapsuleHub {
         self.accrued_plato_fee_ton = 0;
         self.private_entries = emptyMap();
         self.public_entries = emptyMap();
-        self.private_sender_index = emptyMap();
-        self.private_recipient_index = emptyMap();
+        self.private_bucket_index = emptyMap();
         self.public_author_index = emptyMap();
         self.public_parent_index = emptyMap();
         self.public_oldest_live_id = 0;
         self.private_oldest_live_id = 0;
         self.public_profile_index = emptyMap();   // clean-11
         self.public_profile_head = 0;             // clean-11
+        self.intro_entries = emptyMap();          // clean-16 ИНК4
+        self.intro_latest_id = 0;
+        self.intro_oldest_live_id = 0;
+        self.intro_live_count = 0;
+        self.recovery_slots = emptyMap();         // clean-16 ИНК6
+        self.recovery_live_count = 0;
     }
 
     fun requireSealed() {
@@ -331,8 +476,23 @@ contract CapsuleHub {
         return CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT;
     }
 
+    // clean-16 ИНК5: INTRO entries are backed the same way — keepalive + INTRO endowment per live entry.
+    fun introIndexStorageReservePerEntry(): Int {
+        return CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_INTRO_ENTRY_STORAGE_ENDOWMENT;
+    }
+
+    // clean-16 ИНК6: RECOVERY slots are backed the same way — keepalive + the (larger, on-chain-body) endowment.
+    fun recoveryIndexStorageReservePerEntry(): Int {
+        return CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT;
+    }
+
     fun indexStorageReserve(): Int {
-        let base: Int = (self.private_live_count * self.privateIndexStorageReservePerEntry()) + (self.public_live_count * self.publicIndexStorageReservePerEntry());
+        // clean-16 ИНК5/ИНК6: the intro + recovery terms join the private/public terms so EVERY live pool's
+        // endowment sits inside protectedReserve() and cannot be classified as excess and swept out.
+        let base: Int = (self.private_live_count * self.privateIndexStorageReservePerEntry())
+            + (self.public_live_count * self.publicIndexStorageReservePerEntry())
+            + (self.intro_live_count * self.introIndexStorageReservePerEntry())
+            + (self.recovery_live_count * self.recoveryIndexStorageReservePerEntry());
         return (base * CAPSULEHUB_STORAGE_RESERVE_BUFFER_NUMERATOR) / CAPSULEHUB_STORAGE_RESERVE_BUFFER_DENOMINATOR;
     }
 
@@ -433,6 +593,24 @@ contract CapsuleHub {
         return self.privateBodyCells(sizeClass, cryptoSuite) - 1;
     }
 
+    // clean-16 ИНК4: INTRO body shape uses the larger INTRO overhead (ct_root + handshake fields). INTRO is
+    // hybrid-only (first contact is what establishes the PQ K_root), so no cryptoSuite parameter is needed.
+    fun introBodyBytes(sizeClass: Int): Int {
+        return CAPSULEHUB_INTRO_HYBRID_BODY_OVERHEAD_BYTES + self.privateUsefulBytes(sizeClass);
+    }
+
+    fun introBodyBits(sizeClass: Int): Int {
+        return self.introBodyBytes(sizeClass) * 8;
+    }
+
+    fun introBodyCells(sizeClass: Int): Int {
+        return (self.introBodyBytes(sizeClass) + 126) / 127;
+    }
+
+    fun introBodyRefs(sizeClass: Int): Int {
+        return self.introBodyCells(sizeClass) - 1;
+    }
+
     fun pageId(entryId: Int): Int {
         return entryId / CAPSULEHUB_PAGE_SIZE;
     }
@@ -479,21 +657,45 @@ contract CapsuleHub {
         return entryLink - 1;
     }
 
-    fun privateHeaderSenderKeyId(header0: Cell): Int {
+    // clean-16 ИНК1: the private-lane index key is the client's OPAQUE HKDF bucketKey, read from the same
+    // header0 window the pre-clean-16 sender keyId occupied (bits[64,320): a 64-bit meta skip, then the
+    // 256-bit value). The contract treats it as an opaque map key — it derives NO sender/recipient/
+    // directionality from it (D7-override). The recipient keyId extractor is deleted with the recipient
+    // index: the open who-to-whom graph the redesign exists to close is gone on-chain.
+    fun privateHeaderBucketKey(header0: Cell): Int {
         let header: Slice = header0.beginParse();
         header.loadUint(64);
         return header.loadUint(256);
     }
 
-    fun privateHeaderRecipientKeyId(header0: Cell): Int {
+    // Forward-stub for ИНК3 (NOT yet wired into any assert — see the ИНК1/ИНК3 plan). Once CONV and RECOVERY
+    // share an identical header0 length, the receive path will cross-check this against the batch publish_kind
+    // to stop a CONV capsule landing in the RECOVERY pool (or vice versa). Until ИНК3 wires it, it is an unused
+    // pure extractor with no on-chain effect. Layout: skip 40 bits (magic32 + version8), then the 8-bit publishKind.
+    fun privateHeaderPublishKind(header0: Cell): Int {
+        let header: Slice = header0.beginParse();
+        header.loadUint(40);
+        return header.loadUint(8);
+    }
+
+    // clean-16 ИНК4 INTRO header0 extractors. The 336-bit INTRO header0 layout is meta(64) | ephemeral_R(256) |
+    // view_tag(16). ephemeral_R occupies the SAME bits[64,320) window CONV uses for its bucketKey; view_tag is the
+    // trailing 16 bits[320,336). Both are read ONLY for the scan getters — they are never stored as an index.
+    fun introHeaderEphemeralR(header0: Cell): Int {
+        let header: Slice = header0.beginParse();
+        header.loadUint(64);
+        return header.loadUint(256);
+    }
+
+    fun introHeaderViewTag(header0: Cell): Int {
         let header: Slice = header0.beginParse();
         header.loadUint(64);
         header.loadUint(256);
-        return header.loadUint(256);
+        return header.loadUint(16);
     }
 
-    fun pushPrivateSenderIndex(keyId: Int, entryLink: Int): Int {
-        let indexOpt: PrivateCapsuleKeyIndex? = self.private_sender_index.get(keyId);
+    fun pushPrivateBucketIndex(bucketKey: Int, entryLink: Int): Int {
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_bucket_index.get(bucketKey);
         let prevLink: Int = 0;
         let count: Int = 0;
         if (indexOpt != null) {
@@ -501,32 +703,16 @@ contract CapsuleHub {
             prevLink = index.latest_entry_link;
             count = index.entry_count;
         }
-        self.private_sender_index.set(keyId, PrivateCapsuleKeyIndex {
+        self.private_bucket_index.set(bucketKey, PrivateCapsuleKeyIndex {
             latest_entry_link: entryLink,
             entry_count: count + 1
         });
         return prevLink;
     }
 
-    fun pushPrivateRecipientIndex(keyId: Int, entryLink: Int): Int {
-        let indexOpt: PrivateCapsuleKeyIndex? = self.private_recipient_index.get(keyId);
-        let prevLink: Int = 0;
-        let count: Int = 0;
-        if (indexOpt != null) {
-            let index: PrivateCapsuleKeyIndex = indexOpt!!;
-            prevLink = index.latest_entry_link;
-            count = index.entry_count;
-        }
-        self.private_recipient_index.set(keyId, PrivateCapsuleKeyIndex {
-            latest_entry_link: entryLink,
-            entry_count: count + 1
-        });
-        return prevLink;
-    }
-
-    fun prunePrivateSenderIndex(keyId: Int, entryLink: Int, prevLink: Int) {
-        // Private key indexes are retained-history hints. Pruning an expired middle entry can truncate older expired tail traversal; archive recovery should use page/body-history scans.
-        let indexOpt: PrivateCapsuleKeyIndex? = self.private_sender_index.get(keyId);
+    fun prunePrivateBucketIndex(bucketKey: Int, entryLink: Int, prevLink: Int) {
+        // Private bucket indexes are retained-history hints. Pruning an expired middle entry can truncate older expired tail traversal; archive recovery should use page/body-history scans.
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_bucket_index.get(bucketKey);
         if (indexOpt != null) {
             let index: PrivateCapsuleKeyIndex = indexOpt!!;
             if (index.latest_entry_link == entryLink) {
@@ -536,28 +722,9 @@ contract CapsuleHub {
                 index.entry_count -= 1;
             }
             if (index.entry_count == 0) {
-                self.private_sender_index.del(keyId);
+                self.private_bucket_index.del(bucketKey);
             } else {
-                self.private_sender_index.set(keyId, index);
-            }
-        }
-    }
-
-    fun prunePrivateRecipientIndex(keyId: Int, entryLink: Int, prevLink: Int) {
-        // Same retained-history contract as sender index: do not spend gas rewiring middle links beyond the pruned expired entry.
-        let indexOpt: PrivateCapsuleKeyIndex? = self.private_recipient_index.get(keyId);
-        if (indexOpt != null) {
-            let index: PrivateCapsuleKeyIndex = indexOpt!!;
-            if (index.latest_entry_link == entryLink) {
-                index.latest_entry_link = prevLink;
-            }
-            if (index.entry_count > 0) {
-                index.entry_count -= 1;
-            }
-            if (index.entry_count == 0) {
-                self.private_recipient_index.del(keyId);
-            } else {
-                self.private_recipient_index.set(keyId, index);
+                self.private_bucket_index.set(bucketKey, index);
             }
         }
     }
@@ -568,7 +735,7 @@ contract CapsuleHub {
         return beginCell().storeAddress(authorWallet).endCell().hash();
     }
 
-    // Mirror of pushPrivateRecipientIndex for the public author index (posts).
+    // Mirror of the private bucket-index push, for the public author index (posts).
     fun pushPublicAuthorIndex(keyId: Int, entryLink: Int): Int {
         let indexOpt: PublicCapsuleKeyIndex? = self.public_author_index.get(keyId);
         let prevLink: Int = 0;
@@ -585,7 +752,7 @@ contract CapsuleHub {
         return prevLink;
     }
 
-    // Mirror of pushPrivateRecipientIndex for the public parent index (comments), keyed by parent entry id.
+    // Mirror of the private bucket-index push, for the public parent index (comments), keyed by parent entry id.
     fun pushPublicParentIndex(parentEntryId: Int, entryLink: Int): Int {
         let indexOpt: PublicCapsuleKeyIndex? = self.public_parent_index.get(parentEntryId);
         let prevLink: Int = 0;
@@ -602,7 +769,7 @@ contract CapsuleHub {
         return prevLink;
     }
 
-    // Mirror of prunePrivateRecipientIndex; same retained-history contract (middle links are not rewired).
+    // Mirror of the private bucket-index prune; same retained-history contract (middle links are not rewired).
     fun prunePublicAuthorIndex(keyId: Int, entryLink: Int, prevLink: Int) {
         let indexOpt: PublicCapsuleKeyIndex? = self.public_author_index.get(keyId);
         if (indexOpt != null) {
@@ -679,8 +846,8 @@ contract CapsuleHub {
         self.public_oldest_live_id = oid;
     }
 
-    // Auto-eviction (private): mirror of the public path; un-pushes BOTH the sender and recipient index of each
-    // evicted entry (key ids parsed from header_0, exactly as the old prune path did).
+    // Auto-eviction (private): mirror of the public path; un-pushes the single opaque bucket index of each
+    // evicted entry (the opaque bucketKey parsed from header_0). There is no second directional index to prune.
     fun evictExpiredPrivate(maxEvict: Int) {
         let oid: Int = self.private_oldest_live_id;
         let evicted: Int = 0;
@@ -695,8 +862,7 @@ contract CapsuleHub {
                     stop = true;
                 } else {
                     let entryLink: Int = self.entryLink(oid);
-                    self.prunePrivateSenderIndex(self.privateHeaderSenderKeyId(entry.header_0), entryLink, entry.sender_prev_link);
-                    self.prunePrivateRecipientIndex(self.privateHeaderRecipientKeyId(entry.header_0), entryLink, entry.recipient_prev_link);
+                    self.prunePrivateBucketIndex(self.privateHeaderBucketKey(entry.header_0), entryLink, entry.bucket_prev_link);
                     self.private_entries.del(oid);
                     self.private_live_count -= 1;
                     oid += 1;
@@ -705,6 +871,31 @@ contract CapsuleHub {
             }
         }
         self.private_oldest_live_id = oid;
+    }
+
+    // clean-16 ИНК4: scan-only FIFO eviction of the INTRO pool. Same shape as evictExpiredPrivate but with NO
+    // index un-push (INTRO carries no index). Stops at the first non-expired entry; defensively skips holes.
+    fun evictExpiredIntro(maxEvict: Int) {
+        let oid: Int = self.intro_oldest_live_id;
+        let evicted: Int = 0;
+        let stop: Bool = false;
+        while ((!stop) && (evicted < maxEvict) && (oid < self.intro_latest_id)) {
+            let entryOpt: IntroCapsuleEntry? = self.intro_entries.get(oid);
+            if (entryOpt == null) {
+                oid += 1;
+            } else {
+                let entry: IntroCapsuleEntry = entryOpt!!;
+                if (now() < entry.created_at + CAPSULEHUB_INDEX_RETENTION_SECONDS) {
+                    stop = true;
+                } else {
+                    self.intro_entries.del(oid);
+                    self.intro_live_count -= 1;
+                    oid += 1;
+                    evicted += 1;
+                }
+            }
+        }
+        self.intro_oldest_live_id = oid;
     }
 
     fun computeVaultPrivateEntryUid(entryId: Int, publishId: Int, header0: Int, header1: Int, bodyHash: Int): Int {
@@ -718,6 +909,41 @@ contract CapsuleHub {
             .storeAddress(self.vault_address)
             .storeUint(publishId, 256)
             .storeUint(entryId, 64)
+            .storeRef(hashFields)
+            .endCell()
+            .hash();
+    }
+
+    // clean-16 ИНК4: INTRO entry uid — same hash-fields shape as the private uid, distinct domain tag so INTRO
+    // and CONV/RECOVERY entry ids live in disjoint uid spaces.
+    fun computeVaultIntroEntryUid(entryId: Int, publishId: Int, header0: Int, header1: Int, bodyHash: Int): Int {
+        let hashFields: Cell = beginCell()
+            .storeUint(header0, 256)
+            .storeUint(header1, 256)
+            .storeUint(bodyHash, 256)
+            .endCell();
+        return beginCell()
+            .storeUint(ENTRY_UID_DOMAIN_VAULT_INTRO, 32)
+            .storeAddress(self.vault_address)
+            .storeUint(publishId, 256)
+            .storeUint(entryId, 64)
+            .storeRef(hashFields)
+            .endCell()
+            .hash();
+    }
+
+    // clean-16 ИНК6: RECOVERY entry uid keyed by the slotKey (there is no sequential entry id), distinct domain tag.
+    fun computeVaultRecoveryEntryUid(slotKey: Int, publishId: Int, header0: Int, header1: Int, bodyHash: Int): Int {
+        let hashFields: Cell = beginCell()
+            .storeUint(header0, 256)
+            .storeUint(header1, 256)
+            .storeUint(bodyHash, 256)
+            .endCell();
+        return beginCell()
+            .storeUint(ENTRY_UID_DOMAIN_VAULT_RECOVERY, 32)
+            .storeAddress(self.vault_address)
+            .storeUint(publishId, 256)
+            .storeUint(slotKey, 256)
             .storeRef(hashFields)
             .endCell()
             .hash();
@@ -778,8 +1004,14 @@ contract CapsuleHub {
 
     // Per-entry storage reserve carried IN the batch value, with the 1.25 protectedReserve buffer (S1 finding).
     fun batchStorageReserveWithBuffer(kind: Int): Int {
-        let endowment: Int = CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT;
+        // clean-16 ИНК5: exhaustive per-kind endowment; an unrecognized kind THROWS rather than falling through
+        // to a wrong default (SAFETY #3 — a forgotten branch must never silently under/over-reserve a new lane).
+        let endowment: Int = 0;
         if (kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) { endowment = CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT; }
+        else if (kind == CAPSULEHUB_ENTRY_KIND_PUBLIC) { endowment = CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT; }
+        else if (kind == CAPSULEHUB_ENTRY_KIND_INTRO) { endowment = CAPSULEHUB_INTRO_ENTRY_STORAGE_ENDOWMENT; }
+        else if (kind == CAPSULEHUB_ENTRY_KIND_RECOVERY) { endowment = CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT; }
+        else { throw(13591); }
         return (CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + endowment)
             * CAPSULEHUB_STORAGE_RESERVE_BUFFER_NUMERATOR / CAPSULEHUB_STORAGE_RESERVE_BUFFER_DENOMINATOR;
     }
@@ -794,20 +1026,31 @@ contract CapsuleHub {
         self.requireSealed();
         throwUnless(13500, sender() == self.vault_address);
         throwUnless(13501, msg.publish_id != 0);
-        throwUnless(13502, (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PUBLIC));
+        throwUnless(13502, (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PUBLIC) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_INTRO) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_RECOVERY));
         throwUnless(13503, (msg.part_count >= 1) && (msg.part_count <= MAX_BATCH_PARTS));
-        let isPrivate: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE);
+        // clean-16 ИНК4/ИНК6: CONV (=PRIVATE), INTRO and RECOVERY all ride the 784-bit private part frame; PUBLIC
+        // is the else. RECOVERY is keyed latest-wins (no sequential id) and reuses the CONV 320-bit header0 shape.
+        let isConv: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE);
+        let isIntro: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_INTRO);
+        let isPublic: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PUBLIC);
+        let isRecovery: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_RECOVERY);
 
         let firstEntryId: Int = self.public_latest_id;
         let fullFeePerPart: Int = PLATO_PUBLIC_POST_FEE_TON;
-        if (isPrivate) {
+        if (isConv) {
             firstEntryId = self.private_latest_id;
+            fullFeePerPart = self.privateFullFee(CRYPTO_SUITE_HYBRID);
+        } else if (isIntro) {
+            firstEntryId = self.intro_latest_id;
+            fullFeePerPart = self.privateFullFee(CRYPTO_SUITE_HYBRID);
+        } else if (isRecovery) {
+            // RECOVERY is keyed (no sequential id); firstEntryId is unused. It pays the private hybrid fee.
             fullFeePerPart = self.privateFullFee(CRYPTO_SUITE_HYBRID);
         }
         throwUnless(13504, firstEntryId + msg.part_count <= 18446744073709551615);
         throwUnless(13505, msg.protocol_fee_total >= 0);
         throwUnless(13506, msg.protocol_fee_total <= msg.part_count * fullFeePerPart);
-        if (!isPrivate) {
+        if (isPublic) {
             let mk: Cell? = msg.marketing;
             throwUnless(13507, mk != null);
             throwUnless(13508, mk!!.beginParse().loadUint(152) == PLATHO_PUBLIC_MARKETING_NOTE_ASCII);
@@ -820,13 +1063,16 @@ contract CapsuleHub {
         let i: Int = 0;
         let requiredValue: Int = msg.protocol_fee_total + getComputeFee(HUB_BATCH_BASE_GAS, false) + CAPSULEHUB_ACK_FORWARD_RESERVE;
         let batchUid: Int = 0;
+        // clean-16 ИНК6-fix: number of NEW recovery slots this batch creates (an OVERWRITE reuses an already-funded
+        // slot, so its endowment must NOT be charged/kept again — see the RECOVERY branch + the kept computation).
+        let recoveryNewSlots: Int = 0;
         while (i < msg.part_count) {
             let isLast: Bool = (i == (msg.part_count - 1));
             let part: Slice = cursor.beginParse();
             let entryId: Int = firstEntryId + i;
             let entryPublishId: Int = self.computeEntryPublishId(msg.publish_id, i);
             let nextCell: Cell = msg.parts; // overwritten when not last; unused on the last iteration
-            if (isPrivate) {
+            if (isConv) {
                 let wantRefs: Int = 3;
                 if (!isLast) { wantRefs = 4; }
                 throwUnless(13510, (part.bits() == 784) && (part.refs() == wantRefs));
@@ -841,24 +1087,110 @@ contract CapsuleHub {
                 if (!isLast) { nextCell = part.loadRef(); }
                 throwUnless(13511, self.isAllowedPrivatePair(sizeClass, cryptoSuite));
                 throwUnless(13512, (h0 != 0) && (h1 != 0) && (bh != 0));
-                self.requireExactPayloadCell(header0, h0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_PRIVATE_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13513, 13514);
+                self.requireExactPayloadCell(header0, h0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_CONV_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13513, 13514);
+                // clean-16 ИНК3 (LOAD-BEARING, do not remove): CONV and (from ИНК6) RECOVERY share the same
+                // 320-bit header0 length, so shape alone cannot tell them apart. Bind the header0's embedded
+                // publishKind (byte@5) to the batch publish_kind: a mislabeled RECOVERY capsule under CONV kind
+                // (or vice versa) would otherwise land in the wrong pool — a CONV-pool RECOVERY capsule is
+                // evicted after 1 year, permanently losing the user's K_root. The extractor reads ONLY byte@5.
+                throwUnless(13519, self.privateHeaderPublishKind(header0) == msg.publish_kind);
                 self.requireExactPayloadCell(header1, h1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13515, 13516);
                 self.requireExactPayloadCell(body, bh, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite), 13517, 13518);
                 let entryLink: Int = self.entryLink(entryId);
-                let senderPrevLink: Int = self.pushPrivateSenderIndex(self.privateHeaderSenderKeyId(header0), entryLink);
-                let recipientPrevLink: Int = self.pushPrivateRecipientIndex(self.privateHeaderRecipientKeyId(header0), entryLink);
+                let bucketPrevLink: Int = self.pushPrivateBucketIndex(self.privateHeaderBucketKey(header0), entryLink);
                 let uid: Int = self.computeVaultPrivateEntryUid(entryId, entryPublishId, h0, h1, bh);
                 self.private_entries.set(entryId, PrivateCapsuleEntry {
                     publish_id: entryPublishId,
                     created_at: now(),
                     body_hash: bh,
-                    sender_prev_link: senderPrevLink,
-                    recipient_prev_link: recipientPrevLink,
+                    bucket_prev_link: bucketPrevLink,
                     header_0: header0,
                     header_1: header1
                 });
                 self.private_live_count += 1;
                 requiredValue += getComputeFee(HUB_PART_GAS_PRIVATE, false) + self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_PRIVATE);
+                batchUid = self.accumulateBatchUid(batchUid, uid);
+            } else if (isIntro) {
+                // clean-16 ИНК4 INTRO branch: same 784-bit private frame, but a 336-bit header0 (ephemeral_R +
+                // view_tag), a larger INTRO body, NO index (the recipient scans), and its own meta-assert (13549).
+                let wantRefs: Int = 3;
+                if (!isLast) { wantRefs = 4; }
+                throwUnless(13540, (part.bits() == 784) && (part.refs() == wantRefs));
+                let sizeClass: Int = part.loadUint(8);
+                let cryptoSuite: Int = part.loadUint(8);
+                let h0: Int = part.loadUint(256);
+                let h1: Int = part.loadUint(256);
+                let bh: Int = part.loadUint(256);
+                let header0: Cell = part.loadRef();
+                let header1: Cell = part.loadRef();
+                let body: Cell = part.loadRef();
+                if (!isLast) { nextCell = part.loadRef(); }
+                throwUnless(13541, self.isAllowedPrivatePair(sizeClass, cryptoSuite));
+                throwUnless(13542, (h0 != 0) && (h1 != 0) && (bh != 0));
+                self.requireExactPayloadCell(header0, h0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_INTRO_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13543, 13544);
+                throwUnless(13549, self.privateHeaderPublishKind(header0) == msg.publish_kind);
+                self.requireExactPayloadCell(header1, h1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13545, 13546);
+                self.requireExactPayloadCell(body, bh, self.introBodyCells(sizeClass), self.introBodyBits(sizeClass), self.introBodyRefs(sizeClass), 13547, 13548);
+                let uid: Int = self.computeVaultIntroEntryUid(entryId, entryPublishId, h0, h1, bh);
+                self.intro_entries.set(entryId, IntroCapsuleEntry {
+                    publish_id: entryPublishId,
+                    created_at: now(),
+                    body_hash: bh,
+                    header_0: header0,
+                    header_1: header1
+                });
+                self.intro_live_count += 1;
+                requiredValue += getComputeFee(HUB_PART_GAS_INTRO, false) + self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_INTRO);
+                batchUid = self.accumulateBatchUid(batchUid, uid);
+            } else if (isRecovery) {
+                // clean-16 ИНК6 RECOVERY branch: same 784-bit frame + the CONV 320-bit header0, but the body is
+                // stored ON-CHAIN in a keyed latest-wins slot (key = self-bucketKey). A repeat publish OVERWRITES
+                // the slot; the live count grows ONLY on the first insert. Body size is capped by RECOVERY_MAX_SIZE_CLASS.
+                let wantRefs: Int = 3;
+                if (!isLast) { wantRefs = 4; }
+                throwUnless(13550, (part.bits() == 784) && (part.refs() == wantRefs));
+                let sizeClass: Int = part.loadUint(8);
+                let cryptoSuite: Int = part.loadUint(8);
+                let h0: Int = part.loadUint(256);
+                let h1: Int = part.loadUint(256);
+                let bh: Int = part.loadUint(256);
+                let header0: Cell = part.loadRef();
+                let header1: Cell = part.loadRef();
+                let body: Cell = part.loadRef();
+                if (!isLast) { nextCell = part.loadRef(); }
+                throwUnless(13551, self.isAllowedPrivatePair(sizeClass, cryptoSuite));
+                throwUnless(13552, (h0 != 0) && (h1 != 0) && (bh != 0));
+                throwUnless(13560, sizeClass <= RECOVERY_MAX_SIZE_CLASS);
+                self.requireExactPayloadCell(header0, h0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_CONV_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13553, 13554);
+                throwUnless(13559, self.privateHeaderPublishKind(header0) == msg.publish_kind);
+                self.requireExactPayloadCell(header1, h1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13555, 13556);
+                self.requireExactPayloadCell(body, bh, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite), 13557, 13558);
+                let slotKey: Int = self.privateHeaderBucketKey(header0);
+                let existingOpt: RecoveryCapsuleRecord? = self.recovery_slots.get(slotKey);
+                let existed: Bool = (existingOpt != null);
+                // Variant-B first-publisher bind: only the wallet that created the slot may overwrite it. This is
+                // the ONLY defence against a permissionless destructive overwrite of a K_root recovery blob, since
+                // slotKey is public once published (map key + header_0 bits[64,320) + cleartext in the publish tx).
+                if (existed) { throwUnless(13563, existingOpt!!.author_wallet == msg.author_wallet); }
+                self.recovery_slots.set(slotKey, RecoveryCapsuleRecord {
+                    publish_id: entryPublishId,
+                    updated_at: now(),
+                    body_hash: bh,
+                    author_wallet: msg.author_wallet,
+                    header_0: header0,
+                    header_1: header1,
+                    body: body
+                });
+                requiredValue += getComputeFee(HUB_PART_GAS_RECOVERY, false);
+                if (!existed) {
+                    // A fresh slot's full 3yr endowment is charged/kept ONCE; an OVERWRITE reuses the slot's
+                    // already-protected reserve (the retention clock resets but per-entry reserve = full worst-case
+                    // 3yr, so it stays covered). Charging it again would leak the surplus to the sweepable pool.
+                    self.recovery_live_count += 1;
+                    recoveryNewSlots += 1;
+                    requiredValue += self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_RECOVERY);
+                }
+                let uid: Int = self.computeVaultRecoveryEntryUid(slotKey, entryPublishId, h0, h1, bh);
                 batchUid = self.accumulateBatchUid(batchUid, uid);
             } else {
                 let wantRefs: Int = 2;
@@ -923,25 +1255,48 @@ contract CapsuleHub {
         // Full value gate (atomic: reverts every store above if the forwarded value is short).
         throwUnless(13530, context().value >= requiredValue);
         // Commit batch-level counters + fee exactly once.
-        if (isPrivate) {
+        if (isConv) {
             self.private_latest_id += msg.part_count;
-        } else {
+        } else if (isIntro) {
+            self.intro_latest_id += msg.part_count;
+        } else if (isPublic) {
             self.public_latest_id += msg.part_count;
         }
+        // RECOVERY has no sequential id (keyed slot map); recovery_live_count was bumped per-part in the branch above.
         self.accrued_plato_fee_ton += msg.protocol_fee_total;
 
         // Auto-eviction (FIFO, funded via HUB_PART_GAS_*): each batch evicts up to part_count oldest expired
         // entries of its own kind, bounding live state by construction. Just-added entries are created at now()
         // so they are never expired; the loop stops at the first non-expired entry.
-        if (isPrivate) {
+        // Own-kind FIFO eviction (funded by HUB_PART_GAS_*).
+        if (isConv) {
             self.evictExpiredPrivate(msg.part_count);
-        } else {
+        } else if (isIntro) {
+            self.evictExpiredIntro(msg.part_count);
+        } else if (isPublic) {
             self.evictExpiredPublic(msg.part_count);
+        }
+        // RECOVERY has no FIFO eviction (keyed latest-wins map); expired slots are reclaimed permissionlessly via
+        // the EvictExpiredRecoverySlot message.
+        // clean-16 ИНК4: unconditional capped INTRO sweep. INTRO is low-frequency; without this a quiet INTRO
+        // pool would never shed expired first-contact capsules between INTRO batches. Every non-INTRO batch
+        // sweeps up to CAPSULEHUB_INTRO_SWEEP_CAP expired intro entries — a fixed small cost on the hot path
+        // (G8-provisional: HUB_PART_GAS_* must cover it). An INTRO batch already swept its own pool above.
+        if (!isIntro) {
+            let introSweep: Int = msg.part_count;
+            if (introSweep > CAPSULEHUB_INTRO_SWEEP_CAP) { introSweep = CAPSULEHUB_INTRO_SWEEP_CAP; }
+            self.evictExpiredIntro(introSweep);
         }
 
         // ACK (spec 5.3): keep fee + entry storage (+1.25 buffer), protect pre-existing balance, return the rest
         // (import over-hold + ack float) to the Vault via mode 128. The Vault credits it back to the user ledger.
+        // CONV/INTRO/PUBLIC create one new entry per part → keep part_count endowments. RECOVERY is a keyed slot
+        // map: an OVERWRITE reuses an already-funded slot, so keep endowment only for the NEW slots (else the
+        // redundant endowment is kept as sweepable surplus instead of being returned to the owner).
         let kept: Int = msg.protocol_fee_total + msg.part_count * self.batchStorageReserveWithBuffer(msg.publish_kind);
+        if (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_RECOVERY) {
+            kept = msg.protocol_fee_total + recoveryNewSlots * self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_RECOVERY);
+        }
         nativeReserve(kept, ReserveAtMost | ReserveAddOriginalBalance);
         message(MessageParameters {
             to: self.vault_address,
@@ -1010,14 +1365,72 @@ contract CapsuleHub {
         });
     }
 
+    // clean-16 ИНК6: permissionless reclaim of an EXPIRED RECOVERY slot. The keyed slot map has no FIFO eviction
+    // (a page can only hold one current recovery blob), so a slot is only reclaimed once its 3-year retention has
+    // lapsed. Deleting it drops the live-count term so the endowment it protected is released to the sweepable
+    // surplus. No auth: the expiry check IS the gate.
+    receive(msg: EvictExpiredRecoverySlot) {
+        self.requireSealed();
+        let recOpt: RecoveryCapsuleRecord? = self.recovery_slots.get(msg.slot_key);
+        throwUnless(13562, recOpt != null);
+        let rec: RecoveryCapsuleRecord = recOpt!!;
+        throwUnless(13561, (rec.updated_at + CAPSULEHUB_RECOVERY_POOL_RETENTION_SECONDS) < now());
+        self.recovery_slots.set(msg.slot_key, null);
+        self.recovery_live_count -= 1;
+    }
+
+    // clean-16 L6/#11: permissionless standalone eviction. Reclaims up to CAPSULEHUB_STANDALONE_EVICT_CAP expired
+    // entries of the requested lane WITHOUT a publish — so a quiet private/public lane still sheds its backlog. Same
+    // FIFO/retention logic as the publish-path eviction; the caller funds the gas. No auth (expiry IS the gate).
+    receive(msg: EvictExpiredCapsules) {
+        self.requireSealed();
+        let n: Int = msg.max_count;
+        if (n > CAPSULEHUB_STANDALONE_EVICT_CAP) { n = CAPSULEHUB_STANDALONE_EVICT_CAP; }
+        if (msg.kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) {
+            self.evictExpiredPrivate(n);
+        } else if (msg.kind == CAPSULEHUB_ENTRY_KIND_PUBLIC) {
+            self.evictExpiredPublic(n);
+        } else if (msg.kind == CAPSULEHUB_ENTRY_KIND_INTRO) {
+            self.evictExpiredIntro(n);
+        } else {
+            throw(13570); // unknown lane
+        }
+    }
+
+    get fun get_recovery_capsule(slotKey: Int): RecoveryCapsuleView {
+        let recOpt: RecoveryCapsuleRecord? = self.recovery_slots.get(slotKey);
+        if (recOpt == null) {
+            return RecoveryCapsuleView {
+                exists: false,
+                slot_key: slotKey,
+                updated_at: 0,
+                body_hash: 0,
+                author_wallet: myAddress(),
+                header_0: emptyCell(),
+                header_1: emptyCell(),
+                body: emptyCell()
+            };
+        }
+        let rec: RecoveryCapsuleRecord = recOpt!!;
+        return RecoveryCapsuleView {
+            exists: true,
+            slot_key: slotKey,
+            updated_at: rec.updated_at,
+            body_hash: rec.body_hash,
+            author_wallet: rec.author_wallet,
+            header_0: rec.header_0,
+            header_1: rec.header_1,
+            body: rec.body
+        };
+    }
+
     get fun get_private_entry(entryId: Int): PrivateCapsuleEntryView {
         let entryOpt: PrivateCapsuleEntry? = self.private_entries.get(entryId);
         if (entryOpt == null) {
             return PrivateCapsuleEntryView {
                 exists: false,
                 entry_id: entryId,
-                sender_prev_link: 0,
-                recipient_prev_link: 0,
+                bucket_prev_link: 0,
                 entry_uid: 0,
                 publish_id: 0,
                 author_wallet: myAddress(),
@@ -1037,8 +1450,7 @@ contract CapsuleHub {
         return PrivateCapsuleEntryView {
             exists: true,
             entry_id: entryId,
-            sender_prev_link: entry.sender_prev_link,
-            recipient_prev_link: entry.recipient_prev_link,
+            bucket_prev_link: entry.bucket_prev_link,
             entry_uid: self.computeVaultPrivateEntryUid(entryId, entry.publish_id, header0Hash, header1Hash, entry.body_hash),
             publish_id: entry.publish_id,
             author_wallet: self.vault_address,
@@ -1053,46 +1465,97 @@ contract CapsuleHub {
         };
     }
 
-    get fun get_private_sender_index(keyId: Int): PrivateCapsuleKeyIndexView {
-        let indexOpt: PrivateCapsuleKeyIndex? = self.private_sender_index.get(keyId);
+    // clean-16 ИНК1: the SOLE private-lane index getter. Keyed by the opaque bucketKey; there is no
+    // sender-keyed or recipient-keyed getter anymore, so the on-chain private lane exposes NO who-to-whom
+    // edge. A party fetches its own incoming/outgoing CONV entries by deriving its own bucketKeys client-side.
+    get fun get_private_bucket_index(bucketKey: Int): PrivateBucketIndexView {
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_bucket_index.get(bucketKey);
         if (indexOpt == null) {
-            return PrivateCapsuleKeyIndexView {
+            return PrivateBucketIndexView {
                 exists: false,
-                key_id: keyId,
+                bucket_key: bucketKey,
                 latest_entry_id: 0,
                 latest_entry_link: 0,
                 entry_count: 0
             };
         }
         let index: PrivateCapsuleKeyIndex = indexOpt!!;
-        return PrivateCapsuleKeyIndexView {
+        return PrivateBucketIndexView {
             exists: true,
-            key_id: keyId,
+            bucket_key: bucketKey,
             latest_entry_id: self.entryIdFromLink(index.latest_entry_link),
             latest_entry_link: index.latest_entry_link,
             entry_count: index.entry_count
         };
     }
 
-    get fun get_private_recipient_index(keyId: Int): PrivateCapsuleKeyIndexView {
-        let indexOpt: PrivateCapsuleKeyIndex? = self.private_recipient_index.get(keyId);
-        if (indexOpt == null) {
-            return PrivateCapsuleKeyIndexView {
+    // clean-16 ИНК4 INTRO getters. get_intro_entry returns one stored INTRO capsule; get_intro_scan_bounds gives
+    // the live scan window; get_intro_scan_page returns up to 64 scan rows (view_tag + ephemeral_R read straight
+    // out of header_0) so the recipient trial-decrypts without fetching bodies. No sender/recipient index exists.
+    get fun get_intro_entry(entryId: Int): IntroCapsuleEntryView {
+        let entryOpt: IntroCapsuleEntry? = self.intro_entries.get(entryId);
+        if (entryOpt == null) {
+            return IntroCapsuleEntryView {
                 exists: false,
-                key_id: keyId,
-                latest_entry_id: 0,
-                latest_entry_link: 0,
-                entry_count: 0
+                entry_id: entryId,
+                entry_uid: 0,
+                publish_id: 0,
+                created_at: 0,
+                header_0_hash: 0,
+                header_1_hash: 0,
+                body_hash: 0,
+                header_0: emptyCell(),
+                header_1: emptyCell()
             };
         }
-        let index: PrivateCapsuleKeyIndex = indexOpt!!;
-        return PrivateCapsuleKeyIndexView {
+        let entry: IntroCapsuleEntry = entryOpt!!;
+        let header0Hash: Int = entry.header_0.hash();
+        let header1Hash: Int = entry.header_1.hash();
+        return IntroCapsuleEntryView {
             exists: true,
-            key_id: keyId,
-            latest_entry_id: self.entryIdFromLink(index.latest_entry_link),
-            latest_entry_link: index.latest_entry_link,
-            entry_count: index.entry_count
+            entry_id: entryId,
+            entry_uid: self.computeVaultIntroEntryUid(entryId, entry.publish_id, header0Hash, header1Hash, entry.body_hash),
+            publish_id: entry.publish_id,
+            created_at: entry.created_at,
+            header_0_hash: header0Hash,
+            header_1_hash: header1Hash,
+            body_hash: entry.body_hash,
+            header_0: entry.header_0,
+            header_1: entry.header_1
         };
+    }
+
+    get fun get_intro_scan_bounds(): IntroScanBoundsView {
+        return IntroScanBoundsView {
+            oldest_live_id: self.intro_oldest_live_id,
+            latest_id: self.intro_latest_id,
+            live_count: self.intro_live_count
+        };
+    }
+
+    get fun get_intro_scan_page(fromEntryId: Int, count: Int): IntroScanPageView {
+        let clamped: Int = count;
+        if (clamped > 64) { clamped = 64; }
+        if (clamped < 0) { clamped = 0; }
+        let records: map<Int as uint16, IntroScanRecord> = emptyMap();
+        let i: Int = 0;
+        let emitted: Int = 0;
+        while (i < clamped) {
+            let eid: Int = fromEntryId + i;
+            let entryOpt: IntroCapsuleEntry? = self.intro_entries.get(eid);
+            if (entryOpt != null) {
+                let entry: IntroCapsuleEntry = entryOpt!!;
+                records.set(emitted, IntroScanRecord {
+                    entry_id: eid,
+                    created_at: entry.created_at,
+                    view_tag: self.introHeaderViewTag(entry.header_0),
+                    ephemeral_r: self.introHeaderEphemeralR(entry.header_0)
+                });
+                emitted += 1;
+            }
+            i += 1;
+        }
+        return IntroScanPageView { from_entry_id: fromEntryId, count: emitted, records: records };
     }
 
     get fun get_public_author_index(keyId: Int): PublicCapsuleKeyIndexView {
@@ -1271,6 +1734,10 @@ contract CapsuleHub {
             genesis_controller_address: self.genesis_controller_address,
             private_live_count: self.private_live_count,
             public_live_count: self.public_live_count,
+            intro_latest_id: self.intro_latest_id,
+            intro_oldest_live_id: self.intro_oldest_live_id,
+            intro_live_count: self.intro_live_count,
+            recovery_live_count: self.recovery_live_count,
             index_storage_reserve_ton: self.indexStorageReserve(),
             protected_reserve_ton: self.protectedReserve(),
             reserve_floor_ton: CAPSULEHUB_MIN_PROTECTED_RESERVE_TON,

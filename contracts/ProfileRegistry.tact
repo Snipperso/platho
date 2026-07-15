@@ -314,6 +314,18 @@ contract ProfileRegistry {
         });
         self.current_avatar_versions.set(owner_wallet, nextVersion);
         self.avatar_record_count += 1;
+        // clean-16 L2/#13 (storage-solvency): DELETE the PREVIOUS avatar version's record. Only `current` is ever
+        // read (get_avatar resolves via current_avatar_versions), so old versions were dead, unbounded state that
+        // grew per UPDATE (not per profile). Now avatar_records is O(profiles) and net-flat on an update (the freed
+        // reserve funds the replacement). (Charging the per-record endowment on every update is now a safe
+        // over-collection — refine to first-avatar-only in Фаза-5, consistent with recovery #12.)
+        if (currentVersionOpt != null) {
+            let prevRecordId: Int = self.computeAvatarRecordId(owner_wallet, currentVersionOpt!!);
+            if (self.avatar_records.exists(prevRecordId)) {
+                self.avatar_records.del(prevRecordId);
+                self.avatar_record_count -= 1;
+            }
+        }
 
         let treasury_amount: Int = (amount * PROFILE_TREASURY_SHARE_BPS) / PROFILE_SPLIT_BASE_BPS;
         let burn_amount: Int = amount - treasury_amount;

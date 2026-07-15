@@ -321,6 +321,11 @@ export async function deriveMessagingIdentityFromWallet(wallet, suite) {
   const x25519SecretKey = await hkdfBytes(wallet.seed, `messaging.${normalizedSuite}.x25519`, 32);
   const x25519PublicKey = x25519.getPublicKey(x25519SecretKey);
   const signingSecretKey = await hkdfBytes(wallet.seed, `messaging.${normalizedSuite}.ed25519`, ED25519_SECRET_KEY_BYTES);
+  // clean-16 hybrid: derive the stealth scan secret deterministically from the seed. FROZEN info-string
+  // 'messaging.hybrid-v1.scan.x25519' (audit-critical: changing it orphans every published scan_pubkey). Without
+  // this the scan secret fell back to randomBytes → advertised scan_pubkey desynced from the Vault-registered one
+  // across sessions/devices, so no INTRO capsule could ever be scanned/accepted after reinstall.
+  const scanSecretKey = await hkdfBytes(wallet.seed, 'messaging.hybrid-v1.scan.x25519', 32);
   const mlKemSeed = await hkdfBytes(wallet.seed, 'messaging.hybrid-v1.ml-kem768', 64);
   const mlKem = ml_kem768.keygen(mlKemSeed);
   const mlKem768PublicKey = assertBytes(mlKem.publicKey, MLKEM768_PUBLIC_KEY_BYTES, 'mlKem768PublicKey');
@@ -337,7 +342,7 @@ export async function deriveMessagingIdentityFromWallet(wallet, suite) {
     mlKem768PublicKeyHash,
     mlKem768PublicKeyLen: MLKEM768_PUBLIC_KEY_BYTES,
   };
-  return createMessagingIdentity({ encryptionKeyPair, signingSecretKey });
+  return createMessagingIdentity({ encryptionKeyPair, signingSecretKey, scanSecretKey });
 }
 
 function storeInternalMessage(message) {

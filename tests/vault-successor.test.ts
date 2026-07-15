@@ -59,20 +59,27 @@ describe('Vault VPB2: successor-manifest record (Group E)', () => {
     expect(s.announced_at).toBe(1_700_000_000n);
   });
 
-  it('SUCCESSOR-02: the announcement is one-shot — a second announce is rejected (15052), record unchanged', async () => {
+  it('SUCCESSOR-02: clean-16 L4/#9 — the successor slot is REPLACEABLE: the controller can overwrite it', async () => {
     const { bc, vault, controller } = await setup();
     const v1 = (await bc.treasury('succ-1')).address;
     await vault.send(controller.getSender(), { value: toNano('0.05') }, {
       $$type: 'AnnounceSuccessorManifest', successor_manifest_hash: SUCC_MANIFEST, successor_vault: v1,
     } as AnnounceSuccessorManifest);
+    expect(addressCellHash((await vault.getGetSuccessor()).successor_vault)).toBe(addressCellHash(v1));
 
+    // A SECOND announcement from the controller now OVERWRITES the record (was one-shot; L4 made it replaceable so a
+    // mistaken/griefed announce can be corrected and the migration path stays open across multiple hops). The
+    // ~14-day timelock that gates this in production lives in the controller multisig, not the Vault.
     const v2 = (await bc.treasury('succ-2')).address;
     const res = await bc.sendMessage(internal({
       from: controller.address, to: vault.address, value: toNano('0.05'), bounce: true,
-      body: announceBody(0xdeadn, v2),
+      body: announceBody(0xdead0002n, v2),
     }));
-    expect(vaultTxExit(res, vault)).toBe(15052);
-    expect(addressCellHash((await vault.getGetSuccessor()).successor_vault)).toBe(addressCellHash(v1)); // unchanged
+    expect(vaultTxExit(res, vault)).toBe(0); // accepted
+    const s = await vault.getGetSuccessor();
+    expect(s.announced).toBe(true);
+    expect(s.successor_manifest_hash).toBe(0xdead0002n);
+    expect(addressCellHash(s.successor_vault)).toBe(addressCellHash(v2)); // overwritten
   });
 
   it('SUCCESSOR-03: a non-controller sender cannot announce (15051)', async () => {

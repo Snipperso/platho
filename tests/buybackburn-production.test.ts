@@ -9,6 +9,7 @@ import {
   AcceptBurnReserve,
   BindBuybackFeeAccumulator,
   BindBuybackOfficialAthWallet,
+  BindBuybackTreasury,
   ExecuteBuybackChunk,
   FreezeBuybackRoute,
   RecycleRouteRefundReserve,
@@ -16,6 +17,7 @@ import {
   RecoverStuckStonfiSwap,
   RetryAthBurnDue,
   SealBuybackBurnGenesis,
+  SweepStuckReserveToTreasury,
 } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
 import {
   DepositProtocolFee,
@@ -45,6 +47,8 @@ const OFFER = toNano('50');
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
 const DEADLINE_MAX_AHEAD_SECONDS = 900n;
+const DEADMAN_SWEEP_GRACE_SECONDS = 31536000; // BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS (~365d)
+const SWEEP_STORAGE_FLOOR = 100_000_000n;     // BUYBACK_SWEEP_STORAGE_FLOOR_NANOTONS (0.1 TON)
 const ATH_TOTAL_SUPPLY_ATOMIC = 100000000000000000n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 35_000_000n;
@@ -63,6 +67,18 @@ function addressHash(address: Address): bigint {
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.BUYBACK.${label}`).digest());
+}
+
+function buybackExit(res: any, addr: Address): number {
+  const tx: any = res.transactions.find(
+    (t: any) => t.inMessage?.info?.type === 'internal'
+      && t.inMessage?.info?.dest?.toString() === addr.toString(),
+  );
+  return Number(tx?.description?.computePhase?.exitCode ?? -1);
+}
+
+async function contractBalance(env: Awaited<ReturnType<typeof setup>>, addr: Address): Promise<bigint> {
+  return (await env.blockchain.getContract(addr)).balance;
 }
 
 async function athWalletAddress(owner: Address, athMaster: Address): Promise<Address> {
@@ -121,6 +137,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
   const stonfiAthSourceOwner = await blockchain.treasury('buyback-stonfi-ath-source-owner');
   const stonfiPtonWallet = await blockchain.treasury('buyback-stonfi-pton-wallet');
   const stonfiReferral = await blockchain.treasury('buyback-stonfi-referral');
+  const sweepTreasury = await blockchain.treasury('buyback-sweep-treasury');
 
   const athMasterInit = await ATHMaster.init(
     treasuryOwner.address,
@@ -164,6 +181,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
     stonfiAthSourceOwner,
     stonfiPtonWallet,
     stonfiReferral,
+    sweepTreasury,
     athMasterInit,
     athMasterAddress,
     officialAthWallet,
@@ -190,6 +208,12 @@ async function freezeAndSeal(
   await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env, routeOverrides));
 
   await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindBuybackTreasury',
+    deployment_manifest_hash: MANIFEST_HASH,
+    treasury_address: env.sweepTreasury.address,
+  } as BindBuybackTreasury);
+
+  await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealBuybackBurnGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealBuybackBurnGenesis);
@@ -207,6 +231,12 @@ async function bindAndSealWithoutRoute(env: Awaited<ReturnType<typeof setup>>) {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: env.officialAthWallet,
   } as BindBuybackOfficialAthWallet);
+
+  await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindBuybackTreasury',
+    deployment_manifest_hash: MANIFEST_HASH,
+    treasury_address: env.sweepTreasury.address,
+  } as BindBuybackTreasury);
 
   await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealBuybackBurnGenesis',
@@ -513,6 +543,11 @@ describe('Production BuybackBurn candidate', () => {
     } as BindBuybackOfficialAthWallet);
     await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env));
     await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury',
+      deployment_manifest_hash: MANIFEST_HASH,
+      treasury_address: env.sweepTreasury.address,
+    } as BindBuybackTreasury);
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealBuybackBurnGenesis',
       deployment_manifest_hash: MANIFEST_HASH,
     } as SealBuybackBurnGenesis);
@@ -559,6 +594,11 @@ describe('Production BuybackBurn candidate', () => {
       official_ath_wallet_address: env.officialAthWallet,
     } as BindBuybackOfficialAthWallet);
     await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env));
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury',
+      deployment_manifest_hash: MANIFEST_HASH,
+      treasury_address: env.sweepTreasury.address,
+    } as BindBuybackTreasury);
     await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealBuybackBurnGenesis',
       deployment_manifest_hash: MANIFEST_HASH,
@@ -642,6 +682,11 @@ describe('Production BuybackBurn candidate', () => {
       deployment_manifest_hash: MANIFEST_HASH,
       official_ath_wallet_address: env.officialAthWallet,
     } as BindBuybackOfficialAthWallet);
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury',
+      deployment_manifest_hash: MANIFEST_HASH,
+      treasury_address: env.sweepTreasury.address,
+    } as BindBuybackTreasury);
     await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealBuybackBurnGenesis',
       deployment_manifest_hash: MANIFEST_HASH,
@@ -1329,5 +1374,129 @@ describe('Production BuybackBurn candidate', () => {
     expect(totals.burned_ath_total_atomic).toBe(300_000n);
     expect(jetton.total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC - 300_000n);
     expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
+  });
+
+  // clean-16 L6/#15 (sweep-only): the STON.fi route is NOT rebindable (a rebindable route cannot be zero-theft).
+  // Instead, a permissionless dead-man returns the stranded reserve to an immutable, genesis-bound treasury once the
+  // route is presumed dead (no successful burn for the grace). Zero theft vector; fixed destination; autonomous.
+  it('SWEEP-01: seal is blocked until the dead-man treasury sink is bound (22509), then succeeds', async () => {
+    const env = await setup();
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackFeeAccumulator', deployment_manifest_hash: MANIFEST_HASH, fee_accumulator_address: env.feeAccumulator.address,
+    } as BindBuybackFeeAccumulator);
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackOfficialAthWallet', deployment_manifest_hash: MANIFEST_HASH, official_ath_wallet_address: env.officialAthWallet,
+    } as BindBuybackOfficialAthWallet);
+
+    const blocked = await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealBuybackBurnGenesis', deployment_manifest_hash: MANIFEST_HASH,
+    } as SealBuybackBurnGenesis);
+    expect(buybackExit(blocked, env.buyback.address)).toBe(22509);
+    expect((await env.buyback.getGetBuybackBurnConfig()).sealed).toBe(false);
+
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury', deployment_manifest_hash: MANIFEST_HASH, treasury_address: env.sweepTreasury.address,
+    } as BindBuybackTreasury);
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealBuybackBurnGenesis', deployment_manifest_hash: MANIFEST_HASH,
+    } as SealBuybackBurnGenesis);
+
+    const config = await env.buyback.getGetBuybackBurnConfig();
+    expect(config.sealed).toBe(true);
+    expect(config.treasury_bound).toBe(true);
+    expect(config.treasury_address.equals(env.sweepTreasury.address)).toBe(true);
+    // the grace clock starts at seal (not 0) so the dead-man cannot fire immediately.
+    expect((await env.buyback.getGetBuybackBurnState()).last_burn_at).toBe(BigInt(env.blockchain.now ?? 0));
+  });
+
+  it('SWEEP-02: the treasury bind is one-shot, basechain-only, and never the contract itself', async () => {
+    const env = await setup();
+    // masterchain destination rejected (22506)
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury', deployment_manifest_hash: MANIFEST_HASH, treasury_address: fixtureAddress('MC_TREASURY', -1),
+    } as BindBuybackTreasury);
+    expect((await env.buyback.getGetBuybackBurnConfig()).treasury_bound).toBe(false);
+    // self destination rejected (22507)
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury', deployment_manifest_hash: MANIFEST_HASH, treasury_address: env.buyback.address,
+    } as BindBuybackTreasury);
+    expect((await env.buyback.getGetBuybackBurnConfig()).treasury_bound).toBe(false);
+    // valid bind
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury', deployment_manifest_hash: MANIFEST_HASH, treasury_address: env.sweepTreasury.address,
+    } as BindBuybackTreasury);
+    expect((await env.buyback.getGetBuybackBurnConfig()).treasury_bound).toBe(true);
+    // second bind rejected (22505), destination immutable
+    const second = await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury', deployment_manifest_hash: MANIFEST_HASH, treasury_address: env.attacker.address,
+    } as BindBuybackTreasury);
+    expect(buybackExit(second, env.buyback.address)).toBe(22505);
+    expect((await env.buyback.getGetBuybackBurnConfig()).treasury_address.equals(env.sweepTreasury.address)).toBe(true);
+  });
+
+  it('SWEEP-03: a stranded reserve is permissionlessly dead-man-swept to the immutable treasury only after the grace', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    const sealNow = env.blockchain.now ?? 0;
+    await acceptReserve(env);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
+
+    // before the grace -> 22542, nothing moves
+    env.blockchain.now = sealNow + DEADMAN_SWEEP_GRACE_SECONDS - 100;
+    const early = await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    expect(buybackExit(early, env.buyback.address)).toBe(22542);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
+
+    // after the grace -> ANY sender (here the attacker) can only push funds to the FIXED treasury
+    env.blockchain.now = sealNow + DEADMAN_SWEEP_GRACE_SECONDS + 100;
+    const treasuryBefore = await contractBalance(env, env.sweepTreasury.address);
+    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    expect(state.reserve_due_ton).toBe(0n);
+    expect(state.route_refund_due_ton).toBe(0n);
+    expect(await contractBalance(env, env.sweepTreasury.address)).toBeGreaterThan(treasuryBefore + ENVELOPE);
+    // the buyback retains only a storage floor
+    expect(await contractBalance(env, env.buyback.address)).toBeLessThan(SWEEP_STORAGE_FLOOR + toNano('0.2'));
+  });
+
+  it('SWEEP-04: the dead-man refuses mid-cycle (phase != IDLE) even past the grace (22540)', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    const sealNow = env.blockchain.now ?? 0;
+    await acceptReserve(env);
+    await executeBuyback(env, 1n); // phase -> PENDING_STONFI_SWAP
+    expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
+
+    env.blockchain.now = sealNow + DEADMAN_SWEEP_GRACE_SECONDS + 100;
+    const res = await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    expect(buybackExit(res, env.buyback.address)).toBe(22540);
+  });
+
+  it('SWEEP-05: a successful burn resets the dead-man grace (a live route is never swept)', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    const sealNow = env.blockchain.now ?? 0;
+
+    // complete a full burn cycle late in the seal-grace window
+    env.blockchain.now = sealNow + DEADMAN_SWEEP_GRACE_SECONDS - 1000;
+    await acceptReserve(env);
+    await executeBuyback(env, 1n);
+    await sendStandardStonfiAthOutput(env, 1n, 100_000n, BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS);
+    const burnNow = env.blockchain.now ?? 0;
+    expect((await env.buyback.getGetBuybackBurnTotals()).executed_buyback_count).toBe(1n);
+    expect((await env.buyback.getGetBuybackBurnState()).last_burn_at).toBe(BigInt(burnNow)); // grace reset to the burn
+
+    // a fresh reserve strands; the grace is re-measured from the BURN, so passing the old seal-grace is NOT enough
+    await acceptReserve(env);
+    env.blockchain.now = sealNow + DEADMAN_SWEEP_GRACE_SECONDS + 100;
+    const stillEarly = await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    expect(buybackExit(stillEarly, env.buyback.address)).toBe(22542);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
+
+    // only past the burn-based grace does the dead-man fire
+    env.blockchain.now = burnNow + DEADMAN_SWEEP_GRACE_SECONDS + 100;
+    await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(0n);
   });
 });

@@ -317,12 +317,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/alex, alex\.ath, alex\.ton, or EQ\.\.\./);
     expect(html).toMatch(/Local label is only shown on this device/);
     expect(html).toMatch(/id="identityMenuButton"/);
-    // v769: the "+" add-menu is gone — image/file/link/check moved into the formatting toolbar; the payment
-    // check button keeps its id inside the toolbar, and the anonymous/wallet-visibility button stays on the row.
+    // v769: the "+" add-menu is gone — image/file/link moved into the formatting toolbar; the
+    // anonymous/wallet-visibility button stays on the row. (Payment checks were removed entirely.)
     expect(html).toMatch(/id="privateComposerToolbar"/);
     expect(html).not.toMatch(/id="privateComposerAddButton"/);
     expect(html).not.toMatch(/id="privateComposerAddMenu"/);
-    expect(html).toMatch(/id="paymentCheckButton"/);
+    expect(html).not.toMatch(/id="paymentCheckButton"/);
     expect(html).toMatch(/id="privateAnonymousButton"/);
     expect(html).toMatch(/icon-eye-off/);
     expect(enCopy).toMatch(/Recipient will see your wallet address/);
@@ -1055,12 +1055,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/VAULT_PUBLISH_STATUS_PARTIAL/);
     expect(app).toMatch(/`submitted \$\{landed\}\/\$\{total\}`/);
     expect(app).toMatch(/`confirming \$\{confirmed\}\/\$\{total\}`/);
-    expect(app).toMatch(/publishState: message\.publishState/);
     expect(app).toMatch(/updateMessageInEncryptedHistory/);
-    expect(app).toMatch(/attemptCancelPaymentCheckAfterPublishFailure/);
-    expect(app).toMatch(/Persistent encrypted local history is required before creating a payment check/);
-    expect(app).toMatch(/check preparing/);
-    expect(app).toMatch(/creating payment check/);
     expect(app).toMatch(/isPublishPriceChangeCancelled/);
     expect(app).toMatch(/publish cancelled/);
     expect(app).toMatch(/not sent: cancelled/);
@@ -1191,7 +1186,7 @@ describe('PWA runtime config guard', () => {
     expect(restoreSource).toMatch(/failedRecords: failed/);
     expect(restoreSource).toMatch(/walletAddress: plathoWallet\?\.address \?\? null/);
     expect(restoreSource).toMatch(/failed\.length > 0/);
-    expect(restoreSource).toMatch(/blocked/);
+    expect(restoreSource).toMatch(/historyRestoredBlocked/);
   });
 
   it('PWA-AVATAR-CACHE-01: cached profile avatar media is hash-verified before reuse', () => {
@@ -1848,10 +1843,9 @@ describe('PWA runtime config guard', () => {
     // initial-bounce part.error — a merely-queued message must never trip the 2-minute broadcast-failing
     // terminal (false red "RPC broadcast unavailable" on quick sends queued behind an 8-cap burst).
     expect(app).toMatch(/if \(currentNonce !== null && currentNonce < clientNonce\) \{[\s\S]{0,900}part\.error = null;[\s\S]{0,200}clearedStaleError = true;/);
-    // v624: the last two broadcast paths without a [platho] warn (Vault auth + receive-intent externals) now also
-    // surface the toncenter reason, so NO broadcast 500 can be a bare mystery on any path.
+    // v624: the Vault auth external broadcast path without a [platho] warn now also surfaces the toncenter
+    // reason, so NO broadcast 500 can be a bare mystery on any path.
     expect(app).toMatch(/console\.warn\('\[platho\] vault auth external broadcast failed'/);
-    expect(app).toMatch(/console\.warn\('\[platho\] vault receive-intent external broadcast failed'/);
     // v626: toncenter "duplicate message" on a re-broadcast = the same BoC is ALREADY queued (in flight) -> arm
     // the 35s cooldown via broadcastDuplicateRelayCount, but do NOT burn a broadcastRetryCount slot: a duplicate
     // proves "queued", not "relayed" — burning the 6-slot budget on duplicates left an ACKed-but-undelivered
@@ -1896,7 +1890,6 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toMatch(/index < total - 1 \|\| options\.confirmFinalNonce === true/);
     expect(sendSource).toMatch(/if \(shouldConfirmVaultPublishNonceAfterSend\(batchIndex, batches\.length, options\)\) \{/);
     expect(app).toMatch(/const publishCallbacks = \{[\s\S]*allowOwnVaultActionReadFallback: true,\s*confirmFinalNonce: true,/);
-    expect(app).toMatch(/sendPreparedCapsulesThroughVault\(preparedPublish, \{[\s\S]*publishState,\s*confirmFinalNonce: true,/);
     // v633: the dead confirmFinalNonce is REMOVED from the public path — the public publish confirm driver
     // (tests/public-publish-heal.test.ts) owns final-batch heal/confirmation for posts/comments.
     expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]{0,400}allowOwnVaultActionReadFallback: true \}\);/);
@@ -2147,7 +2140,6 @@ describe('PWA runtime config guard', () => {
     expect(sendRetrySource).toMatch(/const draft = message\?\.privateDraft \?\? \{\}/);
     expect(sendRetrySource).toMatch(/text: draft\.text \?\? message\?\.text \?\? ''/);
     expect(sendRetrySource).toMatch(/attachments: normalizePrivateImageAttachments\(draft\.attachments \?\? \[\]\)/);
-    expect(sendRetrySource).toMatch(/paymentDraft: hasPaymentIntent \? null : \(draft\.paymentDraft \?\? message\?\.paymentDraft \?\? null\)/);
     expect(sendRetrySource).toMatch(/selectedSuite: draft\.selectedSuite \?\? VAULT_RECEIVE_CRYPTO_SUITE/);
     expect(app.match(/resumePendingPrivateSendRetries\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(app).toMatch(/const PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS = 10 \* 60 \* 1000/);
@@ -2255,7 +2247,6 @@ describe('PWA runtime config guard', () => {
     expect(manualSource).toMatch(/function privateMessageCanLocalCancel\(message\)/);
     expect(manualSource).toMatch(/!privateMessageHasPublishAttempt\(message\)/);
     expect(manualSource).toMatch(/!message\.localHistoryId/);
-    expect(manualSource).toMatch(/!paymentHasIntent\(message\.payment\)/);
     expect(manualSource).toMatch(/retryPrivateMessageFromUi\(thread, message\)/);
     expect(manualSource).toMatch(/cancelPrivateMessageFromUi\(thread, message\)/);
     expect(manualSource).toMatch(/thread\.messages = \(thread\.messages \?\? \[\]\)\.filter/);
@@ -2274,14 +2265,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function schedulePrivateSendRetry'),
       app.indexOf('function schedulePrivatePublishConfirmationRetry'),
     );
-    const checkSource = app.slice(
-      app.indexOf('async function attemptPrivatePaymentCheckPublish'),
-      app.indexOf('async function submitCreatePaymentCheck'),
-    );
-    const runRetrySource = app.slice(
-      app.indexOf('async function runPrivateSendRetry'),
-      app.indexOf('function rememberLocalPublicPost'),
-    );
     const settleSource = app.slice(
       app.indexOf('async function settlePrivateComposerSendError'),
       app.indexOf('async function runPrivateSendRetry'),
@@ -2293,10 +2276,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/PRIVATE_SEND_RPC_RETRY_MAX_ATTEMPTS = 90/);
     expect(retrySource).toMatch(/attempt >= privateSendRetryMaxAttempts\(error, message\)/);
     expect(app).toMatch(/checking RPC, retrying/);
-    expect(checkSource).toMatch(/isRecoverablePrivateSendError\(error\)[\s\S]*schedulePrivateSendRetry\(context, error\)/);
-    expect(checkSource).toMatch(/context\.paymentIntentCreated = true/);
-    expect(runRetrySource).toMatch(/context\.paymentIntentCreated && message\.payment && Array\.isArray\(message\.capsules\)/);
-    expect(runRetrySource).toMatch(/paymentDraft: null/);
     expect(settleSource).toMatch(/isRecoverablePrivateSendError\(error\) && privateMessageHasPublishAttempt\(message\)/);
     expect(settleSource).toMatch(/schedulePrivatePublishConfirmationRetry\(context, error\)/);
     expect(settleSource).toMatch(/cancelled \|\| recoverable \|\| partial \|\| privateMessageHasPublishAttempt\(message\)/);
@@ -2864,7 +2843,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const helperSource = app.slice(
       app.indexOf('async function readFreshPendingAthWithdrawalForOwnVaultAction'),
-      app.indexOf('async function submitVaultReceiveIntentExternal'),
+      app.indexOf('async function submitAthWalletMessage'),
     );
     const withdrawSource = app.slice(
       app.indexOf('async function submitVaultWithdrawAthAmount'),
@@ -3069,7 +3048,7 @@ describe('PWA runtime config guard', () => {
     );
     const render = app.slice(
       app.indexOf('function renderConversation'),
-      app.indexOf('async function submitVaultClaimPaymentCheck'),
+      app.indexOf('async function openImageLightbox'),
     );
     const addButton = app.slice(
       app.indexOf("privateComposerAddButton?.addEventListener('click'"),
@@ -3468,7 +3447,7 @@ describe('PWA runtime config guard', () => {
     );
     const avatarSource = app.slice(
       app.indexOf('async function submitProfileAvatarUpdate'),
-      app.indexOf('async function attemptPrivatePaymentCheckPublish'),
+      app.indexOf('async function submitVaultRegisterMessagingKeys'),
     );
     const avatarFinalizeSource = app.slice(
       app.indexOf('async function finalizeProfileAvatarUpdate'),
@@ -3623,10 +3602,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function scheduleMessageAutoSync'),
       app.indexOf('async function bootReplayStore'),
     );
-    const paymentSource = app.slice(
-      app.indexOf('async function attemptPrivatePaymentCheckPublish'),
-      app.indexOf('async function attemptCancelPaymentCheckAfterPublishFailure'),
-    );
     const publishSource = app.slice(
       app.indexOf('async function attemptPrivateComposerMessagePublish'),
       app.indexOf('async function settlePrivateComposerSendError'),
@@ -3645,7 +3620,7 @@ describe('PWA runtime config guard', () => {
     // its own vault read burst and concurrent background reads stall the iOS run loop (v509 pattern).
     expect(autoSyncSource).toMatch(/if \(privateOutboundWorkActive\(\) \|\| privatePublishConfirmJobs\.size > 0 \|\| plathoAccountActivationPending\) \{/);
     expect(autoSyncSource).toMatch(/scheduleMessageAutoSync\(PRIVATE_OUTBOUND_SYNC_PAUSE_MS\)/);
-    for (const source of [paymentSource, publishSource, confirmSource]) {
+    for (const source of [publishSource, confirmSource]) {
       expect(source).toMatch(/const endPrivateOutboundWork = beginPrivateOutboundWork\(\)/);
       expect(source).toMatch(/finally \{[\s\S]*endPrivateOutboundWork\(\);[\s\S]*\}/);
     }
@@ -3808,31 +3783,20 @@ describe('PWA runtime config guard', () => {
   it('PWA-MSG-02C: private attachments are composer drafts, not single-slot or immediate-send actions', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
-    const paymentButtonSource = app.slice(
-      app.indexOf("paymentCheckButton?.addEventListener('click'"),
-      app.indexOf("privateComposerAddButton?.addEventListener('click'"),
-    );
     const submitSource = app.slice(
       app.indexOf("composer?.addEventListener('submit'"),
       app.indexOf('createWalletButton?.addEventListener'),
     );
 
-    expect(html).toMatch(/id="paymentCheckButton"[\s\S]*Attach private payment check/);
     expect(app).toMatch(/let privateImageAttachments = \[\]/);
     expect(app).toMatch(/let privatePaymentCheckDraft = null/);
     expect(app).toMatch(/privateImageAttachments = \[\.\.\.privateImageAttachments, attachment\]/);
     expect(app).toMatch(/function composerBlocksFromDraft/);
     expect(app).toMatch(/function messageDocumentBytesFromDraft/);
-    expect(paymentButtonSource).toMatch(/const paymentDetails = await requestPaymentCheckDetails\(privatePaymentCheckDraft\)/);
-    expect(paymentButtonSource).toMatch(/privatePaymentCheckDraft = paymentDetails/);
-    expect(paymentButtonSource).toMatch(/insertPaymentCheckMarker\(\)/);
-    expect(paymentButtonSource).not.toMatch(/submitCreatePaymentCheck\(/);
     expect(submitSource).toMatch(/const attachments = normalizePrivateImageAttachments\(privateImageAttachments\)/);
     expect(submitSource).toMatch(/const paymentDraft = privatePaymentCheckDraft/);
     expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*paymentDraft,\s*replyDraft,\s*fileAttachments,\s*shareDraft\)/);
     expect(submitSource).toMatch(/blocks:\s*displayBlocks/);
-    expect(submitSource).toMatch(/await attemptPrivatePaymentCheckPublish\(sendContext\)/);
-    expect(submitSource).not.toMatch(/submitCreatePaymentCheck\(\{ thread, paymentDetails: paymentDraft \}\)/);
   });
 
   it('PWA-MSG-02D: rich private document messages survive encrypted-history restore and chain rehydrate', () => {
@@ -3870,136 +3834,15 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function threadForOpenedSenderCapsule\(opened\)[\s\S]*label: 'Recovered sent'/);
   });
 
-  it('PWA-CONFIG-01D4: payment checks preflight and persist recovery before signed CreateReceiveIntent external', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const store = readFileSync('web/encrypted-message-store.mjs', 'utf8');
-    const source = app.slice(
-      app.indexOf('async function attemptPrivatePaymentCheckPublish'),
-      app.indexOf('async function submitVaultClaimPaymentCheck'),
-    );
-    const helpers = app.slice(
-      app.indexOf('function paymentAssetVaultBalance'),
-      app.indexOf('function delay'),
-    );
-    const localIntentIndex = source.indexOf('const intentId = await computeVaultReceiveIntentId({');
-    const quotedPrepareIndex = source.indexOf('const quotedPublish = await prepareCapsulesThroughVault(capsules, {');
-    const fallbackUserIndex = source.indexOf('const initialUser = await readFreshConnectedVaultUserForOwnVaultAction(provider)');
-    const persistIndex = source.indexOf('const storedRecovery = await persistMessageToEncryptedHistory(thread, message)');
-    const pendingLedgerIndex = source.indexOf('const pendingLedger = await rememberPendingPaymentCheckLedgerRecord(');
-    const createIndex = source.indexOf("submitVaultReceiveIntentExternal('CreateReceiveIntent'");
-    const waitCreateIndex = source.indexOf('await waitForPaymentCheckCreateConfirmation(provider, payment)');
-    const finalPreparedIndex = source.indexOf('const preparedPublish = await prepareCapsulesThroughVault(capsules, {', waitCreateIndex);
-
-    expect(fallbackUserIndex).toBeGreaterThanOrEqual(0);
-    expect(localIntentIndex).toBeGreaterThan(fallbackUserIndex);
-    expect(quotedPrepareIndex).toBeGreaterThan(fallbackUserIndex);
-    expect(persistIndex).toBeGreaterThan(quotedPrepareIndex);
-    expect(pendingLedgerIndex).toBeGreaterThan(persistIndex);
-    expect(createIndex).toBeGreaterThan(pendingLedgerIndex);
-    expect(waitCreateIndex).toBeGreaterThan(createIndex);
-    expect(finalPreparedIndex).toBeGreaterThan(waitCreateIndex);
-    expect(source.slice(createIndex)).not.toMatch(/prepareCapsulesThroughVault\(\[capsule\]/);
-    expect(source).not.toMatch(/getReceiveIntentId/);
-    expect(source).not.toMatch(/allowUnverifiedCriticalRead:\s*true[\s\S]*getReceiveIntentId/);
-    expect(source).toMatch(/const commitment = secret32/);
-    expect(source).toMatch(/createPrivateComposerCapsules\(context\.text \?\? '', context\.attachments \?\? \[\], recipientEntry, thread\.id, senderOptions, \{ payment, replyDraft: contextReplyDraft, shareDraft: contextShareDraft, fileAttachments: contextFileAttachments \}\)/);
-    expect(app).toMatch(/function paymentSecret32Bytes\(payment\)/);
-    expect(app).toMatch(/function normalizePaymentForMessage\(payment\)[\s\S]*secret32Hex:\s*bytesToHex\(paymentSecret32Bytes\(payment\)\)/);
-    expect(app).toMatch(/function documentPaymentContent\(payment, options = \{\}\)[\s\S]*paymentSecret32Bytes\(payment\)[\s\S]*options\.allowMissingPaymentSecret === true[\s\S]*new Uint8Array\(32\)/);
-    expect(app).toMatch(/function privateComposerSendPlan[\s\S]*messageDocumentBytesFromDraft\([\s\S]*allowMissingPaymentSecret:\s*true/);
-    expect(source).toMatch(/allowOwnVaultActionReadFallback:\s*true/);
-    expect(source).not.toMatch(/allowUnverifiedNonceRead:\s*true|allowUnverifiedNonceWait/);
-    expect(helpers).toMatch(/async function readConnectedVaultGlobalForOwnVaultAction[\s\S]*criticalChainReadOptions\(\)/);
-    // Pre-sign own-action reads fail closed unless the transport reports
-    // degraded censorship-survival mode (callWithDegradedTransportReadFallback).
-    expect(helpers).toMatch(/async function readFreshConnectedVaultUserForOwnVaultAction\(provider\)[\s\S]*callWithDegradedTransportReadFallback\(/);
-    expect(helpers).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
-    expect(helpers).toMatch(/async function readFreshReceiveIntentForOwnVaultAction\(provider, intentId\)[\s\S]*callWithDegradedTransportReadFallback\(/);
-    expect(helpers).toMatch(/\(\) => readFreshReceiveIntent\(provider, intentId\)/);
-    expect(helpers).not.toMatch(/readFreshConnectedVaultUser\(provider, \{ verify: false|readFreshReceiveIntent\(provider, intentId, \{ verify: false/);
-    expect(app).toMatch(/if \(options\.allowOwnVaultActionReadFallback === true\) \{[\s\S]*await readConnectedVaultGlobalForOwnVaultAction\(provider\)/);
-    expect(source).toMatch(/tonBalance < amount \+ createReserve \+ quotedPublish\.totalMaxCharge/);
-    expect(source).toMatch(/athBalance < amount/);
-    expect(source).toMatch(/tonBalance < createReserve \+ quotedPublish\.totalMaxCharge/);
-    expect(source).toMatch(/waitForPaymentCheckCreateConfirmation\(provider,\s*payment\)/);
-    expect(source).toMatch(/const preparedPublish = await prepareCapsulesThroughVault\(capsules, \{[\s\S]*publishState[\s\S]*allowOwnVaultActionReadFallback:\s*true/);
-    expect(helpers).toMatch(/function readFreshReceiveIntentForOwnVaultAction/);
-    expect(helpers).toMatch(/waitForPaymentCheckCreateConfirmation[\s\S]*readFreshReceiveIntentForOwnVaultAction\(provider, intentId\)/);
-    expect(source).toMatch(/encryptedMessageStore\.persistent === false/);
-    expect(app).toMatch(/function paymentDraftForHistory/);
-    expect(app).toMatch(/payment:\s*paymentForHistory\(message\.payment\)/);
-    expect(app).toMatch(/paymentDraft:\s*paymentDraftForHistory\(message\.paymentDraft\)/);
-    expect(source).toMatch(/message\.paymentDraft = paymentDraftForHistory\(paymentDraft\)/);
-    expect(source).toMatch(/rememberPaymentCheckActionError\('pre-create', error, payment\)/);
-    expect(source).toMatch(/status:\s*'prepared'/);
-    expect(source).toMatch(/required:\s*true/);
-    expect(source).toMatch(/Payment check pending ledger could not be saved/);
-    expect(source).toMatch(/status:\s*'intent_create_submitted'/);
-    expect(source).toMatch(/status:\s*'intent_confirmed'/);
-    expect(source).toMatch(/status:\s*'publish_submitted'/);
-    expect(source).toMatch(/status:\s*'publish_failed_refund_required'/);
-    expect(source).toMatch(/message\.meta = publishStateMeta\(message\.publishState\)/);
-    expect(source).not.toMatch(/message\.meta = `check \$\{publishStateMeta/);
-    expect(source).not.toMatch(/message\.meta = `check \$\{privateSendRetryMeta/);
-    expect(source).toMatch(/removePendingPaymentCheckLedgerRecord\(payment\)/);
-    expect(app).toMatch(/const PAYMENT_CHECK_PENDING_LEDGER_KIND = 'platho\.paymentCheck\.pendingIntent\.v1'/);
-    expect(app).toMatch(/async function restorePendingPaymentCheckLedger/);
-    expect(app).toMatch(/encryptedMessageStore\.putPendingPaymentCheck/);
-    expect(app).toMatch(/encryptedMessageStore\.listPendingPaymentChecks/);
-    expect(store).toMatch(/const PENDING_PAYMENT_CHECK_STORE_NAME = 'pendingPaymentChecks'/);
-    expect(store).toMatch(/const MESSAGE_HISTORY_DB_VERSION = 2/);
-    expect(store).toMatch(/async putPendingPaymentCheck\(input\)/);
-    expect(store).toMatch(/async removePendingPaymentCheck\(id\)/);
-    expect(source).toMatch(/privateSendBlockedStatusText\(error\)/);
-    expect(source).toMatch(/rememberPaymentCheckActionError\('publish', error, payment\)/);
-    expect(source).toMatch(/check not delivered, refund required/);
-  });
-
-  it('PWA-CONFIG-01D4A: receive-intent externals treat ambiguous sendBoc as submitted and poll confirmation', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const source = app.slice(
-      app.indexOf('async function submitVaultReceiveIntentExternal'),
-      app.indexOf('async function submitAthWalletMessage'),
-    );
-
-    expect(source).toMatch(/catch \(error\) \{[\s\S]*isAmbiguousTonRpcBroadcastError\(error\)/);
-    expect(source).toMatch(/ambiguousBroadcast = true/);
-    expect(source).toMatch(/broadcastError = error/);
-    expect(source).toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n/);
-    expect(source).toMatch(/confirmationPending: Boolean\(nonceWaitError\)/);
-    expect(source).toMatch(/if \(ambiguousBroadcast \|\| result\) \{[\s\S]*nonceWaitError = error;[\s\S]*\} else \{[\s\S]*throw error;/);
-    // v758: a 500 carrying THIS path's per-receiver Vault pre-accept nonce reject is DEFINITIVE on the
-    // no-retained-external path — throw WITHOUT ratcheting the nonce floor (the floor-overshoot
-    // liveness wedge) and without reporting a maybe-landed intent that never executed. The batch
-    // publish path intentionally keeps treating such 500s as ambiguous: it retains the signed
-    // external and the heal loop reconciles either way. The matcher is STRICT and fails safe toward
-    // ambiguous: verified per-receiver codes only (16453 is the batch receiver's — a guard matching it
-    // here would never fire), exit-code context required (no bare-number matches in proxy error pages),
-    // and it refuses when an earlier transport attempt's delivery was unknown (a delivered first copy +
-    // a lagging fallback bounce must keep the old raise-floor-and-wait flow — a false "definitely
-    // rejected" on a funds-moving external invites a double-executing user retry).
-    expect(source).toMatch(/if \(!isAmbiguousTonRpcBroadcastError\(error\) \|\| isDefinitiveVaultSingleExternalNonceReject\(error\)\) throw error;/);
-    expect(app).toMatch(/const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES = Object\.freeze\(\[16037, 16135, 16233, 16249, 16262, 16611, 16711, 16808\]\)/);
-    expect(app).toMatch(/function isDefinitiveVaultSingleExternalNonceReject\(error\)[\s\S]{0,300}tonRpcPriorDeliveryAmbiguous === true\) return false;/);
-    expect(app).toMatch(/if \(!\/exit\\s\*_\?code\/i\.test\(text\)\) return false;/);
-    const vaultRpcProviderForSend = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
-    expect(vaultRpcProviderForSend).toMatch(/error\.tonRpcPriorDeliveryAmbiguous = true;/);
-    expect(vaultRpcProviderForSend).toMatch(/if \(status < 400 && String\(error\?\.code \?\? ''\) !== 'QUEUE_TIMEOUT'\) priorDeliveryAmbiguous = true;/);
-  });
-
   it('PWA-CONFIG-01D4C: service Vault externals handle ambiguous broadcast before downstream finality checks', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const helperSource = app.slice(
       app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
-      app.indexOf('async function submitVaultReceiveIntentExternal'),
+      app.indexOf('async function readFreshPendingAthWithdrawalForOwnVaultAction'),
     );
     const profileSource = app.slice(
       app.indexOf('async function submitVaultProfileAvatarRegistration'),
       app.indexOf('async function refreshWalletTonBalanceForProfile'),
-    );
-    const avatarFlow = app.slice(
-      app.indexOf('async function submitProfileAvatarUpdate'),
-      app.indexOf('async function attemptPrivatePaymentCheckPublish'),
     );
     const usernameFlow = app.slice(
       app.indexOf('async function submitUsernameMint'),
@@ -4026,157 +3869,14 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['vault.keyUpdateSent']).toBe('key update sent');
     expect(profileSource).toMatch(/await waitForProfileAvatarRegistryUpdate\(owner, avatarHash\)/);
     expect(usernameFlow).toMatch(/autoLinkMintedUsername\(username, owner,/);
-  });
-
-  it('PWA-CONFIG-01D4D: payment check retry stays on the payment-check path', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const source = app.slice(
-      app.indexOf('async function runPrivateSendRetry'),
-      app.indexOf('function rememberLocalPublicPost'),
-    );
-    const paymentBranchIndex = source.indexOf('if (context.paymentDraft && !(context.paymentIntentCreated && message.payment && Array.isArray(message.capsules)))');
-    const paymentRetryIndex = source.indexOf('await attemptPrivatePaymentCheckPublish(context)');
-    const composerRetryIndex = source.indexOf('await attemptPrivateComposerMessagePublish({');
-
-    expect(paymentBranchIndex).toBeGreaterThanOrEqual(0);
-    expect(paymentRetryIndex).toBeGreaterThan(paymentBranchIndex);
-    expect(composerRetryIndex).toBeGreaterThan(paymentRetryIndex);
-    expect(source).toMatch(/paymentDraft: null/);
-  });
-
-  it('PWA-CONFIG-01D4B: payment check claim confirms Vault credit before rendering claimed', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const helpers = app.slice(
-      app.indexOf('function paymentAssetVaultBalance'),
-      app.indexOf('function delay'),
-    );
-    const claimSource = app.slice(
-      app.indexOf('async function submitVaultClaimPaymentCheck'),
-      app.indexOf('async function submitVaultCancelPaymentCheck'),
-    );
-    const renderSource = app.slice(
-      app.indexOf('function renderConversation'),
-      app.indexOf('async function openImageLightbox'),
-    );
-    const readUserIndex = claimSource.indexOf('const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider)');
-    const readIntentIndex = claimSource.indexOf('const intent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId)');
-    const assertIntentIndex = claimSource.indexOf('assertReceiveIntentMatchesPayment(intent, payment)');
-    const submitIndex = claimSource.indexOf("submitVaultReceiveIntentExternal('ClaimReceiveIntent'");
-    const waitIndex = claimSource.indexOf('waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser)');
-    const flashIndex = claimSource.indexOf("flashWalletIdentityStatus(t('payment.checkClaimed'");
-
-    expect(readUserIndex).toBeGreaterThanOrEqual(0);
-    expect(readIntentIndex).toBeGreaterThan(readUserIndex);
-    expect(assertIntentIndex).toBeGreaterThan(readIntentIndex);
-    expect(submitIndex).toBeGreaterThan(assertIntentIndex);
-    expect(waitIndex).toBeGreaterThan(submitIndex);
-    expect(flashIndex).toBeGreaterThan(waitIndex);
-    expect(claimSource).not.toMatch(/readFreshConnectedVaultUser\(provider\)\.catch/);
-    expect(claimSource).toMatch(/allowPendingServiceWorkerUpdate:\s*true/);
-    expect(claimSource).not.toMatch(/allowUnverifiedNonceWait/);
-    expect(claimSource).toMatch(/secret32:\s*paymentSecret32\(payment\)/);
-    expect(claimSource).toMatch(/markPendingPaymentCheckLedgerRecord\(payment, \{[\s\S]*status:\s*'claim_submitted'/);
-    expect(claimSource).toMatch(/const confirmed = await waitForPaymentCheckClaimConfirmation\(provider, payment, beforeUser\)/);
-    expect(claimSource).toMatch(/await removePendingPaymentCheckLedgerRecord\(payment\)/);
-    expect(helpers).toMatch(/provider\.getReceiveIntent\(intentId,\s*\{[\s\S]*verify:\s*options\.verify !== false[\s\S]*priority:\s*'critical'[\s\S]*cacheTtlMs:\s*0/);
-    expect(helpers).toMatch(/loadConnectedVaultUser\(\{[\s\S]*verify:\s*options\.verify !== false[\s\S]*priority:\s*'critical'[\s\S]*cacheTtlMs:\s*0/);
-    expect(helpers).not.toMatch(/vaultAthBalanceAtomic/);
-    expect(helpers).toMatch(/ath_balance \?\? user\?\.athBalance \?\? user\?\.ath/);
-    expect(helpers).toMatch(/function readFreshReceiveIntentForOwnVaultAction/);
-    expect(helpers).toMatch(/function assertReceiveIntentMatchesPayment[\s\S]*intent\.commitment[\s\S]*paymentSecret32\(payment\)[\s\S]*Payment check data mismatch; this check cannot be claimed/);
-    expect(helpers).toMatch(/waitForPaymentCheckClaimConfirmation[\s\S]*readFreshReceiveIntentForOwnVaultAction\(provider, intentId\)/);
-    expect(helpers).toMatch(/waitForPaymentCheckClaimConfirmation[\s\S]*readFreshConnectedVaultUserForOwnVaultAction\(provider\)/);
-    expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
-    expect(helpers).toMatch(/Payment check disappeared but Vault balance did not update/);
-    expect(renderSource).toMatch(/onStatus:\s*async \(status\)/);
-    expect(renderSource).toMatch(/check claim submitted, confirming/);
-    expect(renderSource).toMatch(/paymentCheckClaimBlockedStatus\(error\)/);
-    expect(helpers).toMatch(/if \(\/data mismatch\|claim secret\|commitment\|exitcode=16280\|exit code 16280\/i\.test\(text\)\) return 'check data mismatch'/);
-    expect(helpers).toMatch(/return `check claim blocked: \$\{shortUiErrorText\(error, 'blocked'\)\}`/);
-  });
-
-  it('PWA-CONFIG-01D4C: payment check cancel verifies sender and persists terminal state', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const helpers = app.slice(
-      app.indexOf('function paymentAssetVaultBalance'),
-      app.indexOf('function delay'),
-    );
-    const cancelSource = app.slice(
-      app.indexOf('async function submitVaultCancelPaymentCheck'),
-      app.indexOf('async function attemptCancelPaymentCheckAfterPublishFailure'),
-    );
-    const receiveIntentFallbackSource = app.slice(
-      app.indexOf('async function readFreshReceiveIntentForOwnVaultAction'),
-      app.indexOf('async function readFreshReceiveIntentForCancel'),
-    );
-    const userFallbackSource = app.slice(
-      app.indexOf('async function readFreshConnectedVaultUserForOwnVaultAction'),
-      app.indexOf('async function callWithOwnVaultActionReadFallback'),
-    );
-    const renderSource = app.slice(
-      app.indexOf('function renderConversation'),
-      app.indexOf('async function openImageLightbox'),
-    );
-    const readUserIndex = cancelSource.indexOf('const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider)');
-    const readIntentIndex = cancelSource.indexOf('const intent = await readFreshReceiveIntentForCancel(provider, intentId)');
-    const assertIndex = cancelSource.indexOf('assertReceiveIntentCancelableBySender(intent, payment)');
-    const submitIndex = cancelSource.indexOf("submitVaultReceiveIntentExternal('CancelReceiveIntent'");
-    const waitIndex = cancelSource.indexOf('waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser)');
-    const flashIndex = cancelSource.indexOf("flashWalletIdentityStatus(t('payment.checkCancelled'))");
-
-    expect(helpers).toMatch(/function assertReceiveIntentCancelableBySender/);
-    expect(helpers).toMatch(/sameWalletAddress\(intent\.sender_wallet, connectedWallet\)/);
-    expect(helpers).toMatch(/payment\.recipientWallet[\s\S]*sameWalletAddress\(intent\.recipient_wallet, payment\.recipientWallet\)/);
-    expect(helpers).toMatch(/function waitForPaymentCheckCancelConfirmation/);
-    expect(helpers).toMatch(/function readFreshReceiveIntentForCancel/);
-    expect(helpers).toMatch(/function readFreshConnectedVaultUserForOwnVaultAction/);
-    expect(receiveIntentFallbackSource).not.toMatch(/RPC_DISAGREEMENT|isTonRpcSoftVaultGlobalReadError/);
-    expect(userFallbackSource).not.toMatch(/RPC_DISAGREEMENT|isTonRpcSoftVaultGlobalReadError/);
-    expect(receiveIntentFallbackSource).toMatch(/callWithDegradedTransportReadFallback\(/);
-    expect(receiveIntentFallbackSource).toMatch(/\(\) => readFreshReceiveIntent\(provider, intentId\)/);
-    expect(userFallbackSource).toMatch(/callWithDegradedTransportReadFallback\(/);
-    expect(userFallbackSource).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
-    expect(receiveIntentFallbackSource).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
-    expect(userFallbackSource).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
-    expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
-    expect(helpers).toMatch(/Payment check disappeared but sender Vault balance was not restored/);
-    expect(readUserIndex).toBeGreaterThanOrEqual(0);
-    expect(readIntentIndex).toBeGreaterThan(readUserIndex);
-    expect(assertIndex).toBeGreaterThan(readIntentIndex);
-    expect(submitIndex).toBeGreaterThan(assertIndex);
-    expect(waitIndex).toBeGreaterThan(submitIndex);
-    expect(flashIndex).toBeGreaterThan(waitIndex);
-    expect(cancelSource).toMatch(/allowPendingServiceWorkerUpdate:\s*true/);
-    expect(cancelSource).not.toMatch(/allowUnverifiedNonceWait/);
-    expect(cancelSource).toMatch(/markPendingPaymentCheckLedgerRecord\(payment, \{[\s\S]*status:\s*'cancel_submitted'/);
-    expect(cancelSource).toMatch(/const confirmed = await waitForPaymentCheckCancelConfirmation\(provider, payment, beforeUser\)/);
-    expect(cancelSource).toMatch(/await removePendingPaymentCheckLedgerRecord\(payment\)/);
-    expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel submitted'\)/);
-    expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel confirming'\)/);
-    expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel signing'\)/);
-    expect(renderSource).toMatch(/paymentMetaText\.includes\('another sender'\)/);
-    expect(renderSource).toMatch(/message\.meta = 'check cancel signing'/);
-    expect(renderSource).toMatch(/onStatus:\s*async \(status\)/);
-    expect(renderSource).toMatch(/message\.meta = 'check cancelled'/);
-    expect(renderSource).toMatch(/message\.meta === 'check cancelled'[\s\S]*schedulePendingServiceWorkerAppShellReload\(\)/);
-    expect(renderSource).toMatch(/paymentCheckCancelBlockedStatus\(error\)/);
-    expect(renderSource).toMatch(/updateMessageInEncryptedHistory\(thread, message\)/);
-  });
-
-  it('PWA-CONFIG-01D4E: payment check renders as one inline attachment row', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const css = readFileSync('web/styles.css', 'utf8');
-    const renderSource = app.slice(
-      app.indexOf('function renderConversation'),
-      app.indexOf('async function openImageLightbox'),
-    );
-
-    expect(renderSource).toMatch(/let paymentBlockElement = null/);
-    expect(renderSource).toMatch(/paymentLabel\.className = 'message-payment-label'/);
-    expect(renderSource).toMatch(/paymentBlockElement\.append\(actions\)/);
-    expect(renderSource).not.toMatch(/bubble\.append\(actions\)/);
-    expect(css).toMatch(/\.message-payment-block \{[\s\S]*display: flex;[\s\S]*justify-content: space-between;/);
-    expect(css).toMatch(/\.message-payment-block \.payment-actions \{[\s\S]*margin-top: 0;/);
+    // General single-external ambiguous-broadcast guards (shared by every signed Vault external — the
+    // definitive per-receiver nonce-reject codes + the provider's prior-delivery-ambiguous flag).
+    expect(app).toMatch(/const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES = Object\.freeze\(\[16037, 16135, 16233, 16249, 16262, 16611, 16711, 16808\]\)/);
+    expect(app).toMatch(/function isDefinitiveVaultSingleExternalNonceReject\(error\)[\s\S]{0,300}tonRpcPriorDeliveryAmbiguous === true\) return false;/);
+    expect(app).toMatch(/if \(!\/exit\\s\*_\?code\/i\.test\(text\)\) return false;/);
+    const vaultRpcProviderForSend = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    expect(vaultRpcProviderForSend).toMatch(/error\.tonRpcPriorDeliveryAmbiguous = true;/);
+    expect(vaultRpcProviderForSend).toMatch(/if \(status < 400 && String\(error\?\.code \?\? ''\) !== 'QUEUE_TIMEOUT'\) priorDeliveryAmbiguous = true;/);
   });
 
   it('PWA-CONFIG-01D5: public submitted publish creates durable pending feed items', () => {
@@ -4214,10 +3914,6 @@ describe('PWA runtime config guard', () => {
 
   it('RT-PWA-VLT-002: own Vault pre-sign reads fail closed while post-broadcast nonce waits may fall back', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const receiveIntentHelper = app.slice(
-      app.indexOf('async function readFreshReceiveIntentForOwnVaultAction'),
-      app.indexOf('async function readFreshReceiveIntentForCancel'),
-    );
     const userHelper = app.slice(
       app.indexOf('async function readFreshConnectedVaultUserForOwnVaultAction'),
       app.indexOf('async function callWithOwnVaultActionReadFallback'),
@@ -4228,7 +3924,7 @@ describe('PWA runtime config guard', () => {
     );
     const canonicalHelper = app.slice(
       app.indexOf('async function readCanonicalPublishChargeForOwnVaultAction'),
-      app.indexOf('async function waitForPaymentCheckClaimConfirmation'),
+      app.indexOf('function delay'),
     );
     const capsuleRoute = app.slice(
       app.indexOf('async function requireCapsuleHubVaultRouteForPublish'),
@@ -4272,10 +3968,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function readConnectedVaultGlobalForOwnVaultAction'),
     );
 
-    expect(receiveIntentHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
-    expect(receiveIntentHelper).toMatch(/\(\) => readFreshReceiveIntent\(provider, intentId\)/);
-    expect(receiveIntentHelper).toMatch(/unverifiedCriticalChainReadOptions\(\)/);
-    expect(receiveIntentHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
     // Own-action pre-sign reads stay verified fail-closed while verification
     // is actually possible. The unverified fallback opens only when the
     // transport reports structural degradation: the primary gateway is
@@ -5778,9 +5470,6 @@ describe('PWA runtime config guard', () => {
     expect(renderSource).toMatch(/const ownSendScrollToEnd = ownSendPendingRender;\s*\n\s*ownSendPendingRender = false;/);
     expect(renderSource).toMatch(/if \(ownSendScrollToEnd\) conversationOpenScrollUnsettled = false;/);
     expect(renderSource).not.toMatch(/if \(conversationNewOutbound\) conversationOpenScrollUnsettled = false;/);
-    // The SECOND own-send path (payment-check create) also sets the flag, so it too abandons the open-anchor + scrolls
-    // to the sent message (root fix: the precise signal covers every own-send, not the conversationNewOutbound proxy).
-    expect(app).toMatch(/ownSendPendingRender = true; \/\/ own-send \(payment check\)[\s\S]*?\n\s*insertThreadMessage\(thread, message\);/);
     // The rAF smooth-scroll-to-end is also gated on the precise flag now (not conversationNewOutbound), so a late
     // out-of-order incoming can't yank a reader who scrolled up to read history.
     expect(renderSource).toMatch(/else if \(ownSendScrollToEnd\) \{[\s\S]*?behavior: 'smooth'/);
@@ -6390,9 +6079,6 @@ describe('PWA runtime config guard', () => {
       // v774: a ↕ dock button (flips the toolbar above/below the input) sits next to the ▼ hide button.
       expect(slice).toMatch(/class="composer-toolbar-dock"[\s\S]*?class="composer-toolbar-hide"/);
     }
-    // Only the private toolbar carries the payment-check button.
-    const privBar = html.slice(html.indexOf('id="privateComposerToolbar"'), html.indexOf('id="privateComposerToolbar"') + 4200);
-    expect(privBar).toMatch(/id="paymentCheckButton"/);
     // The input row keeps ONLY the leading control + textarea + send.
     expect(html).toMatch(/class="composer-input-row">\s*<button class="icon-button private-anonymous-button"/);
 
@@ -7043,7 +6729,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const submitAvatarSource = app.slice(
       app.indexOf('async function submitProfileAvatarUpdate'),
-      app.indexOf('async function submitCreatePaymentCheck'),
+      app.indexOf('async function submitVaultRegisterMessagingKeys'),
     );
     const finalizeAvatarSource = app.slice(
       app.indexOf('async function finalizeProfileAvatarUpdate'),

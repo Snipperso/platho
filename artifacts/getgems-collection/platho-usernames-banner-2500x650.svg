@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2500 650" role="img" aria-label="Platho Usernames collection banner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1113"/>
+      <stop offset="1" stop-color="#0b0d0f"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="118" y1="430" x2="430" y2="82" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2be6ad"/>
+      <stop offset=".55" stop-color="#30d5b0"/>
+      <stop offset="1" stop-color="#25c99b"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="2500" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b0d0f" stop-opacity="0"/>
+      <stop offset=".08" stop-color="#1e262a" stop-opacity=".62"/>
+      <stop offset=".5" stop-color="#30d5b0"/>
+      <stop offset=".92" stop-color="#1e262a" stop-opacity=".62"/>
+      <stop offset="1" stop-color="#0b0d0f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="divider" x1="0" y1="0" x2="0" y2="1" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#30d5b0" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#30d5b0" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#30d5b0" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="2500" height="650" fill="url(#bg)"/>
+  <path d="M0 6h2500" stroke="url(#line)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M0 644h2500" stroke="url(#line)" stroke-width="4" stroke-linecap="round" opacity=".5"/>
+
+  <!-- soft halo behind the logo -->
+  <circle cx="300" cy="325" r="250" fill="none" stroke="#30d5b0" stroke-width="2" opacity=".07"/>
+  <circle cx="300" cy="325" r="186" fill="none" stroke="#66726d" stroke-width="2" opacity=".09"/>
+
+  <!-- logo tile -->
+  <rect x="170" y="195" width="260" height="260" rx="58" fill="#111417" stroke="#283136" stroke-width="2"/>
+  <svg x="194" y="219" width="212" height="212" viewBox="0 0 512 512" overflow="visible">
+    <g transform="translate(0 512) scale(1 -1)">
+      <path fill="url(#teal)" fill-rule="evenodd" d="M167.5 432.1 L330.5 432.1 L346.5 429.9 L364.5 424.8 L380.5 417.7 L393.5 409.6 L404.5 401.0 L416.0 389.5 L425.8 376.5 L435.9 358.5 L441.7 343.5 L445.9 325.5 L446.9 296.5 L445.8 285.5 L442.8 271.5 L435.7 251.5 L425.9 233.5 L416.9 221.5 L402.5 207.1 L387.5 196.1 L362.5 184.1 L348.5 180.1 L334.5 178.0 L221.5 177.2 L220.5 79.2 L137.5 79.4 L137.2 139.5 L166.5 140.2 L166.8 174.5 L136.5 175.1 L135.6 174.5 L135.7 163.5 L134.5 162.8 L104.1 163.5 L104.5 192.7 L134.5 192.9 L135.5 193.5 L135.4 220.5 L136.2 221.5 L166.8 222.5 L166.5 253.0 L135.5 253.3 L134.5 235.2 L105.5 235.1 L104.1 236.5 L104.3 264.5 L134.5 265.3 L135.5 292.5 L197.5 292.7 L198.4 293.5 L198.0 323.5 L166.8 324.5 L167.3 364.5 L198.4 365.5 L198.3 394.5 L166.9 395.5 L166.7 430.5 L167.5 432.1 Z M104.5 407.6 L134.9 407.5 L134.5 377.7 L104.5 377.9 L104.5 407.6 Z M221.5 372.3 L221.5 237.2 L322.5 237.1 L329.5 238.1 L342.5 242.1 L352.5 247.4 L359.5 252.8 L369.6 263.5 L377.0 275.5 L381.5 288.5 L383.1 298.5 L382.7 316.5 L379.7 327.5 L374.8 338.5 L368.9 347.5 L358.5 357.9 L344.5 366.7 L332.5 370.8 L322.5 372.4 L221.5 372.3 Z M65.5 324.3 L93.5 324.3 L93.9 294.5 L64.9 294.5 L64.6 322.5 L65.5 324.3 Z"/>
+    </g>
+  </svg>
+
+  <!-- wordmark -->
+  <text x="485" y="300" fill="#f4f7f5" font-family="Inter, Arial, sans-serif" font-size="86" font-weight="800" letter-spacing="-1">Platho Usernames</text>
+  <text x="489" y="368" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="750">
+    <tspan fill="#96a19c">Username NFTs · live on </tspan><tspan fill="#30d5b0" font-weight="850">TON mainnet</tspan>
+  </text>
+
+  <!-- divider -->
+  <rect x="1330" y="150" width="3" height="350" fill="url(#divider)"/>
+
+  <!-- manifesto (from the NFT itself) -->
+  <text x="1392" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="600" fill="#c9d2cd">
+    <tspan x="1392" y="208">Private correspondence is a </tspan><tspan fill="#30d5b0" font-weight="800">right</tspan><tspan>, not a privilege.</tspan>
+    <tspan x="1392" dy="51">This is a username NFT for Platho — the </tspan><tspan fill="#30d5b0" font-weight="800">anonymous,</tspan>
+    <tspan x="1392" dy="51" fill="#30d5b0" font-weight="800">post-quantum-encrypted</tspan><tspan>, </tspan><tspan fill="#30d5b0" font-weight="800">uncensorable</tspan><tspan> messenger.</tspan>
+    <tspan x="1392" dy="51">A permanent, transferable, </tspan><tspan fill="#30d5b0" font-weight="800">fully on-chain</tspan><tspan> handle:</tspan>
+    <tspan x="1392" dy="51">the name others reach you by,</tspan>
+    <tspan x="1392" dy="51" fill="#f4f7f5" font-weight="800">held by no one but you.</tspan>
+  </text>
+</svg>

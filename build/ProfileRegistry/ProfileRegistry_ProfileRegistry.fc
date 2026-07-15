@@ -1067,6 +1067,13 @@ builder $ProfileRegistry$_store(builder build_0, (slice, slice, slice, slice, in
     $self'avatar_records~__tact_dict_set_int_cell(257, $recordId, $ProfileAvatarRecord$_store_cell($ProfileAvatarRecord$_constructor_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at($owner_wallet, $nextVersion, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $media_format, $global_now()), begin_cell()));
     $self'current_avatar_versions~__tact_dict_set_slice_int(267, $owner_wallet, $nextVersion, 257);
     $self'avatar_record_count = $self'avatar_record_count + 1;
+    if ((~ null?($currentVersionOpt))) {
+        int $prevRecordId = ($self'official_ath_wallet_address, $self'vault_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_computeAvatarRecordId($owner_wallet, $currentVersionOpt);
+        if (__tact_dict_exists_int($self'avatar_records, 257, $prevRecordId)) {
+            $self'avatar_records~__tact_dict_delete_int(257, $prevRecordId);
+            $self'avatar_record_count = $self'avatar_record_count - 1;
+        }
+    }
     int $treasury_amount = (($amount * 5000) / 10000);
     int $burn_amount = ($amount - $treasury_amount);
     $self'treasury_due_ath = $self'treasury_due_ath + $treasury_amount;

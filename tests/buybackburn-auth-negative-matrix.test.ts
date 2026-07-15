@@ -9,6 +9,7 @@ import {
   AthTransferNotification,
   BindBuybackFeeAccumulator,
   BindBuybackOfficialAthWallet,
+  BindBuybackTreasury,
   BuybackBurn,
   storeBuybackBurn$Data,
   ExecuteBuybackChunk,
@@ -94,6 +95,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
   const wrongPoolOwner = await blockchain.treasury('bb-neg-wrong-pool-owner');
   const stonfiPtonWallet = await blockchain.treasury('bb-neg-stonfi-pton-wallet');
   const stonfiReferral = await blockchain.treasury('bb-neg-stonfi-referral');
+  const sweepTreasury = await blockchain.treasury('bb-neg-sweep-treasury');
 
   const athMasterInit = await ATHMaster.init(
     treasuryOwner.address,
@@ -141,6 +143,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
     wrongPoolOwner,
     stonfiPtonWallet,
     stonfiReferral,
+    sweepTreasury,
     officialAthWallet,
     stonfiAskJettonWallet,
   };
@@ -169,6 +172,9 @@ async function forcePendingAthBurn(
     official_ath_wallet_bound: true,
     route_frozen: true,
     sealed: true,
+    treasury_address: env.sweepTreasury.address,
+    treasury_bound: true,
+    last_burn_at: BigInt(env.blockchain.now ?? 0),
     referral_value_bps: 0n,
     buyback_min_ath_out_per_50_ton_atomic: 95_000n,
     evidence_quote_out_atomic_ath: 100_000n,
@@ -221,6 +227,9 @@ async function forceSealedUnfrozenPostSealState(
     official_ath_wallet_bound: true,
     route_frozen: false,
     sealed: true,
+    treasury_address: env.sweepTreasury.address,
+    treasury_bound: true,
+    last_burn_at: BigInt(env.blockchain.now ?? 0),
     referral_value_bps: 0n,
     buyback_min_ath_out_per_50_ton_atomic: 0n,
     evidence_quote_out_atomic_ath: 0n,
@@ -290,6 +299,12 @@ async function freezeAndSeal(env: Awaited<ReturnType<typeof setup>>) {
   } as BindBuybackOfficialAthWallet);
 
   await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env));
+
+  await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindBuybackTreasury',
+    deployment_manifest_hash: MANIFEST_HASH,
+    treasury_address: env.sweepTreasury.address,
+  } as BindBuybackTreasury);
 
   await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealBuybackBurnGenesis',
@@ -394,6 +409,12 @@ describe('BuybackBurn auth and negative matrix', () => {
       deployment_manifest_hash: MANIFEST_HASH,
     } as SealBuybackBurnGenesis);
     expect((await env.buyback.getGetBuybackBurnConfig()).sealed).toBe(false);
+
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackTreasury',
+      deployment_manifest_hash: MANIFEST_HASH,
+      treasury_address: env.sweepTreasury.address,
+    } as BindBuybackTreasury);
 
     await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealBuybackBurnGenesis',

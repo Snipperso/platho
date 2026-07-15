@@ -8,7 +8,7 @@ import {
 import {
   registerVaultSigningKeys,
   sendVaultWithdrawTonExternal,
-} from './helpers/vault-receive-intent-external';
+} from './helpers/vault-external';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const WITHDRAW_TON_EXEC_RESERVE = 2_000_000n;

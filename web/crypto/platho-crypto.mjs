@@ -1,5 +1,6 @@
 import { ed25519, x25519 } from '../vendor/@noble/curves/ed25519.js';
 import { ml_kem768 } from '../vendor/@noble/post-quantum/ml-kem.js';
+import { buildIntroHandshake, openIntroHandshake } from './intro-handshake.mjs';
 
 export const CRYPTO_SUITES = Object.freeze({
   CLASSICAL_V1: 'classical-v1',
@@ -23,6 +24,8 @@ export const CAPSULE_SIZE_CLASS = Object.freeze({
 
 export const CAPSULE_PUBLISH_KIND = Object.freeze({
   PRIVATE: 1,
+  CONV: 1,   // clean-16 hybrid: the CONV (established-conversation) lane reuses the private publish_kind (1)
+  INTRO: 3,  // clean-16 hybrid: the INTRO (first-contact stealth) lane is a distinct batch-level publish_kind (3)
 });
 
 export const MLKEM768_PUBLIC_KEY_BYTES = 1184;
@@ -41,8 +44,16 @@ export const PLATHO_ONCHAIN_CELL_LAYOUT = 'ton-snake-byte-cell.v1';
 export const PLATHO_ONCHAIN_CELL_DATA_BYTES = 127;
 export const PLATHO_ONCHAIN_HEADER_MAX_BYTES = 4096;
 export const PLATHO_ONCHAIN_BODY_MAX_BYTES = 40 * 1024;
-export const PLATHO_BINARY_HEADER0_BYTES = 140;
+export const PLATHO_BINARY_HEADER0_BYTES = 74;
+// clean-16 hybrid: header0 splits into two lanes (NEW fork, mirrored on-chain by CapsuleHub/Vault):
+//   CONV  = meta(8) + bucketKey(32)                = 40 bytes (320 bits) — opaque directional routing, no sender label
+//   INTRO = meta(8) + ephemeral_R(32) + view_tag(2) = 42 bytes (336 bits) — stealth first-contact discovery
+export const PLATHO_BINARY_HEADER0_BYTES_CONV = 40;
+export const PLATHO_BINARY_HEADER0_BYTES_INTRO = 42;
 export const PLATHO_BINARY_HEADER1_BYTES = 30;
+// clean-16 PH0C: the sender identity (ed25519 signing pubkey + profile pointer) moved OUT of the public header0
+// and into the ENCRYPTED body plaintext. 32 (sign pubkey) + 4 (profile_version u32) + 32 (avatar_hash u256) = 68.
+export const PLATHO_COMPACT_IDENTITY_BYTES = 68;
 export const PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES = 32;
 export const PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES = 69;
 export const PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES = 5;
@@ -52,7 +63,6 @@ export const PLATHO_COMPACT_SENDER_RECOVERY_BYTES = 64;
 export const PLATHO_COMPACT_CONTENT_TYPES = Object.freeze({
   TEXT: 1,
   IMAGE: 2,
-  PAYMENT: 3,
   DOCUMENT: 4,
 });
 export const PLATHO_COMPACT_IMAGE_FORMATS = Object.freeze({
@@ -90,8 +100,12 @@ const COMPACT_PAYLOAD_FLAG_SENDER_WALLET = 1;
 const COMPACT_PAYLOAD_FLAG_RECIPIENT_WALLET = 2;
 const COMPACT_PAYLOAD_FLAG_SENDER_USERNAME = 4;
 const COMPACT_BODY_FLAG_SENDER_RECOVERY = 1;
-const PRIVATE_CAPSULE_HEADER0_MAGIC = new Uint8Array([0x50, 0x48, 0x30, 0x42]); // "PH0B"
+const PRIVATE_CAPSULE_HEADER0_MAGIC = new Uint8Array([0x50, 0x48, 0x30, 0x43]); // "PH0C" (clean-16 stealth)
 const PRIVATE_CAPSULE_HEADER1_MAGIC = new Uint8Array([0x50, 0x48, 0x31, 0x42]); // "PH1B"
+// clean-16 stealth: per-message view_tag = first 2 bytes of HKDF-SHA256 over the ephemeral<->scan ECDH secret.
+const STEALTH_VIEWTAG_SALT_DOMAIN = 'PLATHO.STEALTH.VIEWTAG.SALT.V1';
+const STEALTH_VIEWTAG_INFO_DOMAIN = 'PLATHO.STEALTH.VIEWTAG.V1';
+const STEALTH_VIEW_TAG_BYTES = 2;
 const COMPACT_BODY_AAD_DOMAIN = 'PLATHO.COMPACT_BODY.AAD.V1';
 const COMPACT_SENDER_RECOVERY_AAD_DOMAIN = 'PLATHO.COMPACT_BODY.SENDER_RECOVERY.AAD.V1';
 const COMPACT_SENDER_RECOVERY_KEY_DOMAIN = 'PLATHO.SENDER_RECOVERY.KEY.V1';
@@ -102,7 +116,6 @@ const COMPACT_CHUNK_HEADER_BYTES = 24;
 const COMPACT_BODY_BASE_PREFIX_BYTES = 68;
 const COMPACT_BODY_TAG_BYTES = 16;
 const COMPACT_IMAGE_CONTENT_HEADER_BYTES = 0;
-const COMPACT_PAYMENT_CONTENT_BYTES = 82;
 const ZERO_32_BYTES = new Uint8Array(32);
 
 const SUITE_CONFIG = Object.freeze({
@@ -199,6 +212,45 @@ function deriveX25519SharedSecret(secretKey, publicKey) {
     'x25519SharedSecret',
     assertBytes('x25519SharedSecret', sharedSecret, X25519_PUBLIC_KEY_BYTES),
   );
+}
+
+// clean-16 stealth: derive the per-message view_tag (u16, big-endian) from the ephemeral<->scan ECDH secret.
+// salt = STEALTH_VIEWTAG_SALT_DOMAIN, info = STEALTH_VIEWTAG_INFO_DOMAIN || ephemeralPublicKey (domain separation).
+// The recipient recomputes scan_shared = X25519(scan_secret, E) and matches this tag cheaply before decrypting.
+async function deriveStealthViewTag(scanSharedSecret, ephemeralPublicKey) {
+  const ikm = assertBytes('stealth.scanSharedSecret', scanSharedSecret, X25519_PUBLIC_KEY_BYTES);
+  const salt = utf8(STEALTH_VIEWTAG_SALT_DOMAIN);
+  const info = concatBytes(
+    utf8(STEALTH_VIEWTAG_INFO_DOMAIN),
+    assertBytes('stealth.ephemeralPublicKey', ephemeralPublicKey, X25519_PUBLIC_KEY_BYTES),
+  );
+  const hkdfKey = await getCrypto().subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  const tagBytes = new Uint8Array(await getCrypto().subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt, info },
+    hkdfKey,
+    STEALTH_VIEW_TAG_BYTES * 8,
+  ));
+  return ((tagBytes[0] << 8) | tagBytes[1]) & 0xffff;
+}
+
+// Sender side: fresh random ephemeral e (E = e·G) against the recipient's advertised scan pubkey S.
+async function deriveStealthViewTagForRecipient(ephemeralSecretKey, ephemeralPublicKey, recipientScanPublicKey) {
+  const scanShared = deriveX25519SharedSecret(
+    assertBytes('stealth.ephemeralSecretKey', ephemeralSecretKey, X25519_SECRET_KEY_BYTES),
+    assertBytes('recipient.scanPublicKey', recipientScanPublicKey, X25519_PUBLIC_KEY_BYTES),
+  );
+  return deriveStealthViewTag(scanShared, ephemeralPublicKey);
+}
+
+// Recipient side (client scan): scan_shared' = X25519(scan_secret, E); returns the u16 view_tag to compare with
+// the on-chain value. `ephemeralScanPublicKey` may be raw bytes or a bigint/hex uint256 (as returned by the scan getter).
+export async function computePrivateScanViewTag(scanSecretKey, ephemeralScanPublicKey) {
+  const scanSecret = assertBytes('scanSecretKey', toUint8Array(scanSecretKey), X25519_SECRET_KEY_BYTES);
+  const ephemeralPub = typeof ephemeralScanPublicKey === 'bigint'
+    ? writeBigUintBytes(ephemeralScanPublicKey, 32, 'ephemeralScanPublicKey')
+    : assertBytes('ephemeralScanPublicKey', toUint8Array(ephemeralScanPublicKey), 32);
+  const scanShared = deriveX25519SharedSecret(scanSecret, ephemeralPub);
+  return deriveStealthViewTag(scanShared, ephemeralPub);
 }
 
 function base64urlEncode(bytes) {
@@ -857,7 +909,6 @@ export function getCompactCapsuleCapacity(suite, options = {}) {
     maxUsefulPayloadBytes,
     maxTextBytes: maxUsefulPayloadBytes,
     maxImageBytes: maxUsefulPayloadBytes - COMPACT_IMAGE_CONTENT_HEADER_BYTES,
-    maxPaymentBytes: COMPACT_PAYMENT_CONTENT_BYTES,
   };
 }
 
@@ -1287,15 +1338,6 @@ export function encodeCompactPayload(input, options = {}) {
       mediaFormat: payload.format ?? PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
     });
   }
-  if (payload.type === 'payment' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.PAYMENT) {
-    const content = encodeCompactPayloadContentWithMetadata(concatBytes(
-      new Uint8Array([uint8Byte(payload.asset ?? 0, 'payment asset'), 0]),
-      writeBigUintBytes(payload.amount ?? 0n, 16, 'payment amount'),
-      assertBytes('payment intent id', payload.intentId ?? payload.intent_id, 32),
-      assertBytes('payment secret', payload.secret ?? payload.secret32, 32),
-    ), payloadOptions);
-    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.PAYMENT, content.flags, content.content, payloadOptions);
-  }
   if (payload.type === 'document' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.DOCUMENT) {
     const bytes = toUint8Array(payload.bytes ?? payload.documentBytes ?? payload.document_bytes ?? new Uint8Array());
     const encoded = encodeCompactPayloadContentWithMetadata(bytes, payloadOptions);
@@ -1335,17 +1377,6 @@ function decodeCompactPayloadBytes(bytesLike, options = {}) {
       ...part,
     };
   }
-  if (type === PLATHO_COMPACT_CONTENT_TYPES.PAYMENT) {
-    if (decoded.content.length !== COMPACT_PAYMENT_CONTENT_BYTES) throw new Error('Compact payment payload has invalid length');
-    return {
-      type: 'payment',
-      asset: decoded.content[0],
-      amount: readBigUintBytes(decoded.content, 2, 16, 'payment amount'),
-      intentId: decoded.content.subarray(18, 50),
-      secret32: decoded.content.subarray(50, 82),
-      ...part,
-    };
-  }
   if (type === PLATHO_COMPACT_CONTENT_TYPES.DOCUMENT) {
     return {
       type: 'document',
@@ -1370,13 +1401,14 @@ function compactBodyAad(bodyPrefix, hashes) {
 }
 
 function compactSenderRecoveryAad(bodyPrefix, hashes) {
+  // clean-16: recipient_key_id removed from header0/hashes — header0Hash already commits E + view_tag + sender_key_id,
+  // so the recovery AAD binds sender_key_id + both header hashes (the recipient label term was dropped symmetrically).
   return concatBytes(
     utf8(COMPACT_SENDER_RECOVERY_AAD_DOMAIN),
     bodyPrefix,
     compactHashBytes(hashes.header0Hash, 'header0Hash'),
     compactHashBytes(hashes.header1Hash, 'header1Hash'),
     base64urlFixedBytes(hashes.senderKeyId, 32, 'senderKeyId'),
-    base64urlFixedBytes(hashes.recipientKeyId, 32, 'recipientKeyId'),
   );
 }
 
@@ -1445,19 +1477,38 @@ async function decryptSenderRecoveryPayloadKey(info, recipientKeyPair, hashes) {
   ));
 }
 
-async function encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, options) {
+export async function encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, options) {
   const recipient = await normalizeRecipientBundle(recipientPublicBundle);
   const suite = recipient.suite;
   const suiteByte = suiteByteForSuite(suite);
   const nonce = randomBytes(AES_GCM_NONCE_BYTES);
   const messageId = options.messageId ? assertBytes('compact message id', options.messageId, 16) : randomBytes(16);
-  const ephemeralSecretKey = randomBytes(X25519_SECRET_KEY_BYTES);
-  const ephemeralPublicKey = x25519.getPublicKey(ephemeralSecretKey);
+  // clean-16 stealth: the SAME fresh ephemeral e (E = e·G) that seeds header0.ephemeral_scan_pub (view_tag) is reused
+  // for the body KEM half, so body prefix E @36..68 == header0 E @40..72 (one keygen, no verifiable cross-relation).
+  const ephemeralSecretKey = options.ephemeralSecretKey
+    ? assertBytes('ephemeralSecretKey', toUint8Array(options.ephemeralSecretKey), X25519_SECRET_KEY_BYTES)
+    : randomBytes(X25519_SECRET_KEY_BYTES);
+  const ephemeralPublicKey = options.ephemeralPublicKey
+    ? assertBytes('ephemeralPublicKey', toUint8Array(options.ephemeralPublicKey), X25519_PUBLIC_KEY_BYTES)
+    : x25519.getPublicKey(ephemeralSecretKey);
   const x25519SharedSecret = deriveX25519SharedSecret(ephemeralSecretKey, recipient.x25519PublicKey);
+  // The sender identity section (68 bytes) is prepended to the plaintext and sealed under AES-GCM together with the payload.
+  const identityBytes = (options.identityBytes === undefined || options.identityBytes === null)
+    ? null
+    : assertBytes('identityBytes', toUint8Array(options.identityBytes), PLATHO_COMPACT_IDENTITY_BYTES);
   const sharedParts = [x25519SharedSecret];
   const kemParts = [];
   if (suite === CRYPTO_SUITES.HYBRID_V1) {
-    const encapsulated = ml_kem768.encapsulate(recipient.mlKem768PublicKey);
+    // clean-16 hybrid: the caller MAY supply a pre-computed ML-KEM encapsulation (to recipient.mlKem768PublicKey) so a
+    // higher layer can bind sha256(body_KEM_ct) into a signed transcript BEFORE this seal runs (INTRO handshake). It is
+    // the caller's invariant that cipherText decapsulates to sharedSecret under the recipient's key — otherwise the
+    // recipient's decrypt fails closed. When absent, a fresh genuine encapsulation is generated (default path).
+    const encapsulated = options.mlKemEncapsulation
+      ? {
+          cipherText: assertBytes('options.mlKemEncapsulation.cipherText', toUint8Array(options.mlKemEncapsulation.cipherText), MLKEM768_CIPHERTEXT_BYTES),
+          sharedSecret: assertBytes('options.mlKemEncapsulation.sharedSecret', toUint8Array(options.mlKemEncapsulation.sharedSecret), 32),
+        }
+      : ml_kem768.encapsulate(recipient.mlKem768PublicKey);
     kemParts.push(assertBytes('mlKem768Ciphertext', encapsulated.cipherText, MLKEM768_CIPHERTEXT_BYTES));
     sharedParts.push(assertBytes('mlKem768SharedSecret', encapsulated.sharedSecret, 32));
   }
@@ -1479,10 +1530,13 @@ async function encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, o
   const key = keyBytes
     ? await importAesGcmKeyBytes(keyBytes)
     : await deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
+  const plaintextBytes = identityBytes
+    ? concatBytes(identityBytes, toUint8Array(payloadBytes))
+    : toUint8Array(payloadBytes);
   const ciphertext = await getCrypto().subtle.encrypt(
     { name: 'AES-GCM', iv: nonce, additionalData: aad, tagLength: 128 },
     key,
-    toUint8Array(payloadBytes),
+    plaintextBytes,
   );
   const recoverySection = senderRecovery
     ? await encryptSenderRecoverySection(keyBytes, options.senderKeyPair, suite, bodyPrefix, options.hashes)
@@ -1520,18 +1574,17 @@ function inspectCompactBodyBytes(bodyBytesLike) {
   };
 }
 
-async function decryptCompactBodyBytes(bodyBytesLike, recipientKeyPair, hashes) {
+async function decryptCompactBodyBytes(bodyBytesLike, recipientKeyPair, hashes, options = {}) {
   const bodyBytes = toUint8Array(bodyBytesLike);
   const info = inspectCompactBodyBytes(bodyBytes);
-  const expectedRecipientKeyId = await recipientKeyIdForSuite(recipientKeyPair, info.suite);
-  const openedAsRecipient = expectedRecipientKeyId && hashes.recipientKeyId && expectedRecipientKeyId === hashes.recipientKeyId;
-  const openedAsSender = !openedAsRecipient
-    && info.hasSenderRecovery
+  // clean-16 stealth: recipient_key_id is GONE from header0 — recipient recognition is the successful AES-GCM tag
+  // (the key is hybrid ML-KEM, so a wrong recipient's decrypt fails). Only the sender-recovery branch is still
+  // selected up front, keyed on the surviving sender_key_id (the sender opening their own outbox copy).
+  const expectedKeyId = await recipientKeyIdForSuite(recipientKeyPair, info.suite);
+  const openedAsSender = info.hasSenderRecovery
     && hashes.senderKeyId
-    && expectedRecipientKeyId === hashes.senderKeyId;
-  if (!openedAsRecipient && !openedAsSender) {
-    throw new Error('Compact body recipient key mismatch');
-  }
+    && expectedKeyId === hashes.senderKeyId;
+  const identitySectionBytes = Number(options.identitySectionBytes ?? 0);
   const aad = compactBodyAad(info.prefix, hashes);
   let key = null;
   if (openedAsSender) {
@@ -1549,17 +1602,34 @@ async function decryptCompactBodyBytes(bodyBytesLike, recipientKeyPair, hashes) 
       ? await importAesGcmKeyBytes(await deriveAesGcmKeyBytesFromTranscriptHash(sharedParts, transcriptHash))
       : await deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
   }
-  const plaintext = await getCrypto().subtle.decrypt(
-    { name: 'AES-GCM', iv: info.nonce, additionalData: aad, tagLength: 128 },
-    key,
-    info.ciphertext,
-  );
+  let plaintext;
+  try {
+    plaintext = new Uint8Array(await getCrypto().subtle.decrypt(
+      { name: 'AES-GCM', iv: info.nonce, additionalData: aad, tagLength: 128 },
+      key,
+      info.ciphertext,
+    ));
+  } catch {
+    // A wrong recipient (or tampered body) fails the AES-GCM tag — this is the stealth recipient-recognition signal.
+    throw new Error('Compact body could not be decrypted for this recipient key (view_tag/decrypt mismatch)');
+  }
+  // Strip the leading sender identity section (clean-16) before decoding the compact payload. The reserved-tail
+  // accounting for the payload decode folds in BOTH the identity section and the sender-recovery section so the
+  // useful slot size resolves to exactly what the size class encodes.
+  let identity = null;
+  let payloadPlaintext = plaintext;
+  if (identitySectionBytes > 0) {
+    if (plaintext.length < identitySectionBytes) throw new Error('Compact body identity section is truncated');
+    identity = privateCapsuleIdentityFromBytes(plaintext.subarray(0, identitySectionBytes));
+    payloadPlaintext = plaintext.subarray(identitySectionBytes);
+  }
   return {
-    payload: decodeCompactPayloadBytes(new Uint8Array(plaintext), {
-      reservedTailBytes: info.hasSenderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0,
+    payload: decodeCompactPayloadBytes(payloadPlaintext, {
+      reservedTailBytes: (info.hasSenderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0) + identitySectionBytes,
     }),
+    identity,
     openedAs: openedAsSender ? 'sender' : 'recipient',
-    keyId: expectedRecipientKeyId,
+    keyId: expectedKeyId,
   };
 }
 
@@ -1730,6 +1800,18 @@ export async function createMessagingIdentity(options = {}) {
     ed25519.getPublicKey(signingSecretKey),
     ED25519_PUBLIC_KEY_BYTES,
   );
+  // clean-16 stealth: a SEPARATE X25519 scan key pair for one-shot recipient discovery. It is delegable to a thin
+  // observer and its compromise reveals only who-received metadata, never message content (dual-key separation).
+  const scanSecretKey = options.scanKeyPair?.scanSecretKey
+    ? assertBytes('scanSecretKey', toUint8Array(options.scanKeyPair.scanSecretKey), X25519_SECRET_KEY_BYTES)
+    : options.scanSecretKey
+      ? assertBytes('scanSecretKey', toUint8Array(options.scanSecretKey), X25519_SECRET_KEY_BYTES)
+      : randomBytes(X25519_SECRET_KEY_BYTES);
+  const scanPublicKey = assertBytes('scanPublicKey', x25519.getPublicKey(scanSecretKey), X25519_PUBLIC_KEY_BYTES);
+  // Thread the scan key material onto the encryption key pair so exportPublicKeyBundle advertises scanPublicKey and
+  // the same object carries scanSecretKey for the client-side scan pre-filter (view_tag ECDH).
+  encryptionKeyPair.scanSecretKey = scanSecretKey;
+  encryptionKeyPair.scanPublicKey = scanPublicKey;
   return {
     version: PROTOCOL_VERSION,
     suite: encryptionKeyPair.suite,
@@ -1738,6 +1820,8 @@ export async function createMessagingIdentity(options = {}) {
     encryptionKeyPair,
     signingSecretKey,
     signingPublicKey,
+    scanSecretKey,
+    scanPublicKey,
   };
 }
 
@@ -1750,6 +1834,11 @@ export function exportPublicKeyBundle(keyPair) {
     keyId: keyPair.keyId,
     x25519PublicKey: base64urlEncode(assertBytes('x25519PublicKey', keyPair.x25519PublicKey, 32)),
   };
+  // clean-16 stealth: advertise the scan pubkey (X25519) so senders can derive the per-message view_tag. It is NOT
+  // part of keyId (mirrors the Vault KeyRecord, where scan_pubkey is stored alongside, never folded into key_id).
+  if (keyPair.scanPublicKey !== undefined && keyPair.scanPublicKey !== null) {
+    bundle.scanPublicKey = base64urlEncode(assertBytes('scanPublicKey', toUint8Array(keyPair.scanPublicKey), X25519_PUBLIC_KEY_BYTES));
+  }
   if (keyPair.suite === CRYPTO_SUITES.HYBRID_V1) {
     bundle.mlKem768PublicKey = base64urlEncode(assertBytes('mlKem768PublicKey', keyPair.mlKem768PublicKey, MLKEM768_PUBLIC_KEY_BYTES));
     bundle.mlKem768PublicKeyHash = base64urlEncode(assertBytes('mlKem768PublicKeyHash', keyPair.mlKem768PublicKeyHash, 32));
@@ -1767,6 +1856,11 @@ async function normalizeRecipientBundle(bundle) {
     throw new Error(`Public key bundle contract suite does not match ${bundle.suite}`);
   }
   const x25519PublicKey = assertBytes('recipient.x25519PublicKey', base64urlDecode(bundle.x25519PublicKey), 32);
+  // clean-16 stealth: optional scan pubkey (X25519). Advertised in the signed bundle and authenticated by the bundle
+  // signature; required at private-capsule seal time to derive the view_tag (enforced in encryptCompactPayloadBytes).
+  const scanPublicKey = (bundle.scanPublicKey === undefined || bundle.scanPublicKey === null)
+    ? null
+    : assertBytes('recipient.scanPublicKey', base64urlDecode(bundle.scanPublicKey), X25519_PUBLIC_KEY_BYTES);
   if (bundle.suite === CRYPTO_SUITES.CLASSICAL_V1) {
     if (
       bundle.mlKem768PublicKey !== undefined ||
@@ -1779,7 +1873,7 @@ async function normalizeRecipientBundle(bundle) {
     if (bundle.keyId !== expectedKeyId) {
       throw new Error('classical-v1 public key bundle id does not match key material');
     }
-    return { ...bundle, x25519PublicKey };
+    return { ...bundle, x25519PublicKey, scanPublicKey };
   }
   if (bundle.suite === CRYPTO_SUITES.HYBRID_V1) {
     if (bundle.mlKem768PublicKeyLen !== MLKEM768_PUBLIC_KEY_BYTES) {
@@ -1803,7 +1897,7 @@ async function normalizeRecipientBundle(bundle) {
     if (bundle.keyId !== expectedKeyId) {
       throw new Error('hybrid-v1 public key bundle id does not match key material');
     }
-    return { ...bundle, x25519PublicKey, mlKem768PublicKey };
+    return { ...bundle, x25519PublicKey, mlKem768PublicKey, scanPublicKey };
   }
   throw new Error(`Unsupported Platho crypto suite: ${bundle.suite}`);
 }
@@ -1928,6 +2022,13 @@ export async function publicKeyBundleFromVaultKeyRecord(keyRecord, options = {})
         x25519PublicKey: base64urlEncode(encPublicKey),
       };
     }
+    // clean-16 stealth: the X25519 scan pubkey is stored in the Vault key record alongside crypto_suite_mask (uint256,
+    // NOT folded into key_id). Surface it as bundle.scanPublicKey so senders can derive the per-message view_tag. A
+    // clean-16 hybrid record always carries a non-zero scan key; a legacy/zero value is treated as "unscannable".
+    const scanPublicKeyValue = optionalRecordField(keyRecord, 'scan_pubkey', 'scanPubkey');
+    const scanPublicKeyBigInt = scanPublicKeyValue === undefined || scanPublicKeyValue === null
+      ? 0n
+      : uintLikeToBigInt(scanPublicKeyValue, 'scan_pubkey');
     return {
       version: PROTOCOL_VERSION,
       suite: CRYPTO_SUITES.HYBRID_V1,
@@ -1937,6 +2038,9 @@ export async function publicKeyBundleFromVaultKeyRecord(keyRecord, options = {})
       mlKem768PublicKey: base64urlEncode(pqPubkey),
       mlKem768PublicKeyHash: base64urlEncode(computedHash),
       mlKem768PublicKeyLen: MLKEM768_PUBLIC_KEY_BYTES,
+      ...(scanPublicKeyBigInt !== 0n
+        ? { scanPublicKey: base64urlEncode(writeBigUintBytes(scanPublicKeyBigInt, X25519_PUBLIC_KEY_BYTES, 'scan_pubkey')) }
+        : {}),
     };
   }
 
@@ -2030,6 +2134,12 @@ export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKe
   const pqPubkey = bundle.suite === CRYPTO_SUITES.HYBRID_V1
     ? assertBytes('mlKem768PublicKey', bundle.mlKem768PublicKey, MLKEM768_PUBLIC_KEY_BYTES)
     : new Uint8Array();
+  // clean-16 stealth: the X25519 scan pubkey is registered alongside the messaging keys (uint256, after
+  // crypto_suite_mask). Without it a recipient becomes unscannable, so it is required for a v1 registration.
+  if (!bundle.scanPublicKey) {
+    throw new Error('Platho v1 messaging keys require a stealth scan pubkey');
+  }
+  const scanPublicKey = assertBytes('scanPublicKey', toUint8Array(bundle.scanPublicKey), X25519_PUBLIC_KEY_BYTES);
   const draft = {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: bytesToBigInt(encPublicKey),
@@ -2039,6 +2149,7 @@ export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKe
     pq_kem_pubkey_len: bundle.suite === CRYPTO_SUITES.HYBRID_V1 ? BigInt(MLKEM768_PUBLIC_KEY_BYTES) : 0n,
     pq_kem_pubkey: pqPubkey,
     crypto_suite_mask: BigInt(bundle.contractSuite),
+    scan_pubkey: bytesToBigInt(scanPublicKey),
   };
   return {
     message: draft,
@@ -2051,6 +2162,7 @@ export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKe
       pq_kem_pubkey_len: Number(draft.pq_kem_pubkey_len),
       pq_kem_pubkey_b64u: base64urlEncode(pqPubkey),
       crypto_suite_mask: Number(draft.crypto_suite_mask),
+      scan_pubkey: bigintHex256(draft.scan_pubkey),
     },
   };
 }
@@ -2073,6 +2185,7 @@ export async function verifyVaultKeyRecordBinding(signedBundle, keyRecord, optio
     ['pq_kem_pubkey_hash', 'pqKemPubkeyHash', draft.message.pq_kem_pubkey_hash],
     ['pq_kem_pubkey_len', 'pqKemPubkeyLen', draft.message.pq_kem_pubkey_len],
     ['crypto_suite_mask', 'cryptoSuiteMask', draft.message.crypto_suite_mask],
+    ['scan_pubkey', 'scanPubkey', draft.message.scan_pubkey],
   ];
   for (const [snakeName, camelName, expected] of checks) {
     const actual = uintLikeToBigInt(recordField(keyRecord, snakeName, camelName), snakeName);
@@ -2129,6 +2242,32 @@ function privateProfilePointer(profile = {}) {
   };
 }
 
+// clean-16: the sender identity section that used to sit in cleartext header0 now rides INSIDE the AES-GCM body
+// plaintext (68 bytes): ed25519 sign_pubkey (32) ‖ profile_version (u32 BE) ‖ avatar_hash (u256 BE). Only the
+// recipient/sender who can open the body ever sees the sender's signing key, profile pointer, and avatar hash.
+function privateCapsuleIdentityBytes(fields) {
+  const bytes = concatBytes(
+    assertBytes('identity.signingPublicKey', toUint8Array(fields.signingPublicKey), ED25519_PUBLIC_KEY_BYTES),
+    uint32Bytes(fields.profileVersion ?? 0, 'identity.profileVersion'),
+    assertBytes('identity.avatarHash', toUint8Array(fields.avatarHashBytes), 32),
+  );
+  if (bytes.length !== PLATHO_COMPACT_IDENTITY_BYTES) throw new Error('Private capsule identity section size drift');
+  return bytes;
+}
+
+function privateCapsuleIdentityFromBytes(bytesLike) {
+  const bytes = assertBytes('identity section', toUint8Array(bytesLike), PLATHO_COMPACT_IDENTITY_BYTES);
+  const signingPublicKey = bytes.slice(0, ED25519_PUBLIC_KEY_BYTES);
+  return {
+    signingPublicKey,
+    senderSigningPublicKey: base64urlEncode(signingPublicKey),
+    profileVersion: readUint32(bytes, 32, 'identity.profileVersion'),
+    profile_version: readUint32(bytes, 32, 'identity.profileVersion'),
+    avatarHash: bigintHex256(bytesToBigInt(bytes.subarray(36, 68))),
+    avatar_hash: bigintHex256(bytesToBigInt(bytes.subarray(36, 68))),
+  };
+}
+
 function capsuleTimestampSecond(value, name) {
   if (!Number.isSafeInteger(value) || value < 0 || value % 1000 !== 0) {
     throw new Error(`${name} must be second-aligned milliseconds`);
@@ -2155,9 +2294,17 @@ function privateCapsuleHeader0Bytes(header0) {
   if (header0?.version !== PROTOCOL_VERSION || header0.kind !== 'private') {
     throw new Error('Invalid Platho private capsule header0');
   }
+  // clean-16 hybrid: the legacy 74B lane is PRIVATE only. Reject any other publish_kind on write so a self-consistent
+  // legacy header cannot be minted claiming INTRO(3)/other and get misrouted into the intro pool.
+  if (header0.publishKind !== CAPSULE_PUBLISH_KIND.PRIVATE) {
+    throw new Error('Legacy private capsule header0 publishKind must be 1 (PRIVATE)');
+  }
   assertAllowedPrivateCapsulePair(header0.sizeClass, header0.cryptoSuite);
   const suiteByte = suiteByteForSuite(header0.suite);
   if (header0.cryptoSuite !== suiteByte) throw new Error('Private capsule header0 suite byte mismatch');
+  // clean-16 PH0C (74 bytes): sender_key_id @8..40, ephemeral_scan_pub (X25519 E) @40..72, view_tag (u16) @72..74.
+  // recipient_key_id / sender_sign_pubkey / profile_version / avatar_hash were REMOVED from header0 — the recipient
+  // routing label is gone (stealth) and the sender identity moved into the ENCRYPTED body (identity section).
   const bytes = concatBytes(
     PRIVATE_CAPSULE_HEADER0_MAGIC,
     new Uint8Array([
@@ -2167,10 +2314,8 @@ function privateCapsuleHeader0Bytes(header0) {
       uint8Byte(header0.cryptoSuite, 'header0.cryptoSuite'),
     ]),
     base64urlFixedBytes(header0.senderKeyId, 32, 'header0.senderKeyId'),
-    base64urlFixedBytes(header0.recipientKeyId, 32, 'header0.recipientKeyId'),
-    base64urlFixedBytes(header0.senderSigningPublicKey, ED25519_PUBLIC_KEY_BYTES, 'header0.senderSigningPublicKey'),
-    uint32Bytes(header0.profileVersion ?? 0, 'header0.profileVersion'),
-    uint256Bytes(header0.avatarHash ?? 0n, 'header0.avatarHash'),
+    base64urlFixedBytes(header0.ephemeralScanPub, X25519_PUBLIC_KEY_BYTES, 'header0.ephemeralScanPub'),
+    uint16Bytes(header0.viewTag ?? 0, 'header0.viewTag'),
   );
   if (bytes.length !== PLATHO_BINARY_HEADER0_BYTES) throw new Error('Private capsule header0 binary size drift');
   return bytes;
@@ -2203,6 +2348,9 @@ function privateCapsuleHeader0ObjectFromBytes(bytesLike) {
   const version = bytes[4];
   if (version !== PROTOCOL_VERSION) throw new Error('Unsupported private capsule header0 version');
   const publishKind = bytes[5];
+  if (publishKind !== CAPSULE_PUBLISH_KIND.PRIVATE) {
+    throw new Error('Legacy private capsule header0 publishKind mismatch (expected 1)');
+  }
   const sizeClass = bytes[6];
   const cryptoSuite = bytes[7];
   assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
@@ -2215,12 +2363,105 @@ function privateCapsuleHeader0ObjectFromBytes(bytesLike) {
     cryptoSuite,
     suite,
     senderKeyId: base64urlEncode(bytes.subarray(8, 40)),
-    recipientKeyId: base64urlEncode(bytes.subarray(40, 72)),
-    senderSigningPublicKey: base64urlEncode(bytes.subarray(72, 104)),
-    profileVersion: readUint32(bytes, 104, 'header0.profileVersion'),
-    profile_version: readUint32(bytes, 104, 'header0.profileVersion'),
-    avatarHash: bigintHex256(bytesToBigInt(bytes.subarray(108, 140))),
-    avatar_hash: bigintHex256(bytesToBigInt(bytes.subarray(108, 140))),
+    ephemeralScanPub: base64urlEncode(bytes.subarray(40, 72)),
+    ephemeral_scan_pub: base64urlEncode(bytes.subarray(40, 72)),
+    viewTag: readUint16(bytes, 72, 'header0.viewTag'),
+    view_tag: readUint16(bytes, 72, 'header0.viewTag'),
+  };
+}
+
+// clean-16 hybrid header0 — CONV lane (40 bytes): magic(4) PH0C || version(1) || publishKind(1)=1 || sizeClass(1) ||
+// cryptoSuite(1) || bucketKey(32). The bucketKey sits at bytes 8..40 (bits 64..320) — the SAME window the contract
+// extractor reads (loadUint(64); loadUint(256)) so client serialization and on-chain extraction agree byte-for-byte.
+// No sender label, no ephemeral, no view_tag: an index-scraper without the shared K sees a uniformly-random 32 bytes.
+export function convCapsuleHeader0Bytes(header0) {
+  if (header0?.version !== PROTOCOL_VERSION) throw new Error('Invalid Platho CONV capsule header0');
+  if (header0.publishKind !== CAPSULE_PUBLISH_KIND.CONV) throw new Error('CONV capsule header0 publishKind must be 1');
+  assertAllowedPrivateCapsulePair(header0.sizeClass, header0.cryptoSuite);
+  const suiteByte = suiteByteForSuite(header0.suite);
+  if (header0.cryptoSuite !== suiteByte) throw new Error('CONV capsule header0 suite byte mismatch');
+  const bytes = concatBytes(
+    PRIVATE_CAPSULE_HEADER0_MAGIC,
+    new Uint8Array([
+      PROTOCOL_VERSION,
+      uint8Byte(header0.publishKind, 'header0.publishKind'),
+      uint8Byte(header0.sizeClass, 'header0.sizeClass'),
+      uint8Byte(header0.cryptoSuite, 'header0.cryptoSuite'),
+    ]),
+    uint256Bytes(header0.bucketKey, 'header0.bucketKey'),
+  );
+  if (bytes.length !== PLATHO_BINARY_HEADER0_BYTES_CONV) throw new Error('CONV capsule header0 binary size drift');
+  return bytes;
+}
+
+export function convCapsuleHeader0ObjectFromBytes(bytesLike) {
+  const bytes = toUint8Array(bytesLike);
+  if (bytes.length !== PLATHO_BINARY_HEADER0_BYTES_CONV) throw new Error('CONV capsule header0 binary size drift');
+  if (!bytesEqual(bytes.subarray(0, 4), PRIVATE_CAPSULE_HEADER0_MAGIC)) throw new Error('CONV capsule header0 magic mismatch');
+  const version = bytes[4];
+  if (version !== PROTOCOL_VERSION) throw new Error('Unsupported CONV capsule header0 version');
+  const publishKind = bytes[5];
+  if (publishKind !== CAPSULE_PUBLISH_KIND.CONV) throw new Error('CONV capsule header0 publishKind mismatch');
+  const sizeClass = bytes[6];
+  const cryptoSuite = bytes[7];
+  assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
+  return {
+    version,
+    kind: 'conv',
+    publishKind,
+    sizeClass,
+    cryptoSuite,
+    suite: suiteForByte(cryptoSuite),
+    bucketKey: base64urlEncode(bytes.subarray(8, 40)),
+  };
+}
+
+// clean-16 hybrid header0 — INTRO lane (42 bytes): magic(4) PH0C || version(1) || publishKind(1)=3 || sizeClass(1) ||
+// cryptoSuite(1) || ephemeral_R(32) || view_tag(u16 BE). ephemeral_R at bytes 8..40 (bits 64..320), view_tag at
+// bytes 40..42 (bits 320..336) — mirrors the contract intro extractors. Sender identity is inside the encrypted body.
+export function introCapsuleHeader0Bytes(header0) {
+  if (header0?.version !== PROTOCOL_VERSION) throw new Error('Invalid Platho INTRO capsule header0');
+  if (header0.publishKind !== CAPSULE_PUBLISH_KIND.INTRO) throw new Error('INTRO capsule header0 publishKind must be 3');
+  assertAllowedPrivateCapsulePair(header0.sizeClass, header0.cryptoSuite);
+  const suiteByte = suiteByteForSuite(header0.suite);
+  if (header0.cryptoSuite !== suiteByte) throw new Error('INTRO capsule header0 suite byte mismatch');
+  const bytes = concatBytes(
+    PRIVATE_CAPSULE_HEADER0_MAGIC,
+    new Uint8Array([
+      PROTOCOL_VERSION,
+      uint8Byte(header0.publishKind, 'header0.publishKind'),
+      uint8Byte(header0.sizeClass, 'header0.sizeClass'),
+      uint8Byte(header0.cryptoSuite, 'header0.cryptoSuite'),
+    ]),
+    uint256Bytes(header0.ephemeralR, 'header0.ephemeralR'),
+    uint16Bytes(header0.viewTag ?? 0, 'header0.viewTag'),
+  );
+  if (bytes.length !== PLATHO_BINARY_HEADER0_BYTES_INTRO) throw new Error('INTRO capsule header0 binary size drift');
+  return bytes;
+}
+
+export function introCapsuleHeader0ObjectFromBytes(bytesLike) {
+  const bytes = toUint8Array(bytesLike);
+  if (bytes.length !== PLATHO_BINARY_HEADER0_BYTES_INTRO) throw new Error('INTRO capsule header0 binary size drift');
+  if (!bytesEqual(bytes.subarray(0, 4), PRIVATE_CAPSULE_HEADER0_MAGIC)) throw new Error('INTRO capsule header0 magic mismatch');
+  const version = bytes[4];
+  if (version !== PROTOCOL_VERSION) throw new Error('Unsupported INTRO capsule header0 version');
+  const publishKind = bytes[5];
+  if (publishKind !== CAPSULE_PUBLISH_KIND.INTRO) throw new Error('INTRO capsule header0 publishKind mismatch');
+  const sizeClass = bytes[6];
+  const cryptoSuite = bytes[7];
+  assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
+  return {
+    version,
+    kind: 'intro',
+    publishKind,
+    sizeClass,
+    cryptoSuite,
+    suite: suiteForByte(cryptoSuite),
+    ephemeralR: base64urlEncode(bytes.subarray(8, 40)),
+    ephemeral_r: base64urlEncode(bytes.subarray(8, 40)),
+    viewTag: readUint16(bytes, 40, 'header0.viewTag'),
+    view_tag: readUint16(bytes, 40, 'header0.viewTag'),
   };
 }
 
@@ -2267,16 +2508,34 @@ function assertPrivateBodyMatchesHeader(header0, bodyBytes) {
   }
 }
 
+// clean-16 hybrid: serialize header0 per lane. CONV (opaque bucketKey, 40B) and INTRO (ephemeral_R + view_tag, 42B)
+// are the two hybrid lanes; the legacy 74B pure-stealth 'private' shape is still handled during transition. All three
+// feed the SAME chain-cell/hash machinery below, so the on-chain id/hashes are computed identically per lane.
+function capsuleHeader0Bytes(header0) {
+  if (header0?.kind === 'conv') return convCapsuleHeader0Bytes(header0);
+  if (header0?.kind === 'intro') return introCapsuleHeader0Bytes(header0);
+  return privateCapsuleHeader0Bytes(header0);
+}
+
+// clean-16 hybrid: parse header0 bytes back to a lane object, dispatched by the on-chain cell length (each lane has a
+// distinct fixed size: CONV 40 / INTRO 42 / legacy private 74). Needed to read CONV/INTRO capsules from CapsuleHub.
+function capsuleHeader0ObjectFromBytes(bytesLike) {
+  const bytes = toUint8Array(bytesLike);
+  if (bytes.length === PLATHO_BINARY_HEADER0_BYTES_CONV) return convCapsuleHeader0ObjectFromBytes(bytes);
+  if (bytes.length === PLATHO_BINARY_HEADER0_BYTES_INTRO) return introCapsuleHeader0ObjectFromBytes(bytes);
+  return privateCapsuleHeader0ObjectFromBytes(bytes);
+}
+
 async function computePrivateCapsuleChainCells(header0, header1, body) {
   return {
-    header0: await createSnakeCellPayload('private capsule header0', privateCapsuleHeader0Bytes(header0), PLATHO_ONCHAIN_HEADER_MAX_BYTES),
+    header0: await createSnakeCellPayload('private capsule header0', capsuleHeader0Bytes(header0), PLATHO_ONCHAIN_HEADER_MAX_BYTES),
     header1: await createSnakeCellPayload('private capsule header1', privateCapsuleHeader1Bytes(header1), PLATHO_ONCHAIN_HEADER_MAX_BYTES),
     body: await createSnakeCellPayload('private capsule body', privateCapsuleBodyBytes(body), PLATHO_ONCHAIN_BODY_MAX_BYTES),
   };
 }
 
-async function computePrivateCapsuleHeaderHashes(header0, header1) {
-  const header0Cell = await createSnakeCellPayload('private capsule header0', privateCapsuleHeader0Bytes(header0), PLATHO_ONCHAIN_HEADER_MAX_BYTES);
+export async function computePrivateCapsuleHeaderHashes(header0, header1) {
+  const header0Cell = await createSnakeCellPayload('private capsule header0', capsuleHeader0Bytes(header0), PLATHO_ONCHAIN_HEADER_MAX_BYTES);
   const header1Cell = await createSnakeCellPayload('private capsule header1', privateCapsuleHeader1Bytes(header1), PLATHO_ONCHAIN_HEADER_MAX_BYTES);
   return {
     header0Hash: assertHashHex('chainCells.header0.hash', header0Cell.hash),
@@ -2309,20 +2568,35 @@ function entryHashHex(entry, fieldName) {
   return bigintHex256(entry[fieldName]);
 }
 
-function privateCapsuleSignaturePayload(capsule) {
-  return {
+// clean-16: the signed payload swaps the removed recipient_key_id for the header0 view_tag, and takes the sender
+// identity (profile_version / avatar_hash) from the DECRYPTED body identity section rather than cleartext header0.
+// sender_key_id survives in header0; the sender's signing pubkey now lives in the body, so verification runs AFTER decrypt.
+function privateCapsuleSignaturePayload(capsule, identity = {}) {
+  const base = {
     domain: PRIVATE_CAPSULE_SIGNATURE_DOMAIN,
     version: PROTOCOL_VERSION,
     id: capsule.id,
     header0Hash: capsule.hashes.header0Hash,
     header1Hash: capsule.hashes.header1Hash,
     bodyHash: capsule.hashes.bodyHash,
-    senderKeyId: capsule.header0.senderKeyId,
-    recipientKeyId: capsule.header0.recipientKeyId,
-    profileVersion: capsule.header0.profileVersion ?? 0,
-    avatarHash: capsule.header0.avatarHash ?? bigintHex256(0n),
+    profileVersion: identity.profileVersion ?? identity.profile_version ?? 0,
+    avatarHash: identity.avatarHash ?? identity.avatar_hash ?? bigintHex256(0n),
     createdAt: capsule.header1.createdAt,
     expiresAt: capsule.header1.expiresAt,
+  };
+  // clean-16 hybrid: each lane binds its own routing field into the signed payload. CONV binds the opaque bucketKey;
+  // INTRO binds ephemeral_R + view_tag; legacy pure-stealth binds sender_key_id + view_tag (unchanged — same keys as
+  // before, so previously-signed private capsules verify identically).
+  if (capsule.header0.kind === 'conv') {
+    return { ...base, bucketKey: capsule.header0.bucketKey };
+  }
+  if (capsule.header0.kind === 'intro') {
+    return { ...base, ephemeralR: capsule.header0.ephemeralR ?? capsule.header0.ephemeral_r, viewTag: capsule.header0.viewTag ?? capsule.header0.view_tag ?? 0 };
+  }
+  return {
+    ...base,
+    senderKeyId: capsule.header0.senderKeyId,
+    viewTag: capsule.header0.viewTag ?? capsule.header0.view_tag ?? 0,
   };
 }
 
@@ -2342,7 +2616,8 @@ function privateCapsulePublishDraft(capsule) {
   }
   return {
     kind: 'private',
-    publish_kind: CAPSULE_PUBLISH_KIND.PRIVATE,
+    // clean-16 hybrid: CONV reuses publish_kind 1 (= PRIVATE); INTRO is 3. Sourced from header0.publishKind.
+    publish_kind: capsule.header0.publishKind ?? CAPSULE_PUBLISH_KIND.PRIVATE,
     size_class: capsule.header0.sizeClass,
     crypto_suite: capsule.header0.cryptoSuite,
     header_0_hash: capsule.hashes.header0Hash,
@@ -2385,7 +2660,9 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
   const suite = assertSupportedPrivateSuite(recipient.suite);
   const cryptoSuite = recipient.contractSuite;
   const senderRecovery = options.senderRecovery !== false;
-  const payloadReservedBytes = senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0;
+  // clean-16: the sender identity section (68 bytes) rides inside the encrypted body and is carved out of the useful
+  // area exactly like the sender-recovery section, so the on-chain body size stays EXACTLY privateBodyBytes(sizeClass).
+  const payloadReservedBytes = PLATHO_COMPACT_IDENTITY_BYTES + (senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0);
   const payloadBytes = options.payloadBytes
     ? assertCompactPayloadBytes(options.payloadBytes, { ...options, reservedTailBytes: payloadReservedBytes })
     : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext }, {
@@ -2406,6 +2683,19 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
     profileVersion: options.senderProfileVersion ?? options.profileVersion,
     avatarHash: options.senderAvatarHash ?? options.avatarHash,
   });
+  // clean-16 stealth: resolve the recipient's advertised scan pubkey, mint ONE fresh random ephemeral e (E = e·G),
+  // and derive the per-message view_tag = HKDF(X25519(e, scan_pub))[:2]. E + view_tag live in header0; the SAME e
+  // seeds the body KEM half so the on-chain E is a single value used both for discovery and body key agreement.
+  const normalizedRecipient = await normalizeRecipientBundle(recipient.bundle);
+  const recipientScanPublicKey = normalizedRecipient.scanPublicKey;
+  if (!recipientScanPublicKey) {
+    throw new Error('Recipient public key bundle is missing the stealth scan pubkey');
+  }
+  const ephemeralSecretKey = randomBytes(X25519_SECRET_KEY_BYTES);
+  const ephemeralPublicKey = x25519.getPublicKey(ephemeralSecretKey);
+  const viewTag = await deriveStealthViewTagForRecipient(ephemeralSecretKey, ephemeralPublicKey, recipientScanPublicKey);
+  const profileVersion = pointer.version;
+  const avatarHashHex = bigintHex256(bytesToBigInt(pointer.avatarHashBytes));
   const header0 = {
     version: PROTOCOL_VERSION,
     kind: 'private',
@@ -2414,12 +2704,10 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
     cryptoSuite,
     suite,
     senderKeyId: senderIdentity.encryptionKeyPair.keyId,
-    recipientKeyId: recipient.keyId,
-    senderSigningPublicKey: base64urlEncode(senderIdentity.signingPublicKey),
-    profileVersion: pointer.version,
-    profile_version: pointer.version,
-    avatarHash: bigintHex256(bytesToBigInt(pointer.avatarHashBytes)),
-    avatar_hash: bigintHex256(bytesToBigInt(pointer.avatarHashBytes)),
+    ephemeralScanPub: base64urlEncode(ephemeralPublicKey),
+    ephemeral_scan_pub: base64urlEncode(ephemeralPublicKey),
+    viewTag,
+    view_tag: viewTag,
   };
   const header1 = {
     version: PROTOCOL_VERSION,
@@ -2430,16 +2718,23 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
   };
   assertCapsuleTimestampPolicy(header1, { ...options, now });
 
+  const identityBytes = privateCapsuleIdentityBytes({
+    signingPublicKey: senderIdentity.signingPublicKey,
+    profileVersion,
+    avatarHashBytes: pointer.avatarHashBytes,
+  });
   const partialHashes = await computePrivateCapsuleHeaderHashes(header0, header1);
   const bodyBytes = await encryptCompactPayloadBytes(payloadBytes, recipient.bundle, {
     hashes: {
       ...partialHashes,
       senderKeyId: header0.senderKeyId,
-      recipientKeyId: header0.recipientKeyId,
     },
     messageId: options.messageId,
     senderRecovery,
     senderKeyPair: senderIdentity.encryptionKeyPair,
+    ephemeralSecretKey,
+    ephemeralPublicKey,
+    identityBytes,
   });
   assertPrivateBodyMatchesHeader(header0, bodyBytes);
   const body = {
@@ -2460,7 +2755,8 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
     hashes,
     chainCells,
   };
-  const signature = ed25519.sign(utf8(stableStringify(privateCapsuleSignaturePayload(unsignedCapsule))), senderIdentity.signingSecretKey);
+  const signatureIdentity = { profileVersion, avatarHash: avatarHashHex };
+  const signature = ed25519.sign(utf8(stableStringify(privateCapsuleSignaturePayload(unsignedCapsule, signatureIdentity))), senderIdentity.signingSecretKey);
   const capsule = {
     ...unsignedCapsule,
     senderSignature: base64urlEncode(assertBytes('senderSignature', signature, ED25519_SIGNATURE_BYTES)),
@@ -2471,12 +2767,208 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
   };
 }
 
+// clean-16 hybrid CONV lane: build an established-conversation capsule. header0 carries ONLY the opaque directional
+// bucketKey (no scan pubkey, no view_tag) — the recipient finds it by querying its own incoming bucketKey, then
+// decrypts with its own keys. A FRESH random ephemeral seeds the body KEM half (there is no stealth view_tag to bind
+// it to). The sender's own keyId keys the sender-recovery section so the sender can re-open its outbox copy. Identity
+// (sign pubkey / profile) rides in the encrypted body; the signature (which binds the bucketKey) is verified after decrypt.
+export async function createEncryptedConvCapsule(plaintext, recipientPublicBundle, senderIdentity, bucketKey, options = {}) {
+  if (!senderIdentity?.encryptionKeyPair || !senderIdentity?.signingSecretKey || !senderIdentity?.signingPublicKey) {
+    throw new Error('Invalid Platho sender identity');
+  }
+  const bucketKeyBytes = assertBytes('bucketKey', toUint8Array(bucketKey), 32);
+  const now = options.now ?? Date.now();
+  const normalizedRecipient = await normalizeRecipientBundle(recipientPublicBundle);
+  const suite = assertSupportedPrivateSuite(normalizedRecipient.suite);
+  const cryptoSuite = normalizedRecipient.contractSuite;
+  const senderRecovery = options.senderRecovery !== false;
+  const payloadReservedBytes = PLATHO_COMPACT_IDENTITY_BYTES + (senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0);
+  const payloadBytes = options.payloadBytes
+    ? assertCompactPayloadBytes(options.payloadBytes, { ...options, reservedTailBytes: payloadReservedBytes })
+    : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext ?? '' }, { ...options, reservedTailBytes: payloadReservedBytes });
+  const payloadInfo = compactPayloadContent(payloadBytes, { reservedTailBytes: payloadReservedBytes });
+  const sizeClass = normalizeCapsuleSizeClass(options.sizeClass ?? options.size_class ?? payloadInfo.sizeClass);
+  if (payloadInfo.sizeClass !== sizeClass) throw new Error('CONV capsule payload size class mismatch');
+  assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
+
+  const requestedCreatedAt = options.createdAt ?? now;
+  const requestedExpiresAt = options.expiresAt ?? requestedCreatedAt + (options.ttlMs ?? DEFAULT_CAPSULE_TTL_MS);
+  const createdAt = alignCapsuleTimestampMs(requestedCreatedAt, 'floor', 'header1.createdAt');
+  const expiresAt = alignCapsuleTimestampMs(requestedExpiresAt, 'ceil', 'header1.expiresAt');
+  const clientNonce = options.clientNonce ?? base64urlEncode(randomBytes(16));
+  const pointer = privateProfilePointer(options.profile ?? {
+    profileVersion: options.senderProfileVersion ?? options.profileVersion,
+    avatarHash: options.senderAvatarHash ?? options.avatarHash,
+  });
+  const profileVersion = pointer.version;
+  const avatarHashHex = bigintHex256(bytesToBigInt(pointer.avatarHashBytes));
+
+  const header0 = {
+    version: PROTOCOL_VERSION,
+    kind: 'conv',
+    publishKind: CAPSULE_PUBLISH_KIND.CONV,
+    sizeClass,
+    cryptoSuite,
+    suite,
+    bucketKey: base64urlEncode(bucketKeyBytes),
+  };
+  const header1 = { version: PROTOCOL_VERSION, flags: 0, createdAt, expiresAt, clientNonce };
+  assertCapsuleTimestampPolicy(header1, { ...options, now });
+
+  const identityBytes = privateCapsuleIdentityBytes({
+    signingPublicKey: senderIdentity.signingPublicKey,
+    profileVersion,
+    avatarHashBytes: pointer.avatarHashBytes,
+  });
+  const partialHashes = await computePrivateCapsuleHeaderHashes(header0, header1);
+  const ephemeralSecretKey = randomBytes(X25519_SECRET_KEY_BYTES);
+  const ephemeralPublicKey = x25519.getPublicKey(ephemeralSecretKey);
+  const bodyBytes = await encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, {
+    hashes: { ...partialHashes, senderKeyId: senderIdentity.encryptionKeyPair.keyId },
+    messageId: options.messageId,
+    senderRecovery,
+    senderKeyPair: senderIdentity.encryptionKeyPair,
+    ephemeralSecretKey,
+    ephemeralPublicKey,
+    identityBytes,
+  });
+  assertPrivateBodyMatchesHeader(header0, bodyBytes);
+  const body = { version: PROTOCOL_VERSION, kind: 'private', ...compactBodyObjectFromBytes(bodyBytes) };
+  const chainCells = await computePrivateCapsuleChainCells(header0, header1, body);
+  const hashes = privateCapsuleHashesFromChainCells(chainCells);
+  const id = await computePrivateCapsuleId(hashes);
+  const unsignedCapsule = { version: PROTOCOL_VERSION, kind: 'conv', id, header0, header1, body, hashes, chainCells };
+  const signatureIdentity = { profileVersion, avatarHash: avatarHashHex };
+  const signature = ed25519.sign(utf8(stableStringify(privateCapsuleSignaturePayload(unsignedCapsule, signatureIdentity))), senderIdentity.signingSecretKey);
+  const capsule = {
+    ...unsignedCapsule,
+    senderSignature: base64urlEncode(assertBytes('senderSignature', signature, ED25519_SIGNATURE_BYTES)),
+  };
+  return { ...capsule, publish: privateCapsulePublishDraft(capsule) };
+}
+
+// clean-16 hybrid INTRO lane: build a first-contact capsule. header0 carries the stealth ephemeral R + view_tag (the
+// recipient discovers it by scanning the intro pool); the encrypted body carries the INTRO handshake (sender bundle +
+// a SEPARATE ct_root that establishes the pairwise CONV K_root + an anti-replay nonce + a transcript signature). The
+// body KEM encapsulation is pre-computed so the signed transcript can bind sha256(body_KEM_ct); the SAME ephemeral r
+// seeds both the view_tag and the body E (= R). Returns kRoot/introNonce for the sender to bootstrap the CONV lane.
+export async function createEncryptedIntroCapsule(recipientPublicBundle, senderIdentity, options = {}) {
+  if (!senderIdentity?.encryptionKeyPair || !senderIdentity?.signingSecretKey || !senderIdentity?.signingPublicKey) {
+    throw new Error('Invalid Platho sender identity');
+  }
+  const now = options.now ?? Date.now();
+  const normalizedRecipient = await normalizeRecipientBundle(recipientPublicBundle);
+  const suite = assertSupportedPrivateSuite(normalizedRecipient.suite);
+  if (suite !== CRYPTO_SUITES.HYBRID_V1) throw new Error('INTRO capsule requires the hybrid suite');
+  const cryptoSuite = normalizedRecipient.contractSuite;
+  const recipientScanPublicKey = normalizedRecipient.scanPublicKey;
+  if (!recipientScanPublicKey) throw new Error('Recipient bundle is missing the stealth scan pubkey');
+
+  const ephemeralSecretKey = randomBytes(X25519_SECRET_KEY_BYTES);
+  const ephemeralPublicKey = x25519.getPublicKey(ephemeralSecretKey);
+  const viewTag = await deriveStealthViewTagForRecipient(ephemeralSecretKey, ephemeralPublicKey, recipientScanPublicKey);
+
+  // pre-compute the body KEM so the handshake transcript can commit to sha256(body_KEM_ct) before this seal runs.
+  const bodyKem = ml_kem768.encapsulate(normalizedRecipient.mlKem768PublicKey);
+  const bodyKemCiphertext = assertBytes('bodyKemCiphertext', bodyKem.cipherText, MLKEM768_CIPHERTEXT_BYTES);
+
+  const handshake = await buildIntroHandshake({
+    senderIdentity,
+    recipientBundle: {
+      keyId: normalizedRecipient.keyId,
+      x25519PublicKey: normalizedRecipient.x25519PublicKey,
+      mlKem768PublicKey: normalizedRecipient.mlKem768PublicKey,
+    },
+    ephemeralSecretKey,
+    viewTag,
+    bodyKemCiphertext,
+    introNonce: options.introNonce,
+    firstMessageBytes: options.firstMessageBytes,
+  });
+
+  const senderRecovery = options.senderRecovery !== false;
+  const payloadReservedBytes = PLATHO_COMPACT_IDENTITY_BYTES + (senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0);
+  const payloadBytes = encodeCompactPayload(
+    { type: 'document', bytes: handshake.introPayloadBytes },
+    { ...options, reservedTailBytes: payloadReservedBytes },
+  );
+  const payloadInfo = compactPayloadContent(payloadBytes, { reservedTailBytes: payloadReservedBytes });
+  const sizeClass = normalizeCapsuleSizeClass(options.sizeClass ?? options.size_class ?? payloadInfo.sizeClass);
+  if (payloadInfo.sizeClass !== sizeClass) throw new Error('INTRO capsule payload size class mismatch');
+  assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
+
+  const requestedCreatedAt = options.createdAt ?? now;
+  const requestedExpiresAt = options.expiresAt ?? requestedCreatedAt + (options.ttlMs ?? DEFAULT_CAPSULE_TTL_MS);
+  const createdAt = alignCapsuleTimestampMs(requestedCreatedAt, 'floor', 'header1.createdAt');
+  const expiresAt = alignCapsuleTimestampMs(requestedExpiresAt, 'ceil', 'header1.expiresAt');
+  const clientNonce = options.clientNonce ?? base64urlEncode(randomBytes(16));
+  const pointer = privateProfilePointer(options.profile ?? {
+    profileVersion: options.senderProfileVersion ?? options.profileVersion,
+    avatarHash: options.senderAvatarHash ?? options.avatarHash,
+  });
+  const profileVersion = pointer.version;
+  const avatarHashHex = bigintHex256(bytesToBigInt(pointer.avatarHashBytes));
+
+  const header0 = {
+    version: PROTOCOL_VERSION,
+    kind: 'intro',
+    publishKind: CAPSULE_PUBLISH_KIND.INTRO,
+    sizeClass,
+    cryptoSuite,
+    suite,
+    ephemeralR: base64urlEncode(ephemeralPublicKey),
+    viewTag,
+  };
+  const header1 = { version: PROTOCOL_VERSION, flags: 0, createdAt, expiresAt, clientNonce };
+  assertCapsuleTimestampPolicy(header1, { ...options, now });
+
+  const identityBytes = privateCapsuleIdentityBytes({
+    signingPublicKey: senderIdentity.signingPublicKey,
+    profileVersion,
+    avatarHashBytes: pointer.avatarHashBytes,
+  });
+  const partialHashes = await computePrivateCapsuleHeaderHashes(header0, header1);
+  const bodyBytes = await encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, {
+    hashes: { ...partialHashes, senderKeyId: senderIdentity.encryptionKeyPair.keyId },
+    messageId: options.messageId,
+    senderRecovery,
+    senderKeyPair: senderIdentity.encryptionKeyPair,
+    ephemeralSecretKey,
+    ephemeralPublicKey,
+    mlKemEncapsulation: { cipherText: bodyKemCiphertext, sharedSecret: bodyKem.sharedSecret },
+    identityBytes,
+  });
+  assertPrivateBodyMatchesHeader(header0, bodyBytes);
+  const body = { version: PROTOCOL_VERSION, kind: 'private', ...compactBodyObjectFromBytes(bodyBytes) };
+  const chainCells = await computePrivateCapsuleChainCells(header0, header1, body);
+  const hashes = privateCapsuleHashesFromChainCells(chainCells);
+  const id = await computePrivateCapsuleId(hashes);
+  const unsignedCapsule = { version: PROTOCOL_VERSION, kind: 'intro', id, header0, header1, body, hashes, chainCells };
+  const signatureIdentity = { profileVersion, avatarHash: avatarHashHex };
+  const signature = ed25519.sign(utf8(stableStringify(privateCapsuleSignaturePayload(unsignedCapsule, signatureIdentity))), senderIdentity.signingSecretKey);
+  const capsule = {
+    ...unsignedCapsule,
+    senderSignature: base64urlEncode(assertBytes('senderSignature', signature, ED25519_SIGNATURE_BYTES)),
+  };
+  return {
+    ...capsule,
+    publish: privateCapsulePublishDraft(capsule),
+    kRoot: handshake.kRoot,
+    introNonce: handshake.introNonce,
+  };
+}
+
 export async function verifyEncryptedPrivateCapsule(capsule, options = {}) {
-  if (!capsule || capsule.version !== PROTOCOL_VERSION || capsule.kind !== 'private') {
+  // clean-16 hybrid: the shared verify/open machinery handles all three lanes (legacy 'private' + 'conv' + 'intro').
+  if (!capsule || capsule.version !== PROTOCOL_VERSION || !['private', 'conv', 'intro'].includes(capsule.kind)) {
     throw new Error('Invalid Platho private capsule');
   }
-  if (capsule.header0?.version !== PROTOCOL_VERSION || capsule.header0.kind !== 'private') {
+  if (capsule.header0?.version !== PROTOCOL_VERSION || !['private', 'conv', 'intro'].includes(capsule.header0.kind)) {
     throw new Error('Invalid Platho private capsule header0');
+  }
+  // clean-16 hybrid: the top-level lane and the header0 lane must agree (defence-in-depth against a confused dispatcher).
+  if (capsule.kind !== capsule.header0.kind) {
+    throw new Error('Private capsule kind does not match header0 kind');
   }
   if (capsule.header1?.version !== PROTOCOL_VERSION) {
     throw new Error('Invalid Platho private capsule header1');
@@ -2508,9 +3000,30 @@ export async function verifyEncryptedPrivateCapsule(capsule, options = {}) {
   const bodyBytes = compactBodyBytesFromCapsuleBody(capsule.body);
   assertPrivateBodyMatchesHeader(capsule.header0, bodyBytes);
 
+  // clean-16: the sender's ed25519 signing pubkey now lives in the ENCRYPTED body identity section, so the sender
+  // signature can no longer be verified here (pre-decrypt). Structural integrity is still enforced (hashes + id +
+  // body size + cell determinism), and the AAD binds the body to header0Hash; the signature is verified AFTER decrypt
+  // in the open paths (verifyPrivateCapsuleSenderSignature) against the recovered in-body signing key.
+  assertBytes(
+    'capsule.senderSignature',
+    base64urlDecode(capsule.senderSignature),
+    ED25519_SIGNATURE_BYTES,
+  );
+
+  const normalizedCapsule = { ...capsule, hashes, chainCells };
+  return {
+    capsule: normalizedCapsule,
+    publish: privateCapsulePublishDraft(normalizedCapsule),
+    bodyBytes,
+  };
+}
+
+// clean-16: verify the sender signature AFTER decrypt, using the signing pubkey + profile pointer recovered from the
+// body identity section. Binds the on-chain header0 (id/hashes/view_tag/sender_key_id) to the in-body sender identity.
+function verifyPrivateCapsuleSenderSignature(capsule, identity) {
   const senderSigningPublicKey = assertBytes(
-    'capsule.header0.senderSigningPublicKey',
-    base64urlDecode(capsule.header0.senderSigningPublicKey),
+    'capsule.identity.senderSigningPublicKey',
+    toUint8Array(identity.signingPublicKey),
     ED25519_PUBLIC_KEY_BYTES,
   );
   const senderSignature = assertBytes(
@@ -2518,18 +3031,11 @@ export async function verifyEncryptedPrivateCapsule(capsule, options = {}) {
     base64urlDecode(capsule.senderSignature),
     ED25519_SIGNATURE_BYTES,
   );
-  const signaturePayload = privateCapsuleSignaturePayload(capsule);
+  const signaturePayload = privateCapsuleSignaturePayload(capsule, identity);
   if (!ed25519.verify(senderSignature, utf8(stableStringify(signaturePayload)), senderSigningPublicKey, { zip215: false })) {
     throw new Error('Private capsule sender signature is invalid');
   }
-
-  const normalizedCapsule = { ...capsule, hashes, chainCells };
-  return {
-    capsule: normalizedCapsule,
-    publish: privateCapsulePublishDraft(normalizedCapsule),
-    senderSigningPublicKey,
-    bodyBytes,
-  };
+  return senderSigningPublicKey;
 }
 
 export async function openEncryptedPrivateCapsule(capsule, recipientKeyPair, options = {}) {
@@ -2538,12 +3044,17 @@ export async function openEncryptedPrivateCapsule(capsule, recipientKeyPair, opt
   if (replayCache && await replayCache.has(verified.capsule.id)) {
     throw new Error('Private capsule replay detected');
   }
+  // clean-16 hybrid: the recipient opens with senderKeyId absent (CONV/INTRO header0 carry no sender label → the AAD
+  // binds header0Hash+header1Hash, not sender_key_id). To re-open its OWN outbox copy, the sender passes
+  // options.openAsSenderKeyId = its own keyId, which routes to the sender-recovery branch. Legacy 'private' capsules
+  // supply the sender label via header0.senderKeyId as before.
   const decrypted = await decryptCompactBodyBytes(verified.bodyBytes, recipientKeyPair, {
     header0Hash: verified.capsule.hashes.header0Hash,
     header1Hash: verified.capsule.hashes.header1Hash,
-    senderKeyId: verified.capsule.header0.senderKeyId,
-    recipientKeyId: verified.capsule.header0.recipientKeyId,
-  });
+    senderKeyId: options.openAsSenderKeyId ?? verified.capsule.header0.senderKeyId,
+  }, { identitySectionBytes: PLATHO_COMPACT_IDENTITY_BYTES });
+  if (!decrypted.identity) throw new Error('Private capsule is missing its in-body sender identity section');
+  const senderSigningPublicKey = verifyPrivateCapsuleSenderSignature(verified.capsule, decrypted.identity);
   const payload = decrypted.payload;
   if (replayCache) await replayCache.add(verified.capsule.id, verified.capsule.header1.expiresAt);
   return {
@@ -2553,7 +3064,9 @@ export async function openEncryptedPrivateCapsule(capsule, recipientKeyPair, opt
     openedKeyId: decrypted.keyId,
     capsule: verified.capsule,
     publish: verified.publish,
-    senderSigningPublicKey: verified.senderSigningPublicKey,
+    senderSigningPublicKey,
+    profileVersion: decrypted.identity.profileVersion,
+    avatarHash: decrypted.identity.avatarHash,
   };
 }
 
@@ -2562,7 +3075,7 @@ export async function privateCapsuleFromChainEntry(entry, options = {}) {
   const header0Bytes = snakeBytesFromBoc(entry.header_0_boc, 'CapsuleHub private header0');
   const header1Bytes = snakeBytesFromBoc(entry.header_1_boc, 'CapsuleHub private header1');
   const bodyBytes = snakeBytesFromBoc(entry.body_boc, 'CapsuleHub private body');
-  const header0 = privateCapsuleHeader0ObjectFromBytes(header0Bytes);
+  const header0 = capsuleHeader0ObjectFromBytes(header0Bytes);
   const header1 = privateCapsuleHeader1ObjectFromBytes(header1Bytes);
   const body = {
     version: PROTOCOL_VERSION,
@@ -2597,7 +3110,7 @@ export async function privateCapsuleFromChainEntry(entry, options = {}) {
   const id = await computePrivateCapsuleId(hashes);
   const capsule = {
     version: PROTOCOL_VERSION,
-    kind: 'private',
+    kind: header0.kind,
     id,
     header0,
     header1,
@@ -2616,8 +3129,78 @@ export async function privateCapsuleFromChainEntry(entry, options = {}) {
   return {
     capsule,
     publish: privateCapsulePublishDraft(capsule),
-    senderSigningPublicKey: base64urlDecode(header0.senderSigningPublicKey),
+    // clean-16: the sender's signing pubkey is no longer in cleartext header0; it is recovered from the encrypted
+    // body identity section at open time (openPrivateCapsuleChainEntry), so it is intentionally not surfaced here.
     bodyBytes,
+  };
+}
+
+// clean-16 hybrid INTRO open: decrypt the body (recovering the sender's in-body signing key), then verify the INTRO
+// handshake transcript AFTER decrypt and establish the pairwise CONV K_root. The caller MUST still bind the returned
+// {senderKeyId, senderEncPublicKey, senderSigningPublicKey} to the sender's LIVE Vault KeyRecord (authenticity anchor).
+export async function openEncryptedIntroCapsule(capsule, recipientKeyPair, options = {}) {
+  const opened = await openEncryptedPrivateCapsule(capsule, recipientKeyPair, options);
+  if (opened.capsule.header0.kind !== 'intro') throw new Error('Not an INTRO capsule');
+  const payload = opened.payload;
+  const introPayloadBytes = payload?.bytes;
+  if (!introPayloadBytes || payload.type !== 'document') {
+    throw new Error('INTRO capsule is missing its handshake payload');
+  }
+  const bodyBytes = compactBodyBytesFromCapsuleBody(opened.capsule.body);
+  const bodyKemCiphertext = inspectCompactBodyBytes(bodyBytes).mlKem768Ciphertext;
+  const ephemeralR = base64urlDecode(opened.capsule.header0.ephemeralR ?? opened.capsule.header0.ephemeral_r);
+  const viewTag = opened.capsule.header0.viewTag ?? opened.capsule.header0.view_tag ?? 0;
+  const hs = await openIntroHandshake({
+    introPayloadBytes,
+    recipientIdentity: { encryptionKeyPair: recipientKeyPair },
+    senderSigningPublicKey: opened.senderSigningPublicKey,
+    ephemeralR,
+    bodyKemCiphertext,
+    viewTag,
+  });
+  // Vault-binding gate — closes the first-contact impersonation risk (red-team major). The handshake only proves the
+  // sender possesses the in-body signing key it supplied; a stranger could sign a self-consistent INTRO claiming
+  // keyId_A = victim. When the caller supplies resolveVaultKeyRecord(keyIdA) → { signingPublicKey, x25519PublicKey,
+  // mlKem768PublicKey? } (raw bytes or base64url), we require the handshake's sign/enc keys to MATCH the LIVE Vault
+  // record and keyId_A to be the hash of the registered enc+mlkem bundle. First-contact open SHOULD pass it (fail-closed).
+  if (options.resolveVaultKeyRecord) {
+    const asKey = (v, len, name) => assertBytes(name, typeof v === 'string' ? base64urlDecode(v) : toUint8Array(v), len);
+    const keyIdA = base64urlEncode(hs.senderKeyId);
+    const record = await options.resolveVaultKeyRecord(keyIdA);
+    if (!record) throw new Error('INTRO sender keyId is not registered in the Vault (unbindable)');
+    const regSign = asKey(record.signingPublicKey ?? record.signPublicKey, ED25519_PUBLIC_KEY_BYTES, 'vault.signingPublicKey');
+    const regEnc = asKey(record.x25519PublicKey ?? record.encPublicKey, X25519_PUBLIC_KEY_BYTES, 'vault.x25519PublicKey');
+    if (!bytesEqual(regSign, opened.senderSigningPublicKey)) {
+      throw new Error('INTRO sender signing key does not match the Vault KeyRecord (impersonation)');
+    }
+    if (!bytesEqual(regEnc, hs.senderEncPublicKey)) {
+      throw new Error('INTRO sender enc key does not match the Vault KeyRecord (impersonation)');
+    }
+    if (record.mlKem768PublicKey) {
+      const expectedKeyId = await computeHybridKeyId(regEnc, asKey(record.mlKem768PublicKey, MLKEM768_PUBLIC_KEY_BYTES, 'vault.mlKem768PublicKey'));
+      if (expectedKeyId !== keyIdA) throw new Error('INTRO sender keyId does not bind to the registered Vault key bundle');
+    }
+  }
+  // anti-replay: introNonce is the dedup key. Enforce it when the caller supplies a seen-set guard (STRONGLY recommended
+  // for first contact — the signature+transcript are valid on a byte-identical replay, which would otherwise re-surface
+  // the first message). The guard owns the seen-set: { has(key): boolean, add(key) }.
+  if (options.introReplayGuard) {
+    const nonceKey = base64urlEncode(hs.introNonce);
+    if (await options.introReplayGuard.has(nonceKey)) {
+      throw new Error('INTRO replay detected (introNonce already seen)');
+    }
+    await options.introReplayGuard.add(nonceKey);
+  }
+  return {
+    kRoot: hs.kRoot,
+    senderKeyId: hs.senderKeyId,
+    senderEncPublicKey: hs.senderEncPublicKey,
+    senderSigningPublicKey: opened.senderSigningPublicKey,
+    introNonce: hs.introNonce,
+    firstMessageBytes: hs.firstMessageBytes,
+    profileVersion: opened.profileVersion,
+    avatarHash: opened.avatarHash,
+    capsule: opened.capsule,
   };
 }
 
@@ -2627,12 +3210,25 @@ export async function openPrivateCapsuleChainEntry(entry, recipientKeyPair, opti
   if (replayCache && await replayCache.has(verified.capsule.id)) {
     throw new Error('Private capsule replay detected');
   }
+  // clean-16 hybrid: the recipient opens with senderKeyId absent (CONV/INTRO header0 carry no sender label → the AAD
+  // binds header0Hash+header1Hash, not sender_key_id). To re-open its OWN outbox copy, the sender passes
+  // options.openAsSenderKeyId = its own keyId, which routes to the sender-recovery branch. Legacy 'private' capsules
+  // supply the sender label via header0.senderKeyId as before.
   const decrypted = await decryptCompactBodyBytes(verified.bodyBytes, recipientKeyPair, {
     header0Hash: verified.capsule.hashes.header0Hash,
     header1Hash: verified.capsule.hashes.header1Hash,
-    senderKeyId: verified.capsule.header0.senderKeyId,
-    recipientKeyId: verified.capsule.header0.recipientKeyId,
-  });
+    senderKeyId: options.openAsSenderKeyId ?? verified.capsule.header0.senderKeyId,
+  }, { identitySectionBytes: PLATHO_COMPACT_IDENTITY_BYTES });
+  if (!decrypted.identity) throw new Error('Private capsule is missing its in-body sender identity section');
+  // clean-16: the sender signature covers the body HASH, so it cannot ride inside the body (circular) and there is no
+  // on-chain slot for it beyond the three cells — a chain-sourced capsule therefore has no senderSignature to verify.
+  // The in-body signing pubkey is recovered from the AEAD-sealed identity section (bound to header0Hash + sender_key_id
+  // via the body AAD) and surfaced for the app's Vault-record cross-check attribution (parity with the pre-PH0C path).
+  const senderSigningPublicKey = assertBytes(
+    'capsule.identity.senderSigningPublicKey',
+    toUint8Array(decrypted.identity.signingPublicKey),
+    ED25519_PUBLIC_KEY_BYTES,
+  );
   const payload = decrypted.payload;
   if (replayCache) await replayCache.add(verified.capsule.id, verified.capsule.header1.expiresAt);
   return {
@@ -2642,7 +3238,9 @@ export async function openPrivateCapsuleChainEntry(entry, recipientKeyPair, opti
     openedKeyId: decrypted.keyId,
     capsule: verified.capsule,
     publish: verified.publish,
-    senderSigningPublicKey: verified.senderSigningPublicKey,
+    senderSigningPublicKey,
+    profileVersion: decrypted.identity.profileVersion,
+    avatarHash: decrypted.identity.avatarHash,
   };
 }
 
@@ -2775,6 +3373,7 @@ export async function runPlathoCryptoSelfTest() {
     pq_kem_pubkey_len: vaultDraft.message.pq_kem_pubkey_len,
     pq_kem_pubkey: vaultDraft.message.pq_kem_pubkey,
     crypto_suite_mask: vaultDraft.message.crypto_suite_mask,
+    scan_pubkey: vaultDraft.message.scan_pubkey,
     created_at: 1_700_000_000n,
     created_lt: 1n,
     revoked_at: 0n,
@@ -2900,8 +3499,11 @@ export async function runPlathoCryptoSelfTest() {
   const capsuleSignatureBytes = base64urlDecode(capsuleSignatureTampered.senderSignature);
   capsuleSignatureBytes[0] ^= 1;
   capsuleSignatureTampered.senderSignature = base64urlEncode(capsuleSignatureBytes);
-  await expectReject('private capsule signature tamper', () => verifyEncryptedPrivateCapsule(capsuleSignatureTampered, {
+  // clean-16: the sender signature is verified AFTER decrypt (the signing pubkey lives in the encrypted body), so a
+  // signature tamper is caught at open time, not at the structural verify pass.
+  await expectReject('private capsule signature tamper', () => openEncryptedPrivateCapsule(capsuleSignatureTampered, identity.encryptionKeyPair, {
     now: 1_700_000_004_000,
+    replayCache: new Set(),
   }));
 
   const capsuleContextTampered = structuredClone(capsule);

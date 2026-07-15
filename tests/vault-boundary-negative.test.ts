@@ -21,10 +21,9 @@ import {
 import { hybridMessagingKeyFields } from './helpers/vault-hybrid-key';
 import {
   registerVaultSigningKeys,
-  sendVaultReceiveIntentExternal,
   sendVaultWithdrawAthExternal,
   sendVaultWithdrawTonExternal,
-} from './helpers/vault-receive-intent-external';
+} from './helpers/vault-external';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -33,11 +32,8 @@ const DEPOSIT_TON_EXEC_RESERVE = 2_000_000n;
 const WITHDRAW_TON_EXEC_RESERVE = 2_000_000n;
 const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
 const KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 30_000_000n;
-const RECEIVE_INTENT_STORAGE_ENDOWMENT = 5_000_000n;
-const RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE = 2_000_000n;
 const VAULT_ATH_WITHDRAW_MIN_VALUE = 58_000_000n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
-const ASSET_TON = 1n;
 
 const ENC = 0x1000000000000000000000000000000000000000000000000000000000000001n;
 const SIG = 0x2000000000000000000000000000000000000000000000000000000000000002n;
@@ -305,36 +301,6 @@ describe('Vault value/storage boundary negative matrix', () => {
     } as RegisterMessagingKeys);
     expect((await exactKeys.vault.getGetGlobal()).key_record_count).toBe(1n);
     expect((await exactKeys.vault.getGetUser(exactKeys.user.address)).current_key_id).not.toBe(0n);
-  });
-
-  it('VAULT-BND-03: ReceiveIntent external create consumes internal settlement reserve and claim credits activated recipient', async () => {
-    const { blockchain, vault, user, recipient } = await setupPlain();
-    const userKey = await registerVaultSigningKeys(vault, user, 71);
-    const recipientKey = await registerVaultSigningKeys(vault, recipient, 72);
-    const amount = toNano('0.2');
-    await depositTon(vault, user, toNano('1'));
-
-    const createIntentRequired = RECEIVE_INTENT_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE + RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE;
-    const clientNonce = (await vault.getGetUser(user.address)).publish_nonce;
-    const intentId = await vault.getGetReceiveIntentId(user.address, recipient.address, ASSET_TON, amount, clientNonce);
-    const secret = 0x7777n;
-    const commitment = await vault.getGetReceiveIntentCommitment(intentId, recipient.address, secret);
-
-    await sendVaultReceiveIntentExternal(blockchain, vault, 'CreateReceiveIntent', user, userKey, GENESIS_HASH, {
-      asset: ASSET_TON,
-      amount,
-      recipient_wallet: recipient.address,
-      commitment,
-    });
-    expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
-    expect((await vault.getGetUser(user.address)).ton_balance).toBe(toNano('0.8') - createIntentRequired);
-
-    await sendVaultReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', recipient, recipientKey, GENESIS_HASH, {
-      intent_id: intentId,
-      secret32: secret,
-    });
-    expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(false);
-    expect((await vault.getGetUser(recipient.address)).ton_balance).toBe(amount);
   });
 
   it('VAULT-BND-04: ATH notify and withdraw reject min-1 and accept exact value boundaries', async () => {

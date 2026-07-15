@@ -18,7 +18,8 @@ describe('CapsuleHub canonical storage economics', () => {
     const report = await runCapsuleHubStorageEconomics(false);
 
     expect(report.status).toBe('PASS');
-    expect(report.canonical_capsule_cells.header0_bytes).toBe(140);
+    // clean-16 ИНК2: the CONV private header0 is 40 bytes (320 bits), was 140 pre-clean-16.
+    expect(report.canonical_capsule_cells.header0_bytes).toBe(40);
     expect(report.canonical_capsule_cells.header1_bytes).toBe(30);
     expect(report.canonical_capsule_cells.hybrid_body_bytes).toBe(2228);
     expect(report.canonical_capsule_cells.hybrid_body_bytes_by_size_class).toEqual({

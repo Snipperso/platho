@@ -25,7 +25,7 @@ const PRICE_5 = 1_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 const OP_ATH_TRANSFER_NOTIFICATION_REFUND = 0x4154481E;
-const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 500_000_000n + 1_000_000n + 4_000_000n + 36_000_000n; // + name-record endowment (clean-11)
+const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 829_000_000n + 1_000_000n + 4_000_000n + 100_000_000n; // clean-16 L2/#14 (owner: mint=exactly 1 TON): item(829M)+record(100M), sized at the real 64962/cell/yr rate
 const USERNAME_ITEM_STORAGE_FLOOR = 15_900_000n;
 
 // TEP-62 transfer body after query_id (new NftTransfer binding carries it as one slice).
@@ -114,7 +114,7 @@ async function sendMint(
   name: string,
   amount: bigint,
   // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M), so a successful mint notification must carry >= that.
-  value = toNano('0.6'),
+  value = toNano('1.2'),
   payerWallet = fixtureAddress('USERNAME_REGISTRY_VAULT'),
 ) {
   return registry.send(officialAthWallet.getSender(), { value }, {
@@ -355,7 +355,7 @@ describe('UsernameRegistry paid mint milestone', () => {
       officialAthWallet.address,
       registry.address,
       // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M); the mint notification must carry >= that.
-      toNano('0.6'),
+      toNano('1.2'),
       vaultMintNotificationBody(ownerA, 'ackrace', PRICE_6_PLUS, vaultAddress),
     ), { allowParallel: true });
 
@@ -404,7 +404,7 @@ describe('UsernameRegistry paid mint milestone', () => {
       officialAthWallet.address,
       registry.address,
       // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M); the mint notification must carry >= that.
-      toNano('0.6'),
+      toNano('1.2'),
       vaultMintNotificationBody(ownerA, 'resrace', PRICE_6_PLUS, vaultAddress),
     ), { allowParallel: true });
 
