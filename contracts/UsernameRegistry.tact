@@ -566,11 +566,17 @@ contract UsernameRegistry {
         self.meta_sealed = true;
     }
 
+    // clean-16 migration/Durable-Core: PAYER-AUTHENTICATED mint (owner decision 2026-07-15). The mint is no longer
+    // gated on a one-shot-bound Vault — it is authenticated by the UNFORGEABLE payer identity the official ATH wallet
+    // already stamps (sender()==official_ath_wallet guarantees the notify came from OUR wallet, which itself only
+    // stamps payer_wallet=derive_wallet_address(real sender_owner)). Any basechain ATH payer who pays the price may
+    // mint an UNOWNED name (to the client-supplied owner_wallet) — owned-name theft stays impossible (acceptUsernameMint
+    // rejects a taken/pending name; the NFT item is one-shot + transfer owner-only). Because nothing references a Vault,
+    // the registry is Vault-INDEPENDENT and survives every future Vault redeploy → frozen once, reused forever.
     receive(msg: AthTransferNotificationVaultMintUsername) {
         self.requireSealed();
         throwUnless(19180, sender() == self.official_ath_wallet_address);
-        throwUnless(19181, self.vault_bound);
-        throwUnless(19182, msg.payer_wallet == self.vault_address);
+        throwUnless(19183, self.isBasechainAddress(msg.payer_wallet));
         self.acceptUsernameMint(msg.query_id, msg.sender_key, msg.amount, msg.owner_wallet, msg.username_len, msg.username);
     }
 
