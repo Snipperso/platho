@@ -4864,13 +4864,9 @@ PROGRAM{
       28 s() PUSH
       SDEQ
       THROWANYIFNOT
-      19181 PUSHINT
-      22 s() PUSH
-      THROWANYIFNOT
-      19182 PUSHINT
+      19183 PUSHINT
       s0 29 s() XCHG
-      26 s() PUSH
-      SDEQ
+      $UsernameRegistry$_fun_isBasechainAddress INLINECALLDICT
       s1 29 s() XCHG
       THROWANYIFNOT
       25 s() 32 s() XCHG
