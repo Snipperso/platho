@@ -96,6 +96,11 @@
       "output": "build/MockAthWalletNoAck"
     },
     {
+      "name": "MockCheckSig",
+      "path": "contracts/MockCheckSig.tact",
+      "output": "build/MockCheckSig"
+    },
+    {
       "name": "UsernameRegistry",
       "path": "contracts/UsernameRegistry.tact",
       "output": "build/UsernameRegistry"
