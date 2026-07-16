@@ -1,0 +1,121 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MockCheckSig_MockCheckSig.headers.fc
+;;
+;; Header files for MockCheckSig
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $MockCheckSig$_contract_init
+tuple $MockCheckSig$_contract_init() impure inline;
+
+;; $MockCheckSig$_contract_load
+tuple $MockCheckSig$_contract_load() impure inline;
+
+;; $MockCheckSig$_contract_store
+() $MockCheckSig$_contract_store(tuple v) impure inline;
+
+;; $MockCheckSig$_fun_check
+(tuple, int) $MockCheckSig$_fun_check(tuple $self, int $hash, slice $signature, int $public_key) impure inline_ref;
+
+
+;; MockCheckSig_MockCheckSig.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+int $global_checkSignature(int $hash, slice $signature, int $publicKey) impure asm """
+    CHKSIGNU
+""";
+
+;; MockCheckSig_MockCheckSig.storage.fc
+;;
+;; Type: MockCheckSig
+;; TLB: _  = MockCheckSig
+;;
+
+tuple $MockCheckSig$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return null();
+    }
+    else {
+        return $MockCheckSig$_contract_init();
+    }
+}
+
+() $MockCheckSig$_contract_store(tuple v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MockCheckSig functions
+;;
+
+tuple $MockCheckSig$_contract_init() impure inline {
+    tuple $self = null();
+    return $self;
+}
+
+(tuple, int) $MockCheckSig$_fun_check(tuple $self, int $hash, slice $signature, int $public_key) impure inline_ref {
+    var ($self) = $self;
+    var $fresh$ret_0 = $global_checkSignature($hash, $signature, $public_key);
+    return ($self, $fresh$ret_0);
+}
+
+;;
+;; Get methods of a Contract MockCheckSig
+;;
+
+_ %check(int $hash, slice $signature, int $public_key) method_id(120880) {
+    int $hash = $hash;
+    slice $signature = $signature;
+    int $public_key = $public_key;
+    var self = $MockCheckSig$_contract_load();
+    var res = self~$MockCheckSig$_fun_check($hash, $signature, $public_key);
+    return res;
+}
+
+;;
+;; Routing of a Contract MockCheckSig
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var $self = $MockCheckSig$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $MockCheckSig$_contract_store($self);
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}
