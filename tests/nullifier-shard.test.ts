@@ -218,10 +218,41 @@ describe('NULLIFIER-SHARD — one token, one shard, one authority', () => {
     // The forward's funding is checked BEFORE the burn, in COMPUTE, so it bounces and the nullifier is NOT burnt.
     const { body, lane, serial } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0x94)), epoch: nowEpoch, nonce: 9n });
     const shard = await shardFor(nowEpoch, lane);
-    const res = await shard.send(relay.getSender(), { value: toNano('0.05'), bounce: true }, body as any);  // 50M < 60M
+    const res = await shard.send(relay.getSender(), { value: toNano('0.003'), bounce: true }, body as any);  // 3M < ~5.21M floor
     expect(computeExit(res, shard.address)).toBe(13624);
     expect(didBounce(res)).toBe(true);
     expect(await shard.getIsSpent(serial), 'not burnt — the token survives for a funded retry').toBe(false);
+  }, 120_000);
+
+  it('RS-05: CARRY value flow — the relay gets its excess back; each shard keeps only its own endowment', async () => {
+    // The bug this closes: before the change, a fat msg.value stranded ~0.198 GRAM on the NullifierShard forever
+    // (it is ephemeral, so that value is lost). Now the shard keeps only base + nullifier endowment, forwards the
+    // record endowment, and returns the rest to the relay. Assert the relay's NET cost is small and the endowments
+    // landed where they fund real storage.
+    
+    const bk = 0xCA4409n;
+    const { body, lane } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0xC5)), epoch: nowEpoch, nonce: 25n, bucketKey: bk });
+    const nullShard = await shardFor(nowEpoch, lane);
+    const recordShard = await recordShardFor(bk, nowEpoch);
+
+    const relayBefore = await relay.getBalance();
+    const nsBefore = (await blockchain.getContract(nullShard.address)).balance;
+    const res = await nullShard.send(relay.getSender(), { value: toNano('1') }, body as any);  // deliberately fat: 1 GRAM
+    expect(computeExit(res, nullShard.address)).toBe(0);
+
+    const relayAfter = await relay.getBalance();
+    const netCost = relayBefore - relayAfter;   // includes the relay's own send gas
+    // The relay sent 1 GRAM and must get almost all of it back — net cost is endowments + path gas, well under 0.02.
+    expect(netCost).toBeLessThan(toNano('0.02'));
+
+    // The NullifierShard did NOT accumulate the excess: its balance grew by only ~its own endowment, not ~1 GRAM.
+    const nsAfter = (await blockchain.getContract(nullShard.address)).balance;
+    expect(nsAfter - nsBefore, 'shard kept only its own endowment, not the fat value').toBeLessThan(toNano('0.05'));
+
+    // The record landed and carries a funding endowment (the RecordShard balance rose above the record's ~1-yr rent).
+    expect((await recordShard.getGetView()).record_count).toBe(1n);
+    const rsBal = (await blockchain.getContract(recordShard.address)).balance;
+    expect(rsBal).toBeGreaterThan(129924n);  // measured 2 cells x 64962/yr rent for one record
   }, 120_000);
 
   // ── Increment 2: CAC authority ───────────────────────────────────────────────────────────────────────────

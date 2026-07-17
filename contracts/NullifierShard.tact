@@ -57,11 +57,21 @@ const NS_SAFE_CAP: Int = 4096;                  // per-shard live-nullifier ceil
 // self-funds gas + endowment per message via CARRY), so a long worst-case window is acceptable.
 const NS_MAX_CERT_EPOCHS: Int = 550;            // ~18 months, in day-epochs (yearly ceremony + operational slack)
 
-// Increment 3: after burning the nullifier, forward the record (+ its carried endowment) to the RecordShard. The
-// forward is the shard's ONLY outgoing message; it is COMPUTE-gated below (13624) so it can never fail in the
-// ACTION phase for lack of value — the whole point of CARRY is that the money to pay for it arrived in msg.value.
-const NS_RECORD_ENDOWMENT: Int = 1000000;       // carried to the RecordShard as the record's storage endowment
-const NS_FORWARD_VALUE: Int = 60000000;         // min incoming value: record endowment + record gas + 2 fwd hops [G8-provisional]
+// Increment 3+4: after burning the nullifier, forward the record (+ its carried endowment) to the RecordShard AND
+// return the relay's excess. CARRY's value flow: the relay brings the money in msg.value; the shard keeps only its
+// own storage, forwards only the record endowment, and hands the rest BACK — otherwise every message stranded
+// ~0.198 GRAM on this shard forever (measured; the shard is ephemeral so stranded value is lost). All amounts are
+// gated in COMPUTE (13624) before the burn, so the sends below cannot fail in ACTION for lack of funds.
+//   record endowment: 2 measured cells x 64962/cell/yr x 1yr x 1.5  = 194_886 -> 200_000 (the record lives 1 year)
+//   nullifier endowment: ~3 cells x 64962 x (9 days / 365) x 1.5             ~= 7_200 -> 10_000 (nullifier: 9 days)
+//   path gas: measured NullShard 16816 + RecordShard 7697 gas (~1.6M nanoTON) + 2 fwd fees, with margin
+const NS_RECORD_ENDOWMENT: Int = 200000;        // stays on the RecordShard as the record's 1-year storage endowment
+const NS_RECORD_GAS: Int = 2500000;             // the RecordShard's OWN compute (~1.6M measured) — the recipient pays gas
+                                                //   from the message value, so the forward must carry endowment + this
+const NS_NULLIFIER_ENDOWMENT: Int = 10000;      // this shard keeps this per burnt nullifier (9-day rent)
+const NS_BASE_ENDOWMENT: Int = 1000000;         // this shard's own keepalive floor (code rent over its ~9-day life)
+const NS_PATH_GAS: Int = 5000000;               // this shard's own gas + fwd fees + the return-send (measured ~2M, +margin)
+const NS_FORWARD_VALUE: Int = NS_RECORD_ENDOWMENT + NS_RECORD_GAS + NS_NULLIFIER_ENDOWMENT + NS_PATH_GAS;  // min incoming (13624)
 
 // [IMMUTABLE] The M-of-N root of trust, frozen in code (never in data — a key in data would enter the shard
 // address and let an attacker deploy a shard trusting a key they control). 2-of-3 here. Values are test roots
@@ -193,16 +203,30 @@ contract NullifierShard {
         self.spent.set(nk, true);
         self.spent_count = self.spent_count + 1;
 
-        // Increment 3: forward the record to its RecordShard(bucket_key, epoch), carrying the endowment. The value
-        // was verified in COMPUTE (13624) BEFORE the burn, so this single send cannot fail in ACTION for lack of
-        // funds. bounce:true — a refused record (RecordShard SAFE-CAP, effectively unreachable) returns the value
-        // here; the nullifier stays burnt (documented accepted residual, not compensated).
+        // Keep ONLY this shard's own storage funded: its base keepalive + one nullifier-endowment per burnt token
+        // (including the one just added). Everything above that is the relay's, and goes back below. ReserveAtMost
+        // never over-reserves; the 13624 gate guarantees the balance exceeds this, so the sends that follow have
+        // funds and cannot fail in ACTION.
+        nativeReserve(NS_BASE_ENDOWMENT + self.spent_count * NS_NULLIFIER_ENDOWMENT, ReserveAtMost);
+
+        // Forward the record to its RecordShard(bucket_key, epoch) with exactly its endowment. bounce:true — a
+        // refused record (RecordShard SAFE-CAP, effectively unreachable) returns the value here; the nullifier stays
+        // burnt (documented accepted residual, not compensated).
         send(SendParameters{
             to: contractAddress(initOf RecordShard(msg.bucket_key, self.epoch)),
-            value: NS_RECORD_ENDOWMENT,
+            value: NS_RECORD_ENDOWMENT + NS_RECORD_GAS,
             mode: SendPayGasSeparately,
             bounce: true,
             body: RecordStore{ serial: serial, frame_commit: msg.frame_commit }.toCell(),
+        });
+
+        // Return the relay's excess: whatever remains after the reserve and the record forward. A message to an
+        // existing wallet cannot fail here, so this stays within the ACTION-can't-fail guarantee.
+        send(SendParameters{
+            to: sender(),
+            value: 0,
+            mode: SendRemainingBalance | SendIgnoreErrors,
+            bounce: false,
         });
     }
 
