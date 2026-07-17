@@ -1,4 +1,4 @@
-// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/NullifierShard/NullifierShard_NullifierShard.fc` 
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/IntroShard/IntroShard_NullifierShard.fc` 
 PROGRAM{
   DECLPROC __tact_context_get
   DECLPROC __tact_context_get_sender
@@ -16,9 +16,9 @@ PROGRAM{
   DECLPROC $NullifierShard$_load
   DECLPROC $Context$_get_value
   DECLPROC $NullifierShardView$_to_external
+  DECLPROC $NullifierShard$init$_load
   DECLPROC $RecordShard$init$_store
   DECLPROC $IntroShard$init$_store
-  DECLPROC $NullifierShard$init$_load
   DECLPROC $NullifierShard$_contract_init
   DECLPROC $NullifierShard$_contract_load
   DECLPROC $NullifierShard$_contract_store
@@ -26,8 +26,6 @@ PROGRAM{
   DECLPROC $global_newAddress
   DECLPROC $global_contractAddressExt
   DECLPROC $global_contractAddress
-  DECLPROC $RecordShard$_init_child
-  DECLPROC $IntroShard$_init_child
   DECLPROC $NullifierShard$_fun_rootKey
   DECLPROC $NullifierShard$_fun_computeSerial
   DECLPROC $NullifierShard$_fun_certDigest
@@ -35,6 +33,8 @@ PROGRAM{
   DECLPROC $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs
   DECLPROC $NullifierShard$_fun_get_view
   DECLPROC $NullifierShard$_fun_is_spent
+  DECLPROC $RecordShard$_init_child
+  DECLPROC $IntroShard$_init_child
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $RecordStore$_constructor_serial_frame_commit
   DECLPROC $IntroStore$_constructor_serial_r_view_tag_body_commit
@@ -147,6 +147,13 @@ PROGRAM{
   }>
   $NullifierShardView$_to_external PROCINLINE:<{
   }>
+  $NullifierShard$init$_load PROCINLINE:<{
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    -ROT
+  }>
   $RecordShard$init$_store PROCINLINE:<{
     s0 s2 XCHG
     257 PUSHINT
@@ -160,13 +167,6 @@ PROGRAM{
     STIX
     257 PUSHINT
     STIX
-  }>
-  $NullifierShard$init$_load PROCINLINE:<{
-    257 PUSHINT
-    LDIX
-    257 PUSHINT
-    LDIX
-    -ROT
   }>
   $NullifierShard$_contract_init PROCINLINE:<{
     PUSHNULL
@@ -241,68 +241,6 @@ PROGRAM{
     0 PUSHINT
     -ROT
     $global_contractAddressExt INLINECALLDICT
-  }>
-  $RecordShard$_init_child PROCREF:<{
-    __tact_child_contract_codes GETGLOB
-    CTOS
-    LDDICT
-    DROP
-    DUP
-    52655 PUSHINT
-    __tact_dict_get_code INLINECALLDICT
-    NEWDICT
-    34652 PUSHINT
-    MYCODE
-    __tact_dict_set_code INLINECALLDICT
-    s0 s2 XCHG
-    54285 PUSHINT
-    __tact_dict_get_code INLINECALLDICT
-    s1 s2 XCHG
-    54285 PUSHINT
-    SWAP
-    __tact_dict_set_code INLINECALLDICT
-    NEWC
-    SWAP
-    NEWC
-    STDICT
-    STBREFR
-    FALSE
-    SWAP
-    1 STI
-    2SWAP
-    $RecordShard$init$_store INLINECALLDICT
-    ENDC
-  }>
-  $IntroShard$_init_child PROCREF:<{
-    __tact_child_contract_codes GETGLOB
-    CTOS
-    LDDICT
-    DROP
-    DUP
-    54285 PUSHINT
-    __tact_dict_get_code INLINECALLDICT
-    NEWDICT
-    34652 PUSHINT
-    MYCODE
-    __tact_dict_set_code INLINECALLDICT
-    s0 s2 XCHG
-    52655 PUSHINT
-    __tact_dict_get_code INLINECALLDICT
-    s1 s2 XCHG
-    52655 PUSHINT
-    SWAP
-    __tact_dict_set_code INLINECALLDICT
-    NEWC
-    SWAP
-    NEWC
-    STDICT
-    STBREFR
-    FALSE
-    SWAP
-    1 STI
-    2SWAP
-    $IntroShard$init$_store INLINECALLDICT
-    ENDC
   }>
   $NullifierShard$_fun_rootKey PROCREF:<{
     13635 PUSHINT
@@ -379,6 +317,68 @@ PROGRAM{
     NOT
     s4 s3 s0 XCHG3
     s1 s2 XCHG
+  }>
+  $RecordShard$_init_child PROCREF:<{
+    __tact_child_contract_codes GETGLOB
+    CTOS
+    LDDICT
+    DROP
+    DUP
+    52655 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    NEWDICT
+    34652 PUSHINT
+    MYCODE
+    __tact_dict_set_code INLINECALLDICT
+    s0 s2 XCHG
+    54285 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    s1 s2 XCHG
+    54285 PUSHINT
+    SWAP
+    __tact_dict_set_code INLINECALLDICT
+    NEWC
+    SWAP
+    NEWC
+    STDICT
+    STBREFR
+    FALSE
+    SWAP
+    1 STI
+    2SWAP
+    $RecordShard$init$_store INLINECALLDICT
+    ENDC
+  }>
+  $IntroShard$_init_child PROCREF:<{
+    __tact_child_contract_codes GETGLOB
+    CTOS
+    LDDICT
+    DROP
+    DUP
+    54285 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    NEWDICT
+    34652 PUSHINT
+    MYCODE
+    __tact_dict_set_code INLINECALLDICT
+    s0 s2 XCHG
+    52655 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    s1 s2 XCHG
+    52655 PUSHINT
+    SWAP
+    __tact_dict_set_code INLINECALLDICT
+    NEWC
+    SWAP
+    NEWC
+    STDICT
+    STBREFR
+    FALSE
+    SWAP
+    1 STI
+    2SWAP
+    $IntroShard$init$_store INLINECALLDICT
+    ENDC
   }>
   $SendParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
     s2 s4 XCHG

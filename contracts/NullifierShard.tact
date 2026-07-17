@@ -1,4 +1,5 @@
 import "./RecordShard.tact";
+import "./IntroShard.tact";
 
 // NullifierShard — clean-17 sharded anon-publish. Increments 1 (double-spend) + 2 (CAC authority) + 3 (forward).
 //
@@ -66,6 +67,7 @@ const NS_MAX_CERT_EPOCHS: Int = 550;            // ~18 months, in day-epochs (ye
 //   nullifier endowment: ~3 cells x 64962 x (9 days / 365) x 1.5             ~= 7_200 -> 10_000 (nullifier: 9 days)
 //   path gas: measured NullShard 16816 + RecordShard 7697 gas (~1.6M nanoTON) + 2 fwd fees, with margin
 const NS_RECORD_ENDOWMENT: Int = 200000;        // stays on the RecordShard as the record's 1-year storage endowment
+const NS_INTRO_ENDOWMENT: Int = 8000;           // stays on the IntroShard (measured 4 cells x 64962 x 7/365 x 1.5 -> 7500)
 const NS_RECORD_GAS: Int = 2500000;             // the RecordShard's OWN compute (~1.6M measured) — the recipient pays gas
                                                 //   from the message value, so the forward must carry endowment + this
 const NS_NULLIFIER_ENDOWMENT: Int = 10000;      // this shard keeps this per burnt nullifier (9-day rent)
@@ -93,9 +95,15 @@ message(0x4E535032) NullifierSpend {            // "NSP2"
     valid_to: Int as uint32;
     root_idx_a: Int as uint8;
     root_idx_b: Int as uint8;
-    // where the record goes (increment 3): the conversation-direction bucket + the frame commitment
+    // lane discriminator (increment 6): 1 = CONV (record), 2 = INTRO (first contact, stealth)
+    kind: Int as uint8;
+    // CONV: where the record goes + its frame commitment. INTRO reuses frame_commit as the body commitment.
     bucket_key: Int as uint256;
     frame_commit: Int as uint256;
+    // INTRO: the sender-chosen (epoch, bucket) partition + the stealth fields (ignored for CONV)
+    intro_bucket: Int as uint32;
+    intro_r: Int as uint256;
+    intro_view_tag: Int as uint16;
     // signatures live in refs — three 512-bit sigs do not fit one cell
     issuer_sig: Cell;                           // subkey over the serial
     cert_sig_a: Cell;                           // root a over the cert digest
@@ -164,6 +172,7 @@ contract NullifierShard {
         // (1) wall-clock window — cheapest gate first, so a stale/absurd token is refused before any hashing or
         //     signature work (a cheap COMPUTE refusal stays bounceable).
         throwUnless(13600, (msg.epoch >= nowEpoch - NS_EPOCH_ACCEPT_PAST) && (msg.epoch <= nowEpoch + NS_EPOCH_ACCEPT_FUTURE));
+        throwUnless(13625, (msg.kind == 1) || (msg.kind == 2));   // known lane (cheap, before any crypto)
         // (2) THIS shard's epoch — the load-bearing gate the design list omitted.
         throwUnless(13621, msg.epoch == self.epoch);
 
@@ -209,16 +218,28 @@ contract NullifierShard {
         // funds and cannot fail in ACTION.
         nativeReserve(NS_BASE_ENDOWMENT + self.spent_count * NS_NULLIFIER_ENDOWMENT, ReserveAtMost);
 
-        // Forward the record to its RecordShard(bucket_key, epoch) with exactly its endowment. bounce:true — a
-        // refused record (RecordShard SAFE-CAP, effectively unreachable) returns the value here; the nullifier stays
-        // burnt (documented accepted residual, not compensated).
-        send(SendParameters{
-            to: contractAddress(initOf RecordShard(msg.bucket_key, self.epoch)),
-            value: NS_RECORD_ENDOWMENT + NS_RECORD_GAS,
-            mode: SendPayGasSeparately,
-            bounce: true,
-            body: RecordStore{ serial: serial, frame_commit: msg.frame_commit }.toCell(),
-        });
+        // Forward to the lane's shard with its endowment. Both cases carry a bounce (a SAFE-CAP refusal at the
+        // target is effectively unreachable; if it bounces, the value returns and the nullifier stays burnt — a
+        // documented accepted residual). The value was gated in COMPUTE (13624) so this send cannot fail in ACTION.
+        if (msg.kind == 1) {
+            // CONV -> RecordShard(bucket_key, epoch)
+            send(SendParameters{
+                to: contractAddress(initOf RecordShard(msg.bucket_key, self.epoch)),
+                value: NS_RECORD_ENDOWMENT + NS_RECORD_GAS,
+                mode: SendPayGasSeparately,
+                bounce: true,
+                body: RecordStore{ serial: serial, frame_commit: msg.frame_commit }.toCell(),
+            });
+        } else {
+            // INTRO -> IntroShard(epoch, intro_bucket). frame_commit doubles as the intro body commitment.
+            send(SendParameters{
+                to: contractAddress(initOf IntroShard(self.epoch, msg.intro_bucket)),
+                value: NS_INTRO_ENDOWMENT + NS_RECORD_GAS,
+                mode: SendPayGasSeparately,
+                bounce: true,
+                body: IntroStore{ serial: serial, r: msg.intro_r, view_tag: msg.intro_view_tag, body_commit: msg.frame_commit }.toCell(),
+            });
+        }
 
         // Return the relay's excess: whatever remains after the reserve and the record forward. A message to an
         // existing wallet cannot fail here, so this stays within the ACTION-can't-fail guarantee.
@@ -231,6 +252,7 @@ contract NullifierShard {
     }
 
     bounced(_: bounced<RecordStore>) {}   // accepted residual: value returns, nullifier stays burnt (see above)
+    bounced(_: bounced<IntroStore>) {}    // same accepted residual for the INTRO lane
 
     receive() {}   // plain top-up / lazy deploy carrier
 

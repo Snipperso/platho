@@ -215,11 +215,19 @@ PROGRAM{
     CTOS
     LDDICT
     DROP
+    DUP
     34652 PUSHINT
     __tact_dict_get_code INLINECALLDICT
     NEWDICT
     52655 PUSHINT
     MYCODE
+    __tact_dict_set_code INLINECALLDICT
+    s0 s2 XCHG
+    54285 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    s1 s2 XCHG
+    54285 PUSHINT
+    SWAP
     __tact_dict_set_code INLINECALLDICT
     NEWC
     SWAP

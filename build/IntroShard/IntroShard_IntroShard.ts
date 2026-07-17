@@ -1557,32 +1557,32 @@ export function dictValueParserIntroShard$Data(): DictionaryValue<IntroShard$Dat
     }
 }
 
- type NullifierShard_init_args = {
-    $$type: 'NullifierShard_init_args';
+ type IntroShard_init_args = {
+    $$type: 'IntroShard_init_args';
     epoch: bigint;
-    lane: bigint;
+    bucket: bigint;
 }
 
-function initNullifierShard_init_args(src: NullifierShard_init_args) {
+function initIntroShard_init_args(src: IntroShard_init_args) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeInt(src.epoch, 257);
-        b_0.storeInt(src.lane, 257);
+        b_0.storeInt(src.bucket, 257);
     };
 }
 
-async function NullifierShard_init(epoch: bigint, lane: bigint) {
-    const __code = Cell.fromHex('b5ee9c72410218010005d9000114ff00f4a413f4bcf2c80b01020162021203d8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205e3027024d74920c21f953104d31f05de2182104e535032bae30235c00004c12114b0e3025f04f2c08203041100be038020d7217021d749c21f9430d31f309131e220821052535031ba8e1b304003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e0821049535032ba8e1a4003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e05f0402fe5b03d3ffd31fd33fd3ffd31fd31fd307d307d307d3ffd430d0d3ffd31fd3ffd30fd4d4d430f82382015180a90481352021a6fc561201be9701a604561101bb923170e2f2f481353929c001917f9329c002e2f2f481353556105614baf2f4051112050411110403111303021114020111100152ffdb3c81353621a9381325ba05060028c882104253493101cb1f13cbffcb1fcb3fc9f90004dcf2f481353e53fcbe9351fbbb923f70e21ff2f48135442b810226a052b0bbf2f481353f5398b9f2f4550308db3c07db3c8135405381bdf2f4104510344130544bbadb3c8135410ed0544118f9101df2f48135420ad04508f91018f2f48135210dd0544817f9101cf2f410344aa6250707080900f081354321c103f2f4208e233082f0884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0be1c0018e2282f0a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0e082f074f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa90028c882104341433101cb1f13cbffcb1fcb1fc9f90004fedb3c8135242381010123714133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f4813538f8416f24135f03820875a530bef2f412810101017f71216e955b59f45a3098c801cf004133f442e201a482080f424021812710a8a072fb0204c001e30ff8427081008270136d6d50436d03c8cf8580ca00cf8440ce01170a0c1002f63636365165db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d082082932e071037f05c8598210525350315003cb1fcbffcbffc944301210246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901fb000b0e00a4f843d0f40430208200cdaf018010f40f6fa1f2e0876d8200875cf82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c903fc395217db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d00382082644e07150797f07c855308210495350325005cb1f13cbffcbffcb0fcbffc910341035475010246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae20d0e0f00a4f843d0f40430208200d40d018010f40f6fa1f2e0876d8200875cf82a028010f417028200cdaf018010f40f6fa1f2e087128200cdaf01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c9001a58cf8680cf8480f400f400cf810010f400c901fb004013007efa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005502c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5402012013150161bd4a976a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3623c14001c8313830b722651365135038102260165bf524f6a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c16014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb344301217001ec88210424e4c3101cb1fcbffc9f90080f267f9');
+async function IntroShard_init(epoch: bigint, bucket: bigint) {
+    const __code = Cell.fromHex('b5ee9c7241021001000386000114ff00f4a413f4bcf2c80b01020162020b04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200018e10d31fd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821049535032bae30221821049535033bae30237c00006c12116b0e3025f060306090a02f65b05d3ffd3ffd30fd3ff3003a93813813571f8425293db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d012c705f2f481357028811f40b9f2f4810101f82314c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc922103401040500a4f843d0f40430208200875c018010f40f6fa1f2e0876d028200cdaf018010f40f6fa1f2e087128200cdaf01028010f4178200d40df82a028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90066206e953059f45a30944133f415e201a404a410354403c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed5402d05b05d30f30708e115301b99320c1409170e2935372b99170e28ec7238101012959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206eb3973007a410670306e30d10371036e85b10355512070800ba6f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e229103601206e953059f45a30944133f415e206a507a403a496302010671036e2003ac8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed54004210355512c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed540006f2c0820202710c0e016fb254bb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038b6cf1b19e00d00248208093a80811f40275447302554473026590173b23dbb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038954176cf1b19600f008a810101250259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f5530ff3070af');
     const builder = beginCell();
-    const __system = Cell.fromHex('b5ee9c72410220010005b6000101c001020276020f0105b36be0030114ff00f4a413f4bcf2c80b04020162050a02dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd3ffd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de21821052535031bae30235c00004c12114b0e3025f04f2c082060902da5b03d3ffd3ff3001a938135220db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0813552f84258c705f2f481355325830bb9f2f4810101201035544633216e955b59f45a3098c801cf004133f442e203a413070800a4f843d0f40430208200875c018010f40f6fa1f2e0876d8200cdaff82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90030c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed540201200b0d0161bd4a976a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3622c0c00148313830b2554453024590165be200f6a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e362140e003e810101530350334133f40c6fa19401d70030925b6de2206e93307070e07f010105b10360100114ff00f4a413f4bcf2c80b11020162121b04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200018e10d31fd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821049535032bae30221821049535033bae30237c00006c12116b0e3025f061316191a02f65b05d3ffd3ffd30fd3ff3003a93813813571f8425293db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d012c705f2f481357028811f40b9f2f4810101f82314c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc922103401141500a4f843d0f40430208200875c018010f40f6fa1f2e0876d028200cdaf018010f40f6fa1f2e087128200cdaf01028010f4178200d40df82a028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90066206e953059f45a30944133f415e201a404a410354403c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed5402d05b05d30f30708e115301b99320c1409170e2935372b99170e28ec7238101012959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206eb3973007a410670306e30d10371036e85b10355512171800ba6f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e229103601206e953059f45a30944133f415e206a507a403a496302010671036e2003ac8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed54004210355512c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed540006f2c0820202711c1e016fb254bb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038b6cf1b19e01d00248208093a80811f40275447302554473026590173b23dbb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038954176cf1b19601f008a810101250259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f55302c2ce726');
+    const __system = Cell.fromHex('b5ee9c7241022801000809000101c001020158021b0105b875c8030114ff00f4a413f4bcf2c80b04020162051503d8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205e3027024d74920c21f953104d31f05de2182104e535032bae30235c00004c12114b0e3025f04f2c08206071400be038020d7217021d749c21f9430d31f309131e220821052535031ba8e1b304003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e0821049535032ba8e1a4003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e05f0402fe5b03d3ffd31fd33fd3ffd31fd31fd307d307d307d3ffd430d0d3ffd31fd3ffd30fd4d4d430f82382015180a90481352021a6fc561201be9701a604561101bb923170e2f2f481353929c001917f9329c002e2f2f481353556105614baf2f4051112050411110403111303021114020111100152ffdb3c81353621a9381325ba08090028c882104253493101cb1f13cbffcb1fcb3fc9f90004dcf2f481353e53fcbe9351fbbb923f70e21ff2f48135442b810226a052b0bbf2f481353f5398b9f2f4550308db3c07db3c8135405381bdf2f4104510344130544bbadb3c8135410ed0544118f9101df2f48135420ad04508f91018f2f48135210dd0544817f9101cf2f410344aa6250a0a0b0c00f081354321c103f2f4208e233082f0884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0be1c0018e2282f0a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0e082f074f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa90028c882104341433101cb1f13cbffcb1fcb1fc9f90004fedb3c8135242381010123714133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f4813538f8416f24135f03820875a530bef2f412810101017f71216e955b59f45a3098c801cf004133f442e201a482080f424021812710a8a072fb0204c001e30ff8427081008270136d6d50436d03c8cf8580ca00cf8440ce011a0d0f1302f63636365165db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d082082932e071037f05c8598210525350315003cb1fcbffcbffc944301210246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901fb000e1100a4f843d0f40430208200cdaf018010f40f6fa1f2e0876d8200875cf82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c903fc395217db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d00382082644e07150797f07c855308210495350325005cb1f13cbffcbffcb0fcbffc910341035475010246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae210111200a4f843d0f40430208200d40d018010f40f6fa1f2e0876d8200875cf82a028010f417028200cdaf018010f40f6fa1f2e087128200cdaf01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c9001a58cf8680cf8480f400f400cf810010f400c901fb004013007efa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005502c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5402012016180161bd4a976a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3623c17001c8313830b722651365135038102260165bf524f6a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c19014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb34430121a001ec88210424e4c3101cb1fcbffc9f9000105b8daf81c0114ff00f4a413f4bcf2c80b1d0201621e2302dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd3ffd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de21821052535031bae30235c00004c12114b0e3025f04f2c0821f2202da5b03d3ffd3ff3001a938135220db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0813552f84258c705f2f481355325830bb9f2f4810101201035544633216e955b59f45a3098c801cf004133f442e203a413202100a4f843d0f40430208200875c018010f40f6fa1f2e0876d8200cdaff82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90030c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed5402012024260161bd4a976a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3622c2500148313830b2554453024590165be200f6a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3621427003e810101530350334133f40c6fa19401d70030925b6de2206e93307070e07f011d5e0810');
     builder.storeRef(__system);
     builder.storeUint(0, 1);
-    initNullifierShard_init_args({ $$type: 'NullifierShard_init_args', epoch, lane })(builder);
+    initIntroShard_init_args({ $$type: 'IntroShard_init_args', epoch, bucket })(builder);
     const __data = builder.endCell();
     return { code: __code, data: __data };
 }
 
-export const NullifierShard_errors = {
+export const IntroShard_errors = {
     2: { message: "Stack underflow" },
     3: { message: "Stack overflow" },
     4: { message: "Integer overflow" },
@@ -1621,7 +1621,7 @@ export const NullifierShard_errors = {
     138: { message: "Not a basechain address" },
 } as const
 
-export const NullifierShard_errors_backward = {
+export const IntroShard_errors_backward = {
     "Stack underflow": 2,
     "Stack overflow": 3,
     "Integer overflow": 4,
@@ -1660,7 +1660,7 @@ export const NullifierShard_errors_backward = {
     "Not a basechain address": 138,
 } as const
 
-const NullifierShard_types: ABIType[] = [
+const IntroShard_types: ABIType[] = [
     {"name":"DataSize","header":null,"fields":[{"name":"cells","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bits","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"refs","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"SignedBundle","header":null,"fields":[{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signedData","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"StateInit","header":null,"fields":[{"name":"code","type":{"kind":"simple","type":"cell","optional":false}},{"name":"data","type":{"kind":"simple","type":"cell","optional":false}}]},
@@ -1686,25 +1686,26 @@ const NullifierShard_types: ABIType[] = [
     {"name":"IntroShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"bucket","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"intros","type":{"kind":"dict","key":"int","value":"IntroEntry","valueFormat":"ref"}},{"name":"next_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
 
-const NullifierShard_opcodes = {
+const IntroShard_opcodes = {
     "NullifierSpend": 1314082866,
     "RecordStore": 1381191729,
     "IntroStore": 1230196786,
     "EvictIntros": 1230196787,
 }
 
-const NullifierShard_getters: ABIGetter[] = [
-    {"name":"get_view","methodId":76114,"arguments":[],"returnType":{"kind":"simple","type":"NullifierShardView","optional":false}},
-    {"name":"is_spent","methodId":125513,"arguments":[{"name":"serial","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"bool","optional":false}},
+const IntroShard_getters: ABIGetter[] = [
+    {"name":"get_entry","methodId":80118,"arguments":[{"name":"entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"IntroEntryView","optional":false}},
+    {"name":"get_view","methodId":76114,"arguments":[],"returnType":{"kind":"simple","type":"IntroShardView","optional":false}},
 ]
 
-export const NullifierShard_getterMapping: { [key: string]: string } = {
+export const IntroShard_getterMapping: { [key: string]: string } = {
+    'get_entry': 'getGetEntry',
     'get_view': 'getGetView',
-    'is_spent': 'getIsSpent',
 }
 
-const NullifierShard_receivers: ABIReceiver[] = [
-    {"receiver":"internal","message":{"kind":"typed","type":"NullifierSpend"}},
+const IntroShard_receivers: ABIReceiver[] = [
+    {"receiver":"internal","message":{"kind":"typed","type":"IntroStore"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"EvictIntros"}},
     {"receiver":"internal","message":{"kind":"empty"}},
 ]
 
@@ -1735,33 +1736,33 @@ export const IS_INTRO_RETENTION = 604800n;
 export const IS_SAFE_CAP = 8000n;
 export const IS_EVICT_CAP = 64n;
 
-export class NullifierShard implements Contract {
+export class IntroShard implements Contract {
     
     public static readonly storageReserve = 0n;
-    public static readonly errors = NullifierShard_errors_backward;
-    public static readonly opcodes = NullifierShard_opcodes;
+    public static readonly errors = IntroShard_errors_backward;
+    public static readonly opcodes = IntroShard_opcodes;
     
-    static async init(epoch: bigint, lane: bigint) {
-        return await NullifierShard_init(epoch, lane);
+    static async init(epoch: bigint, bucket: bigint) {
+        return await IntroShard_init(epoch, bucket);
     }
     
-    static async fromInit(epoch: bigint, lane: bigint) {
-        const __gen_init = await NullifierShard_init(epoch, lane);
+    static async fromInit(epoch: bigint, bucket: bigint) {
+        const __gen_init = await IntroShard_init(epoch, bucket);
         const address = contractAddress(0, __gen_init);
-        return new NullifierShard(address, __gen_init);
+        return new IntroShard(address, __gen_init);
     }
     
     static fromAddress(address: Address) {
-        return new NullifierShard(address);
+        return new IntroShard(address);
     }
     
     readonly address: Address; 
     readonly init?: { code: Cell, data: Cell };
     readonly abi: ContractABI = {
-        types:  NullifierShard_types,
-        getters: NullifierShard_getters,
-        receivers: NullifierShard_receivers,
-        errors: NullifierShard_errors,
+        types:  IntroShard_types,
+        getters: IntroShard_getters,
+        receivers: IntroShard_receivers,
+        errors: IntroShard_errors,
     };
     
     constructor(address: Address, init?: { code: Cell, data: Cell }) {
@@ -1769,11 +1770,14 @@ export class NullifierShard implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: NullifierSpend | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: IntroStore | EvictIntros | null) {
         
         let body: Cell | null = null;
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'NullifierSpend') {
-            body = beginCell().store(storeNullifierSpend(message)).endCell();
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'IntroStore') {
+            body = beginCell().store(storeIntroStore(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'EvictIntros') {
+            body = beginCell().store(storeEvictIntros(message)).endCell();
         }
         if (message === null) {
             body = new Cell();
@@ -1784,18 +1788,18 @@ export class NullifierShard implements Contract {
         
     }
     
-    async getGetView(provider: ContractProvider) {
+    async getGetEntry(provider: ContractProvider, entry_id: bigint) {
         const builder = new TupleBuilder();
-        const source = (await provider.get('get_view', builder.build())).stack;
-        const result = loadGetterTupleNullifierShardView(source);
+        builder.writeNumber(entry_id);
+        const source = (await provider.get('get_entry', builder.build())).stack;
+        const result = loadGetterTupleIntroEntryView(source);
         return result;
     }
     
-    async getIsSpent(provider: ContractProvider, serial: bigint) {
+    async getGetView(provider: ContractProvider) {
         const builder = new TupleBuilder();
-        builder.writeNumber(serial);
-        const source = (await provider.get('is_spent', builder.build())).stack;
-        const result = source.readBoolean();
+        const source = (await provider.get('get_view', builder.build())).stack;
+        const result = loadGetterTupleIntroShardView(source);
         return result;
     }
     

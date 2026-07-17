@@ -2,7 +2,7 @@
 #pragma allow-post-modification;
 #pragma compute-asm-ltr;
 
-;; RecordShard_NullifierShard.headers.fc
+;; IntroShard_NullifierShard.headers.fc
 ;;
 ;; Header files for NullifierShard
 ;; NOTE: declarations are sorted for optimal order
@@ -126,7 +126,7 @@ slice $global_contractAddress((cell, cell) $s) impure inline;
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
 
 
-;; RecordShard_NullifierShard.stdlib.fc
+;; IntroShard_NullifierShard.stdlib.fc
 global (int, slice, int, slice) __tact_context;
 global slice __tact_context_sender;
 global cell __tact_child_contract_codes;
@@ -313,7 +313,7 @@ int $Cell$_fun_hash(cell $self) impure asm """
     HASHCU
 """;
 
-;; RecordShard_NullifierShard.storage.fc
+;; IntroShard_NullifierShard.storage.fc
 ;;
 ;; Type: Context
 ;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
