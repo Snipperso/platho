@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { incomingRecordShards, outgoingRecordShard, selfRecoveryShard } from '../web/conv-discovery.mjs';
-import { addrKey } from '../web/shard-discovery.mjs';
+import { addrKey, recoveryOwnerSlotKey } from '../web/shard-discovery.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // CONV-DISCOVERY — A writes into exactly the shard B reads. The delivery correctness of the sharded CONV lane.
@@ -45,13 +45,18 @@ describe('CONV-DISCOVERY — A publishes where B reads', () => {
     expect(addrKey(a.address)).toBe(addrKey(b.address));
   });
 
-  it('CONV-DISC-04: the self-recovery shard is deterministic from the seed (found in one lookup after reinstall)', async () => {
+  it('CONV-DISC-04: the self-recovery shard is deterministic AND commits to the owner key (squat-close binding)', async () => {
     const seed = new Uint8Array(32).fill(0x99);
     const r1 = await selfRecoveryShard(seed);
     const r2 = await selfRecoveryShard(seed);
     expect(addrKey(r1.address)).toBe(addrKey(r2.address));
-    // a different seed -> a different recovery shard
+    // the slot IS the owner key: self_bucket_key == H(RS_SLOT_DOMAIN ‖ owner_pubkey). This is exactly what makes the
+    // slot bindable only by the seed-holder (gate 13575) — a reinstalled client re-derives the same owner key and
+    // finds its slot in one lookup, but no one else can name it.
+    expect(r1.slotKey).toBe(recoveryOwnerSlotKey(r1.ownerPublicKey));
+    // a different seed -> a different owner key -> a different recovery shard
     const other = await selfRecoveryShard(new Uint8Array(32).fill(0x98));
     expect(addrKey(r1.address)).not.toBe(addrKey(other.address));
+    expect(r1.slotKey).not.toBe(other.slotKey);
   });
 });

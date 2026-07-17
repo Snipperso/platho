@@ -38,6 +38,9 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 ;; $RecoveryShard$_contract_store
 () $RecoveryShard$_contract_store((int, int, int, int, int, int, int, cell, int) v) impure inline;
 
+;; $RecoveryShard$_fun_slotKeyForOwner
+((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_slotKeyForOwner((int, int, int, int, int, int, int, cell, int) $self, int $ownerPubkey) impure inline_ref;
+
 ;; $RecoveryShard$_fun_recoveryDigest
 ((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_recoveryDigest((int, int, int, int, int, int, int, cell, int) $self, int $seq, int $h0, int $h1, int $bh) impure inline_ref;
 
@@ -291,22 +294,28 @@ builder $RecoveryShard$_store(builder build_0, (int, int, int, int, int, int, in
     return ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at);
 }
 
+((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_slotKeyForOwner((int, int, int, int, int, int, int, cell, int) $self, int $ownerPubkey) impure inline_ref {
+    var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
+    var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1381190731, 32), $ownerPubkey, 256)));
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_0);
+}
+
 ((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_recoveryDigest((int, int, int, int, int, int, int, cell, int) $self, int $seq, int $h0, int $h1, int $bh) impure inline_ref {
     var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
-    var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), $h0, 256), $h1, 256), $bh, 256)), store_uint(store_uint(store_uint($global_beginCell(), 1112691505, 32), $self'self_bucket_key, 256), $seq, 64))));
-    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_0);
+    var $fresh$ret_1 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), $h0, 256), $h1, 256), $bh, 256)), store_uint(store_uint(store_uint($global_beginCell(), 1112691505, 32), $self'self_bucket_key, 256), $seq, 64))));
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_1);
 }
 
 ((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
     var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
-    var $fresh$ret_1 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 23200000);
-    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_1);
+    var $fresh$ret_2 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 23200000);
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_2);
 }
 
 ((int, int, int, int, int, int, int, cell, int), cell) $RecoveryShard$_fun_get_body((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
     var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
-    var $fresh$ret_2 = $self'body;
-    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_2);
+    var $fresh$ret_3 = $self'body;
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_3);
 }
 
 ;;
@@ -368,6 +377,7 @@ _ %get_body() method_id(104539) {
         throw_unless(13572, ($Context$_get_value(__tact_context_get()) >= 31200000));
         ifnot ($self'bound) {
             throw_unless(13573, ($msg'seq >= 1));
+            throw_unless(13575, ($self'self_bucket_key == ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)~$RecoveryShard$_fun_slotKeyForOwner($msg'owner_pubkey)));
             $self'bound = true;
             $self'owner_pubkey = $msg'owner_pubkey;
         } else {

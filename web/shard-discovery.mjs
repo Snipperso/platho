@@ -14,7 +14,7 @@
 // agnostic: it returns Addresses; the caller reads them with whatever toncenter/indexer transport it already uses
 // (see web/capsulehub-ton-rpc-provider.mjs). Browser bundling transpiles the imported wrappers.
 
-import { Address, contractAddress } from '@ton/core';
+import { Address, beginCell, contractAddress } from '@ton/core';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
@@ -27,6 +27,20 @@ export const EPOCH_SECONDS = 86400;
 
 export const laneOf = (serial) => BigInt(serial) % LANE_COUNT;
 export const epochOf = (unixSeconds) => Math.floor(unixSeconds / EPOCH_SECONDS);
+
+// MUST equal RS_SLOT_DOMAIN in RecoveryShard.tact ("RSLK"). The recovery slot IS the owner key.
+const RECOVERY_SLOT_DOMAIN = 0x52534C4Bn;
+const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
+
+/**
+ * The RecoveryShard self_bucket_key that commits to an owner pubkey: H(RS_SLOT_DOMAIN ‖ owner_pubkey) as a uint256,
+ * mirroring RecoveryShard.slotKeyForOwner. Binding the slot to the key is what closes the post-eviction squat
+ * (gate 13575) — only the seed-holder who derived owner_pubkey can name this address.
+ */
+export function recoveryOwnerSlotKey(ownerPublicKey) {
+  const pub = typeof ownerPublicKey === 'bigint' ? ownerPublicKey : bytesToBig(ownerPublicKey);
+  return BigInt('0x' + beginCell().storeUint(RECOVERY_SLOT_DOMAIN, 32).storeUint(pub, 256).endCell().hash().toString('hex'));
+}
 
 /** Address of the CONV record shard for a conversation-direction bucket on a given day-epoch. */
 export async function recordShardAddress(bucketKey, epoch) {

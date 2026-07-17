@@ -19,7 +19,7 @@
 // directional bucket has exactly one visible publisher; both sides derive the SAME keyId ordering from the same Vault
 // bundle, so a lo/hi disagreement is a hard audit-invariant failure (would silently lose messages).
 
-import { x25519 } from '../vendor/@noble/curves/ed25519.js';
+import { x25519, ed25519 } from '../vendor/@noble/curves/ed25519.js';
 import { ml_kem768 } from '../vendor/@noble/post-quantum/ml-kem.js';
 
 // ---- FROZEN domain-separation strings (audit-critical: changing any orphans all previously routed messages) ----
@@ -27,6 +27,8 @@ export const CONV_ROOT_SALT_DOMAIN = 'PLATHO.CONV.ROOT.SALT.V1';
 export const CONV_ROOT_INFO_DOMAIN = 'PLATHO.CONV.ROOT.V1';
 export const CONV_ROOT_SELF_SALT_DOMAIN = 'PLATHO.CONV.ROOT.SELF.SALT.V1';
 export const CONV_ROOT_SELF_INFO_DOMAIN = 'PLATHO.CONV.ROOT.SELF.V1';
+export const RECOVERY_OWNER_SALT_DOMAIN = 'PLATHO.RECOVERY.OWNER.SALT.V1';
+export const RECOVERY_OWNER_INFO_DOMAIN = 'PLATHO.RECOVERY.OWNER.V1';
 export const CONV_RATCHET_SALT_DOMAIN = 'PLATHO.CONV.RATCHET.SALT.V1';
 export const CONV_RATCHET_INFO_DOMAIN = 'PLATHO.CONV.RATCHET.V1';
 export const CONV_BUCKET_SALT_DOMAIN = 'PLATHO.CONV.BUCKET.SALT.V1';
@@ -277,4 +279,18 @@ export async function selfRecoveryBucketKey(seed) {
   const kRootSelf = await computeConvKRootSelf(seed);
   const kEpochSelf0 = await computeKEpoch(kRootSelf, CONV_SELF_EPOCH_SENTINEL);
   return computeBucketKey(kEpochSelf0, CONV_DIR_LO_TO_HI, CONV_SELF_EPOCH_SENTINEL);
+}
+
+// ---- recovery-lane owner key (§12 durability): the RecoveryShard slot address COMMITS to this pubkey ----
+// The RecoveryShard is a distinct lane from the CONV self-capsule above. Its slot key is NOT the CONV bucketKey — it
+// is self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey) (see shard-discovery.recoveryOwnerSlotKey). That binding is
+// the squat-close gate 13575: only the holder of the seed that derives owner_pubkey can name — hence bind — the
+// slot, even after a 3-year eviction frees it. Deterministic from the seed so a reinstalled client re-derives the
+// same signing key; the recovery publish signs owner_sig with recoveryOwnerSecret.
+export async function recoveryOwnerSecret(seed) {
+  return hkdf256(assertBytes('seed', seed), utf8(RECOVERY_OWNER_SALT_DOMAIN), utf8(RECOVERY_OWNER_INFO_DOMAIN), 32);
+}
+
+export async function recoveryOwnerPublicKey(seed) {
+  return ed25519.getPublicKey(await recoveryOwnerSecret(seed));
 }

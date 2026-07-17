@@ -10,6 +10,7 @@ PROGRAM{
   DECLPROC $RecoveryShard$_contract_init
   DECLPROC $RecoveryShard$_contract_load
   DECLPROC $RecoveryShard$_contract_store
+  DECLPROC $RecoveryShard$_fun_slotKeyForOwner
   DECLPROC $RecoveryShard$_fun_recoveryDigest
   DECLPROC $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment
   DECLPROC $RecoveryShard$_fun_get_view
@@ -113,6 +114,15 @@ PROGRAM{
     $RecoveryShard$_store INLINECALLDICT
     ENDC
     c4 POP
+  }>
+  $RecoveryShard$_fun_slotKeyForOwner PROCREF:<{
+        NEWC
+    1381190731 PUSHINT
+    SWAP
+    32 STU
+    256 STU
+        ENDC
+        HASHCU
   }>
   $RecoveryShard$_fun_recoveryDigest PROCREF:<{
         NEWC
@@ -250,15 +260,42 @@ PROGRAM{
         GREATER
         THROWANYIFNOT
       }>ELSE<{
-        s11 POP
-        s11 POP
         13573 PUSHINT
-        s4 PUSH
+        s6 PUSH
         0 GTINT
         THROWANYIFNOT
+        13575 PUSHINT
+        s14 PUSH
+        s8 s15 XCHG
+        s7 s14 XCHG
+        s6 s13 XCHG
+        s5 s12 XCHG
+        s4 s11 XCHG
+        s3 s10 XCHG
+        s2 s9 XCHG
+        s1 16 s() XCHG
+        s0 17 s() XCHG
+        s15 PUSH
+        $RecoveryShard$_fun_slotKeyForOwner INLINECALLDICT
+        s7 POP
+        s7 POP
+        s1 16 s() XCHG
+        s0 s5 XCHG
+        EQUAL
+        s1 s14 XCHG
+        THROWANYIFNOT
+        s3 s13 XCHG
+        s2 s12 XCHG
+        s4 s11 XCHG
         TRUE
         s0 s11 XCHG
         s5 s10 XCHG
+        s9 s8 s0 XCHG3
+        s3 s7 XCHG
+        s0 s4 XCHG
+        s0 s6 XCHG
+        s0 s5 XCHG
+        s0 s3 XCHG
       }>
       s7 s12 XCHG
       s6 s11 XCHG

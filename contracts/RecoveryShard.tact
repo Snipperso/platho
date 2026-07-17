@@ -22,6 +22,7 @@
 // surface: an overwrite reuses the slot (no growth); a new bind adds one blob, gated in COMPUTE.
 
 const RS_RECOVERY_DOMAIN: Int = 0x42525331;       // "BRS1" — recovery digest preimage, MUST mirror CapsuleHub.tact
+const RS_SLOT_DOMAIN: Int = 0x52534C4B;           // "RSLK" — the slot IS the owner key: self_bucket_key = H(this ‖ owner_pubkey)
 const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15); permissionless evict after updated_at + this
 const RS_RECOVERY_ENDOWMENT: Int = 23200000;      // 79 cells (8K cap) x 64962 x 3yr x 1.5 — mirrors the monolith's measured value
 const RS_RECOVERY_PATH_GAS: Int = 8000000;        // compute + change-return, with margin (the blob store is the heavy part)
@@ -74,6 +75,12 @@ contract RecoveryShard {
 
     // digest = H(RECOVERY_DOMAIN ‖ self_bucket_key ‖ seq ‖ h0 ‖ h1 ‖ bh). Binds the signature to THIS slot, THIS
     // seq, and THIS frame — so a signed publish cannot be replayed into a different slot, reordered, or downgraded.
+    // [SQUAT-CLOSE] The slot's identity IS the owner key. self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey), so
+    // only the holder of the seed that derives owner_pubkey can name (hence bind) this address.
+    fun slotKeyForOwner(ownerPubkey: Int): Int {
+        return beginCell().storeUint(RS_SLOT_DOMAIN, 32).storeUint(ownerPubkey, 256).endCell().hash();
+    }
+
     fun recoveryDigest(seq: Int, h0: Int, h1: Int, bh: Int): Int {
         return beginCell()
             .storeUint(RS_RECOVERY_DOMAIN, 32)
@@ -92,6 +99,11 @@ contract RecoveryShard {
         if (!self.bound) {
             // First publish binds the owner. seq must be positive so a later rollback has no seq=0 floor to abuse.
             throwUnless(13573, msg.seq >= 1);
+            // [SQUAT-CLOSE] the first binding is SELF-AUTHENTICATING: this slot's address commits to owner_pubkey, so
+            // a squatter re-binding an evicted (or fresh) slot would need a hash preimage of the victim's
+            // self_bucket_key — infeasible. Anti-hijack no longer rests on "first writer wins": ONLY the owner key
+            // that names the slot can bind it, even after a 3-year eviction frees it.
+            throwUnless(13575, self.self_bucket_key == self.slotKeyForOwner(msg.owner_pubkey));
             self.bound = true;
             self.owner_pubkey = msg.owner_pubkey;
         } else {

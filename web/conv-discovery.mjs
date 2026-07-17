@@ -7,8 +7,8 @@
 // key-ids (outgoingDir for A == incomingDir for B), and the RecordShard address is a pure function of (bucketKey,
 // epoch). So delivery works with no directory — proven in tests/conv-discovery.test.ts.
 
-import { outgoingBucketKey, incomingBucketKeys, selfRecoveryBucketKey } from './crypto/conv-routing.mjs';
-import { recordShardAddress, recoveryShardAddress } from './shard-discovery.mjs';
+import { outgoingBucketKey, incomingBucketKeys, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs';
+import { recordShardAddress, recoveryShardAddress, recoveryOwnerSlotKey } from './shard-discovery.mjs';
 
 // Portable big-endian bytes -> bigint (the on-chain bucket_key is a uint256 = the 32 HKDF bytes, big-endian).
 const bytesToInt = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
@@ -32,8 +32,13 @@ export async function outgoingRecordShard({ kRoot, selfKeyId, peerKeyId, created
   return { epoch, dir, bucketKey, address: await recordShardAddress(bytesToInt(bucketKey), epoch) };
 }
 
-/** The RecoveryShard address for a user's own self-recovery snapshot, derived from the mnemonic seed (epoch-0 sentinel). */
+/**
+ * The RecoveryShard address for a user's own self-recovery snapshot, derived from the mnemonic seed. The slot COMMITS
+ * to the recovery owner key (self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey)), so only the seed-holder can bind it
+ * — the squat-close (gate 13575). Returns the owner pubkey (needed to sign the recovery publish) alongside the slot.
+ */
 export async function selfRecoveryShard(seed) {
-  const bucketKey = await selfRecoveryBucketKey(seed);
-  return { bucketKey, address: await recoveryShardAddress(bytesToInt(bucketKey)) };
+  const ownerPublicKey = await recoveryOwnerPublicKey(seed);
+  const slotKey = recoveryOwnerSlotKey(ownerPublicKey);
+  return { ownerPublicKey, slotKey, address: await recoveryShardAddress(slotKey) };
 }
