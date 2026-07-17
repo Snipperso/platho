@@ -20,6 +20,8 @@ import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 
 const ISSUER_SIG_DOMAIN = 0x42534931n; // "BSI1"
 const CERT_DOMAIN = 0x43414331n;       // "CAC1"
+const SPEND_DOMAIN = 0x42535031n;      // "BSP1" — spend digest, must match NS_SPEND_DOMAIN
+const FRAME_DOMAIN = 0x4E534652n;      // "NSFR" — frame-routing commitment, must match NS_FRAME_DOMAIN
 const LANE_COUNT = 1_048_576n;         // 2^20, must match NS_LANE_COUNT
 const EPOCH_SECONDS = 86400;
 
@@ -50,7 +52,27 @@ function makeCert(sk: KeyPair, validFrom: number, validTo: number, idxA = 0, idx
   };
 }
 
-// A full spend: token signed by `sk` (the subkey), plus the certificate authorizing `sk`.
+// The frame-binding digest the spend_sig signs — must mirror NullifierShard.frameBindingDigest byte-for-byte: an
+// inner commitment over EVERY routing/content field, then an outer hash tying it to the serial.
+function frameBindingDigest(
+  serial: bigint, kind: bigint, bucketKey: bigint, frameCommit: bigint, introBucket: bigint, introR: bigint, introViewTag: bigint,
+): Buffer {
+  const fc = bufToInt(beginCell()
+    .storeUint(FRAME_DOMAIN, 32)
+    .storeUint(kind, 8)
+    .storeUint(bucketKey, 256)
+    .storeUint(frameCommit, 256)
+    .storeUint(introBucket, 32)
+    .storeUint(introR, 256)
+    .storeUint(introViewTag, 16)
+    .endCell().hash());
+  return beginCell()
+    .storeUint(SPEND_DOMAIN, 32).storeUint(serial, 256).storeUint(fc, 256)
+    .endCell().hash();
+}
+
+// A full spend: token signed by `sk` (the subkey) authorizing WHICH token, the certificate authorizing `sk`, AND the
+// spend_sig by the SPEND key over the frame — the RT1-BLOCKER-1 binding of WHAT the token says (gate 13605).
 function buildSpend(opts: {
   spend: KeyPair; epoch: number; nonce: bigint; sk?: KeyPair;
   validFrom?: number; validTo?: number; idxA?: number; idxB?: number;
@@ -66,19 +88,27 @@ function buildSpend(opts: {
   const serial = bufToInt(serialBuf);
   const lane = serial % LANE_COUNT;
   const cert = makeCert(sk, opts.validFrom ?? opts.epoch - 3, opts.validTo ?? opts.epoch + 3, opts.idxA ?? 0, opts.idxB ?? 1);
+  const kind = opts.kind ?? 1n;
+  const bucketKey = opts.bucketKey ?? 0xB0CCE7n;
+  const frameCommit = opts.frameCommit ?? 0xF4A3En;
+  const introBucket = opts.introBucket ?? 0n;
+  const introR = opts.introR ?? 0n;
+  const introViewTag = opts.introViewTag ?? 0n;
+  const spendDigest = frameBindingDigest(serial, kind, bucketKey, frameCommit, introBucket, introR, introViewTag);
   const body = {
     $$type: 'NullifierSpend' as const,
     spend_pubkey: spendPub,
     epoch: BigInt(opts.epoch),
     nonce: opts.nonce,
     ...cert,
-    kind: opts.kind ?? 1n,
-    bucket_key: opts.bucketKey ?? 0xB0CCE7n,
-    frame_commit: opts.frameCommit ?? 0xF4A3En,
-    intro_bucket: opts.introBucket ?? 0n,
-    intro_r: opts.introR ?? 0n,
-    intro_view_tag: opts.introViewTag ?? 0n,
+    kind,
+    bucket_key: bucketKey,
+    frame_commit: frameCommit,
+    intro_bucket: introBucket,
+    intro_r: introR,
+    intro_view_tag: introViewTag,
     issuer_sig: sigCell(sign(serialBuf, sk.secretKey)),
+    spend_sig: sigCell(sign(spendDigest, opts.spend.secretKey)),
   };
   return { body, serial, lane };
 }
@@ -150,6 +180,36 @@ describe('NULLIFIER-SHARD — one token, one shard, one authority', () => {
     const { body, lane } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0x93)), epoch: farEpoch, nonce: 5n });
     const shard = await shardFor(farEpoch, lane);
     expect(computeExit(await shard.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, body as any), shard.address)).toBe(13600);
+  }, 120_000);
+
+  it('NS-06: [RT1-BLOCKER-1] altering ANY frame field after signing is refused (13605) — the token is NOT a bearer token', async () => {
+    // The exact attack the review found: a relay the user handed the token to (for anonymous publishing), or any
+    // observer who front-runs the token in transport, changes a routing/content field WITHOUT re-signing (they cannot
+    // — they lack the spend secret key). Every such swap must fail at 13605 BEFORE the nullifier is burnt, so the
+    // user's credit survives for a correct retry. Positive tests never catch this: buildSpend always signs the frame
+    // it sends, so only an explicit post-signing mutation exercises the gate.
+    const base = {
+      spend: keyPairFromSeed(Buffer.alloc(32, 0xC7)), epoch: nowEpoch,
+      kind: 2n, bucketKey: 0xC0DEn, frameCommit: 0xF00Dn, introBucket: 9n, introR: 0x1234n, introViewTag: 0x55n,
+    };
+    const mutations: Array<[string, (b: any) => any]> = [
+      ['bucket_key', (b) => ({ ...b, bucket_key: b.bucket_key + 1n })],       // CONV: misroute to the wrong RecordShard
+      ['frame_commit', (b) => ({ ...b, frame_commit: b.frame_commit ^ 0xffn })], // store a garbage record / intro body
+      ['kind', (b) => ({ ...b, kind: b.kind === 1n ? 2n : 1n })],             // cross-lane (CONV<->INTRO)
+      ['intro_bucket', (b) => ({ ...b, intro_bucket: b.intro_bucket + 1n })],
+      ['intro_r', (b) => ({ ...b, intro_r: b.intro_r + 1n })],                // INTRO: make the intro unscannable
+      ['intro_view_tag', (b) => ({ ...b, intro_view_tag: b.intro_view_tag ^ 1n })],
+    ];
+    for (let i = 0; i < mutations.length; i += 1) {
+      const [field, mutate] = mutations[i];
+      const built = buildSpend({ ...base, nonce: 100n + BigInt(i) });
+      const shard = await shardFor(nowEpoch, built.lane);
+      const tampered = mutate(built.body);
+      const res = await shard.send(relay.getSender(), { value: toNano('0.2'), bounce: true }, tampered as any);
+      expect(computeExit(res, shard.address), `${field} swap must hit 13605`).toBe(13605);
+      expect(didBounce(res), `${field} swap must bounce`).toBe(true);
+      expect(await shard.getIsSpent(built.serial), `${field}: nullifier NOT burnt on a rejected frame`).toBe(false);
+    }
   }, 120_000);
 
   // ── Increment 3: the forward to the RecordShard (the terminal hop) ─────────────────────────────────────────

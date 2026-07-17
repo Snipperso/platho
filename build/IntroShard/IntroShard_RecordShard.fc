@@ -412,17 +412,17 @@ builder $RecordShard$_store(builder build_0, (int, int, cell, int, int, int) v) 
     var (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)) = $self;
     tuple $e = $RecordEntry$_load_opt(__tact_dict_get_int_cell($self'records, 257, $entry_id));
     if (null?($e)) {
-        var $fresh$ret_22 = $CapsuleRecordView$_constructor_exists_frame_commit(false, 0);
-        return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_22);
+        var $fresh$ret_24 = $CapsuleRecordView$_constructor_exists_frame_commit(false, 0);
+        return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_24);
     }
-    var $fresh$ret_23 = $CapsuleRecordView$_constructor_exists_frame_commit(true, $RecordEntry$_get_frame_commit($RecordEntry$_not_null($e)));
-    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_23);
+    var $fresh$ret_25 = $CapsuleRecordView$_constructor_exists_frame_commit(true, $RecordEntry$_get_frame_commit($RecordEntry$_not_null($e)));
+    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_25);
 }
 
 ((int, int, cell, int, int, int), (int, int, int, int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, cell, int, int, int) $self) impure inline_ref {
     var (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)) = $self;
-    var $fresh$ret_24 = $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention($self'bucket_key, $self'epoch, $self'record_count, $self'live_count, $self'evict_cursor, 1048576, 4096, 31536000);
-    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_24);
+    var $fresh$ret_26 = $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention($self'bucket_key, $self'epoch, $self'record_count, $self'live_count, $self'evict_cursor, 1048576, 4096, 31536000);
+    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_26);
 }
 
 ;;

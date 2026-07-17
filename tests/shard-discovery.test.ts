@@ -22,11 +22,20 @@ import {
 
 const ISSUER_SIG_DOMAIN = 0x42534931n;
 const CERT_DOMAIN = 0x43414331n;
+const SPEND_DOMAIN = 0x42535031n;   // "BSP1"
+const FRAME_DOMAIN = 0x4E534652n;   // "NSFR"
 const RECOVERY_DOMAIN = 0x42525331n;
 const ROOTS = [0x21, 0x22, 0x23].map((s) => keyPairFromSeed(Buffer.alloc(32, s)));
 const subkey = keyPairFromSeed(Buffer.alloc(32, 0x30));
 const bufToInt = (b: Buffer): bigint => BigInt('0x' + b.toString('hex'));
 const sigCell = (b: Buffer) => beginCell().storeBuffer(b).endCell();
+
+// Mirror NullifierShard.frameBindingDigest: inner commit over all frame fields, outer hash over (serial, commit).
+function frameBindingDigest(serial: bigint, kind: bigint, bucketKey: bigint, frameCommit: bigint, introBucket: bigint, introR: bigint, introViewTag: bigint): Buffer {
+  const fc = bufToInt(beginCell().storeUint(FRAME_DOMAIN, 32).storeUint(kind, 8).storeUint(bucketKey, 256)
+    .storeUint(frameCommit, 256).storeUint(introBucket, 32).storeUint(introR, 256).storeUint(introViewTag, 16).endCell().hash());
+  return beginCell().storeUint(SPEND_DOMAIN, 32).storeUint(serial, 256).storeUint(fc, 256).endCell().hash();
+}
 
 function convSpend(spend: any, epoch: number, nonce: bigint, bucketKey: bigint, frameCommit: bigint) {
   const spendPub = bufToInt(spend.publicKey);
@@ -35,6 +44,7 @@ function convSpend(spend: any, epoch: number, nonce: bigint, bucketKey: bigint, 
   const serial = bufToInt(serialBuf);
   const cd = beginCell().storeUint(CERT_DOMAIN, 32).storeUint(bufToInt(subkey.publicKey), 256)
     .storeUint(BigInt(epoch - 3), 32).storeUint(BigInt(epoch + 3), 32).endCell().hash();
+  const spendDigest = frameBindingDigest(serial, 1n, bucketKey, frameCommit, 0n, 0n, 0n);
   return {
     serial,
     body: {
@@ -46,6 +56,7 @@ function convSpend(spend: any, epoch: number, nonce: bigint, bucketKey: bigint, 
       intro_bucket: 0n, intro_r: 0n, intro_view_tag: 0n,
       cert_sig_a: sigCell(sign(cd, ROOTS[0].secretKey)), cert_sig_b: sigCell(sign(cd, ROOTS[1].secretKey)),
       issuer_sig: sigCell(sign(serialBuf, subkey.secretKey)),
+      spend_sig: sigCell(sign(spendDigest, spend.secretKey)),
     },
   };
 }

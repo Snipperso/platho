@@ -32,6 +32,7 @@ PROGRAM{
   DECLPROC $NullifierShard$_fun_computeSerial
   DECLPROC $NullifierShard$_fun_certDigest
   DECLPROC $NullifierShard$_fun_nullifierKey
+  DECLPROC $NullifierShard$_fun_frameBindingDigest
   DECLPROC $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs
   DECLPROC $NullifierShard$_fun_get_view
   DECLPROC $NullifierShard$_fun_is_spent
@@ -353,6 +354,32 @@ PROGRAM{
         ENDC
         HASHCU
   }>
+  $NullifierShard$_fun_frameBindingDigest PROCREF:<{
+        NEWC
+    1314080338 PUSHINT
+    SWAP
+    32 STU
+    s1 s6 XCHG
+    8 STU
+    s1 s4 XCHG
+    256 STU
+    s1 s2 XCHG
+    256 STU
+    32 STU
+    256 STU
+    16 STU
+        ENDC
+        HASHCU
+        NEWC
+    1112756273 PUSHINT
+    SWAP
+    32 STU
+    s1 s2 XCHG
+    256 STU
+    256 STU
+        ENDC
+        HASHCU
+  }>
   $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs PROCINLINE:<{
   }>
   $NullifierShard$_fun_get_view PROCREF:<{
@@ -496,6 +523,7 @@ PROGRAM{
       LDREF
       LDREF
       LDREF
+      LDREF
       DROP
           NOW
       86400 PUSHINT
@@ -503,13 +531,13 @@ PROGRAM{
       13600 PUSHINT
       OVER
       -4 ADDCONST
-      18 s() PUSH
+      19 s() PUSH
       SWAP
       GEQ
       IF:<{
         SWAP
         4 ADDCONST
-        17 s() PUSH
+        18 s() PUSH
         SWAP
         LEQ
       }>ELSE<{
@@ -518,26 +546,29 @@ PROGRAM{
       }>
       THROWANYIFNOT
       13625 PUSHINT
-      s9 PUSH
+      s10 PUSH
       1 EQINT
       IF:<{
         TRUE
       }>ELSE<{
-        s9 PUSH
+        s10 PUSH
         2 EQINT
       }>
       THROWANYIFNOT
       13621 PUSHINT
-      16 s() PUSH
-      20 s() PUSH
+      17 s() PUSH
+      21 s() PUSH
       EQUAL
       THROWANYIFNOT
-      s5 18 s() XCHG
-      s4 17 s() XCHG
-      s3 19 s() XCHG
+      s4 19 s() XCHG
+      s3 18 s() XCHG
       s2 20 s() XCHG
-      s1 16 s() XCHG
-      s15 s14 PUXC
+      s1 21 s() XCHG
+      17 s() PUSH
+      SWAP
+      17 s() PUSH
+      SWAP
+      s0 17 s() XCHG
       $NullifierShard$_fun_computeSerial INLINECALLDICT
       13622 PUSHINT
       OVER
@@ -546,66 +577,80 @@ PROGRAM{
       EQUAL
       THROWANYIFNOT
       13630 PUSHINT
-      s15 s12 PUSH2
+      17 s() PUSH
+      s15 PUSH
       GEQ
       IF:<{
-        s15 s11 XCPU
+        s0 17 s() XCHG
+        s13 PUSH
         LEQ
       }>ELSE<{
-        s15 POP
+        17 s() POP
         FALSE
       }>
-      s1 s15 XCHG
+      s1 17 s() XCHG
       THROWANYIFNOT
       13636 PUSHINT
-      s11 PUSH
+      s13 PUSH
       550 PUSHINT
       ADD
-      s11 s(-1) PUXC
+      s13 s(-1) PUXC
       LEQ
       THROWANYIFNOT
       13631 PUSHINT
-      s9 s8 PUSH2
+      s11 s10 PUSH2
       LESS
       THROWANYIFNOT
       4 ROLL
-      s0 s8 XCHG
+      s0 s10 XCHG
       $NullifierShard$_fun_rootKey INLINECALLDICT
-      s0 s7 XCHG
+      s0 s9 XCHG
       $NullifierShard$_fun_rootKey INLINECALLDICT
       13632 PUSHINT
-      s8 s1 PUSH2
+      s10 s1 PUSH2
       NEQ
       THROWANYIFNOT
       s4 s5 XCHG
       s3 s4 XCHG
       s1 s3 s0 XCHG3
-      s11 s10 s9 PUXC2
+      s13 s12 s11 PUXC2
       $NullifierShard$_fun_certDigest INLINECALLDICT
       13633 PUSHINT
-      s0 s14 XCHG
+      s0 19 s() XCHG
           CTOS
-      s1 s0 s7 PUXC2
+      s1 s0 s9 PUXC2
           CHKSIGNU
-      s1 s13 XCHG
+      s1 18 s() XCHG
       THROWANYIFNOT
       13634 PUSHINT
-      s0 s10 XCHG
+      s0 18 s() XCHG
           CTOS
-      s5 s0 s8 XCHG3
+      s7 s0 s10 XCHG3
           CHKSIGNU
-      s1 s8 XCHG
+      s1 16 s() XCHG
       THROWANYIFNOT
       13601 PUSHINT
-      s0 s13 XCHG
+      s0 s12 XCHG
           CTOS
-      s8 s0 s6 PUXC2
+      s10 s0 s8 PUXC2
           CHKSIGNU
-      s1 s12 XCHG
+      s1 s11 XCHG
       THROWANYIFNOT
-      s3 s4 XCHG
-      s10 s10 s6 XCHG3
-      s5 PUSH
+      s12 s1 s4 XCHG3
+      13605 PUSHINT
+      s12 s8 s5 XCPU2
+      s12 s8 s6 PUSH3
+      18 s() PUSH
+      17 s() PUSH
+      $NullifierShard$_fun_frameBindingDigest INLINECALLDICT
+      s0 s8 XCHG
+          CTOS
+      s8 s0 s10 XCHG3
+          CHKSIGNU
+      s1 s11 XCHG
+      THROWANYIFNOT
+      s9 s1 s3 XCHG3
+      s4 s6 s5 XC2PU
       $NullifierShard$_fun_nullifierKey INLINECALLDICT
       13604 PUSHINT
       s3 PUSH
@@ -641,13 +686,13 @@ PROGRAM{
       ADD
       2 PUSHINT
           RAWRESERVE
-      s0 s4 XCHG
+      s0 s9 XCHG
       1 EQINT
       IF:<{
+        s3 POP
         s6 POP
-        s6 POP
-        s6 POP
-        s6 s5 XCPU
+        s7 POP
+        s3 s6 XCPU
         $RecordShard$_init_child INLINECALLDICT
         $global_contractAddress INLINECALLDICT
         2700000 PUSHINT
@@ -728,22 +773,22 @@ PROGRAM{
             SWAP
             SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
       }>ELSE<{
-        s9 POP
-        s1 s6 PUXC
+        s6 POP
+        s1 s2 PUXC
         $IntroShard$_init_child INLINECALLDICT
         $global_contractAddress INLINECALLDICT
         s0 s3 XCHG
         2508000 PUSHINT
         1 PUSHINT
-        s7 s9 XCHG2
+        s10 s8 XCHG2
         TRUE
         s0 s7 XCHG
         $IntroStore$_constructor_serial_r_view_tag_body_commit INLINECALLDICT
         NEWC
         $IntroStore$_store_cell INLINECALLDICT
         s3 s4 XCHG
-        s3 s5 XCHG
-        s7 s5 s0 XCHG3
+        s3 s8 XCHG
+        s6 s8 s0 XCHG3
         $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
             NEWC
             b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -811,7 +856,6 @@ PROGRAM{
             // Group 5: Sending the message, with `mode` on top
             SWAP
             SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-        s0 s1 s3 XCHG3
       }>
       __tact_context_get_sender INLINECALLDICT
       0 PUSHINT
@@ -884,7 +928,7 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      3 ROLL
+      ROT
       $NullifierShard$_contract_store INLINECALLDICT
     }>
     s5 POP

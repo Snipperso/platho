@@ -98,6 +98,9 @@ slice $global_contractAddress((cell, cell) $s) impure inline;
 ;; $NullifierShard$_fun_nullifierKey
 ((int, int, cell, int), int) $NullifierShard$_fun_nullifierKey((int, int, cell, int) $self, int $serial) impure inline_ref;
 
+;; $NullifierShard$_fun_frameBindingDigest
+((int, int, cell, int), int) $NullifierShard$_fun_frameBindingDigest((int, int, cell, int) $self, int $serial, int $kind, int $bucketKey, int $frameCommit, int $introBucket, int $introR, int $introViewTag) impure inline_ref;
+
 ;; $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs
 ((int, int, int, int, int, int, int)) $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs(int $epoch, int $lane, int $spent_count, int $lane_count, int $safe_cap, int $root_threshold, int $max_cert_epochs) inline;
 
@@ -575,16 +578,23 @@ builder $IntroShard$init$_store(builder build_0, (int, int) v) inline {
     return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_5);
 }
 
+((int, int, cell, int), int) $NullifierShard$_fun_frameBindingDigest((int, int, cell, int) $self, int $serial, int $kind, int $bucketKey, int $frameCommit, int $introBucket, int $introR, int $introViewTag) impure inline_ref {
+    var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
+    int $fc = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 1314080338, 32), $kind, 8), $bucketKey, 256), $frameCommit, 256), $introBucket, 32), $introR, 256), $introViewTag, 16)));
+    var $fresh$ret_6 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1112756273, 32), $serial, 256), $fc, 256)));
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_6);
+}
+
 ((int, int, cell, int), (int, int, int, int, int, int, int)) $NullifierShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
-    var $fresh$ret_6 = $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs($self'epoch, $self'lane, $self'spent_count, 1048576, 4096, 2, 550);
-    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_6);
+    var $fresh$ret_7 = $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs($self'epoch, $self'lane, $self'spent_count, 1048576, 4096, 2, 550);
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_7);
 }
 
 ((int, int, cell, int), int) $NullifierShard$_fun_is_spent((int, int, cell, int) $self, int $serial) impure inline_ref {
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
-    var $fresh$ret_7 = (~ null?(__tact_dict_get_int_int($self'spent, 257, ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_nullifierKey($serial), 1)));
-    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_7);
+    var $fresh$ret_8 = (~ null?(__tact_dict_get_int_int($self'spent, 257, ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_nullifierKey($serial), 1)));
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_8);
 }
 
 ;;
@@ -675,6 +685,7 @@ _ %is_spent(int $serial) method_id(125513) {
         var $msg'issuer_sig = sc_1~load_ref();
         var $msg'cert_sig_a = sc_1~load_ref();
         var $msg'cert_sig_b = sc_1~load_ref();
+        var $msg'spend_sig = sc_1~load_ref();
         int $nowEpoch = ($global_now() / 86400);
         throw_unless(13600, ( (($msg'epoch >= ($nowEpoch - 4))) ? (($msg'epoch <= ($nowEpoch + 4))) : (false) ));
         throw_unless(13625, ( (($msg'kind == 1)) ? (true) : (($msg'kind == 2)) ));
@@ -691,6 +702,7 @@ _ %is_spent(int $serial) method_id(125513) {
         throw_unless(13633, $global_checkSignature($cd, $Cell$_fun_beginParse($msg'cert_sig_a), $ka));
         throw_unless(13634, $global_checkSignature($cd, $Cell$_fun_beginParse($msg'cert_sig_b), $kb));
         throw_unless(13601, $global_checkSignature($serial, $Cell$_fun_beginParse($msg'issuer_sig), $msg'subkey_pubkey));
+        throw_unless(13605, $global_checkSignature(($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_frameBindingDigest($serial, $msg'kind, $msg'bucket_key, $msg'frame_commit, $msg'intro_bucket, $msg'intro_r, $msg'intro_view_tag), $Cell$_fun_beginParse($msg'spend_sig), $msg'spend_pubkey));
         int $nk = ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_nullifierKey($serial);
         throw_unless(13604, null?(__tact_dict_get_int_int($self'spent, 257, $nk, 1)));
         throw_unless(13623, ($self'spent_count < 4096));
