@@ -46,6 +46,15 @@ const NS_EPOCH_ACCEPT_FUTURE: Int = 4;
 const NS_LANE_COUNT: Int = 1048576;             // 2^20 lanes per epoch (lazy deploy: only touched lanes are born)
 const NS_SAFE_CAP: Int = 4096;                  // per-shard live-nullifier ceiling (refuse in COMPUTE, not code 50 in ACTION)
 
+// [OWNER 2026-07-17] Ceremony cadence = YEARLY. The root ceremony signs a fresh subkey cert once a year, with an
+// OVERLAPPING ~15-month window so a slightly-late ceremony never leaves a gap (a gap halts anon-publishing). This
+// cap is DEFENSE-IN-DEPTH on ONE cert's window length: it refuses an absurdly-long window from a ceremony error or
+// a single rogue signing, bounding a LEAKED SUBKEY to <= ~18 months. It does NOT bound a compromised ROOT (which
+// can pre-sign a chain of back-to-back capped certs) — that stays redeploy-only, mitigated by M-of-N cold custody,
+// not by this number. Tolerable because a leaked subkey costs only forgone protocol-fee revenue (it still
+// self-funds gas + endowment per message via CARRY), so a long worst-case window is acceptable.
+const NS_MAX_CERT_EPOCHS: Int = 550;            // ~18 months, in day-epochs (yearly ceremony + operational slack)
+
 // [IMMUTABLE] The M-of-N root of trust, frozen in code (never in data — a key in data would enter the shard
 // address and let an attacker deploy a shard trusting a key they control). 2-of-3 here. Values are test roots
 // (seeds 0x21/0x22/0x23); the genesis ceremony substitutes the real cold keys. Losing M-of-N of these stops the
@@ -79,6 +88,7 @@ struct NullifierShardView {
     lane_count: Int;
     safe_cap: Int;
     root_threshold: Int;
+    max_cert_epochs: Int;
 }
 
 contract NullifierShard {
@@ -144,6 +154,9 @@ contract NullifierShard {
         // cert window must cover the token's epoch. A subkey whose window has passed is dead — this is exactly how
         // revocation works: the next ceremony simply does not renew a compromised subkey's window.
         throwUnless(13630, (msg.epoch >= msg.valid_from) && (msg.epoch <= msg.valid_to));
+        // defense-in-depth: refuse an over-long cert window (ceremony error / rogue single signing). Written as an
+        // addition, not a subtraction, so a valid_to < valid_from can never underflow here.
+        throwUnless(13636, msg.valid_to <= msg.valid_from + NS_MAX_CERT_EPOCHS);
         // 2-of-3: the two roots must be DISTINCT. idx_a < idx_b forces distinct indices and a canonical order;
         // rootKey(a) != rootKey(b) additionally defends against a ceremony that set two root constants equal, which
         // would otherwise let one signature presented twice satisfy the threshold (the design round's silent
@@ -180,6 +193,7 @@ contract NullifierShard {
             lane_count: NS_LANE_COUNT,
             safe_cap: NS_SAFE_CAP,
             root_threshold: NS_ROOT_THRESHOLD,
+            max_cert_epochs: NS_MAX_CERT_EPOCHS,
         };
     }
 

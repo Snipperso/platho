@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: NullifierShard
-BoC Size: 772 bytes
+BoC Size: 788 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 13
@@ -50,8 +50,8 @@ TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 s
 Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell}`
 
 ### NullifierShardView
-TL-B: `_ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 = NullifierShardView`
-Signature: `NullifierShardView{epoch:int257,lane:int257,spent_count:int257,lane_count:int257,safe_cap:int257,root_threshold:int257}`
+TL-B: `_ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView`
+Signature: `NullifierShardView{epoch:int257,lane:int257,spent_count:int257,lane_count:int257,safe_cap:int257,root_threshold:int257,max_cert_epochs:int257}`
 
 ### NullifierShard$Data
 TL-B: `_ epoch:uint32 lane:uint32 spent:dict<int, bool> spent_count:uint32 = NullifierShard`

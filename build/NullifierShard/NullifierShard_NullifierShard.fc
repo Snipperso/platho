@@ -21,7 +21,7 @@ builder $NullifierShard$_store(builder build_0, (int, int, cell, int) v) inline;
 (slice, ((int, int, cell, int))) $NullifierShard$_load(slice sc_0) inline;
 
 ;; $NullifierShardView$_to_external
-(int, int, int, int, int, int) $NullifierShardView$_to_external(((int, int, int, int, int, int)) v) inline;
+(int, int, int, int, int, int, int) $NullifierShardView$_to_external(((int, int, int, int, int, int, int)) v) inline;
 
 ;; $NullifierShard$init$_load
 (slice, ((int, int))) $NullifierShard$init$_load(slice sc_0) inline;
@@ -47,11 +47,11 @@ builder $NullifierShard$_store(builder build_0, (int, int, cell, int) v) inline;
 ;; $NullifierShard$_fun_nullifierKey
 ((int, int, cell, int), int) $NullifierShard$_fun_nullifierKey((int, int, cell, int) $self, int $serial) impure inline_ref;
 
-;; $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold
-((int, int, int, int, int, int)) $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold(int $epoch, int $lane, int $spent_count, int $lane_count, int $safe_cap, int $root_threshold) inline;
+;; $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs
+((int, int, int, int, int, int, int)) $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs(int $epoch, int $lane, int $spent_count, int $lane_count, int $safe_cap, int $root_threshold, int $max_cert_epochs) inline;
 
 ;; $NullifierShard$_fun_get_view
-((int, int, cell, int), (int, int, int, int, int, int)) $NullifierShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref;
+((int, int, cell, int), (int, int, int, int, int, int, int)) $NullifierShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref;
 
 ;; $NullifierShard$_fun_is_spent
 ((int, int, cell, int), int) $NullifierShard$_fun_is_spent((int, int, cell, int) $self, int $serial) impure inline_ref;
@@ -108,16 +108,16 @@ int $Cell$_fun_hash(cell $self) impure asm """
 ;; NullifierShard_NullifierShard.storage.fc
 ;;
 ;; Type: NullifierShardView
-;; TLB: _ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 = NullifierShardView
+;; TLB: _ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView
 ;;
 
-(int, int, int, int, int, int) $NullifierShardView$_to_external(((int, int, int, int, int, int)) v) inline {
-    var (v'epoch, v'lane, v'spent_count, v'lane_count, v'safe_cap, v'root_threshold) = v; 
-    return (v'epoch, v'lane, v'spent_count, v'lane_count, v'safe_cap, v'root_threshold);
+(int, int, int, int, int, int, int) $NullifierShardView$_to_external(((int, int, int, int, int, int, int)) v) inline {
+    var (v'epoch, v'lane, v'spent_count, v'lane_count, v'safe_cap, v'root_threshold, v'max_cert_epochs) = v; 
+    return (v'epoch, v'lane, v'spent_count, v'lane_count, v'safe_cap, v'root_threshold, v'max_cert_epochs);
 }
 
-((int, int, int, int, int, int)) $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold(int $epoch, int $lane, int $spent_count, int $lane_count, int $safe_cap, int $root_threshold) inline {
-    return ($epoch, $lane, $spent_count, $lane_count, $safe_cap, $root_threshold);
+((int, int, int, int, int, int, int)) $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs(int $epoch, int $lane, int $spent_count, int $lane_count, int $safe_cap, int $root_threshold, int $max_cert_epochs) inline {
+    return ($epoch, $lane, $spent_count, $lane_count, $safe_cap, $root_threshold, $max_cert_epochs);
 }
 
 ;;
@@ -214,9 +214,9 @@ builder $NullifierShard$_store(builder build_0, (int, int, cell, int) v) inline 
     return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_5);
 }
 
-((int, int, cell, int), (int, int, int, int, int, int)) $NullifierShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
+((int, int, cell, int), (int, int, int, int, int, int, int)) $NullifierShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
-    var $fresh$ret_6 = $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold($self'epoch, $self'lane, $self'spent_count, 1048576, 4096, 2);
+    var $fresh$ret_6 = $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs($self'epoch, $self'lane, $self'spent_count, 1048576, 4096, 2, 550);
     return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_6);
 }
 
@@ -291,6 +291,7 @@ _ %is_spent(int $serial) method_id(125513) {
         int $serial = ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_computeSerial($msg'spend_pubkey, $msg'epoch, $msg'nonce);
         throw_unless(13622, (($serial % 1048576) == $self'lane));
         throw_unless(13630, ( (($msg'epoch >= $msg'valid_from)) ? (($msg'epoch <= $msg'valid_to)) : (false) ));
+        throw_unless(13636, ($msg'valid_to <= ($msg'valid_from + 550)));
         throw_unless(13631, ($msg'root_idx_a < $msg'root_idx_b));
         int $ka = ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_rootKey($msg'root_idx_a);
         int $kb = ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_rootKey($msg'root_idx_b);

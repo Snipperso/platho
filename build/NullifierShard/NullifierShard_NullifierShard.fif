@@ -13,7 +13,7 @@ PROGRAM{
   DECLPROC $NullifierShard$_fun_computeSerial
   DECLPROC $NullifierShard$_fun_certDigest
   DECLPROC $NullifierShard$_fun_nullifierKey
-  DECLPROC $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold
+  DECLPROC $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs
   DECLPROC $NullifierShard$_fun_get_view
   DECLPROC $NullifierShard$_fun_is_spent
   76114 DECLMETHOD %get_view
@@ -154,7 +154,7 @@ PROGRAM{
         ENDC
         HASHCU
   }>
-  $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold PROCINLINE:<{
+  $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs PROCINLINE:<{
   }>
   $NullifierShard$_fun_get_view PROCREF:<{
     20 PUSHPOW2
@@ -164,7 +164,8 @@ PROGRAM{
     s3 s6 XCPU
     s3 s5 XCPU
     s0 s3 XCHG
-    $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold INLINECALLDICT
+    550 PUSHINT
+    $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs INLINECALLDICT
   }>
   $NullifierShard$_fun_is_spent PROCREF:<{
     s2 PUSH
@@ -183,7 +184,7 @@ PROGRAM{
   %get_view PROC:<{
     $NullifierShard$_contract_load INLINECALLDICT
     $NullifierShard$_fun_get_view INLINECALLDICT
-    4 6 BLKDROP2
+    4 7 BLKDROP2
     $NullifierShardView$_to_external INLINECALLDICT
   }>
   %is_spent PROC:<{
@@ -286,6 +287,13 @@ PROGRAM{
         FALSE
       }>
       s1 s9 XCHG
+      THROWANYIFNOT
+      13636 PUSHINT
+      s5 PUSH
+      550 PUSHINT
+      ADD
+      s12 s(-1) PUXC
+      LEQ
       THROWANYIFNOT
       13631 PUSHINT
       s10 s12 PUSH2
