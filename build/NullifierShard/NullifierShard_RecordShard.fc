@@ -275,6 +275,10 @@ builder $NullifierShard$init$_store(builder build_0, (int, int) v) inline {
     ;; Contract Code: RecordShard
     contracts = __tact_dict_set_code(contracts, 52655, my_code());
 
+    ;; Contract Code: IntroShard
+    cell code_54285 = __tact_dict_get_code(source, 54285);
+    contracts = __tact_dict_set_code(contracts, 54285, code_54285);
+
     builder b = begin_cell();
     b = b.store_builder_ref(begin_cell().store_dict(contracts));
     b = b.store_int(false, 1);

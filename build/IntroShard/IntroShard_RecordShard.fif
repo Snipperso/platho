@@ -1,4 +1,4 @@
-// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/RecordShard/RecordShard_RecordShard.fc` 
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/IntroShard/IntroShard_RecordShard.fc` 
 PROGRAM{
   DECLPROC __tact_context_get_sender
   DECLPROC __tact_dict_set_code

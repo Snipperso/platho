@@ -9,12 +9,16 @@ PROGRAM{
   DECLPROC $RecordStore$_store
   DECLPROC $RecordStore$_store_cell
   DECLPROC $RecordStore$_load_bounced
+  DECLPROC $IntroStore$_store
+  DECLPROC $IntroStore$_store_cell
+  DECLPROC $IntroStore$_load_bounced
   DECLPROC $NullifierShard$_store
   DECLPROC $NullifierShard$_load
   DECLPROC $Context$_get_value
   DECLPROC $NullifierShardView$_to_external
   DECLPROC $NullifierShard$init$_load
   DECLPROC $RecordShard$init$_store
+  DECLPROC $IntroShard$init$_store
   DECLPROC $NullifierShard$_contract_init
   DECLPROC $NullifierShard$_contract_load
   DECLPROC $NullifierShard$_contract_store
@@ -30,8 +34,10 @@ PROGRAM{
   DECLPROC $NullifierShard$_fun_get_view
   DECLPROC $NullifierShard$_fun_is_spent
   DECLPROC $RecordShard$_init_child
+  DECLPROC $IntroShard$_init_child
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $RecordStore$_constructor_serial_frame_commit
+  DECLPROC $IntroStore$_constructor_serial_r_view_tag_body_commit
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
   76114 DECLMETHOD %get_view
   125513 DECLMETHOD %is_spent
@@ -103,6 +109,24 @@ PROGRAM{
   $RecordStore$_load_bounced PROCINLINE:<{
     PUSHNULL
   }>
+  $IntroStore$_store PROCINLINE:<{
+    1230196786 PUSHINT
+    s0 s5 XCHG2
+    32 STU
+    s1 s3 XCHG
+    256 STU
+    256 STU
+    16 STU
+    256 STU
+  }>
+  $IntroStore$_store_cell PROCINLINE:<{
+    4 -ROLL
+    $IntroStore$_store INLINECALLDICT
+    ENDC
+  }>
+  $IntroStore$_load_bounced PROCINLINE:<{
+    PUSHNULL
+  }>
   $NullifierShard$_store PROCINLINE:<{
     s3 s4 XCHG2
     32 STU
@@ -131,6 +155,13 @@ PROGRAM{
     -ROT
   }>
   $RecordShard$init$_store PROCINLINE:<{
+    s0 s2 XCHG
+    257 PUSHINT
+    STIX
+    257 PUSHINT
+    STIX
+  }>
+  $IntroShard$init$_store PROCINLINE:<{
     s0 s2 XCHG
     257 PUSHINT
     STIX
@@ -292,11 +323,19 @@ PROGRAM{
     CTOS
     LDDICT
     DROP
+    DUP
     52655 PUSHINT
     __tact_dict_get_code INLINECALLDICT
     NEWDICT
     34652 PUSHINT
     MYCODE
+    __tact_dict_set_code INLINECALLDICT
+    s0 s2 XCHG
+    54285 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    s1 s2 XCHG
+    54285 PUSHINT
+    SWAP
     __tact_dict_set_code INLINECALLDICT
     NEWC
     SWAP
@@ -310,6 +349,37 @@ PROGRAM{
     $RecordShard$init$_store INLINECALLDICT
     ENDC
   }>
+  $IntroShard$_init_child PROCREF:<{
+    __tact_child_contract_codes GETGLOB
+    CTOS
+    LDDICT
+    DROP
+    DUP
+    54285 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    NEWDICT
+    34652 PUSHINT
+    MYCODE
+    __tact_dict_set_code INLINECALLDICT
+    s0 s2 XCHG
+    52655 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    s1 s2 XCHG
+    52655 PUSHINT
+    SWAP
+    __tact_dict_set_code INLINECALLDICT
+    NEWC
+    SWAP
+    NEWC
+    STDICT
+    STBREFR
+    FALSE
+    SWAP
+    1 STI
+    2SWAP
+    $IntroShard$init$_store INLINECALLDICT
+    ENDC
+  }>
   $SendParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
     s2 s4 XCHG
     PUSHNULL
@@ -318,6 +388,8 @@ PROGRAM{
     s0 s3 XCHG
   }>
   $RecordStore$_constructor_serial_frame_commit PROCINLINE:<{
+  }>
+  $IntroStore$_constructor_serial_r_view_tag_body_commit PROCINLINE:<{
   }>
   $SendParameters$_constructor_to_value_mode_bounce PROCINLINE:<{
     s1 s3 XCHG
@@ -371,7 +443,15 @@ PROGRAM{
       }>ELSE<{
         NIP
       }>
+      DUP
       1381191729 PUSHINT
+      EQUAL
+      IFJMP:<{
+        DROP
+        s0 s0 s3 XCHG3
+        $NullifierShard$_contract_store INLINECALLDICT
+      }>
+      1230196786 PUSHINT
       EQUAL
       IFJMP:<{
         s0 s0 s3 XCHG3
@@ -404,11 +484,15 @@ PROGRAM{
       32 LDU
       8 LDU
       8 LDU
+      8 LDU
       256 LDU
       LDREF
       DROP
       CTOS
       256 LDU
+      32 LDU
+      256 LDU
+      16 LDU
       LDREF
       LDREF
       LDREF
@@ -419,27 +503,41 @@ PROGRAM{
       13600 PUSHINT
       OVER
       -4 ADDCONST
-      s14 s(-1) PUXC
+      18 s() PUSH
+      SWAP
       GEQ
       IF:<{
         SWAP
         4 ADDCONST
-        s13 s(-1) PUXC
+        17 s() PUSH
+        SWAP
         LEQ
       }>ELSE<{
         NIP
         FALSE
       }>
       THROWANYIFNOT
+      13625 PUSHINT
+      s9 PUSH
+      1 EQINT
+      IF:<{
+        TRUE
+      }>ELSE<{
+        s9 PUSH
+        2 EQINT
+      }>
+      THROWANYIFNOT
       13621 PUSHINT
-      s12 s15 PUSH2
+      16 s() PUSH
+      20 s() PUSH
       EQUAL
       THROWANYIFNOT
-      s5 s14 XCHG
-      s4 s13 XCHG
-      s3 s15 XCHG
-      s2 16 s() XCHG
-      s12 s11 s10 XCPUXC
+      s5 18 s() XCHG
+      s4 17 s() XCHG
+      s3 19 s() XCHG
+      s2 20 s() XCHG
+      s1 16 s() XCHG
+      s15 s14 PUXC
       $NullifierShard$_fun_computeSerial INLINECALLDICT
       13622 PUSHINT
       OVER
@@ -448,65 +546,66 @@ PROGRAM{
       EQUAL
       THROWANYIFNOT
       13630 PUSHINT
-      s11 s8 PUSH2
+      s15 s12 PUSH2
       GEQ
       IF:<{
-        s11 s7 XCPU
+        s15 s11 XCPU
         LEQ
       }>ELSE<{
-        s11 POP
+        s15 POP
         FALSE
       }>
-      s1 s11 XCHG
+      s1 s15 XCHG
       THROWANYIFNOT
       13636 PUSHINT
-      s7 PUSH
+      s11 PUSH
       550 PUSHINT
       ADD
-      s7 s(-1) PUXC
+      s11 s(-1) PUXC
       LEQ
       THROWANYIFNOT
       13631 PUSHINT
-      s5 s13 PUSH2
+      s9 s8 PUSH2
       LESS
       THROWANYIFNOT
       4 ROLL
+      s0 s8 XCHG
       $NullifierShard$_fun_rootKey INLINECALLDICT
-      s0 s12 XCHG
+      s0 s7 XCHG
       $NullifierShard$_fun_rootKey INLINECALLDICT
       13632 PUSHINT
-      s13 s1 PUSH2
+      s8 s1 PUSH2
       NEQ
       THROWANYIFNOT
       s4 s5 XCHG
       s3 s4 XCHG
       s1 s3 s0 XCHG3
-      s7 s6 s(-1) PUXC2
+      s11 s10 s9 PUXC2
       $NullifierShard$_fun_certDigest INLINECALLDICT
       13633 PUSHINT
-      s0 s10 XCHG
+      s0 s14 XCHG
           CTOS
-      s1 s0 s12 PUXC2
+      s1 s0 s7 PUXC2
           CHKSIGNU
-      s1 s9 XCHG
+      s1 s13 XCHG
       THROWANYIFNOT
       13634 PUSHINT
-      s0 s6 XCHG
+      s0 s10 XCHG
           CTOS
-      s10 s0 s4 XCHG3
-          CHKSIGNU
-      s1 s4 XCHG
-      THROWANYIFNOT
-      13601 PUSHINT
-      s0 s9 XCHG
-          CTOS
-      s4 s0 s2 PUXC2
+      s5 s0 s8 XCHG3
           CHKSIGNU
       s1 s8 XCHG
       THROWANYIFNOT
-      s0 s3 XCHG
-      s4 s6 s4 XCHG3
-      s6 PUSH
+      13601 PUSHINT
+      s0 s13 XCHG
+          CTOS
+      s8 s0 s6 PUXC2
+          CHKSIGNU
+      s1 s12 XCHG
+      THROWANYIFNOT
+      s3 s4 XCHG
+      s10 s10 s6 XCHG3
+      s5 PUSH
       $NullifierShard$_fun_nullifierKey INLINECALLDICT
       13604 PUSHINT
       s3 PUSH
@@ -542,86 +641,178 @@ PROGRAM{
       ADD
       2 PUSHINT
           RAWRESERVE
-      s4 s3 XCPU
-      $RecordShard$_init_child INLINECALLDICT
-      $global_contractAddress INLINECALLDICT
-      2700000 PUSHINT
-      1 PUSHINT
-      s0 s8 XCHG
-      TRUE
-      s0 s8 XCHG
-      $RecordStore$_constructor_serial_frame_commit INLINECALLDICT
-      NEWC
-      $RecordStore$_store_cell INLINECALLDICT
-      s4 s3 s0 XCHG3
-      s8 s7 s0 XCHG3
-      $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
-          NEWC
-          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
-          1 STI               // store `bounce`
-          b{000} STSLICECONST // store bounced = false and src = addr_none
-          STSLICE             // store `to`
-          SWAP
-          STGRAMS             // store `value`
-          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
-          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
-          // → Stack state
-          // s0: Builder
-          // s1: `data`
-          // s2: `code`
-          // s3: `body`
-          // s4: `mode`
-          // Group 2: Placing the Builder after code and data, then checking those for nullability
-          s2 XCHG0
-          DUP2
-          ISNULL
-          SWAP
-          ISNULL
-          AND
-          // → Stack state
-          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
-          // s1: `code`
-          // s2: `data`
-          // s3: Builder
-          // s4: `body`
-          // s5: `mode`
-          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
-          <{
-              DROP2 // drop `data` and `code`, since either of those is null
-              b{0} STSLICECONST
-          }> PUSHCONT
-          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
-          <{
-              // _ split_depth:(Maybe (## 5))
-              //   special:(Maybe TickTock)
-              //   code:(Maybe ^Cell)
-              //   data:(Maybe ^Cell)
-              //   library:(Maybe ^Cell)
-              // = StateInit;
-              ROT                // place message Builder on top
-              b{10} STSLICECONST // store Maybe = true, Either = false
-              // Start composing inlined StateInit
-              b{00} STSLICECONST // store split_depth and special first
-              STDICT             // store code
-              STDICT             // store data
-              b{0} STSLICECONST  // store library
-          }> PUSHCONT
-          // Group 3: IFELSE that does the branching shown above
-          IFELSE
-          // → Stack state
-          // s0: Builder
-          // s1: null or StateInit
-          // s2: `body`
-          // s3: `mode`
-          // Group 4: Finalizing the message
-          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
-          ENDC
-          // → Stack state
-          // s0: Cell
-          // s1: `mode`
-          // Group 5: Sending the message, with `mode` on top
-          SWAP
-          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      s0 s4 XCHG
+      1 EQINT
+      IF:<{
+        s6 POP
+        s6 POP
+        s6 POP
+        s6 s5 XCPU
+        $RecordShard$_init_child INLINECALLDICT
+        $global_contractAddress INLINECALLDICT
+        2700000 PUSHINT
+        1 PUSHINT
+        s0 s3 XCHG
+        TRUE
+        s0 s5 XCHG
+        $RecordStore$_constructor_serial_frame_commit INLINECALLDICT
+        NEWC
+        $RecordStore$_store_cell INLINECALLDICT
+        s4 s3 s0 XCHG3
+        s1 s2 XCHG
+        $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+            STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+            // → Stack state
+            // s0: Builder
+            // s1: `data`
+            // s2: `code`
+            // s3: `body`
+            // s4: `mode`
+            // Group 2: Placing the Builder after code and data, then checking those for nullability
+            s2 XCHG0
+            DUP2
+            ISNULL
+            SWAP
+            ISNULL
+            AND
+            // → Stack state
+            // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+            // s1: `code`
+            // s2: `data`
+            // s3: Builder
+            // s4: `body`
+            // s5: `mode`
+            // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+            <{
+                DROP2 // drop `data` and `code`, since either of those is null
+                b{0} STSLICECONST
+            }> PUSHCONT
+            // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+            <{
+                // _ split_depth:(Maybe (## 5))
+                //   special:(Maybe TickTock)
+                //   code:(Maybe ^Cell)
+                //   data:(Maybe ^Cell)
+                //   library:(Maybe ^Cell)
+                // = StateInit;
+                ROT                // place message Builder on top
+                b{10} STSLICECONST // store Maybe = true, Either = false
+                // Start composing inlined StateInit
+                b{00} STSLICECONST // store split_depth and special first
+                STDICT             // store code
+                STDICT             // store data
+                b{0} STSLICECONST  // store library
+            }> PUSHCONT
+            // Group 3: IFELSE that does the branching shown above
+            IFELSE
+            // → Stack state
+            // s0: Builder
+            // s1: null or StateInit
+            // s2: `body`
+            // s3: `mode`
+            // Group 4: Finalizing the message
+            STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+            ENDC
+            // → Stack state
+            // s0: Cell
+            // s1: `mode`
+            // Group 5: Sending the message, with `mode` on top
+            SWAP
+            SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      }>ELSE<{
+        s9 POP
+        s1 s6 PUXC
+        $IntroShard$_init_child INLINECALLDICT
+        $global_contractAddress INLINECALLDICT
+        s0 s3 XCHG
+        2508000 PUSHINT
+        1 PUSHINT
+        s7 s9 XCHG2
+        TRUE
+        s0 s7 XCHG
+        $IntroStore$_constructor_serial_r_view_tag_body_commit INLINECALLDICT
+        NEWC
+        $IntroStore$_store_cell INLINECALLDICT
+        s3 s4 XCHG
+        s3 s5 XCHG
+        s7 s5 s0 XCHG3
+        $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+            STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+            // → Stack state
+            // s0: Builder
+            // s1: `data`
+            // s2: `code`
+            // s3: `body`
+            // s4: `mode`
+            // Group 2: Placing the Builder after code and data, then checking those for nullability
+            s2 XCHG0
+            DUP2
+            ISNULL
+            SWAP
+            ISNULL
+            AND
+            // → Stack state
+            // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+            // s1: `code`
+            // s2: `data`
+            // s3: Builder
+            // s4: `body`
+            // s5: `mode`
+            // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+            <{
+                DROP2 // drop `data` and `code`, since either of those is null
+                b{0} STSLICECONST
+            }> PUSHCONT
+            // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+            <{
+                // _ split_depth:(Maybe (## 5))
+                //   special:(Maybe TickTock)
+                //   code:(Maybe ^Cell)
+                //   data:(Maybe ^Cell)
+                //   library:(Maybe ^Cell)
+                // = StateInit;
+                ROT                // place message Builder on top
+                b{10} STSLICECONST // store Maybe = true, Either = false
+                // Start composing inlined StateInit
+                b{00} STSLICECONST // store split_depth and special first
+                STDICT             // store code
+                STDICT             // store data
+                b{0} STSLICECONST  // store library
+            }> PUSHCONT
+            // Group 3: IFELSE that does the branching shown above
+            IFELSE
+            // → Stack state
+            // s0: Builder
+            // s1: null or StateInit
+            // s2: `body`
+            // s3: `mode`
+            // Group 4: Finalizing the message
+            STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+            ENDC
+            // → Stack state
+            // s0: Cell
+            // s1: `mode`
+            // Group 5: Sending the message, with `mode` on top
+            SWAP
+            SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+        s0 s1 s3 XCHG3
+      }>
       __tact_context_get_sender INLINECALLDICT
       0 PUSHINT
       130 PUSHINT
@@ -693,7 +884,7 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      3 -ROLL
+      3 ROLL
       $NullifierShard$_contract_store INLINECALLDICT
     }>
     s5 POP

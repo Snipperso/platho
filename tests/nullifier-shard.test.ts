@@ -4,6 +4,7 @@ import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { keyPairFromSeed, sign, KeyPair } from '@ton/crypto';
 import { NullifierShard } from '../build/NullifierShard/NullifierShard_NullifierShard';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
+import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // NULLIFIER-SHARD — the load-bearing proof for the clean-17 redesign.
@@ -54,6 +55,7 @@ function buildSpend(opts: {
   spend: KeyPair; epoch: number; nonce: bigint; sk?: KeyPair;
   validFrom?: number; validTo?: number; idxA?: number; idxB?: number;
   bucketKey?: bigint; frameCommit?: bigint;
+  kind?: bigint; introBucket?: bigint; introR?: bigint; introViewTag?: bigint;
 }) {
   const sk = opts.sk ?? subkey;
   const spendPub = bufToInt(opts.spend.publicKey);
@@ -70,8 +72,12 @@ function buildSpend(opts: {
     epoch: BigInt(opts.epoch),
     nonce: opts.nonce,
     ...cert,
+    kind: opts.kind ?? 1n,
     bucket_key: opts.bucketKey ?? 0xB0CCE7n,
     frame_commit: opts.frameCommit ?? 0xF4A3En,
+    intro_bucket: opts.introBucket ?? 0n,
+    intro_r: opts.introR ?? 0n,
+    intro_view_tag: opts.introViewTag ?? 0n,
     issuer_sig: sigCell(sign(serialBuf, sk.secretKey)),
   };
   return { body, serial, lane };
@@ -253,6 +259,80 @@ describe('NULLIFIER-SHARD — one token, one shard, one authority', () => {
     expect((await recordShard.getGetView()).record_count).toBe(1n);
     const rsBal = (await blockchain.getContract(recordShard.address)).balance;
     expect(rsBal).toBeGreaterThan(129924n);  // measured 2 cells x 64962/yr rent for one record
+  }, 120_000);
+
+  // ── Increment 6: the INTRO lane (first contact, stealth) ───────────────────────────────────────────────────
+
+  async function introShardFor(epoch: number, bucket: bigint): Promise<SandboxContract<IntroShard>> {
+    const init = await IntroShard.init(BigInt(epoch), bucket);
+    const c = blockchain.openContract(new IntroShard(contractAddress(0, init), init));
+    await c.send(relay.getSender(), { value: toNano('0.1') }, null);
+    return c;
+  }
+
+  it('INTRO-01: an INTRO spend forwards the (R, view_tag, commit) to its IntroShard(epoch, bucket)', async () => {
+    const introBucket = 42n;
+    const R = 0xAAAA0001n, viewTag = 0x1234n, commit = 0xC0FFEEn;
+    const { body, serial, lane } = buildSpend({
+      spend: keyPairFromSeed(Buffer.alloc(32, 0xD0)), epoch: nowEpoch, nonce: 30n,
+      kind: 2n, introBucket, introR: R, introViewTag: viewTag, frameCommit: commit,
+    });
+    const nullShard = await shardFor(nowEpoch, lane);
+    const introShard = await introShardFor(nowEpoch, introBucket);
+
+    const res = await nullShard.send(relay.getSender(), { value: toNano('0.2') }, body as any);
+    expect(computeExit(res, nullShard.address), 'nullifier burnt').toBe(0);
+    expect(await nullShard.getIsSpent(serial)).toBe(true);
+    // stored at the intro shard, compactly (body lives in tx history)
+    const e = await introShard.getGetEntry(0n);
+    expect(e.exists).toBe(true);
+    expect(e.r).toBe(R);
+    expect(e.view_tag).toBe(viewTag);
+    expect(e.body_commit).toBe(commit);
+    expect((await introShard.getGetView()).live_count).toBe(1n);
+  }, 120_000);
+
+  it('INTRO-02: a direct IntroStore (not from the authorized NullifierShard) is refused (13681)', async () => {
+    const introShard = await introShardFor(nowEpoch, 7n);
+    const res = await introShard.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, {
+      $$type: 'IntroStore', serial: 999n, r: 1n, view_tag: 2n, body_commit: 3n,
+    } as any);
+    expect(computeExit(res, introShard.address)).toBe(13681);
+    expect((await introShard.getGetView()).live_count).toBe(0n);
+  }, 120_000);
+
+  it('INTRO-03: a token spent in CONV cannot ALSO be spent in INTRO — one nullifier covers both lanes', async () => {
+    const spend = keyPairFromSeed(Buffer.alloc(32, 0xD3));
+    // CONV spend
+    const conv = buildSpend({ spend, epoch: nowEpoch, nonce: 33n, bucketKey: 0xBEEFn });
+    const nullShard = await shardFor(nowEpoch, conv.lane);
+    await recordShardFor(0xBEEFn, nowEpoch);
+    expect(computeExit(await nullShard.send(relay.getSender(), { value: toNano('0.2') }, conv.body as any), nullShard.address)).toBe(0);
+    // same token (same serial), now as an INTRO spend -> the nullifier is already burnt
+    const intro = buildSpend({ spend, epoch: nowEpoch, nonce: 33n, kind: 2n, introBucket: 5n, introR: 1n, introViewTag: 1n });
+    expect(conv.serial).toBe(intro.serial);
+    const introShard = await introShardFor(nowEpoch, 5n);
+    const res = await nullShard.send(relay.getSender(), { value: toNano('0.2'), bounce: true }, intro.body as any);
+    expect(computeExit(res, nullShard.address), 'double-spend across lanes -> 13604').toBe(13604);
+    expect((await introShard.getGetView()).live_count, 'no intro written').toBe(0n);
+  }, 120_000);
+
+  it('INTRO-04: intros past the 1-week window are evicted; fresher ones survive', async () => {
+    const introBucket = 88n;
+    const introShard = await introShardFor(nowEpoch, introBucket);
+    // one intro now
+    const a = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0xD4)), epoch: nowEpoch, nonce: 40n, kind: 2n, introBucket, introR: 0xA1n, introViewTag: 1n });
+    const nsA = await shardFor(nowEpoch, a.lane);
+    await nsA.send(relay.getSender(), { value: toNano('0.2') }, a.body as any);
+    expect((await introShard.getGetView()).live_count).toBe(1n);
+
+    // 8 days later, a fresh intro in the SAME (epoch, bucket)... but epoch is nowEpoch; the shard is epoch-scoped,
+    // so to test eviction we advance time and evict: the first intro is now > 1 week old.
+    blockchain.now = blockchain.now! + 8 * 86400;
+    const keeper = await blockchain.treasury('intro-keeper');
+    const ev = await introShard.send(keeper.getSender(), { value: toNano('0.1') }, { $$type: 'EvictIntros', max_count: 32n } as any);
+    expect(computeExit(ev, introShard.address)).toBe(0);
+    expect((await introShard.getGetView()).live_count, 'the stale intro was evicted').toBe(0n);
   }, 120_000);
 
   // ── Increment 2: CAC authority ───────────────────────────────────────────────────────────────────────────

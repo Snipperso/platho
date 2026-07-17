@@ -139,6 +139,11 @@
       "name": "RecoveryShard",
       "path": "./contracts/RecoveryShard.tact",
       "output": "./build/RecoveryShard"
+    },
+    {
+      "name": "IntroShard",
+      "path": "./contracts/IntroShard.tact",
+      "output": "./build/IntroShard"
     }
   ]
 }

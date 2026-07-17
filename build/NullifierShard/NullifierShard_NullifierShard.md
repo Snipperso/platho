@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: NullifierShard
-BoC Size: 1170 bytes
+BoC Size: 1509 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 17
+Total structures: 23
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -61,9 +61,33 @@ Signature: `RecordShardView{bucket_key:int257,epoch:int257,record_count:int257,l
 TL-B: `_ bucket_key:uint256 epoch:uint32 records:dict<int, int> record_count:uint32 = RecordShard`
 Signature: `RecordShard{bucket_key:uint256,epoch:uint32,records:dict<int, int>,record_count:uint32}`
 
+### IntroStore
+TL-B: `intro_store#49535032 serial:uint256 r:uint256 view_tag:uint16 body_commit:uint256 = IntroStore`
+Signature: `IntroStore{serial:uint256,r:uint256,view_tag:uint16,body_commit:uint256}`
+
+### EvictIntros
+TL-B: `evict_intros#49535033 max_count:uint16 = EvictIntros`
+Signature: `EvictIntros{max_count:uint16}`
+
+### IntroEntry
+TL-B: `_ r:int257 view_tag:int257 body_commit:int257 created_at:int257 = IntroEntry`
+Signature: `IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}`
+
+### IntroEntryView
+TL-B: `_ exists:bool r:int257 view_tag:int257 body_commit:int257 created_at:int257 = IntroEntryView`
+Signature: `IntroEntryView{exists:bool,r:int257,view_tag:int257,body_commit:int257,created_at:int257}`
+
+### IntroShardView
+TL-B: `_ epoch:int257 bucket:int257 live_count:int257 next_id:int257 evict_cursor:int257 retention:int257 safe_cap:int257 = IntroShardView`
+Signature: `IntroShardView{epoch:int257,bucket:int257,live_count:int257,next_id:int257,evict_cursor:int257,retention:int257,safe_cap:int257}`
+
+### IntroShard$Data
+TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 live_count:uint32 evict_cursor:uint32 = IntroShard`
+Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32,live_count:uint32,evict_cursor:uint32}`
+
 ### NullifierSpend
-TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 subkey_pubkey:uint256 valid_from:uint32 valid_to:uint32 root_idx_a:uint8 root_idx_b:uint8 bucket_key:uint256 frame_commit:uint256 issuer_sig:^cell cert_sig_a:^cell cert_sig_b:^cell = NullifierSpend`
-Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,bucket_key:uint256,frame_commit:uint256,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell}`
+TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 subkey_pubkey:uint256 valid_from:uint32 valid_to:uint32 root_idx_a:uint8 root_idx_b:uint8 kind:uint8 bucket_key:uint256 frame_commit:uint256 intro_bucket:uint32 intro_r:uint256 intro_view_tag:uint16 issuer_sig:^cell cert_sig_a:^cell cert_sig_b:^cell = NullifierSpend`
+Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,kind:uint8,bucket_key:uint256,frame_commit:uint256,intro_bucket:uint32,intro_r:uint256,intro_view_tag:uint16,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell}`
 
 ### NullifierShardView
 TL-B: `_ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView`
@@ -135,4 +159,8 @@ graph TD
 NullifierShard
 NullifierShard --> RecordShard
 RecordShard --> NullifierShard
+NullifierShard --> IntroShard
+IntroShard --> NullifierShard
+IntroShard --> RecordShard
+RecordShard --> IntroShard
 ```

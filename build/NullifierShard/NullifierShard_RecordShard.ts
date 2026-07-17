@@ -848,6 +848,418 @@ export function dictValueParserRecordShard$Data(): DictionaryValue<RecordShard$D
     }
 }
 
+export type IntroStore = {
+    $$type: 'IntroStore';
+    serial: bigint;
+    r: bigint;
+    view_tag: bigint;
+    body_commit: bigint;
+}
+
+export function storeIntroStore(src: IntroStore) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1230196786, 32);
+        b_0.storeUint(src.serial, 256);
+        b_0.storeUint(src.r, 256);
+        b_0.storeUint(src.view_tag, 16);
+        b_0.storeUint(src.body_commit, 256);
+    };
+}
+
+export function loadIntroStore(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1230196786) { throw Error('Invalid prefix'); }
+    const _serial = sc_0.loadUintBig(256);
+    const _r = sc_0.loadUintBig(256);
+    const _view_tag = sc_0.loadUintBig(16);
+    const _body_commit = sc_0.loadUintBig(256);
+    return { $$type: 'IntroStore' as const, serial: _serial, r: _r, view_tag: _view_tag, body_commit: _body_commit };
+}
+
+export function loadTupleIntroStore(source: TupleReader) {
+    const _serial = source.readBigNumber();
+    const _r = source.readBigNumber();
+    const _view_tag = source.readBigNumber();
+    const _body_commit = source.readBigNumber();
+    return { $$type: 'IntroStore' as const, serial: _serial, r: _r, view_tag: _view_tag, body_commit: _body_commit };
+}
+
+export function loadGetterTupleIntroStore(source: TupleReader) {
+    const _serial = source.readBigNumber();
+    const _r = source.readBigNumber();
+    const _view_tag = source.readBigNumber();
+    const _body_commit = source.readBigNumber();
+    return { $$type: 'IntroStore' as const, serial: _serial, r: _r, view_tag: _view_tag, body_commit: _body_commit };
+}
+
+export function storeTupleIntroStore(source: IntroStore) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.serial);
+    builder.writeNumber(source.r);
+    builder.writeNumber(source.view_tag);
+    builder.writeNumber(source.body_commit);
+    return builder.build();
+}
+
+export function dictValueParserIntroStore(): DictionaryValue<IntroStore> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeIntroStore(src)).endCell());
+        },
+        parse: (src) => {
+            return loadIntroStore(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type EvictIntros = {
+    $$type: 'EvictIntros';
+    max_count: bigint;
+}
+
+export function storeEvictIntros(src: EvictIntros) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1230196787, 32);
+        b_0.storeUint(src.max_count, 16);
+    };
+}
+
+export function loadEvictIntros(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1230196787) { throw Error('Invalid prefix'); }
+    const _max_count = sc_0.loadUintBig(16);
+    return { $$type: 'EvictIntros' as const, max_count: _max_count };
+}
+
+export function loadTupleEvictIntros(source: TupleReader) {
+    const _max_count = source.readBigNumber();
+    return { $$type: 'EvictIntros' as const, max_count: _max_count };
+}
+
+export function loadGetterTupleEvictIntros(source: TupleReader) {
+    const _max_count = source.readBigNumber();
+    return { $$type: 'EvictIntros' as const, max_count: _max_count };
+}
+
+export function storeTupleEvictIntros(source: EvictIntros) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.max_count);
+    return builder.build();
+}
+
+export function dictValueParserEvictIntros(): DictionaryValue<EvictIntros> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeEvictIntros(src)).endCell());
+        },
+        parse: (src) => {
+            return loadEvictIntros(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type IntroEntry = {
+    $$type: 'IntroEntry';
+    r: bigint;
+    view_tag: bigint;
+    body_commit: bigint;
+    created_at: bigint;
+}
+
+export function storeIntroEntry(src: IntroEntry) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeInt(src.r, 257);
+        b_0.storeInt(src.view_tag, 257);
+        b_0.storeInt(src.body_commit, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.created_at, 257);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadIntroEntry(slice: Slice) {
+    const sc_0 = slice;
+    const _r = sc_0.loadIntBig(257);
+    const _view_tag = sc_0.loadIntBig(257);
+    const _body_commit = sc_0.loadIntBig(257);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _created_at = sc_1.loadIntBig(257);
+    return { $$type: 'IntroEntry' as const, r: _r, view_tag: _view_tag, body_commit: _body_commit, created_at: _created_at };
+}
+
+export function loadTupleIntroEntry(source: TupleReader) {
+    const _r = source.readBigNumber();
+    const _view_tag = source.readBigNumber();
+    const _body_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'IntroEntry' as const, r: _r, view_tag: _view_tag, body_commit: _body_commit, created_at: _created_at };
+}
+
+export function loadGetterTupleIntroEntry(source: TupleReader) {
+    const _r = source.readBigNumber();
+    const _view_tag = source.readBigNumber();
+    const _body_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'IntroEntry' as const, r: _r, view_tag: _view_tag, body_commit: _body_commit, created_at: _created_at };
+}
+
+export function storeTupleIntroEntry(source: IntroEntry) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.r);
+    builder.writeNumber(source.view_tag);
+    builder.writeNumber(source.body_commit);
+    builder.writeNumber(source.created_at);
+    return builder.build();
+}
+
+export function dictValueParserIntroEntry(): DictionaryValue<IntroEntry> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeIntroEntry(src)).endCell());
+        },
+        parse: (src) => {
+            return loadIntroEntry(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type IntroEntryView = {
+    $$type: 'IntroEntryView';
+    exists: boolean;
+    r: bigint;
+    view_tag: bigint;
+    body_commit: bigint;
+    created_at: bigint;
+}
+
+export function storeIntroEntryView(src: IntroEntryView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.exists);
+        b_0.storeInt(src.r, 257);
+        b_0.storeInt(src.view_tag, 257);
+        b_0.storeInt(src.body_commit, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.created_at, 257);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadIntroEntryView(slice: Slice) {
+    const sc_0 = slice;
+    const _exists = sc_0.loadBit();
+    const _r = sc_0.loadIntBig(257);
+    const _view_tag = sc_0.loadIntBig(257);
+    const _body_commit = sc_0.loadIntBig(257);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _created_at = sc_1.loadIntBig(257);
+    return { $$type: 'IntroEntryView' as const, exists: _exists, r: _r, view_tag: _view_tag, body_commit: _body_commit, created_at: _created_at };
+}
+
+export function loadTupleIntroEntryView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _r = source.readBigNumber();
+    const _view_tag = source.readBigNumber();
+    const _body_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'IntroEntryView' as const, exists: _exists, r: _r, view_tag: _view_tag, body_commit: _body_commit, created_at: _created_at };
+}
+
+export function loadGetterTupleIntroEntryView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _r = source.readBigNumber();
+    const _view_tag = source.readBigNumber();
+    const _body_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'IntroEntryView' as const, exists: _exists, r: _r, view_tag: _view_tag, body_commit: _body_commit, created_at: _created_at };
+}
+
+export function storeTupleIntroEntryView(source: IntroEntryView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.exists);
+    builder.writeNumber(source.r);
+    builder.writeNumber(source.view_tag);
+    builder.writeNumber(source.body_commit);
+    builder.writeNumber(source.created_at);
+    return builder.build();
+}
+
+export function dictValueParserIntroEntryView(): DictionaryValue<IntroEntryView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeIntroEntryView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadIntroEntryView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type IntroShardView = {
+    $$type: 'IntroShardView';
+    epoch: bigint;
+    bucket: bigint;
+    live_count: bigint;
+    next_id: bigint;
+    evict_cursor: bigint;
+    retention: bigint;
+    safe_cap: bigint;
+}
+
+export function storeIntroShardView(src: IntroShardView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeInt(src.epoch, 257);
+        b_0.storeInt(src.bucket, 257);
+        b_0.storeInt(src.live_count, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.next_id, 257);
+        b_1.storeInt(src.evict_cursor, 257);
+        b_1.storeInt(src.retention, 257);
+        const b_2 = new Builder();
+        b_2.storeInt(src.safe_cap, 257);
+        b_1.storeRef(b_2.endCell());
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadIntroShardView(slice: Slice) {
+    const sc_0 = slice;
+    const _epoch = sc_0.loadIntBig(257);
+    const _bucket = sc_0.loadIntBig(257);
+    const _live_count = sc_0.loadIntBig(257);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _next_id = sc_1.loadIntBig(257);
+    const _evict_cursor = sc_1.loadIntBig(257);
+    const _retention = sc_1.loadIntBig(257);
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _safe_cap = sc_2.loadIntBig(257);
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap };
+}
+
+export function loadTupleIntroShardView(source: TupleReader) {
+    const _epoch = source.readBigNumber();
+    const _bucket = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _next_id = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    const _retention = source.readBigNumber();
+    const _safe_cap = source.readBigNumber();
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap };
+}
+
+export function loadGetterTupleIntroShardView(source: TupleReader) {
+    const _epoch = source.readBigNumber();
+    const _bucket = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _next_id = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    const _retention = source.readBigNumber();
+    const _safe_cap = source.readBigNumber();
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap };
+}
+
+export function storeTupleIntroShardView(source: IntroShardView) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.epoch);
+    builder.writeNumber(source.bucket);
+    builder.writeNumber(source.live_count);
+    builder.writeNumber(source.next_id);
+    builder.writeNumber(source.evict_cursor);
+    builder.writeNumber(source.retention);
+    builder.writeNumber(source.safe_cap);
+    return builder.build();
+}
+
+export function dictValueParserIntroShardView(): DictionaryValue<IntroShardView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeIntroShardView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadIntroShardView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type IntroShard$Data = {
+    $$type: 'IntroShard$Data';
+    epoch: bigint;
+    bucket: bigint;
+    intros: Dictionary<bigint, IntroEntry>;
+    next_id: bigint;
+    live_count: bigint;
+    evict_cursor: bigint;
+}
+
+export function storeIntroShard$Data(src: IntroShard$Data) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(src.epoch, 32);
+        b_0.storeUint(src.bucket, 32);
+        b_0.storeDict(src.intros, Dictionary.Keys.BigInt(257), dictValueParserIntroEntry());
+        b_0.storeUint(src.next_id, 32);
+        b_0.storeUint(src.live_count, 32);
+        b_0.storeUint(src.evict_cursor, 32);
+    };
+}
+
+export function loadIntroShard$Data(slice: Slice) {
+    const sc_0 = slice;
+    const _epoch = sc_0.loadUintBig(32);
+    const _bucket = sc_0.loadUintBig(32);
+    const _intros = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserIntroEntry(), sc_0);
+    const _next_id = sc_0.loadUintBig(32);
+    const _live_count = sc_0.loadUintBig(32);
+    const _evict_cursor = sc_0.loadUintBig(32);
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor };
+}
+
+export function loadTupleIntroShard$Data(source: TupleReader) {
+    const _epoch = source.readBigNumber();
+    const _bucket = source.readBigNumber();
+    const _intros = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserIntroEntry(), source.readCellOpt());
+    const _next_id = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor };
+}
+
+export function loadGetterTupleIntroShard$Data(source: TupleReader) {
+    const _epoch = source.readBigNumber();
+    const _bucket = source.readBigNumber();
+    const _intros = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserIntroEntry(), source.readCellOpt());
+    const _next_id = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor };
+}
+
+export function storeTupleIntroShard$Data(source: IntroShard$Data) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.epoch);
+    builder.writeNumber(source.bucket);
+    builder.writeCell(source.intros.size > 0 ? beginCell().storeDictDirect(source.intros, Dictionary.Keys.BigInt(257), dictValueParserIntroEntry()).endCell() : null);
+    builder.writeNumber(source.next_id);
+    builder.writeNumber(source.live_count);
+    builder.writeNumber(source.evict_cursor);
+    return builder.build();
+}
+
+export function dictValueParserIntroShard$Data(): DictionaryValue<IntroShard$Data> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeIntroShard$Data(src)).endCell());
+        },
+        parse: (src) => {
+            return loadIntroShard$Data(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type NullifierSpend = {
     $$type: 'NullifierSpend';
     spend_pubkey: bigint;
@@ -858,8 +1270,12 @@ export type NullifierSpend = {
     valid_to: bigint;
     root_idx_a: bigint;
     root_idx_b: bigint;
+    kind: bigint;
     bucket_key: bigint;
     frame_commit: bigint;
+    intro_bucket: bigint;
+    intro_r: bigint;
+    intro_view_tag: bigint;
     issuer_sig: Cell;
     cert_sig_a: Cell;
     cert_sig_b: Cell;
@@ -877,9 +1293,13 @@ export function storeNullifierSpend(src: NullifierSpend) {
         b_0.storeUint(src.valid_to, 32);
         b_0.storeUint(src.root_idx_a, 8);
         b_0.storeUint(src.root_idx_b, 8);
+        b_0.storeUint(src.kind, 8);
         b_0.storeUint(src.bucket_key, 256);
         const b_1 = new Builder();
         b_1.storeUint(src.frame_commit, 256);
+        b_1.storeUint(src.intro_bucket, 32);
+        b_1.storeUint(src.intro_r, 256);
+        b_1.storeUint(src.intro_view_tag, 16);
         b_1.storeRef(src.issuer_sig);
         b_1.storeRef(src.cert_sig_a);
         b_1.storeRef(src.cert_sig_b);
@@ -898,13 +1318,17 @@ export function loadNullifierSpend(slice: Slice) {
     const _valid_to = sc_0.loadUintBig(32);
     const _root_idx_a = sc_0.loadUintBig(8);
     const _root_idx_b = sc_0.loadUintBig(8);
+    const _kind = sc_0.loadUintBig(8);
     const _bucket_key = sc_0.loadUintBig(256);
     const sc_1 = sc_0.loadRef().beginParse();
     const _frame_commit = sc_1.loadUintBig(256);
+    const _intro_bucket = sc_1.loadUintBig(32);
+    const _intro_r = sc_1.loadUintBig(256);
+    const _intro_view_tag = sc_1.loadUintBig(16);
     const _issuer_sig = sc_1.loadRef();
     const _cert_sig_a = sc_1.loadRef();
     const _cert_sig_b = sc_1.loadRef();
-    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, bucket_key: _bucket_key, frame_commit: _frame_commit, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
+    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, kind: _kind, bucket_key: _bucket_key, frame_commit: _frame_commit, intro_bucket: _intro_bucket, intro_r: _intro_r, intro_view_tag: _intro_view_tag, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
 }
 
 export function loadTupleNullifierSpend(source: TupleReader) {
@@ -916,12 +1340,17 @@ export function loadTupleNullifierSpend(source: TupleReader) {
     const _valid_to = source.readBigNumber();
     const _root_idx_a = source.readBigNumber();
     const _root_idx_b = source.readBigNumber();
+    const _kind = source.readBigNumber();
     const _bucket_key = source.readBigNumber();
     const _frame_commit = source.readBigNumber();
+    const _intro_bucket = source.readBigNumber();
+    const _intro_r = source.readBigNumber();
+    const _intro_view_tag = source.readBigNumber();
+    source = source.readTuple();
     const _issuer_sig = source.readCell();
     const _cert_sig_a = source.readCell();
     const _cert_sig_b = source.readCell();
-    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, bucket_key: _bucket_key, frame_commit: _frame_commit, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
+    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, kind: _kind, bucket_key: _bucket_key, frame_commit: _frame_commit, intro_bucket: _intro_bucket, intro_r: _intro_r, intro_view_tag: _intro_view_tag, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
 }
 
 export function loadGetterTupleNullifierSpend(source: TupleReader) {
@@ -933,12 +1362,16 @@ export function loadGetterTupleNullifierSpend(source: TupleReader) {
     const _valid_to = source.readBigNumber();
     const _root_idx_a = source.readBigNumber();
     const _root_idx_b = source.readBigNumber();
+    const _kind = source.readBigNumber();
     const _bucket_key = source.readBigNumber();
     const _frame_commit = source.readBigNumber();
+    const _intro_bucket = source.readBigNumber();
+    const _intro_r = source.readBigNumber();
+    const _intro_view_tag = source.readBigNumber();
     const _issuer_sig = source.readCell();
     const _cert_sig_a = source.readCell();
     const _cert_sig_b = source.readCell();
-    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, bucket_key: _bucket_key, frame_commit: _frame_commit, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
+    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, kind: _kind, bucket_key: _bucket_key, frame_commit: _frame_commit, intro_bucket: _intro_bucket, intro_r: _intro_r, intro_view_tag: _intro_view_tag, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
 }
 
 export function storeTupleNullifierSpend(source: NullifierSpend) {
@@ -951,8 +1384,12 @@ export function storeTupleNullifierSpend(source: NullifierSpend) {
     builder.writeNumber(source.valid_to);
     builder.writeNumber(source.root_idx_a);
     builder.writeNumber(source.root_idx_b);
+    builder.writeNumber(source.kind);
     builder.writeNumber(source.bucket_key);
     builder.writeNumber(source.frame_commit);
+    builder.writeNumber(source.intro_bucket);
+    builder.writeNumber(source.intro_r);
+    builder.writeNumber(source.intro_view_tag);
     builder.writeCell(source.issuer_sig);
     builder.writeCell(source.cert_sig_a);
     builder.writeCell(source.cert_sig_b);
@@ -1135,9 +1572,9 @@ function initRecordShard_init_args(src: RecordShard_init_args) {
 }
 
 async function RecordShard_init(bucket_key: bigint, epoch: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241020c01000200000114ff00f4a413f4bcf2c80b01020162020702dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd3ffd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de21821052535031bae30235c00004c12114b0e3025f04f2c082030602da5b03d3ffd3ff3001a938135220db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0813552f84258c705f2f481355325830bb9f2f4810101201035544633216e955b59f45a3098c801cf004133f442e203a4130405006ef843d0f404308200875c018010f40f6fa1f2e0876d8200cdaff82a028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90030c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed54020120080a0161bd4a976a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3622c0900148313830b2554453024590165be200f6a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e362140b003e810101530350334133f40c6fa19401d70030925b6de2206e93307070e07f011c7c2f08');
+    const __code = Cell.fromHex('b5ee9c7241020c0100021b000114ff00f4a413f4bcf2c80b01020162020702dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd3ffd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de21821052535031bae30235c00004c12114b0e3025f04f2c082030602da5b03d3ffd3ff3001a938135220db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0813552f84258c705f2f481355325830bb9f2f4810101201035544633216e955b59f45a3098c801cf004133f442e203a413040500a4f843d0f40430208200875c018010f40f6fa1f2e0876d8200cdaff82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90030c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed54020120080a0161bd4a976a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3622c0900148313830b2554453024590165be200f6a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e362140b003e810101530350334133f40c6fa19401d70030925b6de2206e93307070e07f01c80c1350');
     const builder = beginCell();
-    const __system = Cell.fromHex('b5ee9c7241021601000490000101c0010105a10eb9020114ff00f4a413f4bcf2c80b03020162041003d8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205e3027024d74920c21f953104d31f05de2182104e535032bae30235c00004c12114b0e3025f04f2c08205060f0072038020d7217021d749c21f9430d31f309131e2821052535031ba8e1a4003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e05f0402fc5b03d3ffd31fd33fd3ffd31fd31fd307d307d3ffd430d0d3ffd4d4d430f82382015180a90481352021a6fc52e0be9601a60452d0bb923170e2f2f481353553cfbaf2f4105e104d103f02111002542cbbdb3c81353621a9381325baf2f481353e53b8be9351b7bb923b70e21bf2f481354427810226a05270bbf2f481353f07080028c882104253493101cb1f13cbffcb1fcb3fc9f9000492535db9f2f45503db3c0cdb3c81354053d1bdf2f4104510344130544770db3c8135410ad054411df91019f2f481354206d04a04f91014f2f481352109d0544413f91018f2f40344642609090a0b00f081354321c103f2f4208e233082f0884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0be1c0018e2282f0a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0e082f074f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa90028c882104341433101cb1f13cbffcb1fcb1fc9f90003cadb3c8135242381010123714133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f4813538f8416f24135f03820875a530bef2f412810101017f71216e955b59f45a3098c801cf004133f442e201a482080f424021812710a8a072fb025143db3c150c0d006ef843d0f404308200cdaf018010f40f6fa1f2e0876d8200875cf82a028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c901fe705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d082082932e071087f08c8598210525350315003cb1fcbffcbffc94430487010246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c90e00b601fb00f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005520c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5402012011130161bd4a976a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3623c12001c8313830b722651365135038102260165bf524f6a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c14014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb344301215001ec88210424e4c3101cb1fcbffc9f9005075375e');
+    const __system = Cell.fromHex('b5ee9c7241022c01000974000101c001020158021b0105b875c8030114ff00f4a413f4bcf2c80b04020162051503d8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205e3027024d74920c21f953104d31f05de2182104e535032bae30235c00004c12114b0e3025f04f2c08206071400be038020d7217021d749c21f9430d31f309131e220821052535031ba8e1b304003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e0821049535032ba8e1a4003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e05f0402fe5b03d3ffd31fd33fd3ffd31fd31fd307d307d307d3ffd430d0d3ffd31fd3ffd30fd4d4d430f82382015180a90481352021a6fc561201be9701a604561101bb923170e2f2f481353929c001917f9329c002e2f2f481353556105614baf2f4051112050411110403111303021114020111100152ffdb3c81353621a9381325ba08090028c882104253493101cb1f13cbffcb1fcb3fc9f90004dcf2f481353e53fcbe9351fbbb923f70e21ff2f48135442b810226a052b0bbf2f481353f5398b9f2f4550308db3c07db3c8135405381bdf2f4104510344130544bbadb3c8135410ed0544118f9101df2f48135420ad04508f91018f2f48135210dd0544817f9101cf2f410344aa6250a0a0b0c00f081354321c103f2f4208e233082f0884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0be1c0018e2282f0a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0e082f074f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa90028c882104341433101cb1f13cbffcb1fcb1fc9f90004fedb3c8135242381010123714133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f4813538f8416f24135f03820875a530bef2f412810101017f71216e955b59f45a3098c801cf004133f442e201a482080f424021812710a8a072fb0204c001e30ff8427081008270136d6d50436d03c8cf8580ca00cf8440ce011a0d0f1302f63636365165db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d082082932e071037f05c8598210525350315003cb1fcbffcbffc944301210246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901fb000e1100a4f843d0f40430208200cdaf018010f40f6fa1f2e0876d8200875cf82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c903fc395217db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d00382082644e07150797f07c855308210495350325005cb1f13cbffcbffcb0fcbffc910341035475010246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae210111200a4f843d0f40430208200d40d018010f40f6fa1f2e0876d8200875cf82a028010f417028200cdaf018010f40f6fa1f2e087128200cdaf01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c9001a58cf8680cf8480f400f400cf810010f400c901fb004013007efa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005502c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5402012016180161bd4a976a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3623c17001c8313830b722651365135038102260165bf524f6a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c19014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb34430121a001ec88210424e4c3101cb1fcbffc9f9000105b940d81c0114ff00f4a413f4bcf2c80b1d0201621e2704f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200018e10d31fd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821049535032bae30221821049535033bae30237c00006c12116b0e3025f061f22252602f65b05d3ffd3ffd30fd3ff3003a93813813571f8425293db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d012c705f2f481357028811f40b9f2f4810101f82314c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc922103401202100a4f843d0f40430208200875c018010f40f6fa1f2e0876d028200cdaf018010f40f6fa1f2e087128200cdaf01028010f4178200d40df82a028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90066206e953059f45a30944133f415e201a404a410354403c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed5402d05b05d30f30708e115301b99320c1409170e2935372b99170e28ec7238101012959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206eb3973007a410670306e30d10371036e85b10355512232400ba6f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e229103601206e953059f45a30944133f415e206a507a403a496302010671036e2003ac8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed54004210355512c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed540006f2c082020271282a016fb254bb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038b6cf1b19e02900248208093a80811f40275447302554473026590173b23dbb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038954176cf1b19602b008a810101250259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f5530af32029d');
     builder.storeRef(__system);
     builder.storeUint(0, 1);
     initRecordShard_init_args({ $$type: 'RecordShard_init_args', bucket_key, epoch })(builder);
@@ -1238,13 +1675,21 @@ const RecordShard_types: ABIType[] = [
     {"name":"CapsuleRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"RecordShardView","header":null,"fields":[{"name":"bucket_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"RecordShard$Data","header":null,"fields":[{"name":"bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"records","type":{"kind":"dict","key":"int","value":"int"}},{"name":"record_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"NullifierSpend","header":1314082866,"fields":[{"name":"spend_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"subkey_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"valid_from","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"valid_to","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"root_idx_a","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"root_idx_b","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"frame_commit","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"issuer_sig","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_a","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_b","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"IntroStore","header":1230196786,"fields":[{"name":"serial","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"r","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"view_tag","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"body_commit","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"EvictIntros","header":1230196787,"fields":[{"name":"max_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
+    {"name":"IntroEntry","header":null,"fields":[{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"IntroEntryView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"IntroShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bucket","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"IntroShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"bucket","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"intros","type":{"kind":"dict","key":"int","value":"IntroEntry","valueFormat":"ref"}},{"name":"next_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"NullifierSpend","header":1314082866,"fields":[{"name":"spend_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"subkey_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"valid_from","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"valid_to","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"root_idx_a","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"root_idx_b","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"kind","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"frame_commit","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"intro_bucket","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"intro_r","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"intro_view_tag","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"issuer_sig","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_a","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_b","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"NullifierShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"spent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"root_threshold","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_cert_epochs","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"NullifierShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"lane","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"spent","type":{"kind":"dict","key":"int","value":"bool"}},{"name":"spent_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
 
 const RecordShard_opcodes = {
     "RecordStore": 1381191729,
+    "IntroStore": 1230196786,
+    "EvictIntros": 1230196787,
     "NullifierSpend": 1314082866,
 }
 
@@ -1265,6 +1710,10 @@ const RecordShard_receivers: ABIReceiver[] = [
 
 export const RS_LANE_COUNT = 1048576n;
 export const RS_SAFE_CAP = 4096n;
+export const IS_LANE_COUNT = 1048576n;
+export const IS_INTRO_RETENTION = 604800n;
+export const IS_SAFE_CAP = 8000n;
+export const IS_EVICT_CAP = 64n;
 export const NS_ISSUER_SIG_DOMAIN = 1112754481n;
 export const NS_NULL_DOMAIN = 1112427569n;
 export const NS_CERT_DOMAIN = 1128350513n;
@@ -1275,6 +1724,7 @@ export const NS_LANE_COUNT = 1048576n;
 export const NS_SAFE_CAP = 4096n;
 export const NS_MAX_CERT_EPOCHS = 550n;
 export const NS_RECORD_ENDOWMENT = 200000n;
+export const NS_INTRO_ENDOWMENT = 8000n;
 export const NS_RECORD_GAS = 2500000n;
 export const NS_NULLIFIER_ENDOWMENT = 10000n;
 export const NS_BASE_ENDOWMENT = 1000000n;

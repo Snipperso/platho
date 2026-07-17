@@ -1,6 +1,6 @@
 # Tact compilation report
-Contract: RecordShard
-BoC Size: 551 bytes
+Contract: IntroShard
+BoC Size: 914 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 23
@@ -45,6 +45,18 @@ Signature: `VarAddress{workchain:int32,address:^slice}`
 TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
+### NullifierSpend
+TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 subkey_pubkey:uint256 valid_from:uint32 valid_to:uint32 root_idx_a:uint8 root_idx_b:uint8 kind:uint8 bucket_key:uint256 frame_commit:uint256 intro_bucket:uint32 intro_r:uint256 intro_view_tag:uint16 issuer_sig:^cell cert_sig_a:^cell cert_sig_b:^cell = NullifierSpend`
+Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,kind:uint8,bucket_key:uint256,frame_commit:uint256,intro_bucket:uint32,intro_r:uint256,intro_view_tag:uint16,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell}`
+
+### NullifierShardView
+TL-B: `_ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView`
+Signature: `NullifierShardView{epoch:int257,lane:int257,spent_count:int257,lane_count:int257,safe_cap:int257,root_threshold:int257,max_cert_epochs:int257}`
+
+### NullifierShard$Data
+TL-B: `_ epoch:uint32 lane:uint32 spent:dict<int, bool> spent_count:uint32 = NullifierShard`
+Signature: `NullifierShard{epoch:uint32,lane:uint32,spent:dict<int, bool>,spent_count:uint32}`
+
 ### RecordStore
 TL-B: `record_store#52535031 serial:uint256 frame_commit:uint256 = RecordStore`
 Signature: `RecordStore{serial:uint256,frame_commit:uint256}`
@@ -85,22 +97,10 @@ Signature: `IntroShardView{epoch:int257,bucket:int257,live_count:int257,next_id:
 TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 live_count:uint32 evict_cursor:uint32 = IntroShard`
 Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32,live_count:uint32,evict_cursor:uint32}`
 
-### NullifierSpend
-TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 subkey_pubkey:uint256 valid_from:uint32 valid_to:uint32 root_idx_a:uint8 root_idx_b:uint8 kind:uint8 bucket_key:uint256 frame_commit:uint256 intro_bucket:uint32 intro_r:uint256 intro_view_tag:uint16 issuer_sig:^cell cert_sig_a:^cell cert_sig_b:^cell = NullifierSpend`
-Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,kind:uint8,bucket_key:uint256,frame_commit:uint256,intro_bucket:uint32,intro_r:uint256,intro_view_tag:uint16,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell}`
-
-### NullifierShardView
-TL-B: `_ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView`
-Signature: `NullifierShardView{epoch:int257,lane:int257,spent_count:int257,lane_count:int257,safe_cap:int257,root_threshold:int257,max_cert_epochs:int257}`
-
-### NullifierShard$Data
-TL-B: `_ epoch:uint32 lane:uint32 spent:dict<int, bool> spent_count:uint32 = NullifierShard`
-Signature: `NullifierShard{epoch:uint32,lane:uint32,spent:dict<int, bool>,spent_count:uint32}`
-
 ## Get methods
 Total get methods: 2
 
-## get_record
+## get_entry
 Argument: entry_id
 
 ## get_view
@@ -148,19 +148,19 @@ No arguments
 
 ```mermaid
 graph TD
-RecordShard
-RecordShard --> BaseTrait
+IntroShard
+IntroShard --> BaseTrait
 ```
 
 ## Contract dependency diagram
 
 ```mermaid
 graph TD
-RecordShard
-RecordShard --> NullifierShard
-NullifierShard --> RecordShard
-RecordShard --> IntroShard
+IntroShard
 IntroShard --> NullifierShard
+NullifierShard --> RecordShard
+RecordShard --> NullifierShard
 NullifierShard --> IntroShard
 IntroShard --> RecordShard
+RecordShard --> IntroShard
 ```

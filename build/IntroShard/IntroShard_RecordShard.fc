@@ -2,7 +2,7 @@
 #pragma allow-post-modification;
 #pragma compute-asm-ltr;
 
-;; RecordShard_RecordShard.headers.fc
+;; IntroShard_RecordShard.headers.fc
 ;;
 ;; Header files for RecordShard
 ;; NOTE: declarations are sorted for optimal order
@@ -78,7 +78,7 @@ slice $global_contractAddress((cell, cell) $s) impure inline;
 ((int, int, cell, int), (int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref;
 
 
-;; RecordShard_RecordShard.stdlib.fc
+;; IntroShard_RecordShard.stdlib.fc
 global (int, slice, int, slice) __tact_context;
 global slice __tact_context_sender;
 global cell __tact_child_contract_codes;
@@ -170,7 +170,7 @@ slice $global_contractAddress((cell, cell) $s) impure inline {
     return $global_contractAddressExt(0, $s'code, $s'data);
 }
 
-;; RecordShard_RecordShard.storage.fc
+;; IntroShard_RecordShard.storage.fc
 ;;
 ;; Type: CapsuleRecordView
 ;; TLB: _ exists:bool frame_commit:int257 = CapsuleRecordView
