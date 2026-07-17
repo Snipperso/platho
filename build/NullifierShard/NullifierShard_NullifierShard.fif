@@ -1,0 +1,282 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/NullifierShard/NullifierShard_NullifierShard.fc` 
+PROGRAM{
+  DECLPROC __tact_dict_get_int_int
+  DECLPROC __tact_dict_set_int_int
+  DECLPROC $NullifierShard$_store
+  DECLPROC $NullifierShard$_load
+  DECLPROC $NullifierShardView$_to_external
+  DECLPROC $NullifierShard$init$_load
+  DECLPROC $NullifierShard$_contract_init
+  DECLPROC $NullifierShard$_contract_load
+  DECLPROC $NullifierShard$_contract_store
+  DECLPROC $NullifierShard$_fun_computeSerial
+  DECLPROC $NullifierShard$_fun_nullifierKey
+  DECLPROC $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap
+  DECLPROC $NullifierShard$_fun_get_view
+  DECLPROC $NullifierShard$_fun_is_spent
+  76114 DECLMETHOD %get_view
+  125513 DECLMETHOD %is_spent
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_dict_get_int_int PROCINLINE:<{
+    s1 s3 s3 XCHG3
+    DICTIGET
+    NULLSWAPIFNOT
+    IF:<{
+      SWAP
+      LDIX
+      DROP
+    }>ELSE<{
+      2DROP
+      PUSHNULL
+    }>
+  }>
+  __tact_dict_set_int_int PROCINLINE:<{
+    OVER
+    ISNULL
+    IF:<{
+      2DROP
+      -ROT
+      DICTIDEL
+      DROP
+    }>ELSE<{
+      NEWC
+      SWAP
+      STIX
+      s1 s3 s3 XCHG3
+      DICTISETB
+    }>
+  }>
+  $NullifierShard$_store PROCINLINE:<{
+    s3 s4 XCHG2
+    32 STU
+    32 STU
+    STDICT
+    32 STU
+  }>
+  $NullifierShard$_load PROCINLINE:<{
+    32 LDU
+    32 LDU
+    LDDICT
+    32 LDU
+    4 -ROLL
+  }>
+  $NullifierShardView$_to_external PROCINLINE:<{
+  }>
+  $NullifierShard$init$_load PROCINLINE:<{
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    -ROT
+  }>
+  $NullifierShard$_contract_init PROCINLINE:<{
+    PUSHNULL
+    0 PUSHINT
+  }>
+  $NullifierShard$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $NullifierShard$_load INLINECALLDICT
+      1 4 BLKDROP2
+    }>ELSE<{
+      $NullifierShard$init$_load INLINECALLDICT
+      s0 s2 XCHG
+      ENDS
+      SWAP
+      $NullifierShard$_contract_init INLINECALLDICT
+    }>
+  }>
+  $NullifierShard$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    4 -ROLL
+    $NullifierShard$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $NullifierShard$_fun_computeSerial PROCREF:<{
+        NEWC
+    1112754481 PUSHINT
+    SWAP
+    32 STU
+    s1 s3 XCHG
+    256 STU
+    32 STU
+    64 STU
+        ENDC
+        HASHCU
+  }>
+  $NullifierShard$_fun_nullifierKey PROCREF:<{
+        NEWC
+    1112427569 PUSHINT
+    SWAP
+    32 STU
+    256 STU
+        ENDC
+        HASHCU
+  }>
+  $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap PROCINLINE:<{
+  }>
+  $NullifierShard$_fun_get_view PROCREF:<{
+    20 PUSHPOW2
+    12 PUSHPOW2
+    s5 PUSH
+    s5 s2 s(-1) PUXC2
+    s4 PUSH
+    -ROT
+    $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap INLINECALLDICT
+  }>
+  $NullifierShard$_fun_is_spent PROCREF:<{
+    s2 PUSH
+    4 2 BLKSWAP
+    257 PUSHINT
+    s0 s6 XCHG
+    $NullifierShard$_fun_nullifierKey INLINECALLDICT
+    s5 s6 s0 XCHG3
+    1 PUSHINT
+    __tact_dict_get_int_int INLINECALLDICT
+    ISNULL
+    NOT
+    s4 s3 s0 XCHG3
+    s1 s2 XCHG
+  }>
+  %get_view PROC:<{
+    $NullifierShard$_contract_load INLINECALLDICT
+    $NullifierShard$_fun_get_view INLINECALLDICT
+    4 5 BLKDROP2
+    $NullifierShardView$_to_external INLINECALLDICT
+  }>
+  %is_spent PROC:<{
+    $NullifierShard$_contract_load INLINECALLDICT
+    4 ROLL
+    $NullifierShard$_fun_is_spent INLINECALLDICT
+    4 1 BLKDROP2
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $NullifierShard$_contract_load INLINECALLDICT
+    s0 s5 XCHG
+    IFJMP:<{
+      5 BLKDROP
+    }>
+    0 PUSHINT
+    s4 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s4 XCHG
+      32 LDU
+      s0 s5 XCHG
+    }>
+    OVER
+    1314082865 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s3 XCHG
+      256 LDU
+      32 LDU
+      64 LDU
+          NOW
+      86400 PUSHINT
+      DIV
+      13600 PUSHINT
+      OVER
+      -4 ADDCONST
+      s5 s(-1) PUXC
+      GEQ
+      IF:<{
+        SWAP
+        4 ADDCONST
+        s4 s(-1) PUXC
+        LEQ
+      }>ELSE<{
+        NIP
+        FALSE
+      }>
+      THROWANYIFNOT
+      13621 PUSHINT
+      s3 s6 PUSH2
+      EQUAL
+      THROWANYIFNOT
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s0 s7 XCHG
+      3 -ROLL
+      $NullifierShard$_fun_computeSerial INLINECALLDICT
+      13622 PUSHINT
+      OVER
+      20 MODPOW2#
+      s5 PUSH
+      EQUAL
+      THROWANYIFNOT
+      DUP
+      13601 PUSHINT
+      s0 s7 XCHG
+      94213049059194276631126957333813648528405465366403415476211330748195142076215 PUSHINT
+          CHKSIGNU
+      s1 s6 XCHG
+      THROWANYIFNOT
+      4 ROLL
+      $NullifierShard$_fun_nullifierKey INLINECALLDICT
+      13604 PUSHINT
+      s3 PUSH
+      257 PUSHINT
+      s3 PUSH
+      1 PUSHINT
+      __tact_dict_get_int_int INLINECALLDICT
+      ISNULL
+      THROWANYIFNOT
+      13623 PUSHINT
+      s2 PUSH
+      12 PUSHPOW2
+      LESS
+      THROWANYIFNOT
+      s1 s2 XCHG
+      257 PUSHINT
+      SWAP
+      TRUE
+      1 PUSHINT
+      __tact_dict_set_int_int INLINECALLDICT
+      SWAP
+      INC
+      $NullifierShard$_contract_store INLINECALLDICT
+    }>
+    s5 POP
+    0 EQINT
+    s0 s4 XCHG
+    33 LESSINT
+    s1 s4 XCHG
+    AND
+    IFJMP:<{
+      s0 s0 s3 XCHG3
+      $NullifierShard$_contract_store INLINECALLDICT
+    }>
+    4 BLKDROP
+    130 THROW
+  }>
+}END>c
