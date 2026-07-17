@@ -9,9 +9,11 @@ PROGRAM{
   DECLPROC $NullifierShard$_contract_init
   DECLPROC $NullifierShard$_contract_load
   DECLPROC $NullifierShard$_contract_store
+  DECLPROC $NullifierShard$_fun_rootKey
   DECLPROC $NullifierShard$_fun_computeSerial
+  DECLPROC $NullifierShard$_fun_certDigest
   DECLPROC $NullifierShard$_fun_nullifierKey
-  DECLPROC $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap
+  DECLPROC $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold
   DECLPROC $NullifierShard$_fun_get_view
   DECLPROC $NullifierShard$_fun_is_spent
   76114 DECLMETHOD %get_view
@@ -103,6 +105,22 @@ PROGRAM{
     ENDC
     c4 POP
   }>
+  $NullifierShard$_fun_rootKey PROCREF:<{
+    13635 PUSHINT
+    OVER
+    3 LESSINT
+    THROWANYIFNOT
+    DUP
+    IFNOTJMP:<{
+      DROP
+      61648001945993851713387341017509757467197514600518013224456945346175643262219 PUSHINT
+    }>
+    1 EQINT
+    IFJMP:<{
+      72643295600563315702315007365945353005398927859637280636436839326056233411824 PUSHINT
+    }>
+    52907109351218747841695970573523340373205112110913690393551713332454347868841 PUSHINT
+  }>
   $NullifierShard$_fun_computeSerial PROCREF:<{
         NEWC
     1112754481 PUSHINT
@@ -115,6 +133,18 @@ PROGRAM{
         ENDC
         HASHCU
   }>
+  $NullifierShard$_fun_certDigest PROCREF:<{
+        NEWC
+    1128350513 PUSHINT
+    SWAP
+    32 STU
+    s1 s3 XCHG
+    256 STU
+    32 STU
+    32 STU
+        ENDC
+        HASHCU
+  }>
   $NullifierShard$_fun_nullifierKey PROCREF:<{
         NEWC
     1112427569 PUSHINT
@@ -124,16 +154,17 @@ PROGRAM{
         ENDC
         HASHCU
   }>
-  $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap PROCINLINE:<{
+  $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold PROCINLINE:<{
   }>
   $NullifierShard$_fun_get_view PROCREF:<{
     20 PUSHPOW2
     12 PUSHPOW2
-    s5 PUSH
-    s5 s2 s(-1) PUXC2
-    s4 PUSH
-    -ROT
-    $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap INLINECALLDICT
+    2 PUSHINT
+    s6 PUSH
+    s3 s6 XCPU
+    s3 s5 XCPU
+    s0 s3 XCHG
+    $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold INLINECALLDICT
   }>
   $NullifierShard$_fun_is_spent PROCREF:<{
     s2 PUSH
@@ -152,7 +183,7 @@ PROGRAM{
   %get_view PROC:<{
     $NullifierShard$_contract_load INLINECALLDICT
     $NullifierShard$_fun_get_view INLINECALLDICT
-    4 5 BLKDROP2
+    4 6 BLKDROP2
     $NullifierShardView$_to_external INLINECALLDICT
   }>
   %is_spent PROC:<{
@@ -193,7 +224,7 @@ PROGRAM{
       s0 s5 XCHG
     }>
     OVER
-    1314082865 PUSHINT
+    1314082866 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
@@ -201,18 +232,27 @@ PROGRAM{
       256 LDU
       32 LDU
       64 LDU
+      256 LDU
+      32 LDU
+      32 LDU
+      8 LDU
+      8 LDU
+      LDREF
+      LDREF
+      LDREF
+      DROP
           NOW
       86400 PUSHINT
       DIV
       13600 PUSHINT
       OVER
       -4 ADDCONST
-      s5 s(-1) PUXC
+      s12 s(-1) PUXC
       GEQ
       IF:<{
         SWAP
         4 ADDCONST
-        s4 s(-1) PUXC
+        s11 s(-1) PUXC
         LEQ
       }>ELSE<{
         NIP
@@ -220,13 +260,14 @@ PROGRAM{
       }>
       THROWANYIFNOT
       13621 PUSHINT
-      s3 s6 PUSH2
+      s10 s13 PUSH2
       EQUAL
       THROWANYIFNOT
-      s5 s6 XCHG
-      s4 s5 XCHG
-      s0 s7 XCHG
-      3 -ROLL
+      s5 s12 XCHG
+      s4 s11 XCHG
+      s3 s13 XCHG
+      s14 s10 s0 XCHG3
+      s9 s8 PUXC
       $NullifierShard$_fun_computeSerial INLINECALLDICT
       13622 PUSHINT
       OVER
@@ -234,14 +275,58 @@ PROGRAM{
       s5 PUSH
       EQUAL
       THROWANYIFNOT
-      DUP
+      13630 PUSHINT
+      s9 s6 PUSH2
+      GEQ
+      IF:<{
+        s9 s12 XCPU
+        LEQ
+      }>ELSE<{
+        s9 POP
+        FALSE
+      }>
+      s1 s9 XCHG
+      THROWANYIFNOT
+      13631 PUSHINT
+      s10 s12 PUSH2
+      LESS
+      THROWANYIFNOT
+      4 ROLL
+      s0 s9 XCHG
+      $NullifierShard$_fun_rootKey INLINECALLDICT
+      s0 s11 XCHG
+      $NullifierShard$_fun_rootKey INLINECALLDICT
+      13632 PUSHINT
+      s12 s1 PUSH2
+      NEQ
+      THROWANYIFNOT
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      s1 s9 s10 PUXC2
+      $NullifierShard$_fun_certDigest INLINECALLDICT
+      13633 PUSHINT
+      s0 s8 XCHG
+          CTOS
+      s1 s0 s11 PUXC2
+          CHKSIGNU
+      s1 s7 XCHG
+      THROWANYIFNOT
+      13634 PUSHINT
+      s0 s4 XCHG
+          CTOS
+      s9 s0 s7 XCHG3
+          CHKSIGNU
+      s1 s2 XCHG
+      THROWANYIFNOT
       13601 PUSHINT
       s0 s7 XCHG
-      94213049059194276631126957333813648528405465366403415476211330748195142076215 PUSHINT
+          CTOS
+      s2 s0 s5 PUXC2
           CHKSIGNU
       s1 s6 XCHG
       THROWANYIFNOT
-      4 ROLL
+      s1 s0 s4 XCHG3
       $NullifierShard$_fun_nullifierKey INLINECALLDICT
       13604 PUSHINT
       s3 PUSH
