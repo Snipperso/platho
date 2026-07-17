@@ -457,7 +457,7 @@ builder $NullifierShard$_store(builder build_0, (int, int, cell, int) v) inline 
 
 ;;
 ;; Type: RecordShard
-;; TLB: _ bucket_key:uint256 epoch:uint32 records:dict<int, int> record_count:uint32 = RecordShard
+;; TLB: _ bucket_key:uint256 epoch:uint32 records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}> record_count:uint32 live_count:uint32 evict_cursor:uint32 = RecordShard
 ;;
 
 builder $RecordShard$init$_store(builder build_0, (int, int) v) inline {

@@ -220,6 +220,24 @@ describe('NULLIFIER-SHARD — one token, one shard, one authority', () => {
     expect((await recordShard.getGetView()).record_count, 'still one record').toBe(1n);
   }, 120_000);
 
+  it('RS-06: CONV records past the 1-year window are evicted (no unbounded shard growth)', async () => {
+    const bucketKey = 0xE71C7n;
+    const { body, lane } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0xC6)), epoch: nowEpoch, nonce: 26n, bucketKey });
+    const nullShard = await shardFor(nowEpoch, lane);
+    const recordShard = await recordShardFor(bucketKey, nowEpoch);
+    await nullShard.send(relay.getSender(), { value: toNano('0.2') }, body as any);
+    expect((await recordShard.getGetView()).live_count).toBe(1n);
+    // before 1 year: eviction sweeps nothing
+    const keeper = await blockchain.treasury('rec-keeper');
+    await recordShard.send(keeper.getSender(), { value: toNano('0.1') }, { $$type: 'EvictRecords', max_count: 32n } as any);
+    expect((await recordShard.getGetView()).live_count, 'still live within the year').toBe(1n);
+    // after 1 year + a day: evicted
+    blockchain.now = blockchain.now! + 31536000 + 86400;
+    const ev = await recordShard.send(keeper.getSender(), { value: toNano('0.1') }, { $$type: 'EvictRecords', max_count: 32n } as any);
+    expect(computeExit(ev, recordShard.address)).toBe(0);
+    expect((await recordShard.getGetView()).live_count, 'the stale record was evicted').toBe(0n);
+  }, 120_000);
+
   it('NS-05: an accept with too little value to carry the record is refused in COMPUTE (13624)', async () => {
     // The forward's funding is checked BEFORE the burn, in COMPUTE, so it bounces and the nullifier is NOT burnt.
     const { body, lane, serial } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0x94)), epoch: nowEpoch, nonce: 9n });

@@ -959,6 +959,104 @@ export function dictValueParserRecordStore(): DictionaryValue<RecordStore> {
     }
 }
 
+export type EvictRecords = {
+    $$type: 'EvictRecords';
+    max_count: bigint;
+}
+
+export function storeEvictRecords(src: EvictRecords) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1381191730, 32);
+        b_0.storeUint(src.max_count, 16);
+    };
+}
+
+export function loadEvictRecords(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1381191730) { throw Error('Invalid prefix'); }
+    const _max_count = sc_0.loadUintBig(16);
+    return { $$type: 'EvictRecords' as const, max_count: _max_count };
+}
+
+export function loadTupleEvictRecords(source: TupleReader) {
+    const _max_count = source.readBigNumber();
+    return { $$type: 'EvictRecords' as const, max_count: _max_count };
+}
+
+export function loadGetterTupleEvictRecords(source: TupleReader) {
+    const _max_count = source.readBigNumber();
+    return { $$type: 'EvictRecords' as const, max_count: _max_count };
+}
+
+export function storeTupleEvictRecords(source: EvictRecords) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.max_count);
+    return builder.build();
+}
+
+export function dictValueParserEvictRecords(): DictionaryValue<EvictRecords> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeEvictRecords(src)).endCell());
+        },
+        parse: (src) => {
+            return loadEvictRecords(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type RecordEntry = {
+    $$type: 'RecordEntry';
+    frame_commit: bigint;
+    created_at: bigint;
+}
+
+export function storeRecordEntry(src: RecordEntry) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeInt(src.frame_commit, 257);
+        b_0.storeInt(src.created_at, 257);
+    };
+}
+
+export function loadRecordEntry(slice: Slice) {
+    const sc_0 = slice;
+    const _frame_commit = sc_0.loadIntBig(257);
+    const _created_at = sc_0.loadIntBig(257);
+    return { $$type: 'RecordEntry' as const, frame_commit: _frame_commit, created_at: _created_at };
+}
+
+export function loadTupleRecordEntry(source: TupleReader) {
+    const _frame_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'RecordEntry' as const, frame_commit: _frame_commit, created_at: _created_at };
+}
+
+export function loadGetterTupleRecordEntry(source: TupleReader) {
+    const _frame_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'RecordEntry' as const, frame_commit: _frame_commit, created_at: _created_at };
+}
+
+export function storeTupleRecordEntry(source: RecordEntry) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.frame_commit);
+    builder.writeNumber(source.created_at);
+    return builder.build();
+}
+
+export function dictValueParserRecordEntry(): DictionaryValue<RecordEntry> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeRecordEntry(src)).endCell());
+        },
+        parse: (src) => {
+            return loadRecordEntry(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type CapsuleRecordView = {
     $$type: 'CapsuleRecordView';
     exists: boolean;
@@ -1015,8 +1113,11 @@ export type RecordShardView = {
     bucket_key: bigint;
     epoch: bigint;
     record_count: bigint;
+    live_count: bigint;
+    evict_cursor: bigint;
     lane_count: bigint;
     safe_cap: bigint;
+    retention: bigint;
 }
 
 export function storeRecordShardView(src: RecordShardView) {
@@ -1026,8 +1127,13 @@ export function storeRecordShardView(src: RecordShardView) {
         b_0.storeInt(src.epoch, 257);
         b_0.storeInt(src.record_count, 257);
         const b_1 = new Builder();
+        b_1.storeInt(src.live_count, 257);
+        b_1.storeInt(src.evict_cursor, 257);
         b_1.storeInt(src.lane_count, 257);
-        b_1.storeInt(src.safe_cap, 257);
+        const b_2 = new Builder();
+        b_2.storeInt(src.safe_cap, 257);
+        b_2.storeInt(src.retention, 257);
+        b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
 }
@@ -1038,27 +1144,37 @@ export function loadRecordShardView(slice: Slice) {
     const _epoch = sc_0.loadIntBig(257);
     const _record_count = sc_0.loadIntBig(257);
     const sc_1 = sc_0.loadRef().beginParse();
+    const _live_count = sc_1.loadIntBig(257);
+    const _evict_cursor = sc_1.loadIntBig(257);
     const _lane_count = sc_1.loadIntBig(257);
-    const _safe_cap = sc_1.loadIntBig(257);
-    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _safe_cap = sc_2.loadIntBig(257);
+    const _retention = sc_2.loadIntBig(257);
+    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, lane_count: _lane_count, safe_cap: _safe_cap, retention: _retention };
 }
 
 export function loadTupleRecordShardView(source: TupleReader) {
     const _bucket_key = source.readBigNumber();
     const _epoch = source.readBigNumber();
     const _record_count = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
     const _lane_count = source.readBigNumber();
     const _safe_cap = source.readBigNumber();
-    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
+    const _retention = source.readBigNumber();
+    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, lane_count: _lane_count, safe_cap: _safe_cap, retention: _retention };
 }
 
 export function loadGetterTupleRecordShardView(source: TupleReader) {
     const _bucket_key = source.readBigNumber();
     const _epoch = source.readBigNumber();
     const _record_count = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
     const _lane_count = source.readBigNumber();
     const _safe_cap = source.readBigNumber();
-    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
+    const _retention = source.readBigNumber();
+    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, lane_count: _lane_count, safe_cap: _safe_cap, retention: _retention };
 }
 
 export function storeTupleRecordShardView(source: RecordShardView) {
@@ -1066,8 +1182,11 @@ export function storeTupleRecordShardView(source: RecordShardView) {
     builder.writeNumber(source.bucket_key);
     builder.writeNumber(source.epoch);
     builder.writeNumber(source.record_count);
+    builder.writeNumber(source.live_count);
+    builder.writeNumber(source.evict_cursor);
     builder.writeNumber(source.lane_count);
     builder.writeNumber(source.safe_cap);
+    builder.writeNumber(source.retention);
     return builder.build();
 }
 
@@ -1086,8 +1205,10 @@ export type RecordShard$Data = {
     $$type: 'RecordShard$Data';
     bucket_key: bigint;
     epoch: bigint;
-    records: Dictionary<bigint, bigint>;
+    records: Dictionary<bigint, RecordEntry>;
     record_count: bigint;
+    live_count: bigint;
+    evict_cursor: bigint;
 }
 
 export function storeRecordShard$Data(src: RecordShard$Data) {
@@ -1095,8 +1216,10 @@ export function storeRecordShard$Data(src: RecordShard$Data) {
         const b_0 = builder;
         b_0.storeUint(src.bucket_key, 256);
         b_0.storeUint(src.epoch, 32);
-        b_0.storeDict(src.records, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
+        b_0.storeDict(src.records, Dictionary.Keys.BigInt(257), dictValueParserRecordEntry());
         b_0.storeUint(src.record_count, 32);
+        b_0.storeUint(src.live_count, 32);
+        b_0.storeUint(src.evict_cursor, 32);
     };
 }
 
@@ -1104,33 +1227,41 @@ export function loadRecordShard$Data(slice: Slice) {
     const sc_0 = slice;
     const _bucket_key = sc_0.loadUintBig(256);
     const _epoch = sc_0.loadUintBig(32);
-    const _records = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
+    const _records = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserRecordEntry(), sc_0);
     const _record_count = sc_0.loadUintBig(32);
-    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
+    const _live_count = sc_0.loadUintBig(32);
+    const _evict_cursor = sc_0.loadUintBig(32);
+    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor };
 }
 
 export function loadTupleRecordShard$Data(source: TupleReader) {
     const _bucket_key = source.readBigNumber();
     const _epoch = source.readBigNumber();
-    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
+    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserRecordEntry(), source.readCellOpt());
     const _record_count = source.readBigNumber();
-    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor };
 }
 
 export function loadGetterTupleRecordShard$Data(source: TupleReader) {
     const _bucket_key = source.readBigNumber();
     const _epoch = source.readBigNumber();
-    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
+    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserRecordEntry(), source.readCellOpt());
     const _record_count = source.readBigNumber();
-    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor };
 }
 
 export function storeTupleRecordShard$Data(source: RecordShard$Data) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.bucket_key);
     builder.writeNumber(source.epoch);
-    builder.writeCell(source.records.size > 0 ? beginCell().storeDictDirect(source.records, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
+    builder.writeCell(source.records.size > 0 ? beginCell().storeDictDirect(source.records, Dictionary.Keys.BigInt(257), dictValueParserRecordEntry()).endCell() : null);
     builder.writeNumber(source.record_count);
+    builder.writeNumber(source.live_count);
+    builder.writeNumber(source.evict_cursor);
     return builder.build();
 }
 
@@ -1574,7 +1705,7 @@ function initNullifierShard_init_args(src: NullifierShard_init_args) {
 async function NullifierShard_init(epoch: bigint, lane: bigint) {
     const __code = Cell.fromHex('b5ee9c72410218010005d9000114ff00f4a413f4bcf2c80b01020162021203d8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205e3027024d74920c21f953104d31f05de2182104e535032bae30235c00004c12114b0e3025f04f2c08203041100be038020d7217021d749c21f9430d31f309131e220821052535031ba8e1b304003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e0821049535032ba8e1a4003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed54e05f0402fe5b03d3ffd31fd33fd3ffd31fd31fd307d307d307d3ffd430d0d3ffd31fd3ffd30fd4d4d430f82382015180a90481352021a6fc561201be9701a604561101bb923170e2f2f481353929c001917f9329c002e2f2f481353556105614baf2f4051112050411110403111303021114020111100152ffdb3c81353621a9381325ba05060028c882104253493101cb1f13cbffcb1fcb3fc9f90004dcf2f481353e53fcbe9351fbbb923f70e21ff2f48135442b810226a052b0bbf2f481353f5398b9f2f4550308db3c07db3c8135405381bdf2f4104510344130544bbadb3c8135410ed0544118f9101df2f48135420ad04508f91018f2f48135210dd0544817f9101cf2f410344aa6250707080900f081354321c103f2f4208e233082f0884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0be1c0018e2282f0a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0e082f074f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa90028c882104341433101cb1f13cbffcb1fcb1fc9f90004fedb3c8135242381010123714133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f4813538f8416f24135f03820875a530bef2f412810101017f71216e955b59f45a3098c801cf004133f442e201a482080f424021812710a8a072fb0204c001e30ff8427081008270136d6d50436d03c8cf8580ca00cf8440ce01170a0c1002f63636365165db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d082082932e071037f05c8598210525350315003cb1fcbffcbffc944301210246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901fb000b0e00a4f843d0f40430208200cdaf018010f40f6fa1f2e0876d8200875cf82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c903fc395217db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d00382082644e07150797f07c855308210495350325005cb1f13cbffcbffcb0fcbffc910341035475010246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae20d0e0f00a4f843d0f40430208200d40d018010f40f6fa1f2e0876d8200875cf82a028010f417028200cdaf018010f40f6fa1f2e087128200cdaf01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c9001a58cf8680cf8480f400f400cf810010f400c901fb004013007efa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005502c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cb1fcb1ff400cb1fc9ed5402012013150161bd4a976a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3623c14001c8313830b722651365135038102260165bf524f6a2686a00fc31e90000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c16014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb344301217001ec88210424e4c3101cb1fcbffc9f90080f267f9');
     const builder = beginCell();
-    const __system = Cell.fromHex('b5ee9c72410220010005b6000101c001020276020f0105b36be0030114ff00f4a413f4bcf2c80b04020162050a02dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200019cd3ffd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de21821052535031bae30235c00004c12114b0e3025f04f2c082060902da5b03d3ffd3ff3001a938135220db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0813552f84258c705f2f481355325830bb9f2f4810101201035544633216e955b59f45a3098c801cf004133f442e203a413070800a4f843d0f40430208200875c018010f40f6fa1f2e0876d8200cdaff82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90030c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed5400344003c8f84301cc7f01ca0055305034cbffcb1ff400cb1fc9ed540201200b0d0161bd4a976a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3622c0c00148313830b2554453024590165be200f6a2686a00fc31e90000ce69ffe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e362140e003e810101530350334133f40c6fa19401d70030925b6de2206e93307070e07f010105b10360100114ff00f4a413f4bcf2c80b11020162121b04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200018e10d31fd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821049535032bae30221821049535033bae30237c00006c12116b0e3025f061316191a02f65b05d3ffd3ffd30fd3ff3003a93813813571f8425293db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d012c705f2f481357028811f40b9f2f4810101f82314c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc922103401141500a4f843d0f40430208200875c018010f40f6fa1f2e0876d028200cdaf018010f40f6fa1f2e087128200cdaf01028010f4178200d40df82a028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90066206e953059f45a30944133f415e201a404a410354403c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed5402d05b05d30f30708e115301b99320c1409170e2935372b99170e28ec7238101012959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206eb3973007a410670306e30d10371036e85b10355512171800ba6f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e229103601206e953059f45a30944133f415e206a507a403a496302010671036e2003ac8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed54004210355512c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed540006f2c0820202711c1e016fb254bb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038b6cf1b19e01d00248208093a80811f40275447302554473026590173b23dbb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038954176cf1b19601f008a810101250259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f55302c2ce726');
+    const __system = Cell.fromHex('b5ee9c72410222010006d3000101c00102027602110105b36be0030114ff00f4a413f4bcf2c80b04020162050c04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200018e10d3ffd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821052535031bae30221821052535032bae30237c00006c12116b0e3025f0606090b1c02fa5b05d3ffd3ff3001a938135240db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0813552f84258c705f2f481355326830bb9f2f4810101f82312c85902810101cf00810101cf00c922103401206e953059f45a30944133f415e201a404a410354403070800a4f843d0f40430208200875c018010f40f6fa1f2e0876d8200cdaff82a028010f417028200d40d018010f40f6fa1f2e087128200d40d01028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c9003ac8f84301cc7f01ca0055505056cbff13cb1ff400cb1fcb1fcb1fc9ed5401ea5b05d30f30708e115301b99320c1409170e2935372b99170e28eb7238101012959f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e2206eb3973007a410670306e30d10371036e85b10355512c8f84301cc7f01ca0055505056cbff13cb1ff400cb1fcb1fcb1fc9ed540a00986f22318209e13380a0f823b98e368101016dc8216e925b6d8e11016f22585902810101cf00810101cf00c9e229103601206e953059f45a30944133f415e206a507a403a496302010671036e2004210355512c8f84301cc7f01ca0055505056cbff13cb1ff400cb1fcb1fcb1fc9ed540201200d0f016fbd4a976a2686a00fc31e90000c70869ffe98ffa02698fe98fe98faaa8360b4709408080eb80408080eb802c816880b6b82980716d9e363440e00288313830b8209e1338028513851375137513741330173be200f6a2686a00fc31e90000c70869ffe98ffa02698fe98fe98faaa8360b4709408080eb80408080eb802c816880b6b82980712a82ed9e36314100064810101250259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e2206e93307070e07f016f22300105b10360120114ff00f4a413f4bcf2c80b13020162141d04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d401f863d200018e10d31fd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821049535032bae30221821049535033bae30237c00006c12116b0e3025f0615181b1c02f65b05d3ffd3ffd30fd3ff3003a93813813571f8425293db3c705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d012c705f2f481357028811f40b9f2f4810101f82314c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc922103401161700a4f843d0f40430208200875c018010f40f6fa1f2e0876d028200cdaf018010f40f6fa1f2e087128200cdaf01028010f4178200d40df82a028010f417c801c8f400cd7001ca005a02810101cf00810101cf00c90066206e953059f45a30944133f415e201a404a410354403c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed5402d05b05d30f30708e115301b99320c1409170e2935372b99170e28ec7238101012959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206eb3973007a410670306e30d10371036e85b10355512191a00ba6f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e229103601206e953059f45a30944133f415e206a507a403a496302010671036e2003ac8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed54004210355512c8f84301cc7f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed540006f2c0820202711e20016fb254bb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038b6cf1b19e01f00248208093a80811f40275447302554473026590173b23dbb513435007e18f48000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038954176cf1b196021008a810101250259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f5530d8ffb9ca');
     builder.storeRef(__system);
     builder.storeUint(0, 1);
     initNullifierShard_init_args({ $$type: 'NullifierShard_init_args', epoch, lane })(builder);
@@ -1675,9 +1806,11 @@ const NullifierShard_types: ABIType[] = [
     {"name":"NullifierShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"spent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"root_threshold","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_cert_epochs","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"NullifierShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"lane","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"spent","type":{"kind":"dict","key":"int","value":"bool"}},{"name":"spent_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"RecordStore","header":1381191729,"fields":[{"name":"serial","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"frame_commit","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"EvictRecords","header":1381191730,"fields":[{"name":"max_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
+    {"name":"RecordEntry","header":null,"fields":[{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"CapsuleRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"RecordShardView","header":null,"fields":[{"name":"bucket_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"RecordShard$Data","header":null,"fields":[{"name":"bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"records","type":{"kind":"dict","key":"int","value":"int"}},{"name":"record_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"RecordShardView","header":null,"fields":[{"name":"bucket_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"RecordShard$Data","header":null,"fields":[{"name":"bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"records","type":{"kind":"dict","key":"int","value":"RecordEntry","valueFormat":"ref"}},{"name":"record_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"IntroStore","header":1230196786,"fields":[{"name":"serial","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"r","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"view_tag","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"body_commit","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"EvictIntros","header":1230196787,"fields":[{"name":"max_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
     {"name":"IntroEntry","header":null,"fields":[{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
@@ -1689,6 +1822,7 @@ const NullifierShard_types: ABIType[] = [
 const NullifierShard_opcodes = {
     "NullifierSpend": 1314082866,
     "RecordStore": 1381191729,
+    "EvictRecords": 1381191730,
     "IntroStore": 1230196786,
     "EvictIntros": 1230196787,
 }
@@ -1730,6 +1864,8 @@ export const NS_ROOT_1 = 7264329560056331570231500736594535300539892785963728063
 export const NS_ROOT_2 = 52907109351218747841695970573523340373205112110913690393551713332454347868841n;
 export const RS_LANE_COUNT = 1048576n;
 export const RS_SAFE_CAP = 4096n;
+export const RS_RETENTION = 31536000n;
+export const RS_EVICT_CAP = 64n;
 export const IS_LANE_COUNT = 1048576n;
 export const IS_INTRO_RETENTION = 604800n;
 export const IS_SAFE_CAP = 8000n;

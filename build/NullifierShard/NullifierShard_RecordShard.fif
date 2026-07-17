@@ -3,10 +3,19 @@ PROGRAM{
   DECLPROC __tact_context_get_sender
   DECLPROC __tact_dict_set_code
   DECLPROC __tact_dict_get_code
-  DECLPROC __tact_dict_get_int_int
-  DECLPROC __tact_dict_set_int_int
+  DECLPROC __tact_dict_get_int_cell
+  DECLPROC __tact_dict_set_int_cell
+  DECLPROC $RecordEntry$_store
+  DECLPROC $RecordEntry$_store_cell
+  DECLPROC $RecordEntry$_not_null
+  DECLPROC $RecordEntry$_store_opt
+  DECLPROC $RecordEntry$_load
+  DECLPROC $RecordEntry$_as_optional
+  DECLPROC $RecordEntry$_load_opt
   DECLPROC $RecordShard$_store
   DECLPROC $RecordShard$_load
+  DECLPROC $RecordEntry$_get_frame_commit
+  DECLPROC $RecordEntry$_get_created_at
   DECLPROC $CapsuleRecordView$_to_external
   DECLPROC $RecordShardView$_to_external
   DECLPROC $RecordShard$init$_load
@@ -20,9 +29,10 @@ PROGRAM{
   DECLPROC $global_contractAddress
   DECLPROC $CapsuleRecordView$_constructor_exists_frame_commit
   DECLPROC $RecordShard$_fun_get_record
-  DECLPROC $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap
+  DECLPROC $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention
   DECLPROC $RecordShard$_fun_get_view
   DECLPROC $NullifierShard$_init_child
+  DECLPROC $RecordEntry$_constructor_frame_commit_created_at
   115713 DECLMETHOD %get_record
   76114 DECLMETHOD %get_view
   DECLPROC recv_internal
@@ -45,40 +55,88 @@ PROGRAM{
     NULLSWAPIFNOT
     135 THROWIFNOT
   }>
-  __tact_dict_get_int_int PROCINLINE:<{
-    s1 s3 s3 XCHG3
-    DICTIGET
+  __tact_dict_get_int_cell PROCINLINE:<{
+    -ROT
+    DICTIGETREF
     NULLSWAPIFNOT
     IF:<{
-      SWAP
-      LDIX
-      DROP
     }>ELSE<{
-      2DROP
+      DROP
       PUSHNULL
     }>
   }>
-  __tact_dict_set_int_int PROCINLINE:<{
-    OVER
+  __tact_dict_set_int_cell PROCINLINE:<{
+    DUP
     ISNULL
     IF:<{
-      2DROP
+      DROP
       -ROT
       DICTIDEL
       DROP
     }>ELSE<{
-      NEWC
-      SWAP
-      STIX
       s1 s3 s3 XCHG3
-      DICTISETB
+      DICTISETREF
+    }>
+  }>
+  $RecordEntry$_store PROCINLINE:<{
+    s0 s2 XCHG
+    257 PUSHINT
+    STIX
+    257 PUSHINT
+    STIX
+  }>
+  $RecordEntry$_store_cell PROCINLINE:<{
+    -ROT
+    $RecordEntry$_store INLINECALLDICT
+    ENDC
+  }>
+  $RecordEntry$_not_null PROCINLINE:<{
+        2 UNTUPLE
+  }>
+  $RecordEntry$_store_opt PROCINLINE:<{
+    OVER
+    ISNULL
+    IF:<{
+      2DROP
+      PUSHNULL
+    }>ELSE<{
+      SWAP
+      $RecordEntry$_not_null INLINECALLDICT
+      ROT
+      $RecordEntry$_store_cell INLINECALLDICT
+    }>
+  }>
+  $RecordEntry$_load PROCINLINE:<{
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    -ROT
+  }>
+  $RecordEntry$_as_optional PROCINLINE:<{
+        2 TUPLE
+  }>
+  $RecordEntry$_load_opt PROCINLINE:<{
+    DUP
+    ISNULL
+    IF:<{
+      DROP
+      PUSHNULL
+    }>ELSE<{
+      CTOS
+      $RecordEntry$_load INLINECALLDICT
+      1 2 BLKDROP2
+      $RecordEntry$_as_optional INLINECALLDICT
     }>
   }>
   $RecordShard$_store PROCINLINE:<{
-    s3 s4 XCHG2
+    s5 s6 XCHG2
     256 STU
+    s1 s3 XCHG
     32 STU
     STDICT
+    32 STU
+    32 STU
     32 STU
   }>
   $RecordShard$_load PROCINLINE:<{
@@ -86,7 +144,15 @@ PROGRAM{
     32 LDU
     LDDICT
     32 LDU
-    4 -ROLL
+    32 LDU
+    32 LDU
+    6 -ROLL
+  }>
+  $RecordEntry$_get_frame_commit PROCINLINE:<{
+    DROP
+  }>
+  $RecordEntry$_get_created_at PROCINLINE:<{
+    NIP
   }>
   $CapsuleRecordView$_to_external PROCINLINE:<{
   }>
@@ -109,6 +175,7 @@ PROGRAM{
   $RecordShard$_contract_init PROCINLINE:<{
     PUSHNULL
     0 PUSHINT
+    s0 s0 PUSH2
   }>
   $RecordShard$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -120,7 +187,7 @@ PROGRAM{
     SWAP
     IF:<{
       $RecordShard$_load INLINECALLDICT
-      1 4 BLKDROP2
+      1 6 BLKDROP2
     }>ELSE<{
       $RecordShard$init$_load INLINECALLDICT
       s0 s2 XCHG
@@ -137,7 +204,7 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    4 -ROLL
+    6 -ROLL
     $RecordShard$_store INLINECALLDICT
     ENDC
     c4 POP
@@ -184,9 +251,10 @@ PROGRAM{
   }>
   $RecordShard$_fun_get_record PROCREF:<{
     257 PUSHINT
-    s0 s3 PUSH2
-    s3 s3 XCHG2
-    __tact_dict_get_int_int INLINECALLDICT
+    s5 PUSH
+    s0 s2 XCHG
+    __tact_dict_get_int_cell INLINECALLDICT
+    $RecordEntry$_load_opt INLINECALLDICT
     DUP
     ISNULL
     IFJMP:<{
@@ -197,18 +265,23 @@ PROGRAM{
     }>
     TRUE
     SWAP
+    $RecordEntry$_not_null INLINECALLDICT
+    $RecordEntry$_get_frame_commit INLINECALLDICT
     $CapsuleRecordView$_constructor_exists_frame_commit INLINECALLDICT
   }>
-  $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap PROCINLINE:<{
+  $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention PROCINLINE:<{
   }>
   $RecordShard$_fun_get_view PROCREF:<{
     20 PUSHPOW2
     12 PUSHPOW2
-    s5 PUSH
-    s5 s2 s(-1) PUXC2
-    s4 PUSH
-    -ROT
-    $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap INLINECALLDICT
+    31536000 PUSHINT
+    s8 PUSH
+    s3 s8 XCPU
+    s3 s7 XCPU
+    s3 s7 XCPU
+    s3 s7 XCPU
+    s1 s3 s3 XCHG3
+    $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention INLINECALLDICT
   }>
   $NullifierShard$_init_child PROCREF:<{
     __tact_child_contract_codes GETGLOB
@@ -241,17 +314,19 @@ PROGRAM{
     $NullifierShard$init$_store INLINECALLDICT
     ENDC
   }>
+  $RecordEntry$_constructor_frame_commit_created_at PROCINLINE:<{
+  }>
   %get_record PROC:<{
     $RecordShard$_contract_load INLINECALLDICT
-    4 ROLL
+    6 ROLL
     $RecordShard$_fun_get_record INLINECALLDICT
-    4 2 BLKDROP2
+    6 2 BLKDROP2
     $CapsuleRecordView$_to_external INLINECALLDICT
   }>
   %get_view PROC:<{
     $RecordShard$_contract_load INLINECALLDICT
     $RecordShard$_fun_get_view INLINECALLDICT
-    4 5 BLKDROP2
+    6 8 BLKDROP2
     $RecordShardView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -270,33 +345,33 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $RecordShard$_contract_load INLINECALLDICT
-    s0 s5 XCHG
+    s0 s7 XCHG
     IFJMP:<{
-      5 BLKDROP
+      7 BLKDROP
     }>
     0 PUSHINT
-    s4 PUSH
+    s6 PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 s4 XCHG
+      s0 s6 XCHG
       32 LDU
-      s0 s5 XCHG
+      s0 s7 XCHG
     }>
     OVER
     1381191729 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s3 XCHG
+      s0 s5 XCHG
       256 LDU
       256 LDU
       DROP
       SWAP
       20 MODPOW2#
-      s2 s(-1) PUXC
+      s4 s(-1) PUXC
       $NullifierShard$_init_child INLINECALLDICT
       $global_contractAddress INLINECALLDICT
       13650 PUSHINT
@@ -305,31 +380,117 @@ PROGRAM{
       SDEQ
       THROWANYIFNOT
       13651 PUSHINT
-      s5 PUSH
+      s6 PUSH
       12 PUSHPOW2
       LESS
       THROWANYIFNOT
       257 PUSHINT
-      DUP
-      s3 s5 XCHG
-      s6 s2 s2 PUXC2
-      __tact_dict_set_int_int INLINECALLDICT
-      s0 s3 XCHG
+          NOW
+      s1 s2 XCHG
+      $RecordEntry$_constructor_frame_commit_created_at INLINECALLDICT
+      NEWC
+      $RecordEntry$_store_cell INLINECALLDICT
+      s2 PUSH
+      s3 s4 XCHG
+      SWAP
+      __tact_dict_set_int_cell INLINECALLDICT
+      SWAP
       INC
-      s1 s3 XCHG
+      s0 s4 XCHG
+      INC
+      s3 s5 XCHG
+      s4 s0 s3 XCHG3
       $RecordShard$_contract_store INLINECALLDICT
     }>
-    s5 POP
+    OVER
+    1381191730 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s5 XCHG
+      16 LDU
+      DROP
+      0 PUSHINT
+      WHILE:<{
+        s0 s1 PUSH2
+        LESS
+        IF:<{
+          DUP
+          64 LESSINT
+        }>ELSE<{
+          FALSE
+        }>
+        IF:<{
+          s7 s2 PUSH2
+          LESS
+        }>ELSE<{
+          FALSE
+        }>
+      }>DO<{
+        s3 PUSH
+        257 PUSHINT
+        s9 PUSH
+        __tact_dict_get_int_cell INLINECALLDICT
+        $RecordEntry$_load_opt INLINECALLDICT
+        DUP
+        ISNULL
+        NOT
+        IF:<{
+          $RecordEntry$_not_null INLINECALLDICT
+          $RecordEntry$_get_created_at INLINECALLDICT
+          31536000 PUSHINT
+          ADD
+              NOW
+          LESS
+          IF:<{
+            257 PUSHINT
+            PUSHNULL
+            NEWC
+            $RecordEntry$_store_opt INLINECALLDICT
+            s9 PUSH
+            s3 s6 XCHG
+            SWAP
+            __tact_dict_set_int_cell INLINECALLDICT
+            s0 s6 XCHG
+            DEC
+            s0 s7 XCHG
+            INC
+            s0 s3 XCHG
+            INC
+          }>ELSE<{
+            DROP
+            DUP
+            s6 s7 XCHG
+            s3 s6 XCHG
+          }>
+        }>ELSE<{
+          DROP
+          s0 s7 XCHG
+          INC
+          s6 s7 XCHG
+          s0 s3 XCHG
+          s0 s6 XCHG
+        }>
+        s3 s7 XCHG
+        s3 s6 XCHG
+      }>
+      2DROP
+      s3 s5 XCHG
+      2 3 BLKSWAP
+      $RecordShard$_contract_store INLINECALLDICT
+    }>
+    s7 POP
     0 EQINT
-    s0 s4 XCHG
+    s0 s6 XCHG
     33 LESSINT
-    s1 s4 XCHG
+    s1 s6 XCHG
     AND
     IFJMP:<{
-      s0 s0 s3 XCHG3
+      s3 s5 XCHG
+      2 3 BLKSWAP
       $RecordShard$_contract_store INLINECALLDICT
     }>
-    4 BLKDROP
+    6 BLKDROP
     130 THROW
   }>
 }END>c
