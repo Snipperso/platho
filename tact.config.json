@@ -129,6 +129,11 @@
       "name": "RecordShard",
       "path": "./contracts/RecordShard.tact",
       "output": "./build/RecordShard"
+    },
+    {
+      "name": "CreditSale",
+      "path": "./contracts/CreditSale.tact",
+      "output": "./build/CreditSale"
     }
   ]
 }
