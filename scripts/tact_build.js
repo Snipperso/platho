@@ -37,7 +37,12 @@ if (!originalArgs.includes('--project')) {
       let passed = false;
       let lastStatus = 1;
       for (let attempt = 1; attempt <= 3; attempt += 1) {
+        // clean-16 B3: the CapsuleHub FunC output is large enough that funcfiftlib's recursive compile overflows
+        // Node's default V8 stack ("RangeError: Maximum call stack size exceeded"). Raise the child's stack to ~8 MB
+        // (still within the OS thread-stack limit). This is a compiler-recursion depth knob ONLY — the emitted
+        // code.boc / hashes are byte-identical to a default-stack build, so genesis reproducibility is unaffected.
         const result = spawnSync(process.execPath, [
+          '--stack-size=8000',
           __filename,
           '--config',
           configPath,

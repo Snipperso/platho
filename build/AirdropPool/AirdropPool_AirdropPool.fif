@@ -1,0 +1,898 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/AirdropPool/AirdropPool_AirdropPool.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get
+  DECLPROC __tact_context_get_sender
+  DECLPROC $ATHTransferRequest$_store
+  DECLPROC $ATHTransferRequest$_store_cell
+  DECLPROC $ATHTransferRequest$_load_bounced
+  DECLPROC $AirdropPool$_store
+  DECLPROC $AirdropPool$_load
+  DECLPROC $Context$_get_value
+  DECLPROC $AirdropGlobalView$_to_external
+  DECLPROC $AirdropPool$init$_load
+  DECLPROC $AirdropPool$_contract_init
+  DECLPROC $AirdropPool$_contract_load
+  DECLPROC $AirdropPool$_contract_store
+  DECLPROC $AirdropPool$_fun_requireController
+  DECLPROC $AirdropPool$_fun_requireUnsealed
+  DECLPROC $AirdropPool$_fun_requireSealed
+  DECLPROC $AirdropPool$_fun_isBasechainAddress
+  DECLPROC $AirdropGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_ath_master_address_pool_ath_wallet_address_credit_issuer_address_treasury_address_ath_per_credit_total_pool_funded_amount_remaining_budget_distributed_total_claim_count_sealed_at_ath_master_bound_credit_issuer_bound_treasury_bound
+  DECLPROC $AirdropPool$_fun_get_global
+  DECLPROC $SendParameters$_constructor_to_value_mode_bounce_body
+  DECLPROC $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination
+  126899 DECLMETHOD %get_global
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get PROCINLINE:<{
+    __tact_context GETGLOB
+    4 UNTUPLE
+  }>
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  $ATHTransferRequest$_store PROCINLINE:<{
+    1096042512 PUSHINT
+    s0 s5 XCHG2
+    32 STU
+    s1 s3 XCHG
+    64 STU
+    128 STU
+    STSLICE
+    STSLICE
+  }>
+  $ATHTransferRequest$_store_cell PROCINLINE:<{
+    4 -ROLL
+    $ATHTransferRequest$_store INLINECALLDICT
+    ENDC
+  }>
+  $ATHTransferRequest$_load_bounced PROCINLINE:<{
+    64 LDU
+    128 LDU
+    -ROT
+  }>
+  $AirdropPool$_store PROCINLINE:<{
+    s1 16 s() XCHG
+    s0 17 s() XCHG
+    1 STI
+    s1 s14 XCHG
+    STSLICE
+    s1 s12 XCHG
+    256 STU
+    s1 s10 XCHG
+    256 STU
+    s0 s8 XCHG
+    NEWC
+    STSLICE
+    s1 s7 XCHG
+    STSLICE
+    s1 s5 XCHG
+    1 STI
+    s1 s3 XCHG
+    STSLICE
+    1 STI
+    SWAP
+    NEWC
+    STSLICE
+    s1 s2 XCHG
+    1 STI
+    s1 s2 XCHG
+    128 STU
+    s1 s3 XCHG
+    128 STU
+    s1 s3 XCHG
+    128 STU
+    s1 s3 XCHG
+    64 STU
+    s1 s3 XCHG
+    64 STU
+    s1 s3 XCHG
+    64 STU
+    s1 s2 XCHG
+    STBREFR
+    STBREFR
+  }>
+  $AirdropPool$_load PROCINLINE:<{
+    1 LDI
+    LDMSGADDR
+    256 LDU
+    256 LDU
+    LDREF
+    SWAP
+    CTOS
+    LDMSGADDR
+    LDMSGADDR
+    1 LDI
+    LDMSGADDR
+    1 LDI
+    LDREF
+    DROP
+    CTOS
+    LDMSGADDR
+    1 LDI
+    128 LDU
+    128 LDU
+    128 LDU
+    64 LDU
+    64 LDU
+    64 LDU
+    DROP
+    s13 17 s() XCHG
+    s13 16 s() XCHG
+    s13 s15 XCHG
+    s13 s14 XCHG
+  }>
+  $Context$_get_value PROCINLINE:<{
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $AirdropGlobalView$_to_external PROCINLINE:<{
+  }>
+  $AirdropPool$init$_load PROCINLINE:<{
+    LDMSGADDR
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    1 LDI
+    4 -ROLL
+  }>
+  $AirdropPool$_contract_init PROCINLINE:<{
+    s3 s3 s3 PUSH3
+    FALSE
+    s7 PUSH
+    FALSE
+    FALSE
+    0 PUSHINT
+    s0 s0 s0 PUSH3
+    s0 s0 PUSH2
+    s13 16 s() XCHG
+    s12 s15 XCHG
+    s12 s14 XCHG
+    s12 s13 XCHG
+    s11 s12 XCHG
+    s10 s11 XCHG
+    s9 s10 XCHG
+    s8 s9 XCHG
+    s7 s8 XCHG
+  }>
+  $AirdropPool$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $AirdropPool$_load INLINECALLDICT
+      17 s() POP
+      s15 16 s() XCHG
+      15 ROLL
+    }>ELSE<{
+      $AirdropPool$init$_load INLINECALLDICT
+      s0 s4 XCHG
+      ENDS
+      3 ROLL
+      $AirdropPool$_contract_init INLINECALLDICT
+    }>
+  }>
+  $AirdropPool$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    s0 17 s() XCHG
+    s0 16 s() XCHG
+    15 -ROLL
+    $AirdropPool$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $AirdropPool$_fun_requireController PROCREF:<{
+    26033 PUSHINT
+    __tact_context_get_sender INLINECALLDICT
+    17 s() PUSH
+    SDEQ
+    THROWANYIFNOT
+  }>
+  $AirdropPool$_fun_requireUnsealed PROCREF:<{
+    26034 PUSHINT
+    17 s() PUSH
+    NOT
+    THROWANYIFNOT
+  }>
+  $AirdropPool$_fun_requireSealed PROCREF:<{
+    26100 PUSHINT
+    17 s() PUSH
+    THROWANYIFNOT
+  }>
+  $AirdropPool$_fun_isBasechainAddress PROCREF:<{
+    11 LDU
+    DROP
+    10 PUSHPOW2
+    EQUAL
+  }>
+  $AirdropGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_ath_master_address_pool_ath_wallet_address_credit_issuer_address_treasury_address_ath_per_credit_total_pool_funded_amount_remaining_budget_distributed_total_claim_count_sealed_at_ath_master_bound_credit_issuer_bound_treasury_bound PROCINLINE:<{
+  }>
+  $AirdropPool$_fun_get_global PROCREF:<{
+    10000000000 PUSHINT
+    15000000000000000 PUSHINT
+    18 s() PUSH
+    s0 s2 XCHG
+    17 s() PUSH
+    s0 s2 XCHG
+    17 s() PUSH
+    s0 s2 XCHG
+    20 s() PUSH
+    s0 s2 XCHG
+    18 s() PUSH
+    s0 s2 XCHG
+    18 s() PUSH
+    s0 s2 XCHG
+    17 s() PUSH
+    s0 s2 XCHG
+    16 s() PUSH
+    s2 s15 s14 XCPU2
+    s15 s14 s13 PUSH3
+    25 s() PUSH
+    24 s() PUSH
+    23 s() PUSH
+    $AirdropGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_ath_master_address_pool_ath_wallet_address_credit_issuer_address_treasury_address_ath_per_credit_total_pool_funded_amount_remaining_budget_distributed_total_claim_count_sealed_at_ath_master_bound_credit_issuer_bound_treasury_bound INLINECALLDICT
+  }>
+  $SendParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
+    s2 s4 XCHG
+    PUSHNULL
+    s4 s3 XCHG2
+    PUSHNULL
+    s0 s3 XCHG
+  }>
+  $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination PROCINLINE:<{
+  }>
+  %get_global PROC:<{
+    $AirdropPool$_contract_load INLINECALLDICT
+    $AirdropPool$_fun_get_global INLINECALLDICT
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    18 s() POP
+    s0 17 s() XCHG
+    s0 16 s() XCHG
+    15 -ROLL
+    $AirdropGlobalView$_to_external INLINECALLDICT
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $AirdropPool$_contract_load INLINECALLDICT
+    s0 18 s() XCHG
+    IFJMP:<{
+      s0 16 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      0 PUSHINT
+      OVER
+      SBITS
+      31 GTINT
+      IF:<{
+        DROP
+        32 LDU
+        DROP
+      }>ELSE<{
+        NIP
+      }>
+      1096042512 PUSHINT
+      EQUAL
+      IFJMP:<{
+        s14 16 s() XCHG
+        2 14 BLKSWAP
+        $AirdropPool$_contract_store INLINECALLDICT
+      }>
+      15 BLKDROP
+      2DROP
+    }>
+    0 PUSHINT
+    17 s() PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      17 s() PUSH
+      32 PLDU
+      SWAP
+    }>
+    OVER
+    1094996481 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 16 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      LDMSGADDR
+      LDMSGADDR
+      DROP
+      s1 17 s() XCHG
+      s0 18 s() XCHG
+      $AirdropPool$_fun_requireUnsealed INLINECALLDICT
+      $AirdropPool$_fun_requireController INLINECALLDICT
+      s11 POP
+      s11 POP
+      26010 PUSHINT
+      s0 s9 XCHG
+      NOT
+      s1 s9 XCHG
+      THROWANYIFNOT
+      s13 s15 XCHG
+      s12 s14 XCHG
+      s11 s13 XCHG
+      s10 s12 XCHG
+      s10 s11 XCHG
+      TRUE
+      s0 s10 XCHG
+      s7 s9 XCHG
+      s6 s8 XCHG
+      s5 s7 XCHG
+      s4 s6 XCHG
+      s3 s5 XCHG
+      s4 s0 s3 XCHG3
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1094996482 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 16 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      LDMSGADDR
+      DROP
+      s15 16 s() XCHG
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s0 17 s() XCHG
+      s1 s3 s0 XCHG3
+      $AirdropPool$_fun_requireUnsealed INLINECALLDICT
+      $AirdropPool$_fun_requireController INLINECALLDICT
+      s9 POP
+      26012 PUSHINT
+      s0 s8 XCHG
+      NOT
+      s1 s8 XCHG
+      THROWANYIFNOT
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      TRUE
+      s0 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1094996483 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 16 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      LDMSGADDR
+      DROP
+      s15 16 s() XCHG
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s0 17 s() XCHG
+      s1 s3 s0 XCHG3
+      $AirdropPool$_fun_requireUnsealed INLINECALLDICT
+      $AirdropPool$_fun_requireController INLINECALLDICT
+      s7 POP
+      26017 PUSHINT
+      s0 s6 XCHG
+      NOT
+      s1 s6 XCHG
+      THROWANYIFNOT
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      TRUE
+      s0 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1194171773 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 16 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      64 LDU
+      NIP
+      160 LDU
+      NIP
+      128 LDU
+      DROP
+      s15 16 s() XCHG
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s0 17 s() XCHG
+      s1 s3 s0 XCHG3
+      $AirdropPool$_fun_requireUnsealed INLINECALLDICT
+      26011 PUSHINT
+      s11 PUSH
+      THROWANYIFNOT
+      26019 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s13 PUSH
+      SDEQ
+      THROWANYIFNOT
+      s0 s5 XCHG
+      17 s() PUSH
+      ADD
+      s0 17 s() XCHG
+      s1 s4 XCHG
+      ADD
+      s15 16 s() XCHG
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s1 s3 s4 XCHG3
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1094996484 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 16 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      256 LDU
+      DROP
+      s15 16 s() XCHG
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s0 17 s() XCHG
+      s1 s3 s0 XCHG3
+      $AirdropPool$_fun_requireUnsealed INLINECALLDICT
+      $AirdropPool$_fun_requireController INLINECALLDICT
+      NIP
+      s15 POP
+      26040 PUSHINT
+      s0 16 s() XCHG
+      s13 PUSH
+      EQUAL
+      s1 16 s() XCHG
+      THROWANYIFNOT
+      26041 PUSHINT
+      s8 PUSH
+      THROWANYIFNOT
+      26042 PUSHINT
+      s6 PUSH
+      THROWANYIFNOT
+      26043 PUSHINT
+      s4 PUSH
+      THROWANYIFNOT
+      26044 PUSHINT
+      s3 PUSH
+      15000000000000000 PUSHINT
+      EQUAL
+      THROWANYIFNOT
+      TRUE
+          NOW
+      s1 16 s() XCHG
+      15 ROLL
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1094996496 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 16 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      64 LDU
+      NIP
+      LDMSGADDR
+      64 LDU
+      DROP
+      s1 17 s() XCHG
+      s0 18 s() XCHG
+      $AirdropPool$_fun_requireSealed INLINECALLDICT
+      26110 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s11 PUSH
+      SDEQ
+      THROWANYIFNOT
+      s15 16 s() XCHG
+      s14 16 s() XCHG
+      s13 16 s() XCHG
+      s12 16 s() XCHG
+      s11 16 s() XCHG
+      s10 16 s() XCHG
+      s9 16 s() XCHG
+      s0 16 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      26111 PUSHINT
+      s0 17 s() XCHG
+      18 s() PUSH
+      $AirdropPool$_fun_isBasechainAddress INLINECALLDICT
+      s1 18 s() XCHG
+      THROWANYIFNOT
+      26112 PUSHINT
+      19 s() PUSH
+      0 GTINT
+      IF:<{
+        19 s() PUSH
+        1000 PUSHINT
+        LEQ
+      }>ELSE<{
+        FALSE
+      }>
+      THROWANYIFNOT
+      s0 18 s() XCHG
+      10000000000 PUSHINT
+      MUL
+      s3 s0 PUSH2
+      LESS
+      IFJMP:<{
+        DROP
+        16 s() POP
+        s13 16 s() XCHG
+        s12 s15 XCHG
+        s11 s14 XCHG
+        s10 s13 XCHG
+        s9 s12 XCHG
+        s8 s11 XCHG
+        s7 s10 XCHG
+        s6 s9 XCHG
+        s5 s8 XCHG
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        $AirdropPool$_contract_store INLINECALLDICT
+      }>
+      26114 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      60000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      s3 s3 XCPU
+      SUB
+      s2 s3 XCPU
+      ADD
+      SWAP
+      INC
+      s0 16 s() XCHG
+      INC
+      50000000 PUSHINT
+      1 PUSHINT
+      FALSE
+          MYADDR
+      s4 PUSH
+      s8 s1 s3 XCHG3
+      s0 22 s() XCHG
+      SWAP
+      $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination INLINECALLDICT
+      NEWC
+      $ATHTransferRequest$_store_cell INLINECALLDICT
+      s12 PUSH
+      s3 s1 s4 XCHG3
+      s2 20 s() XCHG
+      s6 s6 XCHG2
+      $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+          // → Stack state
+          // s0: Builder
+          // s1: `data`
+          // s2: `code`
+          // s3: `body`
+          // s4: `mode`
+          // Group 2: Placing the Builder after code and data, then checking those for nullability
+          s2 XCHG0
+          DUP2
+          ISNULL
+          SWAP
+          ISNULL
+          AND
+          // → Stack state
+          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+          // s1: `code`
+          // s2: `data`
+          // s3: Builder
+          // s4: `body`
+          // s5: `mode`
+          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+          <{
+              DROP2 // drop `data` and `code`, since either of those is null
+              b{0} STSLICECONST
+          }> PUSHCONT
+          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+          <{
+              // _ split_depth:(Maybe (## 5))
+              //   special:(Maybe TickTock)
+              //   code:(Maybe ^Cell)
+              //   data:(Maybe ^Cell)
+              //   library:(Maybe ^Cell)
+              // = StateInit;
+              ROT                // place message Builder on top
+              b{10} STSLICECONST // store Maybe = true, Either = false
+              // Start composing inlined StateInit
+              b{00} STSLICECONST // store split_depth and special first
+              STDICT             // store code
+              STDICT             // store data
+              b{0} STSLICECONST  // store library
+          }> PUSHCONT
+          // Group 3: IFELSE that does the branching shown above
+          IFELSE
+          // → Stack state
+          // s0: Builder
+          // s1: null or StateInit
+          // s2: `body`
+          // s3: `mode`
+          // Group 4: Finalizing the message
+          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+          ENDC
+          // → Stack state
+          // s0: Cell
+          // s1: `mode`
+          // Group 5: Sending the message, with `mode` on top
+          SWAP
+          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      s13 16 s() XCHG
+      s12 s15 XCHG
+      s11 s14 XCHG
+      s10 s13 XCHG
+      s9 s12 XCHG
+      s8 s11 XCHG
+      s7 s10 XCHG
+      s6 s9 XCHG
+      s5 s8 XCHG
+      s4 s7 XCHG
+      s3 s6 XCHG
+      s5 s4 s4 XCHG3
+      s0 s3 XCHG
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    18 s() POP
+    DUP
+    1094996497 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      16 s() POP
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    DUP
+    1094996498 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      16 s() POP
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $AirdropPool$_fun_requireSealed INLINECALLDICT
+      26140 PUSHINT
+          NOW
+      s3 PUSH
+      315360000 PUSHINT
+      ADD
+      GEQ
+      THROWANYIFNOT
+      26141 PUSHINT
+      s5 PUSH
+      0 GTINT
+      THROWANYIFNOT
+      0 PUSHINT
+      SWAP
+      INC
+      26142 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      60000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      50000000 PUSHINT
+      1 PUSHINT
+      FALSE
+          MYADDR
+      s4 s9 s(-1) PUXC2
+      s13 s10 PUXC
+      $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination INLINECALLDICT
+      NEWC
+      $ATHTransferRequest$_store_cell INLINECALLDICT
+      s15 PUSH
+      s0 s4 XCHG
+      s9 s9 XCHG2
+      $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+          // → Stack state
+          // s0: Builder
+          // s1: `data`
+          // s2: `code`
+          // s3: `body`
+          // s4: `mode`
+          // Group 2: Placing the Builder after code and data, then checking those for nullability
+          s2 XCHG0
+          DUP2
+          ISNULL
+          SWAP
+          ISNULL
+          AND
+          // → Stack state
+          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+          // s1: `code`
+          // s2: `data`
+          // s3: Builder
+          // s4: `body`
+          // s5: `mode`
+          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+          <{
+              DROP2 // drop `data` and `code`, since either of those is null
+              b{0} STSLICECONST
+          }> PUSHCONT
+          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+          <{
+              // _ split_depth:(Maybe (## 5))
+              //   special:(Maybe TickTock)
+              //   code:(Maybe ^Cell)
+              //   data:(Maybe ^Cell)
+              //   library:(Maybe ^Cell)
+              // = StateInit;
+              ROT                // place message Builder on top
+              b{10} STSLICECONST // store Maybe = true, Either = false
+              // Start composing inlined StateInit
+              b{00} STSLICECONST // store split_depth and special first
+              STDICT             // store code
+              STDICT             // store data
+              b{0} STSLICECONST  // store library
+          }> PUSHCONT
+          // Group 3: IFELSE that does the branching shown above
+          IFELSE
+          // → Stack state
+          // s0: Builder
+          // s1: null or StateInit
+          // s2: `body`
+          // s3: `mode`
+          // Group 4: Finalizing the message
+          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+          ENDC
+          // → Stack state
+          // s0: Cell
+          // s1: `mode`
+          // Group 5: Sending the message, with `mode` on top
+          SWAP
+          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      s0 s4 XCHG
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    0 EQINT
+    s0 17 s() XCHG
+    33 LESSINT
+    s1 17 s() XCHG
+    AND
+    IFJMP:<{
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    s14 16 s() XCHG
+    2 14 BLKSWAP
+    $AirdropPool$_contract_store INLINECALLDICT
+  }>
+}END>c

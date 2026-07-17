@@ -7,6 +7,7 @@ import {
   CapsuleHub,
   BindDeploymentManifest as CapsuleBind,
   SealGenesis as CapsuleSeal,
+  BindCreditIssuer as CapsuleBindCredit,
 } from '../../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import {
   BindDeploymentManifest as VaultBind,
@@ -447,10 +448,16 @@ export async function deployBoundSealedPair() {
   await send(vault, { $$type: 'BindOfficialAthWallet', deployment_manifest_hash: MANIFEST_HASH, official_ath_wallet_address: officialAthWallet } as VaultBindAth);
   await send(vault, { $$type: 'BindProfileRegistry', deployment_manifest_hash: MANIFEST_HASH, profile_registry_address: fixtureAddress('PROFILE_REG') } as VaultBindProfile);
   await send(vault, { $$type: 'BindUsernameRegistry', deployment_manifest_hash: MANIFEST_HASH, username_registry_address: fixtureAddress('USERNAME_REG') } as VaultBindUsername);
+  // clean-16 B3: the Hub's SealGenesis now requires a bound CreditIssuer (12923) — the anon-publish pool/issuer-mirror
+  // wiring must exist before seal (BindCreditIssuer needs unsealed, so a post-seal bind is impossible). A treasury
+  // stands in for the CreditIssuer address here: FundAnonPool's gate is sender()==credit_issuer_address, so this
+  // treasury can fund the pool directly in the B3 spend tests (no separate CreditIssuer deploy needed on the Hub side).
+  const creditIssuer = await blockchain.treasury('vpb2-e2e-credit-issuer');
+  await send(hub, { $$type: 'BindCreditIssuer', credit_issuer_address: creditIssuer.address } as CapsuleBindCredit);
   await send(vault, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as VaultSeal);
   await send(hub, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as CapsuleSeal);
 
-  return { blockchain, vault, hub, user, vaultAddress, hubAddress, deployer, feeAccumulator, feeAddress, genesisHash: addressCellHash(deployer.address) };
+  return { blockchain, vault, hub, user, vaultAddress, hubAddress, deployer, feeAccumulator, feeAddress, creditIssuer, genesisHash: addressCellHash(deployer.address) };
 }
 
 // A standalone pre-bound/pre-sealed Vault whose genesis_config_hash is poked to `airdropRemaining` so the

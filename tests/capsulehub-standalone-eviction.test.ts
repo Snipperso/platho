@@ -1,63 +1,84 @@
 import { describe, expect, it } from 'vitest';
 import { toNano } from '@ton/core';
-import { KIND_PRIVATE, KIND_PUBLIC, SIZE_1K, partsList, marketingCell, setupHub } from './helpers/vpb2';
+import { webcrypto } from 'crypto';
+import { hubTxExit, KIND_PRIVATE } from './helpers/vpb2';
+import { convPartToken, anonBatch, spendKey, deployAnonReady } from './helpers/anon';
 
-// clean-16 L6/#11 — permissionless standalone eviction. A QUIET private/public lane (no new publishes of its kind)
-// otherwise never sheds its expired entries, because own-kind FIFO eviction was coupled to publish traffic.
-// EvictExpiredCapsules lets anyone reclaim up to CAPSULEHUB_STANDALONE_EVICT_CAP expired entries per call.
-
-const RETENTION = 31536000; // CAPSULEHUB_INDEX_RETENTION_SECONDS (1 year)
-const T0 = 1_700_000_000;
-
-async function seedPrivate(hub: any, vault: any, n: number, id: bigint) {
-  await hub.send(vault.getSender(), { value: toNano('2') }, {
-    $$type: 'PublishBatchToHub',
-    bounce_id: id, bounce_tag: id + 1000n, publish_id: id, publish_kind: KIND_PRIVATE,
-    part_count: BigInt(n), protocol_fee_total: 0n, author_wallet: vault.address,
-    parts: partsList(KIND_PRIVATE, n, SIZE_1K), marketing: null,
-  } as any);
+if (!globalThis.crypto) {
+  Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
 }
 
-describe('CapsuleHub permissionless standalone eviction (clean-16 L6/#11)', () => {
+// clean-16 B3 migration of the permissionless standalone-eviction coverage onto the anon-publish path. The old
+// seedPrivate drove the Hub via the REMOVED Vault-forwarded PublishBatchToHub (op 0xA4F862D1); private entries are
+// now created ONLY through PublishAnonBatch (CONV lane), per-part spend-token authorized against the prepaid pool.
+// The eviction semantics under test are UNCHANGED: EvictExpiredCapsules lets anyone reclaim up to
+// CAPSULEHUB_STANDALONE_EVICT_CAP (32) expired own-kind entries per call WITHOUT any new publish, and rejects an
+// unknown lane kind with 13570. Only the way live entries get SEEDED changed.
+
+const RETENTION = 31536000; // CAPSULEHUB_INDEX_RETENTION_SECONDS (1 year)
+const T0 = 1_700_000_000;   // == deployAnonReady's blockchain.now, so nowEpoch funds the seed epoch
+
+// Seed `n` private (CONV) entries at the pool's funded epoch via single-part anon batches (MAX_BATCH_PARTS_ANON=4,
+// so a backlog is built one part at a time). Each part carries a distinct spend key + distinct nonce (⇒ distinct
+// serial ⇒ distinct nullifier) and a distinct fill (⇒ distinct opaque bucketKey), spending one prepaid credit. The
+// relay is any treasury — the publish path is permissionless.
+async function seedPrivate(env: any, n: number, nonceBase: number) {
+  for (let i = 0; i < n; i += 1) {
+    const pt = convPartToken({
+      issuer: env.issuer, spend: spendKey(i), slot: env.slot, epoch: env.nowEpoch,
+      nonce: BigInt(nonceBase + i), fill: i,
+    });
+    const res = await env.hub.send(env.relay.getSender(), { value: toNano('0.5') }, anonBatch({
+      parts: pt.part, tokens: pt.tok, partCount: 1n, kind: KIND_PRIVATE,
+    }));
+    expect(hubTxExit(res, env.hub)).toBe(0);
+  }
+}
+
+async function setup(credits: bigint) {
+  const env: any = await deployAnonReady({ credits });
+  env.relay = await env.blockchain.treasury('standalone-relay');
+  return env;
+}
+
+describe('CapsuleHub permissionless standalone eviction (clean-16 L6/#11) — B3 anon path', () => {
   it('EVICT-STANDALONE-01: anyone can reclaim a quiet private lane once its entries expire', async () => {
-    const { hub, vault, blockchain } = (await setupHub()) as any;
-    blockchain.now = T0;
-    await seedPrivate(hub, vault, 3, 0x111n);
-    expect((await hub.getGetState()).private_live_count).toBe(3n);
+    const env = await setup(3n);
+    env.blockchain.now = T0;
+    await seedPrivate(env, 3, 0x111);
+    expect((await env.hub.getGetState()).private_live_count).toBe(3n);
 
     // Before expiry: a standalone evict sweeps nothing.
-    const evictor = await blockchain.treasury('standalone-evictor');
-    blockchain.now = T0 + RETENTION - 100;
-    await hub.send(evictor.getSender(), { value: toNano('0.15') }, { $$type: 'EvictExpiredCapsules', kind: 1n, max_count: 10n } as any);
-    expect((await hub.getGetState()).private_live_count).toBe(3n); // not yet expired → unchanged
+    const evictor = await env.blockchain.treasury('standalone-evictor');
+    env.blockchain.now = T0 + RETENTION - 100;
+    await env.hub.send(evictor.getSender(), { value: toNano('0.15') }, { $$type: 'EvictExpiredCapsules', kind: 1n, max_count: 10n } as any);
+    expect((await env.hub.getGetState()).private_live_count).toBe(3n); // not yet expired → unchanged
 
     // After expiry: a permissionless standalone evict reclaims them WITHOUT any new publish.
-    blockchain.now = T0 + RETENTION + 100;
-    await hub.send(evictor.getSender(), { value: toNano('0.15') }, { $$type: 'EvictExpiredCapsules', kind: 1n, max_count: 10n } as any);
-    expect((await hub.getGetState()).private_live_count).toBe(0n);
+    env.blockchain.now = T0 + RETENTION + 100;
+    await env.hub.send(evictor.getSender(), { value: toNano('0.15') }, { $$type: 'EvictExpiredCapsules', kind: 1n, max_count: 10n } as any);
+    expect((await env.hub.getGetState()).private_live_count).toBe(0n);
   });
 
   it('EVICT-STANDALONE-02: the per-call cap bounds the sweep; keepers repeat to drain a backlog', async () => {
-    const { hub, vault, blockchain } = (await setupHub()) as any;
-    blockchain.now = T0;
-    await seedPrivate(hub, vault, 8, 0x222n); // 8 entries
-    blockchain.now = T0 + RETENTION + 100;
+    const env = await setup(8n);
+    env.blockchain.now = T0;
+    await seedPrivate(env, 8, 0x222); // 8 entries
+    env.blockchain.now = T0 + RETENTION + 100;
 
-    const evictor = await blockchain.treasury('cap-evictor');
-    // Request more than the cap (32) — but only 8 exist, so all 8 go in one call (8 < 32).
-    await hub.send(evictor.getSender(), { value: toNano('0.3') }, { $$type: 'EvictExpiredCapsules', kind: 1n, max_count: 5n } as any);
-    // max_count=5 → only 5 of the 8 swept this call.
-    expect((await hub.getGetState()).private_live_count).toBe(3n);
+    const evictor = await env.blockchain.treasury('cap-evictor');
+    // max_count=5 (< the 32 cap) → only 5 of the 8 swept this call.
+    await env.hub.send(evictor.getSender(), { value: toNano('0.3') }, { $$type: 'EvictExpiredCapsules', kind: 1n, max_count: 5n } as any);
+    expect((await env.hub.getGetState()).private_live_count).toBe(3n);
     // A second call drains the rest.
-    await hub.send(evictor.getSender(), { value: toNano('0.3') }, { $$type: 'EvictExpiredCapsules', kind: 1n, max_count: 5n } as any);
-    expect((await hub.getGetState()).private_live_count).toBe(0n);
+    await env.hub.send(evictor.getSender(), { value: toNano('0.3') }, { $$type: 'EvictExpiredCapsules', kind: 1n, max_count: 5n } as any);
+    expect((await env.hub.getGetState()).private_live_count).toBe(0n);
   });
 
   it('EVICT-STANDALONE-03: unknown lane kind is rejected (13570)', async () => {
-    const { hub, blockchain } = (await setupHub()) as any;
-    const evictor = await blockchain.treasury('bad-evictor');
-    const res = await hub.send(evictor.getSender(), { value: toNano('0.1') }, { $$type: 'EvictExpiredCapsules', kind: 9n, max_count: 1n } as any);
-    const tx: any = res.transactions.find((t: any) => t.inMessage?.info?.dest?.toString() === hub.address.toString());
-    expect(Number(tx.description.computePhase.exitCode)).toBe(13570);
+    const env = await deployAnonReady();
+    const evictor = await env.blockchain.treasury('bad-evictor');
+    const res = await env.hub.send(evictor.getSender(), { value: toNano('0.1') }, { $$type: 'EvictExpiredCapsules', kind: 9n, max_count: 1n } as any);
+    expect(hubTxExit(res, env.hub)).toBe(13570);
   });
 });

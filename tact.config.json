@@ -104,6 +104,21 @@
       "name": "UsernameRegistry",
       "path": "contracts/UsernameRegistry.tact",
       "output": "build/UsernameRegistry"
+    },
+    {
+      "name": "KeyRegistry",
+      "path": "contracts/KeyRegistry.tact",
+      "output": "build/KeyRegistry"
+    },
+    {
+      "name": "CreditIssuer",
+      "path": "contracts/CreditIssuer.tact",
+      "output": "build/CreditIssuer"
+    },
+    {
+      "name": "AirdropPool",
+      "path": "./contracts/AirdropPool.tact",
+      "output": "./build/AirdropPool"
     }
   ]
 }

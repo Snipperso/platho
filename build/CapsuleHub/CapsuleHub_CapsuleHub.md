@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: CapsuleHub
-BoC Size: 24768 bytes
+BoC Size: 42884 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 38
+Total structures: 50
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -44,6 +44,46 @@ Signature: `VarAddress{workchain:int32,address:^slice}`
 ### BasechainAddress
 TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
+
+### PublishAnonBatch
+TL-B: `publish_anon_batch#50415542 bounce_id:uint64 bounce_tag:uint160 publish_id:uint256 publish_kind:uint8 part_count:uint8 parts:^cell tokens:^cell marketing:Maybe ^cell = PublishAnonBatch`
+Signature: `PublishAnonBatch{bounce_id:uint64,bounce_tag:uint160,publish_id:uint256,publish_kind:uint8,part_count:uint8,parts:^cell,tokens:^cell,marketing:Maybe ^cell}`
+
+### PublishRecovery
+TL-B: `publish_recovery#50415243 bounce_id:uint64 bounce_tag:uint160 publish_id:uint256 part:^cell owner_pubkey:uint256 seq:uint64 owner_sig:^cell = PublishRecovery`
+Signature: `PublishRecovery{bounce_id:uint64,bounce_tag:uint160,publish_id:uint256,part:^cell,owner_pubkey:uint256,seq:uint64,owner_sig:^cell}`
+
+### FundAnonPool
+TL-B: `fund_anon_pool#46414e50 credits_k:uint64 epoch:uint32 purchase_id:uint64 = FundAnonPool`
+Signature: `FundAnonPool{credits_k:uint64,epoch:uint32,purchase_id:uint64}`
+
+### FundAnonPoolAck
+TL-B: `fund_anon_pool_ack#46414e41 credits_k:uint64 epoch:uint32 purchase_id:uint64 = FundAnonPoolAck`
+Signature: `FundAnonPoolAck{credits_k:uint64,epoch:uint32,purchase_id:uint64}`
+
+### HubMirrorIssuerKey
+TL-B: `hub_mirror_issuer_key#48524b31 slot:uint8 pubkey:uint256 active:bool version:uint32 = HubMirrorIssuerKey`
+Signature: `HubMirrorIssuerKey{slot:uint8,pubkey:uint256,active:bool,version:uint32}`
+
+### BindCreditIssuer
+TL-B: `bind_credit_issuer#424c4e44 credit_issuer_address:address = BindCreditIssuer`
+Signature: `BindCreditIssuer{credit_issuer_address:address}`
+
+### EvictExpiredNullifiers
+TL-B: `evict_expired_nullifiers#4e554c4c max_count:uint16 = EvictExpiredNullifiers`
+Signature: `EvictExpiredNullifiers{max_count:uint16}`
+
+### ReclaimExpiredFunding
+TL-B: `reclaim_expired_funding#52454346 epoch:uint32 = ReclaimExpiredFunding`
+Signature: `ReclaimExpiredFunding{epoch:uint32}`
+
+### IssuerSlot
+TL-B: `_ pubkey:uint256 active:bool version:uint32 = IssuerSlot`
+Signature: `IssuerSlot{pubkey:uint256,active:bool,version:uint32}`
+
+### NullRec
+TL-B: `_ key:uint256 insert_time:uint32 = NullRec`
+Signature: `NullRec{key:uint256,insert_time:uint32}`
 
 ### BindDeploymentManifest
 TL-B: `bind_deployment_manifest#90e2e0cb deployment_manifest_hash:uint256 counterpart_address:address = BindDeploymentManifest`
@@ -98,8 +138,8 @@ TL-B: `_ publish_id:uint256 created_at:uint64 body_hash:uint256 bucket_prev_link
 Signature: `PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,bucket_prev_link:uint64,header_0:^cell,header_1:^cell}`
 
 ### PublicCapsuleEntry
-TL-B: `_ publish_id:uint256 created_at:uint64 author_wallet:address body_hash:uint256 parent_link:uint64 prev_link:uint64 profile_prev_link:uint64 header:^cell = PublicCapsuleEntry`
-Signature: `PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}`
+TL-B: `_ publish_id:uint256 created_at:uint64 channel_id:uint256 body_hash:uint256 parent_link:uint64 prev_link:uint64 profile_prev_link:uint64 header:^cell = PublicCapsuleEntry`
+Signature: `PublicCapsuleEntry{publish_id:uint256,created_at:uint64,channel_id:uint256,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}`
 
 ### PrivateCapsuleEntryView
 TL-B: `_ exists:bool entry_id:int257 bucket_prev_link:int257 entry_uid:int257 publish_id:int257 author_wallet:address page_id:int257 page_offset:int257 created_at:int257 header_0_hash:int257 header_1_hash:int257 body_hash:int257 header_0:^cell header_1:^cell = PrivateCapsuleEntryView`
@@ -134,16 +174,16 @@ TL-B: `_ from_entry_id:int257 count:int257 records:dict<uint16, ^IntroScanRecord
 Signature: `IntroScanPageView{from_entry_id:int257,count:int257,records:dict<uint16, ^IntroScanRecord{entry_id:int257,created_at:int257,view_tag:int257,ephemeral_r:int257}>}`
 
 ### RecoveryCapsuleRecord
-TL-B: `_ publish_id:uint256 updated_at:uint64 body_hash:uint256 author_wallet:address header_0:^cell header_1:^cell body:^cell = RecoveryCapsuleRecord`
-Signature: `RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,author_wallet:address,header_0:^cell,header_1:^cell,body:^cell}`
+TL-B: `_ publish_id:uint256 updated_at:uint64 body_hash:uint256 owner_pubkey:uint256 seq:uint64 header_0:^cell header_1:^cell body:^cell = RecoveryCapsuleRecord`
+Signature: `RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,owner_pubkey:uint256,seq:uint64,header_0:^cell,header_1:^cell,body:^cell}`
 
 ### RecoveryCapsuleView
-TL-B: `_ exists:bool slot_key:int257 updated_at:int257 body_hash:int257 author_wallet:address header_0:^cell header_1:^cell body:^cell = RecoveryCapsuleView`
-Signature: `RecoveryCapsuleView{exists:bool,slot_key:int257,updated_at:int257,body_hash:int257,author_wallet:address,header_0:^cell,header_1:^cell,body:^cell}`
+TL-B: `_ exists:bool slot_key:int257 updated_at:int257 body_hash:int257 owner_pubkey:int257 seq:int257 header_0:^cell header_1:^cell body:^cell = RecoveryCapsuleView`
+Signature: `RecoveryCapsuleView{exists:bool,slot_key:int257,updated_at:int257,body_hash:int257,owner_pubkey:int257,seq:int257,header_0:^cell,header_1:^cell,body:^cell}`
 
 ### PublicCapsuleEntryView
-TL-B: `_ exists:bool entry_id:int257 entry_uid:int257 publish_id:int257 author_wallet:address page_id:int257 page_offset:int257 created_at:int257 header_hash:int257 body_hash:int257 parent_link:int257 prev_link:int257 profile_prev_link:int257 header:^cell = PublicCapsuleEntryView`
-Signature: `PublicCapsuleEntryView{exists:bool,entry_id:int257,entry_uid:int257,publish_id:int257,author_wallet:address,page_id:int257,page_offset:int257,created_at:int257,header_hash:int257,body_hash:int257,parent_link:int257,prev_link:int257,profile_prev_link:int257,header:^cell}`
+TL-B: `_ exists:bool entry_id:int257 entry_uid:int257 publish_id:int257 channel_id:int257 page_id:int257 page_offset:int257 created_at:int257 header_hash:int257 body_hash:int257 parent_link:int257 prev_link:int257 profile_prev_link:int257 header:^cell = PublicCapsuleEntryView`
+Signature: `PublicCapsuleEntryView{exists:bool,entry_id:int257,entry_uid:int257,publish_id:int257,channel_id:int257,page_id:int257,page_offset:int257,created_at:int257,header_hash:int257,body_hash:int257,parent_link:int257,prev_link:int257,profile_prev_link:int257,header:^cell}`
 
 ### PublicCapsuleKeyIndex
 TL-B: `_ latest_entry_link:uint64 entry_count:uint64 = PublicCapsuleKeyIndex`
@@ -153,12 +193,20 @@ Signature: `PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}`
 TL-B: `_ exists:bool key_id:int257 latest_entry_id:int257 latest_entry_link:int257 entry_count:int257 = PublicCapsuleKeyIndexView`
 Signature: `PublicCapsuleKeyIndexView{exists:bool,key_id:int257,latest_entry_id:int257,latest_entry_link:int257,entry_count:int257}`
 
+### AnonPoolStateView
+TL-B: `_ credit_issuer_bound:bool credit_issuer_address:address nullifier_live_count:int257 nullifier_latest:int257 nullifier_oldest_live:int257 anon_pool_outstanding:int257 prepaid_unit:int257 max_batch_parts_anon:int257 = AnonPoolStateView`
+Signature: `AnonPoolStateView{credit_issuer_bound:bool,credit_issuer_address:address,nullifier_live_count:int257,nullifier_latest:int257,nullifier_oldest_live:int257,anon_pool_outstanding:int257,prepaid_unit:int257,max_batch_parts_anon:int257}`
+
+### IssuerSlotView
+TL-B: `_ exists:bool slot:int257 pubkey:int257 active:bool version:int257 = IssuerSlotView`
+Signature: `IssuerSlotView{exists:bool,slot:int257,pubkey:int257,active:bool,version:int257}`
+
 ### CapsuleHub$Data
-TL-B: `_ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 private_live_count:uint64 public_live_count:uint64 accrued_plato_fee_ton:uint128 private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,bucket_prev_link:uint64,header_0:^cell,header_1:^cell}> public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}> private_bucket_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_author_index:dict<uint256, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_parent_index:dict<uint64, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_oldest_live_id:uint64 private_oldest_live_id:uint64 public_profile_index:dict<uint256, uint64> public_profile_head:uint64 intro_entries:dict<uint64, ^IntroCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,header_0:^cell,header_1:^cell}> intro_latest_id:uint64 intro_oldest_live_id:uint64 intro_live_count:uint64 recovery_slots:dict<uint256, ^RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,author_wallet:address,header_0:^cell,header_1:^cell,body:^cell}> recovery_live_count:uint64 = CapsuleHub`
-Signature: `CapsuleHub{fee_accumulator_address:address,vault_address:address,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_controller_address:address,private_latest_id:uint64,public_latest_id:uint64,private_live_count:uint64,public_live_count:uint64,accrued_plato_fee_ton:uint128,private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,bucket_prev_link:uint64,header_0:^cell,header_1:^cell}>,public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}>,private_bucket_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_author_index:dict<uint256, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_parent_index:dict<uint64, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_oldest_live_id:uint64,private_oldest_live_id:uint64,public_profile_index:dict<uint256, uint64>,public_profile_head:uint64,intro_entries:dict<uint64, ^IntroCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,header_0:^cell,header_1:^cell}>,intro_latest_id:uint64,intro_oldest_live_id:uint64,intro_live_count:uint64,recovery_slots:dict<uint256, ^RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,author_wallet:address,header_0:^cell,header_1:^cell,body:^cell}>,recovery_live_count:uint64}`
+TL-B: `_ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 private_live_count:uint64 public_live_count:uint64 accrued_plato_fee_ton:uint128 private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,bucket_prev_link:uint64,header_0:^cell,header_1:^cell}> public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,channel_id:uint256,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}> private_bucket_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_author_index:dict<uint256, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_parent_index:dict<uint64, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> public_oldest_live_id:uint64 private_oldest_live_id:uint64 public_profile_index:dict<uint256, uint64> public_profile_head:uint64 intro_entries:dict<uint64, ^IntroCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,header_0:^cell,header_1:^cell}> intro_latest_id:uint64 intro_oldest_live_id:uint64 intro_live_count:uint64 recovery_slots:dict<uint256, ^RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,owner_pubkey:uint256,seq:uint64,header_0:^cell,header_1:^cell,body:^cell}> recovery_live_count:uint64 credit_issuer_address:address credit_issuer_bound:bool issuer_mirror:dict<int, ^IssuerSlot{pubkey:uint256,active:bool,version:uint32}> spent_nullifiers:dict<int, int> nullifier_seq:dict<int, ^NullRec{key:uint256,insert_time:uint32}> nullifier_latest:uint64 nullifier_oldest_live:uint64 nullifier_live_count:uint32 funded_by_epoch:dict<int, int> spent_by_epoch:dict<int, int> anon_pool_outstanding:uint64 = CapsuleHub`
+Signature: `CapsuleHub{fee_accumulator_address:address,vault_address:address,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_controller_address:address,private_latest_id:uint64,public_latest_id:uint64,private_live_count:uint64,public_live_count:uint64,accrued_plato_fee_ton:uint128,private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,bucket_prev_link:uint64,header_0:^cell,header_1:^cell}>,public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,channel_id:uint256,body_hash:uint256,parent_link:uint64,prev_link:uint64,profile_prev_link:uint64,header:^cell}>,private_bucket_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_author_index:dict<uint256, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_parent_index:dict<uint64, ^PublicCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}>,public_oldest_live_id:uint64,private_oldest_live_id:uint64,public_profile_index:dict<uint256, uint64>,public_profile_head:uint64,intro_entries:dict<uint64, ^IntroCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,header_0:^cell,header_1:^cell}>,intro_latest_id:uint64,intro_oldest_live_id:uint64,intro_live_count:uint64,recovery_slots:dict<uint256, ^RecoveryCapsuleRecord{publish_id:uint256,updated_at:uint64,body_hash:uint256,owner_pubkey:uint256,seq:uint64,header_0:^cell,header_1:^cell,body:^cell}>,recovery_live_count:uint64,credit_issuer_address:address,credit_issuer_bound:bool,issuer_mirror:dict<int, ^IssuerSlot{pubkey:uint256,active:bool,version:uint32}>,spent_nullifiers:dict<int, int>,nullifier_seq:dict<int, ^NullRec{key:uint256,insert_time:uint32}>,nullifier_latest:uint64,nullifier_oldest_live:uint64,nullifier_live_count:uint32,funded_by_epoch:dict<int, int>,spent_by_epoch:dict<int, int>,anon_pool_outstanding:uint64}`
 
 ## Get methods
-Total get methods: 14
+Total get methods: 18
 
 ## get_recovery_capsule
 Argument: slotKey
@@ -202,6 +250,18 @@ Argument: pageId
 
 ## get_state
 No arguments
+
+## get_anon_pool_state
+No arguments
+
+## get_issuer_slot
+Argument: slot
+
+## get_epoch_funding
+Argument: epoch
+
+## get_nullifier_insert_time
+Argument: serial
 
 ## Exit codes
 * 2: Stack underflow
