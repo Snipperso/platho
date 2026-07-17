@@ -234,6 +234,17 @@ describe('Deployment genesis controller auth', () => {
       counterpart_address: vaultAddress,
     } as CapsuleBind);
 
+    // clean-16 B3: the seal now also requires a bound CreditIssuer (gate 12923) — the anon-publish path spends
+    // prepaid credits, so a Hub sealed without its issuer would be permanently unable to accept a publish. The
+    // ceremony below predates that gate; without this bind the CONTROLLER's own legitimate seal is refused, which
+    // read as "the auth test broke" when the auth half was in fact working perfectly (the attacker stays rejected).
+    const creditIssuerAddress = fixtureAddress('GENESIS_AUTH_CREDIT_ISSUER');
+    await capsule.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindCreditIssuer',
+      credit_issuer_address: creditIssuerAddress,
+    } as any);
+
+    // An arbitrary sender must still be refused — this is the assertion the test exists for.
     await capsule.send(attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
       deployment_manifest_hash: MANIFEST_HASH,

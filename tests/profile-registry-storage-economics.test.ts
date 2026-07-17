@@ -24,17 +24,23 @@ describe('ProfileRegistry storage economics', () => {
     expect(report.status).toBe('PASS');
     expect(report.code_hashes.profile_registry).toBe(currentCodeHashes().PROFILE_REGISTRY_CODE_HASH);
     expect(report.cases.map((item) => item.label)).toEqual([
-      'VAULT_FIRST_AVATAR',
-      'VAULT_REPEAT_AVATAR',
-      'VAULT_MANY_OWNERS_12',
-      'VAULT_MANY_UPDATES_ONE_OWNER_10',
+      // Renamed from VAULT_*: the payer-auth freeze made avatars DIRECT-PAY (owner_wallet == payer_wallet, gate
+      // 21163). No Vault stands in the middle any more — that is what makes the registry durable across redeploys.
+      'DIRECT_FIRST_AVATAR',
+      'DIRECT_REPEAT_AVATAR',
+      'DIRECT_MANY_OWNERS_12',
+      'DIRECT_MANY_UPDATES_ONE_OWNER_10',
     ]);
     for (const item of report.cases) {
       expect(BigInt(item.raw_balance_delta_nanotons), item.label)
         .toBeGreaterThanOrEqual(BigInt(item.expected_permanent_endowment_nanotons));
       expect(BigInt(item.retained_margin_vs_permanent_endowment_nanotons), item.label)
         .toBeGreaterThanOrEqual(BigInt(report.constants.minimum_storage_margin_nanotons));
-      expect(BigInt(item.avatar_record_count), item.label).toBeGreaterThanOrEqual(BigInt(item.updates));
+      // NOT `>= updates`. Fix #13 (avatar_records.del) deletes the previous record on every update
+      // (ProfileRegistry.tact:323-324), so the surviving count is one per OWNER regardless of how often they
+      // changed their avatar. The old expectation encoded the pre-#13 world where records accumulated forever —
+      // it read as "the economics are broken" while what was actually broken was the expectation.
+      expect(BigInt(item.avatar_record_count), item.label).toBe(BigInt(item.owners ?? 1));
     }
   }, 30000);
 

@@ -79,6 +79,13 @@ describe('Deployment binding profile', () => {
       deployment_manifest_hash: MANIFEST_HASH,
       counterpart_address: vaultAddress,
     } as CapsuleBind);
+    // clean-16 B3: the Hub's seal also requires a bound CreditIssuer (gate 12923). Without it the CONTROLLER's own
+    // seal is refused, and this test — which is about POST-seal rebinding being rejected forever — never reaches
+    // the state it means to assert.
+    await capsule.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindCreditIssuer',
+      credit_issuer_address: fixtureAddress('POST_SEAL_CREDIT_ISSUER'),
+    } as any);
     await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
       deployment_manifest_hash: MANIFEST_HASH,
@@ -170,6 +177,13 @@ describe('Deployment binding profile', () => {
       deployment_manifest_hash: MANIFEST_HASH,
       counterpart_address: vaultAddress,
     } as CapsuleBind);
+    // clean-16 B3: the Hub's seal also requires a bound CreditIssuer (gate 12923). Without it the CONTROLLER's own
+    // seal is refused, and this test — which is about POST-seal rebinding being rejected forever — never reaches
+    // the state it means to assert.
+    await capsule.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindCreditIssuer',
+      credit_issuer_address: fixtureAddress('POST_SEAL_CREDIT_ISSUER'),
+    } as any);
     await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
       deployment_manifest_hash: MANIFEST_HASH,

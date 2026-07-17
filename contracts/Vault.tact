@@ -338,7 +338,11 @@ const PROTOCOL_FEE_TON_BATCH: Int = 10000000; // 0.01 TON per part
 const STORAGE_RESERVE_PRIVATE: Int = 4300000; // 1M keepalive + 3.3M endowment
 const STORAGE_RESERVE_PUBLIC: Int = 10400000;  // 1M keepalive + 9.4M endowment (raised for the author/parent index slot)
 const STORAGE_RESERVE_INTRO: Int = 3000000; // clean-16 ИНК4 (G8-provisional): 1M keepalive + 2M endowment; mirrors the Hub INTRO endowment
-const STORAGE_RESERVE_RECOVERY: Int = 201000000; // clean-16 ИНК6 (G8-provisional, review-fix): 1M keepalive + 200M endowment (real worst-case 3yr on-chain body rent ≈166M); mirrors the Hub RECOVERY endowment. FINALIZE in Фаза-5
+// clean-16 ИНК6 [G8 CANONICAL 2026-07-17]: mirrors CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT bit-for-bit.
+// 79.1 cells (8K cap) x 64962/cell/yr (frozen 135/0) x 3yr = 15_415_483, x1.5 rate-risk margin -> 23_200_000.
+// The former 201000000 (1M keepalive + 200M) was derived on the DEAD pre-Apr-2026 schedule (500/1, billed bits);
+// the keepalive term is gone too — liveness rides the Hub's 100 TON reserve floor, not a per-entry charge.
+const STORAGE_RESERVE_RECOVERY: Int = 23200000;
 // clean-16 L2/#4 (storage-solvency): a dormant, ZERO-balance account is permissionlessly evictable after this much
 // inactivity (owner-decided 2026-07-15 = 2 years). Bounds the never-pruned users/key_records state → self-financing.
 // A returning user simply re-registers (keys are seed-deterministic → zero crypto loss).

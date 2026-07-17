@@ -2322,7 +2322,7 @@ builder $Vault$_store(builder build_0, (slice, slice, slice, slice, slice, int, 
         return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_240);
     }
     if (($kind == 4)) {
-        var $fresh$ret_241 = 201000000;
+        var $fresh$ret_241 = 23200000;
         return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_241);
     }
     throw_unless(16360, ($kind == 1));

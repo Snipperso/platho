@@ -23,14 +23,32 @@ const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const PRICE_4 = 10_000_000_000_000n;
 const PRICE_5 = 1_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
-const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = 6_000_000n;
-const USERNAME_STATE_GROWTH_EXEC_RESERVE = 4_000_000n;
-const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 500_000_000n;
-const USERNAME_ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
-const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT = 36_000_000n; // dedicated century-rent endowment for the never-evicted name_records entry (mirrors PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT)
-// The registry retains 6M endowment + 500M item deploy reserve + 1M ack value + 4M state-growth reserve + 36M
-// name-record endowment = 547M, then forwards the 500M deploy reserve to the item. The notify message must carry
-// the full retained value plus a gas/fwd-fee margin for the registry's own accept + deploy send.
+// ── Every constant in the contract's retainedValue gate is READ FROM THE CONTRACT, never copied. ──────────────
+// All four used to be hand-mirrored here, and two had silently drifted:
+//   USERNAME_NFT_ITEM_DEPLOY_RESERVE   script 500_000_000  vs contract 829_000_000
+//   USERNAME_NAME_RECORD_STORAGE_...   script  36_000_000  vs contract 100_000_000
+// So the model computed retainedValue = 611M while the contract demanded 940M, the notify under-funded the mint,
+// gate 19122 threw, the registry retained nothing, and the case reported "negative retained margin -6000000" —
+// which reads as an economics hole. It was a stale copy. (The 829M is not drift to "fix": its comment records the
+// owner's decision that a username mint costs EXACTLY 1 TON, and the roadmap's #7 rollback explicitly excludes
+// username for that reason.)
+// tests/constants-single-source.test.ts polices contract-vs-spec drift but does not reach scripts/; parsing the
+// source is what makes this model unable to lie.
+const CONTRACT_SRC = fs.readFileSync(path.join('contracts', 'UsernameRegistry.tact'), 'utf8');
+function contractConst(name: string): bigint {
+  const m = CONTRACT_SRC.match(new RegExp(`^const ${name}: Int = (\\d+);`, 'm'));
+  if (!m) throw new Error(`${name} not found in contracts/UsernameRegistry.tact`);
+  return BigInt(m[1]);
+}
+const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = contractConst('USERNAME_PENDING_MINT_STORAGE_ENDOWMENT');
+const USERNAME_STATE_GROWTH_EXEC_RESERVE = contractConst('USERNAME_STATE_GROWTH_EXEC_RESERVE');
+const USERNAME_NFT_ITEM_DEPLOY_RESERVE = contractConst('USERNAME_NFT_ITEM_DEPLOY_RESERVE');
+const USERNAME_ATH_NOTIFICATION_ACK_VALUE = contractConst('USERNAME_ATH_NOTIFICATION_ACK_VALUE');
+const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT = contractConst('USERNAME_NAME_RECORD_STORAGE_ENDOWMENT');
+// The registry retains pending endowment + item deploy reserve + ack value + state-growth reserve + name-record
+// endowment, then forwards the deploy reserve to the item. The notify must carry the full retained value plus a
+// gas/fwd margin for the registry's own accept + deploy send. Figures are NOT written here on purpose — they are
+// read from the contract above, because the two that were written here are exactly the two that drifted.
 const USERNAME_RETAINED_VALUE =
   USERNAME_PENDING_MINT_STORAGE_ENDOWMENT +
   USERNAME_NFT_ITEM_DEPLOY_RESERVE +

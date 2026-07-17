@@ -1,0 +1,1320 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/KeyRegistry/KeyRegistry_KeyRegistry.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get
+  DECLPROC __tact_context_get_sender
+  DECLPROC __tact_dict_get_int_cell
+  DECLPROC __tact_dict_set_int_cell
+  DECLPROC __tact_dict_exists_int
+  DECLPROC $KeyAccount$_store
+  DECLPROC $KeyAccount$_store_cell
+  DECLPROC $KeyAccount$_load
+  DECLPROC $KeyAccount$_as_optional
+  DECLPROC $KeyAccount$_load_opt
+  DECLPROC $KeyRecord$_store
+  DECLPROC $KeyRecord$_store_cell
+  DECLPROC $KeyRecord$_load
+  DECLPROC $KeyRecord$_as_optional
+  DECLPROC $KeyRecord$_load_opt
+  DECLPROC $KeyRegistry$_store
+  DECLPROC $KeyRegistry$_load
+  DECLPROC $Context$_get_value
+  DECLPROC $KeyAccount$_not_null
+  DECLPROC $KeyRecord$_not_null
+  DECLPROC $KeyRegKeyRecordView$_to_external
+  DECLPROC $KeyRegAccountView$_to_external
+  DECLPROC $KeyRegGlobalView$_to_external
+  DECLPROC $KeyRegistry$init$_load
+  DECLPROC $KeyRegistry$_contract_init
+  DECLPROC $KeyRegistry$_contract_load
+  DECLPROC $KeyRegistry$_contract_store
+  DECLPROC $KeyRegistry$_fun_requireUnsealed
+  DECLPROC $KeyRegistry$_fun_requireSealed
+  DECLPROC $KeyRegistry$_fun_requireGenesisController
+  DECLPROC $KeyRegistry$_fun_isBasechainAddress
+  DECLPROC $KeyRegistry$_fun_accountKey
+  DECLPROC $KeyRegistry$_fun_validatePqPubkeyCell
+  DECLPROC $KeyRegistry$_fun_isValidPqPubkeyCell
+  DECLPROC $KeyRegistry$_fun_validateKeyProfile
+  DECLPROC $KeyRegistry$_fun_isValidKeyProfile
+  DECLPROC $KeyRegistry$_fun_computeKeyId
+  DECLPROC $KeyRegistry$_fun_requireEmptyEnvelopePadding
+  DECLPROC $KeyRegKeyRecordView$_constructor_exists_owner_wallet_key_generation_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt
+  DECLPROC $KeyRegistry$_fun_get_key_record
+  DECLPROC $KeyRegAccountView$_constructor_exists_owner_wallet_current_key_id_key_generation_rotation_nonce_registered_at
+  DECLPROC $KeyRegistry$_fun_get_account
+  DECLPROC $KeyRegistry$_fun_get_current_key_record
+  DECLPROC $KeyRegGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_account_count_key_record_count_key_record_storage_endowment_account_storage_endowment_base_storage_endowment
+  DECLPROC $KeyRegistry$_fun_get_global
+  DECLPROC $KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt
+  DECLPROC $KeyAccount$_constructor_owner_wallet_current_key_id_auth_pubkey_key_generation_rotation_nonce_registered_at
+  104356 DECLMETHOD %get_key_record
+  110232 DECLMETHOD %get_account
+  80085 DECLMETHOD %get_current_key_record
+  126899 DECLMETHOD %get_global
+  DECLPROC recv_internal
+  DECLPROC recv_external
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get PROCINLINE:<{
+    __tact_context GETGLOB
+    4 UNTUPLE
+  }>
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  __tact_dict_get_int_cell PROCINLINE:<{
+    -ROT
+    DICTIGETREF
+    NULLSWAPIFNOT
+    IF:<{
+    }>ELSE<{
+      DROP
+      PUSHNULL
+    }>
+  }>
+  __tact_dict_set_int_cell PROCINLINE:<{
+    DUP
+    ISNULL
+    IF:<{
+      DROP
+      -ROT
+      DICTIDEL
+      DROP
+    }>ELSE<{
+      s1 s3 s3 XCHG3
+      DICTISETREF
+    }>
+  }>
+  __tact_dict_exists_int PROCINLINE:<{
+    -ROT
+    DICTIGET
+    NULLSWAPIFNOT
+    NIP
+  }>
+  $KeyAccount$_store PROCINLINE:<{
+    s5 s6 XCHG2
+    STSLICE
+    s1 s3 XCHG
+    256 STU
+    256 STU
+    32 STU
+    64 STU
+    64 STU
+  }>
+  $KeyAccount$_store_cell PROCINLINE:<{
+    6 -ROLL
+    $KeyAccount$_store INLINECALLDICT
+    ENDC
+  }>
+  $KeyAccount$_load PROCINLINE:<{
+    LDMSGADDR
+    256 LDU
+    256 LDU
+    32 LDU
+    64 LDU
+    64 LDU
+    6 -ROLL
+  }>
+  $KeyAccount$_as_optional PROCINLINE:<{
+        6 TUPLE
+  }>
+  $KeyAccount$_load_opt PROCINLINE:<{
+    DUP
+    ISNULL
+    IF:<{
+      DROP
+      PUSHNULL
+    }>ELSE<{
+      CTOS
+      $KeyAccount$_load INLINECALLDICT
+      1 6 BLKDROP2
+      $KeyAccount$_as_optional INLINECALLDICT
+    }>
+  }>
+  $KeyRecord$_store PROCREF:<{
+    s12 s13 XCHG2
+    STSLICE
+    s1 s10 XCHG
+    32 STU
+    s1 s8 XCHG
+    256 STU
+    s1 s6 XCHG
+    256 STU
+    s0 s4 XCHG
+    NEWC
+    256 STU
+    s1 s3 XCHG
+    256 STU
+    16 STU
+    STREF
+    s1 s2 XCHG
+    16 STU
+    s1 s2 XCHG
+    64 STU
+    s1 s2 XCHG
+    64 STU
+    s1 s2 XCHG
+    64 STU
+    s1 s2 XCHG
+    64 STU
+    STBREFR
+  }>
+  $KeyRecord$_store_cell PROCINLINE:<{
+    13 -ROLL
+    $KeyRecord$_store INLINECALLDICT
+    ENDC
+  }>
+  $KeyRecord$_load PROCREF:<{
+    LDMSGADDR
+    32 LDU
+    256 LDU
+    256 LDU
+    LDREF
+    SWAP
+    CTOS
+    256 LDU
+    256 LDU
+    16 LDU
+    LDREF
+    16 LDU
+    64 LDU
+    64 LDU
+    64 LDU
+    64 LDU
+    DROP
+    s9 s13 XCHG
+    s9 s12 XCHG
+    s9 s11 XCHG
+    s9 s10 XCHG
+  }>
+  $KeyRecord$_as_optional PROCINLINE:<{
+        13 TUPLE
+  }>
+  $KeyRecord$_load_opt PROCINLINE:<{
+    DUP
+    ISNULL
+    IF:<{
+      DROP
+      PUSHNULL
+    }>ELSE<{
+      CTOS
+      $KeyRecord$_load INLINECALLDICT
+      1 13 BLKDROP2
+      $KeyRecord$_as_optional INLINECALLDICT
+    }>
+  }>
+  $KeyRegistry$_store PROCINLINE:<{
+    s7 s8 XCHG2
+    1 STI
+    s1 s5 XCHG
+    STSLICE
+    s1 s3 XCHG
+    256 STU
+    256 STU
+    64 STU
+    64 STU
+    STDICT
+    STDICT
+  }>
+  $KeyRegistry$_load PROCINLINE:<{
+    1 LDI
+    LDMSGADDR
+    256 LDU
+    256 LDU
+    64 LDU
+    64 LDU
+    LDDICT
+    LDDICT
+    8 -ROLL
+  }>
+  $Context$_get_value PROCINLINE:<{
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $KeyAccount$_not_null PROCINLINE:<{
+        6 UNTUPLE
+  }>
+  $KeyRecord$_not_null PROCINLINE:<{
+        13 UNTUPLE
+  }>
+  $KeyRegKeyRecordView$_to_external PROCINLINE:<{
+  }>
+  $KeyRegAccountView$_to_external PROCINLINE:<{
+  }>
+  $KeyRegGlobalView$_to_external PROCINLINE:<{
+  }>
+  $KeyRegistry$init$_load PROCINLINE:<{
+    LDMSGADDR
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    1 LDI
+    4 -ROLL
+  }>
+  $KeyRegistry$_contract_init PROCINLINE:<{
+    PUSHNULL
+    PUSHNULL
+    0 PUSHINT
+    DUP
+    s4 s7 XCHG
+    s4 s6 XCHG
+    s4 s5 XCHG
+    2SWAP
+  }>
+  $KeyRegistry$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $KeyRegistry$_load INLINECALLDICT
+      1 8 BLKDROP2
+    }>ELSE<{
+      $KeyRegistry$init$_load INLINECALLDICT
+      s0 s4 XCHG
+      ENDS
+      3 ROLL
+      $KeyRegistry$_contract_init INLINECALLDICT
+    }>
+  }>
+  $KeyRegistry$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    8 -ROLL
+    $KeyRegistry$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $KeyRegistry$_fun_requireUnsealed PROCREF:<{
+    20000 PUSHINT
+    s8 PUSH
+    NOT
+    THROWANYIFNOT
+  }>
+  $KeyRegistry$_fun_requireSealed PROCREF:<{
+    20100 PUSHINT
+    s8 PUSH
+    THROWANYIFNOT
+  }>
+  $KeyRegistry$_fun_requireGenesisController PROCREF:<{
+    20033 PUSHINT
+    __tact_context_get_sender INLINECALLDICT
+    s8 PUSH
+    SDEQ
+    THROWANYIFNOT
+  }>
+  $KeyRegistry$_fun_isBasechainAddress PROCREF:<{
+        REWRITESTDADDR
+    DROP
+    0 EQINT
+  }>
+  $KeyRegistry$_fun_accountKey PROCREF:<{
+    20050 PUSHINT
+    SWAP
+    11 LDU
+    SWAP
+    10 PUSHPOW2
+    EQUAL
+    s1 s2 XCHG
+    THROWANYIFNOT
+    256 LDU
+    DROP
+  }>
+  $KeyRegistry$_fun_validatePqPubkeyCell PROCREF:<{
+    20107 PUSHINT
+    s0 s2 XCHG
+    2 EQINT
+    s1 s2 XCHG
+    THROWANYIFNOT
+    DUP
+    10 PUSHINT
+        CDATASIZE
+    20108 PUSHINT
+    s0 s3 XCHG
+    10 EQINT
+    s1 s3 XCHG
+    THROWANYIFNOT
+    20109 PUSHINT
+    SWAP
+    9472 PUSHINT
+    EQUAL
+    THROWANYIFNOT
+    20113 PUSHINT
+    SWAP
+    9 EQINT
+    THROWANYIFNOT
+    WHILE:<{
+      OVER
+      0 GTINT
+    }>DO<{
+      127 PUSHINT
+      s2 PUSH
+      1184 PUSHINT
+      EQUAL
+      IF:<{
+        DROP
+        41 PUSHINT
+      }>ELSE<{
+        s2 PUSH
+        127 LESSINT
+        IF:<{
+          DROP
+          OVER
+        }>
+      }>
+      OVER
+          CTOS
+      20114 PUSHINT
+      OVER
+          SBITS
+      s3 PUSH
+      3 LSHIFT#
+      EQUAL
+      THROWANYIFNOT
+      s3 s1 PUSH2
+      GREATER
+      IF:<{
+        s2 POP
+        20115 PUSHINT
+        s2 PUSH
+            SREFS
+        1 EQINT
+        THROWANYIFNOT
+        SWAP
+            LDREF
+        DROP
+      }>ELSE<{
+        20116 PUSHINT
+        SWAP
+            SREFS
+        0 EQINT
+        THROWANYIFNOT
+        SWAP
+      }>
+      -ROT
+      SUB
+      SWAP
+    }>
+    2DROP
+  }>
+  $KeyRegistry$_fun_isValidPqPubkeyCell PROCREF:<{
+    c2 SAVE
+    SAMEALTSAVE
+    SWAP
+    2 NEQINT
+    IFJMP:<{
+      2DROP
+      FALSE
+    }>
+    DUP
+    10 PUSHINT
+        CDATASIZE
+    s0 s2 XCHG
+    10 NEQINT
+    IFJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    9472 PUSHINT
+    NEQ
+    IFJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    9 NEQINT
+    IFJMP:<{
+      2DROP
+      FALSE
+    }>
+    WHILE:<{
+      OVER
+      0 GTINT
+    }>DO<{
+      127 PUSHINT
+      s2 PUSH
+      1184 PUSHINT
+      EQUAL
+      IF:<{
+        DROP
+        41 PUSHINT
+      }>ELSE<{
+        s2 PUSH
+        127 LESSINT
+        IF:<{
+          DROP
+          OVER
+        }>
+      }>
+      OVER
+          CTOS
+      DUP
+          SBITS
+      s2 PUSH
+      3 LSHIFT#
+      NEQ
+      IFJMP:<{
+        4 BLKDROP
+        FALSE
+        RETALT
+      }>
+      s3 s1 PUSH2
+      GREATER
+      IF:<{
+        s2 POP
+        OVER
+            SREFS
+        1 NEQINT
+        IFJMP:<{
+          3 BLKDROP
+          FALSE
+          RETALT
+        }>
+        SWAP
+            LDREF
+        DROP
+      }>ELSE<{
+            SREFS
+        IFJMP:<{
+          3 BLKDROP
+          FALSE
+          RETALT
+        }>
+        SWAP
+      }>
+      -ROT
+      SUB
+      SWAP
+    }>
+    2DROP
+    TRUE
+  }>
+  $KeyRegistry$_fun_validateKeyProfile PROCREF:<{
+    20101 PUSHINT
+    s0 s7 XCHG
+    0 NEQINT
+    s1 s7 XCHG
+    THROWANYIFNOT
+    20102 PUSHINT
+    s0 s5 XCHG
+    0 NEQINT
+    s1 s5 XCHG
+    THROWANYIFNOT
+    20103 PUSHINT
+    s0 s3 XCHG
+    0 NEQINT
+    s1 s3 XCHG
+    THROWANYIFNOT
+    20107 PUSHINT
+    s4 PUSH
+    2 EQINT
+    THROWANYIFNOT
+    20105 PUSHINT
+    SWAP
+    0 NEQINT
+    THROWANYIFNOT
+    20106 PUSHINT
+    OVER
+    1184 PUSHINT
+    EQUAL
+    THROWANYIFNOT
+    -ROT
+    $KeyRegistry$_fun_validatePqPubkeyCell INLINECALLDICT
+  }>
+  $KeyRegistry$_fun_isValidKeyProfile PROCREF:<{
+    s0 s6 XCHG
+    IFNOTJMP:<{
+      6 BLKDROP
+      FALSE
+    }>
+    s0 s4 XCHG
+    IFNOTJMP:<{
+      5 BLKDROP
+      FALSE
+    }>
+    s0 s2 XCHG
+    IFNOTJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    s3 PUSH
+    2 NEQINT
+    IFJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    IFNOTJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    DUP
+    1184 PUSHINT
+    NEQ
+    IFJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    -ROT
+    $KeyRegistry$_fun_isValidPqPubkeyCell INLINECALLDICT
+  }>
+  $KeyRegistry$_fun_computeKeyId PROCREF:<{
+        NEWC
+    s1 s5 XCHG
+    256 STU
+    s1 s3 XCHG
+    256 STU
+    256 STU
+        ENDC
+        NEWC
+    1262836041 PUSHINT
+    SWAP
+    32 STU
+    s0 s5 XCHG2
+        STSLICER
+    s1 s3 XCHG
+    32 STU
+    s1 s2 XCHG
+    16 STU
+    16 STU
+        STREF
+        ENDC
+        HASHCU
+  }>
+  $KeyRegistry$_fun_requireEmptyEnvelopePadding PROCINLINE:<{
+    20900 PUSHINT
+    OVER
+        SBITS
+    0 EQINT
+    THROWANYIFNOT
+    20901 PUSHINT
+    SWAP
+        SREFS
+    0 EQINT
+    THROWANYIFNOT
+  }>
+  $KeyRegKeyRecordView$_constructor_exists_owner_wallet_key_generation_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt PROCINLINE:<{
+  }>
+  $KeyRegistry$_fun_get_key_record PROCREF:<{
+    257 PUSHINT
+    s2 PUSH
+    s0 s2 XCHG
+    __tact_dict_get_int_cell INLINECALLDICT
+    $KeyRecord$_load_opt INLINECALLDICT
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      FALSE
+          MYADDR
+      0 PUSHINT
+      s0 s0 s0 PUSH3
+      s0 s0 PUSH2
+          <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
+      s1 s1 s1 PUSH3
+      s0 s0 PUSH2
+      $KeyRegKeyRecordView$_constructor_exists_owner_wallet_key_generation_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt INLINECALLDICT
+    }>
+    $KeyRecord$_not_null INLINECALLDICT
+    TRUE
+    13 -ROLL
+    $KeyRegKeyRecordView$_constructor_exists_owner_wallet_key_generation_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt INLINECALLDICT
+  }>
+  $KeyRegAccountView$_constructor_exists_owner_wallet_current_key_id_key_generation_rotation_nonce_registered_at PROCINLINE:<{
+  }>
+  $KeyRegistry$_fun_get_account PROCREF:<{
+    s2 PUSH
+    8 2 BLKSWAP
+    257 PUSHINT
+    s0 s10 XCHG
+    $KeyRegistry$_fun_accountKey INLINECALLDICT
+    s9 s10 s0 XCHG3
+    __tact_dict_get_int_cell INLINECALLDICT
+    $KeyAccount$_load_opt INLINECALLDICT
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      FALSE
+          MYADDR
+      0 PUSHINT
+      s0 s0 s0 PUSH3
+      $KeyRegAccountView$_constructor_exists_owner_wallet_current_key_id_key_generation_rotation_nonce_registered_at INLINECALLDICT
+      s11 s13 XCHG
+      s10 s12 XCHG
+      s9 s11 XCHG
+      s8 s10 XCHG
+      s7 s9 XCHG
+      s6 s8 XCHG
+      s6 s7 XCHG
+    }>
+    $KeyAccount$_not_null INLINECALLDICT
+    s3 POP
+    TRUE
+    s0 s5 XCHG
+    s0 s4 XCHG
+    s0 s3 XCHG
+    $KeyRegAccountView$_constructor_exists_owner_wallet_current_key_id_key_generation_rotation_nonce_registered_at INLINECALLDICT
+    s11 s13 XCHG
+    s10 s12 XCHG
+    s9 s11 XCHG
+    s8 s10 XCHG
+    s7 s9 XCHG
+    s6 s8 XCHG
+    s6 s7 XCHG
+  }>
+  $KeyRegistry$_fun_get_current_key_record PROCREF:<{
+    s2 PUSH
+    8 2 BLKSWAP
+    257 PUSHINT
+    s0 s10 XCHG
+    $KeyRegistry$_fun_accountKey INLINECALLDICT
+    s9 s10 s0 XCHG3
+    __tact_dict_get_int_cell INLINECALLDICT
+    $KeyAccount$_load_opt INLINECALLDICT
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      s5 s7 XCHG
+      2 5 BLKSWAP
+      0 PUSHINT
+      $KeyRegistry$_fun_get_key_record INLINECALLDICT
+    }>
+    $KeyAccount$_not_null INLINECALLDICT
+    s4 s5 XCHG
+    5 BLKDROP
+    s6 s8 XCHG
+    s5 s7 XCHG
+    s4 s6 XCHG
+    s3 s5 XCHG
+    s4 s3 s0 XCHG3
+    s1 s2 XCHG
+    $KeyRegistry$_fun_get_key_record INLINECALLDICT
+  }>
+  $KeyRegGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_account_count_key_record_count_key_record_storage_endowment_account_storage_endowment_base_storage_endowment PROCINLINE:<{
+  }>
+  $KeyRegistry$_fun_get_global PROCREF:<{
+    30000000 PUSHINT
+    10000000 PUSHINT
+    100000000 PUSHINT
+    s10 PUSH
+    s3 s9 XCPU
+    s3 s9 XCPU
+    s3 s12 XCPU
+    s3 s10 XCPU
+    s3 s10 XCPU
+    s0 s3 XCHG
+    $KeyRegGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_account_count_key_record_count_key_record_storage_endowment_account_storage_endowment_base_storage_endowment INLINECALLDICT
+  }>
+  $KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt PROCINLINE:<{
+  }>
+  $KeyAccount$_constructor_owner_wallet_current_key_id_auth_pubkey_key_generation_rotation_nonce_registered_at PROCINLINE:<{
+  }>
+  %get_key_record PROC:<{
+    $KeyRegistry$_contract_load INLINECALLDICT
+    8 ROLL
+    $KeyRegistry$_fun_get_key_record INLINECALLDICT
+    8 14 BLKDROP2
+    $KeyRegKeyRecordView$_to_external INLINECALLDICT
+  }>
+  %get_account PROC:<{
+    $KeyRegistry$_contract_load INLINECALLDICT
+    8 ROLL
+    $KeyRegistry$_fun_get_account INLINECALLDICT
+    8 6 BLKDROP2
+    $KeyRegAccountView$_to_external INLINECALLDICT
+  }>
+  %get_current_key_record PROC:<{
+    $KeyRegistry$_contract_load INLINECALLDICT
+    8 ROLL
+    $KeyRegistry$_fun_get_current_key_record INLINECALLDICT
+    8 14 BLKDROP2
+    $KeyRegKeyRecordView$_to_external INLINECALLDICT
+  }>
+  %get_global PROC:<{
+    $KeyRegistry$_contract_load INLINECALLDICT
+    $KeyRegistry$_fun_get_global INLINECALLDICT
+    8 9 BLKDROP2
+    $KeyRegGlobalView$_to_external INLINECALLDICT
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $KeyRegistry$_contract_load INLINECALLDICT
+    s0 s9 XCHG
+    IFJMP:<{
+      9 BLKDROP
+    }>
+    0 PUSHINT
+    s8 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s8 XCHG
+      32 LDU
+      s0 s9 XCHG
+    }>
+    OVER
+    974311853 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s7 XCHG
+      256 LDU
+      DROP
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s1 s3 s8 XCHG3
+      $KeyRegistry$_fun_requireUnsealed INLINECALLDICT
+      $KeyRegistry$_fun_requireGenesisController INLINECALLDICT
+      s4 POP
+      s6 POP
+      20040 PUSHINT
+      s7 PUSH
+      1 GTINT
+      THROWANYIFNOT
+      20041 PUSHINT
+      s4 s7 PUSH2
+      EQUAL
+      THROWANYIFNOT
+      TRUE
+      s0 s7 XCHG
+      s5 s6 XCHG
+      s0 s4 XCHG
+      s1 s5 s5 XCHG3
+      s0 s3 XCHG
+      $KeyRegistry$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1263683377 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s7 XCHG
+      256 LDU
+      256 LDU
+      256 LDU
+      LDREF
+      DROP
+      CTOS
+      256 LDU
+      256 LDU
+      16 LDU
+      LDREF
+      16 LDU
+      DROP
+      s7 s13 XCHG
+      s6 s12 XCHG
+      s5 s11 XCHG
+      s4 s10 XCHG
+      s3 s9 XCHG
+      s8 s14 s15 XCHG3
+      $KeyRegistry$_fun_requireSealed INLINECALLDICT
+      s13 s12 s11 PUSH3
+      s12 s11 PUSH2
+      19 s() PUSH
+      21 s() PUSH
+      $KeyRegistry$_fun_validateKeyProfile INLINECALLDICT
+      20118 PUSHINT
+      s11 PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      20119 PUSHINT
+      s11 s13 PUSH2
+      NEQ
+      THROWANYIFNOT
+      20051 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s1 s9 XCHG
+      s1 s8 XCHG
+      s1 s7 XCHG
+      s1 s6 XCHG
+      s1 s5 XCHG
+      s1 s4 XCHG
+      s3 s3 s0 XCHG3
+      $KeyRegistry$_fun_isBasechainAddress INLINECALLDICT
+      s1 s9 XCHG
+      THROWANYIFNOT
+      __tact_context_get_sender INLINECALLDICT
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      $KeyRegistry$_fun_accountKey INLINECALLDICT
+      20111 PUSHINT
+      s3 PUSH
+      257 PUSHINT
+      s3 PUSH
+      __tact_dict_exists_int INLINECALLDICT
+      NOT
+      THROWANYIFNOT
+      42000000 PUSHINT
+      20110 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      ROT
+      GEQ
+      THROWANYIFNOT
+      0 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s8 s10 XCHG
+      5 6 REVERSE
+      s5 s9 XCHG
+      s4 s10 XCHG
+      s3 s9 XCHG
+      s10 s9 s0 XCHG3
+      s9 PUSH
+      17 s() PUSH
+      17 s() PUSH
+      s15 s14 PUSH2
+      23 s() PUSH
+      $KeyRegistry$_fun_computeKeyId INLINECALLDICT
+      20112 PUSHINT
+      s2 PUSH
+      257 PUSHINT
+      s3 PUSH
+      __tact_dict_exists_int INLINECALLDICT
+      NOT
+      THROWANYIFNOT
+      257 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+          NOW
+          LTIME
+      s13 s13 PUSH2
+      s15 PUSH
+      s5 s12 XCHG
+      s0 s11 XCHG
+      s10 23 s() XCHG
+      s9 22 s() XCHG
+      s8 21 s() XCHG
+      s7 19 s() XCHG
+      s6 18 s() XCHG
+      s5 24 s() XCHG
+      s0 25 s() XCHG
+      4 -ROLL
+      $KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt INLINECALLDICT
+      NEWC
+      $KeyRecord$_store_cell INLINECALLDICT
+      s9 s6 s0 XCHG3
+      s7 s(-1) PUXC
+      __tact_dict_set_int_cell INLINECALLDICT
+      s0 s9 XCHG
+      INC
+      257 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s4 PUSH
+          NOW
+      s2 s5 XCHG
+      s4 s9 XCHG
+      s3 s10 XCHG
+      s2 s6 XCHG
+      $KeyAccount$_constructor_owner_wallet_current_key_id_auth_pubkey_key_generation_rotation_nonce_registered_at INLINECALLDICT
+      NEWC
+      $KeyAccount$_store_cell INLINECALLDICT
+      s3 s7 XCHG
+      s5 s5 s0 XCHG3
+      __tact_dict_set_int_cell INLINECALLDICT
+      s0 s7 XCHG
+      INC
+      6 2 REVERSE
+      s0 s3 XCHG
+      s2 s4 XCHG2
+      $KeyRegistry$_contract_store INLINECALLDICT
+    }>
+    s9 POP
+    DUP
+    1263683380 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s7 POP
+      s5 s7 XCHG
+      2 5 BLKSWAP
+      $KeyRegistry$_contract_store INLINECALLDICT
+    }>
+    0 EQINT
+    s0 s8 XCHG
+    33 LESSINT
+    s1 s8 XCHG
+    AND
+    IFJMP:<{
+      s5 s7 XCHG
+      2 5 BLKSWAP
+      $KeyRegistry$_contract_store INLINECALLDICT
+    }>
+    8 BLKDROP
+    130 THROW
+  }>
+  recv_external PROC:<{
+    $KeyRegistry$_contract_load INLINECALLDICT
+    s0 s8 XCHG
+    32 LDUQ 130 THROWIFNOT
+    SWAP
+    1263683378 PUSHINT
+    EQUAL
+    IFJMP:<{
+      LDMSGADDR
+      9 PUSHPOW2
+      LDSLICEX
+      LDREF
+      s8 s10 XCHG
+      5 6 REVERSE
+      s5 s9 XCHG
+      s4 s10 XCHG
+      s3 s9 XCHG
+      s10 s11 s0 XCHG3
+      $KeyRegistry$_fun_requireEmptyEnvelopePadding INLINECALLDICT
+      $KeyRegistry$_fun_requireSealed INLINECALLDICT
+      s8 PUSH
+      $KeyRegistry$_fun_accountKey INLINECALLDICT
+      s2 PUSH
+      257 PUSHINT
+      s2 PUSH
+      __tact_dict_get_int_cell INLINECALLDICT
+      $KeyAccount$_load_opt INLINECALLDICT
+      20120 PUSHINT
+      OVER
+      ISNULL
+      NOT
+      THROWANYIFNOT
+      $KeyAccount$_not_null INLINECALLDICT
+      20121 PUSHINT
+      s5 PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      20128 PUSHINT
+      s4 PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      20130 PUSHINT
+      18 s() PUSH
+          HASHCU
+      SWAP
+      s0 18 s() XCHG
+      s5 PUSH
+          CHKSIGNU
+      s1 17 s() XCHG
+      THROWANYIFNOT
+      s0 16 s() XCHG
+          CTOS
+      20136 PUSHINT
+      OVER
+          SBITS
+      864 PUSHINT
+      EQUAL
+      THROWANYIFNOT
+      20137 PUSHINT
+      OVER
+          SREFS
+      1 EQINT
+      THROWANYIFNOT
+      32 LDU
+      20131 PUSHINT
+      s0 s2 XCHG
+      1263684401 PUSHINT
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      256 LDU
+      20132 PUSHINT
+      s2 s13 XCPU
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      256 LDU
+          MYADDR
+      20133 PUSHINT
+      SWAP
+      11 LDU
+      SWAP
+      10 PUSHPOW2
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      20133 PUSHINT
+      SWAP
+      256 LDU
+      DROP
+      s1 s3 XCHG
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      256 LDU
+      20134 PUSHINT
+      s2 s7 XCPU
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      64 LDU
+      20135 PUSHINT
+      s0 s2 XCHG
+      18 s() PUSH
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+          ACCEPT
+      s0 16 s() XCHG
+      INC
+      257 PUSHINT
+      NEWC
+      s6 PUSH
+      s6 s2 s(-1) PUXC2
+      s6 s5 s(-1) PUXC2
+      s5 s(-1) PUXC
+      21 s() PUSH
+      s0 s8 XCHG2
+      $KeyAccount$_store_cell INLINECALLDICT
+      s8 s8 s0 XCHG3
+      s6 s(-1) PUXC
+      __tact_dict_set_int_cell INLINECALLDICT
+          COMMIT
+      s0 s15 XCHG
+          LDREF
+      DROP
+      DUP
+          CTOS
+      DUP
+          SBITS
+      800 PUSHINT
+      EQUAL
+      IFNOTJMP:<{
+        s6 s7 XCHG
+        7 BLKDROP
+        s7 POP
+        s7 POP
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+          SREFS
+      2 EQINT
+      IFNOTJMP:<{
+        s5 s6 XCHG
+        6 BLKDROP
+        s7 POP
+        s7 POP
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+          CTOS
+      256 LDU
+      256 LDU
+      256 LDU
+      16 LDU
+      16 LDU
+          LDREF
+          LDREF
+      DUP
+          SBITS
+      0 EQINT
+      IFNOTJMP:<{
+        s12 s13 XCHG
+        13 BLKDROP
+        s7 POP
+        s7 POP
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+          SREFS
+      0 EQINT
+      IFNOTJMP:<{
+        s11 s12 XCHG
+        12 BLKDROP
+        s7 POP
+        s7 POP
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+          CTOS
+      DUP
+          SBITS
+      8 PUSHPOW2
+      EQUAL
+      IFNOTJMP:<{
+        s11 s12 XCHG
+        12 BLKDROP
+        s7 POP
+        s7 POP
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      DUP
+          SREFS
+      0 EQINT
+      IFNOTJMP:<{
+        s11 s12 XCHG
+        12 BLKDROP
+        s7 POP
+        s7 POP
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      256 LDU
+      DROP
+      s7 18 s() XCHG
+      s6 17 s() XCHG
+      s5 16 s() XCHG
+      s4 s15 XCHG
+      s3 s14 XCHG
+      s2 s13 XCHG
+      s1 21 s() XCHG
+      s0 s11 XCHG
+      17 s() PUSH
+      17 s() PUSH
+      17 s() PUSH
+      s14 PUSH
+      18 s() PUSH
+      26 s() PUSH
+      19 s() PUSH
+      $KeyRegistry$_fun_isValidKeyProfile INLINECALLDICT
+      IFNOTJMP:<{
+        14 8 BLKDROP2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      16 s() PUSH
+      19 s() PUSH
+      NEQ
+      IFNOTJMP:<{
+        14 8 BLKDROP2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      DUP
+      257 PUSHINT
+      s10 PUSH
+      __tact_dict_get_int_cell INLINECALLDICT
+      $KeyRecord$_load_opt INLINECALLDICT
+      DUP
+      ISNULL
+      IFJMP:<{
+        DROP
+        14 8 BLKDROP2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      $KeyRecord$_not_null INLINECALLDICT
+      10 1 BLKDROP2
+      s0 s2 XCHG
+      22 s() PUSH
+      SDEQ
+      IFNOTJMP:<{
+        2DROP
+        14 8 BLKDROP2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      SWAP
+      0 EQINT
+      IFNOTJMP:<{
+        DROP
+        14 8 BLKDROP2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      DUP
+      32 PUSHPOW2DEC
+      LESS
+      IFNOTJMP:<{
+        DROP
+        14 8 BLKDROP2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      INC
+      8 -ROLL
+      20 s() PUSH
+      s9 PUSH
+      20 s() PUSH
+      20 s() PUSH
+      16 s() PUSH
+      20 s() PUSH
+      20 s() PUSH
+      $KeyRegistry$_fun_computeKeyId INLINECALLDICT
+      OVER
+      257 PUSHINT
+      s2 PUSH
+      __tact_dict_exists_int INLINECALLDICT
+      IFJMP:<{
+        DROP
+        8 8 BLKDROP2
+        7 8 BLKDROP2
+        $KeyRegistry$_contract_store INLINECALLDICT
+      }>
+      s10 s10 XCHG2
+      257 PUSHINT
+          DICTIDEL
+      DROP
+      257 PUSHINT
+          NOW
+          LTIME
+      0 PUSHINT
+      DUP
+      s11 25 s() XCHG
+      s13 PUSH
+      s0 s11 XCHG
+      s10 24 s() XCHG
+      s9 23 s() XCHG
+      s8 22 s() XCHG
+      s7 18 s() XCHG
+      s6 21 s() XCHG
+      s5 28 s() XCHG
+      s0 20 s() XCHG
+      4 -ROLL
+      $KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt INLINECALLDICT
+      NEWC
+      $KeyRecord$_store_cell INLINECALLDICT
+      s2 s9 XCHG
+      s1 16 s() XCHG
+      s3 s(-1) PUXC
+      __tact_dict_set_int_cell INLINECALLDICT
+      s4 s3 s0 XCHG3
+      s11 s7 s0 XCHG3
+      257 PUSHINT
+      s6 s14 XCHG2
+      NEWC
+      $KeyAccount$_store_cell INLINECALLDICT
+      s3 s7 XCHG
+      s9 s7 s0 XCHG3
+      __tact_dict_set_int_cell INLINECALLDICT
+      s5 s6 XCHG
+      4 ROLL
+      $KeyRegistry$_contract_store INLINECALLDICT
+    }>
+    9 BLKDROP
+    130 THROW
+  }>
+}END>c

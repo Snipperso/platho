@@ -16,23 +16,106 @@ const CRYPTO_SUITE_HYBRID: Int = 2;
 const CAPSULEHUB_INDEX_STORAGE_YEARS: Int = 1;
 const CAPSULEHUB_INDEX_RETENTION_SECONDS: Int = 31536000;
 const CAPSULEHUB_PAGE_SIZE: Int = 256;
-const CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
-const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 3300000;
-const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 9400000; // 7.4M header/entry + ~2M author/parent index slot
-// clean-16 ИНК4 INTRO lane (G8-provisional; finalized at ИНК8). INTRO entries store header0(42B)+header1(30B)
-// + body_hash with NO index links. CAPSULEHUB_INTRO_SWEEP_CAP bounds the per-batch INTRO eviction, decoupled
-// from part_count, so the hot PUBLIC/CONV path pays a fixed, small unconditional intro-sweep cost.
-const CAPSULEHUB_INTRO_ENTRY_STORAGE_ENDOWMENT: Int = 2000000;
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// [G8 CANONICAL — measured 2026-07-17] THE SINGLE SOURCE OF TRUTH FOR EVERY STORAGE ENDOWMENT IN THIS CONTRACT.
+//
+// ONE RATE: 64962 nanoTON / CELL / YEAR. Frozen config-18 schedule (cell_price_ps=135, bit_price_ps=0 — bits are
+// FREE) in force since ~Apr-2026. The pre-Apr-2026 schedule (500/1, billed bits) is HISTORY: it must never appear
+// in a derivation again. Every wrong constant this contract ever carried came from silently mixing the two rates.
+//
+// ONE MEASUREMENT — the MARGINAL cost of the Nth live entry, reproduced by test HUB-G8-CANON:
+//     PRIVATE (CONV)      8.02-8.03 cells   PUBLIC            6.02-6.03 cells
+//     INTRO               5.02-5.03 cells   RECOVERY 8K cap  79.0 cells
+//     nullifier           4.98-4.99 cells (its own 9-day retention, NOT a year — priced separately below)
+// Ranges, not points: the marginal drifts ~0.01 cells with run length. Each constant is rounded UP from the
+// TOP of its range, so it covers the entry at any N — a constant that sits exactly ON the measurement is one
+// rounding away from under-funding an immutable contract.
+// Getting this number right took three tries; each trap below produced a WRONG constant that looked authoritative:
+//   1. storageStats DEDUPLICATES identical cells by hash. Helpers reusing one header across messages under-count.
+//      Real traffic is encrypted -> every header is unique. (This is where the bogus "12.0 / 10.5 / 9.25" came from.)
+//   2. The nullifier is a SEPARATE 9-day charge. Folding it into the per-entry year inflated the count.
+//   3. PUBLIC's channel_id = H(domain||spend_pubkey), so REUSING a spend key appends to an EXISTING channel index
+//      and makes the marginal look cheap. A test helper was folding its key index into one byte and wrapping at 256,
+//      silently reusing keys: PUBLIC read 4.491 against the true 6.020. Worst case is a fresh channel per post.
+// The measurement is only trustworthy when the marginal is STABLE across two disjoint segments of the run (an
+// empty dict's first entries are not representative) — HUB-G8-CANON asserts exactly that.
+//
+// ONE DERIVATION:   endowment = measured_cells x 64962 x RETENTION_YEARS x 1.5
+// The x1.5 is the RATE-RISK MARGIN: these constants are IMMUTABLE, but cell_price_ps is governance-set and has
+// already moved once. It buys headroom up to cell_price_ps~253 (current 135). It does NOT cover a return to the
+// historical 500 — that residual is documented, accepted, and NOT silently provisioned for.
+// The x1.25 CAPSULEHUB_STORAGE_RESERVE_BUFFER on top guards the sweep from classifying backing as excess.
+//
+// RETENTION: messages 1 year (CAPSULEHUB_INDEX_RETENTION_SECONDS). RECOVERY 3 years (owner 2026-07-15; the
+// 10-year figure in older spec drafts is SUPERSEDED — see CAPSULEHUB_RECOVERY_POOL_RETENTION_SECONDS).
+//
+// The per-entry KEEPALIVE was dropped: account liveness is already covered by the 100 TON
+// CAPSULEHUB_MIN_PROTECTED_RESERVE_TON floor (design RT3-#6), and 1M keepalive alone exceeded a year of rent.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+//   PRIVATE  8.04 cells x 64962 x 1yr = 522_296 x 1.5 = 783_438 -> 784_000  (WORST 1-yr lane: TWO headers)
+const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 784000;
+//   PUBLIC   6.04 cells x 64962 x 1yr = 392_370 x 1.5 = 588_556 -> 589_000  (one header + a fresh channel index)
+const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 589000;
+// clean-16 ИНК4 INTRO lane. INTRO entries store header0(42B)+header1(30B)+body_hash with NO index links.
+// CAPSULEHUB_INTRO_SWEEP_CAP bounds the per-batch INTRO eviction, decoupled from part_count, so the hot
+// PUBLIC/CONV path pays a fixed, small unconditional intro-sweep cost.
+//   INTRO    5.04 cells x 64962 x 1yr = 327_408 x 1.5 = 491_111 -> 492_000
+const CAPSULEHUB_INTRO_ENTRY_STORAGE_ENDOWMENT: Int = 492000;
 const CAPSULEHUB_INTRO_SWEEP_CAP: Int = 4;
 // clean-16 L6/#11: max entries a single permissionless EvictExpiredCapsules call may sweep (bounds gas per call;
 // keepers repeat it to drain a backlog). Lets a QUIET private/public lane shed expired entries without waiting for
 // its own next publish (own-kind FIFO eviction was otherwise coupled to publish traffic).
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// [SAFE-CAP — 2026-07-17] The state ceiling, made VISIBLE.
+//
+// TON caps one account's state at max_acc_state_cells = 65536 (mainnet config-43). Past it, the ACTION phase
+// fails with code 50 — and an ACTION-phase failure is the worst possible failure this contract can have:
+//   * compute.exit stays 0, so every exit-code check reads CLEAN;
+//   * TON emits a bounce ONLY for a COMPUTE-phase failure — an ACTION-phase failure produces NO BOUNCE
+//     (measured on 3 independent classes: codes 37/33/37; control: a compute throw DOES bounce);
+//   * so the capsule silently does not exist, the payer is not refunded, and NOTHING upstream can learn of it.
+// A caller cannot detect it, a keeper cannot compensate for it, and a saga's compensation hop is blind to it.
+//
+// These caps convert that into an ordinary COMPUTE-phase throw, which bounces normally and refunds the relay.
+// The contract now states its true capacity out loud instead of eating messages once it is exceeded.
+//
+// THE GENERAL RULE THIS IS AN INSTANCE OF — it governs any sharded successor, where a burnt nullifier upstream
+// desyncs forever if the last hop fails quietly:
+//   A receiver that others depend on must (a) be INCAPABLE of failing in the ACTION phase, and (b) refuse EARLY
+//   and CHEAPLY in COMPUTE, so a bounce is still affordable.
+// (b) is not style. Measured on the recovery lane: at value=5M the frame validation burns the whole incoming value
+// before any check can throw -> exit -14 and NO bounce (nothing left to pay for one); at value=20M the cheap gate
+// throws 13576 first and it DOES bounce. That is why the publish path orders its gates "cheap -> expensive
+// fail-fast" — the ordering is what keeps a refusal reportable.
+// Audited 2026-07-17, both axes clean here: value -> 13509/13530 in COMPUTE + bounce; state -> the caps below.
+//
+// The numbers are a BUDGET of ONE account (measured cells, frozen rate; see the G8-CANONICAL block above):
+//     65536 total  -  448 code  -  ~7300 pool epoch buckets over 100 years   =  57788 cells to divide
+//     entries    60%  ->  34672 / 8.02 (PRIVATE, the worst lane)  ->  4300
+//     recovery   25%  ->  14447 / 79.0 (the 8K cap, worst case)   ->   180
+//     nullifiers 15%  ->   8668 / 4.98                            ->  1700
+// So a MONOLITHIC Hub honestly supports ~4300 live entries (= ~4300 messages/year at 1-year retention) and
+// ~180 users (RECOVERY holds one slot per user). That is the real capacity — the caps do not create it, they
+// only stop it from being discovered as silent loss. Reaching them is the signal to shard, not to raise them.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+const CAPSULEHUB_SAFE_LIVE_CAP: Int = 4300;        // private + public + intro, summed
+const CAPSULEHUB_SAFE_RECOVERY_CAP: Int = 180;     // recovery slots (79 cells each — one per user)
+const CAPSULEHUB_SAFE_NULLIFIER_CAP: Int = 1700;   // live nullifiers (their own 9-day retention)
+
 const CAPSULEHUB_STANDALONE_EVICT_CAP: Int = 32;
 // clean-16 ИНК6 RECOVERY durability lane (Variant-B). The K_root self-recovery blob is stored ON-CHAIN for the
 // full retention (owner: 3 years) so it survives even if archive nodes drop old history; the endowment is prepaid
 // once at conversation start. RECOVERY_MAX_SIZE_CLASS caps the on-chain blob. All G8-provisional (finalized ИНК8).
-const CAPSULEHUB_RECOVERY_POOL_RETENTION_SECONDS: Int = 94608000; // owner 2026-07-15: 3 years (= 3 × 31536000)
-const CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT: Int = 200000000; // G8-provisional (ИНК6-fix): worst-case RecoveryCapsuleRecord (8K body ~74 cells/75168 bits + headers + wallet) 3yr rent ≈166M nanoTON; (1M keepalive + this) ×1.25 ≈251M ≈1.5× cover. FINALIZE from measured cell.computeDataSize() in Фаза-5
+// owner 2026-07-15: 3 years (= 3 x CAPSULEHUB_INDEX_RETENTION_SECONDS). SUPERSEDES the 10-year (315360000) figure
+// in older spec drafts — 3 years is the binding number everywhere.
+const CAPSULEHUB_RECOVERY_POOL_RETENTION_SECONDS: Int = 94608000;
+//   RECOVERY 79.1 cells (8K cap, worst case) x 64962 x 3yr = 15_415_483 x 1.5 = 23_123_224 -> 23_200_000.
+// [G8 CANONICAL] The former 200000000 came off the DEAD pre-Apr-2026 schedule — its own comment claimed a
+// "3yr rent ~166M", which reproduces exactly as (74x240600 + 75168x481)x3 = 161_880_624: old cell rate AND billed
+// bits. Under the frozen 135/0 the true 3-year rent is 15.4M, so the old constant over-charged conversation start
+// ~13x (0.25 GRAM instead of ~0.023). This was the last constant still carrying the historical rate.
+const CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT: Int = 23200000;
 const RECOVERY_MAX_SIZE_CLASS: Int = 8; // 8K cap on the recovery blob
 const CAPSULEHUB_ACK_FORWARD_RESERVE: Int = 30000000;
 const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
@@ -81,13 +164,144 @@ const CAPSULEHUB_ENTRY_KIND_RECOVERY: Int = 4; // clean-16 ИНК6: K_root self-
 // the Session-5 generator pins both sides from one source) ---
 const MAX_BATCH_PARTS: Int = 8;
 const HUB_BATCH_BASE_GAS: Int = 14000;
-const HUB_PART_GAS_PRIVATE: Int = 170000; // add (2 index pushes + payload validation) + auto-evict one (2 index un-pushes + header parse + del); provisional, measured-tightened
+// STALE-COMMENT WARNING (fixed 2026-07-17): this used to claim PRIVATE does "2 index pushes / 2 un-pushes". It does
+// ONE of each — clean-16 D7 removed the directional index (see evictExpiredPrivate + prunePrivateBucketIndex, which
+// prune the SINGLE opaque bucket index). Measurement: the per-depth gas slope is IDENTICAL across CONV/PUBLIC/INTRO;
+// CONV is dearer than PUBLIC by a flat ~84_737 (bigger body overhead + TWO headers), not by a steeper slope.
+const HUB_PART_GAS_PRIVATE: Int = 170000; // add (1 index push + payload validation) + auto-evict one (1 index un-push + header parse + del); provisional, measured-tightened
 const HUB_PART_GAS_PUBLIC: Int = 180000;  // add (1 index push + author-key hash; clean-11 is_profile: +1 profile-index set + head store) + auto-evict one (1 index un-push + del; clean-11: +1 profile-index get, occasional del); provisional, measured-tightened
 const HUB_PART_GAS_INTRO: Int = 120000; // clean-16 ИНК4 (G8-provisional): store-only, no index push; cheaper than PRIVATE, plus its own capped intro-sweep
 const HUB_PART_GAS_RECOVERY: Int = 150000; // clean-16 ИНК6 (G8-provisional): keyed slot set + on-chain body write, no index push
 const HUB_MIN_PER_PART_VALUE: Int = 1000000; // loose O(1) Phase-A lower bound (gross-underfunding early bounce)
 const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN: Int = 0x45504931; // "EPI1" per-entry publish_id derivation
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
+
+// ================= clean-16 B3: anon-publish (permissionless spend-token ingest) =================
+// Design: artifacts/PLATHO_CLEAN16_B3_HUB_ANONPUBLISH_DESIGN.md. Publish becomes an INTERNAL message from a
+// permissionless relay wallet, authorized per-part by a spend token (2×checkSignature) + epoch-nullifier, funded
+// from a prepaid pool (buyer→CreditIssuer→Hub). author_wallet is removed (sender anonymity). All [G8] constants are
+// finalized from measured computeDataSize @ 64962 nanoton/cell/yr before seal.
+const HUB_ANON_PUBLISH_KIND_PRIVATE: Int = 1;
+const HUB_ANON_PUBLISH_KIND_PUBLIC: Int = 2;
+const HUB_ANON_PUBLISH_KIND_INTRO: Int = 3;
+// [IRREVERSIBLE] Max parts in one PublishAnonBatch. OWNER decision (2026-07-16): 4.
+//
+// The original justification is WITHDRAWN (2026-07-17). It read: "4p=621086 = 62% of the gas limit, ~38% headroom".
+// Both of that gate's assumptions were false in production:
+//   1. It measured an EMPTY Hub — the gate rebuilds the contract per measurement, so zero entries are live and
+//      auto-eviction never runs. Eviction is the dominant per-part cost, and it only begins a YEAR after launch
+//      (entries must outlive CAPSULEHUB_INDEX_RETENTION_SECONDS first). The worst kind of defect: invisible at
+//      launch and on every test, then permanent.
+//   2. It measured PUBLIC. CONV is the dearer lane by a flat ~84_737 gas (larger body overhead + TWO headers).
+// Re-measured in steady state (insert n + evict n): a 4-part batch sits at 96-98% of the limit at scale, NOT 62%.
+// The "38% headroom" never existed. Gas tracks the NULLIFIER dict (9-day retention) => it scales with message RATE,
+// not with accumulated entries.
+//
+// 4 REMAINS CORRECT, for reasons that survive the correction — pinned by tests/capsulehub-gas-degradation.test.ts:
+//   a. An over-limit batch REVERTS COMPLETELY and its spend tokens are NOT consumed, so the relay simply re-sends
+//      the same capsules in smaller batches (HUB-GAS-DEGRADE-01, with -02 as the control proving a LANDED token
+//      really is burnt). Out-of-gas is degradation, never loss.
+//   b. This constant is a CEILING, not a mandate: part_count>=1 is always legal and n=1 uses ~32% of the limit
+//      forever (HUB-GAS-DEGRADE-03). A relay under gas pressure always has a safe fallback.
+// Lowering it to 2 would buy nothing a relay cannot already choose, while permanently removing cheap batching.
+// What DOES need to happen lives off-chain: the relay should pick part_count adaptively from the nullifier count.
+const MAX_BATCH_PARTS_ANON: Int = 4;
+// Domain separators (32-bit) for the spend-token preimages.
+const ISSUER_SIG_DOMAIN: Int = 0x42534931;           // "BSI1" serial preimage
+const SPEND_DOMAIN: Int = 0x42535031;                // "BSP1" spend digest preimage
+const FRAMECOMMIT_DOMAIN: Int = 0x42464331;          // "BFC1" per-part frame commit
+const NULL_DOMAIN: Int = 0x424E4C31;                 // "BNL1" nullifier key
+const PUBLIC_CHANNEL_DOMAIN: Int = 0x42504331;       // "BPC1" public channel id = H(DOMAIN‖spend_pubkey)
+const RECOVERY_SLOT_DOMAIN: Int = 0x42525331;        // "BRS1" recovery slot owner_sig digest
+// Epoch + nullifier retention. NULLIFIER_RETENTION_SECONDS = (PAST+FUTURE+1)*EPOCH_SECONDS (§4.3 invariant:
+// retention >= the whole re-spend acceptance window, so a nullifier never evicts while its serial is still
+// acceptable). [G8/OWNER-D4] window width.
+const EPOCH_SECONDS: Int = 86400;                    // 1 day (provisional; OWNER-D4)
+const EPOCH_ACCEPT_PAST: Int = 4;
+const EPOCH_ACCEPT_FUTURE: Int = 4;
+const NULLIFIER_RETENTION_SECONDS: Int = 777600;     // (4+4+1)*86400 = 9 epochs — MUST stay = (PAST+FUTURE+1)*EPOCH_SECONDS
+const NULLIFIER_SWEEP_MARGIN: Int = 4;               // [G8] fold evicts part_count+MARGIN >= inserted -> net growth <=0
+const CAPSULEHUB_STANDALONE_NULLIFIER_EVICT_CAP: Int = 32;
+//   nullifier 4.99 cells x 64962 x (777600/31536000 = 9 days) = 7_992 x 1.5 = 11_988 -> 12_000. NOT a year: a nullifier
+//   only lives its re-spend window. The former 50000 assumed "2 dict entries" — measurement says 5 cells. [G8 CANONICAL]
+const CAPSULEHUB_NULLIFIER_ENTRY_STORAGE_ENDOWMENT: Int = 12000;
+const HUB_TOKEN_VERIFY_GAS: Int = 18000;             // [G8] per-part: 2×checkSignature + 3 hashes + dict get/set
+// Prepaid pool: one kind-agnostic credit funds the worst-case (PUBLIC) publish. prepaidUnit MUST equal the
+// CreditIssuer side bit-for-bit (SEAL-GATE G-PREPAID, §5.6). [G8] finalize @64962.
+// [G8] Priced at the PRIVATE (CONV) lane — the dominant traffic — NOT the PUBLIC worst case. Pricing the blind credit at
+// PUBLIC made every private message overpay 7.625M (~+50% of its real cost) just because the credit cannot know the lane.
+// [G8 CANONICAL] ONE credit = ONE capsule = 10 ATH on EVERY lane, so the credit is priced at the WORST lane and
+// over-covers the others. PRIVATE is the worst (8.02 cells vs PUBLIC 6.02 / INTRO 5.02) — no lane tops up.
+//   PRIVATE = protocolFee(10M) + endowment 784_000x1.25 (=980_000) + nullifier 12_000x1.25 (=15_000) = 10_995_000
+//   PUBLIC  = 10M + 589_000x1.25 (=736_250) + 15_000 = 10_751_250  <= PRIVATE  ✓
+//   INTRO   = 0   + 492_000x1.25 (=615_000) + 15_000 =    630_000  <= PRIVATE  ✓
+const CAPSULEHUB_PREPAID_UNIT: Int = 10995000;
+const CAPSULEHUB_FUND_LOCAL_EXEC_RESERVE: Int = 2000000;
+
+message(0x50415542) PublishAnonBatch {               // "PAUB" — permissionless anon publish (PRIVATE/PUBLIC/INTRO)
+    bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
+    publish_id: Int as uint256;
+    publish_kind: Int as uint8;
+    part_count: Int as uint8;
+    parts: Cell;                                     // ref[0]: part frames, byte-identical to the current lane frames
+    tokens: Cell;                                    // ref[1]: parallel singly-linked spend-token list, len == part_count
+    marketing: Cell?;                                // ref[2]: PUBLIC only
+}
+
+message(0x50415243) PublishRecovery {                // "PARC" — self-funded RECOVERY durability lane
+    bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
+    publish_id: Int as uint256;
+    part: Cell;                                      // one CONV-shaped frame (header0 320 + header1 + on-chain body)
+    owner_pubkey: Int as uint256;
+    seq: Int as uint64;                              // owner-signed MONOTONIC freshness — anti-replay/rollback (13564)
+    owner_sig: Cell;                                 // ^(Slice as bytes64): ed25519 over recoveryDigest (binds seq)
+}
+
+message(0x46414E50) FundAnonPool {                   // "FANP" — CreditIssuer forwards a credit purchase into the pool
+    credits_k: Int as uint64;
+    epoch: Int as uint32;                            // Variant B: buyer-declared epoch bucket (== token epoch)
+    purchase_id: Int as uint64;                      // CreditIssuer correlation id — echoed back in the ack, and (being
+                                                     // within the first 224 bits) survives a bounce, so the CreditIssuer
+                                                     // can settle/refund the exact pending purchase (§5.5 true refund).
+}
+
+message(0x46414E41) FundAnonPoolAck {                // "FANA"
+    credits_k: Int as uint64;
+    epoch: Int as uint32;
+    purchase_id: Int as uint64;
+}
+
+message(0x48524B31) HubMirrorIssuerKey {             // "HRK1" — controller mirrors a CreditIssuer slot into the Hub
+    slot: Int as uint8;
+    pubkey: Int as uint256;
+    active: Bool;
+    version: Int as uint32;
+}
+
+message(0x424C4E44) BindCreditIssuer {               // "BLND" — genesis bind of the CreditIssuer address (controller, unsealed)
+    credit_issuer_address: Address;
+}
+
+message(0x4E554C4C) EvictExpiredNullifiers {         // "NULL" — permissionless FIFO nullifier eviction
+    max_count: Int as uint16;
+}
+
+message(0x52454346) ReclaimExpiredFunding {          // "RECF" — permissionless: release an expired-epoch funding bucket
+    epoch: Int as uint32;
+}
+
+struct IssuerSlot {
+    pubkey: Int as uint256;
+    active: Bool;
+    version: Int as uint32;
+}
+
+struct NullRec {
+    key: Int as uint256;
+    insert_time: Int as uint32;
+}
 
 message(0x90E2E0CB) BindDeploymentManifest {
     deployment_manifest_hash: Int as uint256;
@@ -202,7 +416,9 @@ struct PrivateCapsuleEntry {
 struct PublicCapsuleEntry {
     publish_id: Int as uint256;
     created_at: Int as uint64;
-    author_wallet: Address;
+    // clean-16 B3: the trusted author wallet is gone (permissionless publish, §6). Discovery/attribution is now the
+    // crypto-bound channel id = H(PUBLIC_CHANNEL_DOMAIN ‖ spend_pubkey); the spend_sig proves control of the channel.
+    channel_id: Int as uint256;
     body_hash: Int as uint256;
     // parent_link == 0 -> top-level post (indexed by author); else == parentEntryId+1 -> comment
     // (indexed by parent). Reuses the entryLink convention so entry 0 is unambiguous.
@@ -300,12 +516,16 @@ struct RecoveryCapsuleRecord {
     publish_id: Int as uint256;
     updated_at: Int as uint64;
     body_hash: Int as uint256;
-    // clean-16 ИНК6-fix (adversarial review): the slot is bound to its FIRST publisher's wallet (Variant-B).
-    // slotKey is a self-derived value that becomes public on-chain once published; without this bind ANY third
-    // party could re-publish the same slotKey with garbage and destroy the owner's K_root recovery blob forever.
-    // Only msg.author_wallet == this field may overwrite. Self-recovery has no dialogue partner, so storing the
-    // owner's own wallet leaks nothing about the who-to-whom graph (and it is already in the publish tx).
-    author_wallet: Address;
+    // clean-16 B3 (§7): the slot is bound to its FIRST publisher's ed25519 owner_pubkey (was author_wallet). slotKey
+    // is a self-derived value that becomes public on-chain once published; without this bind ANY third party could
+    // re-publish the same slotKey with garbage and destroy the owner's K_root recovery blob forever. Only an
+    // owner_sig from THIS pubkey may overwrite (13563). Self-recovery has no dialogue partner, so the pubkey leaks
+    // nothing about the who-to-whom graph, and — unlike a wallet — it is NOT the payer/relay address (sender-anon).
+    owner_pubkey: Int as uint256;
+    // clean-16 B3 (adversarial-review fix): owner-signed monotonic freshness. An overwrite requires seq STRICTLY greater
+    // than the stored seq (13564), so an old validly-signed PublishRecovery cannot be replayed to roll the K_root blob
+    // back to a stale version (the only prior overwrite guard, owner_pubkey==owner_pubkey, is identical across versions).
+    seq: Int as uint64;
     header_0: Cell;
     header_1: Cell;
     body: Cell;
@@ -316,7 +536,8 @@ struct RecoveryCapsuleView {
     slot_key: Int;
     updated_at: Int;
     body_hash: Int;
-    author_wallet: Address;
+    owner_pubkey: Int;
+    seq: Int;
     header_0: Cell;
     header_1: Cell;
     body: Cell;
@@ -327,7 +548,7 @@ struct PublicCapsuleEntryView {
     entry_id: Int;
     entry_uid: Int;
     publish_id: Int;
-    author_wallet: Address;
+    channel_id: Int;
     page_id: Int;
     page_offset: Int;
     created_at: Int;
@@ -350,6 +571,26 @@ struct PublicCapsuleKeyIndexView {
     latest_entry_id: Int;
     latest_entry_link: Int;
     entry_count: Int;
+}
+
+// clean-16 B3 observability: pool + nullifier-ledger snapshot and one mirrored issuer slot.
+struct AnonPoolStateView {
+    credit_issuer_bound: Bool;
+    credit_issuer_address: Address;
+    nullifier_live_count: Int;
+    nullifier_latest: Int;
+    nullifier_oldest_live: Int;
+    anon_pool_outstanding: Int;
+    prepaid_unit: Int;               // CAPSULEHUB_PREPAID_UNIT — MUST equal CreditIssuer CREDIT_PREPAID_UNIT (G-PREPAID)
+    max_batch_parts_anon: Int;       // the G-GAS-pinned per-batch part cap
+}
+
+struct IssuerSlotView {
+    exists: Bool;
+    slot: Int;
+    pubkey: Int;
+    active: Bool;
+    version: Int;
 }
 
 contract CapsuleHub {
@@ -402,6 +643,22 @@ contract CapsuleHub {
     recovery_slots: map<Int as uint256, RecoveryCapsuleRecord>;
     recovery_live_count: Int as uint64;
 
+    // ===== clean-16 B3 anon-publish state =====
+    // issuer-key mirror (genesis snapshot of CreditIssuer.issuer_slots, version-monotone controller updates, §9).
+    credit_issuer_address: Address;
+    credit_issuer_bound: Bool;
+    issuer_mirror: map<Int, IssuerSlot>;
+    // epoch-nullifier ledger (§4): membership test + FIFO eviction keyed by insert order == expiry order.
+    spent_nullifiers: map<Int, Int>;         // nk(uint256) -> insert_time(uint32)
+    nullifier_seq: map<Int, NullRec>;        // seq(uint64) -> {key, insert_time}
+    nullifier_latest: Int as uint64;
+    nullifier_oldest_live: Int as uint64;
+    nullifier_live_count: Int as uint32;
+    // prepaid pool (Variant B, §5.4): per-epoch funded/spent credit counts + a running outstanding aggregate.
+    funded_by_epoch: map<Int, Int>;          // epoch -> credits funded (uint64 count)
+    spent_by_epoch: map<Int, Int>;           // epoch -> credits spent
+    anon_pool_outstanding: Int as uint64;    // sum over live epochs of (funded - spent); drives poolTerm()
+
     init(fee_accumulator_address: Address, vault_address: Address, vault_bound: Bool, sealed: Bool, deployment_manifest_hash: Int, genesis_controller_address: Address) {
         self.fee_accumulator_address = fee_accumulator_address;
         self.vault_address = vault_address;
@@ -429,6 +686,18 @@ contract CapsuleHub {
         self.intro_live_count = 0;
         self.recovery_slots = emptyMap();         // clean-16 ИНК6
         self.recovery_live_count = 0;
+        // clean-16 B3 anon-publish
+        self.credit_issuer_address = fee_accumulator_address;  // placeholder until BindCreditIssuer
+        self.credit_issuer_bound = false;
+        self.issuer_mirror = emptyMap();
+        self.spent_nullifiers = emptyMap();
+        self.nullifier_seq = emptyMap();
+        self.nullifier_latest = 0;
+        self.nullifier_oldest_live = 0;
+        self.nullifier_live_count = 0;
+        self.funded_by_epoch = emptyMap();
+        self.spent_by_epoch = emptyMap();
+        self.anon_pool_outstanding = 0;
     }
 
     fun requireSealed() {
@@ -469,21 +738,21 @@ contract CapsuleHub {
     }
 
     fun privateIndexStorageReservePerEntry(): Int {
-        return CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT;
+        return CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT;
     }
 
     fun publicIndexStorageReservePerEntry(): Int {
-        return CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT;
+        return CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT;
     }
 
-    // clean-16 ИНК5: INTRO entries are backed the same way — keepalive + INTRO endowment per live entry.
+    // clean-16 ИНК5: INTRO entries are backed the same way — the measured INTRO endowment per live entry.
     fun introIndexStorageReservePerEntry(): Int {
-        return CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_INTRO_ENTRY_STORAGE_ENDOWMENT;
+        return CAPSULEHUB_INTRO_ENTRY_STORAGE_ENDOWMENT;
     }
 
-    // clean-16 ИНК6: RECOVERY slots are backed the same way — keepalive + the (larger, on-chain-body) endowment.
+    // clean-16 ИНК6: RECOVERY slots are backed the same way — the (larger, on-chain-body) endowment per live slot.
     fun recoveryIndexStorageReservePerEntry(): Int {
-        return CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT;
+        return CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT;
     }
 
     fun indexStorageReserve(): Int {
@@ -497,12 +766,134 @@ contract CapsuleHub {
     }
 
     fun protectedReserve(): Int {
-        let dynamicReserve: Int = self.indexStorageReserve();
+        // clean-16 B3: the live-nullifier rent term + the prepaid-pool term join the index reserve so neither can be
+        // classified as sweepable excess (§5.2). Nullifier term carries the 1.25 buffer; keepalive is NOT added
+        // per-nullifier (the 100 TON floor already covers it, RT3-#6).
+        let dynamicReserve: Int = self.indexStorageReserve()
+            + (self.nullifier_live_count * self.nullifierReserveWithBuffer())
+            + self.poolTerm();
         let storageReserve: Int = CAPSULEHUB_MIN_PROTECTED_RESERVE_TON;
         if (dynamicReserve > storageReserve) {
             storageReserve = dynamicReserve;
         }
         return self.accrued_plato_fee_ton + storageReserve;
+    }
+
+    // ===== clean-16 B3 anon-publish primitives (§3-§5) =====
+
+    fun nullifierReserveWithBuffer(): Int {
+        return (CAPSULEHUB_NULLIFIER_ENTRY_STORAGE_ENDOWMENT * CAPSULEHUB_STORAGE_RESERVE_BUFFER_NUMERATOR) / CAPSULEHUB_STORAGE_RESERVE_BUFFER_DENOMINATOR;
+    }
+
+    // poolTerm: outstanding prepaid credits × the per-credit worst-case backing. Variant B keeps it bounded to the
+    // live-epoch window (ReclaimExpiredFunding releases expired buckets). anon_pool_outstanding >= 0 by construction.
+    fun poolTerm(): Int {
+        return self.anon_pool_outstanding * CAPSULEHUB_PREPAID_UNIT;
+    }
+
+    // serial = H(ISSUER_SIG_DOMAIN ‖ spend_pubkey ‖ epoch ‖ nonce). The issuer blind-signs THIS 256-bit value; the
+    // domain separates it from any other 256-bit signed message (RT1-MINOR-4). Finding a preimage is infeasible, so
+    // a relay cannot swap spend_pubkey/epoch/nonce under a fixed serial (§3.2).
+    fun computeSerial(spendPubkey: Int, epoch: Int, nonce: Int): Int {
+        return beginCell()
+            .storeUint(ISSUER_SIG_DOMAIN, 32)
+            .storeUint(spendPubkey, 256)
+            .storeUint(epoch, 32)
+            .storeUint(nonce, 64)
+            .endCell().hash();
+    }
+
+    fun nullifierKey(serial: Int): Int {
+        return beginCell().storeUint(NULL_DOMAIN, 32).storeUint(serial, 256).endCell().hash();
+    }
+
+    // Public-lane channel discovery key (replaces hash(author_wallet)); crypto-bound by the spend_sig (§6).
+    fun publicChannelKeyId(spendPubkey: Int): Int {
+        return beginCell().storeUint(PUBLIC_CHANNEL_DOMAIN, 32).storeUint(spendPubkey, 256).endCell().hash();
+    }
+
+    // spendDigest = H(SPEND_DOMAIN ‖ serial ‖ kind ‖ frameCommit). frameCommit binds ALL frame scalars (incl. h0),
+    // and serial ties the spend_sig to THIS token → token-splicing/reorder fails checkSignature (RT1-BLOCKER-1, §3.3).
+    fun spendDigestPrivate(serial: Int, kind: Int, sizeClass: Int, cryptoSuite: Int, h0: Int, h1: Int, bh: Int): Int {
+        let frameCommit: Int = beginCell()
+            .storeUint(FRAMECOMMIT_DOMAIN, 32).storeUint(sizeClass, 8).storeUint(cryptoSuite, 8)
+            .storeUint(h0, 256).storeUint(h1, 256).storeUint(bh, 256).endCell().hash();
+        return beginCell()
+            .storeUint(SPEND_DOMAIN, 32).storeUint(serial, 256).storeUint(kind, 8)
+            .storeUint(frameCommit, 256).endCell().hash();
+    }
+
+    fun spendDigestPublic(serial: Int, kind: Int, sizeClass: Int, reserved: Int, parentLink: Int, h0: Int, bh: Int): Int {
+        let frameCommit: Int = beginCell()
+            .storeUint(FRAMECOMMIT_DOMAIN, 32).storeUint(sizeClass, 8).storeUint(reserved, 8)
+            .storeUint(parentLink, 64).storeUint(h0, 256).storeUint(bh, 256).endCell().hash();
+        return beginCell()
+            .storeUint(SPEND_DOMAIN, 32).storeUint(serial, 256).storeUint(kind, 8)
+            .storeUint(frameCommit, 256).endCell().hash();
+    }
+
+    fun insertNullifier(nk: Int) {
+        self.spent_nullifiers.set(nk, now());
+        self.nullifier_seq.set(self.nullifier_latest, NullRec { key: nk, insert_time: now() });
+        self.nullifier_latest += 1;
+        self.nullifier_live_count += 1;
+    }
+
+    // FIFO eviction by insert order. Because retention is keyed to insert_time and insert order == expiry order,
+    // the first still-live entry means ALL subsequent are live → break is correct, no stall (§4.1/§4.2).
+    fun evictNullifiersFIFO(maxEvict: Int) {
+        let n: Int = 0;
+        let id: Int = self.nullifier_oldest_live;
+        while ((n < maxEvict) && (id < self.nullifier_latest)) {
+            let r: NullRec? = self.nullifier_seq.get(id);
+            if (r == null) {
+                id += 1;
+            } else {
+                if (now() < (r!!.insert_time + NULLIFIER_RETENTION_SECONDS)) {
+                    self.nullifier_oldest_live = id;
+                    return;
+                }
+                self.spent_nullifiers.set(r!!.key, null);
+                self.nullifier_seq.set(id, null);
+                self.nullifier_live_count -= 1;
+                id += 1;
+                n += 1;
+            }
+        }
+        self.nullifier_oldest_live = id;
+    }
+
+    // Verify a spend token's issuer signature against the mirrored (active) issuer slot. Returns the resolved serial
+    // for the caller's nullifier/double-spend check. Reverts on any failure (dispatch cheap→expensive).
+    fun verifyIssuerToken(serial: Int, slot: Int, spendPubkey: Int, epoch: Int, nonce: Int, issuerSig: Slice, nowEpoch: Int) {
+        throwUnless(13600, (epoch >= nowEpoch - EPOCH_ACCEPT_PAST) && (epoch <= nowEpoch + EPOCH_ACCEPT_FUTURE));
+        throwUnless(13601, self.computeSerial(spendPubkey, epoch, nonce) == serial);
+        let ms: IssuerSlot? = self.issuer_mirror.get(slot);
+        throwUnless(13602, (ms != null) && ms!!.active);
+        throwUnless(13604, self.spent_nullifiers.get(self.nullifierKey(serial)) == null);
+        throwUnless(13603, checkSignature(serial, issuerSig, ms!!.pubkey));
+    }
+
+    fun epochFunded(epoch: Int): Int {
+        let v: Int? = self.funded_by_epoch.get(epoch);
+        if (v == null) { return 0; }
+        return v!!;
+    }
+
+    fun epochSpent(epoch: Int): Int {
+        let v: Int? = self.spent_by_epoch.get(epoch);
+        if (v == null) { return 0; }
+        return v!!;
+    }
+
+    // Consume one prepaid credit from a token's own epoch bucket. Guard is per-epoch: a token can only spend against
+    // funding declared for its OWN epoch (a mismatched/unfunded epoch self-harms into a revert, §5.4-B). fail-closed.
+    fun spendPoolCredit(epoch: Int) {
+        let funded: Int = self.epochFunded(epoch);
+        let spent: Int = self.epochSpent(epoch);
+        throwUnless(13613, spent + 1 <= funded);
+        self.spent_by_epoch.set(epoch, spent + 1);
+        self.anon_pool_outstanding -= 1;
     }
 
     fun isAllowedPrivatePair(sizeClass: Int, cryptoSuite: Int): Bool {
@@ -731,9 +1122,8 @@ contract CapsuleHub {
 
     // Public author key id: hash of the standard-address serialization of the author wallet. The client
     // derives the identical key with beginCell().storeAddress(addr).endCell().hash(). Workchain-agnostic.
-    fun publicAuthorKeyId(authorWallet: Address): Int {
-        return beginCell().storeAddress(authorWallet).endCell().hash();
-    }
+    // clean-16 B3: publicAuthorKeyId(author_wallet) is gone — the public index is now keyed by channel_id
+    // (= publicChannelKeyId(spend_pubkey), computed at publish time), stored on the entry and reused directly.
 
     // Mirror of the private bucket-index push, for the public author index (posts).
     fun pushPublicAuthorIndex(keyId: Int, entryLink: Int): Int {
@@ -825,7 +1215,7 @@ contract CapsuleHub {
                 } else {
                     let entryLink: Int = self.entryLink(oid);
                     if (entry.parent_link == 0) {
-                        let authorKey: Int = self.publicAuthorKeyId(entry.author_wallet);
+                        let authorKey: Int = entry.channel_id;   // channel_id IS the index key (§6)
                         self.prunePublicAuthorIndex(authorKey, entryLink, entry.prev_link);
                         // clean-11: reclaim the per-author profile pointer if THIS evicted post was its target,
                         // so public_profile_index stays bounded by LIVE profiles (mirrors the author-index del-at-zero).
@@ -949,9 +1339,9 @@ contract CapsuleHub {
             .hash();
     }
 
-    fun computeVaultPublicEntryUid(entryId: Int, publishId: Int, author: Address, headerHash: Int, bodyHash: Int): Int {
+    fun computeVaultPublicEntryUid(entryId: Int, publishId: Int, channelId: Int, headerHash: Int, bodyHash: Int): Int {
         let payloadFields: Cell = beginCell()
-            .storeAddress(author)
+            .storeUint(channelId, 256)
             .storeUint(headerHash, 256)
             .storeUint(bodyHash, 256)
             .endCell();
@@ -984,7 +1374,83 @@ contract CapsuleHub {
         throwUnless(12920, msg.deployment_manifest_hash != 0);
         throwUnless(12921, self.deployment_manifest_hash == msg.deployment_manifest_hash);
         throwUnless(12922, self.vault_bound);
+        throwUnless(12923, self.credit_issuer_bound);   // clean-16 B3: anon-publish needs the CreditIssuer bound
         self.sealed = true;
+    }
+
+    // ===== clean-16 B3 anon-publish lifecycle + pool/mirror receivers =====
+
+    receive(msg: BindCreditIssuer) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(13580, self.isBasechainAddress(msg.credit_issuer_address));
+        throwUnless(13581, msg.credit_issuer_address != myAddress());
+        self.credit_issuer_address = msg.credit_issuer_address;
+        self.credit_issuer_bound = true;
+    }
+
+    // Mirror a CreditIssuer issuer slot: genesis-fill (unsealed) + post-seal controller-authenticated Replace/Revoke
+    // propagation. version STRICTLY monotone (anti-reorder/replay). Hub-first Revoke is a governance-runner rule (§9).
+    receive(msg: HubMirrorIssuerKey) {
+        self.requireGenesisController();
+        throwUnless(13582, msg.slot < 16);
+        let existingOpt: IssuerSlot? = self.issuer_mirror.get(msg.slot);
+        if (existingOpt != null) {
+            throwUnless(13615, msg.version > existingOpt!!.version);
+        }
+        self.issuer_mirror.set(msg.slot, IssuerSlot { pubkey: msg.pubkey, active: msg.active, version: msg.version });
+    }
+
+    // The bound CreditIssuer forwards a credit purchase into the prepaid pool (Variant B, epoch-bucketed). The value
+    // it carries (credits_k × prepaidUnit) is KEPT as pool backing (poolTerm rises inside protectedReserve); only the
+    // gas float is returned with the ack, which lets CreditIssuer release the k blind signatures.
+    receive(msg: FundAnonPool) {
+        self.requireSealed();
+        throwUnless(13611, sender() == self.credit_issuer_address);
+        throwUnless(13610, msg.credits_k >= 1);
+        // clean-16 B3 (adversarial-review fix): bound the buyer-declared epoch to the SAME acceptance window the spend
+        // (13600) and reclaim (13616) sides use. Without this, a far-future/garbage epoch (client bug or griefer) makes
+        // a funded_by_epoch bucket that can NEVER be spent AND never reclaimed → poolTerm permanently inflated (violates
+        // the Variant-B boundedness invariant on an immutable contract). A rejected forward bounces (bounce:true) back to
+        // the CreditIssuer, whose bounced-handler refunds the exact buyer — so a bad epoch fails safe, not silently stuck.
+        let nowEpoch: Int = now() / EPOCH_SECONDS;
+        throwUnless(13617, (msg.epoch >= nowEpoch - EPOCH_ACCEPT_PAST) && (msg.epoch <= nowEpoch + EPOCH_ACCEPT_FUTURE));
+        let backing: Int = msg.credits_k * CAPSULEHUB_PREPAID_UNIT;
+        throwUnless(13612, context().value >= backing + CAPSULEHUB_FUND_LOCAL_EXEC_RESERVE);
+        self.funded_by_epoch.set(msg.epoch, self.epochFunded(msg.epoch) + msg.credits_k);
+        self.anon_pool_outstanding += msg.credits_k;
+        // Keep the backing (+ pre-existing balance); return the float with the ack.
+        nativeReserve(backing, ReserveAtMost | ReserveAddOriginalBalance);
+        message(MessageParameters {
+            to: sender(),
+            value: 0,
+            bounce: false,
+            mode: SendRemainingBalance,
+            body: FundAnonPoolAck { credits_k: msg.credits_k, epoch: msg.epoch, purchase_id: msg.purchase_id }.toCell()
+        });
+    }
+
+    // Permissionless FIFO nullifier eviction (standalone; publish also folds it in). Gate = expiry.
+    receive(msg: EvictExpiredNullifiers) {
+        self.requireSealed();
+        let cap: Int = msg.max_count;
+        if (cap > CAPSULEHUB_STANDALONE_NULLIFIER_EVICT_CAP) { cap = CAPSULEHUB_STANDALONE_NULLIFIER_EVICT_CAP; }
+        self.evictNullifiersFIFO(cap);
+    }
+
+    // Permissionless reclamation of an epoch funding bucket that has fallen out of the acceptance window: its
+    // unspent (funded − spent) backing is forfeited (removed from poolTerm → sweepable) so the pool term stays
+    // bounded to the live-epoch window (Variant B, §5.4).
+    receive(msg: ReclaimExpiredFunding) {
+        self.requireSealed();
+        let nowEpoch: Int = now() / EPOCH_SECONDS;
+        throwUnless(13616, msg.epoch < (nowEpoch - EPOCH_ACCEPT_PAST));
+        let outstanding: Int = self.epochFunded(msg.epoch) - self.epochSpent(msg.epoch);
+        if (outstanding > 0) {
+            self.anon_pool_outstanding -= outstanding;
+        }
+        self.funded_by_epoch.set(msg.epoch, null);
+        self.spent_by_epoch.set(msg.epoch, null);
     }
 
     // entry.publish_id = hash(EPI1 ‖ batch_publish_id ‖ part_index:u16) — a distinct, verifiable id per stored entry.
@@ -1012,66 +1478,82 @@ contract CapsuleHub {
         else if (kind == CAPSULEHUB_ENTRY_KIND_INTRO) { endowment = CAPSULEHUB_INTRO_ENTRY_STORAGE_ENDOWMENT; }
         else if (kind == CAPSULEHUB_ENTRY_KIND_RECOVERY) { endowment = CAPSULEHUB_RECOVERY_ENTRY_STORAGE_ENDOWMENT; }
         else { throw(13591); }
-        return (CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + endowment)
-            * CAPSULEHUB_STORAGE_RESERVE_BUFFER_NUMERATOR / CAPSULEHUB_STORAGE_RESERVE_BUFFER_DENOMINATOR;
+        // endowment = measured 1-year rent; ×1.25 buffer = the +3-month margin. No per-entry keepalive (the 100 TON
+        // protected floor covers account liveness — design RT3-#6).
+        return endowment * CAPSULEHUB_STORAGE_RESERVE_BUFFER_NUMERATOR / CAPSULEHUB_STORAGE_RESERVE_BUFFER_DENOMINATOR;
     }
 
-    // VPB2 batch ingest (spec 5.2): validate-all-then-commit-all. Tact reverts ALL state on any throw, so a
-    // single atomic pass that validates (shape+hash via requireExact*) and stores each part IS "no partial
-    // commit": any per-part throw aborts the whole batch (nothing stored, no fee, message bounces). The full
-    // value gate is checked after the loop (still atomic). Phase A holds a cheap O(1) lower bound so gross
-    // underfunding bounces before the expensive walk.
-    receive(msg: PublishBatchToHub) {
-        // Phase A — scalars
+    // ===== clean-16 B3: permissionless anonymous spend-publish (§3) — the SOLE publish path (Vault path removed) =====
+    // Handles CONV(=PRIVATE) + PUBLIC + INTRO; RECOVERY has its own self-funded receiver (§7). Authorization is
+    // per-part crypto (issuer_sig over serial + spend_sig over the frame) + an epoch-nullifier double-spend ledger —
+    // the old sender()==vault trust is gone. The relay pays gas from msg.value; the storage endowment is already on
+    // the Hub balance (prepaid pool), so a spam batch cannot touch protectedReserve (internal msg = no acceptMessage;
+    // compute gas is burned from the relay's value on revert).
+    receive(msg: PublishAnonBatch) {
+        // Phase A — root scalars (O(1), cheap→expensive fail-fast)
         self.requireSealed();
-        throwUnless(13500, sender() == self.vault_address);
         throwUnless(13501, msg.publish_id != 0);
-        throwUnless(13502, (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PUBLIC) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_INTRO) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_RECOVERY));
-        throwUnless(13503, (msg.part_count >= 1) && (msg.part_count <= MAX_BATCH_PARTS));
-        // clean-16 ИНК4/ИНК6: CONV (=PRIVATE), INTRO and RECOVERY all ride the 784-bit private part frame; PUBLIC
-        // is the else. RECOVERY is keyed latest-wins (no sequential id) and reuses the CONV 320-bit header0 shape.
+        // PRIVATE (CONV) + PUBLIC + INTRO. RECOVERY has its OWN self-funded receiver (§7), not here.
+        throwUnless(13502, (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PUBLIC) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_INTRO));
+        throwUnless(13503, (msg.part_count >= 1) && (msg.part_count <= MAX_BATCH_PARTS_ANON));
+        // [SAFE-CAP] Refuse in COMPUTE (bounces, relay refunded) rather than let the ACTION phase hit code 50
+        // (silent, no bounce, capsule gone, payer not refunded). Checked BEFORE any crypto so the refusal is cheap.
+        throwUnless(13618, (self.private_live_count + self.public_live_count + self.intro_live_count + msg.part_count) <= CAPSULEHUB_SAFE_LIVE_CAP);
+        throwUnless(13619, (self.nullifier_live_count + msg.part_count) <= CAPSULEHUB_SAFE_NULLIFIER_CAP);
+        let relay: Address = sender();                       // captured for the ACK (§8) — old sender()==vault gate removed
+        let nowEpoch: Int = now() / EPOCH_SECONDS;
+
         let isConv: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE);
         let isIntro: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_INTRO);
         let isPublic: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PUBLIC);
-        let isRecovery: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_RECOVERY);
 
-        let firstEntryId: Int = self.public_latest_id;
-        let fullFeePerPart: Int = PLATO_PUBLIC_POST_FEE_TON;
-        if (isConv) {
-            firstEntryId = self.private_latest_id;
-            fullFeePerPart = self.privateFullFee(CRYPTO_SUITE_HYBRID);
-        } else if (isIntro) {
-            firstEntryId = self.intro_latest_id;
-            fullFeePerPart = self.privateFullFee(CRYPTO_SUITE_HYBRID);
-        } else if (isRecovery) {
-            // RECOVERY is keyed (no sequential id); firstEntryId is unused. It pays the private hybrid fee.
-            fullFeePerPart = self.privateFullFee(CRYPTO_SUITE_HYBRID);
-        }
+        let firstEntryId: Int = self.private_latest_id;
+        if (isIntro) { firstEntryId = self.intro_latest_id; }
+        else if (isPublic) { firstEntryId = self.public_latest_id; }
         throwUnless(13504, firstEntryId + msg.part_count <= 18446744073709551615);
-        throwUnless(13505, msg.protocol_fee_total >= 0);
-        throwUnless(13506, msg.protocol_fee_total <= msg.part_count * fullFeePerPart);
+
+        // PUBLIC marketing-note guard (13507/13508), unchanged from the Vault path.
         if (isPublic) {
             let mk: Cell? = msg.marketing;
             throwUnless(13507, mk != null);
             throwUnless(13508, mk!!.beginParse().loadUint(152) == PLATHO_PUBLIC_MARKETING_NOTE_ASCII);
         }
-        // Phase A cheap lower bound (O(1)): bounce gross underfunding before the walk (drift-beyond-cushion case).
-        throwUnless(13509, context().value >= msg.protocol_fee_total + msg.part_count * HUB_MIN_PER_PART_VALUE + CAPSULEHUB_ACK_FORWARD_RESERVE);
 
-        // Phases B/C/D — one atomic pass.
+        // Phase A cheap lower bound: gas + ack only. The endowment is prepaid on-balance, NOT brought by the relay.
+        throwUnless(13509, context().value >= msg.part_count * HUB_MIN_PER_PART_VALUE + CAPSULEHUB_ACK_FORWARD_RESERVE);
+
         let cursor: Cell = msg.parts;
+        let tokenCursor: Cell = msg.tokens;
         let i: Int = 0;
-        let requiredValue: Int = msg.protocol_fee_total + getComputeFee(HUB_BATCH_BASE_GAS, false) + CAPSULEHUB_ACK_FORWARD_RESERVE;
+        let requiredValue: Int = getComputeFee(HUB_BATCH_BASE_GAS, false) + CAPSULEHUB_ACK_FORWARD_RESERVE;
         let batchUid: Int = 0;
-        // clean-16 ИНК6-fix: number of NEW recovery slots this batch creates (an OVERWRITE reuses an already-funded
-        // slot, so its endowment must NOT be charged/kept again — see the RECOVERY branch + the kept computation).
-        let recoveryNewSlots: Int = 0;
         while (i < msg.part_count) {
             let isLast: Bool = (i == (msg.part_count - 1));
-            let part: Slice = cursor.beginParse();
             let entryId: Int = firstEntryId + i;
             let entryPublishId: Int = self.computeEntryPublishId(msg.publish_id, i);
-            let nextCell: Cell = msg.parts; // overwritten when not last; unused on the last iteration
+
+            // --- spend-token parse (parallel list, one node per part; §2.2) ---
+            let tok: Slice = tokenCursor.beginParse();
+            let wantTokRefs: Int = 2;                         // issuer_sig + spend_sig
+            if (!isLast) { wantTokRefs = 3; }                // + next_token
+            // token shape doubles as the tokens-len == part_count guard (13609, RT2-F2/RT6-8): a short list makes a
+            // non-last node carry 2 refs (want 3); a long list makes the last node carry 3 (want 2). Either fails here.
+            throwUnless(13609, (tok.bits() == 616) && (tok.refs() == wantTokRefs));
+            let serial: Int = tok.loadUint(256);
+            let slot: Int = tok.loadUint(8);
+            let spendPubkey: Int = tok.loadUint(256);
+            let epoch: Int = tok.loadUint(32);
+            let nonce: Int = tok.loadUint(64);
+            let issuerSig: Slice = tok.loadRef().beginParse();
+            let spendSig: Slice = tok.loadRef().beginParse();
+            let nextTok: Cell = msg.tokens;                  // overwritten when not last; unused on the last iteration
+            if (!isLast) { nextTok = tok.loadRef(); }
+
+            // --- issuer-side verification: epoch window → serial commitment → slot active → double-spend → issuer_sig ---
+            self.verifyIssuerToken(serial, slot, spendPubkey, epoch, nonce, issuerSig, nowEpoch);
+
+            let nextCell: Cell = msg.parts;                  // overwritten when not last; unused on the last iteration
+            let part: Slice = cursor.beginParse();
             if (isConv) {
                 let wantRefs: Int = 3;
                 if (!isLast) { wantRefs = 4; }
@@ -1085,17 +1567,18 @@ contract CapsuleHub {
                 let header1: Cell = part.loadRef();
                 let body: Cell = part.loadRef();
                 if (!isLast) { nextCell = part.loadRef(); }
+                // Existing lane-parse integrity — PRESERVED VERBATIM (§3.3/§10): requireExactPayloadCell binds each ref
+                // cell to its scalar hash, so spend_sig-over-scalars transitively covers the real header/body cells.
                 throwUnless(13511, self.isAllowedPrivatePair(sizeClass, cryptoSuite));
                 throwUnless(13512, (h0 != 0) && (h1 != 0) && (bh != 0));
                 self.requireExactPayloadCell(header0, h0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_CONV_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13513, 13514);
-                // clean-16 ИНК3 (LOAD-BEARING, do not remove): CONV and (from ИНК6) RECOVERY share the same
-                // 320-bit header0 length, so shape alone cannot tell them apart. Bind the header0's embedded
-                // publishKind (byte@5) to the batch publish_kind: a mislabeled RECOVERY capsule under CONV kind
-                // (or vice versa) would otherwise land in the wrong pool — a CONV-pool RECOVERY capsule is
-                // evicted after 1 year, permanently losing the user's K_root. The extractor reads ONLY byte@5.
                 throwUnless(13519, self.privateHeaderPublishKind(header0) == msg.publish_kind);
                 self.requireExactPayloadCell(header1, h1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13515, 13516);
                 self.requireExactPayloadCell(body, bh, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite), 13517, 13518);
+                // spend_sig binds serial + ALL frame scalars → token-splicing/reorder fails checkSignature (RT1-BLOCKER-1)
+                throwUnless(13605, checkSignature(self.spendDigestPrivate(serial, msg.publish_kind, sizeClass, cryptoSuite, h0, h1, bh), spendSig, spendPubkey));
+                // consume one prepaid credit from the token's OWN epoch bucket (per-epoch fail-closed guard 13613, §5.4-B)
+                self.spendPoolCredit(epoch);
                 let entryLink: Int = self.entryLink(entryId);
                 let bucketPrevLink: Int = self.pushPrivateBucketIndex(self.privateHeaderBucketKey(header0), entryLink);
                 let uid: Int = self.computeVaultPrivateEntryUid(entryId, entryPublishId, h0, h1, bh);
@@ -1108,11 +1591,13 @@ contract CapsuleHub {
                     header_1: header1
                 });
                 self.private_live_count += 1;
-                requiredValue += getComputeFee(HUB_PART_GAS_PRIVATE, false) + self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_PRIVATE);
+                // Revenue model (§5.3): accrue protocolFee(PRIVATE) from the Hub's OWN constant (relay can't spoof it).
+                self.accrued_plato_fee_ton += self.privateFullFee(CRYPTO_SUITE_HYBRID);
+                requiredValue += getComputeFee(HUB_PART_GAS_PRIVATE, false) + getComputeFee(HUB_TOKEN_VERIFY_GAS, false);
                 batchUid = self.accumulateBatchUid(batchUid, uid);
             } else if (isIntro) {
-                // clean-16 ИНК4 INTRO branch: same 784-bit private frame, but a 336-bit header0 (ephemeral_R +
-                // view_tag), a larger INTRO body, NO index (the recipient scans), and its own meta-assert (13549).
+                // INTRO: same 784-bit private frame, 336-bit header0 (ephemeral_R + view_tag), larger body, NO index.
+                // protocolFee(INTRO) = 0 (§5.3): the credit's PUBLIC-worst-case fee component stays as sweepable margin.
                 let wantRefs: Int = 3;
                 if (!isLast) { wantRefs = 4; }
                 throwUnless(13540, (part.bits() == 784) && (part.refs() == wantRefs));
@@ -1131,6 +1616,8 @@ contract CapsuleHub {
                 throwUnless(13549, self.privateHeaderPublishKind(header0) == msg.publish_kind);
                 self.requireExactPayloadCell(header1, h1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13545, 13546);
                 self.requireExactPayloadCell(body, bh, self.introBodyCells(sizeClass), self.introBodyBits(sizeClass), self.introBodyRefs(sizeClass), 13547, 13548);
+                throwUnless(13605, checkSignature(self.spendDigestPrivate(serial, msg.publish_kind, sizeClass, cryptoSuite, h0, h1, bh), spendSig, spendPubkey));
+                self.spendPoolCredit(epoch);
                 let uid: Int = self.computeVaultIntroEntryUid(entryId, entryPublishId, h0, h1, bh);
                 self.intro_entries.set(entryId, IntroCapsuleEntry {
                     publish_id: entryPublishId,
@@ -1140,59 +1627,11 @@ contract CapsuleHub {
                     header_1: header1
                 });
                 self.intro_live_count += 1;
-                requiredValue += getComputeFee(HUB_PART_GAS_INTRO, false) + self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_INTRO);
-                batchUid = self.accumulateBatchUid(batchUid, uid);
-            } else if (isRecovery) {
-                // clean-16 ИНК6 RECOVERY branch: same 784-bit frame + the CONV 320-bit header0, but the body is
-                // stored ON-CHAIN in a keyed latest-wins slot (key = self-bucketKey). A repeat publish OVERWRITES
-                // the slot; the live count grows ONLY on the first insert. Body size is capped by RECOVERY_MAX_SIZE_CLASS.
-                let wantRefs: Int = 3;
-                if (!isLast) { wantRefs = 4; }
-                throwUnless(13550, (part.bits() == 784) && (part.refs() == wantRefs));
-                let sizeClass: Int = part.loadUint(8);
-                let cryptoSuite: Int = part.loadUint(8);
-                let h0: Int = part.loadUint(256);
-                let h1: Int = part.loadUint(256);
-                let bh: Int = part.loadUint(256);
-                let header0: Cell = part.loadRef();
-                let header1: Cell = part.loadRef();
-                let body: Cell = part.loadRef();
-                if (!isLast) { nextCell = part.loadRef(); }
-                throwUnless(13551, self.isAllowedPrivatePair(sizeClass, cryptoSuite));
-                throwUnless(13552, (h0 != 0) && (h1 != 0) && (bh != 0));
-                throwUnless(13560, sizeClass <= RECOVERY_MAX_SIZE_CLASS);
-                self.requireExactPayloadCell(header0, h0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_CONV_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13553, 13554);
-                throwUnless(13559, self.privateHeaderPublishKind(header0) == msg.publish_kind);
-                self.requireExactPayloadCell(header1, h1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13555, 13556);
-                self.requireExactPayloadCell(body, bh, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite), 13557, 13558);
-                let slotKey: Int = self.privateHeaderBucketKey(header0);
-                let existingOpt: RecoveryCapsuleRecord? = self.recovery_slots.get(slotKey);
-                let existed: Bool = (existingOpt != null);
-                // Variant-B first-publisher bind: only the wallet that created the slot may overwrite it. This is
-                // the ONLY defence against a permissionless destructive overwrite of a K_root recovery blob, since
-                // slotKey is public once published (map key + header_0 bits[64,320) + cleartext in the publish tx).
-                if (existed) { throwUnless(13563, existingOpt!!.author_wallet == msg.author_wallet); }
-                self.recovery_slots.set(slotKey, RecoveryCapsuleRecord {
-                    publish_id: entryPublishId,
-                    updated_at: now(),
-                    body_hash: bh,
-                    author_wallet: msg.author_wallet,
-                    header_0: header0,
-                    header_1: header1,
-                    body: body
-                });
-                requiredValue += getComputeFee(HUB_PART_GAS_RECOVERY, false);
-                if (!existed) {
-                    // A fresh slot's full 3yr endowment is charged/kept ONCE; an OVERWRITE reuses the slot's
-                    // already-protected reserve (the retention clock resets but per-entry reserve = full worst-case
-                    // 3yr, so it stays covered). Charging it again would leak the surplus to the sweepable pool.
-                    self.recovery_live_count += 1;
-                    recoveryNewSlots += 1;
-                    requiredValue += self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_RECOVERY);
-                }
-                let uid: Int = self.computeVaultRecoveryEntryUid(slotKey, entryPublishId, h0, h1, bh);
+                requiredValue += getComputeFee(HUB_PART_GAS_INTRO, false) + getComputeFee(HUB_TOKEN_VERIFY_GAS, false);
                 batchUid = self.accumulateBatchUid(batchUid, uid);
             } else {
+                // PUBLIC: 592-bit frame; author_wallet removed — the discovery/attribution key is the crypto-bound
+                // channel_id = publicChannelKeyId(spend_pubkey) (§6). Lane-parse otherwise unchanged from the Vault path.
                 let wantRefs: Int = 2;
                 if (!isLast) { wantRefs = 3; }
                 throwUnless(13520, (part.bits() == 592) && (part.refs() == wantRefs));
@@ -1204,31 +1643,26 @@ contract CapsuleHub {
                 let header: Cell = part.loadRef();
                 let body: Cell = part.loadRef();
                 if (!isLast) { nextCell = part.loadRef(); }
-                // clean-11: bit0 (0x01) = is_profile (client PDC1 PROFILE=7 body signal); bits 1..7 stay reserved (0).
-                throwUnless(13521, (reserved & 254) == 0);   // 254 == 0b11111110
+                throwUnless(13521, (reserved & 254) == 0);       // bit0 = is_profile; bits 1..7 reserved 0
                 let isProfile: Bool = (reserved & 1) == 1;
                 throwUnless(13522, self.isAllowedPublicSizeClass(sizeClass));
                 throwUnless(13523, (h0 != 0) && (bh != 0));
-                // parentLink == 0 -> post; else parentLink == parentEntryId+1 and the parent must strictly precede.
-                // The parent is NOT required to still exist (it may have been evicted) nor to be a top-level post
-                // (a comment may reply to a comment) — intentional: each entry is independently funded and the
-                // thread is reassembled client-side. The only guard is that the parent id precedes this entry.
-                // clean-11: an is_profile flag is valid ONLY on a top-level post (a channel's own description).
-                // A comment (parentLink != 0) carrying it is malformed -> fail-closed.
-                throwUnless(13529, (!isProfile) || (parentLink == 0));
+                throwUnless(13529, (!isProfile) || (parentLink == 0));   // is_profile only on a top-level post
                 throwUnless(13528, (parentLink == 0) || (parentLink <= entryId));
                 self.requirePublicHeaderCell(header, h0, 13524, 13525);
                 self.requirePublicPayloadCell(body, bh, sizeClass, 13526, 13527);
-                let uid: Int = self.computeVaultPublicEntryUid(entryId, entryPublishId, msg.author_wallet, h0, bh);
+                // spend_sig binds serial + the PUBLIC frame scalars (§3.3 public variant) → token-splicing fails here.
+                throwUnless(13605, checkSignature(self.spendDigestPublic(serial, msg.publish_kind, sizeClass, reserved, parentLink, h0, bh), spendSig, spendPubkey));
+                self.spendPoolCredit(epoch);
+                let channelId: Int = self.publicChannelKeyId(spendPubkey);
+                let uid: Int = self.computeVaultPublicEntryUid(entryId, entryPublishId, channelId, h0, bh);
                 let entryLink: Int = self.entryLink(entryId);
                 let publicPrevLink: Int = 0;
-                let profilePrevLink: Int = 0;                       // clean-11: 0 for non-profile posts
+                let profilePrevLink: Int = 0;
                 if (parentLink == 0) {
-                    let authorKey: Int = self.publicAuthorKeyId(msg.author_wallet);
-                    publicPrevLink = self.pushPublicAuthorIndex(authorKey, entryLink);
+                    publicPrevLink = self.pushPublicAuthorIndex(channelId, entryLink);
                     if (isProfile) {
-                        // per-author pointer (latest profile for this channel) + global profile chain head-insert
-                        self.public_profile_index.set(authorKey, entryLink);
+                        self.public_profile_index.set(channelId, entryLink);
                         profilePrevLink = self.public_profile_head;
                         self.public_profile_head = entryLink;
                     }
@@ -1238,68 +1672,56 @@ contract CapsuleHub {
                 self.public_entries.set(entryId, PublicCapsuleEntry {
                     publish_id: entryPublishId,
                     created_at: now(),
-                    author_wallet: msg.author_wallet,
+                    channel_id: channelId,
                     body_hash: bh,
                     parent_link: parentLink,
                     prev_link: publicPrevLink,
-                    profile_prev_link: profilePrevLink,             // clean-11
+                    profile_prev_link: profilePrevLink,
                     header: header
                 });
                 self.public_live_count += 1;
-                requiredValue += getComputeFee(HUB_PART_GAS_PUBLIC, false) + self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_PUBLIC);
+                self.accrued_plato_fee_ton += PLATO_PUBLIC_POST_FEE_TON;   // protocolFee(PUBLIC), §5.3
+                // No top-up: G8 measured PUBLIC (10.5 cells) CHEAPER than PRIVATE (12), and the credit is priced at
+                // PRIVATE — so one credit already over-covers a public post's backing.
+                requiredValue += getComputeFee(HUB_PART_GAS_PUBLIC, false) + getComputeFee(HUB_TOKEN_VERIFY_GAS, false);
                 batchUid = self.accumulateBatchUid(batchUid, uid);
             }
+            // Nullifier insert AFTER all per-part checks. Tact reverts-all on any later throw (V2 value gate below), so
+            // an underfunded/short batch never burns a token (fail-closed, §3.4). Intra-batch dup: the next part's
+            // verifyIssuerToken sees this insert and reverts 13604.
+            self.insertNullifier(self.nullifierKey(serial));
             cursor = nextCell;
+            tokenCursor = nextTok;
             i += 1;
         }
-        // Full value gate (atomic: reverts every store above if the forwarded value is short).
+        // Full gas gate (atomic): ONLY gas + ack, NOT endowment (prepaid). Reverts every store + nullifier insert above
+        // if the relay underfunded gas.
         throwUnless(13530, context().value >= requiredValue);
-        // Commit batch-level counters + fee exactly once.
+        // Commit lane counters + own-lane FIFO eviction.
         if (isConv) {
             self.private_latest_id += msg.part_count;
-        } else if (isIntro) {
-            self.intro_latest_id += msg.part_count;
+            self.evictExpiredPrivate(msg.part_count);
         } else if (isPublic) {
             self.public_latest_id += msg.part_count;
-        }
-        // RECOVERY has no sequential id (keyed slot map); recovery_live_count was bumped per-part in the branch above.
-        self.accrued_plato_fee_ton += msg.protocol_fee_total;
-
-        // Auto-eviction (FIFO, funded via HUB_PART_GAS_*): each batch evicts up to part_count oldest expired
-        // entries of its own kind, bounding live state by construction. Just-added entries are created at now()
-        // so they are never expired; the loop stops at the first non-expired entry.
-        // Own-kind FIFO eviction (funded by HUB_PART_GAS_*).
-        if (isConv) {
-            self.evictExpiredPrivate(msg.part_count);
-        } else if (isIntro) {
-            self.evictExpiredIntro(msg.part_count);
-        } else if (isPublic) {
             self.evictExpiredPublic(msg.part_count);
+        } else {
+            self.intro_latest_id += msg.part_count;
+            self.evictExpiredIntro(msg.part_count);
         }
-        // RECOVERY has no FIFO eviction (keyed latest-wins map); expired slots are reclaimed permissionlessly via
-        // the EvictExpiredRecoverySlot message.
-        // clean-16 ИНК4: unconditional capped INTRO sweep. INTRO is low-frequency; without this a quiet INTRO
-        // pool would never shed expired first-contact capsules between INTRO batches. Every non-INTRO batch
-        // sweeps up to CAPSULEHUB_INTRO_SWEEP_CAP expired intro entries — a fixed small cost on the hot path
-        // (G8-provisional: HUB_PART_GAS_* must cover it). An INTRO batch already swept its own pool above.
+        // Unconditional capped INTRO sweep on non-INTRO batches (low-frequency lane still sheds expired entries).
         if (!isIntro) {
             let introSweep: Int = msg.part_count;
             if (introSweep > CAPSULEHUB_INTRO_SWEEP_CAP) { introSweep = CAPSULEHUB_INTRO_SWEEP_CAP; }
             self.evictExpiredIntro(introSweep);
         }
-
-        // ACK (spec 5.3): keep fee + entry storage (+1.25 buffer), protect pre-existing balance, return the rest
-        // (import over-hold + ack float) to the Vault via mode 128. The Vault credits it back to the user ledger.
-        // CONV/INTRO/PUBLIC create one new entry per part → keep part_count endowments. RECOVERY is a keyed slot
-        // map: an OVERWRITE reuses an already-funded slot, so keep endowment only for the NEW slots (else the
-        // redundant endowment is kept as sweepable surplus instead of being returned to the owner).
-        let kept: Int = msg.protocol_fee_total + msg.part_count * self.batchStorageReserveWithBuffer(msg.publish_kind);
-        if (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_RECOVERY) {
-            kept = msg.protocol_fee_total + recoveryNewSlots * self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_RECOVERY);
-        }
-        nativeReserve(kept, ReserveAtMost | ReserveAddOriginalBalance);
+        // Nullifier FIFO eviction: fold evicts part_count + margin >= inserted → net live growth <= 0 (§4.2).
+        self.evictNullifiersFIFO(msg.part_count + NULLIFIER_SWEEP_MARGIN);
+        // ACK → relay (§8): reserve keeps the ENTIRE pre-existing balance (prepaid pool + every locked endowment, all
+        // already on-balance), returning only the unspent incoming gas float. reserve(protectedReserve) would be WRONG —
+        // it would leak the sweepable surplus to the relay.
+        nativeReserve(0, ReserveAtMost | ReserveAddOriginalBalance);
         message(MessageParameters {
-            to: self.vault_address,
+            to: relay,
             value: 0,
             bounce: false,
             mode: SendRemainingBalance,
@@ -1309,6 +1731,97 @@ contract CapsuleHub {
                 part_count: msg.part_count,
                 batch_uid: batchUid
             }.toCell()
+        });
+    }
+
+    // ===== clean-16 B3: RECOVERY durability lane (§7) — separate, SELF-FUNDED, owner_sig-authorized =====
+    // RECOVERY is its OWN K_root durability (not sender-anonymous: it stores the owner's own key, already in the tx),
+    // so it does NOT ride the prepaid token pool — that would bloat prepaidUnit with a 200M unit and kill the cheap
+    // lanes. It brings its endowment directly in msg.value and is authorized by an ed25519 owner_sig over the frame,
+    // binding the slot to its first publisher's pubkey (anti destructive-overwrite of the K_root blob).
+    receive(msg: PublishRecovery) {
+        self.requireSealed();
+        throwUnless(13501, msg.publish_id != 0);
+        // [SAFE-CAP] RECOVERY is the line where a silent code 50 costs the most: the slot holds K_root, so losing
+        // it loses the whole conversation history irreversibly. An overwrite of an EXISTING slot adds no state, so
+        // only a NEW slot is capped — the check below is the cheap upper bound; the exact existed/!existed test
+        // happens later, and an overwrite at the cap is admitted by that path without growing state.
+        throwUnless(13565, self.recovery_live_count < CAPSULEHUB_SAFE_RECOVERY_CAP);
+        let relay: Address = sender();
+
+        // Single CONV-shaped 784-bit frame (3 refs: header0, header1, body — no next).
+        let part: Slice = msg.part.beginParse();
+        throwUnless(13550, (part.bits() == 784) && (part.refs() == 3));
+        let sizeClass: Int = part.loadUint(8);
+        let cryptoSuite: Int = part.loadUint(8);
+        let h0: Int = part.loadUint(256);
+        let h1: Int = part.loadUint(256);
+        let bh: Int = part.loadUint(256);
+        let header0: Cell = part.loadRef();
+        let header1: Cell = part.loadRef();
+        let body: Cell = part.loadRef();
+        throwUnless(13551, self.isAllowedPrivatePair(sizeClass, cryptoSuite));
+        throwUnless(13552, (h0 != 0) && (h1 != 0) && (bh != 0));
+        throwUnless(13560, sizeClass <= RECOVERY_MAX_SIZE_CLASS);
+        // Existing integrity — PRESERVED (§7/RT6-MAJOR-3): without body.hash()==bh a relay could overwrite the slot
+        // with the same bh but garbage body (the body is stored ON-CHAIN), destroying the K_root blob forever.
+        self.requireExactPayloadCell(header0, h0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_CONV_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13553, 13554);
+        throwUnless(13559, self.privateHeaderPublishKind(header0) == CAPSULEHUB_ENTRY_KIND_RECOVERY);
+        self.requireExactPayloadCell(header1, h1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13555, 13556);
+        self.requireExactPayloadCell(body, bh, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite), 13557, 13558);
+
+        let slotKey: Int = self.privateHeaderBucketKey(header0);
+        // recoveryDigest binds slotKey (derived from header0) + the monotonic seq + all three frame hashes; swapping
+        // header0 changes slotKey, header1/body changes h1/bh, and seq is signed → any tamper fails owner_sig (§7).
+        // DOMAIN(32)+slotKey(256)+seq(64)+ref = 352 inline bits < 1023 (the three frame hashes spill into the ref).
+        let recoveryDigest: Int = beginCell()
+            .storeUint(RECOVERY_SLOT_DOMAIN, 32).storeUint(slotKey, 256).storeUint(msg.seq, 64)
+            .storeRef(beginCell().storeUint(h0, 256).storeUint(h1, 256).storeUint(bh, 256).endCell())
+            .endCell().hash();
+        throwUnless(13571, checkSignature(recoveryDigest, msg.owner_sig.beginParse(), msg.owner_pubkey));
+
+        let existingOpt: RecoveryCapsuleRecord? = self.recovery_slots.get(slotKey);
+        let existed: Bool = (existingOpt != null);
+        // First publisher binds owner_pubkey; only that pubkey (with a valid owner_sig) may overwrite. AND the seq must
+        // STRICTLY increase (13564) — this is the anti-replay/rollback guard: a stale but validly-signed message carries
+        // an older seq and is rejected, so the slot cannot be rolled back to a superseded K_root blob (review fix).
+        if (existed) {
+            throwUnless(13563, existingOpt!!.owner_pubkey == msg.owner_pubkey);
+            throwUnless(13564, msg.seq > existingOpt!!.seq);
+        }
+
+        // Self-funded value gate: a NEW slot must carry its full endowment + gas + ack; an OVERWRITE reuses the
+        // already-protected slot reserve (retention clock resets, per-entry reserve = full worst-case, still covered).
+        let requiredValue: Int = getComputeFee(HUB_BATCH_BASE_GAS, false) + getComputeFee(HUB_PART_GAS_RECOVERY, false) + CAPSULEHUB_ACK_FORWARD_RESERVE;
+        let keptEndowment: Int = 0;
+        if (!existed) {
+            keptEndowment = self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_RECOVERY);
+            requiredValue += keptEndowment;
+        }
+        throwUnless(13576, context().value >= requiredValue);
+
+        self.recovery_slots.set(slotKey, RecoveryCapsuleRecord {
+            publish_id: msg.publish_id,
+            updated_at: now(),
+            body_hash: bh,
+            owner_pubkey: msg.owner_pubkey,
+            seq: msg.seq,
+            header_0: header0,
+            header_1: header1,
+            body: body
+        });
+        if (!existed) { self.recovery_live_count += 1; }
+        let uid: Int = self.computeVaultRecoveryEntryUid(slotKey, msg.publish_id, h0, h1, bh);
+
+        // ACK → relay: keep the pre-existing balance PLUS the new slot's endowment (self-funded, brought in value),
+        // returning only the leftover gas float. Overwrite keeps 0 extra (slot already backed).
+        nativeReserve(keptEndowment, ReserveAtMost | ReserveAddOriginalBalance);
+        message(MessageParameters {
+            to: relay,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingBalance,
+            body: CapsuleHubBatchAck { publish_id: msg.publish_id, first_entry_id: 0, part_count: 1, batch_uid: uid }.toCell()
         });
     }
 
@@ -1405,7 +1918,8 @@ contract CapsuleHub {
                 slot_key: slotKey,
                 updated_at: 0,
                 body_hash: 0,
-                author_wallet: myAddress(),
+                owner_pubkey: 0,
+                seq: 0,
                 header_0: emptyCell(),
                 header_1: emptyCell(),
                 body: emptyCell()
@@ -1417,7 +1931,8 @@ contract CapsuleHub {
             slot_key: slotKey,
             updated_at: rec.updated_at,
             body_hash: rec.body_hash,
-            author_wallet: rec.author_wallet,
+            owner_pubkey: rec.owner_pubkey,
+            seq: rec.seq,
             header_0: rec.header_0,
             header_1: rec.header_1,
             body: rec.body
@@ -1638,7 +2153,7 @@ contract CapsuleHub {
                 entry_id: entryId,
                 entry_uid: 0,
                 publish_id: 0,
-                author_wallet: myAddress(),
+                channel_id: 0,
                 page_id: self.pageId(entryId),
                 page_offset: self.pageOffset(entryId),
                 created_at: 0,
@@ -1655,9 +2170,9 @@ contract CapsuleHub {
         return PublicCapsuleEntryView {
             exists: true,
             entry_id: entryId,
-            entry_uid: self.computeVaultPublicEntryUid(entryId, entry.publish_id, entry.author_wallet, headerHash, entry.body_hash),
+            entry_uid: self.computeVaultPublicEntryUid(entryId, entry.publish_id, entry.channel_id, headerHash, entry.body_hash),
             publish_id: entry.publish_id,
-            author_wallet: entry.author_wallet,
+            channel_id: entry.channel_id,
             page_id: self.pageId(entryId),
             page_offset: self.pageOffset(entryId),
             created_at: entry.created_at,
@@ -1744,6 +2259,40 @@ contract CapsuleHub {
             reserve_buffer_numerator: CAPSULEHUB_STORAGE_RESERVE_BUFFER_NUMERATOR,
             reserve_buffer_denominator: CAPSULEHUB_STORAGE_RESERVE_BUFFER_DENOMINATOR
         };
+    }
+
+    // clean-16 B3 observability getters (§9/§4/§5).
+    get fun get_anon_pool_state(): AnonPoolStateView {
+        return AnonPoolStateView {
+            credit_issuer_bound: self.credit_issuer_bound,
+            credit_issuer_address: self.credit_issuer_address,
+            nullifier_live_count: self.nullifier_live_count,
+            nullifier_latest: self.nullifier_latest,
+            nullifier_oldest_live: self.nullifier_oldest_live,
+            anon_pool_outstanding: self.anon_pool_outstanding,
+            prepaid_unit: CAPSULEHUB_PREPAID_UNIT,
+            max_batch_parts_anon: MAX_BATCH_PARTS_ANON
+        };
+    }
+
+    get fun get_issuer_slot(slot: Int): IssuerSlotView {
+        let s: IssuerSlot? = self.issuer_mirror.get(slot);
+        if (s == null) {
+            return IssuerSlotView { exists: false, slot: slot, pubkey: 0, active: false, version: 0 };
+        }
+        return IssuerSlotView { exists: true, slot: slot, pubkey: s!!.pubkey, active: s!!.active, version: s!!.version };
+    }
+
+    // Live (funded − spent) credits still backing an epoch bucket; 0 once reclaimed or fully spent.
+    get fun get_epoch_funding(epoch: Int): Int {
+        return self.epochFunded(epoch) - self.epochSpent(epoch);
+    }
+
+    // Membership probe for the nullifier ledger: the insert_time of a spent serial's key, or 0 if unspent.
+    get fun get_nullifier_insert_time(serial: Int): Int {
+        let t: Int? = self.spent_nullifiers.get(self.nullifierKey(serial));
+        if (t == null) { return 0; }
+        return t!!;
     }
 
     receive() {

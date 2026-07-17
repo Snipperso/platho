@@ -31,6 +31,10 @@ const PROFILE_REPEAT_RETAINED_MODEL = PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT
 
 type ProfileStorageCase = {
   label: string;
+  // Owners, not just updates: fix #13 (avatar_records.del) makes PERMANENT state per-owner, so the surviving
+  // record count is a function of `owners` while the money paid is a function of `updates`. Reporting only
+  // `updates` made the two indistinguishable and let a stale per-update expectation look authoritative.
+  owners: number;
   updates: number;
   raw_balance_delta_nanotons: string;
   expected_permanent_endowment_nanotons: string;
@@ -116,13 +120,19 @@ async function setupRegistry(label: string) {
   return { blockchain, registry, officialAthWallet, vault };
 }
 
+// clean-16 Durable-Core: ProfileRegistry payer-auth freeze made avatars DIRECT-PAY. The registry now gates on
+// `owner_wallet == payer_wallet` (21163) — the avatar's owner must BE the payer, with no Vault standing in the
+// middle. That is what makes the registry Vault-independent, and therefore durable across redeploys.
+// This fixture used to set payer_wallet = ctx.vault, which the gate now rejects: the notification threw, the
+// registry retained nothing, and the case reported "retained margin is negative (-45000000)" — reading as an
+// endowment shortfall when it was really a fixture describing a world that no longer exists.
 function avatarNotification(ctx: Setup, owner: Address, queryId: bigint): AthTransferNotificationVaultProfileAvatar {
   return {
     $$type: 'AthTransferNotificationVaultProfileAvatar',
     query_id: queryId,
     amount: PROFILE_AVATAR_PRICE_ATH,
     sender_key: 77n,
-    payer_wallet: ctx.vault,
+    payer_wallet: owner,
     owner_wallet: owner,
     avatar_hash: 0xabc000n + queryId,
     avatar_entry_id: queryId,
@@ -160,6 +170,7 @@ async function singleCase(label: string, preUpdates: number): Promise<ProfileSto
 
   return {
     label,
+    owners: 1,
     updates: 1,
     raw_balance_delta_nanotons: String(rawDelta),
     expected_permanent_endowment_nanotons: String(expectedPermanent),
@@ -184,8 +195,13 @@ async function aggregateCase(label: string, owners: number, updatesPerOwner: num
   const after = await contractBalance(ctx.blockchain, ctx.registry.address);
   const state = await ctx.registry.getGetGlobal();
   const updates = owners * updatesPerOwner;
-  const expectedPermanent = BigInt(owners) * PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT
-    + BigInt(updates) * PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT;
+  // PERMANENT state is per-OWNER, not per-update: fix #13 (avatar_records.del) makes an update DELETE the previous
+  // record (ProfileRegistry.tact:323-324), so an owner leaves exactly one version entry + one avatar record behind
+  // however many times they change their avatar. Every update still PAYS a record endowment, so repeats accumulate
+  // surplus the registry keeps — that is over-collection, which is the safe direction, and the margin assertion
+  // below is what observes it. Modelling permanence as `updates x RECORD` described the world before #13 landed.
+  const expectedPermanent = BigInt(owners) * (PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT
+    + PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT);
   const expectedRetainedModel = BigInt(owners) * PROFILE_FIRST_RETAINED_MODEL
     + BigInt(updates - owners) * PROFILE_REPEAT_RETAINED_MODEL;
   const rawDelta = after - before;
@@ -194,6 +210,7 @@ async function aggregateCase(label: string, owners: number, updatesPerOwner: num
 
   return {
     label,
+    owners,
     updates,
     raw_balance_delta_nanotons: String(rawDelta),
     expected_permanent_endowment_nanotons: String(expectedPermanent),
@@ -228,10 +245,10 @@ function renderMarkdown(report: ProfileRegistryStorageEconomicsReport): string {
 
 export async function runProfileRegistryStorageEconomics(writeArtifacts = true): Promise<ProfileRegistryStorageEconomicsReport> {
   const cases = [
-    await singleCase('VAULT_FIRST_AVATAR', 0),
-    await singleCase('VAULT_REPEAT_AVATAR', 1),
-    await aggregateCase('VAULT_MANY_OWNERS_12', 12, 1),
-    await aggregateCase('VAULT_MANY_UPDATES_ONE_OWNER_10', 1, 10),
+    await singleCase('DIRECT_FIRST_AVATAR', 0),
+    await singleCase('DIRECT_REPEAT_AVATAR', 1),
+    await aggregateCase('DIRECT_MANY_OWNERS_12', 12, 1),
+    await aggregateCase('DIRECT_MANY_UPDATES_ONE_OWNER_10', 1, 10),
   ];
   const worst = cases.map((item) => BigInt(item.retained_margin_vs_permanent_endowment_nanotons)).reduce((a, b) => a < b ? a : b);
   if (worst < MINIMUM_STORAGE_MARGIN_NANOTONS) {
