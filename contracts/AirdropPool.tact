@@ -229,9 +229,14 @@ contract AirdropPool {
 
     // ===== SEALED =====
 
-    // The ONLY accrual path. Authenticated by exactly one sender: the bound CreditIssuer, which emits this only
-    // from its FundAnonPoolAck handler — i.e. only after the Hub confirmed the funding landed. A bounced
-    // FundAnonPool yields no ack, hence no accrual, hence the refund-and-keep-the-ATH loop cannot exist.
+    // The ONLY accrual path. Authenticated by exactly one sender: the bound credit_issuer (the 26110 gate below).
+    // The invariant is that accrual fires ONLY downstream of REAL, non-bounced funding — the credit_issuer enforces
+    // that on its side before it ever emits AirdropAccrue, so the refund-and-keep-the-ATH loop cannot exist. Two
+    // callers have filled that role, and this pool is agnostic to which:
+    //   * clean-16 caller = CreditIssuer, which emits this only from its FundAnonPoolAck handler — i.e. only after
+    //     the Hub confirmed the pool funding landed (a bounced FundAnonPool yields no ack, hence no accrual).
+    //   * clean-17 caller = CreditSale, which accrues ATOMICALLY on a settled buy (no pool, no ack, no bounce path).
+    // Either way the accrual is gated on confirmed value, never on a mere request.
     receive(msg: AirdropAccrue) {
         self.requireSealed();
         throwUnless(26110, sender() == self.credit_issuer_address);
