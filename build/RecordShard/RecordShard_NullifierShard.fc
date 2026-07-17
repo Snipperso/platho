@@ -11,6 +11,9 @@
 ;; __tact_context_get
 (int, slice, int, slice) __tact_context_get() inline;
 
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
 ;; __tact_dict_set_code
 cell __tact_dict_set_code(cell dict, int id, cell code) inline;
 
@@ -101,6 +104,9 @@ slice $global_contractAddress((cell, cell) $s) impure inline;
 ;; $RecordStore$_constructor_serial_frame_commit
 ((int, int)) $RecordStore$_constructor_serial_frame_commit(int $serial, int $frame_commit) inline;
 
+;; $SendParameters$_constructor_to_value_mode_bounce
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
+
 
 ;; RecordShard_NullifierShard.stdlib.fc
 global (int, slice, int, slice) __tact_context;
@@ -110,6 +116,10 @@ global int __tact_randomized;
 
 (int, slice, int, slice) __tact_context_get() inline {
     return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
 }
 
 cell __tact_dict_set_code(cell dict, int id, cell code) inline {
@@ -197,6 +207,10 @@ slice $global_contractAddress((cell, cell) $s) impure inline {
     var (($s'code, $s'data)) = $s;
     return $global_contractAddressExt(0, $s'code, $s'data);
 }
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
 
 () $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
     NEWC
@@ -299,6 +313,10 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline {
     return ($mode, $body, null(), null(), $value, $to, $bounce);
+}
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline {
+    return ($mode, null(), null(), null(), $value, $to, $bounce);
 }
 
 ;;
@@ -577,10 +595,12 @@ _ %is_spent(int $serial) method_id(125513) {
         int $nk = ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_nullifierKey($serial);
         throw_unless(13604, null?(__tact_dict_get_int_int($self'spent, 257, $nk, 1)));
         throw_unless(13623, ($self'spent_count < 4096));
-        throw_unless(13624, ($Context$_get_value(__tact_context_get()) >= 60000000));
+        throw_unless(13624, ($Context$_get_value(__tact_context_get()) >= 7710000));
         $self'spent~__tact_dict_set_int_int(257, $nk, true, 1);
         $self'spent_count = ($self'spent_count + 1);
-        $global_send($SendParameters$_constructor_to_value_mode_bounce_body($global_contractAddress($RecordShard$_init_child($msg'bucket_key, $self'epoch)), 1000000, 1, true, $RecordStore$_store_cell($RecordStore$_constructor_serial_frame_commit($serial, $msg'frame_commit), begin_cell())));
+        $global_nativeReserve((1000000 + ($self'spent_count * 10000)), 2);
+        $global_send($SendParameters$_constructor_to_value_mode_bounce_body($global_contractAddress($RecordShard$_init_child($msg'bucket_key, $self'epoch)), 2700000, 1, true, $RecordStore$_store_cell($RecordStore$_constructor_serial_frame_commit($serial, $msg'frame_commit), begin_cell())));
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $NullifierShard$_contract_store(($self'epoch, $self'lane, $self'spent, $self'spent_count));
         return ();
     }

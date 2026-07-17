@@ -1,6 +1,7 @@
 // automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/RecordShard/RecordShard_NullifierShard.fc` 
 PROGRAM{
   DECLPROC __tact_context_get
+  DECLPROC __tact_context_get_sender
   DECLPROC __tact_dict_set_code
   DECLPROC __tact_dict_get_code
   DECLPROC __tact_dict_get_int_int
@@ -31,6 +32,7 @@ PROGRAM{
   DECLPROC $RecordShard$_init_child
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $RecordStore$_constructor_serial_frame_commit
+  DECLPROC $SendParameters$_constructor_to_value_mode_bounce
   76114 DECLMETHOD %get_view
   125513 DECLMETHOD %is_spent
   DECLPROC recv_internal
@@ -41,6 +43,9 @@ PROGRAM{
   __tact_context_get PROCINLINE:<{
     __tact_context GETGLOB
     4 UNTUPLE
+  }>
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
   }>
   __tact_dict_set_code PROCINLINE:<{
     s0 s2 XCHG
@@ -314,6 +319,14 @@ PROGRAM{
   }>
   $RecordStore$_constructor_serial_frame_commit PROCINLINE:<{
   }>
+  $SendParameters$_constructor_to_value_mode_bounce PROCINLINE:<{
+    s1 s3 XCHG
+    PUSHNULL
+    PUSHNULL
+    s4 s3 XCHG2
+    PUSHNULL
+    s0 s3 XCHG
+  }>
   %get_view PROC:<{
     $NullifierShard$_contract_load INLINECALLDICT
     $NullifierShard$_fun_get_view INLINECALLDICT
@@ -511,7 +524,7 @@ PROGRAM{
       13624 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      60000000 PUSHINT
+      7710000 PUSHINT
       GEQ
       THROWANYIFNOT
       s1 s2 XCHG
@@ -522,10 +535,17 @@ PROGRAM{
       __tact_dict_set_int_int INLINECALLDICT
       SWAP
       INC
+      1000000 PUSHINT
+      OVER
+      10000 PUSHINT
+      MUL
+      ADD
+      2 PUSHINT
+          RAWRESERVE
       s4 s3 XCPU
       $RecordShard$_init_child INLINECALLDICT
       $global_contractAddress INLINECALLDICT
-      1000000 PUSHINT
+      2700000 PUSHINT
       1 PUSHINT
       s0 s8 XCHG
       TRUE
@@ -536,6 +556,77 @@ PROGRAM{
       s4 s3 s0 XCHG3
       s8 s7 s0 XCHG3
       $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+          // → Stack state
+          // s0: Builder
+          // s1: `data`
+          // s2: `code`
+          // s3: `body`
+          // s4: `mode`
+          // Group 2: Placing the Builder after code and data, then checking those for nullability
+          s2 XCHG0
+          DUP2
+          ISNULL
+          SWAP
+          ISNULL
+          AND
+          // → Stack state
+          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+          // s1: `code`
+          // s2: `data`
+          // s3: Builder
+          // s4: `body`
+          // s5: `mode`
+          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+          <{
+              DROP2 // drop `data` and `code`, since either of those is null
+              b{0} STSLICECONST
+          }> PUSHCONT
+          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+          <{
+              // _ split_depth:(Maybe (## 5))
+              //   special:(Maybe TickTock)
+              //   code:(Maybe ^Cell)
+              //   data:(Maybe ^Cell)
+              //   library:(Maybe ^Cell)
+              // = StateInit;
+              ROT                // place message Builder on top
+              b{10} STSLICECONST // store Maybe = true, Either = false
+              // Start composing inlined StateInit
+              b{00} STSLICECONST // store split_depth and special first
+              STDICT             // store code
+              STDICT             // store data
+              b{0} STSLICECONST  // store library
+          }> PUSHCONT
+          // Group 3: IFELSE that does the branching shown above
+          IFELSE
+          // → Stack state
+          // s0: Builder
+          // s1: null or StateInit
+          // s2: `body`
+          // s3: `mode`
+          // Group 4: Finalizing the message
+          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+          ENDC
+          // → Stack state
+          // s0: Cell
+          // s1: `mode`
+          // Group 5: Sending the message, with `mode` on top
+          SWAP
+          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      __tact_context_get_sender INLINECALLDICT
+      0 PUSHINT
+      130 PUSHINT
+      FALSE
+      $SendParameters$_constructor_to_value_mode_bounce INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
           1 STI               // store `bounce`

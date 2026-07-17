@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: NullifierShard
-BoC Size: 1094 bytes
+BoC Size: 1170 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 17
