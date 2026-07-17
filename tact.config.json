@@ -119,6 +119,11 @@
       "name": "AirdropPool",
       "path": "./contracts/AirdropPool.tact",
       "output": "./build/AirdropPool"
+    },
+    {
+      "name": "NullifierShard",
+      "path": "./contracts/NullifierShard.tact",
+      "output": "./build/NullifierShard"
     }
   ]
 }
