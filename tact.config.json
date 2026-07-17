@@ -134,6 +134,11 @@
       "name": "CreditSale",
       "path": "./contracts/CreditSale.tact",
       "output": "./build/CreditSale"
+    },
+    {
+      "name": "RecoveryShard",
+      "path": "./contracts/RecoveryShard.tact",
+      "output": "./build/RecoveryShard"
     }
   ]
 }

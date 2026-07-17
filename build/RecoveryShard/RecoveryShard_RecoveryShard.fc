@@ -1,0 +1,415 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; RecoveryShard_RecoveryShard.headers.fc
+;;
+;; Header files for RecoveryShard
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $RecoveryShard$_store
+builder $RecoveryShard$_store(builder build_0, (int, int, int, int, int, int, int, cell, int) v) inline;
+
+;; $RecoveryShard$_load
+(slice, ((int, int, int, int, int, int, int, cell, int))) $RecoveryShard$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $RecoveryShardView$_to_external
+(int, int, int, int, int, int, int) $RecoveryShardView$_to_external(((int, int, int, int, int, int, int)) v) inline;
+
+;; $RecoveryShard$init$_load
+(slice, ((int))) $RecoveryShard$init$_load(slice sc_0) inline;
+
+;; $RecoveryShard$_contract_init
+(int, int, int, int, int, int, int, cell, int) $RecoveryShard$_contract_init(int $self_bucket_key) impure inline;
+
+;; $RecoveryShard$_contract_load
+(int, int, int, int, int, int, int, cell, int) $RecoveryShard$_contract_load() impure inline;
+
+;; $RecoveryShard$_contract_store
+() $RecoveryShard$_contract_store((int, int, int, int, int, int, int, cell, int) v) impure inline;
+
+;; $RecoveryShard$_fun_recoveryDigest
+((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_recoveryDigest((int, int, int, int, int, int, int, cell, int) $self, int $seq, int $h0, int $h1, int $bh) impure inline_ref;
+
+;; $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment
+((int, int, int, int, int, int, int)) $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment(int $self_bucket_key, int $bound, int $owner_pubkey, int $seq, int $updated_at, int $retention, int $endowment) inline;
+
+;; $RecoveryShard$_fun_get_view
+((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref;
+
+;; $RecoveryShard$_fun_get_body
+((int, int, int, int, int, int, int, cell, int), cell) $RecoveryShard$_fun_get_body((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref;
+
+;; $SendParameters$_constructor_to_value_mode_bounce
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
+
+
+;; RecoveryShard_RecoveryShard.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+cell $global_emptyCell() impure asm """
+    <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
+""";
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_checkSignature(int $hash, slice $signature, int $publicKey) impure asm """
+    CHKSIGNU
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+int $global_now() impure asm """
+    NOW
+""";
+
+builder $Builder$_fun_storeRef(cell $cell, builder $self) impure asm """
+    STREF
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+int $Cell$_fun_hash(cell $self) impure asm """
+    HASHCU
+""";
+
+;; RecoveryShard_RecoveryShard.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline {
+    return ($mode, null(), null(), null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: RecoveryShardView
+;; TLB: _ self_bucket_key:int257 bound:bool owner_pubkey:int257 seq:int257 updated_at:int257 retention:int257 endowment:int257 = RecoveryShardView
+;;
+
+(int, int, int, int, int, int, int) $RecoveryShardView$_to_external(((int, int, int, int, int, int, int)) v) inline {
+    var (v'self_bucket_key, v'bound, v'owner_pubkey, v'seq, v'updated_at, v'retention, v'endowment) = v; 
+    return (v'self_bucket_key, v'bound, v'owner_pubkey, v'seq, v'updated_at, v'retention, v'endowment);
+}
+
+((int, int, int, int, int, int, int)) $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment(int $self_bucket_key, int $bound, int $owner_pubkey, int $seq, int $updated_at, int $retention, int $endowment) inline {
+    return ($self_bucket_key, $bound, $owner_pubkey, $seq, $updated_at, $retention, $endowment);
+}
+
+;;
+;; Type: RecoveryShard
+;; TLB: _ self_bucket_key:uint256 bound:bool owner_pubkey:uint256 seq:uint64 h0:uint256 h1:uint256 bh:uint256 body:^cell updated_at:uint64 = RecoveryShard
+;;
+
+builder $RecoveryShard$_store(builder build_0, (int, int, int, int, int, int, int, cell, int) v) inline {
+    var (v'self_bucket_key, v'bound, v'owner_pubkey, v'seq, v'h0, v'h1, v'bh, v'body, v'updated_at) = v;
+    build_0 = build_0.store_uint(v'self_bucket_key, 256);
+    build_0 = build_0.store_int(v'bound, 1);
+    build_0 = build_0.store_uint(v'owner_pubkey, 256);
+    build_0 = build_0.store_uint(v'seq, 64);
+    build_0 = build_0.store_uint(v'h0, 256);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'h1, 256);
+    build_1 = build_1.store_uint(v'bh, 256);
+    build_1 = build_1.store_ref(v'body);
+    build_1 = build_1.store_uint(v'updated_at, 64);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((int, int, int, int, int, int, int, cell, int))) $RecoveryShard$_load(slice sc_0) inline {
+    var v'self_bucket_key = sc_0~load_uint(256);
+    var v'bound = sc_0~load_int(1);
+    var v'owner_pubkey = sc_0~load_uint(256);
+    var v'seq = sc_0~load_uint(64);
+    var v'h0 = sc_0~load_uint(256);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'h1 = sc_1~load_uint(256);
+    var v'bh = sc_1~load_uint(256);
+    var v'body = sc_1~load_ref();
+    var v'updated_at = sc_1~load_uint(64);
+    return (sc_0, (v'self_bucket_key, v'bound, v'owner_pubkey, v'seq, v'h0, v'h1, v'bh, v'body, v'updated_at));
+}
+
+(slice, ((int))) $RecoveryShard$init$_load(slice sc_0) inline {
+    var v'self_bucket_key = sc_0~load_int(257);
+    return (sc_0, (v'self_bucket_key));
+}
+
+(int, int, int, int, int, int, int, cell, int) $RecoveryShard$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$RecoveryShard$_load();
+    }
+    else {
+        (int $self_bucket_key) = $sc~$RecoveryShard$init$_load();
+        $sc.end_parse();
+        return $RecoveryShard$_contract_init($self_bucket_key);
+    }
+}
+
+() $RecoveryShard$_contract_store((int, int, int, int, int, int, int, cell, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $RecoveryShard$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract RecoveryShard functions
+;;
+
+(int, int, int, int, int, int, int, cell, int) $RecoveryShard$_contract_init(int $self_bucket_key) impure inline {
+    var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = (null(), null(), null(), null(), null(), null(), null(), null(), null());
+    $self'self_bucket_key = $self_bucket_key;
+    $self'bound = false;
+    $self'owner_pubkey = 0;
+    $self'seq = 0;
+    $self'h0 = 0;
+    $self'h1 = 0;
+    $self'bh = 0;
+    $self'body = $global_emptyCell();
+    $self'updated_at = 0;
+    return ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at);
+}
+
+((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_recoveryDigest((int, int, int, int, int, int, int, cell, int) $self, int $seq, int $h0, int $h1, int $bh) impure inline_ref {
+    var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
+    var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), $h0, 256), $h1, 256), $bh, 256)), store_uint(store_uint(store_uint($global_beginCell(), 1112691505, 32), $self'self_bucket_key, 256), $seq, 64))));
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_0);
+}
+
+((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
+    var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
+    var $fresh$ret_1 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 23200000);
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_1);
+}
+
+((int, int, int, int, int, int, int, cell, int), cell) $RecoveryShard$_fun_get_body((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
+    var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
+    var $fresh$ret_2 = $self'body;
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_2);
+}
+
+;;
+;; Get methods of a Contract RecoveryShard
+;;
+
+_ %get_view() method_id(76114) {
+    var self = $RecoveryShard$_contract_load();
+    var res = self~$RecoveryShard$_fun_get_view();
+    return $RecoveryShardView$_to_external(res);
+}
+
+_ %get_body() method_id(104539) {
+    var self = $RecoveryShard$_contract_load();
+    var res = self~$RecoveryShard$_fun_get_body();
+    return res;
+}
+
+;;
+;; Routing of a Contract RecoveryShard
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at) = $RecoveryShard$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive RecoveryStore message
+    if (op == 0x52435631) {
+        var $msg'owner_pubkey = in_msg~load_uint(256);
+        var $msg'seq = in_msg~load_uint(64);
+        var $msg'h0 = in_msg~load_uint(256);
+        var $msg'h1 = in_msg~load_uint(256);
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'bh = sc_1~load_uint(256);
+        var $msg'body = sc_1~load_ref();
+        var $msg'owner_sig = sc_1~load_ref();
+        throw_unless(13571, ( (( (($msg'h0 != 0)) ? (($msg'h1 != 0)) : (false) )) ? (($msg'bh != 0)) : (false) ));
+        throw_unless(13572, ($Context$_get_value(__tact_context_get()) >= 31200000));
+        ifnot ($self'bound) {
+            throw_unless(13573, ($msg'seq >= 1));
+            $self'bound = true;
+            $self'owner_pubkey = $msg'owner_pubkey;
+        } else {
+            throw_unless(13563, ($msg'owner_pubkey == $self'owner_pubkey));
+            throw_unless(13564, ($msg'seq > $self'seq));
+        }
+        throw_unless(13574, $global_checkSignature(($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)~$RecoveryShard$_fun_recoveryDigest($msg'seq, $msg'h0, $msg'h1, $msg'bh), $Cell$_fun_beginParse($msg'owner_sig), $self'owner_pubkey));
+        $self'seq = $msg'seq;
+        $self'h0 = $msg'h0;
+        $self'h1 = $msg'h1;
+        $self'bh = $msg'bh;
+        $self'body = $msg'body;
+        $self'updated_at = $global_now();
+        $global_nativeReserve(23200000, 2);
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
+        $RecoveryShard$_contract_store(($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at));
+        return ();
+    }
+    
+    ;; Receive EvictRecovery message
+    if (op == 0x52435632) {
+        var $_ = empty_tuple();
+        throw_unless(13561, $self'bound);
+        throw_unless(13562, (($self'updated_at + 94608000) < $global_now()));
+        $self'bound = false;
+        $self'owner_pubkey = 0;
+        $self'seq = 0;
+        $self'h0 = 0;
+        $self'h1 = 0;
+        $self'bh = 0;
+        $self'body = $global_emptyCell();
+        $self'updated_at = 0;
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
+        $RecoveryShard$_contract_store(($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $RecoveryShard$_contract_store(($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}
