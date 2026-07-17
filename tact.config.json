@@ -124,6 +124,11 @@
       "name": "NullifierShard",
       "path": "./contracts/NullifierShard.tact",
       "output": "./build/NullifierShard"
+    },
+    {
+      "name": "RecordShard",
+      "path": "./contracts/RecordShard.tact",
+      "output": "./build/RecordShard"
     }
   ]
 }

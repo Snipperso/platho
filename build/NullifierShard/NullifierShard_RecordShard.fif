@@ -1,0 +1,327 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/NullifierShard/NullifierShard_RecordShard.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get_sender
+  DECLPROC __tact_dict_set_code
+  DECLPROC __tact_dict_get_code
+  DECLPROC __tact_dict_get_int_int
+  DECLPROC __tact_dict_set_int_int
+  DECLPROC $RecordShard$_store
+  DECLPROC $RecordShard$_load
+  DECLPROC $CapsuleRecordView$_to_external
+  DECLPROC $RecordShardView$_to_external
+  DECLPROC $RecordShard$init$_load
+  DECLPROC $NullifierShard$init$_store
+  DECLPROC $RecordShard$_contract_init
+  DECLPROC $RecordShard$_contract_load
+  DECLPROC $RecordShard$_contract_store
+  DECLPROC $Cell$_fun_asSlice
+  DECLPROC $global_newAddress
+  DECLPROC $global_contractAddressExt
+  DECLPROC $global_contractAddress
+  DECLPROC $CapsuleRecordView$_constructor_exists_frame_commit
+  DECLPROC $RecordShard$_fun_get_record
+  DECLPROC $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap
+  DECLPROC $RecordShard$_fun_get_view
+  DECLPROC $NullifierShard$_init_child
+  115713 DECLMETHOD %get_record
+  76114 DECLMETHOD %get_view
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  __tact_dict_set_code PROCINLINE:<{
+    s0 s2 XCHG
+    16 PUSHINT
+    DICTUSETREF
+  }>
+  __tact_dict_get_code PROCINLINE:<{
+    SWAP
+    16 PUSHINT
+    DICTUGETREF
+    NULLSWAPIFNOT
+    135 THROWIFNOT
+  }>
+  __tact_dict_get_int_int PROCINLINE:<{
+    s1 s3 s3 XCHG3
+    DICTIGET
+    NULLSWAPIFNOT
+    IF:<{
+      SWAP
+      LDIX
+      DROP
+    }>ELSE<{
+      2DROP
+      PUSHNULL
+    }>
+  }>
+  __tact_dict_set_int_int PROCINLINE:<{
+    OVER
+    ISNULL
+    IF:<{
+      2DROP
+      -ROT
+      DICTIDEL
+      DROP
+    }>ELSE<{
+      NEWC
+      SWAP
+      STIX
+      s1 s3 s3 XCHG3
+      DICTISETB
+    }>
+  }>
+  $RecordShard$_store PROCINLINE:<{
+    s3 s4 XCHG2
+    256 STU
+    32 STU
+    STDICT
+    32 STU
+  }>
+  $RecordShard$_load PROCINLINE:<{
+    256 LDU
+    32 LDU
+    LDDICT
+    32 LDU
+    4 -ROLL
+  }>
+  $CapsuleRecordView$_to_external PROCINLINE:<{
+  }>
+  $RecordShardView$_to_external PROCINLINE:<{
+  }>
+  $RecordShard$init$_load PROCINLINE:<{
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    -ROT
+  }>
+  $NullifierShard$init$_store PROCINLINE:<{
+    s0 s2 XCHG
+    257 PUSHINT
+    STIX
+    257 PUSHINT
+    STIX
+  }>
+  $RecordShard$_contract_init PROCINLINE:<{
+    PUSHNULL
+    0 PUSHINT
+  }>
+  $RecordShard$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    LDREF
+    SWAP
+    __tact_child_contract_codes SETGLOB
+    1 LDI
+    SWAP
+    IF:<{
+      $RecordShard$_load INLINECALLDICT
+      1 4 BLKDROP2
+    }>ELSE<{
+      $RecordShard$init$_load INLINECALLDICT
+      s0 s2 XCHG
+      ENDS
+      SWAP
+      $RecordShard$_contract_init INLINECALLDICT
+    }>
+  }>
+  $RecordShard$_contract_store PROCINLINE:<{
+    NEWC
+    __tact_child_contract_codes GETGLOB
+    SWAP
+    STREF
+    TRUE
+    SWAP
+    1 STI
+    4 -ROLL
+    $RecordShard$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $Cell$_fun_asSlice PROCINLINE:<{
+        CTOS
+  }>
+  $global_newAddress PROCINLINE:<{
+        NEWC
+    4 PUSHINT
+    SWAP
+    3 STU
+    s1 s2 XCHG
+    8 STI
+    256 STU
+        ENDC
+    $Cell$_fun_asSlice INLINECALLDICT
+  }>
+  $global_contractAddressExt PROCINLINE:<{
+        s0 PUSH HASHCU // `data` hash
+        s2 PUSH HASHCU // `code` hash
+        SWAP2
+        CDEPTH         // `data` depth
+        SWAP
+        CDEPTH         // `code` depth
+        131380 INT     // (2 << 16) | (1 << 8) | 0x34
+        // Group 2: Composition of the Builder
+        NEWC
+        24 STU  // store refs_descriptor | bits_descriptor | data
+        16 STU  // store depth_descriptor for `code`
+        16 STU  // store depth_descriptor for `data`
+        256 STU // store `code` hash
+        256 STU // store `data` hash
+        // Group 3: SHA256 hash of the resulting Builder
+        ONE HASHEXT_SHA256
+    $global_newAddress INLINECALLDICT
+  }>
+  $global_contractAddress PROCINLINE:<{
+    0 PUSHINT
+    -ROT
+    $global_contractAddressExt INLINECALLDICT
+  }>
+  $CapsuleRecordView$_constructor_exists_frame_commit PROCINLINE:<{
+  }>
+  $RecordShard$_fun_get_record PROCREF:<{
+    257 PUSHINT
+    s0 s3 PUSH2
+    s3 s3 XCHG2
+    __tact_dict_get_int_int INLINECALLDICT
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      FALSE
+      0 PUSHINT
+      $CapsuleRecordView$_constructor_exists_frame_commit INLINECALLDICT
+    }>
+    TRUE
+    SWAP
+    $CapsuleRecordView$_constructor_exists_frame_commit INLINECALLDICT
+  }>
+  $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap PROCINLINE:<{
+  }>
+  $RecordShard$_fun_get_view PROCREF:<{
+    20 PUSHPOW2
+    12 PUSHPOW2
+    s5 PUSH
+    s5 s2 s(-1) PUXC2
+    s4 PUSH
+    -ROT
+    $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap INLINECALLDICT
+  }>
+  $NullifierShard$_init_child PROCREF:<{
+    __tact_child_contract_codes GETGLOB
+    CTOS
+    LDDICT
+    DROP
+    34652 PUSHINT
+    __tact_dict_get_code INLINECALLDICT
+    NEWDICT
+    52655 PUSHINT
+    MYCODE
+    __tact_dict_set_code INLINECALLDICT
+    NEWC
+    SWAP
+    NEWC
+    STDICT
+    STBREFR
+    FALSE
+    SWAP
+    1 STI
+    2SWAP
+    $NullifierShard$init$_store INLINECALLDICT
+    ENDC
+  }>
+  %get_record PROC:<{
+    $RecordShard$_contract_load INLINECALLDICT
+    4 ROLL
+    $RecordShard$_fun_get_record INLINECALLDICT
+    4 2 BLKDROP2
+    $CapsuleRecordView$_to_external INLINECALLDICT
+  }>
+  %get_view PROC:<{
+    $RecordShard$_contract_load INLINECALLDICT
+    $RecordShard$_fun_get_view INLINECALLDICT
+    4 5 BLKDROP2
+    $RecordShardView$_to_external INLINECALLDICT
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $RecordShard$_contract_load INLINECALLDICT
+    s0 s5 XCHG
+    IFJMP:<{
+      5 BLKDROP
+    }>
+    0 PUSHINT
+    s4 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s4 XCHG
+      32 LDU
+      s0 s5 XCHG
+    }>
+    OVER
+    1381191729 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s3 XCHG
+      256 LDU
+      256 LDU
+      DROP
+      SWAP
+      20 MODPOW2#
+      s2 s(-1) PUXC
+      $NullifierShard$_init_child INLINECALLDICT
+      $global_contractAddress INLINECALLDICT
+      13650 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      ROT
+      SDEQ
+      THROWANYIFNOT
+      13651 PUSHINT
+      s5 PUSH
+      12 PUSHPOW2
+      LESS
+      THROWANYIFNOT
+      257 PUSHINT
+      DUP
+      s3 s5 XCHG
+      s6 s2 s2 PUXC2
+      __tact_dict_set_int_int INLINECALLDICT
+      s0 s3 XCHG
+      INC
+      s1 s3 XCHG
+      $RecordShard$_contract_store INLINECALLDICT
+    }>
+    s5 POP
+    0 EQINT
+    s0 s4 XCHG
+    33 LESSINT
+    s1 s4 XCHG
+    AND
+    IFJMP:<{
+      s0 s0 s3 XCHG3
+      $RecordShard$_contract_store INLINECALLDICT
+    }>
+    4 BLKDROP
+    130 THROW
+  }>
+}END>c

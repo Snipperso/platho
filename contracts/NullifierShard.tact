@@ -1,4 +1,6 @@
-// NullifierShard — clean-17 sharded anon-publish. Increments 1 (double-spend) + 2 (CAC authority).
+import "./RecordShard.tact";
+
+// NullifierShard — clean-17 sharded anon-publish. Increments 1 (double-spend) + 2 (CAC authority) + 3 (forward).
 //
 // One (epoch, lane) partition of the spent-nullifier ledger the monolithic CapsuleHub could not scale (see the
 // ~182-user ceiling in [[capsulehub-account-state-cell-ceiling]]). Deployed lazily, address = f(StateInit{epoch,
@@ -55,6 +57,12 @@ const NS_SAFE_CAP: Int = 4096;                  // per-shard live-nullifier ceil
 // self-funds gas + endowment per message via CARRY), so a long worst-case window is acceptable.
 const NS_MAX_CERT_EPOCHS: Int = 550;            // ~18 months, in day-epochs (yearly ceremony + operational slack)
 
+// Increment 3: after burning the nullifier, forward the record (+ its carried endowment) to the RecordShard. The
+// forward is the shard's ONLY outgoing message; it is COMPUTE-gated below (13624) so it can never fail in the
+// ACTION phase for lack of value — the whole point of CARRY is that the money to pay for it arrived in msg.value.
+const NS_RECORD_ENDOWMENT: Int = 1000000;       // carried to the RecordShard as the record's storage endowment
+const NS_FORWARD_VALUE: Int = 60000000;         // min incoming value: record endowment + record gas + 2 fwd hops [G8-provisional]
+
 // [IMMUTABLE] The M-of-N root of trust, frozen in code (never in data — a key in data would enter the shard
 // address and let an attacker deploy a shard trusting a key they control). 2-of-3 here. Values are test roots
 // (seeds 0x21/0x22/0x23); the genesis ceremony substitutes the real cold keys. Losing M-of-N of these stops the
@@ -75,6 +83,9 @@ message(0x4E535032) NullifierSpend {            // "NSP2"
     valid_to: Int as uint32;
     root_idx_a: Int as uint8;
     root_idx_b: Int as uint8;
+    // where the record goes (increment 3): the conversation-direction bucket + the frame commitment
+    bucket_key: Int as uint256;
+    frame_commit: Int as uint256;
     // signatures live in refs — three 512-bit sigs do not fit one cell
     issuer_sig: Cell;                           // subkey over the serial
     cert_sig_a: Cell;                           // root a over the cert digest
@@ -177,11 +188,25 @@ contract NullifierShard {
         let nk: Int = self.nullifierKey(serial);
         throwUnless(13604, self.spent.get(nk) == null);                 // double spend within this partition
         throwUnless(13623, self.spent_count < NS_SAFE_CAP);             // SAFE-CAP: refuse in COMPUTE, not code 50 in ACTION
+        throwUnless(13624, context().value >= NS_FORWARD_VALUE);        // enough value to carry the record forward (COMPUTE, so the forward can't fail in ACTION)
 
         self.spent.set(nk, true);
         self.spent_count = self.spent_count + 1;
-        // EMPTY ACTION PHASE: no send, no reserve. Nothing can fail after this.
+
+        // Increment 3: forward the record to its RecordShard(bucket_key, epoch), carrying the endowment. The value
+        // was verified in COMPUTE (13624) BEFORE the burn, so this single send cannot fail in ACTION for lack of
+        // funds. bounce:true — a refused record (RecordShard SAFE-CAP, effectively unreachable) returns the value
+        // here; the nullifier stays burnt (documented accepted residual, not compensated).
+        send(SendParameters{
+            to: contractAddress(initOf RecordShard(msg.bucket_key, self.epoch)),
+            value: NS_RECORD_ENDOWMENT,
+            mode: SendPayGasSeparately,
+            bounce: true,
+            body: RecordStore{ serial: serial, frame_commit: msg.frame_commit }.toCell(),
+        });
     }
+
+    bounced(_: bounced<RecordStore>) {}   // accepted residual: value returns, nullifier stays burnt (see above)
 
     receive() {}   // plain top-up / lazy deploy carrier
 
