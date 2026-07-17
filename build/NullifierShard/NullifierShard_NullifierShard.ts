@@ -614,44 +614,79 @@ export type NullifierSpend = {
     spend_pubkey: bigint;
     epoch: bigint;
     nonce: bigint;
-    issuer_sig: Slice;
+    subkey_pubkey: bigint;
+    valid_from: bigint;
+    valid_to: bigint;
+    root_idx_a: bigint;
+    root_idx_b: bigint;
+    issuer_sig: Cell;
+    cert_sig_a: Cell;
+    cert_sig_b: Cell;
 }
 
 export function storeNullifierSpend(src: NullifierSpend) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(1314082865, 32);
+        b_0.storeUint(1314082866, 32);
         b_0.storeUint(src.spend_pubkey, 256);
         b_0.storeUint(src.epoch, 32);
         b_0.storeUint(src.nonce, 64);
-        b_0.storeBuilder(src.issuer_sig.asBuilder());
+        b_0.storeUint(src.subkey_pubkey, 256);
+        b_0.storeUint(src.valid_from, 32);
+        b_0.storeUint(src.valid_to, 32);
+        b_0.storeUint(src.root_idx_a, 8);
+        b_0.storeUint(src.root_idx_b, 8);
+        b_0.storeRef(src.issuer_sig);
+        b_0.storeRef(src.cert_sig_a);
+        b_0.storeRef(src.cert_sig_b);
     };
 }
 
 export function loadNullifierSpend(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1314082865) { throw Error('Invalid prefix'); }
+    if (sc_0.loadUint(32) !== 1314082866) { throw Error('Invalid prefix'); }
     const _spend_pubkey = sc_0.loadUintBig(256);
     const _epoch = sc_0.loadUintBig(32);
     const _nonce = sc_0.loadUintBig(64);
-    const _issuer_sig = sc_0;
-    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, issuer_sig: _issuer_sig };
+    const _subkey_pubkey = sc_0.loadUintBig(256);
+    const _valid_from = sc_0.loadUintBig(32);
+    const _valid_to = sc_0.loadUintBig(32);
+    const _root_idx_a = sc_0.loadUintBig(8);
+    const _root_idx_b = sc_0.loadUintBig(8);
+    const _issuer_sig = sc_0.loadRef();
+    const _cert_sig_a = sc_0.loadRef();
+    const _cert_sig_b = sc_0.loadRef();
+    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
 }
 
 export function loadTupleNullifierSpend(source: TupleReader) {
     const _spend_pubkey = source.readBigNumber();
     const _epoch = source.readBigNumber();
     const _nonce = source.readBigNumber();
-    const _issuer_sig = source.readCell().asSlice();
-    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, issuer_sig: _issuer_sig };
+    const _subkey_pubkey = source.readBigNumber();
+    const _valid_from = source.readBigNumber();
+    const _valid_to = source.readBigNumber();
+    const _root_idx_a = source.readBigNumber();
+    const _root_idx_b = source.readBigNumber();
+    const _issuer_sig = source.readCell();
+    const _cert_sig_a = source.readCell();
+    const _cert_sig_b = source.readCell();
+    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
 }
 
 export function loadGetterTupleNullifierSpend(source: TupleReader) {
     const _spend_pubkey = source.readBigNumber();
     const _epoch = source.readBigNumber();
     const _nonce = source.readBigNumber();
-    const _issuer_sig = source.readCell().asSlice();
-    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, issuer_sig: _issuer_sig };
+    const _subkey_pubkey = source.readBigNumber();
+    const _valid_from = source.readBigNumber();
+    const _valid_to = source.readBigNumber();
+    const _root_idx_a = source.readBigNumber();
+    const _root_idx_b = source.readBigNumber();
+    const _issuer_sig = source.readCell();
+    const _cert_sig_a = source.readCell();
+    const _cert_sig_b = source.readCell();
+    return { $$type: 'NullifierSpend' as const, spend_pubkey: _spend_pubkey, epoch: _epoch, nonce: _nonce, subkey_pubkey: _subkey_pubkey, valid_from: _valid_from, valid_to: _valid_to, root_idx_a: _root_idx_a, root_idx_b: _root_idx_b, issuer_sig: _issuer_sig, cert_sig_a: _cert_sig_a, cert_sig_b: _cert_sig_b };
 }
 
 export function storeTupleNullifierSpend(source: NullifierSpend) {
@@ -659,7 +694,14 @@ export function storeTupleNullifierSpend(source: NullifierSpend) {
     builder.writeNumber(source.spend_pubkey);
     builder.writeNumber(source.epoch);
     builder.writeNumber(source.nonce);
-    builder.writeSlice(source.issuer_sig.asCell());
+    builder.writeNumber(source.subkey_pubkey);
+    builder.writeNumber(source.valid_from);
+    builder.writeNumber(source.valid_to);
+    builder.writeNumber(source.root_idx_a);
+    builder.writeNumber(source.root_idx_b);
+    builder.writeCell(source.issuer_sig);
+    builder.writeCell(source.cert_sig_a);
+    builder.writeCell(source.cert_sig_b);
     return builder.build();
 }
 
@@ -681,6 +723,7 @@ export type NullifierShardView = {
     spent_count: bigint;
     lane_count: bigint;
     safe_cap: bigint;
+    root_threshold: bigint;
 }
 
 export function storeNullifierShardView(src: NullifierShardView) {
@@ -692,6 +735,7 @@ export function storeNullifierShardView(src: NullifierShardView) {
         const b_1 = new Builder();
         b_1.storeInt(src.lane_count, 257);
         b_1.storeInt(src.safe_cap, 257);
+        b_1.storeInt(src.root_threshold, 257);
         b_0.storeRef(b_1.endCell());
     };
 }
@@ -704,7 +748,8 @@ export function loadNullifierShardView(slice: Slice) {
     const sc_1 = sc_0.loadRef().beginParse();
     const _lane_count = sc_1.loadIntBig(257);
     const _safe_cap = sc_1.loadIntBig(257);
-    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap };
+    const _root_threshold = sc_1.loadIntBig(257);
+    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold };
 }
 
 export function loadTupleNullifierShardView(source: TupleReader) {
@@ -713,7 +758,8 @@ export function loadTupleNullifierShardView(source: TupleReader) {
     const _spent_count = source.readBigNumber();
     const _lane_count = source.readBigNumber();
     const _safe_cap = source.readBigNumber();
-    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap };
+    const _root_threshold = source.readBigNumber();
+    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold };
 }
 
 export function loadGetterTupleNullifierShardView(source: TupleReader) {
@@ -722,7 +768,8 @@ export function loadGetterTupleNullifierShardView(source: TupleReader) {
     const _spent_count = source.readBigNumber();
     const _lane_count = source.readBigNumber();
     const _safe_cap = source.readBigNumber();
-    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap };
+    const _root_threshold = source.readBigNumber();
+    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold };
 }
 
 export function storeTupleNullifierShardView(source: NullifierShardView) {
@@ -732,6 +779,7 @@ export function storeTupleNullifierShardView(source: NullifierShardView) {
     builder.writeNumber(source.spent_count);
     builder.writeNumber(source.lane_count);
     builder.writeNumber(source.safe_cap);
+    builder.writeNumber(source.root_threshold);
     return builder.build();
 }
 
@@ -824,7 +872,7 @@ function initNullifierShard_init_args(src: NullifierShard_init_args) {
 }
 
 async function NullifierShard_init(epoch: bigint, lane: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241020d01000222000114ff00f4a413f4bcf2c80b01020162020702f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de2182104e535031bae30235c00004c12114b08e164003c87f01ca0055305034cb1fcb1ff400cb1fc9ed54e0030603f65b03d3ffd31fd33ff82382015180a90481352021a6fc5250be9601a6045240bb923170e2f2f48135355336baf2f410561045075520db3c81353621a9381325baf2f4208135210782f0d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737f91016f2f45503db3c813524238101012371040c050028c882104253493101cb1f13cbffcb1fcb3fc9f90000944133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f412810101017f71216e955b59f45a3098c801cf004133f442e201a4c87f01ca0055305034cb1fcb1ff400cb1fc9ed54000a5f04f2c082020120080a0159bd4a976a268690000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3622c0900148313830b255445302459015dbf524f6a268690000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c0b014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb34430120c001ec88210424e4c3101cb1fcbffc9f900d445ee9e');
+    const __code = Cell.fromHex('b5ee9c72410210010002f8000114ff00f4a413f4bcf2c80b01020162020a02f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de2182104e535032bae30235c00004c12114b08e164003c87f01ca0055305034cb1fcb1ff400cb1fc9ed54e0030904fc5b03d3ffd31fd33fd3ffd31fd31fd307d307d4d4d430f82382015180a90481352021a6fc52c0be9601a60452b0bb923170e2f2f481353553adbaf2f4105c104b103d4ea05299db3c81353621a9381325baf2f481353e5396be93519cbb923970e219f2f481353f53acb9f2f4550309db3c0bdb3c81354053c1bdf2f41045040505060028c882104253493101cb1f13cbffcb1fcb3fc9f90000f081354321c103f2f4208e233082f0884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0be1c0018e2282f0a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0e082f074f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa903e4103441305441abdb3c81354108d054411cf91017f2f481354204d04907f91012f2f481352107d0544216f91016f2f44104db3c8135242381010123714133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f412810101017f71216e955b59f45a3098c801cf004133f442e201a4070f080028c882104341433101cb1f13cbffcb1fcb1fc9f9000028c87f01ca0055305034cb1fcb1ff400cb1fc9ed54000a5f04f2c0820201200b0d0159bd4a976a268690000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e362340c00168313830b72265136513503015dbf524f6a268690000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c0e014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb34430120f001ec88210424e4c3101cb1fcbffc9f900c4b847de');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initNullifierShard_init_args({ $$type: 'NullifierShard_init_args', epoch, lane })(builder);
@@ -921,13 +969,13 @@ const NullifierShard_types: ABIType[] = [
     {"name":"StdAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":8}},{"name":"address","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
-    {"name":"NullifierSpend","header":1314082865,"fields":[{"name":"spend_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"issuer_sig","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
-    {"name":"NullifierShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"spent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"NullifierSpend","header":1314082866,"fields":[{"name":"spend_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"subkey_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"valid_from","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"valid_to","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"root_idx_a","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"root_idx_b","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"issuer_sig","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_a","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_b","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"NullifierShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"spent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"root_threshold","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"NullifierShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"lane","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"spent","type":{"kind":"dict","key":"int","value":"bool"}},{"name":"spent_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
 
 const NullifierShard_opcodes = {
-    "NullifierSpend": 1314082865,
+    "NullifierSpend": 1314082866,
 }
 
 const NullifierShard_getters: ABIGetter[] = [
@@ -947,12 +995,16 @@ const NullifierShard_receivers: ABIReceiver[] = [
 
 export const NS_ISSUER_SIG_DOMAIN = 1112754481n;
 export const NS_NULL_DOMAIN = 1112427569n;
+export const NS_CERT_DOMAIN = 1128350513n;
 export const NS_EPOCH_SECONDS = 86400n;
 export const NS_EPOCH_ACCEPT_PAST = 4n;
 export const NS_EPOCH_ACCEPT_FUTURE = 4n;
 export const NS_LANE_COUNT = 1048576n;
 export const NS_SAFE_CAP = 4096n;
-export const NS_ISSUER_PUBKEY = 94213049059194276631126957333813648528405465366403415476211330748195142076215n;
+export const NS_ROOT_THRESHOLD = 2n;
+export const NS_ROOT_0 = 61648001945993851713387341017509757467197514600518013224456945346175643262219n;
+export const NS_ROOT_1 = 72643295600563315702315007365945353005398927859637280636436839326056233411824n;
+export const NS_ROOT_2 = 52907109351218747841695970573523340373205112110913690393551713332454347868841n;
 
 export class NullifierShard implements Contract {
     
