@@ -37,7 +37,7 @@ CapsuleHub держал ВСЁ в одном аккаунте. Замерено:
 | Контракт | Ключ шарда | Роль | Жизнь |
 |---|---|---|---|
 | **NullifierShard** | `(эпоха, serial mod 2²⁰)` | жжёт нуллификатор + проверяет CAC + маршрутизирует запись | ~9 дней (окно траты) |
-| **RecordShard** | `(bucket_key, эпоха)` | CONV: хранит запись (frame_commit) | 1 год (эндаумент); ⚠ эвикция ещё не реализована |
+| **RecordShard** | `(bucket_key, эпоха)` | CONV: хранит запись (frame_commit) | 1 год (эвикция FIFO) |
 | **IntroShard** | `(эпоха, отправительский бакет)` | INTRO: stealth-запись (R, view_tag, commit) | **1 неделя** (эвикция FIFO) |
 | **RecoveryShard** | `(self_bucket_key)` эпохо-НЕзависимый | RECOVERY: блоб K_root на цепи | 3 года (эвикция) |
 | **CreditSale** | singleton | продаёт кредиты за комиссию, начисляет эйрдроп | вечный |
@@ -127,8 +127,8 @@ ProfileRegistry / UsernameRegistry / KeyRegistry (Durable Core, payer-auth freez
 1. **🔒 Внешний крипто-аудит CAC** — unlinkability слепой выдачи + ROS/Wagner-стойкость конкурентной выдачи
    (наследует HUB-ANON-04). Анонимность стоит на непроверенном крипто-свойстве.
 2. **🔒 Внешний ANO-CCA / key-privacy аудит ML-KEM гибрида** (X25519+ML-KEM-768) — body_KEM_ct в клиртексте.
-3. **⚠ RecordShard: эвикция/ретенция НЕ реализована** — CONV-записи финансируются на год, но нет receiver'а,
-   вычищающего их после; шарды `(bucket_key, эпоха)` накапливаются. Реализовать по образцу IntroShard (FIFO + окно).
+3. ✅ **РЕАЛИЗОВАНО** — RecordShard: permissionless FIFO `EvictRecords` (1-год окно, `created_at` от контракта,
+   bounded per call), тест RS-06. CONV-шарды больше не накапливаются.
 4. **G8-калибровка на ЖИВОМ code.boc** — все эндаументы/газ перемерить на mainnet-конфиге; NS_PATH_GAS/NS_RECORD_GAS
    провизорны.
 5. **Genesis/seal CAC-корней** — церемония генерации 2-of-3 холодных корней, замена тестовых значений (seeds

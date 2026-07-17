@@ -17,23 +17,50 @@ cell __tact_dict_set_code(cell dict, int id, cell code) inline;
 ;; __tact_dict_get_code
 cell __tact_dict_get_code(cell dict, int id) inline;
 
-;; __tact_dict_get_int_int
-int __tact_dict_get_int_int(cell d, int kl, int k, int vl) inline;
+;; __tact_dict_get_int_cell
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
 
-;; __tact_dict_set_int_int
-(cell, ()) __tact_dict_set_int_int(cell d, int kl, int k, int v, int vl) inline;
+;; __tact_dict_set_int_cell
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline;
+
+;; $RecordEntry$_store
+builder $RecordEntry$_store(builder build_0, (int, int) v) inline;
+
+;; $RecordEntry$_store_cell
+cell $RecordEntry$_store_cell((int, int) v, builder b) inline;
+
+;; $RecordEntry$_not_null
+((int, int)) $RecordEntry$_not_null(tuple v) inline;
+
+;; $RecordEntry$_store_opt
+cell $RecordEntry$_store_opt(tuple v, builder b) inline;
+
+;; $RecordEntry$_load
+(slice, ((int, int))) $RecordEntry$_load(slice sc_0) inline;
+
+;; $RecordEntry$_as_optional
+tuple $RecordEntry$_as_optional((int, int) v) inline;
+
+;; $RecordEntry$_load_opt
+tuple $RecordEntry$_load_opt(cell cl) inline;
 
 ;; $RecordShard$_store
-builder $RecordShard$_store(builder build_0, (int, int, cell, int) v) inline;
+builder $RecordShard$_store(builder build_0, (int, int, cell, int, int, int) v) inline;
 
 ;; $RecordShard$_load
-(slice, ((int, int, cell, int))) $RecordShard$_load(slice sc_0) inline;
+(slice, ((int, int, cell, int, int, int))) $RecordShard$_load(slice sc_0) inline;
+
+;; $RecordEntry$_get_frame_commit
+_ $RecordEntry$_get_frame_commit((int, int) v) inline;
+
+;; $RecordEntry$_get_created_at
+_ $RecordEntry$_get_created_at((int, int) v) inline;
 
 ;; $CapsuleRecordView$_to_external
 (int, int) $CapsuleRecordView$_to_external(((int, int)) v) inline;
 
 ;; $RecordShardView$_to_external
-(int, int, int, int, int) $RecordShardView$_to_external(((int, int, int, int, int)) v) inline;
+(int, int, int, int, int, int, int, int) $RecordShardView$_to_external(((int, int, int, int, int, int, int, int)) v) inline;
 
 ;; $NullifierShard$init$_store
 builder $NullifierShard$init$_store(builder build_0, (int, int) v) inline;
@@ -42,13 +69,13 @@ builder $NullifierShard$init$_store(builder build_0, (int, int) v) inline;
 (slice, ((int, int))) $RecordShard$init$_load(slice sc_0) inline;
 
 ;; $RecordShard$_contract_init
-(int, int, cell, int) $RecordShard$_contract_init(int $bucket_key, int $epoch) impure inline;
+(int, int, cell, int, int, int) $RecordShard$_contract_init(int $bucket_key, int $epoch) impure inline;
 
 ;; $RecordShard$_contract_load
-(int, int, cell, int) $RecordShard$_contract_load() impure inline;
+(int, int, cell, int, int, int) $RecordShard$_contract_load() impure inline;
 
 ;; $RecordShard$_contract_store
-() $RecordShard$_contract_store((int, int, cell, int) v) impure inline;
+() $RecordShard$_contract_store((int, int, cell, int, int, int) v) impure inline;
 
 ;; $Cell$_fun_asSlice
 slice $Cell$_fun_asSlice(cell $self) impure inline;
@@ -69,13 +96,16 @@ slice $global_contractAddress((cell, cell) $s) impure inline;
 ((int, int)) $CapsuleRecordView$_constructor_exists_frame_commit(int $exists, int $frame_commit) inline;
 
 ;; $RecordShard$_fun_get_record
-((int, int, cell, int), (int, int)) $RecordShard$_fun_get_record((int, int, cell, int) $self, int $entry_id) impure inline_ref;
+((int, int, cell, int, int, int), (int, int)) $RecordShard$_fun_get_record((int, int, cell, int, int, int) $self, int $entry_id) impure inline_ref;
 
-;; $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap
-((int, int, int, int, int)) $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap(int $bucket_key, int $epoch, int $record_count, int $lane_count, int $safe_cap) inline;
+;; $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention
+((int, int, int, int, int, int, int, int)) $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention(int $bucket_key, int $epoch, int $record_count, int $live_count, int $evict_cursor, int $lane_count, int $safe_cap, int $retention) inline;
 
 ;; $RecordShard$_fun_get_view
-((int, int, cell, int), (int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref;
+((int, int, cell, int, int, int), (int, int, int, int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, cell, int, int, int) $self) impure inline_ref;
+
+;; $RecordEntry$_constructor_frame_commit_created_at
+((int, int)) $RecordEntry$_constructor_frame_commit_created_at(int $frame_commit, int $created_at) inline;
 
 
 ;; RecordShard_RecordShard.stdlib.fc
@@ -98,21 +128,29 @@ cell __tact_dict_get_code(cell dict, int id) inline {
     return data;
 }
 
-int __tact_dict_get_int_int(cell d, int kl, int k, int vl) inline {
-    var (r, ok) = idict_get?(d, kl, k);
+forall X0, X1 -> tuple __tact_tuple_create_2((X0, X1) v) asm """
+    2 TUPLE
+""";
+
+forall X0, X1 -> (X0, X1) __tact_tuple_destroy_2(tuple v) asm """
+    2 UNTUPLE
+""";
+
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get_ref?(d, kl, k);
     if (ok) {
-        return r~load_int(vl);
+        return r;
     } else {
         return null();
     }
 }
 
-(cell, ()) __tact_dict_set_int_int(cell d, int kl, int k, int v, int vl) inline {
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline {
     if (null?(v)) {
         var (r, ok) = idict_delete?(d, kl, k);
         return (r, ());
     } else {
-        return (idict_set_builder(d, kl, k, begin_cell().store_int(v, vl)), ());
+        return (idict_set_ref(d, kl, k, v), ());
     }
 }
 
@@ -170,7 +208,72 @@ slice $global_contractAddress((cell, cell) $s) impure inline {
     return $global_contractAddressExt(0, $s'code, $s'data);
 }
 
+int $global_now() impure asm """
+    NOW
+""";
+
 ;; RecordShard_RecordShard.storage.fc
+;;
+;; Type: RecordEntry
+;; TLB: _ frame_commit:int257 created_at:int257 = RecordEntry
+;;
+
+builder $RecordEntry$_store(builder build_0, (int, int) v) inline {
+    var (v'frame_commit, v'created_at) = v;
+    build_0 = build_0.store_int(v'frame_commit, 257);
+    build_0 = build_0.store_int(v'created_at, 257);
+    return build_0;
+}
+
+cell $RecordEntry$_store_cell((int, int) v, builder b) inline {
+    return $RecordEntry$_store(b, v).end_cell();
+}
+
+((int, int)) $RecordEntry$_not_null(tuple v) inline {
+    var (int vvv'frame_commit, int vvv'created_at) = __tact_tuple_destroy_2(v);
+    return (vvv'frame_commit, vvv'created_at);
+}
+
+cell $RecordEntry$_store_opt(tuple v, builder b) inline {
+    if (null?(v)) {
+        return null();
+    }
+    return $RecordEntry$_store_cell($RecordEntry$_not_null(v), b);
+}
+
+(slice, ((int, int))) $RecordEntry$_load(slice sc_0) inline {
+    var v'frame_commit = sc_0~load_int(257);
+    var v'created_at = sc_0~load_int(257);
+    return (sc_0, (v'frame_commit, v'created_at));
+}
+
+tuple $RecordEntry$_as_optional((int, int) v) inline {
+    var (v'frame_commit, v'created_at) = v;
+    return __tact_tuple_create_2(v'frame_commit, v'created_at);
+}
+
+tuple $RecordEntry$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $RecordEntry$_as_optional(sc~$RecordEntry$_load());
+}
+
+_ $RecordEntry$_get_frame_commit((int, int) v) inline {
+    var (v'frame_commit, v'created_at) = v;
+    return v'frame_commit;
+}
+
+_ $RecordEntry$_get_created_at((int, int) v) inline {
+    var (v'frame_commit, v'created_at) = v;
+    return v'created_at;
+}
+
+((int, int)) $RecordEntry$_constructor_frame_commit_created_at(int $frame_commit, int $created_at) inline {
+    return ($frame_commit, $created_at);
+}
+
 ;;
 ;; Type: CapsuleRecordView
 ;; TLB: _ exists:bool frame_commit:int257 = CapsuleRecordView
@@ -187,16 +290,16 @@ slice $global_contractAddress((cell, cell) $s) impure inline {
 
 ;;
 ;; Type: RecordShardView
-;; TLB: _ bucket_key:int257 epoch:int257 record_count:int257 lane_count:int257 safe_cap:int257 = RecordShardView
+;; TLB: _ bucket_key:int257 epoch:int257 record_count:int257 live_count:int257 evict_cursor:int257 lane_count:int257 safe_cap:int257 retention:int257 = RecordShardView
 ;;
 
-(int, int, int, int, int) $RecordShardView$_to_external(((int, int, int, int, int)) v) inline {
-    var (v'bucket_key, v'epoch, v'record_count, v'lane_count, v'safe_cap) = v; 
-    return (v'bucket_key, v'epoch, v'record_count, v'lane_count, v'safe_cap);
+(int, int, int, int, int, int, int, int) $RecordShardView$_to_external(((int, int, int, int, int, int, int, int)) v) inline {
+    var (v'bucket_key, v'epoch, v'record_count, v'live_count, v'evict_cursor, v'lane_count, v'safe_cap, v'retention) = v; 
+    return (v'bucket_key, v'epoch, v'record_count, v'live_count, v'evict_cursor, v'lane_count, v'safe_cap, v'retention);
 }
 
-((int, int, int, int, int)) $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap(int $bucket_key, int $epoch, int $record_count, int $lane_count, int $safe_cap) inline {
-    return ($bucket_key, $epoch, $record_count, $lane_count, $safe_cap);
+((int, int, int, int, int, int, int, int)) $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention(int $bucket_key, int $epoch, int $record_count, int $live_count, int $evict_cursor, int $lane_count, int $safe_cap, int $retention) inline {
+    return ($bucket_key, $epoch, $record_count, $live_count, $evict_cursor, $lane_count, $safe_cap, $retention);
 }
 
 ;;
@@ -238,24 +341,28 @@ builder $NullifierShard$init$_store(builder build_0, (int, int) v) inline {
 
 ;;
 ;; Type: RecordShard
-;; TLB: _ bucket_key:uint256 epoch:uint32 records:dict<int, int> record_count:uint32 = RecordShard
+;; TLB: _ bucket_key:uint256 epoch:uint32 records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}> record_count:uint32 live_count:uint32 evict_cursor:uint32 = RecordShard
 ;;
 
-builder $RecordShard$_store(builder build_0, (int, int, cell, int) v) inline {
-    var (v'bucket_key, v'epoch, v'records, v'record_count) = v;
+builder $RecordShard$_store(builder build_0, (int, int, cell, int, int, int) v) inline {
+    var (v'bucket_key, v'epoch, v'records, v'record_count, v'live_count, v'evict_cursor) = v;
     build_0 = build_0.store_uint(v'bucket_key, 256);
     build_0 = build_0.store_uint(v'epoch, 32);
     build_0 = build_0.store_dict(v'records);
     build_0 = build_0.store_uint(v'record_count, 32);
+    build_0 = build_0.store_uint(v'live_count, 32);
+    build_0 = build_0.store_uint(v'evict_cursor, 32);
     return build_0;
 }
 
-(slice, ((int, int, cell, int))) $RecordShard$_load(slice sc_0) inline {
+(slice, ((int, int, cell, int, int, int))) $RecordShard$_load(slice sc_0) inline {
     var v'bucket_key = sc_0~load_uint(256);
     var v'epoch = sc_0~load_uint(32);
     var v'records = sc_0~load_dict();
     var v'record_count = sc_0~load_uint(32);
-    return (sc_0, (v'bucket_key, v'epoch, v'records, v'record_count));
+    var v'live_count = sc_0~load_uint(32);
+    var v'evict_cursor = sc_0~load_uint(32);
+    return (sc_0, (v'bucket_key, v'epoch, v'records, v'record_count, v'live_count, v'evict_cursor));
 }
 
 (slice, ((int, int))) $RecordShard$init$_load(slice sc_0) inline {
@@ -264,7 +371,7 @@ builder $RecordShard$_store(builder build_0, (int, int, cell, int) v) inline {
     return (sc_0, (v'bucket_key, v'epoch));
 }
 
-(int, int, cell, int) $RecordShard$_contract_load() impure inline {
+(int, int, cell, int, int, int) $RecordShard$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     __tact_child_contract_codes = $sc~load_ref();
     int $loaded = $sc~load_int(1);
@@ -278,7 +385,7 @@ builder $RecordShard$_store(builder build_0, (int, int, cell, int) v) inline {
     }
 }
 
-() $RecordShard$_contract_store((int, int, cell, int) v) impure inline {
+() $RecordShard$_contract_store((int, int, cell, int, int, int) v) impure inline {
     builder b = begin_cell();
     b = b.store_ref(__tact_child_contract_codes);
     b = b.store_int(true, 1);
@@ -290,30 +397,32 @@ builder $RecordShard$_store(builder build_0, (int, int, cell, int) v) inline {
 ;; Contract RecordShard functions
 ;;
 
-(int, int, cell, int) $RecordShard$_contract_init(int $bucket_key, int $epoch) impure inline {
-    var (($self'bucket_key, $self'epoch, $self'records, $self'record_count)) = (null(), null(), null(), null());
+(int, int, cell, int, int, int) $RecordShard$_contract_init(int $bucket_key, int $epoch) impure inline {
+    var (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)) = (null(), null(), null(), null(), null(), null());
     $self'bucket_key = $bucket_key;
     $self'epoch = $epoch;
     $self'records = null();
     $self'record_count = 0;
-    return ($self'bucket_key, $self'epoch, $self'records, $self'record_count);
+    $self'live_count = 0;
+    $self'evict_cursor = 0;
+    return ($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor);
 }
 
-((int, int, cell, int), (int, int)) $RecordShard$_fun_get_record((int, int, cell, int) $self, int $entry_id) impure inline_ref {
-    var (($self'bucket_key, $self'epoch, $self'records, $self'record_count)) = $self;
-    int $fc = __tact_dict_get_int_int($self'records, 257, $entry_id, 257);
-    if (null?($fc)) {
+((int, int, cell, int, int, int), (int, int)) $RecordShard$_fun_get_record((int, int, cell, int, int, int) $self, int $entry_id) impure inline_ref {
+    var (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)) = $self;
+    tuple $e = $RecordEntry$_load_opt(__tact_dict_get_int_cell($self'records, 257, $entry_id));
+    if (null?($e)) {
         var $fresh$ret_22 = $CapsuleRecordView$_constructor_exists_frame_commit(false, 0);
-        return (($self'bucket_key, $self'epoch, $self'records, $self'record_count), $fresh$ret_22);
+        return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_22);
     }
-    var $fresh$ret_23 = $CapsuleRecordView$_constructor_exists_frame_commit(true, $fc);
-    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count), $fresh$ret_23);
+    var $fresh$ret_23 = $CapsuleRecordView$_constructor_exists_frame_commit(true, $RecordEntry$_get_frame_commit($RecordEntry$_not_null($e)));
+    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_23);
 }
 
-((int, int, cell, int), (int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
-    var (($self'bucket_key, $self'epoch, $self'records, $self'record_count)) = $self;
-    var $fresh$ret_24 = $RecordShardView$_constructor_bucket_key_epoch_record_count_lane_count_safe_cap($self'bucket_key, $self'epoch, $self'record_count, 1048576, 4096);
-    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count), $fresh$ret_24);
+((int, int, cell, int, int, int), (int, int, int, int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, cell, int, int, int) $self) impure inline_ref {
+    var (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)) = $self;
+    var $fresh$ret_24 = $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention($self'bucket_key, $self'epoch, $self'record_count, $self'live_count, $self'evict_cursor, 1048576, 4096, 31536000);
+    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_24);
 }
 
 ;;
@@ -353,7 +462,7 @@ _ %get_view() method_id(76114) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'bucket_key, $self'epoch, $self'records, $self'record_count) = $RecordShard$_contract_load();
+    var ($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor) = $RecordShard$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) { return (); }
@@ -369,16 +478,42 @@ _ %get_view() method_id(76114) {
         int $lane = ($msg'serial % 1048576);
         slice $expected = $global_contractAddress($NullifierShard$_init_child($self'epoch, $lane));
         throw_unless(13650, ( equal_slices_bits(__tact_context_get_sender(), $expected) ));
-        throw_unless(13651, ($self'record_count < 4096));
-        $self'records~__tact_dict_set_int_int(257, $self'record_count, $msg'frame_commit, 257);
+        throw_unless(13651, ($self'live_count < 4096));
+        $self'records~__tact_dict_set_int_cell(257, $self'record_count, $RecordEntry$_store_cell($RecordEntry$_constructor_frame_commit_created_at($msg'frame_commit, $global_now()), begin_cell()));
         $self'record_count = ($self'record_count + 1);
-        $RecordShard$_contract_store(($self'bucket_key, $self'epoch, $self'records, $self'record_count));
+        $self'live_count = ($self'live_count + 1);
+        $RecordShard$_contract_store(($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor));
+        return ();
+    }
+    
+    ;; Receive EvictRecords message
+    if (op == 0x52535032) {
+        var $msg'max_count = in_msg~load_uint(16);
+        int $swept = 0;
+        int $cursor = $self'evict_cursor;
+        while (( (( (($swept < $msg'max_count)) ? (($swept < 64)) : (false) )) ? (($cursor < $self'record_count)) : (false) )) {
+            tuple $e = $RecordEntry$_load_opt(__tact_dict_get_int_cell($self'records, 257, $cursor));
+            if ((~ null?($e))) {
+                if ((($RecordEntry$_get_created_at($RecordEntry$_not_null($e)) + 31536000) < $global_now())) {
+                    $self'records~__tact_dict_set_int_cell(257, $cursor, $RecordEntry$_store_opt(null(), begin_cell()));
+                    $self'live_count = ($self'live_count - 1);
+                    $cursor = ($cursor + 1);
+                    $swept = ($swept + 1);
+                } else {
+                    $swept = $msg'max_count;
+                }
+            } else {
+                $cursor = ($cursor + 1);
+            }
+        }
+        $self'evict_cursor = $cursor;
+        $RecordShard$_contract_store(($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
-        $RecordShard$_contract_store(($self'bucket_key, $self'epoch, $self'records, $self'record_count));
+        $RecordShard$_contract_store(($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor));
         return ();
     }
     ;; Throw if not handled

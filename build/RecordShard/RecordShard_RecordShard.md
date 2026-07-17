@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: RecordShard
-BoC Size: 551 bytes
+BoC Size: 841 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 23
+Total structures: 25
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -61,17 +61,25 @@ Signature: `NullifierShard{epoch:uint32,lane:uint32,spent:dict<int, bool>,spent_
 TL-B: `record_store#52535031 serial:uint256 frame_commit:uint256 = RecordStore`
 Signature: `RecordStore{serial:uint256,frame_commit:uint256}`
 
+### EvictRecords
+TL-B: `evict_records#52535032 max_count:uint16 = EvictRecords`
+Signature: `EvictRecords{max_count:uint16}`
+
+### RecordEntry
+TL-B: `_ frame_commit:int257 created_at:int257 = RecordEntry`
+Signature: `RecordEntry{frame_commit:int257,created_at:int257}`
+
 ### CapsuleRecordView
 TL-B: `_ exists:bool frame_commit:int257 = CapsuleRecordView`
 Signature: `CapsuleRecordView{exists:bool,frame_commit:int257}`
 
 ### RecordShardView
-TL-B: `_ bucket_key:int257 epoch:int257 record_count:int257 lane_count:int257 safe_cap:int257 = RecordShardView`
-Signature: `RecordShardView{bucket_key:int257,epoch:int257,record_count:int257,lane_count:int257,safe_cap:int257}`
+TL-B: `_ bucket_key:int257 epoch:int257 record_count:int257 live_count:int257 evict_cursor:int257 lane_count:int257 safe_cap:int257 retention:int257 = RecordShardView`
+Signature: `RecordShardView{bucket_key:int257,epoch:int257,record_count:int257,live_count:int257,evict_cursor:int257,lane_count:int257,safe_cap:int257,retention:int257}`
 
 ### RecordShard$Data
-TL-B: `_ bucket_key:uint256 epoch:uint32 records:dict<int, int> record_count:uint32 = RecordShard`
-Signature: `RecordShard{bucket_key:uint256,epoch:uint32,records:dict<int, int>,record_count:uint32}`
+TL-B: `_ bucket_key:uint256 epoch:uint32 records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}> record_count:uint32 live_count:uint32 evict_cursor:uint32 = RecordShard`
+Signature: `RecordShard{bucket_key:uint256,epoch:uint32,records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}>,record_count:uint32,live_count:uint32,evict_cursor:uint32}`
 
 ### IntroStore
 TL-B: `intro_store#49535032 serial:uint256 r:uint256 view_tag:uint16 body_commit:uint256 = IntroStore`
