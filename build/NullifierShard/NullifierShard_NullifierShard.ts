@@ -724,6 +724,7 @@ export type NullifierShardView = {
     lane_count: bigint;
     safe_cap: bigint;
     root_threshold: bigint;
+    max_cert_epochs: bigint;
 }
 
 export function storeNullifierShardView(src: NullifierShardView) {
@@ -736,6 +737,9 @@ export function storeNullifierShardView(src: NullifierShardView) {
         b_1.storeInt(src.lane_count, 257);
         b_1.storeInt(src.safe_cap, 257);
         b_1.storeInt(src.root_threshold, 257);
+        const b_2 = new Builder();
+        b_2.storeInt(src.max_cert_epochs, 257);
+        b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
 }
@@ -749,7 +753,9 @@ export function loadNullifierShardView(slice: Slice) {
     const _lane_count = sc_1.loadIntBig(257);
     const _safe_cap = sc_1.loadIntBig(257);
     const _root_threshold = sc_1.loadIntBig(257);
-    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold };
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _max_cert_epochs = sc_2.loadIntBig(257);
+    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold, max_cert_epochs: _max_cert_epochs };
 }
 
 export function loadTupleNullifierShardView(source: TupleReader) {
@@ -759,7 +765,8 @@ export function loadTupleNullifierShardView(source: TupleReader) {
     const _lane_count = source.readBigNumber();
     const _safe_cap = source.readBigNumber();
     const _root_threshold = source.readBigNumber();
-    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold };
+    const _max_cert_epochs = source.readBigNumber();
+    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold, max_cert_epochs: _max_cert_epochs };
 }
 
 export function loadGetterTupleNullifierShardView(source: TupleReader) {
@@ -769,7 +776,8 @@ export function loadGetterTupleNullifierShardView(source: TupleReader) {
     const _lane_count = source.readBigNumber();
     const _safe_cap = source.readBigNumber();
     const _root_threshold = source.readBigNumber();
-    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold };
+    const _max_cert_epochs = source.readBigNumber();
+    return { $$type: 'NullifierShardView' as const, epoch: _epoch, lane: _lane, spent_count: _spent_count, lane_count: _lane_count, safe_cap: _safe_cap, root_threshold: _root_threshold, max_cert_epochs: _max_cert_epochs };
 }
 
 export function storeTupleNullifierShardView(source: NullifierShardView) {
@@ -780,6 +788,7 @@ export function storeTupleNullifierShardView(source: NullifierShardView) {
     builder.writeNumber(source.lane_count);
     builder.writeNumber(source.safe_cap);
     builder.writeNumber(source.root_threshold);
+    builder.writeNumber(source.max_cert_epochs);
     return builder.build();
 }
 
@@ -872,7 +881,7 @@ function initNullifierShard_init_args(src: NullifierShard_init_args) {
 }
 
 async function NullifierShard_init(epoch: bigint, lane: bigint) {
-    const __code = Cell.fromHex('b5ee9c72410210010002f8000114ff00f4a413f4bcf2c80b01020162020a02f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de2182104e535032bae30235c00004c12114b08e164003c87f01ca0055305034cb1fcb1ff400cb1fc9ed54e0030904fc5b03d3ffd31fd33fd3ffd31fd31fd307d307d4d4d430f82382015180a90481352021a6fc52c0be9601a60452b0bb923170e2f2f481353553adbaf2f4105c104b103d4ea05299db3c81353621a9381325baf2f481353e5396be93519cbb923970e219f2f481353f53acb9f2f4550309db3c0bdb3c81354053c1bdf2f41045040505060028c882104253493101cb1f13cbffcb1fcb3fc9f90000f081354321c103f2f4208e233082f0884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0be1c0018e2282f0a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0e082f074f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa903e4103441305441abdb3c81354108d054411cf91017f2f481354204d04907f91012f2f481352107d0544216f91016f2f44104db3c8135242381010123714133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f412810101017f71216e955b59f45a3098c801cf004133f442e201a4070f080028c882104341433101cb1f13cbffcb1fcb1fc9f9000028c87f01ca0055305034cb1fcb1ff400cb1fc9ed54000a5f04f2c0820201200b0d0159bd4a976a268690000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e362340c00168313830b72265136513503015dbf524f6a268690000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c0e014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb34430120f001ec88210424e4c3101cb1fcbffc9f900c4b847de');
+    const __code = Cell.fromHex('b5ee9c7241021001000308000114ff00f4a413f4bcf2c80b01020162020a02f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cd31fd31ff404d31f55306c148e10810101d700810101d7005902d1016d70e205925f05e07024d74920c21f953104d31f05de2182104e535032bae30235c00004c12114b08e164003c87f01ca0055305034cb1fcb1ff400cb1fc9ed54e0030903fe5b03d3ffd31fd33fd3ffd31fd31fd307d307d4d4d430f82382015180a90481352021a6fc52c0be9601a60452b0bb923170e2f2f481353553adbaf2f4105c104b103d4ea05299db3c81353621a9381325baf2f481353e5396be93519cbb923970e219f2f481354425810226a052c0bbf2f481353f53acb9f2f4550309db3c0b0406050028c882104253493101cb1f13cbffcb1fcb3fc9f90004fcdb3c81354053c1bdf2f41045103441305441abdb3c81354108d054411cf91017f2f481354204d04907f91012f2f481352107d0544216f91016f2f44104db3c8135242381010123714133f40c6fa19401d70030925b6de26ef2f481353722830bb9f2f412810101017f71216e955b59f45a3098c801cf004133f442e201a406070f0800f081354321c103f2f4208e233082f0884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0be1c0018e2282f0a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0e082f074f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa90028c882104341433101cb1f13cbffcb1fcb1fc9f9000028c87f01ca0055305034cb1fcb1ff400cb1fc9ed54000a5f04f2c0820201200b0d0159bd4a976a268690000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8716d9e3623c0c001c8313830b72265136513503810226015dbf524f6a268690000ce698fe98ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a81ed9e3620c0e014022553181010106db3c4560714133f40c6fa19401d70030925b6de26eb34430120f001ec88210424e4c3101cb1fcbffc9f9005489b174');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initNullifierShard_init_args({ $$type: 'NullifierShard_init_args', epoch, lane })(builder);
@@ -970,7 +979,7 @@ const NullifierShard_types: ABIType[] = [
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
     {"name":"NullifierSpend","header":1314082866,"fields":[{"name":"spend_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"subkey_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"valid_from","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"valid_to","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"root_idx_a","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"root_idx_b","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"issuer_sig","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_a","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_b","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"NullifierShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"spent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"root_threshold","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"NullifierShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"spent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"root_threshold","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_cert_epochs","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"NullifierShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"lane","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"spent","type":{"kind":"dict","key":"int","value":"bool"}},{"name":"spent_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
 
@@ -1001,6 +1010,7 @@ export const NS_EPOCH_ACCEPT_PAST = 4n;
 export const NS_EPOCH_ACCEPT_FUTURE = 4n;
 export const NS_LANE_COUNT = 1048576n;
 export const NS_SAFE_CAP = 4096n;
+export const NS_MAX_CERT_EPOCHS = 550n;
 export const NS_ROOT_THRESHOLD = 2n;
 export const NS_ROOT_0 = 61648001945993851713387341017509757467197514600518013224456945346175643262219n;
 export const NS_ROOT_1 = 72643295600563315702315007365945353005398927859637280636436839326056233411824n;

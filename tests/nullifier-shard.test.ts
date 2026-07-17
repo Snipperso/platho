@@ -205,6 +205,32 @@ describe('NULLIFIER-SHARD — one token, one shard, one authority', () => {
     expect((await shard.getGetView()).spent_count).toBe(0n);
   }, 120_000);
 
+  it('CAC-06: an over-long certificate window is refused (13636) — the yearly-cadence cap', async () => {
+    // A cert that tries to authorize a subkey for far longer than the ~18-month cap: refused regardless of who
+    // signed it, so a ceremony error (or one rogue signing) cannot mint a decade-long subkey.
+    const spend = keyPairFromSeed(Buffer.alloc(32, 0xA5));
+    const { body, lane } = buildSpend({
+      spend, epoch: nowEpoch, nonce: 16n,
+      validFrom: nowEpoch - 3, validTo: nowEpoch + 600,   // window 603 > 550
+    });
+    const shard = await shardFor(nowEpoch, lane);
+    const res = await shard.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, body as any);
+    expect(computeExit(res, shard.address)).toBe(13636);
+    expect((await shard.getGetView()).max_cert_epochs).toBe(550n);
+  }, 120_000);
+
+  it('CAC-07: a ~15-month operational window (yearly ceremony with overlap) is accepted', async () => {
+    // The real regime: a yearly ceremony signs a 15-month window so a late ceremony leaves no gap. Well under the
+    // 18-month cap, so it publishes normally.
+    const spend = keyPairFromSeed(Buffer.alloc(32, 0xA6));
+    const { body, lane } = buildSpend({
+      spend, epoch: nowEpoch, nonce: 17n,
+      validFrom: nowEpoch - 30, validTo: nowEpoch + 425,  // ~15 months, < 550
+    });
+    const shard = await shardFor(nowEpoch, lane);
+    expect(computeExit(await shard.send(relay.getSender(), { value: toNano('0.1') }, body as any), shard.address)).toBe(0);
+  }, 120_000);
+
   it('CAC-05: a token signed by a subkey the roots never certified is refused (13601)', async () => {
     // A rogue subkey with a self-made "cert": the roots did not sign it, so cert verification fails first (13633),
     // and even if the cert somehow passed, the token sig is by a key no cert authorizes. Build a cert the roots
