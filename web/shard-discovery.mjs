@@ -1,0 +1,67 @@
+// clean-17 client — sharded discovery primitive.
+//
+// The load-bearing client property of the sharded design: a client that knows its own keys computes every shard
+// address LOCALLY, with zero on-chain requests. There is no directory, no index to walk — a shard's address is a
+// pure function of its identity (its StateInit), exactly like a jetton wallet address is a function of its owner.
+// The client then reads that account's state (or transaction history) directly via its RPC transport.
+//
+//   CONV record   -> RecordShard(bucket_key, epoch)       — the conversation-direction for a day
+//   INTRO         -> IntroShard(epoch, bucket)            — a sender-chosen bucket the recipient scans
+//   RECOVERY      -> RecoveryShard(self_bucket_key)       — epoch-independent, the user's own slot
+//   spend a token -> NullifierShard(epoch, serial mod N)  — where the relay burns the nullifier
+//
+// This module derives addresses from the compiled contract StateInit (via the build wrappers). It is transport-
+// agnostic: it returns Addresses; the caller reads them with whatever toncenter/indexer transport it already uses
+// (see web/capsulehub-ton-rpc-provider.mjs). Browser bundling transpiles the imported wrappers.
+
+import { Address, contractAddress } from '@ton/core';
+import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
+import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
+import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
+import { NullifierShard } from '../build/NullifierShard/NullifierShard_NullifierShard';
+
+// MUST equal NS_LANE_COUNT / RS_LANE_COUNT / IS_LANE_COUNT in the contracts (2^20). A single source here so the
+// client cannot drift from the on-chain constant.
+export const LANE_COUNT = 1_048_576n;
+export const EPOCH_SECONDS = 86400;
+
+export const laneOf = (serial) => BigInt(serial) % LANE_COUNT;
+export const epochOf = (unixSeconds) => Math.floor(unixSeconds / EPOCH_SECONDS);
+
+/** Address of the CONV record shard for a conversation-direction bucket on a given day-epoch. */
+export async function recordShardAddress(bucketKey, epoch) {
+  return contractAddress(0, await RecordShard.init(BigInt(bucketKey), BigInt(epoch)));
+}
+
+/** Address of the INTRO shard for a sender-chosen bucket on a given day-epoch (the recipient scans these). */
+export async function introShardAddress(epoch, bucket) {
+  return contractAddress(0, await IntroShard.init(BigInt(epoch), BigInt(bucket)));
+}
+
+/** Address of the RECOVERY shard for a user's epoch-independent self-recovery key. */
+export async function recoveryShardAddress(selfBucketKey) {
+  return contractAddress(0, await RecoveryShard.init(BigInt(selfBucketKey)));
+}
+
+/** Address of the NullifierShard a token with `serial` spends on, for `epoch`. */
+export async function nullifierShardAddress(epoch, serial) {
+  return contractAddress(0, await NullifierShard.init(BigInt(epoch), laneOf(serial)));
+}
+
+/**
+ * The INTRO catch-up scan set: every (epoch, bucket) IntroShard a recipient must read to cover a time window.
+ * The recipient does not know which bucket a sender used, so it reads all `bucketCount` buckets for each epoch in
+ * [fromEpoch, toEpoch]. Returns a flat list of addresses. Kept a pure local computation (no I/O).
+ */
+export async function introScanAddresses(fromEpoch, toEpoch, bucketCount) {
+  const out = [];
+  for (let e = fromEpoch; e <= toEpoch; e += 1) {
+    for (let b = 0; b < bucketCount; b += 1) {
+      out.push(await introShardAddress(e, b));
+    }
+  }
+  return out;
+}
+
+/** Normalize any address-ish input to a comparable string (for matching a read account against a derived address). */
+export const addrKey = (a) => (a instanceof Address ? a : Address.parse(String(a))).toString();
