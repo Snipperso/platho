@@ -2,7 +2,7 @@
 #pragma allow-post-modification;
 #pragma compute-asm-ltr;
 
-;; NullifierShard_NullifierShard.headers.fc
+;; RecordShard_NullifierShard.headers.fc
 ;;
 ;; Header files for NullifierShard
 ;; NOTE: declarations are sorted for optimal order
@@ -44,11 +44,11 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 ;; $NullifierShardView$_to_external
 (int, int, int, int, int, int, int) $NullifierShardView$_to_external(((int, int, int, int, int, int, int)) v) inline;
 
-;; $RecordShard$init$_store
-builder $RecordShard$init$_store(builder build_0, (int, int) v) inline;
-
 ;; $NullifierShard$init$_load
 (slice, ((int, int))) $NullifierShard$init$_load(slice sc_0) inline;
+
+;; $RecordShard$init$_store
+builder $RecordShard$init$_store(builder build_0, (int, int) v) inline;
 
 ;; $NullifierShard$_contract_init
 (int, int, cell, int) $NullifierShard$_contract_init(int $epoch, int $lane) impure inline;
@@ -71,9 +71,6 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ;; $global_contractAddress
 slice $global_contractAddress((cell, cell) $s) impure inline;
 
-;; $RecordShard$_init_child
-(cell, cell) $RecordShard$_init_child(int $bucket_key, int $epoch) inline_ref;
-
 ;; $NullifierShard$_fun_rootKey
 ((int, int, cell, int), int) $NullifierShard$_fun_rootKey((int, int, cell, int) $self, int $idx) impure inline_ref;
 
@@ -95,6 +92,9 @@ slice $global_contractAddress((cell, cell) $s) impure inline;
 ;; $NullifierShard$_fun_is_spent
 ((int, int, cell, int), int) $NullifierShard$_fun_is_spent((int, int, cell, int) $self, int $serial) impure inline_ref;
 
+;; $RecordShard$_init_child
+(cell, cell) $RecordShard$_init_child(int $bucket_key, int $epoch) inline_ref;
+
 ;; $SendParameters$_constructor_to_value_mode_bounce_body
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline;
 
@@ -102,7 +102,7 @@ slice $global_contractAddress((cell, cell) $s) impure inline;
 ((int, int)) $RecordStore$_constructor_serial_frame_commit(int $serial, int $frame_commit) inline;
 
 
-;; NullifierShard_NullifierShard.stdlib.fc
+;; RecordShard_NullifierShard.stdlib.fc
 global (int, slice, int, slice) __tact_context;
 global slice __tact_context_sender;
 global cell __tact_child_contract_codes;
@@ -281,7 +281,7 @@ int $Cell$_fun_hash(cell $self) impure asm """
     HASHCU
 """;
 
-;; NullifierShard_NullifierShard.storage.fc
+;; RecordShard_NullifierShard.storage.fc
 ;;
 ;; Type: Context
 ;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
@@ -299,6 +299,20 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline {
     return ($mode, $body, null(), null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: NullifierShardView
+;; TLB: _ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView
+;;
+
+(int, int, int, int, int, int, int) $NullifierShardView$_to_external(((int, int, int, int, int, int, int)) v) inline {
+    var (v'epoch, v'lane, v'spent_count, v'lane_count, v'safe_cap, v'root_threshold, v'max_cert_epochs) = v; 
+    return (v'epoch, v'lane, v'spent_count, v'lane_count, v'safe_cap, v'root_threshold, v'max_cert_epochs);
+}
+
+((int, int, int, int, int, int, int)) $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs(int $epoch, int $lane, int $spent_count, int $lane_count, int $safe_cap, int $root_threshold, int $max_cert_epochs) inline {
+    return ($epoch, $lane, $spent_count, $lane_count, $safe_cap, $root_threshold, $max_cert_epochs);
 }
 
 ;;
@@ -325,53 +339,6 @@ cell $RecordStore$_store_cell((int, int) v, builder b) inline {
 
 ((int, int)) $RecordStore$_constructor_serial_frame_commit(int $serial, int $frame_commit) inline {
     return ($serial, $frame_commit);
-}
-
-;;
-;; Type: NullifierShardView
-;; TLB: _ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView
-;;
-
-(int, int, int, int, int, int, int) $NullifierShardView$_to_external(((int, int, int, int, int, int, int)) v) inline {
-    var (v'epoch, v'lane, v'spent_count, v'lane_count, v'safe_cap, v'root_threshold, v'max_cert_epochs) = v; 
-    return (v'epoch, v'lane, v'spent_count, v'lane_count, v'safe_cap, v'root_threshold, v'max_cert_epochs);
-}
-
-((int, int, int, int, int, int, int)) $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs(int $epoch, int $lane, int $spent_count, int $lane_count, int $safe_cap, int $root_threshold, int $max_cert_epochs) inline {
-    return ($epoch, $lane, $spent_count, $lane_count, $safe_cap, $root_threshold, $max_cert_epochs);
-}
-
-;;
-;; Type: RecordShard
-;; TLB: _ bucket_key:uint256 epoch:uint32 records:dict<int, int> record_count:uint32 = RecordShard
-;;
-
-builder $RecordShard$init$_store(builder build_0, (int, int) v) inline {
-    var (v'bucket_key, v'epoch) = v;
-    build_0 = build_0.store_int(v'bucket_key, 257);
-    build_0 = build_0.store_int(v'epoch, 257);
-    return build_0;
-}
-
-(cell, cell) $RecordShard$_init_child(int $bucket_key, int $epoch) inline_ref {
-    ;; Build init code cell
-
-    slice sc' = __tact_child_contract_codes.begin_parse();
-    cell source = sc'~load_dict();
-    ;; Contract Code: RecordShard
-    cell init_code = __tact_dict_get_code(source, 52655);
-
-    ;; Build init data cell
-    cell contracts = new_dict();
-
-    ;; Contract Code: NullifierShard
-    contracts = __tact_dict_set_code(contracts, 34652, my_code());
-
-    builder b = begin_cell();
-    b = b.store_builder_ref(begin_cell().store_dict(contracts));
-    b = b.store_int(false, 1);
-    b = $RecordShard$init$_store(b, ($bucket_key, $epoch));
-    return (init_code, b.end_cell());
 }
 
 ;;
@@ -425,6 +392,39 @@ builder $NullifierShard$_store(builder build_0, (int, int, cell, int) v) inline 
 }
 
 ;;
+;; Type: RecordShard
+;; TLB: _ bucket_key:uint256 epoch:uint32 records:dict<int, int> record_count:uint32 = RecordShard
+;;
+
+builder $RecordShard$init$_store(builder build_0, (int, int) v) inline {
+    var (v'bucket_key, v'epoch) = v;
+    build_0 = build_0.store_int(v'bucket_key, 257);
+    build_0 = build_0.store_int(v'epoch, 257);
+    return build_0;
+}
+
+(cell, cell) $RecordShard$_init_child(int $bucket_key, int $epoch) inline_ref {
+    ;; Build init code cell
+
+    slice sc' = __tact_child_contract_codes.begin_parse();
+    cell source = sc'~load_dict();
+    ;; Contract Code: RecordShard
+    cell init_code = __tact_dict_get_code(source, 52655);
+
+    ;; Build init data cell
+    cell contracts = new_dict();
+
+    ;; Contract Code: NullifierShard
+    contracts = __tact_dict_set_code(contracts, 34652, my_code());
+
+    builder b = begin_cell();
+    b = b.store_builder_ref(begin_cell().store_dict(contracts));
+    b = b.store_int(false, 1);
+    b = $RecordShard$init$_store(b, ($bucket_key, $epoch));
+    return (init_code, b.end_cell());
+}
+
+;;
 ;; Contract NullifierShard functions
 ;;
 
@@ -441,45 +441,45 @@ builder $NullifierShard$_store(builder build_0, (int, int, cell, int) v) inline 
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
     throw_unless(13635, ($idx <= 2));
     ifnot ($idx) {
-        var $fresh$ret_14 = 61648001945993851713387341017509757467197514600518013224456945346175643262219;
-        return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_14);
+        var $fresh$ret_0 = 61648001945993851713387341017509757467197514600518013224456945346175643262219;
+        return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_0);
     }
     if (($idx == 1)) {
-        var $fresh$ret_15 = 72643295600563315702315007365945353005398927859637280636436839326056233411824;
-        return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_15);
+        var $fresh$ret_1 = 72643295600563315702315007365945353005398927859637280636436839326056233411824;
+        return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_1);
     }
-    var $fresh$ret_16 = 52907109351218747841695970573523340373205112110913690393551713332454347868841;
-    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_16);
+    var $fresh$ret_2 = 52907109351218747841695970573523340373205112110913690393551713332454347868841;
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_2);
 }
 
 ((int, int, cell, int), int) $NullifierShard$_fun_computeSerial((int, int, cell, int) $self, int $spendPubkey, int $epoch, int $nonce) impure inline_ref {
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
-    var $fresh$ret_17 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 1112754481, 32), $spendPubkey, 256), $epoch, 32), $nonce, 64)));
-    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_17);
+    var $fresh$ret_3 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 1112754481, 32), $spendPubkey, 256), $epoch, 32), $nonce, 64)));
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_3);
 }
 
 ((int, int, cell, int), int) $NullifierShard$_fun_certDigest((int, int, cell, int) $self, int $subkeyPubkey, int $validFrom, int $validTo) impure inline_ref {
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
-    var $fresh$ret_18 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 1128350513, 32), $subkeyPubkey, 256), $validFrom, 32), $validTo, 32)));
-    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_18);
+    var $fresh$ret_4 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 1128350513, 32), $subkeyPubkey, 256), $validFrom, 32), $validTo, 32)));
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_4);
 }
 
 ((int, int, cell, int), int) $NullifierShard$_fun_nullifierKey((int, int, cell, int) $self, int $serial) impure inline_ref {
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
-    var $fresh$ret_19 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1112427569, 32), $serial, 256)));
-    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_19);
+    var $fresh$ret_5 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1112427569, 32), $serial, 256)));
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_5);
 }
 
 ((int, int, cell, int), (int, int, int, int, int, int, int)) $NullifierShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
-    var $fresh$ret_20 = $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs($self'epoch, $self'lane, $self'spent_count, 1048576, 4096, 2, 550);
-    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_20);
+    var $fresh$ret_6 = $NullifierShardView$_constructor_epoch_lane_spent_count_lane_count_safe_cap_root_threshold_max_cert_epochs($self'epoch, $self'lane, $self'spent_count, 1048576, 4096, 2, 550);
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_6);
 }
 
 ((int, int, cell, int), int) $NullifierShard$_fun_is_spent((int, int, cell, int) $self, int $serial) impure inline_ref {
     var (($self'epoch, $self'lane, $self'spent, $self'spent_count)) = $self;
-    var $fresh$ret_21 = (~ null?(__tact_dict_get_int_int($self'spent, 257, ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_nullifierKey($serial), 1)));
-    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_21);
+    var $fresh$ret_7 = (~ null?(__tact_dict_get_int_int($self'spent, 257, ($self'epoch, $self'lane, $self'spent, $self'spent_count)~$NullifierShard$_fun_nullifierKey($serial), 1)));
+    return (($self'epoch, $self'lane, $self'spent, $self'spent_count), $fresh$ret_7);
 }
 
 ;;

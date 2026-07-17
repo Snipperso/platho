@@ -1,6 +1,6 @@
 # Tact compilation report
-Contract: NullifierShard
-BoC Size: 1094 bytes
+Contract: RecordShard
+BoC Size: 524 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 17
@@ -76,11 +76,11 @@ Signature: `NullifierShard{epoch:uint32,lane:uint32,spent:dict<int, bool>,spent_
 ## Get methods
 Total get methods: 2
 
+## get_record
+Argument: entry_id
+
 ## get_view
 No arguments
-
-## is_spent
-Argument: serial
 
 ## Exit codes
 * 2: Stack underflow
@@ -124,15 +124,15 @@ Argument: serial
 
 ```mermaid
 graph TD
-NullifierShard
-NullifierShard --> BaseTrait
+RecordShard
+RecordShard --> BaseTrait
 ```
 
 ## Contract dependency diagram
 
 ```mermaid
 graph TD
-NullifierShard
-NullifierShard --> RecordShard
+RecordShard
 RecordShard --> NullifierShard
+NullifierShard --> RecordShard
 ```

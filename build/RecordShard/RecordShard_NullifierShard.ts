@@ -609,245 +609,6 @@ export function dictValueParserBasechainAddress(): DictionaryValue<BasechainAddr
     }
 }
 
-export type RecordStore = {
-    $$type: 'RecordStore';
-    serial: bigint;
-    frame_commit: bigint;
-}
-
-export function storeRecordStore(src: RecordStore) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1381191729, 32);
-        b_0.storeUint(src.serial, 256);
-        b_0.storeUint(src.frame_commit, 256);
-    };
-}
-
-export function loadRecordStore(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1381191729) { throw Error('Invalid prefix'); }
-    const _serial = sc_0.loadUintBig(256);
-    const _frame_commit = sc_0.loadUintBig(256);
-    return { $$type: 'RecordStore' as const, serial: _serial, frame_commit: _frame_commit };
-}
-
-export function loadTupleRecordStore(source: TupleReader) {
-    const _serial = source.readBigNumber();
-    const _frame_commit = source.readBigNumber();
-    return { $$type: 'RecordStore' as const, serial: _serial, frame_commit: _frame_commit };
-}
-
-export function loadGetterTupleRecordStore(source: TupleReader) {
-    const _serial = source.readBigNumber();
-    const _frame_commit = source.readBigNumber();
-    return { $$type: 'RecordStore' as const, serial: _serial, frame_commit: _frame_commit };
-}
-
-export function storeTupleRecordStore(source: RecordStore) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.serial);
-    builder.writeNumber(source.frame_commit);
-    return builder.build();
-}
-
-export function dictValueParserRecordStore(): DictionaryValue<RecordStore> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeRecordStore(src)).endCell());
-        },
-        parse: (src) => {
-            return loadRecordStore(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type CapsuleRecordView = {
-    $$type: 'CapsuleRecordView';
-    exists: boolean;
-    frame_commit: bigint;
-}
-
-export function storeCapsuleRecordView(src: CapsuleRecordView) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeBit(src.exists);
-        b_0.storeInt(src.frame_commit, 257);
-    };
-}
-
-export function loadCapsuleRecordView(slice: Slice) {
-    const sc_0 = slice;
-    const _exists = sc_0.loadBit();
-    const _frame_commit = sc_0.loadIntBig(257);
-    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit };
-}
-
-export function loadTupleCapsuleRecordView(source: TupleReader) {
-    const _exists = source.readBoolean();
-    const _frame_commit = source.readBigNumber();
-    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit };
-}
-
-export function loadGetterTupleCapsuleRecordView(source: TupleReader) {
-    const _exists = source.readBoolean();
-    const _frame_commit = source.readBigNumber();
-    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit };
-}
-
-export function storeTupleCapsuleRecordView(source: CapsuleRecordView) {
-    const builder = new TupleBuilder();
-    builder.writeBoolean(source.exists);
-    builder.writeNumber(source.frame_commit);
-    return builder.build();
-}
-
-export function dictValueParserCapsuleRecordView(): DictionaryValue<CapsuleRecordView> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeCapsuleRecordView(src)).endCell());
-        },
-        parse: (src) => {
-            return loadCapsuleRecordView(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type RecordShardView = {
-    $$type: 'RecordShardView';
-    bucket_key: bigint;
-    epoch: bigint;
-    record_count: bigint;
-    lane_count: bigint;
-    safe_cap: bigint;
-}
-
-export function storeRecordShardView(src: RecordShardView) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeInt(src.bucket_key, 257);
-        b_0.storeInt(src.epoch, 257);
-        b_0.storeInt(src.record_count, 257);
-        const b_1 = new Builder();
-        b_1.storeInt(src.lane_count, 257);
-        b_1.storeInt(src.safe_cap, 257);
-        b_0.storeRef(b_1.endCell());
-    };
-}
-
-export function loadRecordShardView(slice: Slice) {
-    const sc_0 = slice;
-    const _bucket_key = sc_0.loadIntBig(257);
-    const _epoch = sc_0.loadIntBig(257);
-    const _record_count = sc_0.loadIntBig(257);
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _lane_count = sc_1.loadIntBig(257);
-    const _safe_cap = sc_1.loadIntBig(257);
-    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
-}
-
-export function loadTupleRecordShardView(source: TupleReader) {
-    const _bucket_key = source.readBigNumber();
-    const _epoch = source.readBigNumber();
-    const _record_count = source.readBigNumber();
-    const _lane_count = source.readBigNumber();
-    const _safe_cap = source.readBigNumber();
-    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
-}
-
-export function loadGetterTupleRecordShardView(source: TupleReader) {
-    const _bucket_key = source.readBigNumber();
-    const _epoch = source.readBigNumber();
-    const _record_count = source.readBigNumber();
-    const _lane_count = source.readBigNumber();
-    const _safe_cap = source.readBigNumber();
-    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
-}
-
-export function storeTupleRecordShardView(source: RecordShardView) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.bucket_key);
-    builder.writeNumber(source.epoch);
-    builder.writeNumber(source.record_count);
-    builder.writeNumber(source.lane_count);
-    builder.writeNumber(source.safe_cap);
-    return builder.build();
-}
-
-export function dictValueParserRecordShardView(): DictionaryValue<RecordShardView> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeRecordShardView(src)).endCell());
-        },
-        parse: (src) => {
-            return loadRecordShardView(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type RecordShard$Data = {
-    $$type: 'RecordShard$Data';
-    bucket_key: bigint;
-    epoch: bigint;
-    records: Dictionary<bigint, bigint>;
-    record_count: bigint;
-}
-
-export function storeRecordShard$Data(src: RecordShard$Data) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(src.bucket_key, 256);
-        b_0.storeUint(src.epoch, 32);
-        b_0.storeDict(src.records, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
-        b_0.storeUint(src.record_count, 32);
-    };
-}
-
-export function loadRecordShard$Data(slice: Slice) {
-    const sc_0 = slice;
-    const _bucket_key = sc_0.loadUintBig(256);
-    const _epoch = sc_0.loadUintBig(32);
-    const _records = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
-    const _record_count = sc_0.loadUintBig(32);
-    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
-}
-
-export function loadTupleRecordShard$Data(source: TupleReader) {
-    const _bucket_key = source.readBigNumber();
-    const _epoch = source.readBigNumber();
-    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _record_count = source.readBigNumber();
-    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
-}
-
-export function loadGetterTupleRecordShard$Data(source: TupleReader) {
-    const _bucket_key = source.readBigNumber();
-    const _epoch = source.readBigNumber();
-    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _record_count = source.readBigNumber();
-    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
-}
-
-export function storeTupleRecordShard$Data(source: RecordShard$Data) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.bucket_key);
-    builder.writeNumber(source.epoch);
-    builder.writeCell(source.records.size > 0 ? beginCell().storeDictDirect(source.records, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
-    builder.writeNumber(source.record_count);
-    return builder.build();
-}
-
-export function dictValueParserRecordShard$Data(): DictionaryValue<RecordShard$Data> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeRecordShard$Data(src)).endCell());
-        },
-        parse: (src) => {
-            return loadRecordShard$Data(src.loadRef().beginParse());
-        }
-    }
-}
-
 export type NullifierSpend = {
     $$type: 'NullifierSpend';
     spend_pubkey: bigint;
@@ -1120,6 +881,245 @@ export function dictValueParserNullifierShard$Data(): DictionaryValue<NullifierS
     }
 }
 
+export type RecordStore = {
+    $$type: 'RecordStore';
+    serial: bigint;
+    frame_commit: bigint;
+}
+
+export function storeRecordStore(src: RecordStore) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1381191729, 32);
+        b_0.storeUint(src.serial, 256);
+        b_0.storeUint(src.frame_commit, 256);
+    };
+}
+
+export function loadRecordStore(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1381191729) { throw Error('Invalid prefix'); }
+    const _serial = sc_0.loadUintBig(256);
+    const _frame_commit = sc_0.loadUintBig(256);
+    return { $$type: 'RecordStore' as const, serial: _serial, frame_commit: _frame_commit };
+}
+
+export function loadTupleRecordStore(source: TupleReader) {
+    const _serial = source.readBigNumber();
+    const _frame_commit = source.readBigNumber();
+    return { $$type: 'RecordStore' as const, serial: _serial, frame_commit: _frame_commit };
+}
+
+export function loadGetterTupleRecordStore(source: TupleReader) {
+    const _serial = source.readBigNumber();
+    const _frame_commit = source.readBigNumber();
+    return { $$type: 'RecordStore' as const, serial: _serial, frame_commit: _frame_commit };
+}
+
+export function storeTupleRecordStore(source: RecordStore) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.serial);
+    builder.writeNumber(source.frame_commit);
+    return builder.build();
+}
+
+export function dictValueParserRecordStore(): DictionaryValue<RecordStore> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeRecordStore(src)).endCell());
+        },
+        parse: (src) => {
+            return loadRecordStore(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type CapsuleRecordView = {
+    $$type: 'CapsuleRecordView';
+    exists: boolean;
+    frame_commit: bigint;
+}
+
+export function storeCapsuleRecordView(src: CapsuleRecordView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.exists);
+        b_0.storeInt(src.frame_commit, 257);
+    };
+}
+
+export function loadCapsuleRecordView(slice: Slice) {
+    const sc_0 = slice;
+    const _exists = sc_0.loadBit();
+    const _frame_commit = sc_0.loadIntBig(257);
+    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit };
+}
+
+export function loadTupleCapsuleRecordView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _frame_commit = source.readBigNumber();
+    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit };
+}
+
+export function loadGetterTupleCapsuleRecordView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _frame_commit = source.readBigNumber();
+    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit };
+}
+
+export function storeTupleCapsuleRecordView(source: CapsuleRecordView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.exists);
+    builder.writeNumber(source.frame_commit);
+    return builder.build();
+}
+
+export function dictValueParserCapsuleRecordView(): DictionaryValue<CapsuleRecordView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeCapsuleRecordView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadCapsuleRecordView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type RecordShardView = {
+    $$type: 'RecordShardView';
+    bucket_key: bigint;
+    epoch: bigint;
+    record_count: bigint;
+    lane_count: bigint;
+    safe_cap: bigint;
+}
+
+export function storeRecordShardView(src: RecordShardView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeInt(src.bucket_key, 257);
+        b_0.storeInt(src.epoch, 257);
+        b_0.storeInt(src.record_count, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.lane_count, 257);
+        b_1.storeInt(src.safe_cap, 257);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadRecordShardView(slice: Slice) {
+    const sc_0 = slice;
+    const _bucket_key = sc_0.loadIntBig(257);
+    const _epoch = sc_0.loadIntBig(257);
+    const _record_count = sc_0.loadIntBig(257);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _lane_count = sc_1.loadIntBig(257);
+    const _safe_cap = sc_1.loadIntBig(257);
+    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
+}
+
+export function loadTupleRecordShardView(source: TupleReader) {
+    const _bucket_key = source.readBigNumber();
+    const _epoch = source.readBigNumber();
+    const _record_count = source.readBigNumber();
+    const _lane_count = source.readBigNumber();
+    const _safe_cap = source.readBigNumber();
+    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
+}
+
+export function loadGetterTupleRecordShardView(source: TupleReader) {
+    const _bucket_key = source.readBigNumber();
+    const _epoch = source.readBigNumber();
+    const _record_count = source.readBigNumber();
+    const _lane_count = source.readBigNumber();
+    const _safe_cap = source.readBigNumber();
+    return { $$type: 'RecordShardView' as const, bucket_key: _bucket_key, epoch: _epoch, record_count: _record_count, lane_count: _lane_count, safe_cap: _safe_cap };
+}
+
+export function storeTupleRecordShardView(source: RecordShardView) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.bucket_key);
+    builder.writeNumber(source.epoch);
+    builder.writeNumber(source.record_count);
+    builder.writeNumber(source.lane_count);
+    builder.writeNumber(source.safe_cap);
+    return builder.build();
+}
+
+export function dictValueParserRecordShardView(): DictionaryValue<RecordShardView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeRecordShardView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadRecordShardView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type RecordShard$Data = {
+    $$type: 'RecordShard$Data';
+    bucket_key: bigint;
+    epoch: bigint;
+    records: Dictionary<bigint, bigint>;
+    record_count: bigint;
+}
+
+export function storeRecordShard$Data(src: RecordShard$Data) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(src.bucket_key, 256);
+        b_0.storeUint(src.epoch, 32);
+        b_0.storeDict(src.records, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
+        b_0.storeUint(src.record_count, 32);
+    };
+}
+
+export function loadRecordShard$Data(slice: Slice) {
+    const sc_0 = slice;
+    const _bucket_key = sc_0.loadUintBig(256);
+    const _epoch = sc_0.loadUintBig(32);
+    const _records = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
+    const _record_count = sc_0.loadUintBig(32);
+    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
+}
+
+export function loadTupleRecordShard$Data(source: TupleReader) {
+    const _bucket_key = source.readBigNumber();
+    const _epoch = source.readBigNumber();
+    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
+    const _record_count = source.readBigNumber();
+    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
+}
+
+export function loadGetterTupleRecordShard$Data(source: TupleReader) {
+    const _bucket_key = source.readBigNumber();
+    const _epoch = source.readBigNumber();
+    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
+    const _record_count = source.readBigNumber();
+    return { $$type: 'RecordShard$Data' as const, bucket_key: _bucket_key, epoch: _epoch, records: _records, record_count: _record_count };
+}
+
+export function storeTupleRecordShard$Data(source: RecordShard$Data) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.bucket_key);
+    builder.writeNumber(source.epoch);
+    builder.writeCell(source.records.size > 0 ? beginCell().storeDictDirect(source.records, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
+    builder.writeNumber(source.record_count);
+    return builder.build();
+}
+
+export function dictValueParserRecordShard$Data(): DictionaryValue<RecordShard$Data> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeRecordShard$Data(src)).endCell());
+        },
+        parse: (src) => {
+            return loadRecordShard$Data(src.loadRef().beginParse());
+        }
+    }
+}
+
  type NullifierShard_init_args = {
     $$type: 'NullifierShard_init_args';
     epoch: bigint;
@@ -1234,18 +1234,18 @@ const NullifierShard_types: ABIType[] = [
     {"name":"StdAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":8}},{"name":"address","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
+    {"name":"NullifierSpend","header":1314082866,"fields":[{"name":"spend_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"subkey_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"valid_from","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"valid_to","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"root_idx_a","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"root_idx_b","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"frame_commit","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"issuer_sig","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_a","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_b","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"NullifierShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"spent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"root_threshold","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_cert_epochs","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"NullifierShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"lane","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"spent","type":{"kind":"dict","key":"int","value":"bool"}},{"name":"spent_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"RecordStore","header":1381191729,"fields":[{"name":"serial","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"frame_commit","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"CapsuleRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"RecordShardView","header":null,"fields":[{"name":"bucket_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"RecordShard$Data","header":null,"fields":[{"name":"bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"records","type":{"kind":"dict","key":"int","value":"int"}},{"name":"record_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"NullifierSpend","header":1314082866,"fields":[{"name":"spend_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"subkey_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"valid_from","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"valid_to","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"root_idx_a","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"root_idx_b","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"frame_commit","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"issuer_sig","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_a","type":{"kind":"simple","type":"cell","optional":false}},{"name":"cert_sig_b","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"NullifierShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"spent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"lane_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"root_threshold","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_cert_epochs","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"NullifierShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"lane","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"spent","type":{"kind":"dict","key":"int","value":"bool"}},{"name":"spent_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
 
 const NullifierShard_opcodes = {
-    "RecordStore": 1381191729,
     "NullifierSpend": 1314082866,
+    "RecordStore": 1381191729,
 }
 
 const NullifierShard_getters: ABIGetter[] = [
@@ -1263,8 +1263,6 @@ const NullifierShard_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"empty"}},
 ]
 
-export const RS_LANE_COUNT = 1048576n;
-export const RS_SAFE_CAP = 4096n;
 export const NS_ISSUER_SIG_DOMAIN = 1112754481n;
 export const NS_NULL_DOMAIN = 1112427569n;
 export const NS_CERT_DOMAIN = 1128350513n;
@@ -1280,6 +1278,8 @@ export const NS_ROOT_THRESHOLD = 2n;
 export const NS_ROOT_0 = 61648001945993851713387341017509757467197514600518013224456945346175643262219n;
 export const NS_ROOT_1 = 72643295600563315702315007365945353005398927859637280636436839326056233411824n;
 export const NS_ROOT_2 = 52907109351218747841695970573523340373205112110913690393551713332454347868841n;
+export const RS_LANE_COUNT = 1048576n;
+export const RS_SAFE_CAP = 4096n;
 
 export class NullifierShard implements Contract {
     

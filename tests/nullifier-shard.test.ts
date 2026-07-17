@@ -3,6 +3,7 @@ import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { keyPairFromSeed, sign, KeyPair } from '@ton/crypto';
 import { NullifierShard } from '../build/NullifierShard/NullifierShard_NullifierShard';
+import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // NULLIFIER-SHARD — the load-bearing proof for the clean-17 redesign.
@@ -52,6 +53,7 @@ function makeCert(sk: KeyPair, validFrom: number, validTo: number, idxA = 0, idx
 function buildSpend(opts: {
   spend: KeyPair; epoch: number; nonce: bigint; sk?: KeyPair;
   validFrom?: number; validTo?: number; idxA?: number; idxB?: number;
+  bucketKey?: bigint; frameCommit?: bigint;
 }) {
   const sk = opts.sk ?? subkey;
   const spendPub = bufToInt(opts.spend.publicKey);
@@ -68,6 +70,8 @@ function buildSpend(opts: {
     epoch: BigInt(opts.epoch),
     nonce: opts.nonce,
     ...cert,
+    bucket_key: opts.bucketKey ?? 0xB0CCE7n,
+    frame_commit: opts.frameCommit ?? 0xF4A3En,
     issuer_sig: sigCell(sign(serialBuf, sk.secretKey)),
   };
   return { body, serial, lane };
@@ -142,15 +146,82 @@ describe('NULLIFIER-SHARD — one token, one shard, one authority', () => {
     expect(computeExit(await shard.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, body as any), shard.address)).toBe(13600);
   }, 120_000);
 
-  it('NS-05: the accepting path emits NOTHING — the ACTION phase has no failure surface', async () => {
-    const { body, lane } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0x94)), epoch: nowEpoch, nonce: 9n });
+  // ── Increment 3: the forward to the RecordShard (the terminal hop) ─────────────────────────────────────────
+
+  async function recordShardFor(bucketKey: bigint, epoch: number): Promise<SandboxContract<RecordShard>> {
+    const init = await RecordShard.init(bucketKey, BigInt(epoch));
+    const c = blockchain.openContract(new RecordShard(contractAddress(0, init), init));
+    await c.send(relay.getSender(), { value: toNano('0.1') }, null);
+    return c;
+  }
+  const txTo = (res: any, dest: Address): any => res.transactions.find(
+    (t: any) => t.inMessage?.info?.type === 'internal' && t.inMessage?.info?.dest?.toString() === dest.toString());
+
+  it('RS-01: a spent token is forwarded and stored at its RecordShard(bucket_key, epoch)', async () => {
+    const bucketKey = 0xABCDEF00n;
+    const frameCommit = 0x1111222233334444n;
+    const { body, serial, lane } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0xC0)), epoch: nowEpoch, nonce: 20n, bucketKey, frameCommit });
+    const nullShard = await shardFor(nowEpoch, lane);
+    const recordShard = await recordShardFor(bucketKey, nowEpoch);
+
+    const res = await nullShard.send(relay.getSender(), { value: toNano('0.2') }, body as any);
+    expect(computeExit(res, nullShard.address), 'nullifier burnt').toBe(0);
+    expect(await nullShard.getIsSpent(serial)).toBe(true);
+    // the forward reached the RecordShard and stored the record
+    const rsTx = txTo(res, recordShard.address);
+    expect(Number(rsTx?.description?.computePhase?.exitCode), 'record stored').toBe(0);
+    const rec = await recordShard.getGetRecord(0n);
+    expect(rec.exists).toBe(true);
+    expect(rec.frame_commit).toBe(frameCommit);
+    expect((await recordShard.getGetView()).record_count).toBe(1n);
+  }, 120_000);
+
+  it('RS-02: the RecordShard is the terminal hop — its accepting path emits NOTHING (no action-phase failure)', async () => {
+    const bucketKey = 0xBEEF01n;
+    const { body, lane } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0xC1)), epoch: nowEpoch, nonce: 21n, bucketKey });
+    const nullShard = await shardFor(nowEpoch, lane);
+    const recordShard = await recordShardFor(bucketKey, nowEpoch);
+    const res = await nullShard.send(relay.getSender(), { value: toNano('0.2') }, body as any);
+    const rsTx = txTo(res, recordShard.address);
+    expect(Number(rsTx.description.computePhase.exitCode)).toBe(0);
+    expect(rsTx.description.actionPhase?.totalActions ?? 0, 'RecordShard sends nothing').toBe(0);
+    expect(rsTx.description.aborted ?? false).toBe(false);
+  }, 120_000);
+
+  it('RS-03: a record forged directly (not from the authorized NullifierShard) is refused (13650)', async () => {
+    // Without RS-AUTH anyone could write free records, bypassing the nullifier burn.
+    const bucketKey = 0xF0F0n;
+    const recordShard = await recordShardFor(bucketKey, nowEpoch);
+    const res = await recordShard.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, {
+      $$type: 'RecordStore', serial: 12345n, frame_commit: 0x9999n,
+    } as any);
+    expect(computeExit(res, recordShard.address)).toBe(13650);
+    expect((await recordShard.getGetView()).record_count).toBe(0n);
+  }, 120_000);
+
+  it('RS-04: a double-spent token yields exactly ONE record (the second is stopped at the nullifier)', async () => {
+    const bucketKey = 0xD00Dn;
+    const { body, lane } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0xC2)), epoch: nowEpoch, nonce: 22n, bucketKey });
+    const nullShard = await shardFor(nowEpoch, lane);
+    const recordShard = await recordShardFor(bucketKey, nowEpoch);
+
+    expect(computeExit(await nullShard.send(relay.getSender(), { value: toNano('0.2') }, body as any), nullShard.address)).toBe(0);
+    expect((await recordShard.getGetView()).record_count).toBe(1n);
+    // replay: the nullifier shard stops it (13604) BEFORE any forward, so no second record is written
+    const replay = await nullShard.send(relay.getSender(), { value: toNano('0.2'), bounce: true }, body as any);
+    expect(computeExit(replay, nullShard.address)).toBe(13604);
+    expect(txTo(replay, recordShard.address), 'no forward on a double-spend').toBeUndefined();
+    expect((await recordShard.getGetView()).record_count, 'still one record').toBe(1n);
+  }, 120_000);
+
+  it('NS-05: an accept with too little value to carry the record is refused in COMPUTE (13624)', async () => {
+    // The forward's funding is checked BEFORE the burn, in COMPUTE, so it bounces and the nullifier is NOT burnt.
+    const { body, lane, serial } = buildSpend({ spend: keyPairFromSeed(Buffer.alloc(32, 0x94)), epoch: nowEpoch, nonce: 9n });
     const shard = await shardFor(nowEpoch, lane);
-    const res = await shard.send(relay.getSender(), { value: toNano('0.1') }, body as any);
-    const tx: any = res.transactions.find(
-      (t: any) => t.inMessage?.info?.type === 'internal' && t.inMessage?.info?.dest?.toString() === shard.address.toString());
-    expect(Number(tx.description.computePhase.exitCode)).toBe(0);
-    expect(tx.description.actionPhase?.totalActions ?? 0, 'zero outgoing messages').toBe(0);
-    expect(tx.description.aborted ?? false).toBe(false);
+    const res = await shard.send(relay.getSender(), { value: toNano('0.05'), bounce: true }, body as any);  // 50M < 60M
+    expect(computeExit(res, shard.address)).toBe(13624);
+    expect(didBounce(res)).toBe(true);
+    expect(await shard.getIsSpent(serial), 'not burnt — the token survives for a funded retry').toBe(false);
   }, 120_000);
 
   // ── Increment 2: CAC authority ───────────────────────────────────────────────────────────────────────────

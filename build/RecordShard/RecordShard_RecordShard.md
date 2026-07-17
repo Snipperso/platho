@@ -1,6 +1,6 @@
 # Tact compilation report
-Contract: NullifierShard
-BoC Size: 1094 bytes
+Contract: RecordShard
+BoC Size: 524 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 17
@@ -45,6 +45,18 @@ Signature: `VarAddress{workchain:int32,address:^slice}`
 TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
+### NullifierSpend
+TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 subkey_pubkey:uint256 valid_from:uint32 valid_to:uint32 root_idx_a:uint8 root_idx_b:uint8 bucket_key:uint256 frame_commit:uint256 issuer_sig:^cell cert_sig_a:^cell cert_sig_b:^cell = NullifierSpend`
+Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,bucket_key:uint256,frame_commit:uint256,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell}`
+
+### NullifierShardView
+TL-B: `_ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView`
+Signature: `NullifierShardView{epoch:int257,lane:int257,spent_count:int257,lane_count:int257,safe_cap:int257,root_threshold:int257,max_cert_epochs:int257}`
+
+### NullifierShard$Data
+TL-B: `_ epoch:uint32 lane:uint32 spent:dict<int, bool> spent_count:uint32 = NullifierShard`
+Signature: `NullifierShard{epoch:uint32,lane:uint32,spent:dict<int, bool>,spent_count:uint32}`
+
 ### RecordStore
 TL-B: `record_store#52535031 serial:uint256 frame_commit:uint256 = RecordStore`
 Signature: `RecordStore{serial:uint256,frame_commit:uint256}`
@@ -61,26 +73,14 @@ Signature: `RecordShardView{bucket_key:int257,epoch:int257,record_count:int257,l
 TL-B: `_ bucket_key:uint256 epoch:uint32 records:dict<int, int> record_count:uint32 = RecordShard`
 Signature: `RecordShard{bucket_key:uint256,epoch:uint32,records:dict<int, int>,record_count:uint32}`
 
-### NullifierSpend
-TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 subkey_pubkey:uint256 valid_from:uint32 valid_to:uint32 root_idx_a:uint8 root_idx_b:uint8 bucket_key:uint256 frame_commit:uint256 issuer_sig:^cell cert_sig_a:^cell cert_sig_b:^cell = NullifierSpend`
-Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,bucket_key:uint256,frame_commit:uint256,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell}`
-
-### NullifierShardView
-TL-B: `_ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView`
-Signature: `NullifierShardView{epoch:int257,lane:int257,spent_count:int257,lane_count:int257,safe_cap:int257,root_threshold:int257,max_cert_epochs:int257}`
-
-### NullifierShard$Data
-TL-B: `_ epoch:uint32 lane:uint32 spent:dict<int, bool> spent_count:uint32 = NullifierShard`
-Signature: `NullifierShard{epoch:uint32,lane:uint32,spent:dict<int, bool>,spent_count:uint32}`
-
 ## Get methods
 Total get methods: 2
 
+## get_record
+Argument: entry_id
+
 ## get_view
 No arguments
-
-## is_spent
-Argument: serial
 
 ## Exit codes
 * 2: Stack underflow
@@ -124,15 +124,15 @@ Argument: serial
 
 ```mermaid
 graph TD
-NullifierShard
-NullifierShard --> BaseTrait
+RecordShard
+RecordShard --> BaseTrait
 ```
 
 ## Contract dependency diagram
 
 ```mermaid
 graph TD
-NullifierShard
-NullifierShard --> RecordShard
+RecordShard
 RecordShard --> NullifierShard
+NullifierShard --> RecordShard
 ```
