@@ -411,18 +411,18 @@ builder $NullifierShard$init$_store(builder build_0, (int, int) v) inline {
     var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor)) = $self;
     tuple $e = $IntroEntry$_load_opt(__tact_dict_get_int_cell($self'intros, 257, $entry_id));
     if (null?($e)) {
-        var $fresh$ret_17 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(false, 0, 0, 0, 0);
-        return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_17);
+        var $fresh$ret_18 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(false, 0, 0, 0, 0);
+        return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_18);
     }
     var ($v'r, $v'view_tag, $v'body_commit, $v'created_at) = $IntroEntry$_not_null($e);
-    var $fresh$ret_18 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(true, $v'r, $v'view_tag, $v'body_commit, $v'created_at);
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_18);
+    var $fresh$ret_19 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(true, $v'r, $v'view_tag, $v'body_commit, $v'created_at);
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_19);
 }
 
 ((int, int, cell, int, int, int), (int, int, int, int, int, int, int)) $IntroShard$_fun_get_view((int, int, cell, int, int, int) $self) impure inline_ref {
     var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor)) = $self;
-    var $fresh$ret_19 = $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap($self'epoch, $self'bucket, $self'live_count, $self'next_id, $self'evict_cursor, 604800, 8000);
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_19);
+    var $fresh$ret_20 = $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap($self'epoch, $self'bucket, $self'live_count, $self'next_id, $self'evict_cursor, 604800, 8000);
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_20);
 }
 
 ;;

@@ -9,13 +9,19 @@ import "./IntroShard.tact";
 // either frozen in its code or carried in the message it is validating.
 //
 // ── INCREMENT 1: the token binds to exactly ONE shard (cross-shard double-spend closed) ──────────────────────
-// Four gates, all recomputed on-chain, nothing trusted from the sender:
+// Five gates, all recomputed on-chain, nothing trusted from the sender:
 //   (1) 13600  token epoch within the wall-clock window
 //   (2) 13621  token epoch == THIS shard's epoch      <- self.epoch is init-data the deployer (attacker) picks;
 //              without this a token is accepted by a shard of ANY epoch (measured 9/9). Gate (1) checks the token
 //              vs the clock; gate (2) checks it vs THIS shard's identity. Neither substitutes for the other.
 //   (3) 13622  serial mod LANE_COUNT == THIS shard's lane, RECOMPUTED from the serial (the x4096 hole)
 //   (4) 13601  the token is signed by a currently-authorized issuer subkey (see CAC below)
+//   (5) 13605  [RT1-BLOCKER-1] the FRAME is bound to the token — spend_sig, by the spend key, over a digest of the
+//              serial AND every routing/content field (bucket_key, frame_commit, kind, intro_*). Without it the
+//              token is a BEARER token: a relay the user handed it to, or any observer who front-runs it in
+//              transport, spends it with a swapped frame and misdelivers the message while the nullifier burns —
+//              silent, unrecoverable. The monolith gated this (classified BLOCKER); the sharded rewrite dropped the
+//              gate AND the field. Gates (1)-(4) bind WHICH token and WHERE it may be spent; (5) binds WHAT it says.
 //
 // ── INCREMENT 2: CAC — Carried Authority Certificate (how a stateless shard knows which key is valid) ─────────
 // The monolith kept a mutable issuer_mirror and a multisig could Replace/Revoke a slot INSTANTLY. A sharded,
@@ -43,6 +49,8 @@ import "./IntroShard.tact";
 const NS_ISSUER_SIG_DOMAIN: Int = 0x42534931;   // "BSI1" — serial preimage, MUST mirror CapsuleHub.tact
 const NS_NULL_DOMAIN: Int = 0x424E4C31;         // "BNL1" — nullifier key, MUST mirror CapsuleHub.tact
 const NS_CERT_DOMAIN: Int = 0x43414331;         // "CAC1" — certificate preimage (root-signed subkey authorization)
+const NS_SPEND_DOMAIN: Int = 0x42535031;        // "BSP1" — spend digest preimage, MUST mirror CapsuleHub.tact (RT1-BLOCKER-1)
+const NS_FRAME_DOMAIN: Int = 0x4E534652;        // "NSFR" — the frame-routing commitment (binds ALL routing/content fields)
 const NS_EPOCH_SECONDS: Int = 86400;
 const NS_EPOCH_ACCEPT_PAST: Int = 4;
 const NS_EPOCH_ACCEPT_FUTURE: Int = 4;
@@ -104,10 +112,11 @@ message(0x4E535032) NullifierSpend {            // "NSP2"
     intro_bucket: Int as uint32;
     intro_r: Int as uint256;
     intro_view_tag: Int as uint16;
-    // signatures live in refs — three 512-bit sigs do not fit one cell
-    issuer_sig: Cell;                           // subkey over the serial
+    // signatures live in refs — four 512-bit sigs do not fit one cell
+    issuer_sig: Cell;                           // subkey over the serial (WHICH token is authorized)
     cert_sig_a: Cell;                           // root a over the cert digest
     cert_sig_b: Cell;                           // root b over the cert digest
+    spend_sig: Cell;                            // [RT1-BLOCKER-1] spend key over the frame-binding digest (serial + WHAT it says)
 }
 
 struct NullifierShardView {
@@ -166,6 +175,30 @@ contract NullifierShard {
         return beginCell().storeUint(NS_NULL_DOMAIN, 32).storeUint(serial, 256).endCell().hash();
     }
 
+    // [RT1-BLOCKER-1] The frame-binding digest the spend_sig signs. Two-level so it fits a cell: an inner commitment
+    // over EVERY routing/content field the shard acts on (kind, bucket_key, frame_commit, and the INTRO stealth
+    // fields) — 856 bits, one cell — then an outer hash tying it to the serial. Because the spend key that signs
+    // this is the one committed inside the serial (serial = H(BSI1 ‖ spend_pubkey ‖ epoch ‖ nonce)), only the token
+    // holder can produce it, and altering ANY frame field changes the digest -> checkSignature fails.
+    fun frameBindingDigest(serial: Int, kind: Int, bucketKey: Int, frameCommit: Int, introBucket: Int, introR: Int, introViewTag: Int): Int {
+        let fc: Int = beginCell()
+            .storeUint(NS_FRAME_DOMAIN, 32)
+            .storeUint(kind, 8)
+            .storeUint(bucketKey, 256)
+            .storeUint(frameCommit, 256)
+            .storeUint(introBucket, 32)
+            .storeUint(introR, 256)
+            .storeUint(introViewTag, 16)
+            .endCell()
+            .hash();
+        return beginCell()
+            .storeUint(NS_SPEND_DOMAIN, 32)
+            .storeUint(serial, 256)
+            .storeUint(fc, 256)
+            .endCell()
+            .hash();
+    }
+
     receive(msg: NullifierSpend) {
         let nowEpoch: Int = now() / NS_EPOCH_SECONDS;
 
@@ -203,6 +236,17 @@ contract NullifierShard {
 
         // (4) the authorized subkey actually signed THIS serial. Splicing a different serial fails here.
         throwUnless(13601, checkSignature(serial, msg.issuer_sig.beginParse(), msg.subkey_pubkey));
+
+        // (5) [RT1-BLOCKER-1] the FRAME is bound to the token. The spend key (committed inside the serial) signs a
+        // digest over the serial AND every routing/content field, so the frame cannot be altered by anyone but the
+        // token holder. This is the second factor the monolith had and the sharded rewrite dropped: without it the
+        // token is a bearer token — a relay it was handed to, or a front-runner who sees it in transport, spends it
+        // with a swapped bucket_key/frame_commit/kind/intro_* and the message is misdelivered while the nullifier
+        // burns (silent, no bounce, unrecoverable). Placed after 13601 so the whole token+frame is proven before the
+        // ledger is touched; it is a COMPUTE throw, so a forged frame bounces and refunds the relay.
+        throwUnless(13605, checkSignature(
+            self.frameBindingDigest(serial, msg.kind, msg.bucket_key, msg.frame_commit, msg.intro_bucket, msg.intro_r, msg.intro_view_tag),
+            msg.spend_sig.beginParse(), msg.spend_pubkey));
 
         let nk: Int = self.nullifierKey(serial);
         throwUnless(13604, self.spent.get(nk) == null);                 // double spend within this partition

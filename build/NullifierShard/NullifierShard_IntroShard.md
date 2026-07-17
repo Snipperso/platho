@@ -94,8 +94,8 @@ TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_t
 Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32,live_count:uint32,evict_cursor:uint32}`
 
 ### NullifierSpend
-TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 subkey_pubkey:uint256 valid_from:uint32 valid_to:uint32 root_idx_a:uint8 root_idx_b:uint8 kind:uint8 bucket_key:uint256 frame_commit:uint256 intro_bucket:uint32 intro_r:uint256 intro_view_tag:uint16 issuer_sig:^cell cert_sig_a:^cell cert_sig_b:^cell = NullifierSpend`
-Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,kind:uint8,bucket_key:uint256,frame_commit:uint256,intro_bucket:uint32,intro_r:uint256,intro_view_tag:uint16,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell}`
+TL-B: `nullifier_spend#4e535032 spend_pubkey:uint256 epoch:uint32 nonce:uint64 subkey_pubkey:uint256 valid_from:uint32 valid_to:uint32 root_idx_a:uint8 root_idx_b:uint8 kind:uint8 bucket_key:uint256 frame_commit:uint256 intro_bucket:uint32 intro_r:uint256 intro_view_tag:uint16 issuer_sig:^cell cert_sig_a:^cell cert_sig_b:^cell spend_sig:^cell = NullifierSpend`
+Signature: `NullifierSpend{spend_pubkey:uint256,epoch:uint32,nonce:uint64,subkey_pubkey:uint256,valid_from:uint32,valid_to:uint32,root_idx_a:uint8,root_idx_b:uint8,kind:uint8,bucket_key:uint256,frame_commit:uint256,intro_bucket:uint32,intro_r:uint256,intro_view_tag:uint16,issuer_sig:^cell,cert_sig_a:^cell,cert_sig_b:^cell,spend_sig:^cell}`
 
 ### NullifierShardView
 TL-B: `_ epoch:int257 lane:int257 spent_count:int257 lane_count:int257 safe_cap:int257 root_threshold:int257 max_cert_epochs:int257 = NullifierShardView`
