@@ -331,7 +331,7 @@ function serializeCellForBoc(cell, indexes, sizeBytes) {
   );
 }
 
-function serializeBoc(root) {
+export function serializeBoc(root) {
   const { cells, indexes } = flattenCellTree(root);
   const sizeBytes = minimalUintByteLength(cells.length);
   const payloads = cells.map((cell) => serializeCellForBoc(cell, indexes, sizeBytes));
@@ -349,7 +349,7 @@ function serializeBoc(root) {
   );
 }
 
-async function computeCellHashAndDepth(cell, cache = new WeakMap()) {
+export async function computeCellHashAndDepth(cell, cache = new WeakMap()) {
   const cached = cache.get(cell);
   if (cached) return cached;
   const refs = [];
@@ -373,7 +373,7 @@ function readBigUintBytes(bytes, offset, byteLength, name) {
   return out;
 }
 
-function parseBocBase64(value) {
+export function parseBocBase64(value) {
   const bytes = base64ToBytes(assertString(value, 'BoC'));
   if (bytes.length < 10 || BOC_MAGIC.some((byte, index) => bytes[index] !== byte)) {
     throw new Error('Invalid BoC magic');

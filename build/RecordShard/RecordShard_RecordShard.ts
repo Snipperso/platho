@@ -851,6 +851,8 @@ export type RecordShardView = {
     min_value: bigint;
     protocol_fee: bigint;
     accrued_fee: bigint;
+    evict_bounty: bigint;
+    accrued_bounty: bigint;
 }
 
 export function storeRecordShardView(src: RecordShardView) {
@@ -870,6 +872,10 @@ export function storeRecordShardView(src: RecordShardView) {
         const b_3 = new Builder();
         b_3.storeInt(src.protocol_fee, 257);
         b_3.storeInt(src.accrued_fee, 257);
+        b_3.storeInt(src.evict_bounty, 257);
+        const b_4 = new Builder();
+        b_4.storeInt(src.accrued_bounty, 257);
+        b_3.storeRef(b_4.endCell());
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
@@ -892,7 +898,10 @@ export function loadRecordShardView(slice: Slice) {
     const sc_3 = sc_2.loadRef().beginParse();
     const _protocol_fee = sc_3.loadIntBig(257);
     const _accrued_fee = sc_3.loadIntBig(257);
-    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee };
+    const _evict_bounty = sc_3.loadIntBig(257);
+    const sc_4 = sc_3.loadRef().beginParse();
+    const _accrued_bounty = sc_4.loadIntBig(257);
+    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty };
 }
 
 export function loadTupleRecordShardView(source: TupleReader) {
@@ -907,7 +916,9 @@ export function loadTupleRecordShardView(source: TupleReader) {
     const _min_value = source.readBigNumber();
     const _protocol_fee = source.readBigNumber();
     const _accrued_fee = source.readBigNumber();
-    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee };
+    const _evict_bounty = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty };
 }
 
 export function loadGetterTupleRecordShardView(source: TupleReader) {
@@ -922,7 +933,9 @@ export function loadGetterTupleRecordShardView(source: TupleReader) {
     const _min_value = source.readBigNumber();
     const _protocol_fee = source.readBigNumber();
     const _accrued_fee = source.readBigNumber();
-    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee };
+    const _evict_bounty = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty };
 }
 
 export function storeTupleRecordShardView(source: RecordShardView) {
@@ -938,6 +951,8 @@ export function storeTupleRecordShardView(source: RecordShardView) {
     builder.writeNumber(source.min_value);
     builder.writeNumber(source.protocol_fee);
     builder.writeNumber(source.accrued_fee);
+    builder.writeNumber(source.evict_bounty);
+    builder.writeNumber(source.accrued_bounty);
     return builder.build();
 }
 
@@ -962,6 +977,7 @@ export type RecordShard$Data = {
     live_count: bigint;
     evict_cursor: bigint;
     accrued_fee: bigint;
+    accrued_bounty: bigint;
 }
 
 export function storeRecordShard$Data(src: RecordShard$Data) {
@@ -975,6 +991,7 @@ export function storeRecordShard$Data(src: RecordShard$Data) {
         b_0.storeUint(src.live_count, 32);
         b_0.storeUint(src.evict_cursor, 32);
         b_0.storeCoins(src.accrued_fee);
+        b_0.storeCoins(src.accrued_bounty);
     };
 }
 
@@ -988,7 +1005,8 @@ export function loadRecordShard$Data(slice: Slice) {
     const _live_count = sc_0.loadUintBig(32);
     const _evict_cursor = sc_0.loadUintBig(32);
     const _accrued_fee = sc_0.loadCoins();
-    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee };
+    const _accrued_bounty = sc_0.loadCoins();
+    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
 export function loadTupleRecordShard$Data(source: TupleReader) {
@@ -1000,7 +1018,8 @@ export function loadTupleRecordShard$Data(source: TupleReader) {
     const _live_count = source.readBigNumber();
     const _evict_cursor = source.readBigNumber();
     const _accrued_fee = source.readBigNumber();
-    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee };
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
 export function loadGetterTupleRecordShard$Data(source: TupleReader) {
@@ -1012,7 +1031,8 @@ export function loadGetterTupleRecordShard$Data(source: TupleReader) {
     const _live_count = source.readBigNumber();
     const _evict_cursor = source.readBigNumber();
     const _accrued_fee = source.readBigNumber();
-    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee };
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
 export function storeTupleRecordShard$Data(source: RecordShard$Data) {
@@ -1025,6 +1045,7 @@ export function storeTupleRecordShard$Data(source: RecordShard$Data) {
     builder.writeNumber(source.live_count);
     builder.writeNumber(source.evict_cursor);
     builder.writeNumber(source.accrued_fee);
+    builder.writeNumber(source.accrued_bounty);
     return builder.build();
 }
 
@@ -1054,7 +1075,7 @@ function initRecordShard_init_args(src: RecordShard_init_args) {
 }
 
 async function RecordShard_init(write_pubkey: bigint, epoch: bigint) {
-    const __code = Cell.fromHex('b5ee9c72410211010003f3000114ff00f4a413f4bcf2c80b01020162020c04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e14d3ffd31fd33ff404d31fd31fd31ffa0055706c188e14810101d700810101d7005902d101706d54711120e209925f09e07028d74920c21f953108d31f09de21821052535031bae30221821052535032bae30239c00008c12118b0e30203070a0b02ec5b07d33fd4d4d430d0d4d430813554f8416f24135f038208c35000bef2f481355326830bb9f2f48135555359bcf2f4104b0c5520db3c36c882105253574401cb1f5290cb3f5260cbffc9f9008135560bd029f9101af2f4088208989680a0810101f82316c85902810101cf00810101cf00c95e31523004050040c882105253464301cb1f03f9005003cbff01f90001cbff01f90001cbffc9f90001d6206e953059f45a30944133f415e201a402a482089d2a6023c0019582081e84809170e2a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010574043161506003ec87f01ca0055705078cbff15cb1f13cb3ff400cb1fcb1fcb1f01fa02c9ed5402fc5b07d30f307020708e175313b99321c1409170e29353a5b99170e29220b39170e28ebc268101012c59f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e202a4226eb398320aa4104a104602e30d102a10464014e85b81355732c200f2f482081e84802182080493e0a8a028a072fb02f842700809009c026f22318209e13380a0f823b98e368101016dc8216e925b6d8e11016f22585902810101cf00810101cf00c9e22c103901206e953059f45a30944133f415e204a50aa402a4973010397f064414e200bc81008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010575514c87f01ca0055705078cbff15cb1f13cb3ff400cb1fcb1fcb1f01fa02c9ed54004610575514c87f01ca0055705078cbff15cb1f13cb3ff400cb1fcb1fcb1f01fa02c9ed54000a5f08f2c0820201200d0f0173bd4a976a268690000c70a69ffe98fe99ffa02698fe98fe98ffd002ab8360c470a408080eb80408080eb802c816880b836aa388890716d9e3645c0e003e830b8209e133808208c3500082089896802b514b514b514a514a514a44342a0177be200f6a268690000c70a69ffe98fe99ffa02698fe98fe98ffd002ab8360c470a408080eb80408080eb802c816880b836aa388890712a83ed9e3641c100064810101260259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e2206e9430707020e06f227f59c713eefb');
+    const __code = Cell.fromHex('b5ee9c724102100100044d000114ff00f4a413f4bcf2c80b01020162020b03f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e16d3ffd31fd33ff404d31fd31fd31ffa00fa0055806c198e15810101d700810101d7005902d101706d5471115300e20a925f0ae07029d74920c21f953109d31f0ade21821052535031bae30221821052535032bae3023ac00009c1211903070a02fe5b08d33fd4d4d430d0d4d430f82382015180a9048135582ca55220be942ca412bb923170e2f2f4813554f8416f24135f038208cf8500bef2f481355327830bb9f2f4813555535abcf2f4104c0d5520db3c37c882105253574401cb1f52a0cb3f5270cbffc9f9008135560cd02af9101bf2f48208989680a00982080c3500a004050040c882105253464301cb1f03f9005003cbff01f90001cbff01f90001cbffc9f90001fe810101f82317c85902810101cf00810101cf00c945605240206e953059f45a30944133f415e202a401a48208a95f6022c0019582081e84809170e2a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010680600561057105645134004c87f01ca0055805089cbff16cb1f14cb3f12f400cb1fcb1fcb1f01fa0201fa02c9ed5402fe5b08d30f307020708e175313b99321c1409170e2935346b99170e29220b39170e28ebc278101012659f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e202a4226eb3983204a41047104502e30d105710454014e810235f0381355721c200f2f4f8276f10f8416f24135f03a10182080c3500a80809009a026f22318209e13380a0f823b98e368101016dc8216e925b6d8e11016f22585902810101cf00810101cf00c9e226103a01206e953059f45a30944133f415e205a504a402a496307f07054414e200e851aaa10aa120c100923070de72fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010685515c87f01ca0055805089cbff16cb1f14cb3f12f400cb1fcb1fcb1f01fa0201fa02c9ed540060b08e2710685515c87f01ca0055805089cbff16cb1f14cb3f12f400cb1fcb1fcb1f01fa0201fa02c9ed54e05f09f2c0820201200c0e018bbd4a976a268690000c70b69ffe98fe99ffa02698fe98fe98ffd007d002ac0360cc70ac08080eb80408080eb802c816880b836aa3888a980716d9e1e9e9e9e9e9e9e9e9eaac1c0d004c830b8209e133808208cf8500820898968082080c35002d515d515d515c515c515c5540546cc1017dbe200f6a268690000c70b69ffe98fe99ffa02698fe98fe98ffd007d002ac0360cc70ac08080eb80408080eb802c816880b836aa3888a980712a846d9e3649c0f0064810101270259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e2206e9430707020e06f227f5943553110');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initRecordShard_init_args({ $$type: 'RecordShard_init_args', write_pubkey, epoch })(builder);
@@ -1155,8 +1176,8 @@ const RecordShard_types: ABIType[] = [
     {"name":"EvictRecords","header":1381191730,"fields":[{"name":"max_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
     {"name":"RecordEntry","header":null,"fields":[{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"CapsuleRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"RecordShardView","header":null,"fields":[{"name":"write_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_seq","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"protocol_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"RecordShard$Data","header":null,"fields":[{"name":"write_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"last_seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"records","type":{"kind":"dict","key":"int","value":"RecordEntry","valueFormat":"ref"}},{"name":"record_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"accrued_fee","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
+    {"name":"RecordShardView","header":null,"fields":[{"name":"write_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_seq","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"protocol_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"RecordShard$Data","header":null,"fields":[{"name":"write_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"last_seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"records","type":{"kind":"dict","key":"int","value":"RecordEntry","valueFormat":"ref"}},{"name":"record_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"accrued_fee","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"accrued_bounty","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
 ]
 
 const RecordShard_opcodes = {
@@ -1189,7 +1210,8 @@ export const RS_RECORD_ENDOWMENT = 300000n;
 export const RS_BASE_ENDOWMENT = 2000000n;
 export const RS_PUBLISH_GAS = 2500000n;
 export const RS_PROTOCOL_FEE = 10000000n;
-export const RS_MIN_VALUE = 12800000n;
+export const RS_EVICT_BOUNTY = 800000n;
+export const RS_MIN_VALUE = 13600000n;
 
 export class RecordShard implements Contract {
     

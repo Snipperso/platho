@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: MarketStabilitySeller
-BoC Size: 13335 bytes
+BoC Size: 12461 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 54
+Total structures: 53
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -185,10 +185,6 @@ Signature: `BindMarketStabilityOfficialAthWallet{deployment_manifest_hash:uint25
 TL-B: `bind_market_stability_treasury#4d535452 deployment_manifest_hash:uint256 ton_treasury_receiver_address:address = BindMarketStabilityTreasury`
 Signature: `BindMarketStabilityTreasury{deployment_manifest_hash:uint256,ton_treasury_receiver_address:address}`
 
-### FreezeMarketStabilityPricing
-TL-B: `freeze_market_stability_pricing#4d535046 deployment_manifest_hash:uint256 base_tranche_price_nanotons:uint128 evidence_x1_tranche_quote_nanotons:uint128 pricing_evidence_hash:uint256 = FreezeMarketStabilityPricing`
-Signature: `FreezeMarketStabilityPricing{deployment_manifest_hash:uint256,base_tranche_price_nanotons:uint128,evidence_x1_tranche_quote_nanotons:uint128,pricing_evidence_hash:uint256}`
-
 ### SealMarketStabilityGenesis
 TL-B: `seal_market_stability_genesis#4d53534c deployment_manifest_hash:uint256 = SealMarketStabilityGenesis`
 Signature: `SealMarketStabilityGenesis{deployment_manifest_hash:uint256}`
@@ -206,8 +202,8 @@ TL-B: `market_stability_top_up_storage_reserve#906182d3  = MarketStabilityTopUpS
 Signature: `MarketStabilityTopUpStorageReserve{}`
 
 ### MarketStabilitySellerConfigView
-TL-B: `_ sealed:bool reserve_funder_bound:bool official_ath_wallet_bound:bool treasury_bound:bool pricing_frozen:bool deployment_manifest_hash:int257 genesis_config_hash:int257 ath_master_address:address reserve_funder_address:address official_ath_wallet_address:address ton_treasury_receiver_address:address base_tranche_price_nanotons:int257 evidence_x1_tranche_quote_nanotons:int257 pricing_evidence_hash:int257 = MarketStabilitySellerConfigView`
-Signature: `MarketStabilitySellerConfigView{sealed:bool,reserve_funder_bound:bool,official_ath_wallet_bound:bool,treasury_bound:bool,pricing_frozen:bool,deployment_manifest_hash:int257,genesis_config_hash:int257,ath_master_address:address,reserve_funder_address:address,official_ath_wallet_address:address,ton_treasury_receiver_address:address,base_tranche_price_nanotons:int257,evidence_x1_tranche_quote_nanotons:int257,pricing_evidence_hash:int257}`
+TL-B: `_ sealed:bool reserve_funder_bound:bool official_ath_wallet_bound:bool treasury_bound:bool pricing_frozen:bool deployment_manifest_hash:int257 genesis_config_hash:int257 ath_master_address:address reserve_funder_address:address official_ath_wallet_address:address ton_treasury_receiver_address:address base_tranche_price_nanotons:int257 = MarketStabilitySellerConfigView`
+Signature: `MarketStabilitySellerConfigView{sealed:bool,reserve_funder_bound:bool,official_ath_wallet_bound:bool,treasury_bound:bool,pricing_frozen:bool,deployment_manifest_hash:int257,genesis_config_hash:int257,ath_master_address:address,reserve_funder_address:address,official_ath_wallet_address:address,ton_treasury_receiver_address:address,base_tranche_price_nanotons:int257}`
 
 ### MarketStabilitySellerStateView
 TL-B: `_ phase:int257 reserve_due_ath:int257 treasury_due_ton:int257 pending_query_id:int257 pending_amount_ath:int257 pending_paid_ton:int257 pending_buyer:address pending_recipient:address pending_recipient_ath_wallet:address completed_tranche_count:int257 current_tranche_sold_ath:int257 current_multiplier:int257 current_tranche_remaining_ath:int257 last_terminal_query_id:int257 = MarketStabilitySellerStateView`
@@ -218,8 +214,8 @@ TL-B: `_ reserve_funded_total_ath:int257 sold_ath_total:int257 treasury_flushed_
 Signature: `MarketStabilitySellerTotalsView{reserve_funded_total_ath:int257,sold_ath_total:int257,treasury_flushed_ton_total:int257}`
 
 ### MarketStabilitySeller$Data
-TL-B: `_ genesis_config_hash:uint256 deployment_manifest_hash:uint256 ath_master_address:address reserve_funder_address:address official_ath_wallet_address:address ton_treasury_receiver_address:address reserve_funder_bound:bool official_ath_wallet_bound:bool treasury_bound:bool pricing_frozen:bool sealed:bool base_tranche_price_nanotons:uint128 evidence_x1_tranche_quote_nanotons:uint128 pricing_evidence_hash:uint256 phase:uint8 reserve_due_ath:uint128 treasury_due_ton:uint128 pending_query_id:uint64 pending_amount_ath:uint128 pending_paid_ton:uint128 pending_buyer:address pending_recipient:address pending_recipient_ath_wallet:address completed_tranche_count:uint8 current_tranche_sold_ath:uint128 last_terminal_query_id:uint64 reserve_funded_total_ath:uint128 sold_ath_total:uint128 treasury_flushed_ton_total:uint128 = MarketStabilitySeller`
-Signature: `MarketStabilitySeller{genesis_config_hash:uint256,deployment_manifest_hash:uint256,ath_master_address:address,reserve_funder_address:address,official_ath_wallet_address:address,ton_treasury_receiver_address:address,reserve_funder_bound:bool,official_ath_wallet_bound:bool,treasury_bound:bool,pricing_frozen:bool,sealed:bool,base_tranche_price_nanotons:uint128,evidence_x1_tranche_quote_nanotons:uint128,pricing_evidence_hash:uint256,phase:uint8,reserve_due_ath:uint128,treasury_due_ton:uint128,pending_query_id:uint64,pending_amount_ath:uint128,pending_paid_ton:uint128,pending_buyer:address,pending_recipient:address,pending_recipient_ath_wallet:address,completed_tranche_count:uint8,current_tranche_sold_ath:uint128,last_terminal_query_id:uint64,reserve_funded_total_ath:uint128,sold_ath_total:uint128,treasury_flushed_ton_total:uint128}`
+TL-B: `_ genesis_config_hash:uint256 deployment_manifest_hash:uint256 ath_master_address:address reserve_funder_address:address official_ath_wallet_address:address ton_treasury_receiver_address:address reserve_funder_bound:bool official_ath_wallet_bound:bool treasury_bound:bool sealed:bool phase:uint8 reserve_due_ath:uint128 treasury_due_ton:uint128 pending_query_id:uint64 pending_amount_ath:uint128 pending_paid_ton:uint128 pending_buyer:address pending_recipient:address pending_recipient_ath_wallet:address completed_tranche_count:uint8 current_tranche_sold_ath:uint128 last_terminal_query_id:uint64 reserve_funded_total_ath:uint128 sold_ath_total:uint128 treasury_flushed_ton_total:uint128 = MarketStabilitySeller`
+Signature: `MarketStabilitySeller{genesis_config_hash:uint256,deployment_manifest_hash:uint256,ath_master_address:address,reserve_funder_address:address,official_ath_wallet_address:address,ton_treasury_receiver_address:address,reserve_funder_bound:bool,official_ath_wallet_bound:bool,treasury_bound:bool,sealed:bool,phase:uint8,reserve_due_ath:uint128,treasury_due_ton:uint128,pending_query_id:uint64,pending_amount_ath:uint128,pending_paid_ton:uint128,pending_buyer:address,pending_recipient:address,pending_recipient_ath_wallet:address,completed_tranche_count:uint8,current_tranche_sold_ath:uint128,last_terminal_query_id:uint64,reserve_funded_total_ath:uint128,sold_ath_total:uint128,treasury_flushed_ton_total:uint128}`
 
 ## Get methods
 Total get methods: 5

@@ -16,8 +16,13 @@ const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 4000000;
 // record must persist for the life of the collection — owner-decided 2026-07-15: usernames are the eviction
 // EXCEPTION, guaranteed 100+ years, effectively forever when actively used). This dedicated endowment stays in the
 // registry's single balance to self-fund that entry's rent, folded into retainedValue so the FLOOR guarantees it.
-// clean-16 L2/#14/#7-fix: the old 36M was sized at a WRONG rate (~67k nanoton/cell/yr; the CANONICAL basechain rate
-// is 240,631/cell/yr — ×3.6, so 36M was really only ~40 years, NOT "250+"). Raised to a true 100-year figure.
+// clean-16 L2/#14/#7-fix: the old 36M was raised here on the belief that 240,631/cell/yr was canonical. THAT BELIEF
+// WAS WRONG and this comment used to assert it in the present tense, which is the most dangerous kind of stale
+// number: 240,631 is the DEAD pre-2026-04-29 schedule (500/1, bits billed). Since 2026-04-29 config-18 charges
+// 135/0 — 64,962 per cell-year with BITS FREE — so this constant is ~385 years, not ~100 (see the next line).
+// The comment also called ~67k "a WRONG rate"; it is not, it is a 3%-conservative rounding of the live 64,962, and
+// ATHWallet.tact and ProfileRegistry.tact both size their endowments on it CORRECTLY. A reader who trusted the old
+// wording would have "corrected" those two onto the dead rate — on immutable contracts. See [[ton-storage-rate-frozen]].
 // G8-provisional: finalize from measured cell.computeDataSize().
 const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT: Int = 100000000; // 0.1 TON: ~385 yr at the REAL basechain rate 64962 nanoton/cell/yr, bit=0 (~4-cell record). See [[ton-storage-rate-frozen]].
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 829000000; // clean-16 L2/#14 (owner: mint = EXACTLY 1 TON): sized so client usernameMintTonCharge = 1_000_000_000 exactly. ~412 yr at the REAL rate 64962/cell/yr for the ~31-cell item (the earlier 240,631-rate figures were the STALE pre-2026 config-18 — corrected 2026-07-15). Minter funds once; NFT lives centuries, forever when used. G8-provisional (finalize NFT cell count via computeDataSize). (A masterchain library code-cell would cut per-item rent ~7× — deferred, Фаза-5.)

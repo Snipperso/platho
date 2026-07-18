@@ -7,7 +7,6 @@ import {
   BindMarketStabilityOfficialAthWallet as MarketSellerBindAth,
   BindMarketStabilityReserveFunder as MarketSellerBindReserveFunder,
   BindMarketStabilityTreasury as MarketSellerBindTreasury,
-  FreezeMarketStabilityPricing as MarketSellerFreezePricing,
   SealMarketStabilityGenesis as MarketSellerSeal,
 } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
 import { ProfileRegistry, BindProfileOfficialAthWallet as ProfileBindAth, BindProfileVault as ProfileBindVault, SealGenesis as ProfileSeal } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
@@ -180,13 +179,6 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
       deployment_manifest_hash: manifestHash,
       ton_treasury_receiver_address: Address.parse(manifest.addresses.market_stability_ton_treasury_receiver),
     } as MarketSellerBindTreasury);
-    await marketSeller.send(genesisController, { value: toNano('0.05') }, {
-      $$type: 'FreezeMarketStabilityPricing',
-      deployment_manifest_hash: manifestHash,
-      base_tranche_price_nanotons: toNano('1'),
-      evidence_x1_tranche_quote_nanotons: toNano('1'),
-      pricing_evidence_hash: 0x5151515151515151515151515151515151515151515151515151515151515151n,
-    } as MarketSellerFreezePricing);
 
     await vault.send(genesisController, { value: toNano('0.05') }, {
       $$type: 'SealGenesis',

@@ -859,16 +859,16 @@ export function dictValueParserIntroEntryView(): DictionaryValue<IntroEntryView>
     }
 }
 
-export type IntroTagPage = {
-    $$type: 'IntroTagPage';
+export type IntroScanPage = {
+    $$type: 'IntroScanPage';
     from_id: bigint;
     count: bigint;
     next_id: bigint;
     evict_cursor: bigint;
-    tags: Cell;
+    pairs: Cell;
 }
 
-export function storeIntroTagPage(src: IntroTagPage) {
+export function storeIntroScanPage(src: IntroScanPage) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeInt(src.from_id, 257);
@@ -876,57 +876,57 @@ export function storeIntroTagPage(src: IntroTagPage) {
         b_0.storeInt(src.next_id, 257);
         const b_1 = new Builder();
         b_1.storeInt(src.evict_cursor, 257);
-        b_1.storeRef(src.tags);
+        b_1.storeRef(src.pairs);
         b_0.storeRef(b_1.endCell());
     };
 }
 
-export function loadIntroTagPage(slice: Slice) {
+export function loadIntroScanPage(slice: Slice) {
     const sc_0 = slice;
     const _from_id = sc_0.loadIntBig(257);
     const _count = sc_0.loadIntBig(257);
     const _next_id = sc_0.loadIntBig(257);
     const sc_1 = sc_0.loadRef().beginParse();
     const _evict_cursor = sc_1.loadIntBig(257);
-    const _tags = sc_1.loadRef();
-    return { $$type: 'IntroTagPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, tags: _tags };
+    const _pairs = sc_1.loadRef();
+    return { $$type: 'IntroScanPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, pairs: _pairs };
 }
 
-export function loadTupleIntroTagPage(source: TupleReader) {
+export function loadTupleIntroScanPage(source: TupleReader) {
     const _from_id = source.readBigNumber();
     const _count = source.readBigNumber();
     const _next_id = source.readBigNumber();
     const _evict_cursor = source.readBigNumber();
-    const _tags = source.readCell();
-    return { $$type: 'IntroTagPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, tags: _tags };
+    const _pairs = source.readCell();
+    return { $$type: 'IntroScanPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, pairs: _pairs };
 }
 
-export function loadGetterTupleIntroTagPage(source: TupleReader) {
+export function loadGetterTupleIntroScanPage(source: TupleReader) {
     const _from_id = source.readBigNumber();
     const _count = source.readBigNumber();
     const _next_id = source.readBigNumber();
     const _evict_cursor = source.readBigNumber();
-    const _tags = source.readCell();
-    return { $$type: 'IntroTagPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, tags: _tags };
+    const _pairs = source.readCell();
+    return { $$type: 'IntroScanPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, pairs: _pairs };
 }
 
-export function storeTupleIntroTagPage(source: IntroTagPage) {
+export function storeTupleIntroScanPage(source: IntroScanPage) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.from_id);
     builder.writeNumber(source.count);
     builder.writeNumber(source.next_id);
     builder.writeNumber(source.evict_cursor);
-    builder.writeCell(source.tags);
+    builder.writeCell(source.pairs);
     return builder.build();
 }
 
-export function dictValueParserIntroTagPage(): DictionaryValue<IntroTagPage> {
+export function dictValueParserIntroScanPage(): DictionaryValue<IntroScanPage> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeIntroTagPage(src)).endCell());
+            builder.storeRef(beginCell().store(storeIntroScanPage(src)).endCell());
         },
         parse: (src) => {
-            return loadIntroTagPage(src.loadRef().beginParse());
+            return loadIntroScanPage(src.loadRef().beginParse());
         }
     }
 }
@@ -941,6 +941,10 @@ export type IntroShardView = {
     retention: bigint;
     safe_cap: bigint;
     min_value: bigint;
+    protocol_fee: bigint;
+    accrued_fee: bigint;
+    evict_bounty: bigint;
+    accrued_bounty: bigint;
 }
 
 export function storeIntroShardView(src: IntroShardView) {
@@ -956,6 +960,12 @@ export function storeIntroShardView(src: IntroShardView) {
         const b_2 = new Builder();
         b_2.storeInt(src.safe_cap, 257);
         b_2.storeInt(src.min_value, 257);
+        b_2.storeInt(src.protocol_fee, 257);
+        const b_3 = new Builder();
+        b_3.storeInt(src.accrued_fee, 257);
+        b_3.storeInt(src.evict_bounty, 257);
+        b_3.storeInt(src.accrued_bounty, 257);
+        b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
@@ -973,7 +983,12 @@ export function loadIntroShardView(slice: Slice) {
     const sc_2 = sc_1.loadRef().beginParse();
     const _safe_cap = sc_2.loadIntBig(257);
     const _min_value = sc_2.loadIntBig(257);
-    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value };
+    const _protocol_fee = sc_2.loadIntBig(257);
+    const sc_3 = sc_2.loadRef().beginParse();
+    const _accrued_fee = sc_3.loadIntBig(257);
+    const _evict_bounty = sc_3.loadIntBig(257);
+    const _accrued_bounty = sc_3.loadIntBig(257);
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty };
 }
 
 export function loadTupleIntroShardView(source: TupleReader) {
@@ -985,7 +1000,11 @@ export function loadTupleIntroShardView(source: TupleReader) {
     const _retention = source.readBigNumber();
     const _safe_cap = source.readBigNumber();
     const _min_value = source.readBigNumber();
-    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value };
+    const _protocol_fee = source.readBigNumber();
+    const _accrued_fee = source.readBigNumber();
+    const _evict_bounty = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty };
 }
 
 export function loadGetterTupleIntroShardView(source: TupleReader) {
@@ -997,7 +1016,11 @@ export function loadGetterTupleIntroShardView(source: TupleReader) {
     const _retention = source.readBigNumber();
     const _safe_cap = source.readBigNumber();
     const _min_value = source.readBigNumber();
-    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value };
+    const _protocol_fee = source.readBigNumber();
+    const _accrued_fee = source.readBigNumber();
+    const _evict_bounty = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty };
 }
 
 export function storeTupleIntroShardView(source: IntroShardView) {
@@ -1010,6 +1033,10 @@ export function storeTupleIntroShardView(source: IntroShardView) {
     builder.writeNumber(source.retention);
     builder.writeNumber(source.safe_cap);
     builder.writeNumber(source.min_value);
+    builder.writeNumber(source.protocol_fee);
+    builder.writeNumber(source.accrued_fee);
+    builder.writeNumber(source.evict_bounty);
+    builder.writeNumber(source.accrued_bounty);
     return builder.build();
 }
 
@@ -1032,6 +1059,8 @@ export type IntroShard$Data = {
     next_id: bigint;
     live_count: bigint;
     evict_cursor: bigint;
+    accrued_fee: bigint;
+    accrued_bounty: bigint;
 }
 
 export function storeIntroShard$Data(src: IntroShard$Data) {
@@ -1043,6 +1072,8 @@ export function storeIntroShard$Data(src: IntroShard$Data) {
         b_0.storeUint(src.next_id, 32);
         b_0.storeUint(src.live_count, 32);
         b_0.storeUint(src.evict_cursor, 32);
+        b_0.storeCoins(src.accrued_fee);
+        b_0.storeCoins(src.accrued_bounty);
     };
 }
 
@@ -1054,7 +1085,9 @@ export function loadIntroShard$Data(slice: Slice) {
     const _next_id = sc_0.loadUintBig(32);
     const _live_count = sc_0.loadUintBig(32);
     const _evict_cursor = sc_0.loadUintBig(32);
-    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor };
+    const _accrued_fee = sc_0.loadCoins();
+    const _accrued_bounty = sc_0.loadCoins();
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
 export function loadTupleIntroShard$Data(source: TupleReader) {
@@ -1064,7 +1097,9 @@ export function loadTupleIntroShard$Data(source: TupleReader) {
     const _next_id = source.readBigNumber();
     const _live_count = source.readBigNumber();
     const _evict_cursor = source.readBigNumber();
-    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor };
+    const _accrued_fee = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
 export function loadGetterTupleIntroShard$Data(source: TupleReader) {
@@ -1074,7 +1109,9 @@ export function loadGetterTupleIntroShard$Data(source: TupleReader) {
     const _next_id = source.readBigNumber();
     const _live_count = source.readBigNumber();
     const _evict_cursor = source.readBigNumber();
-    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor };
+    const _accrued_fee = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
 export function storeTupleIntroShard$Data(source: IntroShard$Data) {
@@ -1085,6 +1122,8 @@ export function storeTupleIntroShard$Data(source: IntroShard$Data) {
     builder.writeNumber(source.next_id);
     builder.writeNumber(source.live_count);
     builder.writeNumber(source.evict_cursor);
+    builder.writeNumber(source.accrued_fee);
+    builder.writeNumber(source.accrued_bounty);
     return builder.build();
 }
 
@@ -1114,7 +1153,7 @@ function initIntroShard_init_args(src: IntroShard_init_args) {
 }
 
 async function IntroShard_init(epoch: bigint, bucket: bigint) {
-    const __code = Cell.fromHex('b5ee9c72410215010004c1000114ff00f4a413f4bcf2c80b01020162020b03f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e10d31fd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821049535031bae30221821049535032bae30237c00006c12116b0e3025f06f2c08203070a03fc5b05d3ffd30fd4d430813572f8416f24135f0382082644e0bef2f481357029811f40b9f2f42581010126107a10691058104a103b4cabdb3c34f82310384740c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc910384670206e953059f45a30944133f415e202a401a4811f4022c0019170e30da0760405060032c882104953424301cb1f02f90058cbff01f90001cbffc9f900000a82080f424000b6fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005503c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed5402fa5b05d30f307020708e175313b99321c1409170e2935394b99170e29220b39170e28eca258101012b59f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e202a4226eb3983209a41089105802e30d40190805e85b81357332c200f2f482080f424025080900c0026f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e22b103801206e953059f45a30944133f415e208a509a402a49830107810477f4515e200c6811f40a8a072fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010355512c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed54003a10355512c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed540201200c110201660d0f0167b254bb5134348000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038b6cf1b1a200e00308208093a80811f4082082644e02851385136513851374133016bb23dbb5134348000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038954176cf1b196010008a810101250259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f5530016bbd86376a268690000c708698fe98ffa02698fe98fe98faaa8360b4709408080eb80408080eb802c816880b6b82980712a8aed9e3632c12015c5112b6095340bc935340a19170e2028307b60858b608534210591048103746985376db3c104810374a90106a10591301f4c8c97f9322c2008e6f22803fb6085343a021a1c870935303b98e4b8101015331a02d5959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e923070966f2410235f03e258cb0f01a4e8303122946c22c9709413ccc901e25aa159e8131400045f030b88e66e');
+    const __code = Cell.fromHex('b5ee9c7241021601000538000114ff00f4a413f4bcf2c80b01020162020c04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e14d31fd31ff404d31fd31fd31ffa00fa0055706c188e14810101d700810101d7005902d1016d7054700020e209925f09e07028d74920c21f953108d31f09de21821049535031bae30221821049535032bae30239c00008c12118b0e30203060a0b02fe5b07d3ffd30fd4d430f82382015180a9048135742ba55220be942ba412bb923170e2f2f4813572f8416f24135f038208cc9700bef2f481357026811f40b9f2f42781010128109c108b107a106c105b104a103d4eaddb3c36f823103b4a60c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc9103a469004050032c882104953424301cb1f02f90058cbff01f90001cbffc9f90001f4206e953059f45a30944133f415e203a406a4048208989680a00782080dbba0a08208a6716027c0019582080f42409170e2a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00476010351443300902fc5b07d30f307020708e175313b99321c1409170e2935346b99170e29220b39170e28ecc278101012659f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e202a4226eb3983204a41047104502e30d105710454014e810235f0381357321c200f2f4f827070800bc026f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e226103a01206e953059f45a30944133f415e205a504a402a496307f07054414e201c46f10f8416f24135f03a10182080dbba0a85199a109a120c100923070de72fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010575514090040c87f01ca0055705078cb1f15cb1f13f400cb1fcb1fcb1f01fa0201fa02c9ed54004810575514c87f01ca0055705078cb1f15cb1f13f400cb1fcb1fcb1f01fa0201fa02c9ed54000a5f08f2c0820201480d120201580e100173b254bb5134348000638534c7f4c7fd0134c7f4c7f4c7fe803e80155c1b06238520404075c020404075c01640b4405b5c151c000838b6cf1b23200f00468208093a80811f408208cc9700820898968082080dbba02c515c515a515c515b52b62b0177b23dbb5134348000638534c7f4c7fd0134c7f4c7f4c7fe803e80155c1b06238520404075c020404075c01640b4405b5c151c0008389541f6cf1b216011008a810101270259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f55300177bbdd0ed44d0d200018e14d31fd31ff404d31fd31fd31ffa00fa0055706c188e14810101d700810101d7005902d1016d7054700020e25517db3c6c8581301605114b6095360bc935360a19170e270038307b60801b60812b6095364557353badb3c104c103b4a90108c107b106a1059140118c8c97f9322c2008ae8135f031500fc2273b6085343a021a1c870935303b98e5b8101015331a02f5959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e917095206f245f03e25003cbff226e92327097026f2410235f03e258cb0f01a4e8303122946c22c9709413ccc901e25aa159b1c1ce25');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initIntroShard_init_args({ $$type: 'IntroShard_init_args', epoch, bucket })(builder);
@@ -1215,9 +1254,9 @@ const IntroShard_types: ABIType[] = [
     {"name":"EvictIntros","header":1230196786,"fields":[{"name":"max_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
     {"name":"IntroEntry","header":null,"fields":[{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"IntroEntryView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"IntroTagPage","header":null,"fields":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"tags","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"IntroShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bucket","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"IntroShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"bucket","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"intros","type":{"kind":"dict","key":"int","value":"IntroEntry","valueFormat":"ref"}},{"name":"next_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"IntroScanPage","header":null,"fields":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pairs","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"IntroShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bucket","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"protocol_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"IntroShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"bucket","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"intros","type":{"kind":"dict","key":"int","value":"IntroEntry","valueFormat":"ref"}},{"name":"next_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"accrued_fee","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"accrued_bounty","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
 ]
 
 const IntroShard_opcodes = {
@@ -1226,13 +1265,13 @@ const IntroShard_opcodes = {
 }
 
 const IntroShard_getters: ABIGetter[] = [
-    {"name":"get_view_tags","methodId":110790,"arguments":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_count","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"IntroTagPage","optional":false}},
+    {"name":"get_scan_page","methodId":97744,"arguments":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_count","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"IntroScanPage","optional":false}},
     {"name":"get_entry","methodId":80118,"arguments":[{"name":"entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"IntroEntryView","optional":false}},
     {"name":"get_view","methodId":76114,"arguments":[],"returnType":{"kind":"simple","type":"IntroShardView","optional":false}},
 ]
 
 export const IntroShard_getterMapping: { [key: string]: string } = {
-    'get_view_tags': 'getGetViewTags',
+    'get_scan_page': 'getGetScanPage',
     'get_entry': 'getGetEntry',
     'get_view': 'getGetView',
 }
@@ -1246,13 +1285,15 @@ const IntroShard_receivers: ABIReceiver[] = [
 export const IS_INTRO_RETENTION = 604800n;
 export const IS_SAFE_CAP = 8000n;
 export const IS_EVICT_CAP = 64n;
-export const IS_TAG_PAGE_CAP = 256n;
-export const IS_TAGS_PER_CELL = 63n;
+export const IS_SCAN_PAGE_CAP = 256n;
+export const IS_PAIRS_PER_CELL = 3n;
 export const IS_BODY_DOMAIN = 1230193219n;
 export const IS_INTRO_ENDOWMENT = 8000n;
 export const IS_BASE_ENDOWMENT = 1000000n;
 export const IS_PUBLISH_GAS = 2500000n;
-export const IS_MIN_VALUE = 2508000n;
+export const IS_PROTOCOL_FEE = 10000000n;
+export const IS_EVICT_BOUNTY = 900000n;
+export const IS_MIN_VALUE = 13408000n;
 
 export class IntroShard implements Contract {
     
@@ -1306,12 +1347,12 @@ export class IntroShard implements Contract {
         
     }
     
-    async getGetViewTags(provider: ContractProvider, from_id: bigint, max_count: bigint) {
+    async getGetScanPage(provider: ContractProvider, from_id: bigint, max_count: bigint) {
         const builder = new TupleBuilder();
         builder.writeNumber(from_id);
         builder.writeNumber(max_count);
-        const source = (await provider.get('get_view_tags', builder.build())).stack;
-        const result = loadGetterTupleIntroTagPage(source);
+        const source = (await provider.get('get_scan_page', builder.build())).stack;
+        const result = loadGetterTupleIntroScanPage(source);
         return result;
     }
     

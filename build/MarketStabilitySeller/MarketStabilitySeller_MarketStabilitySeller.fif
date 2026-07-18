@@ -40,7 +40,7 @@ PROGRAM{
   DECLPROC $MarketStabilitySeller$_fun_refundTon
   DECLPROC $MarketStabilitySeller$_fun_failPendingSale
   DECLPROC $MarketStabilitySeller$_fun_finalizePendingSale
-  DECLPROC $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash
+  DECLPROC $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons
   DECLPROC $MarketStabilitySeller$_fun_get_market_stability_seller_config
   DECLPROC $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id
   DECLPROC $MarketStabilitySeller$_fun_get_market_stability_seller_state
@@ -102,24 +102,20 @@ PROGRAM{
     -ROT
   }>
   $MarketStabilitySeller$_store PROCINLINE:<{
-    s1 28 s() XCHG
-    s0 29 s() XCHG
-    256 STU
-    s1 26 s() XCHG
-    256 STU
     s1 24 s() XCHG
+    s0 25 s() XCHG
+    256 STU
+    s1 22 s() XCHG
+    256 STU
+    s1 20 s() XCHG
     STSLICE
-    s0 22 s() XCHG
+    s0 18 s() XCHG
     NEWC
     STSLICE
-    s1 21 s() XCHG
-    STSLICE
-    s1 19 s() XCHG
-    STSLICE
     s1 17 s() XCHG
-    1 STI
+    STSLICE
     s1 s15 XCHG
-    1 STI
+    STSLICE
     s1 s13 XCHG
     1 STI
     s1 s11 XCHG
@@ -127,15 +123,13 @@ PROGRAM{
     s1 s9 XCHG
     1 STI
     s1 s7 XCHG
-    128 STU
-    s0 s5 XCHG
-    NEWC
-    128 STU
-    s1 s4 XCHG
-    256 STU
-    s1 s2 XCHG
+    1 STI
+    s1 s5 XCHG
     8 STU
+    s1 s3 XCHG
     128 STU
+    SWAP
+    NEWC
     128 STU
     s1 s2 XCHG
     64 STU
@@ -143,30 +137,27 @@ PROGRAM{
     128 STU
     s1 s2 XCHG
     128 STU
+    s1 s2 XCHG
+    STSLICE
+    s1 s2 XCHG
+    STSLICE
     s0 s2 XCHG
     NEWC
     STSLICE
     s1 s3 XCHG
-    STSLICE
-    s1 s3 XCHG
-    STSLICE
-    s1 s3 XCHG
     8 STU
     s1 s3 XCHG
     128 STU
     s1 s4 XCHG
     64 STU
-    s0 s4 XCHG
-    NEWC
+    s1 s4 XCHG
     128 STU
-    s1 s5 XCHG
+    s1 s4 XCHG
     128 STU
-    s1 s5 XCHG
+    s1 s4 XCHG
     128 STU
-    s1 s2 XCHG
     STBREFR
     s1 s2 XCHG
-    STBREFR
     STBREFR
     STBREFR
   }>
@@ -184,38 +175,31 @@ PROGRAM{
     1 LDI
     1 LDI
     1 LDI
-    1 LDI
+    8 LDU
     128 LDU
     LDREF
     DROP
     CTOS
-    128 LDU
-    256 LDU
-    8 LDU
-    128 LDU
     128 LDU
     64 LDU
     128 LDU
     128 LDU
+    LDMSGADDR
+    LDMSGADDR
     LDREF
     DROP
     CTOS
-    LDMSGADDR
-    LDMSGADDR
     LDMSGADDR
     8 LDU
     128 LDU
     64 LDU
-    LDREF
-    DROP
-    CTOS
     128 LDU
     128 LDU
     128 LDU
     DROP
-    26 s() 29 s() XCHG
-    26 s() 28 s() XCHG
-    26 s() 27 s() XCHG
+    22 s() 25 s() XCHG
+    22 s() 24 s() XCHG
+    22 s() 23 s() XCHG
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -252,18 +236,11 @@ PROGRAM{
     FALSE
     FALSE
     FALSE
-    FALSE
-    s9 s9 s9 PUSH3
+    s8 s8 s8 PUSH3
     s0 s0 s0 PUSH3
+    s15 s15 s0 PUSH3
     s0 s0 s0 PUSH3
-    19 s() PUSH
-    20 s() PUSH
-    s2 s2 s2 PUSH3
-    s0 s0 s0 PUSH3
-    26 s() 27 s() XCHG
-    25 s() 26 s() XCHG
-    24 s() 25 s() XCHG
-    23 s() 24 s() XCHG
+    s0 s0 PUSH2
     22 s() 23 s() XCHG
     21 s() 22 s() XCHG
     20 s() 21 s() XCHG
@@ -289,11 +266,7 @@ PROGRAM{
     SWAP
     IF:<{
       $MarketStabilitySeller$_load INLINECALLDICT
-      29 s() POP
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
-      24 s() 25 s() XCHG
+      25 s() POP
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
       21 s() 22 s() XCHG
@@ -317,10 +290,6 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    s0 29 s() XCHG
-    s0 28 s() XCHG
-    s0 27 s() XCHG
-    s0 26 s() XCHG
     s0 25 s() XCHG
     s0 24 s() XCHG
     s0 23 s() XCHG
@@ -384,18 +353,18 @@ PROGRAM{
   }>
   $MarketStabilitySeller$_fun_requireUnsealed PROCREF:<{
     23001 PUSHINT
-    19 s() PUSH
+    16 s() PUSH
     NOT
     THROWANYIFNOT
   }>
   $MarketStabilitySeller$_fun_requireSealed PROCREF:<{
     23002 PUSHINT
-    19 s() PUSH
+    16 s() PUSH
     THROWANYIFNOT
   }>
   $MarketStabilitySeller$_fun_requireGenesisController PROCREF:<{
     23003 PUSHINT
-    29 s() PUSH
+    25 s() PUSH
     0 NEQINT
     THROWANYIFNOT
     23004 PUSHINT
@@ -404,7 +373,7 @@ PROGRAM{
         STSLICER
         ENDC
         HASHCU
-    30 s() PUSH
+    26 s() PUSH
     EQUAL
     THROWANYIFNOT
   }>
@@ -414,17 +383,17 @@ PROGRAM{
     1 GTINT
     THROWANYIFNOT
     23006 PUSHINT
-    29 s() PUSH
+    25 s() PUSH
     0 EQINT
     IF:<{
-      29 s() POP
+      25 s() POP
       TRUE
     }>ELSE<{
-      s0 29 s() XCHG
+      s0 25 s() XCHG
       OVER
       EQUAL
     }>
-    s1 29 s() XCHG
+    s1 25 s() XCHG
     THROWANYIFNOT
   }>
   $MarketStabilitySeller$_fun_is_basechain_address PROCREF:<{
@@ -438,7 +407,7 @@ PROGRAM{
     DROP
     0 PUSHINT
     ROT
-    29 s() PUSH
+    25 s() PUSH
     $ATHWallet$_init_child INLINECALLDICT
     $global_contractAddressExt INLINECALLDICT
   }>
@@ -477,34 +446,27 @@ PROGRAM{
     SUB
   }>
   $MarketStabilitySeller$_fun_quoteTonForAmount PROCREF:<{
-    23008 PUSHINT
-    21 s() PUSH
-    THROWANYIFNOT
     23009 PUSHINT
     OVER
     0 GTINT
     THROWANYIFNOT
-    28 s() 29 s() XCHG
-    27 s() 29 s() XCHG
-    26 s() 29 s() XCHG
-    25 s() 29 s() XCHG
-    24 s() 29 s() XCHG
-    23 s() 29 s() XCHG
-    22 s() 29 s() XCHG
-    21 s() 29 s() XCHG
-    20 s() 29 s() XCHG
-    19 s() 29 s() XCHG
-    18 s() 29 s() XCHG
-    17 s() 29 s() XCHG
-    16 s() 29 s() XCHG
-    s15 29 s() XCHG
-    s14 29 s() XCHG
-    s13 29 s() XCHG
-    s12 29 s() XCHG
-    s11 29 s() XCHG
-    s10 29 s() XCHG
-    s9 29 s() XCHG
-    s0 29 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 25 s() XCHG
+    22 s() 25 s() XCHG
+    21 s() 25 s() XCHG
+    20 s() 25 s() XCHG
+    19 s() 25 s() XCHG
+    18 s() 25 s() XCHG
+    17 s() 25 s() XCHG
+    16 s() 25 s() XCHG
+    s15 25 s() XCHG
+    s14 25 s() XCHG
+    s13 25 s() XCHG
+    s12 25 s() XCHG
+    s11 25 s() XCHG
+    s10 25 s() XCHG
+    s9 25 s() XCHG
+    s0 25 s() XCHG
     s0 s8 XCHG
     s0 s7 XCHG
     s0 s6 XCHG
@@ -514,47 +476,39 @@ PROGRAM{
     OVER
     0 GTINT
     THROWANYIFNOT
-    30 s() PUSH
+    26 s() PUSH
     23011 PUSHINT
     s0 s2 XCHG
     LEQ
     THROWANYIFNOT
-    17 s() PUSH
-    28 s() 29 s() XCHG
-    27 s() 29 s() XCHG
-    26 s() 29 s() XCHG
-    25 s() 29 s() XCHG
-    24 s() 29 s() XCHG
-    23 s() 29 s() XCHG
-    22 s() 29 s() XCHG
-    21 s() 29 s() XCHG
-    20 s() 29 s() XCHG
-    19 s() 29 s() XCHG
-    18 s() 29 s() XCHG
-    17 s() 29 s() XCHG
-    16 s() 29 s() XCHG
-    s15 29 s() XCHG
-    s14 29 s() XCHG
-    s13 29 s() XCHG
-    s12 29 s() XCHG
-    s11 29 s() XCHG
-    s10 29 s() XCHG
-    s9 29 s() XCHG
-    s0 29 s() XCHG
+    23 s() 24 s() XCHG
+    22 s() 24 s() XCHG
+    21 s() 24 s() XCHG
+    20 s() 24 s() XCHG
+    19 s() 24 s() XCHG
+    18 s() 24 s() XCHG
+    17 s() 24 s() XCHG
+    16 s() 24 s() XCHG
+    s15 24 s() XCHG
+    s14 24 s() XCHG
+    s13 24 s() XCHG
+    s12 24 s() XCHG
+    s11 24 s() XCHG
+    s10 24 s() XCHG
+    s9 24 s() XCHG
+    s0 24 s() XCHG
     s0 s8 XCHG
     s0 s7 XCHG
     s0 s6 XCHG
     5 -ROLL
+    3000000000000 PUSHINT
+    s0 25 s() XCHG
     $MarketStabilitySeller$_fun_currentMultiplier INLINECALLDICT
-    s1 30 s() XCHG
+    s1 26 s() XCHG
     MUL
     SWAP
-    s0 30 s() XCHG
+    s0 26 s() XCHG
     MUL
-    27 s() 29 s() XCHG
-    26 s() 28 s() XCHG
-    25 s() 27 s() XCHG
-    24 s() 26 s() XCHG
     23 s() 25 s() XCHG
     22 s() 24 s() XCHG
     21 s() 23 s() XCHG
@@ -602,9 +556,9 @@ PROGRAM{
     s8 POP
     0 PUSHINT
     s0 s0 s0 PUSH3
-    23 s() PUSH
-    24 s() PUSH
-    25 s() PUSH
+    19 s() PUSH
+    20 s() PUSH
+    21 s() PUSH
     s6 s14 XCHG
     6 6 BLKSWAP
   }>
@@ -643,40 +597,32 @@ PROGRAM{
     s1 17 s() XCHG
     s0 s2 XCHG
     ADD
-    28 s() 31 s() XCHG
-    27 s() 30 s() XCHG
-    26 s() 29 s() XCHG
-    25 s() 31 s() XCHG
-    24 s() 30 s() XCHG
-    23 s() 29 s() XCHG
-    22 s() 31 s() XCHG
-    21 s() 30 s() XCHG
-    20 s() 29 s() XCHG
-    19 s() 31 s() XCHG
-    18 s() 30 s() XCHG
-    17 s() 29 s() XCHG
-    16 s() 31 s() XCHG
-    s15 30 s() XCHG
-    s14 29 s() XCHG
+    24 s() 27 s() XCHG
+    23 s() 26 s() XCHG
+    22 s() 25 s() XCHG
+    21 s() 27 s() XCHG
+    20 s() 26 s() XCHG
+    19 s() 25 s() XCHG
+    18 s() 27 s() XCHG
+    17 s() 26 s() XCHG
+    16 s() 25 s() XCHG
+    s15 27 s() XCHG
+    s14 26 s() XCHG
     s0 s13 XCHG
-    s12 30 s() XCHG
-    s11 29 s() XCHG
+    s12 27 s() XCHG
+    s11 26 s() XCHG
     s0 s10 XCHG
-    s9 30 s() XCHG
-    s8 29 s() XCHG
+    s9 27 s() XCHG
+    s8 26 s() XCHG
     s0 s7 XCHG
-    s6 30 s() XCHG
-    s5 29 s() XCHG
+    s6 27 s() XCHG
+    s5 26 s() XCHG
     s0 s4 XCHG
-    s3 30 s() XCHG
-    s2 29 s() XCHG
+    s3 27 s() XCHG
+    s2 26 s() XCHG
     SWAP
-    s0 30 s() XCHG
+    s0 27 s() XCHG
     $MarketStabilitySeller$_fun_clearPending INLINECALLDICT
-    28 s() 29 s() XCHG
-    27 s() 28 s() XCHG
-    26 s() 27 s() XCHG
-    25 s() 26 s() XCHG
     24 s() 25 s() XCHG
     23 s() 24 s() XCHG
     22 s() 23 s() XCHG
@@ -688,11 +634,8 @@ PROGRAM{
     16 s() 17 s() XCHG
     s15 16 s() XCHG
     15 ROLL
+    s0 26 s() XCHG
     $MarketStabilitySeller$_fun_recordTerminalQueryId INLINECALLDICT
-    28 s() 30 s() XCHG
-    27 s() 29 s() XCHG
-    26 s() 28 s() XCHG
-    25 s() 27 s() XCHG
     24 s() 26 s() XCHG
     23 s() 25 s() XCHG
     22 s() 24 s() XCHG
@@ -704,7 +647,8 @@ PROGRAM{
     16 s() 18 s() XCHG
     s15 17 s() XCHG
     s14 16 s() XCHG
-    2 14 BLKSWAP
+    s13 s15 XCHG
+    2 13 BLKSWAP
     $MarketStabilitySeller$_fun_refundTon INLINECALLDICT
   }>
   $MarketStabilitySeller$_fun_finalizePendingSale PROCREF:<{
@@ -725,22 +669,18 @@ PROGRAM{
       s0 s5 XCHG
       0 PUSHINT
     }>
-    28 s() 29 s() XCHG
-    27 s() 29 s() XCHG
-    26 s() 29 s() XCHG
-    25 s() 29 s() XCHG
-    24 s() 29 s() XCHG
-    23 s() 29 s() XCHG
-    22 s() 29 s() XCHG
-    21 s() 29 s() XCHG
-    20 s() 29 s() XCHG
-    19 s() 29 s() XCHG
-    18 s() 29 s() XCHG
-    17 s() 29 s() XCHG
-    16 s() 29 s() XCHG
-    s15 29 s() XCHG
-    s14 29 s() XCHG
-    s13 29 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 25 s() XCHG
+    22 s() 25 s() XCHG
+    21 s() 25 s() XCHG
+    20 s() 25 s() XCHG
+    19 s() 25 s() XCHG
+    18 s() 25 s() XCHG
+    17 s() 25 s() XCHG
+    16 s() 25 s() XCHG
+    s15 25 s() XCHG
+    s14 25 s() XCHG
+    s13 25 s() XCHG
     s2 s12 XCHG
     s2 s11 XCHG
     s2 s10 XCHG
@@ -750,13 +690,9 @@ PROGRAM{
     s2 s6 XCHG
     s5 s1 s4 XCHG3
     s3 s1 s3 XCHG3
-    s0 29 s() XCHG
+    s0 25 s() XCHG
     SWAP
     $MarketStabilitySeller$_fun_clearPending INLINECALLDICT
-    28 s() 29 s() XCHG
-    27 s() 28 s() XCHG
-    26 s() 27 s() XCHG
-    25 s() 26 s() XCHG
     24 s() 25 s() XCHG
     23 s() 24 s() XCHG
     22 s() 23 s() XCHG
@@ -770,24 +706,32 @@ PROGRAM{
     15 ROLL
     $MarketStabilitySeller$_fun_recordTerminalQueryId INLINECALLDICT
   }>
-  $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash PROCINLINE:<{
+  $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons PROCINLINE:<{
   }>
   $MarketStabilitySeller$_fun_get_market_stability_seller_config PROCREF:<{
-    18 s() PUSH
-    23 s() PUSH
-    23 s() PUSH
-    23 s() PUSH
-    23 s() PUSH
-    32 s() PUSH
-    34 s() PUSH
-    33 s() PUSH
-    33 s() PUSH
-    33 s() PUSH
-    33 s() PUSH
-    28 s() PUSH
-    28 s() PUSH
-    28 s() PUSH
-    $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash INLINECALLDICT
+    TRUE
+    3000000000000 PUSHINT
+    17 s() PUSH
+    s0 s2 XCHG
+    21 s() PUSH
+    s0 s2 XCHG
+    21 s() PUSH
+    s0 s2 XCHG
+    21 s() PUSH
+    s0 s2 XCHG
+    29 s() PUSH
+    SWAP
+    31 s() PUSH
+    SWAP
+    30 s() PUSH
+    SWAP
+    30 s() PUSH
+    SWAP
+    30 s() PUSH
+    SWAP
+    30 s() PUSH
+    SWAP
+    $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons INLINECALLDICT
   }>
   $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id PROCINLINE:<{
   }>
@@ -796,10 +740,6 @@ PROGRAM{
     s14 s13 s12 PUSH3
     s14 s13 s12 PUSH3
     s14 s13 PUSH2
-    28 s() 39 s() XCHG
-    27 s() 38 s() XCHG
-    26 s() 37 s() XCHG
-    25 s() 36 s() XCHG
     24 s() 35 s() XCHG
     23 s() 34 s() XCHG
     22 s() 33 s() XCHG
@@ -807,10 +747,10 @@ PROGRAM{
     20 s() 31 s() XCHG
     19 s() 30 s() XCHG
     18 s() 29 s() XCHG
-    17 s() 39 s() XCHG
-    16 s() 38 s() XCHG
-    s15 37 s() XCHG
-    s14 36 s() XCHG
+    17 s() 28 s() XCHG
+    16 s() 27 s() XCHG
+    s15 26 s() XCHG
+    s14 25 s() XCHG
     s13 35 s() XCHG
     s12 34 s() XCHG
     s11 33 s() XCHG
@@ -818,35 +758,31 @@ PROGRAM{
     s9 31 s() XCHG
     s8 30 s() XCHG
     s7 29 s() XCHG
-    s6 39 s() XCHG
-    s5 38 s() XCHG
-    s4 37 s() XCHG
-    s3 36 s() XCHG
+    s6 28 s() XCHG
+    s5 27 s() XCHG
+    s4 26 s() XCHG
+    s3 25 s() XCHG
     s2 35 s() XCHG
     s1 34 s() XCHG
     s0 33 s() XCHG
     $MarketStabilitySeller$_fun_currentMultiplier INLINECALLDICT
-    28 s() 29 s() XCHG
-    27 s() 29 s() XCHG
-    26 s() 29 s() XCHG
-    25 s() 29 s() XCHG
-    24 s() 29 s() XCHG
-    23 s() 29 s() XCHG
-    22 s() 29 s() XCHG
-    21 s() 29 s() XCHG
-    20 s() 29 s() XCHG
-    19 s() 29 s() XCHG
-    18 s() 29 s() XCHG
-    17 s() 29 s() XCHG
-    16 s() 29 s() XCHG
-    s15 29 s() XCHG
-    s14 29 s() XCHG
-    s13 29 s() XCHG
-    s12 29 s() XCHG
-    s11 29 s() XCHG
-    s10 29 s() XCHG
-    s9 29 s() XCHG
-    s0 29 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 25 s() XCHG
+    22 s() 25 s() XCHG
+    21 s() 25 s() XCHG
+    20 s() 25 s() XCHG
+    19 s() 25 s() XCHG
+    18 s() 25 s() XCHG
+    17 s() 25 s() XCHG
+    16 s() 25 s() XCHG
+    s15 25 s() XCHG
+    s14 25 s() XCHG
+    s13 25 s() XCHG
+    s12 25 s() XCHG
+    s11 25 s() XCHG
+    s10 25 s() XCHG
+    s9 25 s() XCHG
+    s0 25 s() XCHG
     s0 s8 XCHG
     s0 s7 XCHG
     s0 s6 XCHG
@@ -856,20 +792,16 @@ PROGRAM{
     s11 33 s() XCHG
     s10 32 s() XCHG
     s9 31 s() XCHG
-    s8 41 s() XCHG
-    s7 40 s() XCHG
-    s6 39 s() XCHG
-    s5 38 s() XCHG
+    s8 30 s() XCHG
+    s7 29 s() XCHG
+    s6 28 s() XCHG
+    s5 27 s() XCHG
     s4 37 s() XCHG
     s3 36 s() XCHG
     s2 35 s() XCHG
-    s1 30 s() XCHG
+    s1 26 s() XCHG
     37 s() PUSH
     $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id INLINECALLDICT
-    30 s() 42 s() XCHG
-    29 s() 41 s() XCHG
-    28 s() 40 s() XCHG
-    27 s() 39 s() XCHG
     26 s() 38 s() XCHG
     25 s() 37 s() XCHG
     24 s() 36 s() XCHG
@@ -887,11 +819,12 @@ PROGRAM{
     22 s() 24 s() XCHG
     21 s() 23 s() XCHG
     20 s() 22 s() XCHG
-    18 s() 21 s() XCHG
-    17 s() 20 s() XCHG
-    16 s() 19 s() XCHG
-    s15 18 s() XCHG
-    4 14 REVERSE
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 19 s() XCHG
+    16 s() 18 s() XCHG
+    s14 17 s() XCHG
+    s14 16 s() XCHG
     s14 s15 XCHG
   }>
   $MarketStabilitySellerTotalsView$_constructor_reserve_funded_total_ath_sold_ath_total_treasury_flushed_ton_total PROCINLINE:<{
@@ -914,22 +847,20 @@ PROGRAM{
   %get_market_stability_seller_config PROC:<{
     $MarketStabilitySeller$_contract_load INLINECALLDICT
     $MarketStabilitySeller$_fun_get_market_stability_seller_config INLINECALLDICT
-    14 14 BLKDROP2
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s14 POP
-    s15 POP
-    1 13 BLKDROP2
+    12 12 BLKDROP2
+    s12 POP
+    s12 POP
+    s12 POP
+    s12 POP
+    s12 POP
+    s12 POP
+    s12 POP
+    s12 POP
+    s12 POP
+    s12 POP
+    s12 POP
+    s13 POP
+    1 11 BLKDROP2
     $MarketStabilitySellerConfigView$_to_external INLINECALLDICT
   }>
   %get_market_stability_seller_state PROC:<{
@@ -947,17 +878,14 @@ PROGRAM{
     s14 POP
     s14 POP
     s14 POP
-    s14 POP
-    s14 POP
-    s15 POP
-    1 13 BLKDROP2
+    11 3 BLKSWAP
     $MarketStabilitySellerStateView$_to_external INLINECALLDICT
   }>
   %get_market_stability_seller_totals PROC:<{
     $MarketStabilitySeller$_contract_load INLINECALLDICT
     $MarketStabilitySeller$_fun_get_market_stability_seller_totals INLINECALLDICT
     15 3 BLKDROP2
-    14 3 BLKDROP2
+    10 3 BLKDROP2
     $MarketStabilitySellerTotalsView$_to_external INLINECALLDICT
   }>
   %get_official_ath_wallet_address PROC:<{
@@ -965,14 +893,10 @@ PROGRAM{
     $MarketStabilitySeller$_fun_get_official_ath_wallet_address INLINECALLDICT
     16 s() POP
     15 BLKDROP
-    13 1 BLKDROP2
+    9 1 BLKDROP2
   }>
   %get_quote_ton_for_amount PROC:<{
     $MarketStabilitySeller$_contract_load INLINECALLDICT
-    28 s() 29 s() XCHG
-    27 s() 28 s() XCHG
-    26 s() 27 s() XCHG
-    25 s() 26 s() XCHG
     24 s() 25 s() XCHG
     23 s() 24 s() XCHG
     22 s() 23 s() XCHG
@@ -987,7 +911,7 @@ PROGRAM{
     $MarketStabilitySeller$_fun_get_quote_ton_for_amount INLINECALLDICT
     16 s() POP
     15 BLKDROP
-    13 1 BLKDROP2
+    9 1 BLKDROP2
   }>
   recv_internal PROC:<{
     SWAP
@@ -1005,9 +929,9 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $MarketStabilitySeller$_contract_load INLINECALLDICT
-    s0 30 s() XCHG
+    s0 26 s() XCHG
     IFJMP:<{
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -1024,12 +948,12 @@ PROGRAM{
       IFJMP:<{
         $ATHTransferRequest$_load_bounced INLINECALLDICT
         s2 POP
-        s1 29 s() XCHG
-        s0 30 s() XCHG
+        s1 25 s() XCHG
+        s0 26 s() XCHG
         $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
         23250 PUSHINT
         __tact_context_get_sender INLINECALLDICT
-        26 s() PUSH
+        22 s() PUSH
         SDEQ
         THROWANYIFNOT
         23251 PUSHINT
@@ -1037,21 +961,17 @@ PROGRAM{
         1 EQINT
         THROWANYIFNOT
         23252 PUSHINT
-        s0 31 s() XCHG
+        s0 27 s() XCHG
         s12 PUSH
         EQUAL
-        s1 31 s() XCHG
+        s1 27 s() XCHG
         THROWANYIFNOT
         23253 PUSHINT
-        s0 29 s() XCHG
+        s0 25 s() XCHG
         s10 PUSH
         EQUAL
-        s1 29 s() XCHG
+        s1 25 s() XCHG
         THROWANYIFNOT
-        26 s() 28 s() XCHG
-        25 s() 27 s() XCHG
-        24 s() 26 s() XCHG
-        23 s() 25 s() XCHG
         22 s() 24 s() XCHG
         21 s() 23 s() XCHG
         20 s() 22 s() XCHG
@@ -1066,36 +986,32 @@ PROGRAM{
         $MarketStabilitySeller$_contract_store INLINECALLDICT
       }>
       15 BLKDROP
-      15 BLKDROP
+      11 BLKDROP
     }>
     0 PUSHINT
-    29 s() PUSH
+    25 s() PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 29 s() XCHG
+      s0 25 s() XCHG
       32 LDU
-      s0 30 s() XCHG
+      s0 26 s() XCHG
     }>
     OVER
     1297306182 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       256 LDU
       LDMSGADDR
       DROP
-      s1 29 s() XCHG
-      s0 30 s() XCHG
+      s1 25 s() XCHG
+      s0 26 s() XCHG
       $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
       $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
-      28 s() 29 s() XCHG
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
       24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
@@ -1109,61 +1025,53 @@ PROGRAM{
       15 ROLL
       $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
       23100 PUSHINT
-      23 s() PUSH
+      19 s() PUSH
       NOT
       THROWANYIFNOT
       23101 PUSHINT
           MYADDR
-      31 s() PUSH
+      27 s() PUSH
       SWAP
       SDEQ
       NOT
       THROWANYIFNOT
-      27 s() 28 s() XCHG
-      26 s() 28 s() XCHG
-      25 s() 28 s() XCHG
-      24 s() 28 s() XCHG
-      23 s() 28 s() XCHG
-      22 s() 28 s() XCHG
-      21 s() 28 s() XCHG
-      20 s() 28 s() XCHG
-      19 s() 28 s() XCHG
-      18 s() 28 s() XCHG
-      17 s() 28 s() XCHG
-      16 s() 28 s() XCHG
-      s15 28 s() XCHG
-      s14 28 s() XCHG
-      s13 28 s() XCHG
-      s12 28 s() XCHG
-      s11 28 s() XCHG
-      s10 28 s() XCHG
-      s9 28 s() XCHG
-      s0 28 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 24 s() XCHG
+      20 s() 24 s() XCHG
+      19 s() 24 s() XCHG
+      18 s() 24 s() XCHG
+      17 s() 24 s() XCHG
+      16 s() 24 s() XCHG
+      s15 24 s() XCHG
+      s14 24 s() XCHG
+      s13 24 s() XCHG
+      s12 24 s() XCHG
+      s11 24 s() XCHG
+      s10 24 s() XCHG
+      s9 24 s() XCHG
+      s0 24 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       23102 PUSHINT
-      s0 29 s() XCHG
-      30 s() PUSH
+      s0 25 s() XCHG
+      26 s() PUSH
       $MarketStabilitySeller$_fun_is_basechain_address INLINECALLDICT
-      23 s() POP
-      25 s() POP
-      s1 28 s() XCHG
-      s0 21 s() XCHG
+      19 s() POP
+      21 s() POP
+      s1 24 s() XCHG
+      s0 17 s() XCHG
       THROWANYIFNOT
-      25 s() 27 s() XCHG
-      24 s() 26 s() XCHG
-      23 s() 25 s() XCHG
-      23 s() 24 s() XCHG
       21 s() 23 s() XCHG
       20 s() 22 s() XCHG
-      TRUE
-      s0 22 s() XCHG
       19 s() 21 s() XCHG
-      18 s() 20 s() XCHG
+      19 s() 20 s() XCHG
       17 s() 19 s() XCHG
       16 s() 18 s() XCHG
+      TRUE
+      s0 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
       s13 s15 XCHG
@@ -1175,18 +1083,14 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       256 LDU
       LDMSGADDR
       DROP
-      s1 29 s() XCHG
-      s0 30 s() XCHG
+      s1 25 s() XCHG
+      s0 26 s() XCHG
       $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
       $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
-      28 s() 29 s() XCHG
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
       24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
@@ -1200,56 +1104,48 @@ PROGRAM{
       15 ROLL
       $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
       23110 PUSHINT
-      22 s() PUSH
+      18 s() PUSH
       NOT
       THROWANYIFNOT
-      27 s() 28 s() XCHG
-      26 s() 28 s() XCHG
-      25 s() 28 s() XCHG
-      24 s() 28 s() XCHG
-      23 s() 28 s() XCHG
-      22 s() 28 s() XCHG
-      21 s() 28 s() XCHG
-      20 s() 28 s() XCHG
-      19 s() 28 s() XCHG
-      18 s() 28 s() XCHG
-      17 s() 28 s() XCHG
-      16 s() 28 s() XCHG
-      s15 28 s() XCHG
-      s14 28 s() XCHG
-      s13 28 s() XCHG
-      s12 28 s() XCHG
-      s11 28 s() XCHG
-      s10 28 s() XCHG
-      s9 28 s() XCHG
-      s0 28 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 24 s() XCHG
+      20 s() 24 s() XCHG
+      19 s() 24 s() XCHG
+      18 s() 24 s() XCHG
+      17 s() 24 s() XCHG
+      16 s() 24 s() XCHG
+      s15 24 s() XCHG
+      s14 24 s() XCHG
+      s13 24 s() XCHG
+      s12 24 s() XCHG
+      s11 24 s() XCHG
+      s10 24 s() XCHG
+      s9 24 s() XCHG
+      s0 24 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       23111 PUSHINT
-      s0 29 s() XCHG
+      s0 25 s() XCHG
       $MarketStabilitySeller$_fun_deriveOwnAthWalletAddress INLINECALLDICT
-      22 s() POP
-      24 s() POP
-      29 s() PUSH
+      18 s() POP
+      20 s() POP
+      25 s() PUSH
       SWAP
-      s0 21 s() XCHG
+      s0 17 s() XCHG
       SDEQ
-      s1 28 s() XCHG
+      s1 24 s() XCHG
       THROWANYIFNOT
-      25 s() 27 s() XCHG
-      24 s() 26 s() XCHG
-      23 s() 25 s() XCHG
-      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
       20 s() 22 s() XCHG
       19 s() 21 s() XCHG
-      TRUE
-      s0 21 s() XCHG
       18 s() 20 s() XCHG
-      17 s() 19 s() XCHG
       16 s() 18 s() XCHG
       s15 17 s() XCHG
+      TRUE
+      s0 17 s() XCHG
       s14 16 s() XCHG
       2 14 BLKSWAP
       $MarketStabilitySeller$_contract_store INLINECALLDICT
@@ -1259,18 +1155,14 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       256 LDU
       LDMSGADDR
       DROP
-      s1 29 s() XCHG
-      s0 30 s() XCHG
+      s1 25 s() XCHG
+      s0 26 s() XCHG
       $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
       $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
-      28 s() 29 s() XCHG
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
       24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
@@ -1284,190 +1176,57 @@ PROGRAM{
       15 ROLL
       $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
       23120 PUSHINT
-      21 s() PUSH
+      17 s() PUSH
       NOT
       THROWANYIFNOT
       23121 PUSHINT
           MYADDR
-      31 s() PUSH
+      27 s() PUSH
       SWAP
       SDEQ
       NOT
       THROWANYIFNOT
-      27 s() 28 s() XCHG
-      26 s() 28 s() XCHG
-      25 s() 28 s() XCHG
-      24 s() 28 s() XCHG
-      23 s() 28 s() XCHG
-      22 s() 28 s() XCHG
-      21 s() 28 s() XCHG
-      20 s() 28 s() XCHG
-      19 s() 28 s() XCHG
-      18 s() 28 s() XCHG
-      17 s() 28 s() XCHG
-      16 s() 28 s() XCHG
-      s15 28 s() XCHG
-      s14 28 s() XCHG
-      s13 28 s() XCHG
-      s12 28 s() XCHG
-      s11 28 s() XCHG
-      s10 28 s() XCHG
-      s9 28 s() XCHG
-      s0 28 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 24 s() XCHG
+      20 s() 24 s() XCHG
+      19 s() 24 s() XCHG
+      18 s() 24 s() XCHG
+      17 s() 24 s() XCHG
+      16 s() 24 s() XCHG
+      s15 24 s() XCHG
+      s14 24 s() XCHG
+      s13 24 s() XCHG
+      s12 24 s() XCHG
+      s11 24 s() XCHG
+      s10 24 s() XCHG
+      s9 24 s() XCHG
+      s0 24 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       23122 PUSHINT
-      s0 29 s() XCHG
-      30 s() PUSH
+      s0 25 s() XCHG
+      26 s() PUSH
       $MarketStabilitySeller$_fun_is_basechain_address INLINECALLDICT
-      21 s() POP
-      23 s() POP
-      s1 28 s() XCHG
-      s0 19 s() XCHG
+      17 s() POP
+      19 s() POP
+      s1 24 s() XCHG
+      s0 s15 XCHG
       THROWANYIFNOT
-      25 s() 27 s() XCHG
-      24 s() 26 s() XCHG
-      23 s() 25 s() XCHG
-      22 s() 24 s() XCHG
       21 s() 23 s() XCHG
-      21 s() 22 s() XCHG
+      20 s() 22 s() XCHG
       19 s() 21 s() XCHG
       18 s() 20 s() XCHG
-      TRUE
-      s0 20 s() XCHG
       17 s() 19 s() XCHG
-      16 s() 18 s() XCHG
+      17 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
+      TRUE
+      s0 16 s() XCHG
       s13 s15 XCHG
       2 13 BLKSWAP
-      $MarketStabilitySeller$_contract_store INLINECALLDICT
-    }>
-    OVER
-    1297305670 PUSHINT
-    EQUAL
-    IFJMP:<{
-      2DROP
-      s0 28 s() XCHG
-      256 LDU
-      128 LDU
-      128 LDU
-      256 LDU
-      DROP
-      28 s() 30 s() XCHG
-      27 s() 29 s() XCHG
-      26 s() 30 s() XCHG
-      25 s() 29 s() XCHG
-      24 s() 30 s() XCHG
-      23 s() 29 s() XCHG
-      22 s() 30 s() XCHG
-      21 s() 29 s() XCHG
-      20 s() 30 s() XCHG
-      19 s() 29 s() XCHG
-      18 s() 30 s() XCHG
-      17 s() 29 s() XCHG
-      16 s() 30 s() XCHG
-      s15 29 s() XCHG
-      s14 30 s() XCHG
-      s13 29 s() XCHG
-      s12 30 s() XCHG
-      s11 29 s() XCHG
-      s10 30 s() XCHG
-      s9 29 s() XCHG
-      s8 30 s() XCHG
-      s7 29 s() XCHG
-      s6 30 s() XCHG
-      s5 29 s() XCHG
-      s4 30 s() XCHG
-      s3 29 s() XCHG
-      s2 30 s() XCHG
-      s1 31 s() XCHG
-      s0 32 s() XCHG
-      $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
-      28 s() 29 s() XCHG
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
-      24 s() 25 s() XCHG
-      23 s() 24 s() XCHG
-      22 s() 23 s() XCHG
-      21 s() 22 s() XCHG
-      20 s() 21 s() XCHG
-      19 s() 20 s() XCHG
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
-      16 s() 17 s() XCHG
-      s15 16 s() XCHG
-      15 ROLL
-      $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
-      s15 POP
-      s15 POP
-      s15 POP
-      23130 PUSHINT
-      s0 17 s() XCHG
-      NOT
-      s1 17 s() XCHG
-      THROWANYIFNOT
-      s14 PUSH
-      IF:<{
-        23131 PUSHINT
-        s11 PUSH
-        0 EQINT
-        THROWANYIFNOT
-        23133 PUSHINT
-        s9 PUSH
-        0 EQINT
-        THROWANYIFNOT
-        23135 PUSHINT
-        s13 PUSH
-        0 EQINT
-        THROWANYIFNOT
-        23139 PUSHINT
-        s2 PUSH
-        0 EQINT
-        IF:<{
-          OVER
-          0 EQINT
-        }>ELSE<{
-          FALSE
-        }>
-        THROWANYIFNOT
-      }>
-      23136 PUSHINT
-      26 s() PUSH
-      0 GTINT
-      THROWANYIFNOT
-      23137 PUSHINT
-      27 s() PUSH
-      27 s() PUSH
-      EQUAL
-      THROWANYIFNOT
-      23138 PUSHINT
-      28 s() PUSH
-      0 NEQINT
-      THROWANYIFNOT
-      TRUE
-      s15 PUSH
-      IF:<{
-        0 PUSHINT
-        26 s() POP
-      }>
-      25 s() 28 s() XCHG
-      24 s() 27 s() XCHG
-      23 s() 26 s() XCHG
-      22 s() 25 s() XCHG
-      21 s() 24 s() XCHG
-      20 s() 23 s() XCHG
-      19 s() 22 s() XCHG
-      18 s() 21 s() XCHG
-      17 s() 20 s() XCHG
-      s0 19 s() XCHG
-      s0 s15 XCHG
-      s0 18 s() XCHG
-      s0 16 s() XCHG
-      3 12 BLKSWAP
       $MarketStabilitySeller$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1475,13 +1234,9 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       256 LDU
       DROP
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
-      24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
       21 s() 22 s() XCHG
@@ -1503,14 +1258,10 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 29 s() XCHG
+      s0 25 s() XCHG
       s1 s3 s0 XCHG3
       $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
       $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
-      28 s() 29 s() XCHG
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
       24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
@@ -1523,23 +1274,21 @@ PROGRAM{
       s15 16 s() XCHG
       15 ROLL
       $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
-      18 s() POP
+      s15 POP
+      23 s() POP
       23140 PUSHINT
-      22 s() PUSH
+      17 s() PUSH
       THROWANYIFNOT
       23141 PUSHINT
-      21 s() PUSH
+      16 s() PUSH
       THROWANYIFNOT
       23142 PUSHINT
-      20 s() PUSH
+      s15 PUSH
       THROWANYIFNOT
-      18 s() PUSH
-      IF:<{
-        0 PUSHINT
-        28 s() POP
-      }>
+      0 PUSHINT
+      s0 23 s() XCHG
       TRUE
-      s0 18 s() XCHG
+      s0 s15 XCHG
       $MarketStabilitySeller$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1547,56 +1296,52 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       64 LDU
       160 LDU
       128 LDU
       LDMSGADDR
       DROP
-      28 s() 30 s() XCHG
-      27 s() 29 s() XCHG
-      26 s() 30 s() XCHG
-      25 s() 29 s() XCHG
-      24 s() 30 s() XCHG
-      23 s() 29 s() XCHG
-      22 s() 30 s() XCHG
-      21 s() 29 s() XCHG
-      20 s() 30 s() XCHG
-      19 s() 29 s() XCHG
-      18 s() 30 s() XCHG
-      17 s() 29 s() XCHG
-      16 s() 30 s() XCHG
-      s15 29 s() XCHG
-      s14 30 s() XCHG
-      s13 29 s() XCHG
-      s12 30 s() XCHG
-      s11 29 s() XCHG
-      s10 30 s() XCHG
-      s9 29 s() XCHG
-      s8 30 s() XCHG
-      s7 29 s() XCHG
-      s6 30 s() XCHG
-      s5 29 s() XCHG
-      s4 30 s() XCHG
-      s3 29 s() XCHG
-      s2 30 s() XCHG
-      s1 31 s() XCHG
-      s0 32 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 26 s() XCHG
+      21 s() 25 s() XCHG
+      20 s() 26 s() XCHG
+      19 s() 25 s() XCHG
+      18 s() 26 s() XCHG
+      17 s() 25 s() XCHG
+      16 s() 26 s() XCHG
+      s15 25 s() XCHG
+      s14 26 s() XCHG
+      s13 25 s() XCHG
+      s12 26 s() XCHG
+      s11 25 s() XCHG
+      s10 26 s() XCHG
+      s9 25 s() XCHG
+      s8 26 s() XCHG
+      s7 25 s() XCHG
+      s6 26 s() XCHG
+      s5 25 s() XCHG
+      s4 26 s() XCHG
+      s3 25 s() XCHG
+      s2 26 s() XCHG
+      s1 27 s() XCHG
+      s0 28 s() XCHG
       $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
       23201 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      26 s() PUSH
+      22 s() PUSH
       SDEQ
       THROWANYIFNOT
       23202 PUSHINT
-      32 s() PUSH
+      28 s() PUSH
       0 GTINT
       THROWANYIFNOT
       23203 PUSHINT
-      s0 33 s() XCHG
-      26 s() PUSH
+      s0 29 s() XCHG
+      22 s() PUSH
       SDEQ
-      s1 33 s() XCHG
+      s1 29 s() XCHG
       THROWANYIFNOT
       23204 PUSHINT
       __tact_context_get INLINECALLDICT
@@ -1606,31 +1351,31 @@ PROGRAM{
       THROWANYIFNOT
       23205 PUSHINT
       s2 PUSH
-      32 s() PUSH
+      28 s() PUSH
       ADD
       60000000000000000 PUSHINT
       LEQ
       THROWANYIFNOT
       s0 s12 XCHG
-      30 s() PUSH
+      26 s() PUSH
       ADD
       SWAP
-      30 s() PUSH
+      26 s() PUSH
       ADD
       __tact_context_get_sender INLINECALLDICT
       1000000 PUSHINT
-      s0 30 s() XCHG
+      s0 26 s() XCHG
       FALSE
-      s0 32 s() XCHG
+      s0 28 s() XCHG
       0 PUSHINT
-      s0 34 s() XCHG
+      s0 30 s() XCHG
       $AthTransferNotificationAck$_constructor_query_id_sender_key_amount INLINECALLDICT
       NEWC
       $AthTransferNotificationAck$_store_cell INLINECALLDICT
       s1 s4 XCHG
-      s3 30 s() XCHG
-      s2 31 s() XCHG
-      s1 32 s() XCHG
+      s3 26 s() XCHG
+      s2 27 s() XCHG
+      s1 28 s() XCHG
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -1649,10 +1394,6 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      24 s() 28 s() XCHG
-      23 s() 27 s() XCHG
-      22 s() 26 s() XCHG
-      21 s() 25 s() XCHG
       20 s() 24 s() XCHG
       19 s() 23 s() XCHG
       18 s() 22 s() XCHG
@@ -1673,116 +1414,101 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       64 LDU
       128 LDU
       LDMSGADDR
       DROP
-      28 s() 29 s() XCHG
-      27 s() 29 s() XCHG
-      26 s() 29 s() XCHG
-      25 s() 29 s() XCHG
-      24 s() 29 s() XCHG
-      23 s() 29 s() XCHG
-      22 s() 29 s() XCHG
-      21 s() 29 s() XCHG
-      20 s() 29 s() XCHG
-      19 s() 29 s() XCHG
-      18 s() 29 s() XCHG
-      17 s() 29 s() XCHG
-      16 s() 29 s() XCHG
-      s15 29 s() XCHG
-      s14 29 s() XCHG
-      s13 29 s() XCHG
-      s12 29 s() XCHG
-      s11 29 s() XCHG
-      s10 29 s() XCHG
-      s9 29 s() XCHG
-      s8 29 s() XCHG
-      s7 29 s() XCHG
-      s6 29 s() XCHG
-      s5 29 s() XCHG
-      s4 29 s() XCHG
-      s3 29 s() XCHG
-      s2 29 s() XCHG
-      s1 30 s() XCHG
-      s0 31 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 25 s() XCHG
+      21 s() 25 s() XCHG
+      20 s() 25 s() XCHG
+      19 s() 25 s() XCHG
+      18 s() 25 s() XCHG
+      17 s() 25 s() XCHG
+      16 s() 25 s() XCHG
+      s15 25 s() XCHG
+      s14 25 s() XCHG
+      s13 25 s() XCHG
+      s12 25 s() XCHG
+      s11 25 s() XCHG
+      s10 25 s() XCHG
+      s9 25 s() XCHG
+      s8 25 s() XCHG
+      s7 25 s() XCHG
+      s6 25 s() XCHG
+      s5 25 s() XCHG
+      s4 25 s() XCHG
+      s3 25 s() XCHG
+      s2 25 s() XCHG
+      s1 26 s() XCHG
+      s0 27 s() XCHG
       $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
-      23210 PUSHINT
-      20 s() PUSH
-      THROWANYIFNOT
       23211 PUSHINT
       s15 PUSH
       0 EQINT
       THROWANYIFNOT
       23212 PUSHINT
-      30 s() PUSH
+      26 s() PUSH
       0 GTINT
       THROWANYIFNOT
-      29 s() PUSH
+      25 s() PUSH
       $MarketStabilitySeller$_fun_requireNextQueryId INLINECALLDICT
       23213 PUSHINT
-      31 s() PUSH
+      27 s() PUSH
       0 GTINT
       THROWANYIFNOT
       23214 PUSHINT
       s6 PUSH
       20 LESSINT
       THROWANYIFNOT
-      27 s() 28 s() XCHG
-      26 s() 28 s() XCHG
-      25 s() 28 s() XCHG
-      24 s() 28 s() XCHG
-      23 s() 28 s() XCHG
-      22 s() 28 s() XCHG
-      21 s() 28 s() XCHG
-      20 s() 28 s() XCHG
-      19 s() 28 s() XCHG
-      18 s() 28 s() XCHG
-      17 s() 28 s() XCHG
-      16 s() 28 s() XCHG
-      s15 28 s() XCHG
-      s14 28 s() XCHG
-      s13 28 s() XCHG
-      s12 28 s() XCHG
-      s11 28 s() XCHG
-      s10 28 s() XCHG
-      s9 28 s() XCHG
-      s0 28 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 24 s() XCHG
+      20 s() 24 s() XCHG
+      19 s() 24 s() XCHG
+      18 s() 24 s() XCHG
+      17 s() 24 s() XCHG
+      16 s() 24 s() XCHG
+      s15 24 s() XCHG
+      s14 24 s() XCHG
+      s13 24 s() XCHG
+      s12 24 s() XCHG
+      s11 24 s() XCHG
+      s10 24 s() XCHG
+      s9 24 s() XCHG
+      s0 24 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       23215 PUSHINT
-      s0 29 s() XCHG
+      s0 25 s() XCHG
       $MarketStabilitySeller$_fun_currentTrancheRemaining INLINECALLDICT
-      32 s() PUSH
+      28 s() PUSH
       SWAP
       LEQ
-      s1 30 s() XCHG
+      s1 26 s() XCHG
       THROWANYIFNOT
       23216 PUSHINT
-      31 s() PUSH
+      27 s() PUSH
       s14 PUSH
       LEQ
       THROWANYIFNOT
       23217 PUSHINT
-      s0 29 s() XCHG
-      32 s() PUSH
+      s0 25 s() XCHG
+      28 s() PUSH
       $MarketStabilitySeller$_fun_is_basechain_address INLINECALLDICT
-      s1 30 s() XCHG
+      s1 26 s() XCHG
       THROWANYIFNOT
       23219 PUSHINT
           MYADDR
-      33 s() PUSH
+      29 s() PUSH
       SWAP
       SDEQ
       NOT
       THROWANYIFNOT
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
-      24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
       21 s() 22 s() XCHG
@@ -1793,7 +1519,7 @@ PROGRAM{
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
-      30 s() PUSH
+      26 s() PUSH
       $MarketStabilitySeller$_fun_quoteTonForAmount INLINECALLDICT
       DUP
       58000000 PUSHINT
@@ -1806,36 +1532,32 @@ PROGRAM{
       s2 PUSH
       GEQ
       THROWANYIFNOT
-      28 s() 30 s() XCHG
-      27 s() 29 s() XCHG
-      26 s() 30 s() XCHG
-      25 s() 29 s() XCHG
-      24 s() 30 s() XCHG
-      23 s() 29 s() XCHG
-      22 s() 30 s() XCHG
-      21 s() 29 s() XCHG
-      20 s() 30 s() XCHG
-      19 s() 29 s() XCHG
-      18 s() 30 s() XCHG
-      17 s() 29 s() XCHG
-      16 s() 30 s() XCHG
-      s15 29 s() XCHG
-      s14 30 s() XCHG
-      s13 29 s() XCHG
-      s12 30 s() XCHG
-      s11 29 s() XCHG
-      s10 30 s() XCHG
-      s9 29 s() XCHG
-      s8 30 s() XCHG
-      s7 29 s() XCHG
-      s6 30 s() XCHG
-      s5 29 s() XCHG
-      s4 30 s() XCHG
-      s3 29 s() XCHG
-      s2 30 s() XCHG
-      s1 29 s() XCHG
-      s0 30 s() XCHG
-      33 s() PUSH
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 26 s() XCHG
+      21 s() 25 s() XCHG
+      20 s() 26 s() XCHG
+      19 s() 25 s() XCHG
+      18 s() 26 s() XCHG
+      17 s() 25 s() XCHG
+      16 s() 26 s() XCHG
+      s15 25 s() XCHG
+      s14 26 s() XCHG
+      s13 25 s() XCHG
+      s12 26 s() XCHG
+      s11 25 s() XCHG
+      s10 26 s() XCHG
+      s9 25 s() XCHG
+      s8 26 s() XCHG
+      s7 25 s() XCHG
+      s6 26 s() XCHG
+      s5 25 s() XCHG
+      s4 26 s() XCHG
+      s3 25 s() XCHG
+      s2 26 s() XCHG
+      s1 25 s() XCHG
+      s0 26 s() XCHG
+      29 s() PUSH
       $MarketStabilitySeller$_fun_deriveAthWalletAddress INLINECALLDICT
       s7 POP
       s7 POP
@@ -1845,28 +1567,28 @@ PROGRAM{
       s7 POP
       s9 POP
       s0 s7 XCHG
-      26 s() PUSH
+      22 s() PUSH
       SUB
       1 PUSHINT
-      26 s() PUSH
-      28 s() PUSH
+      22 s() PUSH
+      24 s() PUSH
       __tact_context_get_sender INLINECALLDICT
-      31 s() PUSH
+      27 s() PUSH
       58000000 PUSHINT
       TRUE
       s6 PUSH
           MYADDR
-      s3 34 s() XCHG
-      s2 35 s() XCHG
-      s1 36 s() XCHG
+      s3 30 s() XCHG
+      s2 31 s() XCHG
+      s1 32 s() XCHG
       $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination INLINECALLDICT
       NEWC
       $ATHTransferRequest$_store_cell INLINECALLDICT
-      24 s() PUSH
+      20 s() PUSH
       s0 s4 XCHG
-      s3 32 s() XCHG
-      s2 33 s() XCHG
-      s0 34 s() XCHG
+      s3 28 s() XCHG
+      s2 29 s() XCHG
+      s0 30 s() XCHG
       SWAP
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
@@ -1890,12 +1612,8 @@ PROGRAM{
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       SWAP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       SUB
-      25 s() 30 s() XCHG
-      24 s() 29 s() XCHG
-      23 s() 28 s() XCHG
-      22 s() 27 s() XCHG
       21 s() 26 s() XCHG
       20 s() 25 s() XCHG
       19 s() 24 s() XCHG
@@ -1909,13 +1627,15 @@ PROGRAM{
       s2 16 s() XCHG
       s3 s15 XCHG
       s9 s14 XCHG
-      s1 s13 XCHG
-      s3 s12 XCHG
-      s11 s10 s0 XCHG3
-      s7 s8 s0 XCHG3
-      s5 s6 s0 XCHG3
-      s4 s4 s0 XCHG3
-      s1 s3 XCHG
+      s12 s13 s0 XCHG3
+      s2 s11 XCHG
+      s9 s10 XCHG
+      s3 s9 XCHG
+      s3 s8 XCHG
+      s2 s7 XCHG
+      s3 s6 XCHG
+      4 2 REVERSE
+      s2 s3 XCHG
       $MarketStabilitySeller$_fun_refundTon INLINECALLDICT
       $MarketStabilitySeller$_contract_store INLINECALLDICT
     }>
@@ -1924,38 +1644,34 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       64 LDU
       128 LDU
       DROP
-      s1 29 s() XCHG
-      s0 30 s() XCHG
+      s1 25 s() XCHG
+      s0 26 s() XCHG
       $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
       23230 PUSHINT
       s15 PUSH
       1 EQINT
       THROWANYIFNOT
       23231 PUSHINT
-      s0 30 s() XCHG
+      s0 26 s() XCHG
       s12 PUSH
       EQUAL
-      s1 30 s() XCHG
+      s1 26 s() XCHG
       THROWANYIFNOT
       23232 PUSHINT
-      s0 30 s() XCHG
+      s0 26 s() XCHG
       s10 PUSH
       EQUAL
-      s1 30 s() XCHG
+      s1 26 s() XCHG
       THROWANYIFNOT
       23233 PUSHINT
       __tact_context_get_sender INLINECALLDICT
       s6 PUSH
       SDEQ
       THROWANYIFNOT
-      26 s() 28 s() XCHG
-      25 s() 27 s() XCHG
-      24 s() 26 s() XCHG
-      23 s() 25 s() XCHG
       22 s() 24 s() XCHG
       21 s() 23 s() XCHG
       20 s() 22 s() XCHG
@@ -1975,16 +1691,16 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       64 LDU
       128 LDU
       DROP
-      s1 29 s() XCHG
-      s0 30 s() XCHG
+      s1 25 s() XCHG
+      s0 26 s() XCHG
       $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
       23240 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      26 s() PUSH
+      22 s() PUSH
       SDEQ
       THROWANYIFNOT
       23241 PUSHINT
@@ -1992,21 +1708,17 @@ PROGRAM{
       1 EQINT
       THROWANYIFNOT
       23242 PUSHINT
-      s0 30 s() XCHG
+      s0 26 s() XCHG
       s12 PUSH
       EQUAL
-      s1 30 s() XCHG
+      s1 26 s() XCHG
       THROWANYIFNOT
       23243 PUSHINT
-      s0 30 s() XCHG
+      s0 26 s() XCHG
       s10 PUSH
       EQUAL
-      s1 30 s() XCHG
+      s1 26 s() XCHG
       THROWANYIFNOT
-      26 s() 28 s() XCHG
-      25 s() 27 s() XCHG
-      24 s() 26 s() XCHG
-      23 s() 25 s() XCHG
       22 s() 24 s() XCHG
       21 s() 23 s() XCHG
       20 s() 22 s() XCHG
@@ -2026,13 +1738,9 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 28 s() XCHG
+      s0 24 s() XCHG
       128 LDU
       DROP
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
-      24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
       21 s() 22 s() XCHG
@@ -2054,26 +1762,26 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 29 s() XCHG
+      s0 25 s() XCHG
       s1 s3 s0 XCHG3
       $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
       23260 PUSHINT
-      30 s() PUSH
+      26 s() PUSH
       0 GTINT
       THROWANYIFNOT
       23261 PUSHINT
-      30 s() PUSH
+      26 s() PUSH
       s14 PUSH
       LEQ
       THROWANYIFNOT
       23263 PUSHINT
-      30 s() PUSH
+      26 s() PUSH
       2000000 PUSHINT
       GEQ
       IF:<{
         TRUE
       }>ELSE<{
-        30 s() PUSH
+        26 s() PUSH
         s14 PUSH
         EQUAL
       }>
@@ -2085,14 +1793,14 @@ PROGRAM{
       GEQ
       THROWANYIFNOT
       s0 s12 XCHG
-      29 s() PUSH
+      25 s() PUSH
       SUB
       s0 s12 XCHG
-      29 s() PUSH
+      25 s() PUSH
       ADD
-      23 s() PUSH
+      19 s() PUSH
       SWAP
-      s0 30 s() XCHG
+      s0 26 s() XCHG
       FALSE
       1 PUSHINT
       PUSHNULL
@@ -2114,10 +1822,6 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
-      25 s() 26 s() XCHG
-      24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
       21 s() 22 s() XCHG
@@ -2130,17 +1834,13 @@ PROGRAM{
       15 ROLL
       $MarketStabilitySeller$_contract_store INLINECALLDICT
     }>
-    30 s() POP
+    26 s() POP
     DUP
     2422309587 PUSHINT
     EQUAL
     IFJMP:<{
       DROP
-      28 s() POP
-      26 s() 28 s() XCHG
-      25 s() 27 s() XCHG
-      24 s() 26 s() XCHG
-      23 s() 25 s() XCHG
+      24 s() POP
       22 s() 24 s() XCHG
       21 s() 23 s() XCHG
       20 s() 22 s() XCHG
@@ -2154,17 +1854,13 @@ PROGRAM{
       $MarketStabilitySeller$_contract_store INLINECALLDICT
     }>
     0 EQINT
-    s0 29 s() XCHG
+    s0 25 s() XCHG
     33 LESSINT
-    s1 29 s() XCHG
+    s1 25 s() XCHG
     AND
     IFJMP:<{
       23999 PUSHINT
       THROWANY
-      26 s() 28 s() XCHG
-      25 s() 27 s() XCHG
-      24 s() 26 s() XCHG
-      23 s() 25 s() XCHG
       22 s() 24 s() XCHG
       21 s() 23 s() XCHG
       20 s() 22 s() XCHG
@@ -2178,7 +1874,7 @@ PROGRAM{
       $MarketStabilitySeller$_contract_store INLINECALLDICT
     }>
     15 BLKDROP
-    14 BLKDROP
+    10 BLKDROP
     130 THROW
   }>
 }END>c

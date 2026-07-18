@@ -24,7 +24,7 @@ PROGRAM{
   DECLPROC $RecordShard$_fun_frameCommit
   DECLPROC $CapsuleRecordView$_constructor_exists_frame_commit_created_at
   DECLPROC $RecordShard$_fun_get_record
-  DECLPROC $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee
+  DECLPROC $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty
   DECLPROC $RecordShard$_fun_get_view
   DECLPROC $RecordEntry$_constructor_frame_commit_created_at
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
@@ -117,16 +117,19 @@ PROGRAM{
     }>
   }>
   $RecordShard$_store PROCINLINE:<{
-    s7 s8 XCHG2
+    s8 s9 XCHG2
     256 STU
-    s1 s5 XCHG
+    s1 s6 XCHG
     32 STU
-    s1 s3 XCHG
+    s1 s4 XCHG
     64 STU
+    s1 s2 XCHG
     STDICT
     32 STU
     32 STU
     32 STU
+    SWAP
+    STVARUINT16
     SWAP
     STVARUINT16
   }>
@@ -139,7 +142,8 @@ PROGRAM{
     32 LDU
     32 LDU
     LDVARUINT16
-    8 -ROLL
+    LDVARUINT16
+    9 -ROLL
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -163,7 +167,7 @@ PROGRAM{
     0 PUSHINT
     PUSHNULL
     s1 s1 s1 PUSH3
-    DUP
+    s0 s0 PUSH2
   }>
   $RecordShard$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -172,7 +176,7 @@ PROGRAM{
     SWAP
     IF:<{
       $RecordShard$_load INLINECALLDICT
-      1 8 BLKDROP2
+      1 9 BLKDROP2
     }>ELSE<{
       $RecordShard$init$_load INLINECALLDICT
       s0 s2 XCHG
@@ -186,7 +190,7 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    8 -ROLL
+    9 -ROLL
     $RecordShard$_store INLINECALLDICT
     ENDC
     c4 POP
@@ -215,7 +219,7 @@ PROGRAM{
   }>
   $RecordShard$_fun_get_record PROCREF:<{
     257 PUSHINT
-    s6 PUSH
+    s7 PUSH
     s0 s2 XCHG
     __tact_dict_get_int_cell INLINECALLDICT
     $RecordEntry$_load_opt INLINECALLDICT
@@ -233,22 +237,23 @@ PROGRAM{
     -ROT
     $CapsuleRecordView$_constructor_exists_frame_commit_created_at INLINECALLDICT
   }>
-  $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee PROCINLINE:<{
+  $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty PROCINLINE:<{
   }>
   $RecordShard$_fun_get_view PROCREF:<{
     12 PUSHPOW2
     31536000 PUSHINT
-    12800000 PUSHINT
+    13600000 PUSHINT
     10000000 PUSHINT
-    s11 PUSH
-    s4 s11 XCPU
-    s4 s11 XCPU
-    s4 s10 XCPU
-    s4 s10 XCPU
-    s4 s10 XCPU
-    s4 s3 s4 XCHG3
-    s10 PUSH
-    $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee INLINECALLDICT
+    800000 PUSHINT
+    s13 PUSH
+    s5 s13 XCPU
+    s5 s13 XCPU
+    s5 s12 XCPU
+    s5 s12 XCPU
+    s5 s12 XCPU
+    5 -ROLL
+    s12 s11 s(-1) PU2XC
+    $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty INLINECALLDICT
   }>
   $RecordEntry$_constructor_frame_commit_created_at PROCINLINE:<{
   }>
@@ -262,15 +267,24 @@ PROGRAM{
   }>
   %get_record PROC:<{
     $RecordShard$_contract_load INLINECALLDICT
-    8 ROLL
+    9 ROLL
     $RecordShard$_fun_get_record INLINECALLDICT
-    8 3 BLKDROP2
+    9 3 BLKDROP2
     $CapsuleRecordView$_to_external INLINECALLDICT
   }>
   %get_view PROC:<{
     $RecordShard$_contract_load INLINECALLDICT
     $RecordShard$_fun_get_view INLINECALLDICT
-    8 11 BLKDROP2
+    s13 POP
+    s13 POP
+    s13 POP
+    s13 POP
+    s13 POP
+    s13 POP
+    s13 POP
+    s13 POP
+    s13 POP
+    9 4 BLKSWAP
     $RecordShardView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -289,27 +303,27 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $RecordShard$_contract_load INLINECALLDICT
-    s0 s9 XCHG
+    s0 s10 XCHG
     IFJMP:<{
-      9 BLKDROP
+      10 BLKDROP
     }>
     0 PUSHINT
-    s8 PUSH
+    s9 PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 s8 XCHG
-      32 LDU
       s0 s9 XCHG
+      32 LDU
+      s0 s10 XCHG
     }>
     OVER
     1381191729 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s7 XCHG
+      s0 s8 XCHG
       64 LDU
       LDREF
       LDREF
@@ -319,61 +333,81 @@ PROGRAM{
       LDREF
       LDREF
       DROP
+          NOW
+      86400 PUSHINT
+      DIV
+      13656 PUSHINT
+      s12 PUSH
+      DEC
+      s2 s(-1) PUXC
+      GEQ
+      IF:<{
+        s12 PUSH
+        INC
+        s1 s2 XCHG
+        LEQ
+      }>ELSE<{
+        NIP
+        FALSE
+      }>
+      THROWANYIFNOT
       13652 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      12800000 PUSHINT
+      13600000 PUSHINT
       GEQ
       THROWANYIFNOT
       13651 PUSHINT
-      s6 PUSH
+      s7 PUSH
       12 PUSHPOW2
       LESS
       THROWANYIFNOT
       13653 PUSHINT
-      s5 s9 PUSH2
+      s5 s10 PUSH2
       GREATER
       THROWANYIFNOT
-      s4 s11 XCHG
-      s0 s12 XCHG
+      s4 s12 XCHG
+      s0 s13 XCHG
       3 -ROLL
       $RecordShard$_fun_frameCommit INLINECALLDICT
-      s6 POP
+      s7 POP
           NEWC
       1381193540 PUSHINT
       SWAP
       32 STU
-      s9 s(-1) PUXC
+      s10 s(-1) PUXC
       64 STU
-      s6 s(-1) PUXC
+      s7 s(-1) PUXC
       256 STU
           ENDC
           HASHCU
       13654 PUSHINT
-      s0 s11 XCHG
+      s0 s12 XCHG
           CTOS
-      s9 PUSH
+      s10 PUSH
           CHKSIGNU
-      s1 s10 XCHG
+      s1 s11 XCHG
       THROWANYIFNOT
-      s0 s8 XCHG
       10000000 PUSHINT
+      ADD
+      s0 s9 XCHG
+      800000 PUSHINT
       ADD
       257 PUSHINT
           NOW
-      s1 s6 XCHG
+      s1 s7 XCHG
       $RecordEntry$_constructor_frame_commit_created_at INLINECALLDICT
       NEWC
       $RecordEntry$_store_cell INLINECALLDICT
-      5 1 REVERSE
-      s3 s(-1) PUXC
+      s5 s6 s0 XCHG3
+      s4 s(-1) PUXC
       __tact_dict_set_int_cell INLINECALLDICT
-      SWAP
-      INC
       s0 s2 XCHG
       INC
-      10300000 PUSHINT
-      s3 PUSH
+      SWAP
+      INC
+      11100000 PUSHINT
+      s2 PUSH
       1 EQINT
       IF:<{
         2000000 PUSHINT
@@ -454,10 +488,11 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      s6 s8 XCHG
       s5 s7 XCHG
-      s0 s4 s3 XCHG3
-      s1 s6 XCHG
-      s1 s5 XCHG
+      s5 s6 XCHG
+      s5 s1 s3 XCHG3
+      s0 s0 s4 XCHG3
       $RecordShard$_contract_store INLINECALLDICT
     }>
     OVER
@@ -465,7 +500,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s7 XCHG
+      s0 s8 XCHG
       16 LDU
       DROP
       0 PUSHINT
@@ -481,7 +516,7 @@ PROGRAM{
           FALSE
         }>
         IF:<{
-          s10 s5 PUSH2
+          s4 s6 PUSH2
           LESS
         }>ELSE<{
           FALSE
@@ -493,9 +528,9 @@ PROGRAM{
           FALSE
         }>
       }>DO<{
-        s6 PUSH
+        s7 PUSH
         257 PUSHINT
-        s12 PUSH
+        s6 PUSH
         __tact_dict_get_int_cell INLINECALLDICT
         $RecordEntry$_load_opt INLINECALLDICT
         s0 s2 XCHG
@@ -516,47 +551,58 @@ PROGRAM{
             PUSHNULL
             NEWC
             $RecordEntry$_store_opt INLINECALLDICT
-            s12 PUSH
-            s3 s9 XCHG
+            s6 PUSH
+            s3 s10 XCHG
             SWAP
             __tact_dict_set_int_cell INLINECALLDICT
-            s0 s4 XCHG
+            s0 s5 XCHG
             DEC
-            s0 s10 XCHG
+            s0 s4 XCHG
             INC
             s0 s2 XCHG
             INC
           }>ELSE<{
             DROP
-            s3 s9 XCHG
             TRUE
-            s0 s6 XCHG
+            s0 s7 XCHG
+            s0 s5 XCHG
             s4 s1 s4 XCHG3
           }>
         }>ELSE<{
           s2 POP
-          s0 s10 XCHG
+          s0 s4 XCHG
           INC
-          s4 s10 XCHG
-          s4 s6 XCHG
+          s4 s7 XCHG
+          s4 s5 XCHG
           s0 s2 XCHG
         }>
-        s2 s10 XCHG
-        s4 s6 XCHG
+        s5 s7 XCHG
+        s4 s5 XCHG
         s0 s1 s4 XCHG3
       }>
-      2DROP
+      s2 s3 XCHG
+      3 BLKDROP
       13655 PUSHINT
-      s2 POP
+      OVER
       0 GTINT
       THROWANYIFNOT
-      2000000 PUSHINT
-      OVER
-      300000 PUSHINT
+          BALANCE FIRST
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      SUB
+      SWAP
+      800000 PUSHINT
       MUL
-      ADD
-      s8 PUSH
-      ADD
+      s10 s10 XCPU
+      SUB
+      s0 s10 XCHG
+      SUB
+      DUP
+      0 LESSINT
+      IF:<{
+        DROP
+        0 PUSHINT
+      }>
       2 PUSHINT
           RAWRESERVE
       __tact_context_get_sender INLINECALLDICT
@@ -630,22 +676,22 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s5 s7 XCHG
-      2 5 BLKSWAP
+      s6 s8 XCHG
+      2 6 BLKSWAP
       $RecordShard$_contract_store INLINECALLDICT
     }>
-    s9 POP
+    s10 POP
     0 EQINT
-    s0 s8 XCHG
+    s0 s9 XCHG
     33 LESSINT
-    s1 s8 XCHG
+    s1 s9 XCHG
     AND
     IFJMP:<{
-      s5 s7 XCHG
-      2 5 BLKSWAP
+      s6 s8 XCHG
+      2 6 BLKSWAP
       $RecordShard$_contract_store INLINECALLDICT
     }>
-    8 BLKDROP
+    9 BLKDROP
     130 THROW
   }>
 }END>c

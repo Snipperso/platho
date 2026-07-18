@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
@@ -12,7 +13,6 @@ import {
   BindMarketStabilityTreasury,
   BuyMarketStabilityAth,
   FlushMarketStabilityTreasuryTon,
-  FreezeMarketStabilityPricing,
   MarketStabilitySeller,
   SealMarketStabilityGenesis,
 } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
@@ -23,10 +23,15 @@ import {
 import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 
 const MANIFEST_HASH = 0xababababababababababababababababababababababababababababababababn;
-const PRICING_EVIDENCE_HASH = 0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdn;
 const TRANCHE = 3_000_000_000_000_000n;
 const TOTAL_RESERVE = 60_000_000_000_000_000n;
-const BASE_TRANCHE_PRICE = toNano('1');
+// Mirrors the contract's own constant, parsed from source so a change on one side cannot silently diverge.
+const BASE_TRANCHE_PRICE = (() => {
+  const src = readFileSync('contracts/MarketStabilitySeller.tact', 'utf8');
+  const m = src.match(/const\s+MARKET_STABILITY_BASE_TRANCHE_PRICE\s*:\s*Int\s*=\s*(\d+)/);
+  if (!m) throw new Error('MARKET_STABILITY_BASE_TRANCHE_PRICE not found in the contract');
+  return BigInt(m[1]);
+})();
 const NOTIFY_VALUE = 80_000_000n;
 const BUY_TRANSFER_REQUEST_VALUE = 58_000_000n; // F11/#3: mirrors MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE (48M->58M, +10M downstream margin)
 const BUY_EXEC_RESERVE = 2_000_000n;
@@ -134,10 +139,8 @@ async function setup() {
   };
 }
 
-async function bindFreezeSeal(env: Awaited<ReturnType<typeof setup>>) {
+async function bindAndSeal(env: Awaited<ReturnType<typeof setup>>) {
   await bindCore(env);
-
-  await freezePricing(env);
 
   await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealMarketStabilityGenesis',
@@ -165,15 +168,6 @@ async function bindCore(env: Awaited<ReturnType<typeof setup>>) {
   } as BindMarketStabilityTreasury);
 }
 
-async function freezePricing(env: Awaited<ReturnType<typeof setup>>) {
-  await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
-    $$type: 'FreezeMarketStabilityPricing',
-    deployment_manifest_hash: MANIFEST_HASH,
-    base_tranche_price_nanotons: BASE_TRANCHE_PRICE,
-    evidence_x1_tranche_quote_nanotons: BASE_TRANCHE_PRICE,
-    pricing_evidence_hash: PRICING_EVIDENCE_HASH,
-  } as FreezeMarketStabilityPricing);
-}
 
 async function sealOnly(env: Awaited<ReturnType<typeof setup>>) {
   await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
@@ -239,7 +233,7 @@ describe('MarketStabilitySeller', () => {
     } as BindMarketStabilityReserveFunder);
     expect((await env.seller.getGetMarketStabilitySellerConfig()).reserve_funder_bound).toBe(false);
 
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
     const config = await env.seller.getGetMarketStabilitySellerConfig();
     expect(config.sealed).toBe(true);
     expect(config.pricing_frozen).toBe(true);
@@ -258,7 +252,7 @@ describe('MarketStabilitySeller', () => {
     expect(pending.exists).toBe(false);
   });
 
-  it('MSTAB-01B genesis-lock: reserve funds + locks BEFORE pricing freeze, and freeze succeeds over the locked reserve', async () => {
+  it('MSTAB-01B genesis-lock: the reserve funds + locks at genesis, before any pool or buyer exists', async () => {
     const env = await setup();
     await bindCore(env);
     await sealOnly(env);
@@ -266,11 +260,10 @@ describe('MarketStabilitySeller', () => {
 
     let config = await env.seller.getGetMarketStabilitySellerConfig();
     expect(config.sealed).toBe(true);
-    expect(config.pricing_frozen).toBe(false);
-    expect(config.genesis_config_hash).not.toBe(0n);
+    expect(config.genesis_config_hash).toBe(0n);
 
-    // clean-12 GENESIS-LOCK: funding BEFORE the pricing freeze is now ACCEPTED. The market-maker reserve is committed +
-    // locked at genesis (before the pool/price exists), so it never sits under the owner's unilateral control.
+    // clean-12 GENESIS-LOCK: the market-maker reserve is committed + locked at genesis, before any pool or buyer
+    // exists, so it never sits under the owner's unilateral control.
     await fundReserve(env, TRANCHE);
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TRANCHE);
     expect((await env.seller.getGetMarketStabilitySellerTotals()).reserve_funded_total_ath).toBe(TRANCHE);
@@ -278,17 +271,16 @@ describe('MarketStabilitySeller', () => {
     expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderInitialAth - TRANCHE);
     expect((await (await officialSellerAthWallet(env)).getGetWalletData()).balance).toBe(TRANCHE);
 
-    // freeze now succeeds even though the reserve is already funded (relaxed 23132/23134); reserve stays locked.
-    await freezePricing(env);
+    // the locked reserve is sellable at the constant schedule with no further privileged step of any kind
     config = await env.seller.getGetMarketStabilitySellerConfig();
     expect(config.pricing_frozen).toBe(true);
-    expect(config.genesis_config_hash).toBe(0n);
+    expect(config.base_tranche_price_nanotons).toBe(BASE_TRANCHE_PRICE);
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TRANCHE);
   });
 
   it('MSTAB-01D: forged and non-bound funding notifications do not move Seller reserve or keep ATH', async () => {
     const env = await setup();
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
 
     await env.seller.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'AthTransferNotification',
@@ -315,87 +307,41 @@ describe('MarketStabilitySeller', () => {
     expect((await officialWallet.getGetPendingNotification(711n, senderKey(wrongFunder.address, 711n))).exists).toBe(false);
   });
 
-  it('MSTAB-01C: rejects launch evidence mismatch in both pricing directions before freezing', async () => {
+  it('MSTAB-01C: the tranche price is a compile-time constant, live from deploy with no ceremony', async () => {
     const env = await setup();
+
+    // Before ANY binding or sealing the schedule is already quotable: no key, in any order, can set it wrong.
+    const bornWith = await env.seller.getGetMarketStabilitySellerConfig();
+    expect(bornWith.pricing_frozen).toBe(true);
+    expect(bornWith.base_tranche_price_nanotons).toBe(BASE_TRANCHE_PRICE);
+
+    // The owner's model: a 15M ATH / 15k GRAM pool => 0.001 GRAM per ATH => 3000 GRAM per 3M ATH tranche at x1.
+    expect(BASE_TRANCHE_PRICE).toBe((TRANCHE * toNano('15000')) / 15_000_000_000_000_000n);
+
     await bindCore(env);
     await sealOnly(env);
-
-    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'FreezeMarketStabilityPricing',
-      deployment_manifest_hash: MANIFEST_HASH,
-      base_tranche_price_nanotons: BASE_TRANCHE_PRICE,
-      evidence_x1_tranche_quote_nanotons: BASE_TRANCHE_PRICE - 1n,
-      pricing_evidence_hash: PRICING_EVIDENCE_HASH,
-    } as FreezeMarketStabilityPricing);
-    expect((await env.seller.getGetMarketStabilitySellerConfig()).pricing_frozen).toBe(false);
-
-    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'FreezeMarketStabilityPricing',
-      deployment_manifest_hash: MANIFEST_HASH,
-      base_tranche_price_nanotons: 1n,
-      evidence_x1_tranche_quote_nanotons: BASE_TRANCHE_PRICE,
-      pricing_evidence_hash: PRICING_EVIDENCE_HASH,
-    } as FreezeMarketStabilityPricing);
-
-    const config = await env.seller.getGetMarketStabilitySellerConfig();
-    expect(config.pricing_frozen).toBe(false);
-    expect(config.base_tranche_price_nanotons).toBe(0n);
-    expect(config.evidence_x1_tranche_quote_nanotons).toBe(0n);
-    expect(config.genesis_config_hash).not.toBe(0n);
-
-    await freezePricing(env);
-    expect((await env.seller.getGetMarketStabilitySellerConfig()).pricing_frozen).toBe(true);
+    const sealed = await env.seller.getGetMarketStabilitySellerConfig();
+    expect(sealed.pricing_frozen).toBe(true);
+    expect(sealed.base_tranche_price_nanotons).toBe(BASE_TRANCHE_PRICE);
+    expect(sealed.genesis_config_hash).toBe(0n);
   });
 
-  it('RT-MSTAB-002: post-freeze controller hash is cleared and privileged genesis calls stay extinct', async () => {
+  it('MSTAB-01E: the whole x2..x21 schedule is derived from the constant, not stored', async () => {
     const env = await setup();
-    await bindCore(env);
-    await sealOnly(env);
-    await freezePricing(env);
 
-    const frozen = await env.seller.getGetMarketStabilitySellerConfig();
-    expect(frozen.pricing_frozen).toBe(true);
-    expect(frozen.genesis_config_hash).toBe(0n);
+    // Selling starts at x2 and every tranche is priced by its own multiplier.
+    expect(await env.seller.getGetQuoteTonForAmount(TRANCHE)).toBe(BASE_TRANCHE_PRICE * 2n);
 
-    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'FreezeMarketStabilityPricing',
-      deployment_manifest_hash: MANIFEST_HASH,
-      base_tranche_price_nanotons: BASE_TRANCHE_PRICE,
-      evidence_x1_tranche_quote_nanotons: BASE_TRANCHE_PRICE,
-      pricing_evidence_hash: PRICING_EVIDENCE_HASH + 1n,
-    } as FreezeMarketStabilityPricing);
-    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindMarketStabilityReserveFunder',
-      deployment_manifest_hash: MANIFEST_HASH,
-      reserve_funder_address: env.attacker.address,
-    } as BindMarketStabilityReserveFunder);
-    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindMarketStabilityOfficialAthWallet',
-      deployment_manifest_hash: MANIFEST_HASH,
-      official_ath_wallet_address: env.attacker.address,
-    } as BindMarketStabilityOfficialAthWallet);
-    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindMarketStabilityTreasury',
-      deployment_manifest_hash: MANIFEST_HASH,
-      ton_treasury_receiver_address: env.attacker.address,
-    } as BindMarketStabilityTreasury);
-    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealMarketStabilityGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as SealMarketStabilityGenesis);
-
-    const after = await env.seller.getGetMarketStabilitySellerConfig();
-    expect(after.genesis_config_hash).toBe(0n);
-    expect(after.pricing_frozen).toBe(true);
-    expect(after.pricing_evidence_hash).toBe(PRICING_EVIDENCE_HASH);
-    expect(after.reserve_funder_address.equals(env.reserveFunder.address)).toBe(true);
-    expect(after.official_ath_wallet_address.equals(env.officialAthWallet)).toBe(true);
-    expect(after.ton_treasury_receiver_address.equals(env.treasury.address)).toBe(true);
+    // A partial buy is priced pro rata within the tranche, rounded UP so a dust split cannot underpay.
+    expect(await env.seller.getGetQuoteTonForAmount(TRANCHE / 2n)).toBe(BASE_TRANCHE_PRICE);
+    expect(await env.seller.getGetQuoteTonForAmount(1n)).toBe(
+      (BASE_TRANCHE_PRICE * 2n + TRANCHE - 1n) / TRANCHE,
+    );
   });
 
   it('MSTAB-02: sells only at the current tranche floor, advances x2 to x3, and flushes TON to treasury', async () => {
     const env = await setup();
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
     await fundReserve(env, TRANCHE * 2n);
 
     const x2Price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
@@ -468,7 +414,7 @@ describe('MarketStabilitySeller', () => {
 
   it('RT-MSTAB-004/MSTAB-02B: failed ATH delivery restores reserve, refunds buyer principal, and preserves treasury backing', async () => {
     const env = await setup();
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
     await fundReserve(env, TRANCHE);
 
     const rejectingRecipientOwner = env.recipient.address;
@@ -536,7 +482,7 @@ describe('MarketStabilitySeller', () => {
 
   it('RT-MSTAB-004B: failed delivery leaves existing treasury due raw-backed while refunding only the failed buyer payment', async () => {
     const env = await setup();
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
     await fundReserve(env, TRANCHE);
 
     const officialWallet = await officialSellerAthWallet(env);
@@ -596,7 +542,7 @@ describe('MarketStabilitySeller', () => {
 
   it('MSTAB-02C: accepted transfer request without ATHWallet callback leaves sale pending and blocks new sales', async () => {
     const env = await setup();
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
     await fundReserve(env, TRANCHE);
 
     const mockAthWalletInit = await MockAthWalletNoAck.init();
@@ -652,7 +598,7 @@ describe('MarketStabilitySeller', () => {
 
   it('MSTAB-03: rejects over-cap reserve funding and over-tranche buys before mutation', async () => {
     const env = await setup();
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
     await fundReserve(env, TOTAL_RESERVE, 1n);
     expect((await env.seller.getGetMarketStabilitySellerTotals()).reserve_funded_total_ath).toBe(TOTAL_RESERVE);
 
@@ -719,7 +665,7 @@ describe('MarketStabilitySeller', () => {
 
   it('MSTAB-05: rejects buys above partially funded reserve before mutation', async () => {
     const env = await setup();
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
     const partialReserve = TRANCHE / 2n;
     await fundReserve(env, partialReserve);
 
@@ -741,7 +687,7 @@ describe('MarketStabilitySeller', () => {
 
   it('RT-MSTAB-003/MSTAB-06: sells through x21, accounts exact treasury sum, flushes all, and rejects post-sellout buys', async () => {
     const env = await setup();
-    await bindFreezeSeal(env);
+    await bindAndSeal(env);
     await fundReserve(env, TOTAL_RESERVE);
     let expectedTreasuryDue = 0n;
 

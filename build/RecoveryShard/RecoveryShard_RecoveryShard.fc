@@ -320,7 +320,7 @@ builder $RecoveryShard$_store(builder build_0, (int, int, int, int, int, int, in
 
 ((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
     var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
-    var $fresh$ret_2 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 23200000, $self'h0, $self'h1, $self'bh, 79);
+    var $fresh$ret_2 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 28700000, $self'h0, $self'h1, $self'bh, 79);
     return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_2);
 }
 
@@ -387,7 +387,7 @@ _ %get_body() method_id(104539) {
         var $msg'owner_sig = sc_1~load_ref();
         throw_unless(13571, ( (( (($msg'h0 != 0)) ? (($msg'h1 != 0)) : (false) )) ? (($msg'bh != 0)) : (false) ));
         throw_unless(13557, ($Cell$_fun_hash($msg'body) == $msg'bh));
-        throw_unless(13572, ($Context$_get_value(__tact_context_get()) >= 31200000));
+        throw_unless(13572, ($Context$_get_value(__tact_context_get()) >= 36700000));
         var ($blob'cells, $blob'bits, $blob'refs) = $Cell$_fun_computeDataSize($msg'body, 1024);
         throw_unless(13560, ($blob'cells <= 79));
         int $wasUnbound = (~ $self'bound);
@@ -407,7 +407,7 @@ _ %get_body() method_id(104539) {
         $self'bh = $msg'bh;
         $self'body = $msg'body;
         $self'updated_at = $global_now();
-        $global_nativeReserve(($wasUnbound ? 23200000 : 0), 6);
+        $global_nativeReserve(($wasUnbound ? 28700000 : 0), 6);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecoveryShard$_contract_store(($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at));
         return ();
