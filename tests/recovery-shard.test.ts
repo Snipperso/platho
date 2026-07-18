@@ -24,9 +24,10 @@ const slotKeyForOwner = (ownerPub: bigint): bigint =>
   bufToInt(beginCell().storeUint(SLOT_DOMAIN, 32).storeUint(ownerPub, 256).endCell().hash());
 const selfOf = (owner: KeyPair): bigint => slotKeyForOwner(bufToInt(owner.publicKey));
 
-function digest(selfBucket: bigint, seq: bigint, h0: bigint, h1: bigint, bh: bigint): Buffer {
+function digest(shard: Address, selfBucket: bigint, seq: bigint, h0: bigint, h1: bigint, bh: bigint): Buffer {
   return beginCell()
     .storeUint(RECOVERY_DOMAIN, 32)
+    .storeAddress(shard)          // the digest binds the signature to THIS deployment (anti cross-generation replay)
     .storeUint(selfBucket, 256)
     .storeUint(seq, 64)
     .storeRef(beginCell().storeUint(h0, 256).storeUint(h1, 256).storeUint(bh, 256).endCell())
@@ -35,14 +36,17 @@ function digest(selfBucket: bigint, seq: bigint, h0: bigint, h1: bigint, bh: big
 }
 
 // A recovery publish, signed by `owner`. h0/h1/bh vary with `fill` so successive versions differ.
-function store(owner: KeyPair, selfBucket: bigint, seq: bigint, fill: number, sigOwner?: KeyPair) {
-  const h0 = 0x100n + BigInt(fill), h1 = 0x200n + BigInt(fill), bh = 0x300n + BigInt(fill);
-  const d = digest(selfBucket, seq, h0, h1, bh);
+function store(owner: KeyPair, shard: Address, selfBucket: bigint, seq: bigint, fill: number, sigOwner?: KeyPair) {
+  const h0 = 0x100n + BigInt(fill), h1 = 0x200n + BigInt(fill);
+  const body = beginCell().storeUint(0xDEADBEEFn + BigInt(fill), 256).endCell();
+  // bh MUST be the body's own hash — gate 13557 binds the stored blob to the signed frame, so a relay cannot ship
+  // the owner's signature with different content and destroy the on-chain K_root blob.
+  const bh = bufToInt(body.hash());
+  const d = digest(shard, selfBucket, seq, h0, h1, bh);
   return {
     $$type: 'RecoveryStore' as const,
     owner_pubkey: bufToInt(owner.publicKey),
-    seq, h0, h1, bh,
-    body: beginCell().storeUint(0xDEADBEEFn + BigInt(fill), 256).endCell(),
+    seq, h0, h1, bh, body,
     owner_sig: cellOf(sign(d, (sigOwner ?? owner).secretKey)),
   };
 }
@@ -75,7 +79,7 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     const self = selfOf(owner);
     const rs = await shard(self);
     const before = await relay.getBalance();
-    const res = await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, self, 1n, 0) as any);
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
     expect(exitOf(res, rs.address)).toBe(0);
     const v = await rs.getGetView();
     expect(v.bound).toBe(true);
@@ -91,8 +95,8 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     const owner = keyPairFromSeed(Buffer.alloc(32, 0x11));
     const self = selfOf(owner);
     const rs = await shard(self);
-    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, self, 1n, 0) as any);
-    const res = await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, self, 5n, 1) as any);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 5n, 1) as any);
     expect(exitOf(res, rs.address)).toBe(0);
     expect((await rs.getGetView()).seq).toBe(5n);
   }, 120_000);
@@ -102,10 +106,10 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     const attacker = keyPairFromSeed(Buffer.alloc(32, 0x99));
     const self = selfOf(owner);
     const rs = await shard(self);
-    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, self, 1n, 0) as any);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
     // attacker signs their own publish with a higher seq (their key does not name this slot, but the slot is already
     // bound to the owner, so this is stopped as a hijack at 13563 — the owner-mismatch gate)
-    const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, self, 9n, 2) as any);
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, rs.address, self, 9n, 2) as any);
     expect(exitOf(res, rs.address)).toBe(13563);
     expect((await rs.getGetView()).owner_pubkey).toBe(bufToInt(owner.publicKey));
   }, 120_000);
@@ -114,10 +118,10 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     const owner = keyPairFromSeed(Buffer.alloc(32, 0x13));
     const self = selfOf(owner);
     const rs = await shard(self);
-    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, self, 5n, 0) as any);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 5n, 0) as any);
     // replay the owner's OWN earlier version (seq 5) and an older one (seq 3): both rejected as non-increasing
-    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, self, 5n, 0) as any), rs.address)).toBe(13564);
-    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, self, 3n, 9) as any), rs.address)).toBe(13564);
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, rs.address, self, 5n, 0) as any), rs.address)).toBe(13564);
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, rs.address, self, 3n, 9) as any), rs.address)).toBe(13564);
     expect((await rs.getGetView()).seq).toBe(5n);
   }, 120_000);
 
@@ -127,7 +131,7 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     const self = selfOf(owner);
     const rs = await shard(self);
     // owner_pubkey claims `owner` (whose key names this slot), but the signature is by `forger`
-    const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, self, 1n, 0, forger) as any);
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, rs.address, self, 1n, 0, forger) as any);
     expect(exitOf(res, rs.address)).toBe(13574);
     expect((await rs.getGetView()).bound).toBe(false);
   }, 120_000);
@@ -136,7 +140,7 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     const owner = keyPairFromSeed(Buffer.alloc(32, 0x15));
     const self = selfOf(owner);
     const rs = await shard(self);
-    const res = await rs.send(relay.getSender(), { value: toNano('0.02'), bounce: true }, store(owner, self, 1n, 0) as any);  // < 23.2M + gas
+    const res = await rs.send(relay.getSender(), { value: toNano('0.02'), bounce: true }, store(owner, rs.address, self, 1n, 0) as any);  // < 23.2M + gas
     expect(exitOf(res, rs.address)).toBe(13572);
   }, 120_000);
 
@@ -144,7 +148,7 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     const owner = keyPairFromSeed(Buffer.alloc(32, 0x16));
     const self = selfOf(owner);
     const rs = await shard(self);
-    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, self, 1n, 0) as any);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
     const keeper = await blockchain.treasury('rec-keeper');
     // before 3 years: refused
     expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05'), bounce: true }, { $$type: 'EvictRecovery' } as any), rs.address)).toBe(13562);
@@ -152,6 +156,38 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     blockchain.now = blockchain.now! + RETENTION + 86400;
     expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecovery' } as any), rs.address)).toBe(0);
     expect((await rs.getGetView()).bound).toBe(false);
+  }, 120_000);
+
+  it('RECOVERY-09: the anti-rollback seq SURVIVES eviction — a freed slot cannot be re-bound with a stale blob', async () => {
+    // Eviction used to reset seq to 0, which made every previously signed RecoveryStore valid again: anyone could
+    // re-bind the freed slot with the owner's OWN outdated blob and roll their K_root back to a key they had
+    // rotated away from. The high-water mark is now retained, and the FIRST-bind branch honours it too (keeping seq
+    // without that would have changed nothing, since the monotonic check lived only in the overwrite branch).
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x18));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+
+    const stale = store(owner, rs.address, self, 3n, 0);            // capture a legitimately signed publish
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, stale as any), rs.address)).toBe(0);
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 7n, 1) as any), rs.address)).toBe(0);
+    expect((await rs.getGetView()).seq).toBe(7n);
+
+    // the owner goes quiet for 3 years and the slot is evicted
+    blockchain.now = blockchain.now! + RETENTION + 86400;
+    const keeper = await blockchain.treasury('rec-keeper9');
+    await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecovery' } as any);
+    const freed = await rs.getGetView();
+    expect(freed.bound, 'slot freed').toBe(false);
+    expect(freed.seq, 'but the high-water mark is retained').toBe(7n);
+
+    // replaying the captured seq-3 publish into the freed slot must fail
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, stale as any), rs.address),
+      'stale replay into a freed slot -> 13573').toBe(13573);
+    expect((await rs.getGetView()).bound, 'slot stays unbound').toBe(false);
+
+    // the owner moving FORWARD still works
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 8n, 2) as any), rs.address)).toBe(0);
+    expect((await rs.getGetView()).seq).toBe(8n);
   }, 120_000);
 
   it('RECOVERY-08: [SQUAT-CLOSE] only the key that names the slot can bind it — fresh AND after eviction (13575)', async () => {
@@ -164,24 +200,26 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     const rs = await shard(self);
 
     // (a) FRESH slot: a squatter cannot make the first binding — their key does not name this address
-    const squat1 = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, self, 1n, 0) as any);
+    const squat1 = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, rs.address, self, 1n, 0) as any);
     expect(exitOf(squat1, rs.address), 'squat on a fresh slot -> 13575').toBe(13575);
     expect((await rs.getGetView()).bound).toBe(false);
 
     // the true owner binds it, then goes silent for 3 years and the slot is evicted (freed)
-    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, self, 1n, 0) as any), rs.address)).toBe(0);
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any), rs.address)).toBe(0);
     blockchain.now = blockchain.now! + RETENTION + 86400;
     const keeper = await blockchain.treasury('rec-keeper8');
     await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecovery' } as any);
     expect((await rs.getGetView()).bound, 'slot freed by eviction').toBe(false);
 
-    // (b) AFTER eviction: the squatter STILL cannot bind the freed slot — identity is the owner key, not first-writer
-    const squat2 = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, self, 1n, 3) as any);
+    // (b) AFTER eviction: the squatter STILL cannot bind the freed slot — identity is the owner key, not first-writer.
+    // seq is deliberately HIGH so the refusal cannot come from the anti-rollback floor (13573) — this must prove the
+    // squat gate itself, not the seq gate that now also guards a freed slot.
+    const squat2 = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, rs.address, self, 99n, 3) as any);
     expect(exitOf(squat2, rs.address), 'squat after eviction -> 13575').toBe(13575);
     expect((await rs.getGetView()).bound).toBe(false);
 
-    // only the true owner can re-establish recovery on their slot (seq resets to 0 on eviction, so seq 1 is forward)
-    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, self, 1n, 5) as any), rs.address), 'owner re-binds').toBe(0);
+    // only the true owner can re-establish recovery, and must still beat the retained high-water seq
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 2n, 5) as any), rs.address), 'owner re-binds').toBe(0);
     expect((await rs.getGetView()).owner_pubkey).toBe(bufToInt(owner.publicKey));
   }, 120_000);
 });

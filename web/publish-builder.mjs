@@ -100,20 +100,26 @@ export async function buildIntroPublish({ epoch, bucket, r, viewTag, header0, bo
  * RECOVERY publish: the owner-signed K_root blob, stored ON CHAIN (this lane alone) so it survives even archive
  * pruning. The slot commits to the recovery owner key derived from the seed, so only the seed-holder can bind it
  * (gate 13575). `seq` MUST be strictly greater than the slot's current seq — read get_view().seq first; a fresh
- * slot is 0. The blob is capped at the contract's max_blob_cells (gate 13560).
+ * slot is 0 (after an eviction it is the retained high-water mark). The blob is capped at max_blob_cells (13560),
+ * and `bh` is derived from `body` — do not pass it.
  */
-export async function buildRecoveryPublish({ seed, seq, h0, h1, bh, body, value }) {
+export async function buildRecoveryPublish({ seed, seq, h0, h1, body, value }) {
   const ownerSecret = await recoveryOwnerSecret(seed);
   const ownerPub = await recoveryOwnerPublicKey(seed);
   const slotKey = recoveryOwnerSlotKey(ownerPub);
+  const target = await recoveryShardState(slotKey);
+  // bh is DERIVED from the body, never supplied: the contract requires body.hash() == bh (gate 13557), so letting a
+  // caller pass it separately only creates a way to get it wrong and have the publish bounce.
+  const bh = cellBig(body);
 
-  // digest = H(RECOVERY_DOMAIN ‖ self_bucket_key ‖ seq ‖ ref(h0 ‖ h1 ‖ bh)), mirroring RecoveryShard.recoveryDigest
+  // digest = H(RECOVERY_DOMAIN ‖ shard_address ‖ self_bucket_key ‖ seq ‖ ref(h0 ‖ h1 ‖ bh)), mirroring
+  // RecoveryShard.recoveryDigest. The address is in the preimage so a signed publish cannot be replayed into the
+  // same slot of a future code generation.
   const digest = beginCell()
-    .storeUint(RECOVERY_DOMAIN, 32).storeUint(slotKey, 256).storeUint(BigInt(seq), 64)
+    .storeUint(RECOVERY_DOMAIN, 32).storeAddress(target.address).storeUint(slotKey, 256).storeUint(BigInt(seq), 64)
     .storeRef(beginCell().storeUint(h0, 256).storeUint(h1, 256).storeUint(bh, 256).endCell())
     .endCell().hash();
 
-  const target = await recoveryShardState(slotKey);
   return {
     to: target.address,
     init: target.init,

@@ -183,24 +183,36 @@ contract RecordShard {
     // created_at is monotonic and a FIFO cursor drains oldest-first — this reclaims the (bucket_key, epoch) shards
     // instead of letting them accumulate forever.
     receive(msg: EvictRecords) {
-        let swept: Int = 0;
+        // `evicted` is the REAL count; `steps` is the gas bound. They must be SEPARATE: the previous version
+        // overloaded one counter as both, assigning it max_count to break out when the oldest record was still
+        // fresh — so a "nothing was evicted" exit looked identical to a full sweep. Every iteration counts toward
+        // `steps`, including the already-gone branch, which previously advanced the cursor without any bound.
+        let evicted: Int = 0;
+        let steps: Int = 0;
         let cursor: Int = self.evict_cursor;
-        while ((swept < msg.max_count) && (swept < RS_EVICT_CAP) && (cursor < self.record_count)) {
+        let stop: Bool = false;
+        while ((steps < msg.max_count) && (steps < RS_EVICT_CAP) && (cursor < self.record_count) && !stop) {
             let e: RecordEntry? = self.records.get(cursor);
+            steps = steps + 1;
             if (e != null) {
                 if ((e!!.created_at + RS_RETENTION) < now()) {
                     self.records.set(cursor, null);
                     self.live_count = self.live_count - 1;
                     cursor = cursor + 1;
-                    swept = swept + 1;
+                    evicted = evicted + 1;
                 } else {
-                    swept = msg.max_count;   // oldest live record is still fresh -> nothing older remains
+                    stop = true;   // oldest live entry is still inside the window -> nothing older remains
                 }
             } else {
-                cursor = cursor + 1;
+                cursor = cursor + 1;   // already gone; advance the low-water mark
             }
         }
         self.evict_cursor = cursor;
+        // REFUSE A NO-OP. Without this, EvictRecords{max_count: 0} — or any call made when nothing has aged out —
+        // skips the loop entirely and still falls through to the payout, letting any passer-by drain the shard's
+        // surplus for the price of gas. Throwing here reverts the cursor advance too, which is correct: nothing
+        // was reclaimed, so nothing is owed.
+        throwUnless(13655, evicted > 0);
         // PAY THE EVICTOR. Eviction is the only drain in an immutable contract and external keeper daemons are
         // forbidden in this project, so it will only ever be called by an ordinary participant — who, before this,
         // paid gas AND donated the rest of their value to the shard. Nobody rationally does that, which would have

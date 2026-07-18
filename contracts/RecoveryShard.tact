@@ -97,6 +97,8 @@ contract RecoveryShard {
     fun recoveryDigest(seq: Int, h0: Int, h1: Int, bh: Int): Int {
         return beginCell()
             .storeUint(RS_RECOVERY_DOMAIN, 32)
+            .storeAddress(myAddress())   // binds the signature to THIS deployment; a signed publish cannot be
+                                         // replayed into the same slot of a future code generation
             .storeUint(self.self_bucket_key, 256)
             .storeUint(seq, 64)
             .storeRef(beginCell().storeUint(h0, 256).storeUint(h1, 256).storeUint(bh, 256).endCell())
@@ -106,6 +108,10 @@ contract RecoveryShard {
 
     receive(msg: RecoveryStore) {
         throwUnless(13571, (msg.h0 != 0) && (msg.h1 != 0) && (msg.bh != 0));
+        // [RESTORED 13557] Bind the stored blob to the SIGNED frame. The signature covers bh, but the body itself
+        // was taken verbatim, so a relay could ship the owner's signature with a DIFFERENT body and destroy the
+        // K_root blob — which lives on chain here, with no second copy. The monolith gated exactly this.
+        throwUnless(13557, msg.body.hash() == msg.bh);
         // CARRY self-funding, gated in COMPUTE so the change-return below cannot fail in ACTION.
         throwUnless(13572, context().value >= RS_MIN_VALUE);
         // [RESTORED 13560] The blob is stored ON CHAIN for 3 years against a FIXED endowment, so its size must be
@@ -122,8 +128,12 @@ contract RecoveryShard {
 
         let wasUnbound: Bool = !self.bound;
         if (!self.bound) {
-            // First publish binds the owner. seq must be positive so a later rollback has no seq=0 floor to abuse.
-            throwUnless(13573, msg.seq >= 1);
+            // First publish binds the owner, and must STILL beat the high-water seq. On a fresh slot self.seq is 0,
+            // so this reduces to seq >= 1. After an eviction it is the retained high-water mark, which is the whole
+            // point: without this the anti-rollback check lived only in the overwrite branch below, so a freed slot
+            // could be re-bound with the owner's own OUTDATED signed blob — rolling their K_root back to a key they
+            // had rotated away from. Keeping seq across eviction is useless unless the first bind honours it too.
+            throwUnless(13573, msg.seq > self.seq);
             // [SQUAT-CLOSE] the first binding is SELF-AUTHENTICATING: this slot's address commits to owner_pubkey, so
             // a squatter re-binding an evicted (or fresh) slot would need a hash preimage of the victim's
             // self_bucket_key — infeasible. Anti-hijack no longer rests on "first writer wins": ONLY the owner key
@@ -163,7 +173,10 @@ contract RecoveryShard {
         throwUnless(13562, (self.updated_at + RS_RECOVERY_RETENTION) < now());
         self.bound = false;
         self.owner_pubkey = 0;
-        self.seq = 0;
+        // seq is deliberately NOT reset — it is the anti-rollback high-water mark. Clearing it made every
+        // previously signed RecoveryStore valid again, so anyone could re-bind the freed slot with the owner's own
+        // OUTDATED blob and roll their K_root back to a key they had rotated away from. Eight bytes of retained
+        // state is a trivial price for closing that.
         self.h0 = 0;
         self.h1 = 0;
         self.bh = 0;
