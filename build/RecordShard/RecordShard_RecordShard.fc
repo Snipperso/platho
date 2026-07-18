@@ -8,14 +8,11 @@
 ;; NOTE: declarations are sorted for optimal order
 ;;
 
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
 ;; __tact_context_get_sender
 slice __tact_context_get_sender() inline;
-
-;; __tact_dict_set_code
-cell __tact_dict_set_code(cell dict, int id, cell code) inline;
-
-;; __tact_dict_get_code
-cell __tact_dict_get_code(cell dict, int id) inline;
 
 ;; __tact_dict_get_int_cell
 cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
@@ -50,20 +47,17 @@ builder $RecordShard$_store(builder build_0, (int, int, cell, int, int, int) v) 
 ;; $RecordShard$_load
 (slice, ((int, int, cell, int, int, int))) $RecordShard$_load(slice sc_0) inline;
 
-;; $RecordEntry$_get_frame_commit
-_ $RecordEntry$_get_frame_commit((int, int) v) inline;
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $RecordEntry$_get_created_at
 _ $RecordEntry$_get_created_at((int, int) v) inline;
 
 ;; $CapsuleRecordView$_to_external
-(int, int) $CapsuleRecordView$_to_external(((int, int)) v) inline;
+(int, int, int) $CapsuleRecordView$_to_external(((int, int, int)) v) inline;
 
 ;; $RecordShardView$_to_external
 (int, int, int, int, int, int, int, int) $RecordShardView$_to_external(((int, int, int, int, int, int, int, int)) v) inline;
-
-;; $NullifierShard$init$_store
-builder $NullifierShard$init$_store(builder build_0, (int, int) v) inline;
 
 ;; $RecordShard$init$_load
 (slice, ((int, int))) $RecordShard$init$_load(slice sc_0) inline;
@@ -77,35 +71,26 @@ builder $NullifierShard$init$_store(builder build_0, (int, int) v) inline;
 ;; $RecordShard$_contract_store
 () $RecordShard$_contract_store((int, int, cell, int, int, int) v) impure inline;
 
-;; $Cell$_fun_asSlice
-slice $Cell$_fun_asSlice(cell $self) impure inline;
+;; $RecordShard$_fun_frameCommit
+((int, int, cell, int, int, int), int) $RecordShard$_fun_frameCommit((int, int, cell, int, int, int) $self, cell $h0, cell $h1, cell $body) impure inline_ref;
 
-;; $global_newAddress
-slice $global_newAddress(int $chain, int $hash) impure inline;
-
-;; $global_contractAddressExt
-slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
-
-;; $global_contractAddress
-slice $global_contractAddress((cell, cell) $s) impure inline;
-
-;; $NullifierShard$_init_child
-(cell, cell) $NullifierShard$_init_child(int $epoch, int $lane) inline_ref;
-
-;; $CapsuleRecordView$_constructor_exists_frame_commit
-((int, int)) $CapsuleRecordView$_constructor_exists_frame_commit(int $exists, int $frame_commit) inline;
+;; $CapsuleRecordView$_constructor_exists_frame_commit_created_at
+((int, int, int)) $CapsuleRecordView$_constructor_exists_frame_commit_created_at(int $exists, int $frame_commit, int $created_at) inline;
 
 ;; $RecordShard$_fun_get_record
-((int, int, cell, int, int, int), (int, int)) $RecordShard$_fun_get_record((int, int, cell, int, int, int) $self, int $entry_id) impure inline_ref;
+((int, int, cell, int, int, int), (int, int, int)) $RecordShard$_fun_get_record((int, int, cell, int, int, int) $self, int $entry_id) impure inline_ref;
 
-;; $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention
-((int, int, int, int, int, int, int, int)) $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention(int $bucket_key, int $epoch, int $record_count, int $live_count, int $evict_cursor, int $lane_count, int $safe_cap, int $retention) inline;
+;; $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_safe_cap_retention_min_value
+((int, int, int, int, int, int, int, int)) $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_safe_cap_retention_min_value(int $bucket_key, int $epoch, int $record_count, int $live_count, int $evict_cursor, int $safe_cap, int $retention, int $min_value) inline;
 
 ;; $RecordShard$_fun_get_view
 ((int, int, cell, int, int, int), (int, int, int, int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, cell, int, int, int) $self) impure inline_ref;
 
 ;; $RecordEntry$_constructor_frame_commit_created_at
 ((int, int)) $RecordEntry$_constructor_frame_commit_created_at(int $frame_commit, int $created_at) inline;
+
+;; $SendParameters$_constructor_to_value_mode_bounce
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
 
 
 ;; RecordShard_RecordShard.stdlib.fc
@@ -114,18 +99,12 @@ global slice __tact_context_sender;
 global cell __tact_child_contract_codes;
 global int __tact_randomized;
 
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
 slice __tact_context_get_sender() inline {
     return __tact_context_sender;
-}
-
-cell __tact_dict_set_code(cell dict, int id, cell code) inline {
-    return udict_set_ref(dict, 16, id, code);
-}
-
-cell __tact_dict_get_code(cell dict, int id) inline {
-    var (data, ok) = udict_get_ref?(dict, 16, id);
-    throw_unless(135, ok);
-    return data;
 }
 
 forall X0, X1 -> tuple __tact_tuple_create_2((X0, X1) v) asm """
@@ -158,61 +137,117 @@ builder $global_beginCell() impure asm """
     NEWC
 """;
 
-int $global_contractHash(cell $code, cell $data) impure asm """
-    s0 PUSH HASHCU // `data` hash
-    s2 PUSH HASHCU // `code` hash
-    SWAP2
-    CDEPTH         // `data` depth
-    SWAP
-    CDEPTH         // `code` depth
-    131380 INT     // (2 << 16) | (1 << 8) | 0x34
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
 
-    // Group 2: Composition of the Builder
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
     NEWC
-    24 STU  // store refs_descriptor | bits_descriptor | data
-    16 STU  // store depth_descriptor for `code`
-    16 STU  // store depth_descriptor for `data`
-    256 STU // store `code` hash
-    256 STU // store `data` hash
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
 
-    // Group 3: SHA256 hash of the resulting Builder
-    ONE HASHEXT_SHA256
-""";
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
 
-slice $Slice$_fun_asAddressUnsafe(slice $self) impure asm "NOP";
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
 
-slice $Cell$_fun_beginParse(cell $self) impure asm """
-    CTOS
-""";
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
 
-slice $Cell$_fun_asSlice(cell $self) impure inline {
-    var ($self) = $self;
-    return $Cell$_fun_beginParse($self);
-}
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
 
-cell $Builder$_fun_endCell(builder $self) impure asm """
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
     ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
 """;
-
-slice $global_newAddress(int $chain, int $hash) impure inline {
-    return $Slice$_fun_asAddressUnsafe($Cell$_fun_asSlice($Builder$_fun_endCell(store_uint(store_int(store_uint($global_beginCell(), 4, 3), $chain, 8), $hash, 256))));
-}
-
-slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline {
-    int $hash = $global_contractHash($code, $data);
-    return $global_newAddress($chain, $hash);
-}
-
-slice $global_contractAddress((cell, cell) $s) impure inline {
-    var (($s'code, $s'data)) = $s;
-    return $global_contractAddressExt(0, $s'code, $s'data);
-}
 
 int $global_now() impure asm """
     NOW
 """;
 
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+int $Cell$_fun_hash(cell $self) impure asm """
+    HASHCU
+""";
+
 ;; RecordShard_RecordShard.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline {
+    return ($mode, null(), null(), null(), $value, $to, $bounce);
+}
+
 ;;
 ;; Type: RecordEntry
 ;; TLB: _ frame_commit:int257 created_at:int257 = RecordEntry
@@ -260,11 +295,6 @@ tuple $RecordEntry$_load_opt(cell cl) inline {
     return $RecordEntry$_as_optional(sc~$RecordEntry$_load());
 }
 
-_ $RecordEntry$_get_frame_commit((int, int) v) inline {
-    var (v'frame_commit, v'created_at) = v;
-    return v'frame_commit;
-}
-
 _ $RecordEntry$_get_created_at((int, int) v) inline {
     var (v'frame_commit, v'created_at) = v;
     return v'created_at;
@@ -276,67 +306,30 @@ _ $RecordEntry$_get_created_at((int, int) v) inline {
 
 ;;
 ;; Type: CapsuleRecordView
-;; TLB: _ exists:bool frame_commit:int257 = CapsuleRecordView
+;; TLB: _ exists:bool frame_commit:int257 created_at:int257 = CapsuleRecordView
 ;;
 
-(int, int) $CapsuleRecordView$_to_external(((int, int)) v) inline {
-    var (v'exists, v'frame_commit) = v; 
-    return (v'exists, v'frame_commit);
+(int, int, int) $CapsuleRecordView$_to_external(((int, int, int)) v) inline {
+    var (v'exists, v'frame_commit, v'created_at) = v; 
+    return (v'exists, v'frame_commit, v'created_at);
 }
 
-((int, int)) $CapsuleRecordView$_constructor_exists_frame_commit(int $exists, int $frame_commit) inline {
-    return ($exists, $frame_commit);
+((int, int, int)) $CapsuleRecordView$_constructor_exists_frame_commit_created_at(int $exists, int $frame_commit, int $created_at) inline {
+    return ($exists, $frame_commit, $created_at);
 }
 
 ;;
 ;; Type: RecordShardView
-;; TLB: _ bucket_key:int257 epoch:int257 record_count:int257 live_count:int257 evict_cursor:int257 lane_count:int257 safe_cap:int257 retention:int257 = RecordShardView
+;; TLB: _ bucket_key:int257 epoch:int257 record_count:int257 live_count:int257 evict_cursor:int257 safe_cap:int257 retention:int257 min_value:int257 = RecordShardView
 ;;
 
 (int, int, int, int, int, int, int, int) $RecordShardView$_to_external(((int, int, int, int, int, int, int, int)) v) inline {
-    var (v'bucket_key, v'epoch, v'record_count, v'live_count, v'evict_cursor, v'lane_count, v'safe_cap, v'retention) = v; 
-    return (v'bucket_key, v'epoch, v'record_count, v'live_count, v'evict_cursor, v'lane_count, v'safe_cap, v'retention);
+    var (v'bucket_key, v'epoch, v'record_count, v'live_count, v'evict_cursor, v'safe_cap, v'retention, v'min_value) = v; 
+    return (v'bucket_key, v'epoch, v'record_count, v'live_count, v'evict_cursor, v'safe_cap, v'retention, v'min_value);
 }
 
-((int, int, int, int, int, int, int, int)) $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention(int $bucket_key, int $epoch, int $record_count, int $live_count, int $evict_cursor, int $lane_count, int $safe_cap, int $retention) inline {
-    return ($bucket_key, $epoch, $record_count, $live_count, $evict_cursor, $lane_count, $safe_cap, $retention);
-}
-
-;;
-;; Type: NullifierShard
-;; TLB: _ epoch:uint32 lane:uint32 spent:dict<int, bool> spent_count:uint32 = NullifierShard
-;;
-
-builder $NullifierShard$init$_store(builder build_0, (int, int) v) inline {
-    var (v'epoch, v'lane) = v;
-    build_0 = build_0.store_int(v'epoch, 257);
-    build_0 = build_0.store_int(v'lane, 257);
-    return build_0;
-}
-
-(cell, cell) $NullifierShard$_init_child(int $epoch, int $lane) inline_ref {
-    ;; Build init code cell
-
-    slice sc' = __tact_child_contract_codes.begin_parse();
-    cell source = sc'~load_dict();
-    ;; Contract Code: NullifierShard
-    cell init_code = __tact_dict_get_code(source, 34652);
-
-    ;; Build init data cell
-    cell contracts = new_dict();
-
-    ;; Contract Code: RecordShard
-    contracts = __tact_dict_set_code(contracts, 52655, my_code());
-
-    ;; Contract Code: IntroShard
-    cell code_54285 = __tact_dict_get_code(source, 54285);
-    contracts = __tact_dict_set_code(contracts, 54285, code_54285);
-
-    builder b = begin_cell();
-    b = b.store_builder_ref(begin_cell().store_dict(contracts));
-    b = b.store_int(false, 1);
-    b = $NullifierShard$init$_store(b, ($epoch, $lane));
-    return (init_code, b.end_cell());
+((int, int, int, int, int, int, int, int)) $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_safe_cap_retention_min_value(int $bucket_key, int $epoch, int $record_count, int $live_count, int $evict_cursor, int $safe_cap, int $retention, int $min_value) inline {
+    return ($bucket_key, $epoch, $record_count, $live_count, $evict_cursor, $safe_cap, $retention, $min_value);
 }
 
 ;;
@@ -373,7 +366,6 @@ builder $RecordShard$_store(builder build_0, (int, int, cell, int, int, int) v) 
 
 (int, int, cell, int, int, int) $RecordShard$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
-    __tact_child_contract_codes = $sc~load_ref();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
         return $sc~$RecordShard$_load();
@@ -387,7 +379,6 @@ builder $RecordShard$_store(builder build_0, (int, int, cell, int, int, int) v) 
 
 () $RecordShard$_contract_store((int, int, cell, int, int, int) v) impure inline {
     builder b = begin_cell();
-    b = b.store_ref(__tact_child_contract_codes);
     b = b.store_int(true, 1);
     b = $RecordShard$_store(b, v);
     set_data(b.end_cell());
@@ -408,21 +399,28 @@ builder $RecordShard$_store(builder build_0, (int, int, cell, int, int, int) v) 
     return ($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor);
 }
 
-((int, int, cell, int, int, int), (int, int)) $RecordShard$_fun_get_record((int, int, cell, int, int, int) $self, int $entry_id) impure inline_ref {
+((int, int, cell, int, int, int), int) $RecordShard$_fun_frameCommit((int, int, cell, int, int, int) $self, cell $h0, cell $h1, cell $body) impure inline_ref {
+    var (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)) = $self;
+    var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 1381189187, 32), $Cell$_fun_hash($h0), 256), $Cell$_fun_hash($h1), 256), $Cell$_fun_hash($body), 256)));
+    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_0);
+}
+
+((int, int, cell, int, int, int), (int, int, int)) $RecordShard$_fun_get_record((int, int, cell, int, int, int) $self, int $entry_id) impure inline_ref {
     var (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)) = $self;
     tuple $e = $RecordEntry$_load_opt(__tact_dict_get_int_cell($self'records, 257, $entry_id));
     if (null?($e)) {
-        var $fresh$ret_24 = $CapsuleRecordView$_constructor_exists_frame_commit(false, 0);
-        return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_24);
+        var $fresh$ret_1 = $CapsuleRecordView$_constructor_exists_frame_commit_created_at(false, 0, 0);
+        return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_1);
     }
-    var $fresh$ret_25 = $CapsuleRecordView$_constructor_exists_frame_commit(true, $RecordEntry$_get_frame_commit($RecordEntry$_not_null($e)));
-    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_25);
+    var ($v'frame_commit, $v'created_at) = $RecordEntry$_not_null($e);
+    var $fresh$ret_2 = $CapsuleRecordView$_constructor_exists_frame_commit_created_at(true, $v'frame_commit, $v'created_at);
+    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_2);
 }
 
 ((int, int, cell, int, int, int), (int, int, int, int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, cell, int, int, int) $self) impure inline_ref {
     var (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)) = $self;
-    var $fresh$ret_26 = $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_lane_count_safe_cap_retention($self'bucket_key, $self'epoch, $self'record_count, $self'live_count, $self'evict_cursor, 1048576, 4096, 31536000);
-    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_26);
+    var $fresh$ret_3 = $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_safe_cap_retention_min_value($self'bucket_key, $self'epoch, $self'record_count, $self'live_count, $self'evict_cursor, 4096, 31536000, 2700000);
+    return (($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor), $fresh$ret_3);
 }
 
 ;;
@@ -471,17 +469,18 @@ _ %get_view() method_id(76114) {
     if (in_msg_length >= 32) {
         op = in_msg~load_uint(32);
     }
-    ;; Receive RecordStore message
+    ;; Receive CapsulePublish message
     if (op == 0x52535031) {
-        var $msg'serial = in_msg~load_uint(256);
-        var $msg'frame_commit = in_msg~load_uint(256);
-        int $lane = ($msg'serial % 1048576);
-        slice $expected = $global_contractAddress($NullifierShard$_init_child($self'epoch, $lane));
-        throw_unless(13650, ( equal_slices_bits(__tact_context_get_sender(), $expected) ));
+        var $msg'header_0 = in_msg~load_ref();
+        var $msg'header_1 = in_msg~load_ref();
+        var $msg'body = in_msg~load_ref();
+        throw_unless(13652, ($Context$_get_value(__tact_context_get()) >= 2700000));
         throw_unless(13651, ($self'live_count < 4096));
-        $self'records~__tact_dict_set_int_cell(257, $self'record_count, $RecordEntry$_store_cell($RecordEntry$_constructor_frame_commit_created_at($msg'frame_commit, $global_now()), begin_cell()));
+        $self'records~__tact_dict_set_int_cell(257, $self'record_count, $RecordEntry$_store_cell($RecordEntry$_constructor_frame_commit_created_at(($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor)~$RecordShard$_fun_frameCommit($msg'header_0, $msg'header_1, $msg'body), $global_now()), begin_cell()));
         $self'record_count = ($self'record_count + 1);
         $self'live_count = ($self'live_count + 1);
+        $global_nativeReserve((2000000 + ($self'live_count * 200000)), 2);
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecordShard$_contract_store(($self'bucket_key, $self'epoch, $self'records, $self'record_count, $self'live_count, $self'evict_cursor));
         return ();
     }

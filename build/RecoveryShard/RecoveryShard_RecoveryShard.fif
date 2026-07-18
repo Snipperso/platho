@@ -12,7 +12,7 @@ PROGRAM{
   DECLPROC $RecoveryShard$_contract_store
   DECLPROC $RecoveryShard$_fun_slotKeyForOwner
   DECLPROC $RecoveryShard$_fun_recoveryDigest
-  DECLPROC $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment
+  DECLPROC $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells
   DECLPROC $RecoveryShard$_fun_get_view
   DECLPROC $RecoveryShard$_fun_get_body
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
@@ -143,18 +143,21 @@ PROGRAM{
         ENDC
         HASHCU
   }>
-  $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment PROCINLINE:<{
+  $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells PROCINLINE:<{
   }>
   $RecoveryShard$_fun_get_view PROCREF:<{
     94608000 PUSHINT
     23200000 PUSHINT
-    s10 PUSH
-    s10 s2 s(-1) PUXC2
-    s10 PUSH
-    s10 s2 s(-1) PUXC2
-    s6 PUSH
-    -ROT
-    $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment INLINECALLDICT
+    79 PUSHINT
+    s11 PUSH
+    s3 s11 XCPU
+    s3 s11 XCPU
+    s3 s11 XCPU
+    s3 s7 XCPU
+    s1 s3 s3 XCHG3
+    s12 s11 s(-2) PU2XC
+    s12 s(-1) PUXC
+    $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells INLINECALLDICT
   }>
   $RecoveryShard$_fun_get_body PROCREF:<{
     OVER
@@ -170,7 +173,7 @@ PROGRAM{
   %get_view PROC:<{
     $RecoveryShard$_contract_load INLINECALLDICT
     $RecoveryShard$_fun_get_view INLINECALLDICT
-    9 7 BLKDROP2
+    9 11 BLKDROP2
     $RecoveryShardView$_to_external INLINECALLDICT
   }>
   %get_body PROC:<{
@@ -247,6 +250,14 @@ PROGRAM{
       $Context$_get_value INLINECALLDICT
       31200000 PUSHINT
       GEQ
+      THROWANYIFNOT
+      OVER
+      10 PUSHPOW2
+          CDATASIZE
+      2DROP
+      13560 PUSHINT
+      SWAP
+      80 LESSINT
       THROWANYIFNOT
       s12 PUSH
       IF:<{

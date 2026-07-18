@@ -1,43 +1,59 @@
-import "./NullifierShard.tact";
+// RecordShard — clean-17 sharded CONV lane: one (bucket_key, epoch) partition = a conversation-direction for a day.
+//
+// DIRECT-PAID (no tokens, no nullifiers, no issuer). [OWNER 2026-07-18: all external infrastructure is forbidden in
+// this project and always has been.] The earlier design routed every publish through a NullifierShard that burnt a
+// blind-issued token. That token layer only bought unlinkability against the ISSUER — a chain observer still reads
+// the spend transaction's `src` — so it paid off only in combination with an external relay. Two mandatory online
+// services in the send path is exactly what this project does not do, so the whole layer is gone. What actually
+// closed the metadata-graph leak is the opaque bucket_key, and that is pure client-side crypto:
+//     bucket_key = HKDF(K_epoch ‖ dir ‖ epoch),  K_epoch = HKDF(K_root, epoch)
+//
+// WRITE CAPABILITY = KNOWING bucket_key. That is the whole authorization model, and it is stronger than it looks:
+// bucket_key is derived from the conversation's shared K_root, so only the two participants can name this address.
+// An outsider cannot aim at someone's conversation because they cannot compute where it lives. Anti-spam is the
+// rent itself — every record pays its own storage — bounded further by SAFE-CAP and 1-year eviction. This replaces
+// the old RS-AUTH gate (13650), which existed only to prove a nullifier had been burnt.
+//
+// BODY CARRIAGE — the bug this rewrite fixes. The two-hop design could not deliver a message at all: the forward
+// carried only {serial, frame_commit}, so the ciphertext existed nowhere on chain and the recipient had nothing to
+// decrypt. Publishing DIRECTLY to the terminal shard fixes it by construction: the client's own transaction lands
+// here carrying the capsule cells, so the content lives in THIS account's transaction history, authenticated by the
+// stored commit. That is the proven monolith pattern (headers/body recovered from hub tx history).
+//
+// STATE STAYS THIN: the account stores only (frame_commit, created_at) per record — the capsule cells are NOT copied
+// into state. That is what keeps a shard's state bounded and the ~65536-cell account ceiling irrelevant. The durability
+// tradeoff is explicit and inherited from the monolith: content lives in transaction history, so a message is
+// recoverable as long as history is. The RECOVERY lane exists precisely because the K_root blob must survive even
+// that, and it alone stores its blob on chain.
+//
+// TERMINAL + CARRY: success stores the record and returns the payer's change (one send to the sender's wallet, which
+// cannot fail), keeping only the shard's own rent. Every refusal is a COMPUTE throw, which bounces and refunds.
 
-// RecordShard — clean-17 sharded anon-publish, increment 3: the TERMINAL hop that stores a capsule record.
-//
-// One (bucket_key, epoch) partition — a conversation-direction for a day. Deployed lazily, address =
-// f(StateInit{bucket_key, epoch}), so a client that knows its bucket_key computes the address locally and reads
-// the records straight from account state (zero getters, zero cross-shard walk). Dies with its epoch.
-//
-// It is the TERMINAL hop on purpose: on success it stores the record and sends NOTHING (0 outgoing, 0
-// nativeReserve). The ACTION phase therefore has no failure surface — the class of silent code-50 loss that has
-// no bounce cannot happen here. Every refusal is a COMPUTE throw, which bounces. This is what makes the two-hop
-// path safe: the nullifier is burnt at the NullifierShard, and the record hop can only either succeed or refuse-
-// and-bounce in COMPUTE — it never half-commits silently.
-//
-// AUTHORITY: it accepts a record ONLY from the exact NullifierShard that must have burnt this token's nullifier.
-// The forward carries the serial; this contract recomputes lane = serial mod LANE_COUNT and the NullifierShard's
-// address = f(StateInit{epoch, lane}), and requires sender() to equal it (RS-AUTH). Without this gate anyone could
-// write records for free, bypassing the nullifier burn.
-//
-// CARRY: the record's storage endowment rides in the forwarded value. Being terminal and reserving nothing, the
-// contract simply keeps the whole incoming value on balance — the endowment stays, funding the record's rent.
-//
-// SAFE-CAP: RS_SAFE_CAP bounds records per (bucket_key, epoch) so the account cannot grow into code 50. The cap is
-// per-conversation-per-day; reaching it means 4096 spent credits (10 ATH each) aimed at one conversation-day —
-// economically absurd, so the bounce path below is effectively unreachable. If ever hit, the residual (the token's
-// nullifier stays burnt while the record is refused) is a single lost message for someone who burnt 4096 credits;
-// documented and accepted rather than compensated with cross-shard saga machinery.
-
-const RS_LANE_COUNT: Int = 1048576;   // MUST equal NullifierShard's NS_LANE_COUNT (the sender-address derivation)
 const RS_SAFE_CAP: Int = 4096;        // records per (bucket_key, epoch); refuse in COMPUTE, not code 50 in ACTION
 const RS_RETENTION: Int = 31536000;   // 1 year — CONV records live this long, then are evictable (matches the endowment)
 const RS_EVICT_CAP: Int = 64;         // max records one EvictRecords call may sweep (bounds gas; keepers repeat)
 
-message(0x52535031) RecordStore {     // "RSP1" — forwarded by the NullifierShard after it burns the nullifier
-    serial: Int as uint256;           // lets this shard recompute the authorized NullifierShard address
-    frame_commit: Int as uint256;     // the capsule frame commitment (H of the header/body hashes); the body lives
-                                       // in the forwarding transaction's history, authenticated by this commit
+// frame_commit preimage tag. The CONTRACT defines the commitment, so client and reader cannot disagree about it.
+const RS_FRAME_DOMAIN: Int = 0x52534643;   // "RSFC"
+
+// [RE-MEASURE BEFORE SEAL] Storage is 64962 nanoton/cell/year (config-18, bits free).
+//   record endowment: 2 measured cells x 64962 x 1yr x 1.5 = 194_886 -> 200_000 (the record lives 1 year)
+//   base endowment:   the shard's own code+data rent over its 1-year life, with margin
+//   publish gas:      this contract's own compute + the change-return, measured ~1.6M on the old terminal hop
+const RS_RECORD_ENDOWMENT: Int = 200000;
+const RS_BASE_ENDOWMENT: Int = 2000000;
+const RS_PUBLISH_GAS: Int = 2500000;
+const RS_MIN_VALUE: Int = RS_RECORD_ENDOWMENT + RS_PUBLISH_GAS;   // minimum that must ARRIVE (gate 13652)
+
+// The capsule a client publishes. The three cells are carried so they land in this account's transaction history;
+// they are NOT stored in state. frame_commit is recomputed here from their hashes — nothing is trusted from the sender.
+message(0x52535031) CapsulePublish {   // "RSP1"
+    header_0: Cell;
+    header_1: Cell;
+    body: Cell;
 }
 
-message(0x52535032) EvictRecords {    // "RSP2" — permissionless FIFO eviction of records past the 1-year window
+message(0x52535032) EvictRecords {     // "RSP2" — permissionless FIFO eviction of records past the 1-year window
     max_count: Int as uint16;
 }
 
@@ -49,6 +65,7 @@ struct RecordEntry {
 struct CapsuleRecordView {
     exists: Bool;
     frame_commit: Int;
+    created_at: Int;     // the client orders/ages records by this; the contract stamps it, so it cannot be gamed
 }
 
 struct RecordShardView {
@@ -57,9 +74,9 @@ struct RecordShardView {
     record_count: Int;   // monotonic next id (total ever stored)
     live_count: Int;     // current live records (after eviction)
     evict_cursor: Int;
-    lane_count: Int;
     safe_cap: Int;
     retention: Int;
+    min_value: Int;      // what a publish must bring (clients read this instead of hardcoding a mirror)
 }
 
 contract RecordShard {
@@ -79,28 +96,43 @@ contract RecordShard {
         self.evict_cursor = 0;
     }
 
-    receive(msg: RecordStore) {
-        // RS-AUTH: the sender must be the exact NullifierShard for (this shard's epoch, serial's lane). That shard,
-        // and only that shard, could have reached here — because it burns the nullifier before forwarding, and its
-        // address is unforgeable. A record therefore exists iff a nullifier was spent for its token.
-        let lane: Int = msg.serial % RS_LANE_COUNT;
-        let expected: Address = contractAddress(initOf NullifierShard(self.epoch, lane));
-        throwUnless(13650, sender() == expected);
+    // The commitment binding a record to its capsule cells. Defined HERE so the publisher and the reader derive it
+    // identically by construction — a client-supplied commit could silently disagree with the cells it ships.
+    fun frameCommit(h0: Cell, h1: Cell, body: Cell): Int {
+        return beginCell()
+            .storeUint(RS_FRAME_DOMAIN, 32)
+            .storeUint(h0.hash(), 256)
+            .storeUint(h1.hash(), 256)
+            .storeUint(body.hash(), 256)
+            .endCell()
+            .hash();
+    }
 
+    receive(msg: CapsulePublish) {
+        // Funding gated in COMPUTE, before any state change, so an underfunded publish bounces and is refunded
+        // rather than half-committing. The record's rent must be present or the shard slowly starves.
+        throwUnless(13652, context().value >= RS_MIN_VALUE);
         // SAFE-CAP in COMPUTE, so a full partition bounces instead of hitting code 50 in ACTION.
         throwUnless(13651, self.live_count < RS_SAFE_CAP);
 
         // created_at is stamped by the CONTRACT (now()), so eviction cannot be gamed by a client field.
-        self.records.set(self.record_count, RecordEntry{ frame_commit: msg.frame_commit, created_at: now() });
+        self.records.set(self.record_count, RecordEntry{
+            frame_commit: self.frameCommit(msg.header_0, msg.header_1, msg.body),
+            created_at: now(),
+        });
         self.record_count = self.record_count + 1;
         self.live_count = self.live_count + 1;
-        // EMPTY ACTION PHASE: no send, no reserve. The forwarded value (the endowment) stays on balance. Nothing
-        // can fail after this point.
+
+        // Keep only this shard's own rent (its base + one endowment per LIVE record) and hand the payer back the
+        // rest. ReserveAtMost never over-reserves; the 13652 gate guarantees the balance covers it, so the send
+        // below has funds. A message to the sender's wallet cannot fail, so ACTION stays safe.
+        nativeReserve(RS_BASE_ENDOWMENT + self.live_count * RS_RECORD_ENDOWMENT, ReserveAtMost);
+        send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
     // Permissionless FIFO eviction of CONV records past the 1-year window. Records are appended in order, so
     // created_at is monotonic and a FIFO cursor drains oldest-first — this reclaims the (bucket_key, epoch) shards
-    // instead of letting them accumulate forever (clean-17 spec section 9, item 3).
+    // instead of letting them accumulate forever.
     receive(msg: EvictRecords) {
         let swept: Int = 0;
         let cursor: Int = self.evict_cursor;
@@ -127,9 +159,10 @@ contract RecordShard {
     get fun get_record(entry_id: Int): CapsuleRecordView {
         let e: RecordEntry? = self.records.get(entry_id);
         if (e == null) {
-            return CapsuleRecordView{ exists: false, frame_commit: 0 };
+            return CapsuleRecordView{ exists: false, frame_commit: 0, created_at: 0 };
         }
-        return CapsuleRecordView{ exists: true, frame_commit: e!!.frame_commit };
+        let v: RecordEntry = e!!;
+        return CapsuleRecordView{ exists: true, frame_commit: v.frame_commit, created_at: v.created_at };
     }
 
     get fun get_view(): RecordShardView {
@@ -139,9 +172,9 @@ contract RecordShard {
             record_count: self.record_count,
             live_count: self.live_count,
             evict_cursor: self.evict_cursor,
-            lane_count: RS_LANE_COUNT,
             safe_cap: RS_SAFE_CAP,
             retention: RS_RETENTION,
+            min_value: RS_MIN_VALUE,
         };
     }
 }

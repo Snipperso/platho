@@ -25,6 +25,13 @@ const RS_RECOVERY_DOMAIN: Int = 0x42525331;       // "BRS1" — recovery digest 
 const RS_SLOT_DOMAIN: Int = 0x52534C4B;           // "RSLK" — the slot IS the owner key: self_bucket_key = H(this ‖ owner_pubkey)
 const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15); permissionless evict after updated_at + this
 const RS_RECOVERY_ENDOWMENT: Int = 23200000;      // 79 cells (8K cap) x 64962 x 3yr x 1.5 — mirrors the monolith's measured value
+// The endowment above is calibrated for EXACTLY this many cells (79 x 64962 x 3 x 1.5 = 23_093_991 ~ 23_200_000), so
+// the blob MUST be capped at it. The monolith gated this as RECOVERY_MAX_SIZE_CLASS (13560); the sharded rewrite
+// dropped the gate, which let an oversized blob buy permanent storage for a fixed endowment — the slot then goes
+// rent-insolvent and the K_root blob is lost on freeze, the exact failure the endowment exists to prevent. Measured
+// here from the ACTUAL cell tree rather than a declared size class, so a lying client cannot under-declare.
+const RS_MAX_BLOB_CELLS: Int = 79;
+const RS_BLOB_PROBE_CELLS: Int = 1024;            // measurement headroom so 13560 fires instead of a raw cell-overflow
 const RS_RECOVERY_PATH_GAS: Int = 8000000;        // compute + change-return, with margin (the blob store is the heavy part)
 const RS_MIN_VALUE: Int = RS_RECOVERY_ENDOWMENT + RS_RECOVERY_PATH_GAS;
 
@@ -48,6 +55,12 @@ struct RecoveryShardView {
     updated_at: Int;
     retention: Int;
     endowment: Int;
+    // The frame hashes were stored but never exposed, so a client could fetch the blob with nothing to check it
+    // against — the monolith returned body_hash alongside the body, making the read self-verifying. Restored.
+    h0: Int;
+    h1: Int;
+    bh: Int;
+    max_blob_cells: Int;   // clients size the blob against the contract's own cap instead of hardcoding a mirror
 }
 
 contract RecoveryShard {
@@ -95,6 +108,17 @@ contract RecoveryShard {
         throwUnless(13571, (msg.h0 != 0) && (msg.h1 != 0) && (msg.bh != 0));
         // CARRY self-funding, gated in COMPUTE so the change-return below cannot fail in ACTION.
         throwUnless(13572, context().value >= RS_MIN_VALUE);
+        // [RESTORED 13560] The blob is stored ON CHAIN for 3 years against a FIXED endowment, so its size must be
+        // capped or the slot goes rent-insolvent and the K_root blob is lost exactly when it is needed. Measured from
+        // the REAL cell tree, so a client cannot under-declare its size.
+        //
+        // The probe limit is deliberately well ABOVE the cap: computeDataSize itself throws (exit 8, cell overflow)
+        // the moment the tree exceeds the limit it is given, so probing AT the cap would make the explicit check
+        // below dead code and report an opaque "cell overflow" instead of a semantic refusal. Probing with headroom
+        // means an over-cap blob is refused as 13560 and a client can tell WHY. An absurdly large tree still exceeds
+        // the probe and bounces on exit 8 — also refused, just without the friendly code.
+        let blob: DataSize = msg.body.computeDataSize(RS_BLOB_PROBE_CELLS);
+        throwUnless(13560, blob.cells <= RS_MAX_BLOB_CELLS);
 
         if (!self.bound) {
             // First publish binds the owner. seq must be positive so a later rollback has no seq=0 floor to abuse.
@@ -153,6 +177,10 @@ contract RecoveryShard {
             updated_at: self.updated_at,
             retention: RS_RECOVERY_RETENTION,
             endowment: RS_RECOVERY_ENDOWMENT,
+            h0: self.h0,
+            h1: self.h1,
+            bh: self.bh,
+            max_blob_cells: RS_MAX_BLOB_CELLS,
         };
     }
 

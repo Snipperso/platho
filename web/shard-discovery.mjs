@@ -8,7 +8,10 @@
 //   CONV record   -> RecordShard(bucket_key, epoch)       — the conversation-direction for a day
 //   INTRO         -> IntroShard(epoch, bucket)            — a sender-chosen bucket the recipient scans
 //   RECOVERY      -> RecoveryShard(self_bucket_key)       — epoch-independent, the user's own slot
-//   spend a token -> NullifierShard(epoch, serial mod N)  — where the relay burns the nullifier
+//
+// Publishing is DIRECT-PAID straight to these addresses — there is no nullifier/token hop, no issuer and no relay
+// (all external infrastructure is forbidden in this project). Writing a CONV bucket is authorized by KNOWING its
+// bucket_key, which only the conversation's two participants can derive.
 //
 // This module derives addresses from the compiled contract StateInit (via the build wrappers). It is transport-
 // agnostic: it returns Addresses; the caller reads them with whatever toncenter/indexer transport it already uses
@@ -18,14 +21,9 @@ import { Address, beginCell, contractAddress } from '@ton/core';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
-import { NullifierShard } from '../build/NullifierShard/NullifierShard_NullifierShard';
 
-// MUST equal NS_LANE_COUNT / RS_LANE_COUNT / IS_LANE_COUNT in the contracts (2^20). A single source here so the
-// client cannot drift from the on-chain constant.
-export const LANE_COUNT = 1_048_576n;
 export const EPOCH_SECONDS = 86400;
 
-export const laneOf = (serial) => BigInt(serial) % LANE_COUNT;
 export const epochOf = (unixSeconds) => Math.floor(unixSeconds / EPOCH_SECONDS);
 
 // MUST equal RS_SLOT_DOMAIN in RecoveryShard.tact ("RSLK"). The recovery slot IS the owner key.
@@ -55,11 +53,6 @@ export async function introShardAddress(epoch, bucket) {
 /** Address of the RECOVERY shard for a user's epoch-independent self-recovery key. */
 export async function recoveryShardAddress(selfBucketKey) {
   return contractAddress(0, await RecoveryShard.init(BigInt(selfBucketKey)));
-}
-
-/** Address of the NullifierShard a token with `serial` spends on, for `epoch`. */
-export async function nullifierShardAddress(epoch, serial) {
-  return contractAddress(0, await NullifierShard.init(BigInt(epoch), laneOf(serial)));
 }
 
 /**
