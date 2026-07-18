@@ -6,7 +6,8 @@ import { NullifierShard, loadNullifierSpend } from '../build/NullifierShard/Null
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecoveryShard, loadRecoveryStore } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
-import { buildConvSpend, buildIntroSpend, buildRecoveryPublish } from '../web/publish-builder.mjs';
+import { readFileSync } from 'node:fs';
+import { buildConvSpend, buildIntroSpend, buildRecoveryPublish, SPEND_MIN_VALUE, RECOVERY_MIN_VALUE } from '../web/publish-builder.mjs';
 import { addrKey, laneOf } from '../web/shard-discovery.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -134,6 +135,32 @@ describe('PUBLISH-BUILDER — client-built messages are accepted by the on-chain
     expect(addrKey(a.to)).toBe(addrKey(b.to));           // ...so both target the same NullifierShard
     expect(a.body.equals(b.body)).toBe(false);           // ...but the signed body differs: the frame is bound in
   }, 120_000);
+
+  it('PB-05: the client value floors are pinned to the CONTRACT constants — silent drift is impossible', () => {
+    // The client hardcodes SPEND_MIN_VALUE / RECOVERY_MIN_VALUE to fund a send past the contract's COMPUTE gates
+    // (13624 / 13572). If a contract constant is ever raised and the client mirror is not, every send silently
+    // under-funds and is refused — the exact bug class that currently has the monolith's VPB2 pricing suite red
+    // (RJ_UNDERPRICED). So derive the truth from the contract SOURCE and pin the client to it.
+    const constOf = (src: string, name: string): bigint => {
+      const m = src.match(new RegExp(`const\\s+${name}\\s*:\\s*Int\\s*=\\s*(\\d+)`));
+      if (!m) throw new Error(`contract constant ${name} not found — did it get renamed?`);
+      return BigInt(m[1]);
+    };
+    const ns = readFileSync('contracts/NullifierShard.tact', 'utf8');
+    const rs = readFileSync('contracts/RecoveryShard.tact', 'utf8');
+
+    // NS_FORWARD_VALUE = record endowment + record gas + nullifier endowment + path gas   (gate 13624)
+    const nsForward = constOf(ns, 'NS_RECORD_ENDOWMENT') + constOf(ns, 'NS_RECORD_GAS')
+      + constOf(ns, 'NS_NULLIFIER_ENDOWMENT') + constOf(ns, 'NS_PATH_GAS');
+    expect(SPEND_MIN_VALUE, 'client SPEND_MIN_VALUE must equal the contract NS_FORWARD_VALUE').toBe(nsForward);
+
+    // RS_MIN_VALUE = recovery endowment + recovery path gas                                (gate 13572)
+    const rsMin = constOf(rs, 'RS_RECOVERY_ENDOWMENT') + constOf(rs, 'RS_RECOVERY_PATH_GAS');
+    expect(RECOVERY_MIN_VALUE, 'client RECOVERY_MIN_VALUE must equal the contract RS_MIN_VALUE').toBe(rsMin);
+
+    // the INTRO lane forwards less than the CONV lane, so the single CONV-derived floor covers both
+    expect(constOf(ns, 'NS_INTRO_ENDOWMENT') + constOf(ns, 'NS_RECORD_GAS')).toBeLessThanOrEqual(nsForward);
+  });
 
   it('PB-04: buildRecoveryPublish lands the owner-signed blob at the owner-bound RecoveryShard', async () => {
     const seed = new Uint8Array(32).fill(0x64);
