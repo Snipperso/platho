@@ -1,8 +1,7 @@
 // automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/IntroShard/IntroShard_IntroShard.fc` 
 PROGRAM{
+  DECLPROC __tact_context_get
   DECLPROC __tact_context_get_sender
-  DECLPROC __tact_dict_set_code
-  DECLPROC __tact_dict_get_code
   DECLPROC __tact_dict_get_int_cell
   DECLPROC __tact_dict_set_int_cell
   DECLPROC $IntroEntry$_store
@@ -14,24 +13,21 @@ PROGRAM{
   DECLPROC $IntroEntry$_load_opt
   DECLPROC $IntroShard$_store
   DECLPROC $IntroShard$_load
+  DECLPROC $Context$_get_value
   DECLPROC $IntroEntry$_get_created_at
   DECLPROC $IntroEntryView$_to_external
   DECLPROC $IntroShardView$_to_external
-  DECLPROC $NullifierShard$init$_store
   DECLPROC $IntroShard$init$_load
   DECLPROC $IntroShard$_contract_init
   DECLPROC $IntroShard$_contract_load
   DECLPROC $IntroShard$_contract_store
-  DECLPROC $Cell$_fun_asSlice
-  DECLPROC $global_newAddress
-  DECLPROC $global_contractAddressExt
-  DECLPROC $global_contractAddress
-  DECLPROC $NullifierShard$_init_child
+  DECLPROC $IntroShard$_fun_bodyCommit
   DECLPROC $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at
   DECLPROC $IntroShard$_fun_get_entry
-  DECLPROC $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap
+  DECLPROC $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value
   DECLPROC $IntroShard$_fun_get_view
   DECLPROC $IntroEntry$_constructor_r_view_tag_body_commit_created_at
+  DECLPROC $SendParameters$_constructor_to_value_mode_bounce
   80118 DECLMETHOD %get_entry
   76114 DECLMETHOD %get_view
   DECLPROC recv_internal
@@ -39,20 +35,12 @@ PROGRAM{
   DECLGLOBVAR __tact_context_sender
   DECLGLOBVAR __tact_child_contract_codes
   DECLGLOBVAR __tact_randomized
+  __tact_context_get PROCINLINE:<{
+    __tact_context GETGLOB
+    4 UNTUPLE
+  }>
   __tact_context_get_sender PROCINLINE:<{
     __tact_context_sender GETGLOB
-  }>
-  __tact_dict_set_code PROCINLINE:<{
-    s0 s2 XCHG
-    16 PUSHINT
-    DICTUSETREF
-  }>
-  __tact_dict_get_code PROCINLINE:<{
-    SWAP
-    16 PUSHINT
-    DICTUGETREF
-    NULLSWAPIFNOT
-    135 THROWIFNOT
   }>
   __tact_dict_get_int_cell PROCINLINE:<{
     -ROT
@@ -163,19 +151,16 @@ PROGRAM{
     32 LDU
     6 -ROLL
   }>
+  $Context$_get_value PROCINLINE:<{
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
   $IntroEntry$_get_created_at PROCINLINE:<{
     3 1 BLKDROP2
   }>
   $IntroEntryView$_to_external PROCINLINE:<{
   }>
   $IntroShardView$_to_external PROCINLINE:<{
-  }>
-  $NullifierShard$init$_store PROCINLINE:<{
-    s0 s2 XCHG
-    257 PUSHINT
-    STIX
-    257 PUSHINT
-    STIX
   }>
   $IntroShard$init$_load PROCINLINE:<{
     257 PUSHINT
@@ -192,9 +177,6 @@ PROGRAM{
   $IntroShard$_contract_load PROCINLINE:<{
     c4 PUSH
     CTOS
-    LDREF
-    SWAP
-    __tact_child_contract_codes SETGLOB
     1 LDI
     SWAP
     IF:<{
@@ -210,9 +192,6 @@ PROGRAM{
   }>
   $IntroShard$_contract_store PROCINLINE:<{
     NEWC
-    __tact_child_contract_codes GETGLOB
-    SWAP
-    STREF
     TRUE
     SWAP
     1 STI
@@ -221,74 +200,21 @@ PROGRAM{
     ENDC
     c4 POP
   }>
-  $Cell$_fun_asSlice PROCINLINE:<{
-        CTOS
-  }>
-  $global_newAddress PROCINLINE:<{
+  $IntroShard$_fun_bodyCommit PROCREF:<{
         NEWC
-    4 PUSHINT
+    1230193219 PUSHINT
     SWAP
-    3 STU
-    s1 s2 XCHG
-    8 STI
+    32 STU
+    s0 s2 XCHG
+        HASHCU
+    ROT
+    256 STU
+    SWAP
+        HASHCU
+    SWAP
     256 STU
         ENDC
-    $Cell$_fun_asSlice INLINECALLDICT
-  }>
-  $global_contractAddressExt PROCINLINE:<{
-        s0 PUSH HASHCU // `data` hash
-        s2 PUSH HASHCU // `code` hash
-        SWAP2
-        CDEPTH         // `data` depth
-        SWAP
-        CDEPTH         // `code` depth
-        131380 INT     // (2 << 16) | (1 << 8) | 0x34
-        // Group 2: Composition of the Builder
-        NEWC
-        24 STU  // store refs_descriptor | bits_descriptor | data
-        16 STU  // store depth_descriptor for `code`
-        16 STU  // store depth_descriptor for `data`
-        256 STU // store `code` hash
-        256 STU // store `data` hash
-        // Group 3: SHA256 hash of the resulting Builder
-        ONE HASHEXT_SHA256
-    $global_newAddress INLINECALLDICT
-  }>
-  $global_contractAddress PROCINLINE:<{
-    0 PUSHINT
-    -ROT
-    $global_contractAddressExt INLINECALLDICT
-  }>
-  $NullifierShard$_init_child PROCREF:<{
-    __tact_child_contract_codes GETGLOB
-    CTOS
-    LDDICT
-    DROP
-    DUP
-    34652 PUSHINT
-    __tact_dict_get_code INLINECALLDICT
-    NEWDICT
-    s0 s2 XCHG
-    52655 PUSHINT
-    __tact_dict_get_code INLINECALLDICT
-    s1 s2 XCHG
-    52655 PUSHINT
-    SWAP
-    __tact_dict_set_code INLINECALLDICT
-    54285 PUSHINT
-    MYCODE
-    __tact_dict_set_code INLINECALLDICT
-    NEWC
-    SWAP
-    NEWC
-    STDICT
-    STBREFR
-    FALSE
-    SWAP
-    1 STI
-    2SWAP
-    $NullifierShard$init$_store INLINECALLDICT
-    ENDC
+        HASHCU
   }>
   $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at PROCINLINE:<{
   }>
@@ -312,20 +238,29 @@ PROGRAM{
     4 -ROLL
     $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at INLINECALLDICT
   }>
-  $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap PROCINLINE:<{
+  $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value PROCINLINE:<{
   }>
   $IntroShard$_fun_get_view PROCREF:<{
     604800 PUSHINT
     8000 PUSHINT
-    s7 PUSH
-    s7 s2 s(-1) PUXC2
-    s5 PUSH
-    s7 s2 s(-1) PUXC2
-    s6 PUSH
-    -ROT
-    $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap INLINECALLDICT
+    2508000 PUSHINT
+    s8 PUSH
+    s3 s8 XCPU
+    s3 s6 XCPU
+    s3 s8 XCPU
+    s3 s7 XCPU
+    s1 s3 s3 XCHG3
+    $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value INLINECALLDICT
   }>
   $IntroEntry$_constructor_r_view_tag_body_commit_created_at PROCINLINE:<{
+  }>
+  $SendParameters$_constructor_to_value_mode_bounce PROCINLINE:<{
+    s1 s3 XCHG
+    PUSHNULL
+    PUSHNULL
+    s4 s3 XCHG2
+    PUSHNULL
+    s0 s3 XCHG
   }>
   %get_entry PROC:<{
     $IntroShard$_contract_load INLINECALLDICT
@@ -337,7 +272,7 @@ PROGRAM{
   %get_view PROC:<{
     $IntroShard$_contract_load INLINECALLDICT
     $IntroShard$_fun_get_view INLINECALLDICT
-    6 7 BLKDROP2
+    6 8 BLKDROP2
     $IntroShardView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -372,51 +307,134 @@ PROGRAM{
       s0 s7 XCHG
     }>
     OVER
-    1230196786 PUSHINT
+    1230196785 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
       s0 s5 XCHG
       256 LDU
-      256 LDU
       16 LDU
-      256 LDU
+      LDREF
+      LDREF
       DROP
-      s0 s3 XCHG
-      20 MODPOW2#
-      13681 PUSHINT
-      __tact_context_get_sender INLINECALLDICT
-      s9 s2 PUXC
-      $NullifierShard$_init_child INLINECALLDICT
-      $global_contractAddress INLINECALLDICT
-      s1 s2 XCHG
-      SDEQ
+      13682 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      2508000 PUSHINT
+      GEQ
       THROWANYIFNOT
       13680 PUSHINT
-      s8 PUSH
+      s9 PUSH
       8000 PUSHINT
       LESS
       THROWANYIFNOT
+      s5 PUSH
       257 PUSHINT
+      s6 PUSH
+      s7 s10 XCHG
+      s6 s9 XCHG
+      s5 s8 XCHG
+      s4 s10 XCHG
+      s3 s11 XCHG
+      s12 s10 s11 XCHG3
+      $IntroShard$_fun_bodyCommit INLINECALLDICT
+      s4 POP
           NOW
-      s1 s4 XCHG
+      s3 s8 XCHG
+      s7 s4 s0 XCHG3
       $IntroEntry$_constructor_r_view_tag_body_commit_created_at INLINECALLDICT
       NEWC
       $IntroEntry$_store_cell INLINECALLDICT
-      s2 PUSH
-      s3 s4 XCHG
-      SWAP
+      s3 s8 XCHG
+      s6 s7 s0 XCHG3
       __tact_dict_set_int_cell INLINECALLDICT
+      s0 s2 XCHG
+      INC
       SWAP
       INC
-      s0 s4 XCHG
-      INC
-      s3 s5 XCHG
-      s4 s0 s3 XCHG3
+      1000000 PUSHINT
+      OVER
+      8000 PUSHINT
+      MUL
+      ADD
+      2 PUSHINT
+          RAWRESERVE
+      __tact_context_get_sender INLINECALLDICT
+      0 PUSHINT
+      130 PUSHINT
+      FALSE
+      $SendParameters$_constructor_to_value_mode_bounce INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+          // → Stack state
+          // s0: Builder
+          // s1: `data`
+          // s2: `code`
+          // s3: `body`
+          // s4: `mode`
+          // Group 2: Placing the Builder after code and data, then checking those for nullability
+          s2 XCHG0
+          DUP2
+          ISNULL
+          SWAP
+          ISNULL
+          AND
+          // → Stack state
+          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+          // s1: `code`
+          // s2: `data`
+          // s3: Builder
+          // s4: `body`
+          // s5: `mode`
+          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+          <{
+              DROP2 // drop `data` and `code`, since either of those is null
+              b{0} STSLICECONST
+          }> PUSHCONT
+          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+          <{
+              // _ split_depth:(Maybe (## 5))
+              //   special:(Maybe TickTock)
+              //   code:(Maybe ^Cell)
+              //   data:(Maybe ^Cell)
+              //   library:(Maybe ^Cell)
+              // = StateInit;
+              ROT                // place message Builder on top
+              b{10} STSLICECONST // store Maybe = true, Either = false
+              // Start composing inlined StateInit
+              b{00} STSLICECONST // store split_depth and special first
+              STDICT             // store code
+              STDICT             // store data
+              b{0} STSLICECONST  // store library
+          }> PUSHCONT
+          // Group 3: IFELSE that does the branching shown above
+          IFELSE
+          // → Stack state
+          // s0: Builder
+          // s1: null or StateInit
+          // s2: `body`
+          // s3: `mode`
+          // Group 4: Finalizing the message
+          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+          ENDC
+          // → Stack state
+          // s0: Cell
+          // s1: `mode`
+          // Group 5: Sending the message, with `mode` on top
+          SWAP
+          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      4 ROLL
       $IntroShard$_contract_store INLINECALLDICT
     }>
     OVER
-    1230196787 PUSHINT
+    1230196786 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP

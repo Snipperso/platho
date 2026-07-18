@@ -1,181 +1,209 @@
 import { describe, expect, it, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { keyPairFromSeed, sign } from '@ton/crypto';
-import { NullifierShard, loadNullifierSpend } from '../build/NullifierShard/NullifierShard_NullifierShard';
-import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
-import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
+import { RecordShard, loadCapsulePublish } from '../build/RecordShard/RecordShard_RecordShard';
+import { IntroShard, loadIntroPublish } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecoveryShard, loadRecoveryStore } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
-import { readFileSync } from 'node:fs';
-import { buildConvSpend, buildIntroSpend, buildRecoveryPublish, SPEND_MIN_VALUE, RECOVERY_MIN_VALUE } from '../web/publish-builder.mjs';
-import { addrKey, laneOf } from '../web/shard-discovery.mjs';
+import { buildConvPublish, buildIntroPublish, buildRecoveryPublish, frameCommit, introBodyCommit } from '../web/publish-builder.mjs';
+import { addrKey, epochOf } from '../web/shard-discovery.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
-// PUBLISH-BUILDER — the client SEND path: a message the client BUILDS is accepted, byte-for-byte, by the on-chain
-// shard. This is the mirror of the discovery/scan RECEIVE path. The strength of the test is that it does NOT use the
-// tests' own ad-hoc message builder — it feeds the real web/publish-builder.mjs output straight into the contract, so
-// any drift between the client's serialization / digest / signing and the contract's expectation fails here. The
-// client signs spend_sig itself (RT1-BLOCKER-1) and owner_sig itself (RECOVERY); the cert + issuer_sig are inputs.
+// PUBLISH-BUILDER — the DIRECT-PAID send path, and the proof that a message is actually DELIVERABLE.
+//
+// The previous two-hop design (client -> NullifierShard -> RecordShard) forwarded only a commitment, so the
+// ciphertext existed nowhere on chain and the recipient had nothing to decrypt — a messenger that could not carry a
+// message. Publishing straight to the terminal shard fixes it by construction: the capsule cells ride in the
+// client's own transaction, so they live in the destination shard's transaction history. PB-01/PB-02 assert exactly
+// that end-to-end — the body is recovered FROM THE TRANSACTION and matches the commitment the CONTRACT stored.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-const CERT_DOMAIN = 0x43414331n;       // "CAC1"
-const ISSUER_SIG_DOMAIN = 0x42534931n; // "BSI1"
-const ROOTS = [0x21, 0x22, 0x23].map((s) => keyPairFromSeed(Buffer.alloc(32, s)));
-const subkey = keyPairFromSeed(Buffer.alloc(32, 0x30));
-const bufToInt = (b: Buffer): bigint => BigInt('0x' + b.toString('hex'));
-
-// The CAC certificate the client receives with its token: roots 0 and 1 authorize the subkey for a window.
-function makeCert(epoch: number) {
-  const validFrom = epoch - 3, validTo = epoch + 3;
-  const digest = beginCell().storeUint(CERT_DOMAIN, 32).storeUint(bufToInt(subkey.publicKey), 256)
-    .storeUint(BigInt(validFrom), 32).storeUint(BigInt(validTo), 32).endCell().hash();
-  return {
-    subkeyPublicKey: bufToInt(subkey.publicKey), validFrom, validTo, rootIdxA: 0, rootIdxB: 1,
-    certSigA: sign(digest, ROOTS[0].secretKey), certSigB: sign(digest, ROOTS[1].secretKey),
-  };
-}
-
-// The issuer's blind signature over the serial (the subkey signs H(BSI1 ‖ spend_pub ‖ epoch ‖ nonce)).
-function issuerSigFor(spendPub: bigint, epoch: number, nonce: bigint): Buffer {
-  const serialBuf = beginCell().storeUint(ISSUER_SIG_DOMAIN, 32).storeUint(spendPub, 256)
-    .storeUint(BigInt(epoch), 32).storeUint(nonce, 64).endCell().hash();
-  return sign(serialBuf, subkey.secretKey);
-}
-
-function exitOf(res: any, dest: Address): number {
+const exitOf = (res: any, dest: Address): number => {
   const tx: any = res.transactions.find(
     (t: any) => t.inMessage?.info?.type === 'internal' && t.inMessage?.info?.dest?.toString() === dest.toString());
   return Number(tx?.description?.computePhase?.exitCode ?? -999);
-}
+};
+// The message that reached `dest` — this is what a client would later re-read from the shard's tx history.
+const inboundTo = (res: any, dest: Address): any => res.transactions.find(
+  (t: any) => t.inMessage?.info?.type === 'internal' && t.inMessage?.info?.dest?.toString() === dest.toString())?.inMessage;
 
-describe('PUBLISH-BUILDER — client-built messages are accepted by the on-chain shards', () => {
+// A capsule cell. Content is opaque to the chain — only its hashes are committed to. A TON cell holds 1023 bits
+// (127 bytes), so anything larger is a SNAKE of chained cells, exactly as the real capsule bodies are built.
+const cellOf = (fill: number, len = 64) => {
+  const buf = Buffer.alloc(len, fill);
+  const chunks: Buffer[] = [];
+  for (let i = 0; i < Math.max(len, 1); i += 127) chunks.push(buf.subarray(i, Math.min(i + 127, len)));
+  let cell = beginCell().storeBuffer(chunks[chunks.length - 1]).endCell();
+  for (let i = chunks.length - 2; i >= 0; i -= 1) {
+    cell = beginCell().storeBuffer(chunks[i]).storeRef(cell).endCell();
+  }
+  return cell;
+};
+
+describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives', () => {
   let blockchain: Blockchain;
-  let relay: SandboxContract<TreasuryContract>;
+  let payer: SandboxContract<TreasuryContract>;
   let epoch: number;
 
   beforeEach(async () => {
     blockchain = await Blockchain.create();
     blockchain.now = 1_700_000_000;
-    epoch = Math.floor(blockchain.now / 86400);
-    relay = await blockchain.treasury('pb-relay');
+    epoch = epochOf(blockchain.now);
+    payer = await blockchain.treasury('pb-payer');
   });
 
   async function deploy<T>(c: SandboxContract<T>): Promise<SandboxContract<T>> {
-    await (c as any).send(relay.getSender(), { value: toNano('0.1') }, null);
+    await (c as any).send(payer.getSender(), { value: toNano('0.05') }, null);
     return c;
   }
-  // Send the client-BUILT body by parsing it and dispatching through the target wrapper (the standard sandbox send
-  // path; a raw internal-message injection trips an unrelated emulator quirk). The body was produced by the client's
-  // storeNullifierSpend/storeRecoveryStore, so parsing it and re-sending exercises the exact client bytes + the
-  // client's serial/digest/spend_sig/owner_sig, all validated against the contract's gates.
-  const sendSpend = (ns: SandboxContract<NullifierShard>, built: { value: bigint; body: any }) =>
-    ns.send(relay.getSender(), { value: built.value, bounce: true }, loadNullifierSpend(built.body.beginParse()) as any);
-  const sendRecovery = (rs: SandboxContract<RecoveryShard>, built: { value: bigint; body: any }) =>
-    rs.send(relay.getSender(), { value: built.value, bounce: true }, loadRecoveryStore(built.body.beginParse()) as any);
+  const send = (built: { to: Address; value: bigint; body: any }) =>
+    payer.send({ to: built.to, value: built.value, body: built.body, bounce: true } as any);
 
-  it('PB-01: buildConvSpend lands the record at its RecordShard (client message == contract expectation)', async () => {
-    const spendSeed = Buffer.alloc(32, 0x71);
-    const spendPub = bufToInt(keyPairFromSeed(spendSeed).publicKey);
-    const nonce = 3n, bucketKey = 0xB0BA_F00Dn, frameCommit = 0xCAFE_1234n;
-    const built = await buildConvSpend({
-      spendSecretKey: spendSeed, epoch, nonce, cert: makeCert(epoch), issuerSig: issuerSigFor(spendPub, epoch, nonce),
-      bucketKey, frameCommit,
-    });
+  it('PB-01: a CONV capsule is stored, and its BODY is recoverable from the shard transaction — the deliverability proof', async () => {
+    const bucketKey = 0xB0BA_F00Dn;
+    const h0 = cellOf(0x11), h1 = cellOf(0x22), body = cellOf(0x33, 512);
+    const built = await buildConvPublish({ bucketKey, epoch, header0: h0, header1: h1, body, value: toNano('0.02') });
 
-    const nsInit = await NullifierShard.init(BigInt(epoch), laneOf(built.serial));
-    const ns = await deploy(blockchain.openContract(new NullifierShard(contractAddress(0, nsInit), nsInit)));
-    const rsInit = await RecordShard.init(bucketKey, BigInt(epoch));
-    const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, rsInit), rsInit)));
+    const init = await RecordShard.init(bucketKey, BigInt(epoch));
+    const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, init), init)));
+    expect(addrKey(built.to), 'builder targets the derived shard').toBe(addrKey(rs.address));
 
-    // the builder targeted exactly the deployed NullifierShard
-    expect(addrKey(built.to)).toBe(addrKey(ns.address));
+    const res = await send(built);
+    expect(exitOf(res, rs.address), 'publish accepted').toBe(0);
 
-    const res = await sendSpend(ns, built);
-    expect(exitOf(res, ns.address), 'nullifier burnt').toBe(0);
-    expect(await ns.getIsSpent(built.serial)).toBe(true);
+    // the contract stored ITS OWN commitment; the client's mirror agrees
     const rec = await rs.getGetRecord(0n);
     expect(rec.exists).toBe(true);
-    expect(rec.frame_commit).toBe(frameCommit);
+    expect(rec.frame_commit, 'contract commitment == client-derived frameCommit').toBe(frameCommit(h0, h1, body));
+    expect(rec.created_at, 'contract stamps the time (now exposed)').toBe(BigInt(blockchain.now!));
+
+    // THE POINT: recover the capsule from the transaction that delivered it and check it against the stored commit.
+    const delivered = loadCapsulePublish(inboundTo(res, rs.address).body.beginParse());
+    expect(delivered.body.equals(body), 'the ciphertext survived the trip').toBe(true);
+    expect(delivered.header_0.equals(h0)).toBe(true);
+    expect(delivered.header_1.equals(h1)).toBe(true);
+    expect(frameCommit(delivered.header_0, delivered.header_1, delivered.body)).toBe(rec.frame_commit);
   }, 120_000);
 
-  it('PB-02: buildIntroSpend lands the (R, view_tag, commit) at its IntroShard', async () => {
-    const spendSeed = Buffer.alloc(32, 0x72);
-    const spendPub = bufToInt(keyPairFromSeed(spendSeed).publicKey);
-    const nonce = 4n, introBucket = 77n, introR = 0xABCDn, introViewTag = 0x1234n, bodyCommit = 0xC0FFEEn;
-    const built = await buildIntroSpend({
-      spendSecretKey: spendSeed, epoch, nonce, cert: makeCert(epoch), issuerSig: issuerSigFor(spendPub, epoch, nonce),
-      introBucket, introR, introViewTag, bodyCommit,
-    });
+  it('PB-02: an INTRO capsule is stored with its stealth fields, and its body is recoverable too', async () => {
+    const bucket = 77n, r = 0xABCDn, viewTag = 0x1234n;
+    const h0 = cellOf(0x44), body = cellOf(0x55, 256);
+    const built = await buildIntroPublish({ epoch, bucket, r, viewTag, header0: h0, body, value: toNano('0.02') });
 
-    const nsInit = await NullifierShard.init(BigInt(epoch), laneOf(built.serial));
-    const ns = await deploy(blockchain.openContract(new NullifierShard(contractAddress(0, nsInit), nsInit)));
-    const isInit = await IntroShard.init(BigInt(epoch), introBucket);
-    const is = await deploy(blockchain.openContract(new IntroShard(contractAddress(0, isInit), isInit)));
+    const init = await IntroShard.init(BigInt(epoch), bucket);
+    const is = await deploy(blockchain.openContract(new IntroShard(contractAddress(0, init), init)));
+    expect(addrKey(built.to)).toBe(addrKey(is.address));
 
-    const res = await sendSpend(ns, built);
-    expect(exitOf(res, ns.address), 'nullifier burnt').toBe(0);
+    const res = await send(built);
+    expect(exitOf(res, is.address)).toBe(0);
+
     const e = await is.getGetEntry(0n);
     expect(e.exists).toBe(true);
-    expect(e.r).toBe(introR);
-    expect(e.view_tag).toBe(introViewTag);
-    expect(e.body_commit).toBe(bodyCommit);
+    expect(e.r, 'stealth ephemeral point').toBe(r);
+    expect(e.view_tag, 'the scan filter').toBe(viewTag);
+    expect(e.body_commit).toBe(introBodyCommit(h0, body));
+
+    const delivered = loadIntroPublish(inboundTo(res, is.address).body.beginParse());
+    expect(delivered.body.equals(body), 'the intro ciphertext survived the trip').toBe(true);
+    expect(introBodyCommit(delivered.header_0, delivered.body)).toBe(e.body_commit);
   }, 120_000);
 
-  it('PB-03: the builder binds the frame into the signature — same token, different frame => different body', async () => {
-    // The serial does NOT depend on the frame, so the two builds target the SAME shard; but the frame IS inside the
-    // spend_sig, so a different frame produces a byte-different body. That is exactly why a relay/front-runner cannot
-    // reuse the signatures with a swapped frame — the on-chain rejection (13605) is proven in NS-06; the builder never
-    // emits such a mismatch because it signs precisely what it sends.
-    const spendSeed = Buffer.alloc(32, 0x73);
-    const spendPub = bufToInt(keyPairFromSeed(spendSeed).publicKey);
-    const nonce = 5n;
-    const a = await buildConvSpend({ spendSecretKey: spendSeed, epoch, nonce, cert: makeCert(epoch), issuerSig: issuerSigFor(spendPub, epoch, nonce), bucketKey: 0xAAAAn, frameCommit: 0xBBBBn });
-    const b = await buildConvSpend({ spendSecretKey: spendSeed, epoch, nonce, cert: makeCert(epoch), issuerSig: issuerSigFor(spendPub, epoch, nonce), bucketKey: 0xCCCCn, frameCommit: 0xBBBBn });
-    expect(a.serial).toBe(b.serial);                     // token identity is frame-independent
-    expect(addrKey(a.to)).toBe(addrKey(b.to));           // ...so both target the same NullifierShard
-    expect(a.body.equals(b.body)).toBe(false);           // ...but the signed body differs: the frame is bound in
+  it('PB-03: an underfunded publish is refused in COMPUTE and stores nothing (it bounces and refunds)', async () => {
+    const bucketKey = 0xDEADn;
+    const init = await RecordShard.init(bucketKey, BigInt(epoch));
+    const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, init), init)));
+    const minValue = (await rs.getGetView()).min_value;
+
+    const built = await buildConvPublish({
+      bucketKey, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3),
+      value: minValue - 1n,   // one nanoton below the contract's own floor
+    });
+    const res = await send(built);
+    expect(exitOf(res, rs.address), 'underfunded -> 13652').toBe(13652);
+    expect((await rs.getGetView()).live_count, 'nothing stored').toBe(0n);
+    expect((await rs.getGetRecord(0n)).exists).toBe(false);
   }, 120_000);
 
-  it('PB-05: the client value floors are pinned to the CONTRACT constants — silent drift is impossible', () => {
-    // The client hardcodes SPEND_MIN_VALUE / RECOVERY_MIN_VALUE to fund a send past the contract's COMPUTE gates
-    // (13624 / 13572). If a contract constant is ever raised and the client mirror is not, every send silently
-    // under-funds and is refused — the exact bug class that currently has the monolith's VPB2 pricing suite red
-    // (RJ_UNDERPRICED). So derive the truth from the contract SOURCE and pin the client to it.
+  it('PB-04: the payer gets change back — the shard keeps only its own rent', async () => {
+    const bucketKey = 0xCA4409n;
+    const init = await RecordShard.init(bucketKey, BigInt(epoch));
+    const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, init), init)));
+
+    const before = await payer.getBalance();
+    const built = await buildConvPublish({
+      bucketKey, epoch, header0: cellOf(7), header1: cellOf(8), body: cellOf(9, 256),
+      value: toNano('1'),   // deliberately fat
+    });
+    expect(exitOf(await send(built), rs.address)).toBe(0);
+
+    // the payer sent 1 GRAM and must get almost all of it back: net cost is rent + gas, well under 0.05
+    expect(before - (await payer.getBalance())).toBeLessThan(toNano('0.05'));
+    // and the shard did NOT pocket the fat value
+    expect((await blockchain.getContract(rs.address)).balance).toBeLessThan(toNano('0.05'));
+  }, 120_000);
+
+  it('PB-05: a RECOVERY blob is stored on chain at the owner-bound slot, and its frame hashes are now readable', async () => {
+    const seed = new Uint8Array(32).fill(0x64);
+    const blob = cellOf(0xAB, 128);
+    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x111n, h1: 0x222n, bh: 0x333n, body: blob, value: toNano('0.05') });
+
+    const init = await RecoveryShard.init(built.slotKey);
+    const rs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, init), init)));
+    expect(addrKey(built.to)).toBe(addrKey(rs.address));
+
+    expect(exitOf(await send(built), rs.address)).toBe(0);
+    const v = await rs.getGetView();
+    expect(v.bound).toBe(true);
+    expect(v.seq).toBe(1n);
+    // this lane alone stores the blob ON CHAIN, and the hashes are now exposed so the read is self-verifying
+    expect(v.h0).toBe(0x111n);
+    expect(v.bh).toBe(0x333n);
+    expect((await rs.getGetBody()).equals(blob), 'the blob itself is on chain').toBe(true);
+  }, 120_000);
+
+  it('PB-06: an oversized RECOVERY blob is refused (13560 restored) — a fixed endowment cannot buy unbounded storage', async () => {
+    // The sharded rewrite dropped the monolith's blob cap while keeping the endowment calibrated for it, so an
+    // oversized blob would buy 3 years of storage it did not pay for and starve the slot. Positive tests are blind
+    // to this (they all use tiny blobs), so the blob here is deliberately built past the cap.
+    const seed = new Uint8Array(32).fill(0x65);
+    let oversized = beginCell().storeBuffer(Buffer.alloc(64, 0xFF)).endCell();
+    for (let i = 0; i < 100; i += 1) {   // past RS_MAX_BLOB_CELLS (79) but under the probe limit, so 13560 fires
+      oversized = beginCell().storeBuffer(Buffer.alloc(64, i & 0xff)).storeRef(oversized).endCell();
+    }
+    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x1n, h1: 0x2n, bh: 0x3n, body: oversized, value: toNano('0.1') });
+    const init = await RecoveryShard.init(built.slotKey);
+    const rs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, init), init)));
+
+    const res = await send(built);
+    // asserted SPECIFICALLY: probing at the cap would make the gate dead code and report an opaque exit 8 instead
+    expect(exitOf(res, rs.address), 'oversized blob -> 13560, not a raw cell-overflow').toBe(13560);
+    expect((await rs.getGetView()).bound, 'slot stays unbound — nothing was stored').toBe(false);
+
+    // and a blob WITHIN the cap on the same (fresh) slot is accepted, so the cap is not simply rejecting everything
+    const okSeed = new Uint8Array(32).fill(0x66);
+    const okBuilt = await buildRecoveryPublish({ seed: okSeed, seq: 1, h0: 0x1n, h1: 0x2n, bh: 0x3n, body: cellOf(0xCD, 512), value: toNano('0.1') });
+    const okInit = await RecoveryShard.init(okBuilt.slotKey);
+    const okRs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, okInit), okInit)));
+    expect(exitOf(await send(okBuilt), okRs.address), 'in-cap blob accepted').toBe(0);
+    expect((await okRs.getGetView()).bound).toBe(true);
+  }, 120_000);
+
+  it('PB-07: the client value floors are pinned to the CONTRACT constants — silent drift is impossible', () => {
+    // Clients fund a publish against the contract's COMPUTE gates. The shards now EXPOSE min_value in get_view, so a
+    // client should read it rather than mirror it; this test pins the arithmetic so a constant change is loud.
     const constOf = (src: string, name: string): bigint => {
       const m = src.match(new RegExp(`const\\s+${name}\\s*:\\s*Int\\s*=\\s*(\\d+)`));
       if (!m) throw new Error(`contract constant ${name} not found — did it get renamed?`);
       return BigInt(m[1]);
     };
-    const ns = readFileSync('contracts/NullifierShard.tact', 'utf8');
-    const rs = readFileSync('contracts/RecoveryShard.tact', 'utf8');
+    const rec = readFileSync('contracts/RecordShard.tact', 'utf8');
+    const intro = readFileSync('contracts/IntroShard.tact', 'utf8');
+    const recov = readFileSync('contracts/RecoveryShard.tact', 'utf8');
 
-    // NS_FORWARD_VALUE = record endowment + record gas + nullifier endowment + path gas   (gate 13624)
-    const nsForward = constOf(ns, 'NS_RECORD_ENDOWMENT') + constOf(ns, 'NS_RECORD_GAS')
-      + constOf(ns, 'NS_NULLIFIER_ENDOWMENT') + constOf(ns, 'NS_PATH_GAS');
-    expect(SPEND_MIN_VALUE, 'client SPEND_MIN_VALUE must equal the contract NS_FORWARD_VALUE').toBe(nsForward);
-
-    // RS_MIN_VALUE = recovery endowment + recovery path gas                                (gate 13572)
-    const rsMin = constOf(rs, 'RS_RECOVERY_ENDOWMENT') + constOf(rs, 'RS_RECOVERY_PATH_GAS');
-    expect(RECOVERY_MIN_VALUE, 'client RECOVERY_MIN_VALUE must equal the contract RS_MIN_VALUE').toBe(rsMin);
-
-    // the INTRO lane forwards less than the CONV lane, so the single CONV-derived floor covers both
-    expect(constOf(ns, 'NS_INTRO_ENDOWMENT') + constOf(ns, 'NS_RECORD_GAS')).toBeLessThanOrEqual(nsForward);
+    expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS'), 'RecordShard RS_MIN_VALUE').toBe(2_700_000n);
+    expect(constOf(intro, 'IS_INTRO_ENDOWMENT') + constOf(intro, 'IS_PUBLISH_GAS'), 'IntroShard IS_MIN_VALUE').toBe(2_508_000n);
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(31_200_000n);
+    // the direct-paid CONV publish must be materially cheaper than the old two-hop floor (7_710_000)
+    expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS')).toBeLessThan(7_710_000n);
   });
-
-  it('PB-04: buildRecoveryPublish lands the owner-signed blob at the owner-bound RecoveryShard', async () => {
-    const seed = new Uint8Array(32).fill(0x64);
-    const body = beginCell().storeUint(0xD00D_F00Dn, 32).endCell();
-    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x111n, h1: 0x222n, bh: 0x333n, body });
-
-    const rsInit = await RecoveryShard.init(built.slotKey);
-    const rs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, rsInit), rsInit)));
-    expect(addrKey(built.to)).toBe(addrKey(rs.address));
-
-    const res = await sendRecovery(rs, built);
-    expect(exitOf(res, rs.address), 'recovery stored').toBe(0);
-    const v = await rs.getGetView();
-    expect(v.bound).toBe(true);
-    expect(v.seq).toBe(1n);
-    expect(v.owner_pubkey).toBe(BigInt('0x' + Buffer.from(built.ownerPublicKey).toString('hex')));
-  }, 120_000);
 });

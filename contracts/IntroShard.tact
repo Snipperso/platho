@@ -1,40 +1,54 @@
-import "./NullifierShard.tact";
+// IntroShard — clean-17 sharded INTRO lane (first contact, stealth). Partition = (epoch, bucket).
+//
+// DIRECT-PAID (no tokens, no nullifiers, no issuer) — see RecordShard.tact for the full rationale. [OWNER
+// 2026-07-18: all external infrastructure is forbidden in this project and always has been.] The blind-token layer
+// that used to gate this lane only bought unlinkability against the issuer and required an external relay to mean
+// anything, so it is gone. A publisher simply pays the rent for what it stores.
+//
+// WHY THIS LANE IS OPEN BY NATURE. Unlike CONV, an INTRO is a first contact from a STRANGER, so there is no shared
+// secret yet and the bucket is SENDER-chosen and public — anyone may write here, and that is inherent, not a
+// weakness. Leak-freedom comes from the payload, not from access control: the bucket reveals nothing about the
+// recipient (who is hidden behind the stealth view_tag), and the recipient SCANS — it reads the compact
+// (r, view_tag) of every live intro in its window and tests each against its scan secret. Spam is bounded by three
+// things: every intro pays its own rent, SAFE-CAP refuses a full partition in COMPUTE, and the one-week eviction
+// keeps the live set small.
+//
+// SHORT RETENTION + EVICTION (owner decision 2026-07-17: ONE WEEK): an intro only needs to live until the recipient
+// scans it. After a week it is evicted, so (a) the persistent intro graph never accumulates in state — the state
+// scraper the redesign targets finds nothing — and (b) the live set stays bounded, which is what keeps the
+// leak-free full scan feasible. A recipient offline longer than a week misses the first contact; the sender retries.
+//
+// BODY CARRIAGE: the client publishes DIRECTLY here, so its transaction carries the intro capsule cells and the
+// content lives in THIS account's transaction history, authenticated by the stored body_commit. State keeps only
+// (r, view_tag, body_commit, created_at) — compact enough that scanning the whole live set stays cheap.
+//
+// TERMINAL + CARRY: stores the intro, returns the payer's change, keeps only its own rent.
 
-// IntroShard — clean-17 sharded anon-publish, INTRO lane (first contact, stealth).
-//
-// Partition = (epoch, bucket), bucket SENDER-chosen — leak-free: it reveals nothing about the recipient (who is
-// hidden behind the stealth view_tag). The recipient SCANS: it reads the compact (R, view_tag) of every live intro
-// in its catch-up window and tests each against its scan secret, fetching the full body (from the publishing
-// transaction's history) only for matches. State holds only R + view_tag + a body commitment — NOT the body — so
-// the scan stays cheap (measured 4 cells/intro; a 1-week window at 1e9-scale traffic is ~2 MB/day to scan).
-//
-// SHORT RETENTION + EVICTION (owner decision 2026-07-17: ONE WEEK): an intro only needs to live until the
-// recipient scans it. After a week it is evicted, so (a) the persistent intro graph never accumulates in state —
-// the state scraper the redesign targets finds nothing — and (b) the live set stays bounded to intros/day x 7,
-// which is what keeps the leak-free full scan feasible. The only residual is a real-time observer at the moment of
-// contact, already an accepted timing residual. A recipient offline longer than a week misses the first contact;
-// the sender retries (they see no reply).
-//
-// AUTHORITY: like the CONV RecordShard, an intro is accepted ONLY from the exact NullifierShard that burnt this
-// token's nullifier (RS-AUTH via serial -> NullifierShard address). So INTRO is credit-paid and a token cannot be
-// spent in both CONV and INTRO — both lanes route through the same NullifierShard, which burns one nullifier.
-//
-// TERMINAL, CARRY: stores the intro and sends nothing (empty ACTION — no code-50 surface). The endowment is
-// carried in the forward and kept on balance.
-
-const IS_LANE_COUNT: Int = 1048576;       // MUST equal NullifierShard's NS_LANE_COUNT (RS-AUTH derivation)
 const IS_INTRO_RETENTION: Int = 604800;   // 1 week (owner 2026-07-17) — evict intros older than this
 const IS_SAFE_CAP: Int = 8000;            // intros per (epoch, bucket) — refuse in COMPUTE, not code 50 in ACTION
 const IS_EVICT_CAP: Int = 64;             // max intros one EvictIntros call may sweep (bounds gas; keepers repeat)
 
-message(0x49535032) IntroStore {          // "ISP2" — forwarded by the NullifierShard after it burns the nullifier
-    serial: Int as uint256;               // lets this shard recompute the authorized NullifierShard address
+// body_commit preimage tag. The CONTRACT defines the commitment so publisher and scanner cannot disagree.
+const IS_BODY_DOMAIN: Int = 0x49534243;   // "ISBC"
+
+// [RE-MEASURE BEFORE SEAL] storage 64962 nanoton/cell/year (config-18, bits free).
+//   intro endowment: measured 4 cells x 64962 x 7/365 x 1.5 -> 7500 -> 8000 (an intro lives 1 week)
+//   base endowment:  this shard's own code+data rent over its short life, with margin
+const IS_INTRO_ENDOWMENT: Int = 8000;
+const IS_BASE_ENDOWMENT: Int = 1000000;
+const IS_PUBLISH_GAS: Int = 2500000;
+const IS_MIN_VALUE: Int = IS_INTRO_ENDOWMENT + IS_PUBLISH_GAS;   // minimum that must ARRIVE (gate 13682)
+
+// A stealth first-contact publish. header_0 + body ride so they land in this account's transaction history; they are
+// NOT stored in state. body_commit is recomputed here from their hashes — nothing is trusted from the sender.
+message(0x49535031) IntroPublish {        // "ISP1"
     r: Int as uint256;                    // stealth ephemeral point R = r*G (recipient tests X25519(scan, R))
-    view_tag: Int as uint16;              // HKDF(X25519(r, recipient.scan_pub), R)[:2] — the scan filter
-    body_commit: Int as uint256;          // H(the intro body, which lives in the publishing tx history)
+    view_tag: Int as uint16;              // HKDF(X25519(r, recipient.scan_pub), R)[:2] — the cheap scan filter
+    header_0: Cell;
+    body: Cell;
 }
 
-message(0x49535033) EvictIntros {         // "ISP3" — permissionless FIFO eviction of intros past the 1-week window
+message(0x49535032) EvictIntros {         // "ISP2" — permissionless FIFO eviction of intros past the 1-week window
     max_count: Int as uint16;
 }
 
@@ -61,6 +75,7 @@ struct IntroShardView {
     evict_cursor: Int;
     retention: Int;
     safe_cap: Int;
+    min_value: Int;      // what a publish must bring (clients read this instead of hardcoding a mirror)
 }
 
 contract IntroShard {
@@ -80,23 +95,32 @@ contract IntroShard {
         self.evict_cursor = 0;
     }
 
-    receive(msg: IntroStore) {
-        // RS-AUTH: the sender must be the exact NullifierShard for (this shard's epoch, the serial's lane). Only it
-        // could be here — it burns the nullifier before forwarding, and its address is unforgeable. So an intro
-        // exists iff a nullifier was spent for its token (no free intros).
-        let lane: Int = msg.serial % IS_LANE_COUNT;
-        throwUnless(13681, sender() == contractAddress(initOf NullifierShard(self.epoch, lane)));
+    fun bodyCommit(h0: Cell, body: Cell): Int {
+        return beginCell()
+            .storeUint(IS_BODY_DOMAIN, 32)
+            .storeUint(h0.hash(), 256)
+            .storeUint(body.hash(), 256)
+            .endCell()
+            .hash();
+    }
+
+    receive(msg: IntroPublish) {
+        // Funding gated in COMPUTE before any state change, so an underfunded intro bounces and is refunded.
+        throwUnless(13682, context().value >= IS_MIN_VALUE);
         throwUnless(13680, self.live_count < IS_SAFE_CAP);   // SAFE-CAP in COMPUTE
 
         self.intros.set(self.next_id, IntroEntry{
             r: msg.r,
             view_tag: msg.view_tag,
-            body_commit: msg.body_commit,
+            body_commit: self.bodyCommit(msg.header_0, msg.body),
             created_at: now(),   // the contract stamps the time, so eviction cannot be gamed by a client field
         });
         self.next_id = self.next_id + 1;
         self.live_count = self.live_count + 1;
-        // EMPTY ACTION: no send, no reserve. The forwarded endowment stays on balance.
+
+        // Keep only this shard's own rent; hand the payer back the rest (a send to the sender's wallet cannot fail).
+        nativeReserve(IS_BASE_ENDOWMENT + self.live_count * IS_INTRO_ENDOWMENT, ReserveAtMost);
+        send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
     // Permissionless FIFO eviction of intros past the 1-week window. Intros are appended in order, so created_at is
@@ -113,8 +137,7 @@ contract IntroShard {
                     cursor = cursor + 1;
                     swept = swept + 1;
                 } else {
-                    // oldest live intro is still within the window -> nothing older remains to evict
-                    swept = msg.max_count;   // break
+                    swept = msg.max_count;   // oldest live intro is still within the window -> nothing older remains
                 }
             } else {
                 cursor = cursor + 1;   // already gone; advance the low-water mark
@@ -143,6 +166,7 @@ contract IntroShard {
             evict_cursor: self.evict_cursor,
             retention: IS_INTRO_RETENTION,
             safe_cap: IS_SAFE_CAP,
+            min_value: IS_MIN_VALUE,
         };
     }
 }
