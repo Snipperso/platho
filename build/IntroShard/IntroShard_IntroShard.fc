@@ -50,11 +50,17 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int, int, int) v) i
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
+;; $IntroEntry$_get_view_tag
+_ $IntroEntry$_get_view_tag((int, int, int, int) v) inline;
+
 ;; $IntroEntry$_get_created_at
 _ $IntroEntry$_get_created_at((int, int, int, int) v) inline;
 
 ;; $IntroEntryView$_to_external
 (int, int, int, int, int) $IntroEntryView$_to_external(((int, int, int, int, int)) v) inline;
+
+;; $IntroTagPage$_to_external
+(int, int, int, int, cell) $IntroTagPage$_to_external(((int, int, int, int, cell)) v) inline;
 
 ;; $IntroShardView$_to_external
 (int, int, int, int, int, int, int, int) $IntroShardView$_to_external(((int, int, int, int, int, int, int, int)) v) inline;
@@ -73,6 +79,15 @@ _ $IntroEntry$_get_created_at((int, int, int, int) v) inline;
 
 ;; $IntroShard$_fun_bodyCommit
 ((int, int, cell, int, int, int), int) $IntroShard$_fun_bodyCommit((int, int, cell, int, int, int) $self, cell $h0, cell $body) impure inline_ref;
+
+;; $IntroShard$_fun_packTags
+((int, int, cell, int, int, int), cell) $IntroShard$_fun_packTags((int, int, cell, int, int, int) $self, int $start, int $n) impure inline_ref;
+
+;; $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags
+((int, int, int, int, cell)) $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags(int $from_id, int $count, int $next_id, int $evict_cursor, cell $tags) inline;
+
+;; $IntroShard$_fun_get_view_tags
+((int, int, cell, int, int, int), (int, int, int, int, cell)) $IntroShard$_fun_get_view_tags((int, int, cell, int, int, int) $self, int $from_id, int $max_count) impure inline_ref;
 
 ;; $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at
 ((int, int, int, int, int)) $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(int $exists, int $r, int $view_tag, int $body_commit, int $created_at) inline;
@@ -135,6 +150,14 @@ cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
 
 builder $global_beginCell() impure asm """
     NEWC
+""";
+
+int $global_min(int $x, int $y) impure asm """
+    MIN
+""";
+
+int $global_max(int $x, int $y) impure asm """
+    MAX
 """;
 
 () $global_nativeReserve(int $amount, int $mode) impure asm """
@@ -220,6 +243,10 @@ int $global_now() impure asm """
     NOW
 """;
 
+builder $Builder$_fun_storeRef(cell $cell, builder $self) impure asm """
+    STREF
+""";
+
 cell $Builder$_fun_endCell(builder $self) impure asm """
     ENDC
 """;
@@ -302,6 +329,11 @@ tuple $IntroEntry$_load_opt(cell cl) inline {
     return $IntroEntry$_as_optional(sc~$IntroEntry$_load());
 }
 
+_ $IntroEntry$_get_view_tag((int, int, int, int) v) inline {
+    var (v'r, v'view_tag, v'body_commit, v'created_at) = v;
+    return v'view_tag;
+}
+
 _ $IntroEntry$_get_created_at((int, int, int, int) v) inline {
     var (v'r, v'view_tag, v'body_commit, v'created_at) = v;
     return v'created_at;
@@ -323,6 +355,20 @@ _ $IntroEntry$_get_created_at((int, int, int, int) v) inline {
 
 ((int, int, int, int, int)) $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(int $exists, int $r, int $view_tag, int $body_commit, int $created_at) inline {
     return ($exists, $r, $view_tag, $body_commit, $created_at);
+}
+
+;;
+;; Type: IntroTagPage
+;; TLB: _ from_id:int257 count:int257 next_id:int257 evict_cursor:int257 tags:^cell = IntroTagPage
+;;
+
+(int, int, int, int, cell) $IntroTagPage$_to_external(((int, int, int, int, cell)) v) inline {
+    var (v'from_id, v'count, v'next_id, v'evict_cursor, v'tags) = v; 
+    return (v'from_id, v'count, v'next_id, v'evict_cursor, v'tags);
+}
+
+((int, int, int, int, cell)) $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags(int $from_id, int $count, int $next_id, int $evict_cursor, cell $tags) inline {
+    return ($from_id, $count, $next_id, $evict_cursor, $tags);
 }
 
 ;;
@@ -412,27 +458,71 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int, int, int) v) i
     return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_0);
 }
 
+((int, int, cell, int, int, int), cell) $IntroShard$_fun_packTags((int, int, cell, int, int, int) $self, int $start, int $n) impure inline_ref {
+    var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor)) = $self;
+    cell $cell = $Builder$_fun_endCell($global_beginCell());
+    int $isTail = true;
+    int $remaining = $n;
+    while (($remaining > 0)) {
+        int $chunk = $global_min($remaining, 63);
+        int $first = (($start + $remaining) - $chunk);
+        builder $b = $global_beginCell();
+        int $i = 0;
+        while (($i < $chunk)) {
+            tuple $e = $IntroEntry$_load_opt(__tact_dict_get_int_cell($self'intros, 257, ($first + $i)));
+            $b = store_uint($b, (null?($e) ? 0 : $IntroEntry$_get_view_tag($IntroEntry$_not_null($e))), 16);
+            $i = ($i + 1);
+        }
+        if ($isTail) {
+            $cell = $Builder$_fun_endCell($b);
+            $isTail = false;
+        } else {
+            $cell = $Builder$_fun_endCell($Builder$_fun_storeRef($cell, $b));
+        }
+        $remaining = ($remaining - $chunk);
+    }
+    var $fresh$ret_1 = $cell;
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_1);
+}
+
+((int, int, cell, int, int, int), (int, int, int, int, cell)) $IntroShard$_fun_get_view_tags((int, int, cell, int, int, int) $self, int $from_id, int $max_count) impure inline_ref {
+    var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor)) = $self;
+    int $start = $global_max($from_id, $self'evict_cursor);
+    int $available = (($self'next_id > $start) ? ($self'next_id - $start) : 0);
+    int $n = $global_min($global_min($max_count, 256), $available);
+    var $fresh$ret_2 = $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags($start, $n, $self'next_id, $self'evict_cursor, ($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor)~$IntroShard$_fun_packTags($start, $n));
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_2);
+}
+
 ((int, int, cell, int, int, int), (int, int, int, int, int)) $IntroShard$_fun_get_entry((int, int, cell, int, int, int) $self, int $entry_id) impure inline_ref {
     var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor)) = $self;
     tuple $e = $IntroEntry$_load_opt(__tact_dict_get_int_cell($self'intros, 257, $entry_id));
     if (null?($e)) {
-        var $fresh$ret_1 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(false, 0, 0, 0, 0);
-        return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_1);
+        var $fresh$ret_3 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(false, 0, 0, 0, 0);
+        return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_3);
     }
     var ($v'r, $v'view_tag, $v'body_commit, $v'created_at) = $IntroEntry$_not_null($e);
-    var $fresh$ret_2 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(true, $v'r, $v'view_tag, $v'body_commit, $v'created_at);
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_2);
+    var $fresh$ret_4 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(true, $v'r, $v'view_tag, $v'body_commit, $v'created_at);
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_4);
 }
 
 ((int, int, cell, int, int, int), (int, int, int, int, int, int, int, int)) $IntroShard$_fun_get_view((int, int, cell, int, int, int) $self) impure inline_ref {
     var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor)) = $self;
-    var $fresh$ret_3 = $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value($self'epoch, $self'bucket, $self'live_count, $self'next_id, $self'evict_cursor, 604800, 8000, 2508000);
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_3);
+    var $fresh$ret_5 = $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value($self'epoch, $self'bucket, $self'live_count, $self'next_id, $self'evict_cursor, 604800, 8000, 2508000);
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor), $fresh$ret_5);
 }
 
 ;;
 ;; Get methods of a Contract IntroShard
 ;;
+
+_ %get_view_tags(int $from_id, int $max_count) method_id(110790) {
+    int $from_id = $from_id;
+    int $max_count = $max_count;
+    var self = $IntroShard$_contract_load();
+    var res = self~$IntroShard$_fun_get_view_tags($from_id, $max_count);
+    return $IntroTagPage$_to_external(res);
+}
 
 _ %get_entry(int $entry_id) method_id(80118) {
     int $entry_id = $entry_id;

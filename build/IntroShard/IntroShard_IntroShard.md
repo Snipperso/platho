@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: IntroShard
-BoC Size: 967 bytes
+BoC Size: 1207 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 16
+Total structures: 17
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -61,6 +61,10 @@ Signature: `IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:in
 TL-B: `_ exists:bool r:int257 view_tag:int257 body_commit:int257 created_at:int257 = IntroEntryView`
 Signature: `IntroEntryView{exists:bool,r:int257,view_tag:int257,body_commit:int257,created_at:int257}`
 
+### IntroTagPage
+TL-B: `_ from_id:int257 count:int257 next_id:int257 evict_cursor:int257 tags:^cell = IntroTagPage`
+Signature: `IntroTagPage{from_id:int257,count:int257,next_id:int257,evict_cursor:int257,tags:^cell}`
+
 ### IntroShardView
 TL-B: `_ epoch:int257 bucket:int257 live_count:int257 next_id:int257 evict_cursor:int257 retention:int257 safe_cap:int257 min_value:int257 = IntroShardView`
 Signature: `IntroShardView{epoch:int257,bucket:int257,live_count:int257,next_id:int257,evict_cursor:int257,retention:int257,safe_cap:int257,min_value:int257}`
@@ -70,7 +74,11 @@ TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_t
 Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32,live_count:uint32,evict_cursor:uint32}`
 
 ## Get methods
-Total get methods: 2
+Total get methods: 3
+
+## get_view_tags
+Argument: from_id
+Argument: max_count
 
 ## get_entry
 Argument: entry_id

@@ -859,6 +859,78 @@ export function dictValueParserIntroEntryView(): DictionaryValue<IntroEntryView>
     }
 }
 
+export type IntroTagPage = {
+    $$type: 'IntroTagPage';
+    from_id: bigint;
+    count: bigint;
+    next_id: bigint;
+    evict_cursor: bigint;
+    tags: Cell;
+}
+
+export function storeIntroTagPage(src: IntroTagPage) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeInt(src.from_id, 257);
+        b_0.storeInt(src.count, 257);
+        b_0.storeInt(src.next_id, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.evict_cursor, 257);
+        b_1.storeRef(src.tags);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadIntroTagPage(slice: Slice) {
+    const sc_0 = slice;
+    const _from_id = sc_0.loadIntBig(257);
+    const _count = sc_0.loadIntBig(257);
+    const _next_id = sc_0.loadIntBig(257);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _evict_cursor = sc_1.loadIntBig(257);
+    const _tags = sc_1.loadRef();
+    return { $$type: 'IntroTagPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, tags: _tags };
+}
+
+export function loadTupleIntroTagPage(source: TupleReader) {
+    const _from_id = source.readBigNumber();
+    const _count = source.readBigNumber();
+    const _next_id = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    const _tags = source.readCell();
+    return { $$type: 'IntroTagPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, tags: _tags };
+}
+
+export function loadGetterTupleIntroTagPage(source: TupleReader) {
+    const _from_id = source.readBigNumber();
+    const _count = source.readBigNumber();
+    const _next_id = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    const _tags = source.readCell();
+    return { $$type: 'IntroTagPage' as const, from_id: _from_id, count: _count, next_id: _next_id, evict_cursor: _evict_cursor, tags: _tags };
+}
+
+export function storeTupleIntroTagPage(source: IntroTagPage) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.from_id);
+    builder.writeNumber(source.count);
+    builder.writeNumber(source.next_id);
+    builder.writeNumber(source.evict_cursor);
+    builder.writeCell(source.tags);
+    return builder.build();
+}
+
+export function dictValueParserIntroTagPage(): DictionaryValue<IntroTagPage> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeIntroTagPage(src)).endCell());
+        },
+        parse: (src) => {
+            return loadIntroTagPage(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type IntroShardView = {
     $$type: 'IntroShardView';
     epoch: bigint;
@@ -1042,7 +1114,7 @@ function initIntroShard_init_args(src: IntroShard_init_args) {
 }
 
 async function IntroShard_init(epoch: bigint, bucket: bigint) {
-    const __code = Cell.fromHex('b5ee9c72410210010003bb000114ff00f4a413f4bcf2c80b01020162020b03f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e10d31fd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821049535031bae30221821049535032bae30237c00006c12116b0e3025f06f2c08203070a03fc5b05d3ffd30fd4d430813572f8416f24135f0382082644e0bef2f481357029811f40b9f2f42581010126107a10691058104a103b4cabdb3c34f82310384740c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc910384670206e953059f45a30944133f415e202a401a4811f4022c0019170e30da0760405060032c882104953424301cb1f02f90058cbff01f90001cbffc9f900000a82080f424000b6fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005503c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed5402f25b05d30f30708e115301b99320c1409170e2935372b99170e28ec7238101012959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206eb3973007a410670306e30d10371036e85b82080f424025811f40a8a072fb02f8427081008270080900ba6f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e229103601206e953059f45a30944133f415e206a507a403a496302010671036e200a8136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010355512c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed54003a10355512c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed540202710c0e0167b254bb5134348000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038b6cf1b1a200d00308208093a80811f4082082644e02851385136513851374133016bb23dbb5134348000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038954176cf1b19600f008a810101250259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f55308ce9bd85');
+    const __code = Cell.fromHex('b5ee9c72410215010004ab000114ff00f4a413f4bcf2c80b01020162020b03f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e10d31fd31ff404d31fd31fd31f55506c168e12810101d700810101d7005902d1016d705300e207925f07e07026d74920c21f953106d31f07de21821049535031bae30221821049535032bae30237c00006c12116b0e3025f06f2c08203070a03fc5b05d3ffd30fd4d430813572f8416f24135f0382082644e0bef2f481357029811f40b9f2f42581010126107a10691058104a103b4cabdb3c34f82310384740c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc910384670206e953059f45a30944133f415e202a401a4811f4022c0019170e30da0760405060032c882104953424301cb1f02f90058cbff01f90001cbffc9f900000a82080f424000b6fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005503c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed5402f25b05d30f30708e115301b99320c1409170e2935372b99170e28ec7238101012959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206eb3973007a410670306e30d10371036e85b82080f424025811f40a8a072fb02f8427081008270080900ba6f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e229103601206e953059f45a30944133f415e206a507a403a496302010671036e200a8136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010355512c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed54003a10355512c87f01ca0055505056cb1f13cb1ff400cb1fcb1fcb1fc9ed540201200c110201660d0f0167b254bb5134348000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038b6cf1b1a200e00308208093a80811f4082082644e02851385136513851374133016bb23dbb5134348000638434c7f4c7fd0134c7f4c7f4c7d5541b05a384a0404075c020404075c01640b4405b5c14c038954176cf1b196010008a810101250259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f5530016bbd86376a268690000c708698fe98ffa02698fe98fe98faaa8360b4709408080eb80408080eb802c816880b6b82980712a8aed9e3632c12015c5112b6095340bc935340a19170e2028307b60858b608534210591048103746985376db3c104810374a90106a10591301f4c8c97f9322c2008e6f22803fb6085343a021a1c870935303b98e4b8101015331a02d5959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e923070966f2410235f03e258cb0f01a4e8303122946c22c9709413ccc901e25aa159e8131400045f037153ca17');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initIntroShard_init_args({ $$type: 'IntroShard_init_args', epoch, bucket })(builder);
@@ -1143,6 +1215,7 @@ const IntroShard_types: ABIType[] = [
     {"name":"EvictIntros","header":1230196786,"fields":[{"name":"max_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
     {"name":"IntroEntry","header":null,"fields":[{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"IntroEntryView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"IntroTagPage","header":null,"fields":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"tags","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"IntroShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bucket","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"IntroShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"bucket","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"intros","type":{"kind":"dict","key":"int","value":"IntroEntry","valueFormat":"ref"}},{"name":"next_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
@@ -1153,11 +1226,13 @@ const IntroShard_opcodes = {
 }
 
 const IntroShard_getters: ABIGetter[] = [
+    {"name":"get_view_tags","methodId":110790,"arguments":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_count","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"IntroTagPage","optional":false}},
     {"name":"get_entry","methodId":80118,"arguments":[{"name":"entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"IntroEntryView","optional":false}},
     {"name":"get_view","methodId":76114,"arguments":[],"returnType":{"kind":"simple","type":"IntroShardView","optional":false}},
 ]
 
 export const IntroShard_getterMapping: { [key: string]: string } = {
+    'get_view_tags': 'getGetViewTags',
     'get_entry': 'getGetEntry',
     'get_view': 'getGetView',
 }
@@ -1171,6 +1246,8 @@ const IntroShard_receivers: ABIReceiver[] = [
 export const IS_INTRO_RETENTION = 604800n;
 export const IS_SAFE_CAP = 8000n;
 export const IS_EVICT_CAP = 64n;
+export const IS_TAG_PAGE_CAP = 256n;
+export const IS_TAGS_PER_CELL = 63n;
 export const IS_BODY_DOMAIN = 1230193219n;
 export const IS_INTRO_ENDOWMENT = 8000n;
 export const IS_BASE_ENDOWMENT = 1000000n;
@@ -1227,6 +1304,15 @@ export class IntroShard implements Contract {
         
         await provider.internal(via, { ...args, body: body });
         
+    }
+    
+    async getGetViewTags(provider: ContractProvider, from_id: bigint, max_count: bigint) {
+        const builder = new TupleBuilder();
+        builder.writeNumber(from_id);
+        builder.writeNumber(max_count);
+        const source = (await provider.get('get_view_tags', builder.build())).stack;
+        const result = loadGetterTupleIntroTagPage(source);
+        return result;
     }
     
     async getGetEntry(provider: ContractProvider, entry_id: bigint) {
