@@ -260,74 +260,82 @@ PROGRAM{
       80 LESSINT
       THROWANYIFNOT
       s12 PUSH
+      NOT
+      s13 PUSH
       IF:<{
         13563 PUSHINT
-        s7 s12 XCPU
+        s8 s13 XCPU
         EQUAL
-        s1 s7 XCHG
+        s1 s8 XCHG
         THROWANYIFNOT
         13564 PUSHINT
-        s5 s10 PUSH2
+        s6 s11 PUSH2
         GREATER
         THROWANYIFNOT
       }>ELSE<{
         13573 PUSHINT
-        s6 PUSH
+        s7 PUSH
         0 GTINT
         THROWANYIFNOT
         13575 PUSHINT
-        s14 PUSH
-        s8 s15 XCHG
-        s7 s14 XCHG
-        s6 s13 XCHG
-        s5 s12 XCHG
-        s4 s11 XCHG
-        s3 s10 XCHG
-        s2 s9 XCHG
-        s1 16 s() XCHG
-        s0 17 s() XCHG
         s15 PUSH
+        s8 16 s() XCHG
+        s7 s15 XCHG
+        s6 s14 XCHG
+        s5 s13 XCHG
+        s4 s12 XCHG
+        s3 s11 XCHG
+        s2 s10 XCHG
+        s1 17 s() XCHG
+        s0 18 s() XCHG
+        s9 PUSH
         $RecoveryShard$_fun_slotKeyForOwner INLINECALLDICT
         s7 POP
         s7 POP
-        s1 16 s() XCHG
+        s1 17 s() XCHG
         s0 s5 XCHG
         EQUAL
-        s1 s14 XCHG
+        s1 s15 XCHG
         THROWANYIFNOT
-        s3 s13 XCHG
-        s2 s12 XCHG
-        s4 s11 XCHG
+        s3 s14 XCHG
+        s2 s13 XCHG
+        s4 s12 XCHG
         TRUE
-        s0 s11 XCHG
-        s5 s10 XCHG
-        s9 s8 s0 XCHG3
-        s3 s7 XCHG
+        s0 s12 XCHG
+        s6 s11 XCHG
+        s10 s9 s0 XCHG3
+        s3 s8 XCHG
         s0 s4 XCHG
+        s0 s7 XCHG
         s0 s6 XCHG
-        s0 s5 XCHG
         s0 s3 XCHG
       }>
-      s7 s12 XCHG
-      s6 s11 XCHG
-      s5 s10 XCHG
-      s4 s9 XCHG
-      s3 s8 XCHG
-      s12 s11 s13 XCHG3
+      s7 s13 XCHG
+      s6 s12 XCHG
+      s5 s11 XCHG
+      s4 s10 XCHG
+      s3 s9 XCHG
+      s8 s13 s14 XCHG3
       13574 PUSHINT
-      s15 s10 s9 XCPU2
-      s15 s14 PUSH2
+      s0 16 s() XCHG
+      s12 s11 s10 PUSH3
+      s12 PUSH
       $RecoveryShard$_fun_recoveryDigest INLINECALLDICT
       6 1 BLKDROP2
-      s0 s6 XCHG
+      s0 s10 XCHG
           CTOS
-      s6 s0 s6 XC2PU
+      s10 s0 s10 XC2PU
           CHKSIGNU
-      s1 s9 XCHG
+      s1 s10 XCHG
       THROWANYIFNOT
           NOW
-      23200000 PUSHINT
-      2 PUSHINT
+      s0 s6 XCHG
+      IF:<{
+        23200000 PUSHINT
+      }>ELSE<{
+        0 PUSHINT
+      }>
+      6 PUSHINT
           RAWRESERVE
       __tact_context_get_sender INLINECALLDICT
       0 PUSHINT
@@ -400,12 +408,10 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s1 s8 XCHG
-      s1 s7 XCHG
-      s4 s6 XCHG
-      s3 s5 XCHG
-      s2 s4 XCHG
-      s2 s3 XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 ROLL
       $RecoveryShard$_contract_store INLINECALLDICT
     }>
     s10 POP

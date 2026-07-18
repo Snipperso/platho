@@ -62,3 +62,8 @@ yarn-error.log*
 pnpm-debug.log*
 .DS_Store
 Thumbs.db
+
+# audit scratch files — never commit
+.audit-*
+zz-lens-*
+tests/zz-scratch-*

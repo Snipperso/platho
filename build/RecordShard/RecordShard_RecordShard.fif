@@ -238,7 +238,7 @@ PROGRAM{
   $RecordShard$_fun_get_view PROCREF:<{
     12 PUSHPOW2
     31536000 PUSHINT
-    12700000 PUSHINT
+    12800000 PUSHINT
     10000000 PUSHINT
     s11 PUSH
     s4 s11 XCPU
@@ -322,7 +322,7 @@ PROGRAM{
       13652 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      12700000 PUSHINT
+      12800000 PUSHINT
       GEQ
       THROWANYIFNOT
       13651 PUSHINT
@@ -372,14 +372,16 @@ PROGRAM{
       INC
       s0 s2 XCHG
       INC
-      2000000 PUSHINT
-      OVER
-      200000 PUSHINT
-      MUL
+      10300000 PUSHINT
+      s3 PUSH
+      1 EQINT
+      IF:<{
+        2000000 PUSHINT
+      }>ELSE<{
+        0 PUSHINT
+      }>
       ADD
-      s4 PUSH
-      ADD
-      2 PUSHINT
+      6 PUSHINT
           RAWRESERVE
       __tact_context_get_sender INLINECALLDICT
       0 PUSHINT
@@ -529,6 +531,86 @@ PROGRAM{
         s2 s4 XCHG
       }>
       2DROP
+      2000000 PUSHINT
+      OVER
+      300000 PUSHINT
+      MUL
+      ADD
+      s8 PUSH
+      ADD
+      2 PUSHINT
+          RAWRESERVE
+      __tact_context_get_sender INLINECALLDICT
+      0 PUSHINT
+      130 PUSHINT
+      FALSE
+      $SendParameters$_constructor_to_value_mode_bounce INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+          // → Stack state
+          // s0: Builder
+          // s1: `data`
+          // s2: `code`
+          // s3: `body`
+          // s4: `mode`
+          // Group 2: Placing the Builder after code and data, then checking those for nullability
+          s2 XCHG0
+          DUP2
+          ISNULL
+          SWAP
+          ISNULL
+          AND
+          // → Stack state
+          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+          // s1: `code`
+          // s2: `data`
+          // s3: Builder
+          // s4: `body`
+          // s5: `mode`
+          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+          <{
+              DROP2 // drop `data` and `code`, since either of those is null
+              b{0} STSLICECONST
+          }> PUSHCONT
+          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+          <{
+              // _ split_depth:(Maybe (## 5))
+              //   special:(Maybe TickTock)
+              //   code:(Maybe ^Cell)
+              //   data:(Maybe ^Cell)
+              //   library:(Maybe ^Cell)
+              // = StateInit;
+              ROT                // place message Builder on top
+              b{10} STSLICECONST // store Maybe = true, Either = false
+              // Start composing inlined StateInit
+              b{00} STSLICECONST // store split_depth and special first
+              STDICT             // store code
+              STDICT             // store data
+              b{0} STSLICECONST  // store library
+          }> PUSHCONT
+          // Group 3: IFELSE that does the branching shown above
+          IFELSE
+          // → Stack state
+          // s0: Builder
+          // s1: null or StateInit
+          // s2: `body`
+          // s3: `mode`
+          // Group 4: Finalizing the message
+          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+          ENDC
+          // → Stack state
+          // s0: Cell
+          // s1: `mode`
+          // Group 5: Sending the message, with `mode` on top
+          SWAP
+          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
       s5 s7 XCHG
       2 5 BLKSWAP
       $RecordShard$_contract_store INLINECALLDICT
