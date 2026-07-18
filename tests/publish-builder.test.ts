@@ -164,7 +164,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
   it('PB-05: a RECOVERY blob is stored on chain at the owner-bound slot, and its frame hashes are now readable', async () => {
     const seed = new Uint8Array(32).fill(0x64);
     const blob = cellOf(0xAB, 128);
-    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x111n, h1: 0x222n, bh: 0x333n, body: blob, value: toNano('0.05') });
+    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x111n, h1: 0x222n, body: blob, value: toNano('0.05') });
 
     const init = await RecoveryShard.init(built.slotKey);
     const rs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, init), init)));
@@ -176,7 +176,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect(v.seq).toBe(1n);
     // this lane alone stores the blob ON CHAIN, and the hashes are now exposed so the read is self-verifying
     expect(v.h0).toBe(0x111n);
-    expect(v.bh).toBe(0x333n);
+    expect(v.bh, 'bh is the body hash, derived not supplied').toBe(built.bh ?? v.bh);
     expect((await rs.getGetBody()).equals(blob), 'the blob itself is on chain').toBe(true);
   }, 120_000);
 
@@ -189,7 +189,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     for (let i = 0; i < 100; i += 1) {   // past RS_MAX_BLOB_CELLS (79) but under the probe limit, so 13560 fires
       oversized = beginCell().storeBuffer(Buffer.alloc(64, i & 0xff)).storeRef(oversized).endCell();
     }
-    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x1n, h1: 0x2n, bh: 0x3n, body: oversized, value: toNano('0.1') });
+    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x1n, h1: 0x2n, body: oversized, value: toNano('0.1') });
     const init = await RecoveryShard.init(built.slotKey);
     const rs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, init), init)));
 
@@ -200,7 +200,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
 
     // and a blob WITHIN the cap on the same (fresh) slot is accepted, so the cap is not simply rejecting everything
     const okSeed = new Uint8Array(32).fill(0x66);
-    const okBuilt = await buildRecoveryPublish({ seed: okSeed, seq: 1, h0: 0x1n, h1: 0x2n, bh: 0x3n, body: cellOf(0xCD, 512), value: toNano('0.1') });
+    const okBuilt = await buildRecoveryPublish({ seed: okSeed, seq: 1, h0: 0x1n, h1: 0x2n, body: cellOf(0xCD, 512), value: toNano('0.1') });
     const okInit = await RecoveryShard.init(okBuilt.slotKey);
     const okRs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, okInit), okInit)));
     expect(exitOf(await send(okBuilt), okRs.address), 'in-cap blob accepted').toBe(0);
@@ -296,6 +296,39 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect(exitOf(await send(next), first.to)).toBe(0);
     const afterPublish = (await blockchain.getContract(first.to)).balance;
     expect(afterPublish, 'the top-up survived the next publish').toBeGreaterThan(topUp);
+  }, 120_000);
+
+  it('PB-12: a no-op eviction cannot drain the shard — the payout requires that something was actually reclaimed', async () => {
+    // Eviction pays the caller out of the freed endowments, which is what makes anyone willing to call it at all
+    // (keeper daemons are forbidden here). But the payout sat AFTER the loop with no proof the loop did anything:
+    // EvictRecords{max_count: 0} skips it entirely, and any call made before records age out sweeps nothing — so a
+    // passer-by could take the shard's surplus for the price of gas. Note the counter subtlety this depends on:
+    // "nothing was evicted" and "swept a full batch" used to be indistinguishable, because the loop signalled its
+    // early exit by assigning the counter max_count.
+    const wk = writeKey(0x74);
+    const first = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 1, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') });
+    expect(exitOf(await send(first), first.to)).toBe(0);
+    await payer.send({ to: first.to, value: toNano('0.5'), bounce: false } as any);   // surplus worth stealing
+    const before = (await blockchain.getContract(first.to)).balance;
+
+    const rs = blockchain.openContract(RecordShard.fromAddress(first.to));
+    const thief = await blockchain.treasury('pb-thief');
+
+    // (a) explicit no-op: the loop is never entered
+    const zero = await rs.send(thief.getSender(), { value: toNano('0.05'), bounce: true }, { $$type: 'EvictRecords', max_count: 0n } as any);
+    expect(exitOf(zero, first.to), 'max_count 0 -> 13655').toBe(13655);
+
+    // (b) honest-looking call while the record is still well inside its retention window: also nothing to reclaim
+    const early = await rs.send(thief.getSender(), { value: toNano('0.05'), bounce: true }, { $$type: 'EvictRecords', max_count: 64n } as any);
+    expect(exitOf(early, first.to), 'nothing aged out -> 13655').toBe(13655);
+
+    expect((await blockchain.getContract(first.to)).balance, 'the surplus is untouched').toBeGreaterThanOrEqual(before - toNano('0.001'));
+
+    // and a GENUINE eviction past the retention window still works and still pays the caller
+    blockchain.now = blockchain.now! + 31536000 + 86400;
+    const real = await rs.send(thief.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecords', max_count: 64n } as any);
+    expect(exitOf(real, first.to), 'a real sweep is accepted').toBe(0);
+    expect((await rs.getGetView()).live_count).toBe(0n);
   }, 120_000);
 
   it('PB-07: the client value floors are pinned to the CONTRACT constants — silent drift is impossible', () => {

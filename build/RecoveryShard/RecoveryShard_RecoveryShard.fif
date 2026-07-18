@@ -135,6 +135,8 @@ PROGRAM{
     1112691505 PUSHINT
     SWAP
     32 STU
+        MYADDR
+        STSLICER
     s11 s(-1) PUXC
     256 STU
     s1 s2 XCHG
@@ -245,6 +247,12 @@ PROGRAM{
         FALSE
       }>
       THROWANYIFNOT
+      13557 PUSHINT
+      s2 PUSH
+          HASHCU
+      s4 PUSH
+      EQUAL
+      THROWANYIFNOT
       13572 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
@@ -274,8 +282,8 @@ PROGRAM{
         THROWANYIFNOT
       }>ELSE<{
         13573 PUSHINT
-        s7 PUSH
-        0 GTINT
+        s7 s12 PUSH2
+        GREATER
         THROWANYIFNOT
         13575 PUSHINT
         s15 PUSH
@@ -419,23 +427,23 @@ PROGRAM{
     1380144690 PUSHINT
     EQUAL
     IFJMP:<{
-      7 BLKDROP
-      s2 POP
+      s5 s6 XCHG
+      6 BLKDROP
+      s3 POP
       13561 PUSHINT
-      ROT
+      SWAP
       THROWANYIFNOT
       13562 PUSHINT
-      s0 s2 XCHG
+      s0 s3 XCHG
       94608000 PUSHINT
       ADD
           NOW
       LESS
-      s1 s2 XCHG
+      s1 s3 XCHG
       THROWANYIFNOT
       FALSE
       0 PUSHINT
       s0 s0 s0 PUSH3
-      DUP
           <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
       OVER
       __tact_context_get_sender INLINECALLDICT
@@ -509,6 +517,8 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      s6 s7 XCHG
+      s5 s6 XCHG
       $RecoveryShard$_contract_store INLINECALLDICT
     }>
     0 EQINT

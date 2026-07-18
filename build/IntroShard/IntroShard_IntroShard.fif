@@ -559,31 +559,42 @@ PROGRAM{
       16 LDU
       DROP
       0 PUSHINT
+      DUP
+      FALSE
       WHILE:<{
-        s0 s1 PUSH2
+        s1 s3 PUSH2
         LESS
         IF:<{
-          DUP
+          OVER
           64 LESSINT
         }>ELSE<{
           FALSE
         }>
         IF:<{
-          s7 s2 PUSH2
+          s9 s4 PUSH2
           LESS
         }>ELSE<{
           FALSE
         }>
+        IF:<{
+          DUP
+          NOT
+        }>ELSE<{
+          FALSE
+        }>
       }>DO<{
-        s3 PUSH
+        s5 PUSH
         257 PUSHINT
-        s9 PUSH
+        s11 PUSH
         __tact_dict_get_int_cell INLINECALLDICT
         $IntroEntry$_load_opt INLINECALLDICT
-        DUP
+        s0 s2 XCHG
+        INC
+        s2 PUSH
         ISNULL
         NOT
         IF:<{
+          s0 s2 XCHG
           $IntroEntry$_not_null INLINECALLDICT
           $IntroEntry$_get_created_at INLINECALLDICT
           604800 PUSHINT
@@ -595,34 +606,40 @@ PROGRAM{
             PUSHNULL
             NEWC
             $IntroEntry$_store_opt INLINECALLDICT
-            s9 PUSH
-            s3 s6 XCHG
+            s11 PUSH
+            s3 s8 XCHG
             SWAP
             __tact_dict_set_int_cell INLINECALLDICT
-            s0 s6 XCHG
+            s0 s8 XCHG
             DEC
-            s0 s7 XCHG
+            s0 s9 XCHG
             INC
-            s0 s3 XCHG
+            s0 s2 XCHG
             INC
           }>ELSE<{
             DROP
-            DUP
-            s6 s7 XCHG
-            s3 s6 XCHG
+            s7 s8 XCHG
+            s4 s7 XCHG
+            TRUE
+            s5 s1 s5 XCHG3
           }>
         }>ELSE<{
-          DROP
-          s0 s7 XCHG
+          s2 POP
+          s0 s9 XCHG
           INC
-          s6 s7 XCHG
-          s0 s3 XCHG
-          s0 s6 XCHG
+          s8 s9 XCHG
+          s5 s8 XCHG
+          s0 s2 XCHG
         }>
-        s3 s7 XCHG
-        s3 s6 XCHG
+        s0 s1 s9 XCHG3
+        s0 s8 XCHG
+        s0 s5 XCHG
       }>
       2DROP
+      13683 PUSHINT
+      s2 POP
+      0 GTINT
+      THROWANYIFNOT
       1000000 PUSHINT
       s5 PUSH
       8000 PUSHINT

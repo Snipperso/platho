@@ -149,24 +149,36 @@ contract IntroShard {
     // Permissionless FIFO eviction of intros past the 1-week window. Intros are appended in order, so created_at is
     // monotonic and a FIFO cursor drains oldest-first. This is what keeps the intro graph from persisting in state.
     receive(msg: EvictIntros) {
-        let swept: Int = 0;
+        // `evicted` is the REAL count; `steps` is the gas bound. They must be SEPARATE: the previous version
+        // overloaded one counter as both, assigning it max_count to break out when the oldest record was still
+        // fresh — so a "nothing was evicted" exit looked identical to a full sweep. Every iteration counts toward
+        // `steps`, including the already-gone branch, which previously advanced the cursor without any bound.
+        let evicted: Int = 0;
+        let steps: Int = 0;
         let cursor: Int = self.evict_cursor;
-        while ((swept < msg.max_count) && (swept < IS_EVICT_CAP) && (cursor < self.next_id)) {
+        let stop: Bool = false;
+        while ((steps < msg.max_count) && (steps < IS_EVICT_CAP) && (cursor < self.next_id) && !stop) {
             let e: IntroEntry? = self.intros.get(cursor);
+            steps = steps + 1;
             if (e != null) {
                 if ((e!!.created_at + IS_INTRO_RETENTION) < now()) {
                     self.intros.set(cursor, null);
                     self.live_count = self.live_count - 1;
                     cursor = cursor + 1;
-                    swept = swept + 1;
+                    evicted = evicted + 1;
                 } else {
-                    swept = msg.max_count;   // oldest live intro is still within the window -> nothing older remains
+                    stop = true;   // oldest live entry is still inside the window -> nothing older remains
                 }
             } else {
                 cursor = cursor + 1;   // already gone; advance the low-water mark
             }
         }
         self.evict_cursor = cursor;
+        // REFUSE A NO-OP. Without this, EvictRecords{max_count: 0} — or any call made when nothing has aged out —
+        // skips the loop entirely and still falls through to the payout, letting any passer-by drain the shard's
+        // surplus for the price of gas. Throwing here reverts the cursor advance too, which is correct: nothing
+        // was reclaimed, so nothing is owed.
+        throwUnless(13683, evicted > 0);
         // Pay the evictor out of the freed endowments — absolute reserve on purpose (see RecordShard). Without this
         // nobody calls eviction, and "the one-week eviction keeps the live set small" stops being true.
         nativeReserve(IS_BASE_ENDOWMENT + self.live_count * IS_INTRO_ENDOWMENT, ReserveAtMost);

@@ -469,31 +469,42 @@ PROGRAM{
       16 LDU
       DROP
       0 PUSHINT
+      DUP
+      FALSE
       WHILE:<{
-        s0 s1 PUSH2
+        s1 s3 PUSH2
         LESS
         IF:<{
-          DUP
+          OVER
           64 LESSINT
         }>ELSE<{
           FALSE
         }>
         IF:<{
-          s8 s3 PUSH2
+          s10 s5 PUSH2
           LESS
         }>ELSE<{
           FALSE
         }>
+        IF:<{
+          DUP
+          NOT
+        }>ELSE<{
+          FALSE
+        }>
       }>DO<{
-        s4 PUSH
+        s6 PUSH
         257 PUSHINT
-        s10 PUSH
+        s12 PUSH
         __tact_dict_get_int_cell INLINECALLDICT
         $RecordEntry$_load_opt INLINECALLDICT
-        DUP
+        s0 s2 XCHG
+        INC
+        s2 PUSH
         ISNULL
         NOT
         IF:<{
+          s0 s2 XCHG
           $RecordEntry$_not_null INLINECALLDICT
           $RecordEntry$_get_created_at INLINECALLDICT
           31536000 PUSHINT
@@ -505,32 +516,40 @@ PROGRAM{
             PUSHNULL
             NEWC
             $RecordEntry$_store_opt INLINECALLDICT
-            s10 PUSH
-            s3 s7 XCHG
+            s12 PUSH
+            s3 s9 XCHG
             SWAP
             __tact_dict_set_int_cell INLINECALLDICT
-            s0 s2 XCHG
-            DEC
-            s0 s8 XCHG
-            INC
             s0 s4 XCHG
+            DEC
+            s0 s10 XCHG
+            INC
+            s0 s2 XCHG
             INC
           }>ELSE<{
             DROP
-            s7 s0 s0 XC2PU
-            s2 s4 XCHG
+            s3 s9 XCHG
+            TRUE
+            s0 s6 XCHG
+            s4 s1 s4 XCHG3
           }>
         }>ELSE<{
-          DROP
-          s0 s8 XCHG
+          s2 POP
+          s0 s10 XCHG
           INC
-          s8 s1 s4 XCHG3
+          s4 s10 XCHG
+          s4 s6 XCHG
           s0 s2 XCHG
         }>
-        s4 s8 XCHG
-        s2 s4 XCHG
+        s2 s10 XCHG
+        s4 s6 XCHG
+        s0 s1 s4 XCHG3
       }>
       2DROP
+      13655 PUSHINT
+      s2 POP
+      0 GTINT
+      THROWANYIFNOT
       2000000 PUSHINT
       OVER
       300000 PUSHINT

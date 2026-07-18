@@ -511,24 +511,28 @@ _ %get_view() method_id(76114) {
     ;; Receive EvictRecords message
     if (op == 0x52535032) {
         var $msg'max_count = in_msg~load_uint(16);
-        int $swept = 0;
+        int $evicted = 0;
+        int $steps = 0;
         int $cursor = $self'evict_cursor;
-        while (( (( (($swept < $msg'max_count)) ? (($swept < 64)) : (false) )) ? (($cursor < $self'record_count)) : (false) )) {
+        int $stop = false;
+        while (( (( (( (($steps < $msg'max_count)) ? (($steps < 64)) : (false) )) ? (($cursor < $self'record_count)) : (false) )) ? ((~ $stop)) : (false) )) {
             tuple $e = $RecordEntry$_load_opt(__tact_dict_get_int_cell($self'records, 257, $cursor));
+            $steps = ($steps + 1);
             if ((~ null?($e))) {
                 if ((($RecordEntry$_get_created_at($RecordEntry$_not_null($e)) + 31536000) < $global_now())) {
                     $self'records~__tact_dict_set_int_cell(257, $cursor, $RecordEntry$_store_opt(null(), begin_cell()));
                     $self'live_count = ($self'live_count - 1);
                     $cursor = ($cursor + 1);
-                    $swept = ($swept + 1);
+                    $evicted = ($evicted + 1);
                 } else {
-                    $swept = $msg'max_count;
+                    $stop = true;
                 }
             } else {
                 $cursor = ($cursor + 1);
             }
         }
         $self'evict_cursor = $cursor;
+        throw_unless(13655, ($evicted > 0));
         $global_nativeReserve(((2000000 + ($self'live_count * 300000)) + $self'accrued_fee), 2);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecordShard$_contract_store(($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee));

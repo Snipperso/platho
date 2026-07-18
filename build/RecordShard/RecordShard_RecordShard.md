@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: RecordShard
-BoC Size: 969 bytes
+BoC Size: 1023 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 16
