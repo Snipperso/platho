@@ -469,6 +469,22 @@ _ %get_global() method_id(126899) {
         return ();
     }
     
+    ;; Receive AirdropRebindCreditIssuer message
+    if (op == 0x41445239) {
+        in_msg~skip_bits(32);
+        var $msg'deployment_manifest_hash = in_msg~load_uint(256);
+        var $msg'credit_issuer_address = in_msg~load_msg_addr();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireSealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireController();
+        throw_unless(26013, ($msg'deployment_manifest_hash == $self'deployment_manifest_hash));
+        throw_unless(26014, $self'credit_issuer_bound);
+        throw_unless(26015, ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_isBasechainAddress($msg'credit_issuer_address));
+        throw_unless(26016, ( ~ equal_slices_bits($msg'credit_issuer_address, $global_myAddress()) ));
+        $self'credit_issuer_address = $msg'credit_issuer_address;
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        return ();
+    }
+    
     ;; Receive AthTransferNotification message
     if (op == 0x472d9d7d) {
         in_msg~skip_bits(32);

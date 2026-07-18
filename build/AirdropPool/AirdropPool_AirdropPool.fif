@@ -463,6 +463,56 @@ PROGRAM{
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     OVER
+    1094996537 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 16 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      256 LDU
+      LDMSGADDR
+      DROP
+      s1 17 s() XCHG
+      s0 18 s() XCHG
+      $AirdropPool$_fun_requireSealed INLINECALLDICT
+      $AirdropPool$_fun_requireController INLINECALLDICT
+      26013 PUSHINT
+      s0 18 s() XCHG
+      s15 PUSH
+      EQUAL
+      s1 18 s() XCHG
+      THROWANYIFNOT
+      26014 PUSHINT
+      s8 PUSH
+      THROWANYIFNOT
+      26015 PUSHINT
+      s0 17 s() XCHG
+      18 s() PUSH
+      $AirdropPool$_fun_isBasechainAddress INLINECALLDICT
+      s10 POP
+      s1 17 s() XCHG
+      s0 s9 XCHG
+      THROWANYIFNOT
+      26016 PUSHINT
+          MYADDR
+      18 s() PUSH
+      SWAP
+      SDEQ
+      NOT
+      THROWANYIFNOT
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      s12 s14 XCHG
+      s11 s13 XCHG
+      s10 s12 XCHG
+      s9 s11 XCHG
+      s8 s10 XCHG
+      s8 s9 XCHG
+      2 7 BLKSWAP
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    OVER
     1194171773 PUSHINT
     EQUAL
     IFJMP:<{
