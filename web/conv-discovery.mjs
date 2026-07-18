@@ -20,16 +20,16 @@ const bytesToInt = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | Bi
 export async function incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) {
   const buckets = await incomingBucketKeys({ kRoot, selfKeyId, peerKeyId, epochNow, windowW });
   const out = [];
-  for (const { epoch, dir, bucketKey } of buckets) {
-    out.push({ epoch, dir, bucketKey, address: await recordShardAddress(bytesToInt(bucketKey), epoch) });
+  for (const { epoch, dir, bucketKey, writePublicKey } of buckets) {
+    out.push({ epoch, dir, bucketKey, writePublicKey, address: await recordShardAddress(bytesToInt(writePublicKey), epoch) });
   }
   return out;
 }
 
 /** The RecordShard address a client WRITES its outgoing message into for a capsule stamped createdAtSec. */
 export async function outgoingRecordShard({ kRoot, selfKeyId, peerKeyId, createdAtSec }) {
-  const { bucketKey, epoch, dir } = await outgoingBucketKey({ kRoot, selfKeyId, peerKeyId, createdAtSec });
-  return { epoch, dir, bucketKey, address: await recordShardAddress(bytesToInt(bucketKey), epoch) };
+  const { bucketKey, writePublicKey, writeSecret, epoch, dir } = await outgoingBucketKey({ kRoot, selfKeyId, peerKeyId, createdAtSec });
+  return { epoch, dir, bucketKey, writePublicKey, writeSecret, address: await recordShardAddress(bytesToInt(writePublicKey), epoch) };
 }
 
 /**
