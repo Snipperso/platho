@@ -54,7 +54,15 @@ const RS_WRITE_DOMAIN: Int = 0x52535744;   // "RSWD" — the write-authorization
 const RS_RECORD_ENDOWMENT: Int = 200000;
 const RS_BASE_ENDOWMENT: Int = 2000000;
 const RS_PUBLISH_GAS: Int = 2500000;
-const RS_MIN_VALUE: Int = RS_RECORD_ENDOWMENT + RS_PUBLISH_GAS;   // minimum that must ARRIVE (gate 13652)
+
+// PROTOCOL FEE — 0.01 GRAM per published capsule. NOT storage: this is the service fee that funds the liquidity
+// pool, and it is the other half of the airdrop's economics (owner's frozen math: 1.5M capsules -> 15M ATH paid out
+// -> 15k GRAM collected). It carried the same value in the deleted CreditSale (CS_CREDIT_FEE_DEFAULT = 10000000,
+// commented "owner: 10M nanoTON -> 15k GRAM at 1.5M"), and dropping the token layer silently dropped it with them.
+// Restoring it also removes what looked like an airdrop-farm: publishing must cost the fee, not just the rent.
+const RS_PROTOCOL_FEE: Int = 10000000;
+
+const RS_MIN_VALUE: Int = RS_RECORD_ENDOWMENT + RS_PUBLISH_GAS + RS_PROTOCOL_FEE;   // must ARRIVE (gate 13652)
 
 // The capsule a client publishes. The three cells are carried so they land in this account's transaction history;
 // they are NOT stored in state. frame_commit is recomputed here from their hashes — nothing is trusted from the sender.
@@ -91,6 +99,8 @@ struct RecordShardView {
     safe_cap: Int;
     retention: Int;
     min_value: Int;      // what a publish must bring (clients read this instead of hardcoding a mirror)
+    protocol_fee: Int;   // the per-capsule service fee included in min_value
+    accrued_fee: Int;    // collected fee held here, awaiting routing to the fee sink
 }
 
 contract RecordShard {
@@ -101,6 +111,7 @@ contract RecordShard {
     record_count: Int as uint32;      // monotonic next id
     live_count: Int as uint32;
     evict_cursor: Int as uint32;      // FIFO low-water: lowest id not yet evicted
+    accrued_fee: Int as coins;        // protocol fee collected here; routing to the fee sink is the open piece
 
     init(write_pubkey: Int, epoch: Int) {
         self.write_pubkey = write_pubkey;
@@ -110,6 +121,7 @@ contract RecordShard {
         self.record_count = 0;
         self.live_count = 0;
         self.evict_cursor = 0;
+        self.accrued_fee = 0;
     }
 
     // The commitment binding a record to its capsule cells. Defined HERE so the publisher and the reader derive it
@@ -143,6 +155,7 @@ contract RecordShard {
         throwUnless(13654, checkSignature(digest, msg.sig.beginParse(), self.write_pubkey));
 
         self.last_seq = msg.seq;
+        self.accrued_fee = self.accrued_fee + RS_PROTOCOL_FEE;
         // created_at is stamped by the CONTRACT (now()), so eviction cannot be gamed by a client field.
         self.records.set(self.record_count, RecordEntry{ frame_commit: commit, created_at: now() });
         self.record_count = self.record_count + 1;
@@ -151,7 +164,8 @@ contract RecordShard {
         // Keep only this shard's own rent (its base + one endowment per LIVE record) and hand the payer back the
         // rest. ReserveAtMost never over-reserves; the 13652 gate guarantees the balance covers it, so the send
         // below has funds. A message to the sender's wallet cannot fail, so ACTION stays safe.
-        nativeReserve(RS_BASE_ENDOWMENT + self.live_count * RS_RECORD_ENDOWMENT, ReserveAtMost);
+        // Retain the shard's own rent AND the collected fee (the fee is owed to the protocol, never to the payer).
+        nativeReserve(RS_BASE_ENDOWMENT + self.live_count * RS_RECORD_ENDOWMENT + self.accrued_fee, ReserveAtMost);
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
@@ -201,6 +215,8 @@ contract RecordShard {
             safe_cap: RS_SAFE_CAP,
             retention: RS_RETENTION,
             min_value: RS_MIN_VALUE,
+            protocol_fee: RS_PROTOCOL_FEE,
+            accrued_fee: self.accrued_fee,
         };
     }
 }
