@@ -12,7 +12,12 @@
 
 const CONTROLLER_THRESHOLD: Int = 3;
 const CONTROLLER_SIGNER_COUNT: Int = 5;
-const CONTROLLER_TIMELOCK_SECONDS: Int = 1209600; // 14 days
+// [OWNER 2026-07-18: одной недели достаточно] The timelock is NOT a way for honest signers to stop a compromised
+// majority — ControllerProposeCancel requires the SAME 3-of-5, so if three keys are held by an attacker the honest
+// two can never reach the threshold to cancel. What the delay actually buys is OBSERVATION: a pending action is
+// public for this long, giving the owner and users time to react out of band (drain custody, warn, refuse to follow
+// the announced successor). One week is the owner's judgement of how long that reaction needs.
+const CONTROLLER_TIMELOCK_SECONDS: Int = 604800; // 7 days
 const CONTROLLER_SIGN_DOMAIN: Int = 0x504C4331; // "PLC1"
 
 // Action kinds (part of the signed digest so a signature for one action can't be replayed as another).

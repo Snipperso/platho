@@ -14,7 +14,7 @@ const DOMAIN = 0x504C4331n; // "PLC1"
 const ACT_ANNOUNCE = 1n;
 const ACT_ROTATE = 2n;
 const ACT_CANCEL = 3n;
-const TIMELOCK = 1209600; // 14 days
+const TIMELOCK = 604800; // 7 days (owner 2026-07-18)
 const T0 = 1_700_000_000;
 
 const pkInt = (kp: KeyPair) => BigInt('0x' + kp.publicKey.toString('hex'));
