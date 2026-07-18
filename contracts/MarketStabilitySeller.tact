@@ -18,6 +18,20 @@ const MARKET_STABILITY_BUY_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_MIN_TREASURY_FLUSH_TON: Int = MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE;
 const MARKET_STABILITY_EXCESS_REFUND_MIN_VALUE: Int = 100000;
+// THE SALE PRICE IS A CONSTANT, not a genesis input. The schedule was always in the code — 20 tranches of 3M ATH at
+// multipliers x2..x21 — so the only free number was this anchor, and it is DERIVED, not chosen: the liquidity pool is
+// 15M ATH against 15k GRAM, i.e. a 0.001 GRAM/ATH start price, so one tranche at x1 is 3M x 0.001 = 3000 GRAM.
+// Check: the first tranche (x2) then costs base x 2 = 6000 GRAM for 3M ATH = 0.002 GRAM/ATH = exactly 2x start.
+// Total across the schedule = base x (2+3+...+21) = 3000 x 230 = 690_000 GRAM.
+//
+// It used to be a one-shot runtime input from the genesis controller, and the checks meant to protect it were
+// decorative: 23136 accepted any positive number and 23137 compared the caller's own two fields TO EACH OTHER (the
+// "independent quote" was supplied by the same sender), so the contract would have accepted base = 1 — collapsing
+// all 20 tranches to 230 nanotons for 60M ATH, 60% of supply. It was also symmetric: losing the single key meant the
+// price could never be frozen and the 60M could never be sold at all, since sales gate on the freeze.
+// As a constant there is no ceremony, no typo, no key, and no way to lock the reserve by losing one.
+const MARKET_STABILITY_BASE_TRANCHE_PRICE: Int = 3000000000000;   // 3000 GRAM per tranche at multiplier x1
+
 const MARKET_STABILITY_PHASE_IDLE: Int = 0;
 const MARKET_STABILITY_PHASE_PENDING_ATH_TRANSFER: Int = 1;
 const UINT64_MAX: Int = 18446744073709551615;
@@ -35,13 +49,6 @@ message(0x4D534157) BindMarketStabilityOfficialAthWallet { // "MSAW"
 message(0x4D535452) BindMarketStabilityTreasury { // "MSTR"
     deployment_manifest_hash: Int as uint256;
     ton_treasury_receiver_address: Address;
-}
-
-message(0x4D535046) FreezeMarketStabilityPricing { // "MSPF"
-    deployment_manifest_hash: Int as uint256;
-    base_tranche_price_nanotons: Int as uint128;
-    evidence_x1_tranche_quote_nanotons: Int as uint128;
-    pricing_evidence_hash: Int as uint256;
 }
 
 message(0x4D53534C) SealMarketStabilityGenesis { // "MSSL"
@@ -65,16 +72,14 @@ struct MarketStabilitySellerConfigView {
     reserve_funder_bound: Bool;
     official_ath_wallet_bound: Bool;
     treasury_bound: Bool;
-    pricing_frozen: Bool;
+    pricing_frozen: Bool;          // always true: the price is frozen by being a constant
     deployment_manifest_hash: Int;
     genesis_config_hash: Int;
     ath_master_address: Address;
     reserve_funder_address: Address;
     official_ath_wallet_address: Address;
     ton_treasury_receiver_address: Address;
-    base_tranche_price_nanotons: Int;
-    evidence_x1_tranche_quote_nanotons: Int;
-    pricing_evidence_hash: Int;
+    base_tranche_price_nanotons: Int;   // the constant, exposed so the ceremony can still verify it externally
 }
 
 struct MarketStabilitySellerStateView {
@@ -110,11 +115,9 @@ contract MarketStabilitySeller {
     reserve_funder_bound: Bool;
     official_ath_wallet_bound: Bool;
     treasury_bound: Bool;
-    pricing_frozen: Bool;
+    // no pricing_frozen field: the price is a constant, so there is no ceremony to record and no state that a
+    // single key could ever set wrong. The views still report pricing_frozen = true, which is now simply the truth.
     sealed: Bool;
-    base_tranche_price_nanotons: Int as uint128;
-    evidence_x1_tranche_quote_nanotons: Int as uint128;
-    pricing_evidence_hash: Int as uint256;
     phase: Int as uint8;
     reserve_due_ath: Int as uint128;
     treasury_due_ton: Int as uint128;
@@ -142,11 +145,7 @@ contract MarketStabilitySeller {
         self.reserve_funder_bound = false;
         self.official_ath_wallet_bound = false;
         self.treasury_bound = false;
-        self.pricing_frozen = false;
         self.sealed = false;
-        self.base_tranche_price_nanotons = 0;
-        self.evidence_x1_tranche_quote_nanotons = 0;
-        self.pricing_evidence_hash = 0;
         self.phase = MARKET_STABILITY_PHASE_IDLE;
         self.reserve_due_ath = 0;
         self.treasury_due_ton = 0;
@@ -218,12 +217,11 @@ contract MarketStabilitySeller {
     }
 
     fun quoteTonForAmount(amount: Int): Int {
-        throwUnless(23008, self.pricing_frozen);
         throwUnless(23009, amount > 0);
         let remaining: Int = self.currentTrancheRemaining();
         throwUnless(23010, remaining > 0);
         throwUnless(23011, amount <= remaining);
-        let numerator: Int = self.base_tranche_price_nanotons * self.currentMultiplier() * amount;
+        let numerator: Int = MARKET_STABILITY_BASE_TRANCHE_PRICE * self.currentMultiplier() * amount;
         return self.ceilDiv(numerator, MARKET_STABILITY_TRANCHE_ATH);
     }
 
@@ -318,33 +316,6 @@ contract MarketStabilitySeller {
         self.treasury_bound = true;
     }
 
-    receive(msg: FreezeMarketStabilityPricing) {
-        self.requireGenesisController();
-        self.acceptManifestHash(msg.deployment_manifest_hash);
-        throwUnless(23130, !self.pricing_frozen);
-        if (self.sealed) {
-            throwUnless(23131, self.phase == MARKET_STABILITY_PHASE_IDLE);
-            // clean-12 genesis-lock: the 60M reserve is funded + locked BEFORE the pricing freeze, so reserve_due_ath and
-            // reserve_funded_total_ath are already at the cap here — the old 23132/23134 "reserve == 0 at freeze" checks
-            // are intentionally dropped. Sales are gated on pricing_frozen (BuyMarketStabilityAth:388), so NO sale can
-            // occur before this freeze regardless; the remaining checks confirm no sale/treasury/tranche activity ran
-            // pre-freeze (always true pre-freeze, kept as belt-and-suspenders).
-            throwUnless(23133, self.treasury_due_ton == 0);
-            throwUnless(23135, self.sold_ath_total == 0);
-            throwUnless(23139, self.completed_tranche_count == 0 && self.current_tranche_sold_ath == 0);
-        }
-        throwUnless(23136, msg.base_tranche_price_nanotons > 0);
-        throwUnless(23137, msg.evidence_x1_tranche_quote_nanotons == msg.base_tranche_price_nanotons);
-        throwUnless(23138, msg.pricing_evidence_hash != 0);
-        self.base_tranche_price_nanotons = msg.base_tranche_price_nanotons;
-        self.evidence_x1_tranche_quote_nanotons = msg.evidence_x1_tranche_quote_nanotons;
-        self.pricing_evidence_hash = msg.pricing_evidence_hash;
-        self.pricing_frozen = true;
-        if (self.sealed) {
-            self.genesis_config_hash = 0;
-        }
-    }
-
     receive(msg: SealMarketStabilityGenesis) {
         self.requireUnsealed();
         self.requireGenesisController();
@@ -352,9 +323,8 @@ contract MarketStabilitySeller {
         throwUnless(23140, self.reserve_funder_bound);
         throwUnless(23141, self.official_ath_wallet_bound);
         throwUnless(23142, self.treasury_bound);
-        if (self.pricing_frozen) {
-            self.genesis_config_hash = 0;
-        }
+        // pricing needs no ceremony any more, so the config is complete the moment the binds are done
+        self.genesis_config_hash = 0;
         self.sealed = true;
     }
 
@@ -393,7 +363,6 @@ contract MarketStabilitySeller {
 
     receive(msg: BuyMarketStabilityAth) {
         self.requireSealed();
-        throwUnless(23210, self.pricing_frozen);
         throwUnless(23211, self.phase == MARKET_STABILITY_PHASE_IDLE);
         throwUnless(23212, msg.query_id > 0);
         self.requireNextQueryId(msg.query_id);
@@ -493,16 +462,14 @@ contract MarketStabilitySeller {
             reserve_funder_bound: self.reserve_funder_bound,
             official_ath_wallet_bound: self.official_ath_wallet_bound,
             treasury_bound: self.treasury_bound,
-            pricing_frozen: self.pricing_frozen,
+            pricing_frozen: true,   // frozen by construction: the price is a constant, not a stored input
             deployment_manifest_hash: self.deployment_manifest_hash,
             genesis_config_hash: self.genesis_config_hash,
             ath_master_address: self.ath_master_address,
             reserve_funder_address: self.reserve_funder_address,
             official_ath_wallet_address: self.official_ath_wallet_address,
             ton_treasury_receiver_address: self.ton_treasury_receiver_address,
-            base_tranche_price_nanotons: self.base_tranche_price_nanotons,
-            evidence_x1_tranche_quote_nanotons: self.evidence_x1_tranche_quote_nanotons,
-            pricing_evidence_hash: self.pricing_evidence_hash
+            base_tranche_price_nanotons: MARKET_STABILITY_BASE_TRANCHE_PRICE
         };
     }
 

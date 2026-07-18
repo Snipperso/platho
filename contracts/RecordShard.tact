@@ -66,7 +66,26 @@ const RS_PUBLISH_GAS: Int = 2500000;
 // Restoring it also removes what looked like an airdrop-farm: publishing must cost the fee, not just the rent.
 const RS_PROTOCOL_FEE: Int = 10000000;
 
-const RS_MIN_VALUE: Int = RS_RECORD_ENDOWMENT + RS_PUBLISH_GAS + RS_PROTOCOL_FEE;   // must ARRIVE (gate 13652)
+// EVICTION BOUNTY — what actually makes eviction happen. [MEASURED 2026-07-18.] The payout used to be the freed
+// RS_RECORD_ENDOWMENT, which cannot work for a structural reason rather than a tuning one: a storage endowment is
+// BY CONSTRUCTION consumed by the storage it paid for, so when a record finally ages out there is nothing left of
+// it. Worse, the floor correctly protects accrued_fee (that money is the liquidity pool's, not the evictor's), so
+// what reaches the caller is only whatever rent has not yet eaten. Measured on a full 64-record sweep past the
+// 1-year window the caller LOST 12_598_501 nanoton; marginal cost is ~187_000 per record (stable across two
+// disjoint spans: 165_820 over records 16-32 and 186_654 over 32-64).
+// Keeper daemons are forbidden in this project, so the only possible caller is a self-interested participant, and
+// "nobody calls it" is a certainty rather than a risk. Everything resting on eviction — bounded state, reclaimed
+// shards, the retention promise — was therefore unfunded. Immutable contracts cannot be repriced later.
+// SIZED AT THE WORST CASE THE CONTRACT PERMITS, not at a convenient one. Marginal gas per evicted record grows
+// with dictionary DEPTH, so a bounty calibrated on a small shard fails on a large one — measured per entry:
+//   64 records 283_082 · 256 -> 366_519 · 1024 -> 449_853 · 2048 -> 491_519 · 4096 (RS_SAFE_CAP) -> 533_186
+// The first revision used 300_000, calibrated at 64 records, and went loss-making from ~80 records upward — an
+// ordinary conversation-day against a 4096 cap. Idle time does NOT enter this (verified: 2048 records after ten
+// idle years sits on the same curve), because the reserve no longer charges the shard's rent to the caller.
+//   533_186 x 1.5 (G8) = 799_779 -> 800_000
+const RS_EVICT_BOUNTY: Int = 800000;
+
+const RS_MIN_VALUE: Int = RS_RECORD_ENDOWMENT + RS_EVICT_BOUNTY + RS_PUBLISH_GAS + RS_PROTOCOL_FEE;   // gate 13652
 
 // The capsule a client publishes. The three cells are carried so they land in this account's transaction history;
 // they are NOT stored in state. frame_commit is recomputed here from their hashes — nothing is trusted from the sender.
@@ -103,8 +122,10 @@ struct RecordShardView {
     safe_cap: Int;
     retention: Int;
     min_value: Int;      // what a publish must bring (clients read this instead of hardcoding a mirror)
-    protocol_fee: Int;   // the per-capsule service fee included in min_value
-    accrued_fee: Int;    // collected fee held here, awaiting routing to the fee sink
+    protocol_fee: Int;    // the per-capsule service fee included in min_value
+    accrued_fee: Int;     // collected fee held here, awaiting routing to the fee sink
+    evict_bounty: Int;    // what evicting one record pays its caller
+    accrued_bounty: Int;  // bounties still owed for records that have not been evicted yet
 }
 
 contract RecordShard {
@@ -116,6 +137,7 @@ contract RecordShard {
     live_count: Int as uint32;
     evict_cursor: Int as uint32;      // FIFO low-water: lowest id not yet evicted
     accrued_fee: Int as coins;        // protocol fee collected here; routing to the fee sink is the open piece
+    accrued_bounty: Int as coins;     // held for the future evictor of each live record; released only on eviction
 
     init(write_pubkey: Int, epoch: Int) {
         self.write_pubkey = write_pubkey;
@@ -126,6 +148,7 @@ contract RecordShard {
         self.live_count = 0;
         self.evict_cursor = 0;
         self.accrued_fee = 0;
+        self.accrued_bounty = 0;
     }
 
     // The commitment binding a record to its capsule cells. Defined HERE so the publisher and the reader derive it
@@ -143,6 +166,21 @@ contract RecordShard {
     receive(msg: CapsulePublish) {
         // Funding gated in COMPUTE, before any state change, so an underfunded publish bounces and is refunded
         // rather than half-committing. The record's rent must be present or the shard slowly starves.
+        // THE SHARD MUST BELONG TO ROUGHLY NOW. Without this the epoch was a free parameter: MEASURED — a publish
+        // into the shard for an epoch 300 days PAST and one 300 days FUTURE were both accepted with exit 0.
+        // Two things go wrong, and the first is a plain product bug rather than an attack. A client whose clock is
+        // off publishes into a shard nobody scans; the recipient's window is the retention period, so the message
+        // is lost FOREVER while the wallet reports success. That is the same silent-success family as sending to
+        // an uninitialised account, and it is the worst failure mode this project has.
+        // The second is that it makes past epochs mutable, so nothing derived from a past epoch's state can be
+        // trusted to be the same for two readers — an attacker can move it after one client has read it and before
+        // another has. Any client-side rule that reads history (for instance sizing the bucket space from observed
+        // fill) rests on epochs being closed, and they were not.
+        // The tolerance is +/-1 epoch, not exact equality: a message signed just before midnight may well be
+        // processed just after it, and bouncing those would be a real bug for no gain. One epoch of slack is safe
+        // because the recipient's scan window is the whole retention period, which is far wider than a day.
+        let nowEpoch: Int = now() / 86400;
+        throwUnless(13656, (nowEpoch >= self.epoch - 1) && (nowEpoch <= self.epoch + 1));
         throwUnless(13652, context().value >= RS_MIN_VALUE);
         // SAFE-CAP in COMPUTE, so a full partition bounces instead of hitting code 50 in ACTION.
         throwUnless(13651, self.live_count < RS_SAFE_CAP);
@@ -160,6 +198,7 @@ contract RecordShard {
 
         self.last_seq = msg.seq;
         self.accrued_fee = self.accrued_fee + RS_PROTOCOL_FEE;
+        self.accrued_bounty = self.accrued_bounty + RS_EVICT_BOUNTY;
         // created_at is stamped by the CONTRACT (now()), so eviction cannot be gamed by a client field.
         self.records.set(self.record_count, RecordEntry{ frame_commit: commit, created_at: now() });
         self.record_count = self.record_count + 1;
@@ -173,7 +212,7 @@ contract RecordShard {
         // whoever publishes next, and the balance also becomes an exact public message counter. ReserveAtMost keeps
         // it from ever exceeding the balance, so ACTION still cannot fail.
         nativeReserve(
-            RS_RECORD_ENDOWMENT + RS_PROTOCOL_FEE + (self.record_count == 1 ? RS_BASE_ENDOWMENT : 0),
+            RS_RECORD_ENDOWMENT + RS_PROTOCOL_FEE + RS_EVICT_BOUNTY + (self.record_count == 1 ? RS_BASE_ENDOWMENT : 0),
             ReserveAtMost | ReserveAddOriginalBalance,
         );
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
@@ -217,9 +256,40 @@ contract RecordShard {
         // forbidden in this project, so it will only ever be called by an ordinary participant — who, before this,
         // paid gas AND donated the rest of their value to the shard. Nobody rationally does that, which would have
         // quietly voided every claim resting on eviction (bounded state, and the one-week INTRO retention that is
-        // the whole point of not persisting the first-contact graph). Here the reserve is deliberately ABSOLUTE:
-        // the freed endowments SHOULD be released, and they pay the caller.
-        nativeReserve(RS_BASE_ENDOWMENT + self.live_count * RS_RECORD_ENDOWMENT + self.accrued_fee, ReserveAtMost);
+        // the whole point of not persisting the first-contact graph).
+        //
+        // Release EXACTLY the endowments this call freed, and nothing else. A plain absolute reserve was wrong for
+        // the same reason it is wrong on the publish path above: it makes the balance a hard ceiling, so the first
+        // eviction hands a deliberate top-up to whoever happens to call it — the publish path promises to protect
+        // that top-up, and this path was quietly taking it. Inverting the sign instead (original − freed) fixes
+        // that but opens the opposite hole: once rent has eaten into the balance, paying out a full `freed` comes
+        // out of the endowments of records that are still LIVE. Both bounds have to hold at once, so take the max.
+        // RELEASE EXACTLY THE BOUNTIES THIS SWEEP FREED, AND NOTHING ELSE.
+        //
+        // The previous revision reserved `max(floor, original - freed - payout)` where floor counted
+        // `base + live*endowment + accrued_fee + accrued_bounty`. That was wrong for a reason worth spelling out,
+        // because it looks right: the publish path reserves RELATIVELY (original_balance + endowment + fee +
+        // bounty), which are exactly the terms the floor counts, so `balance == floor` holds identically while the
+        // shard sits idle. `original` is read AFTER the storage phase, so original = floor - R where R is all the
+        // rent settled in this transaction. The clamp therefore fired every time, and the evictor's take became
+        // `freed + payout - R`. In other words the shard's ENTIRE accumulated storage bill was deducted from the
+        // caller instead of from the entries that incurred it. Measured: +6_640_039 at 64 records but +839_978 at
+        // 80, -2_286_748 at 96, -17_460_321 at 160, and at 400 records after ten idle years the caller lost their
+        // whole attached value. RS_SAFE_CAP is 4096, so ~80 records is an ordinary day, not an edge case — the
+        // regression the bounty exists to prevent had simply moved to larger shards.
+        //
+        // Releasing the freed ENDOWMENTS was fiction in the first place: a storage endowment is consumed by the
+        // storage it paid for, so by the time an entry ages out there is nothing of it left to hand anyone. That is
+        // precisely why the bounty exists. So the reserve keeps everything the shard still holds and lets go of the
+        // bounty alone. A deliberate top-up is untouched by construction (it is part of `original`, and only
+        // `payout` is subtracted), which is the property PB-13 pins. The clamp at zero is the graceful end for a
+        // shard already too poor to honour the bounties it owes: pay out what is there and clear the entries.
+        let original: Int = myBalance() - context().value;
+        let payout: Int = evicted * RS_EVICT_BOUNTY;
+        self.accrued_bounty = self.accrued_bounty - payout;
+        let keep: Int = original - payout;
+        if (keep < 0) { keep = 0; }
+        nativeReserve(keep, ReserveAtMost);
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
@@ -247,6 +317,8 @@ contract RecordShard {
             min_value: RS_MIN_VALUE,
             protocol_fee: RS_PROTOCOL_FEE,
             accrued_fee: self.accrued_fee,
+            evict_bounty: RS_EVICT_BOUNTY,
+            accrued_bounty: self.accrued_bounty,
         };
     }
 }

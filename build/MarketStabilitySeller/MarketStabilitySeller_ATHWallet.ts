@@ -3000,71 +3000,6 @@ export function dictValueParserBindMarketStabilityTreasury(): DictionaryValue<Bi
     }
 }
 
-export type FreezeMarketStabilityPricing = {
-    $$type: 'FreezeMarketStabilityPricing';
-    deployment_manifest_hash: bigint;
-    base_tranche_price_nanotons: bigint;
-    evidence_x1_tranche_quote_nanotons: bigint;
-    pricing_evidence_hash: bigint;
-}
-
-export function storeFreezeMarketStabilityPricing(src: FreezeMarketStabilityPricing) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1297305670, 32);
-        b_0.storeUint(src.deployment_manifest_hash, 256);
-        b_0.storeUint(src.base_tranche_price_nanotons, 128);
-        b_0.storeUint(src.evidence_x1_tranche_quote_nanotons, 128);
-        b_0.storeUint(src.pricing_evidence_hash, 256);
-    };
-}
-
-export function loadFreezeMarketStabilityPricing(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1297305670) { throw Error('Invalid prefix'); }
-    const _deployment_manifest_hash = sc_0.loadUintBig(256);
-    const _base_tranche_price_nanotons = sc_0.loadUintBig(128);
-    const _evidence_x1_tranche_quote_nanotons = sc_0.loadUintBig(128);
-    const _pricing_evidence_hash = sc_0.loadUintBig(256);
-    return { $$type: 'FreezeMarketStabilityPricing' as const, deployment_manifest_hash: _deployment_manifest_hash, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash };
-}
-
-export function loadTupleFreezeMarketStabilityPricing(source: TupleReader) {
-    const _deployment_manifest_hash = source.readBigNumber();
-    const _base_tranche_price_nanotons = source.readBigNumber();
-    const _evidence_x1_tranche_quote_nanotons = source.readBigNumber();
-    const _pricing_evidence_hash = source.readBigNumber();
-    return { $$type: 'FreezeMarketStabilityPricing' as const, deployment_manifest_hash: _deployment_manifest_hash, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash };
-}
-
-export function loadGetterTupleFreezeMarketStabilityPricing(source: TupleReader) {
-    const _deployment_manifest_hash = source.readBigNumber();
-    const _base_tranche_price_nanotons = source.readBigNumber();
-    const _evidence_x1_tranche_quote_nanotons = source.readBigNumber();
-    const _pricing_evidence_hash = source.readBigNumber();
-    return { $$type: 'FreezeMarketStabilityPricing' as const, deployment_manifest_hash: _deployment_manifest_hash, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash };
-}
-
-export function storeTupleFreezeMarketStabilityPricing(source: FreezeMarketStabilityPricing) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.deployment_manifest_hash);
-    builder.writeNumber(source.base_tranche_price_nanotons);
-    builder.writeNumber(source.evidence_x1_tranche_quote_nanotons);
-    builder.writeNumber(source.pricing_evidence_hash);
-    return builder.build();
-}
-
-export function dictValueParserFreezeMarketStabilityPricing(): DictionaryValue<FreezeMarketStabilityPricing> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeFreezeMarketStabilityPricing(src)).endCell());
-        },
-        parse: (src) => {
-            return loadFreezeMarketStabilityPricing(src.loadRef().beginParse());
-        }
-    }
-}
-
 export type SealMarketStabilityGenesis = {
     $$type: 'SealMarketStabilityGenesis';
     deployment_manifest_hash: bigint;
@@ -3273,8 +3208,6 @@ export type MarketStabilitySellerConfigView = {
     official_ath_wallet_address: Address;
     ton_treasury_receiver_address: Address;
     base_tranche_price_nanotons: bigint;
-    evidence_x1_tranche_quote_nanotons: bigint;
-    pricing_evidence_hash: bigint;
 }
 
 export function storeMarketStabilitySellerConfigView(src: MarketStabilitySellerConfigView) {
@@ -3294,8 +3227,6 @@ export function storeMarketStabilitySellerConfigView(src: MarketStabilitySellerC
         b_1.storeAddress(src.ton_treasury_receiver_address);
         const b_2 = new Builder();
         b_2.storeInt(src.base_tranche_price_nanotons, 257);
-        b_2.storeInt(src.evidence_x1_tranche_quote_nanotons, 257);
-        b_2.storeInt(src.pricing_evidence_hash, 257);
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
@@ -3317,9 +3248,7 @@ export function loadMarketStabilitySellerConfigView(slice: Slice) {
     const _ton_treasury_receiver_address = sc_1.loadAddress();
     const sc_2 = sc_1.loadRef().beginParse();
     const _base_tranche_price_nanotons = sc_2.loadIntBig(257);
-    const _evidence_x1_tranche_quote_nanotons = sc_2.loadIntBig(257);
-    const _pricing_evidence_hash = sc_2.loadIntBig(257);
-    return { $$type: 'MarketStabilitySellerConfigView' as const, sealed: _sealed, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash };
+    return { $$type: 'MarketStabilitySellerConfigView' as const, sealed: _sealed, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, base_tranche_price_nanotons: _base_tranche_price_nanotons };
 }
 
 export function loadTupleMarketStabilitySellerConfigView(source: TupleReader) {
@@ -3335,9 +3264,7 @@ export function loadTupleMarketStabilitySellerConfigView(source: TupleReader) {
     const _official_ath_wallet_address = source.readAddress();
     const _ton_treasury_receiver_address = source.readAddress();
     const _base_tranche_price_nanotons = source.readBigNumber();
-    const _evidence_x1_tranche_quote_nanotons = source.readBigNumber();
-    const _pricing_evidence_hash = source.readBigNumber();
-    return { $$type: 'MarketStabilitySellerConfigView' as const, sealed: _sealed, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash };
+    return { $$type: 'MarketStabilitySellerConfigView' as const, sealed: _sealed, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, base_tranche_price_nanotons: _base_tranche_price_nanotons };
 }
 
 export function loadGetterTupleMarketStabilitySellerConfigView(source: TupleReader) {
@@ -3353,9 +3280,7 @@ export function loadGetterTupleMarketStabilitySellerConfigView(source: TupleRead
     const _official_ath_wallet_address = source.readAddress();
     const _ton_treasury_receiver_address = source.readAddress();
     const _base_tranche_price_nanotons = source.readBigNumber();
-    const _evidence_x1_tranche_quote_nanotons = source.readBigNumber();
-    const _pricing_evidence_hash = source.readBigNumber();
-    return { $$type: 'MarketStabilitySellerConfigView' as const, sealed: _sealed, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash };
+    return { $$type: 'MarketStabilitySellerConfigView' as const, sealed: _sealed, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, base_tranche_price_nanotons: _base_tranche_price_nanotons };
 }
 
 export function storeTupleMarketStabilitySellerConfigView(source: MarketStabilitySellerConfigView) {
@@ -3372,8 +3297,6 @@ export function storeTupleMarketStabilitySellerConfigView(source: MarketStabilit
     builder.writeAddress(source.official_ath_wallet_address);
     builder.writeAddress(source.ton_treasury_receiver_address);
     builder.writeNumber(source.base_tranche_price_nanotons);
-    builder.writeNumber(source.evidence_x1_tranche_quote_nanotons);
-    builder.writeNumber(source.pricing_evidence_hash);
     return builder.build();
 }
 
@@ -3591,11 +3514,7 @@ export type MarketStabilitySeller$Data = {
     reserve_funder_bound: boolean;
     official_ath_wallet_bound: boolean;
     treasury_bound: boolean;
-    pricing_frozen: boolean;
     sealed: boolean;
-    base_tranche_price_nanotons: bigint;
-    evidence_x1_tranche_quote_nanotons: bigint;
-    pricing_evidence_hash: bigint;
     phase: bigint;
     reserve_due_ath: bigint;
     treasury_due_ton: bigint;
@@ -3626,30 +3545,24 @@ export function storeMarketStabilitySeller$Data(src: MarketStabilitySeller$Data)
         b_1.storeBit(src.reserve_funder_bound);
         b_1.storeBit(src.official_ath_wallet_bound);
         b_1.storeBit(src.treasury_bound);
-        b_1.storeBit(src.pricing_frozen);
         b_1.storeBit(src.sealed);
-        b_1.storeUint(src.base_tranche_price_nanotons, 128);
+        b_1.storeUint(src.phase, 8);
+        b_1.storeUint(src.reserve_due_ath, 128);
         const b_2 = new Builder();
-        b_2.storeUint(src.evidence_x1_tranche_quote_nanotons, 128);
-        b_2.storeUint(src.pricing_evidence_hash, 256);
-        b_2.storeUint(src.phase, 8);
-        b_2.storeUint(src.reserve_due_ath, 128);
         b_2.storeUint(src.treasury_due_ton, 128);
         b_2.storeUint(src.pending_query_id, 64);
         b_2.storeUint(src.pending_amount_ath, 128);
         b_2.storeUint(src.pending_paid_ton, 128);
+        b_2.storeAddress(src.pending_buyer);
+        b_2.storeAddress(src.pending_recipient);
         const b_3 = new Builder();
-        b_3.storeAddress(src.pending_buyer);
-        b_3.storeAddress(src.pending_recipient);
         b_3.storeAddress(src.pending_recipient_ath_wallet);
         b_3.storeUint(src.completed_tranche_count, 8);
         b_3.storeUint(src.current_tranche_sold_ath, 128);
         b_3.storeUint(src.last_terminal_query_id, 64);
-        const b_4 = new Builder();
-        b_4.storeUint(src.reserve_funded_total_ath, 128);
-        b_4.storeUint(src.sold_ath_total, 128);
-        b_4.storeUint(src.treasury_flushed_ton_total, 128);
-        b_3.storeRef(b_4.endCell());
+        b_3.storeUint(src.reserve_funded_total_ath, 128);
+        b_3.storeUint(src.sold_ath_total, 128);
+        b_3.storeUint(src.treasury_flushed_ton_total, 128);
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
@@ -3668,30 +3581,25 @@ export function loadMarketStabilitySeller$Data(slice: Slice) {
     const _reserve_funder_bound = sc_1.loadBit();
     const _official_ath_wallet_bound = sc_1.loadBit();
     const _treasury_bound = sc_1.loadBit();
-    const _pricing_frozen = sc_1.loadBit();
     const _sealed = sc_1.loadBit();
-    const _base_tranche_price_nanotons = sc_1.loadUintBig(128);
+    const _phase = sc_1.loadUintBig(8);
+    const _reserve_due_ath = sc_1.loadUintBig(128);
     const sc_2 = sc_1.loadRef().beginParse();
-    const _evidence_x1_tranche_quote_nanotons = sc_2.loadUintBig(128);
-    const _pricing_evidence_hash = sc_2.loadUintBig(256);
-    const _phase = sc_2.loadUintBig(8);
-    const _reserve_due_ath = sc_2.loadUintBig(128);
     const _treasury_due_ton = sc_2.loadUintBig(128);
     const _pending_query_id = sc_2.loadUintBig(64);
     const _pending_amount_ath = sc_2.loadUintBig(128);
     const _pending_paid_ton = sc_2.loadUintBig(128);
+    const _pending_buyer = sc_2.loadAddress();
+    const _pending_recipient = sc_2.loadAddress();
     const sc_3 = sc_2.loadRef().beginParse();
-    const _pending_buyer = sc_3.loadAddress();
-    const _pending_recipient = sc_3.loadAddress();
     const _pending_recipient_ath_wallet = sc_3.loadAddress();
     const _completed_tranche_count = sc_3.loadUintBig(8);
     const _current_tranche_sold_ath = sc_3.loadUintBig(128);
     const _last_terminal_query_id = sc_3.loadUintBig(64);
-    const sc_4 = sc_3.loadRef().beginParse();
-    const _reserve_funded_total_ath = sc_4.loadUintBig(128);
-    const _sold_ath_total = sc_4.loadUintBig(128);
-    const _treasury_flushed_ton_total = sc_4.loadUintBig(128);
-    return { $$type: 'MarketStabilitySeller$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, sealed: _sealed, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash, phase: _phase, reserve_due_ath: _reserve_due_ath, treasury_due_ton: _treasury_due_ton, pending_query_id: _pending_query_id, pending_amount_ath: _pending_amount_ath, pending_paid_ton: _pending_paid_ton, pending_buyer: _pending_buyer, pending_recipient: _pending_recipient, pending_recipient_ath_wallet: _pending_recipient_ath_wallet, completed_tranche_count: _completed_tranche_count, current_tranche_sold_ath: _current_tranche_sold_ath, last_terminal_query_id: _last_terminal_query_id, reserve_funded_total_ath: _reserve_funded_total_ath, sold_ath_total: _sold_ath_total, treasury_flushed_ton_total: _treasury_flushed_ton_total };
+    const _reserve_funded_total_ath = sc_3.loadUintBig(128);
+    const _sold_ath_total = sc_3.loadUintBig(128);
+    const _treasury_flushed_ton_total = sc_3.loadUintBig(128);
+    return { $$type: 'MarketStabilitySeller$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, sealed: _sealed, phase: _phase, reserve_due_ath: _reserve_due_ath, treasury_due_ton: _treasury_due_ton, pending_query_id: _pending_query_id, pending_amount_ath: _pending_amount_ath, pending_paid_ton: _pending_paid_ton, pending_buyer: _pending_buyer, pending_recipient: _pending_recipient, pending_recipient_ath_wallet: _pending_recipient_ath_wallet, completed_tranche_count: _completed_tranche_count, current_tranche_sold_ath: _current_tranche_sold_ath, last_terminal_query_id: _last_terminal_query_id, reserve_funded_total_ath: _reserve_funded_total_ath, sold_ath_total: _sold_ath_total, treasury_flushed_ton_total: _treasury_flushed_ton_total };
 }
 
 export function loadTupleMarketStabilitySeller$Data(source: TupleReader) {
@@ -3704,16 +3612,12 @@ export function loadTupleMarketStabilitySeller$Data(source: TupleReader) {
     const _reserve_funder_bound = source.readBoolean();
     const _official_ath_wallet_bound = source.readBoolean();
     const _treasury_bound = source.readBoolean();
-    const _pricing_frozen = source.readBoolean();
     const _sealed = source.readBoolean();
-    const _base_tranche_price_nanotons = source.readBigNumber();
-    const _evidence_x1_tranche_quote_nanotons = source.readBigNumber();
-    const _pricing_evidence_hash = source.readBigNumber();
-    source = source.readTuple();
     const _phase = source.readBigNumber();
     const _reserve_due_ath = source.readBigNumber();
     const _treasury_due_ton = source.readBigNumber();
     const _pending_query_id = source.readBigNumber();
+    source = source.readTuple();
     const _pending_amount_ath = source.readBigNumber();
     const _pending_paid_ton = source.readBigNumber();
     const _pending_buyer = source.readAddress();
@@ -3724,9 +3628,8 @@ export function loadTupleMarketStabilitySeller$Data(source: TupleReader) {
     const _last_terminal_query_id = source.readBigNumber();
     const _reserve_funded_total_ath = source.readBigNumber();
     const _sold_ath_total = source.readBigNumber();
-    source = source.readTuple();
     const _treasury_flushed_ton_total = source.readBigNumber();
-    return { $$type: 'MarketStabilitySeller$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, sealed: _sealed, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash, phase: _phase, reserve_due_ath: _reserve_due_ath, treasury_due_ton: _treasury_due_ton, pending_query_id: _pending_query_id, pending_amount_ath: _pending_amount_ath, pending_paid_ton: _pending_paid_ton, pending_buyer: _pending_buyer, pending_recipient: _pending_recipient, pending_recipient_ath_wallet: _pending_recipient_ath_wallet, completed_tranche_count: _completed_tranche_count, current_tranche_sold_ath: _current_tranche_sold_ath, last_terminal_query_id: _last_terminal_query_id, reserve_funded_total_ath: _reserve_funded_total_ath, sold_ath_total: _sold_ath_total, treasury_flushed_ton_total: _treasury_flushed_ton_total };
+    return { $$type: 'MarketStabilitySeller$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, sealed: _sealed, phase: _phase, reserve_due_ath: _reserve_due_ath, treasury_due_ton: _treasury_due_ton, pending_query_id: _pending_query_id, pending_amount_ath: _pending_amount_ath, pending_paid_ton: _pending_paid_ton, pending_buyer: _pending_buyer, pending_recipient: _pending_recipient, pending_recipient_ath_wallet: _pending_recipient_ath_wallet, completed_tranche_count: _completed_tranche_count, current_tranche_sold_ath: _current_tranche_sold_ath, last_terminal_query_id: _last_terminal_query_id, reserve_funded_total_ath: _reserve_funded_total_ath, sold_ath_total: _sold_ath_total, treasury_flushed_ton_total: _treasury_flushed_ton_total };
 }
 
 export function loadGetterTupleMarketStabilitySeller$Data(source: TupleReader) {
@@ -3739,11 +3642,7 @@ export function loadGetterTupleMarketStabilitySeller$Data(source: TupleReader) {
     const _reserve_funder_bound = source.readBoolean();
     const _official_ath_wallet_bound = source.readBoolean();
     const _treasury_bound = source.readBoolean();
-    const _pricing_frozen = source.readBoolean();
     const _sealed = source.readBoolean();
-    const _base_tranche_price_nanotons = source.readBigNumber();
-    const _evidence_x1_tranche_quote_nanotons = source.readBigNumber();
-    const _pricing_evidence_hash = source.readBigNumber();
     const _phase = source.readBigNumber();
     const _reserve_due_ath = source.readBigNumber();
     const _treasury_due_ton = source.readBigNumber();
@@ -3759,7 +3658,7 @@ export function loadGetterTupleMarketStabilitySeller$Data(source: TupleReader) {
     const _reserve_funded_total_ath = source.readBigNumber();
     const _sold_ath_total = source.readBigNumber();
     const _treasury_flushed_ton_total = source.readBigNumber();
-    return { $$type: 'MarketStabilitySeller$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, pricing_frozen: _pricing_frozen, sealed: _sealed, base_tranche_price_nanotons: _base_tranche_price_nanotons, evidence_x1_tranche_quote_nanotons: _evidence_x1_tranche_quote_nanotons, pricing_evidence_hash: _pricing_evidence_hash, phase: _phase, reserve_due_ath: _reserve_due_ath, treasury_due_ton: _treasury_due_ton, pending_query_id: _pending_query_id, pending_amount_ath: _pending_amount_ath, pending_paid_ton: _pending_paid_ton, pending_buyer: _pending_buyer, pending_recipient: _pending_recipient, pending_recipient_ath_wallet: _pending_recipient_ath_wallet, completed_tranche_count: _completed_tranche_count, current_tranche_sold_ath: _current_tranche_sold_ath, last_terminal_query_id: _last_terminal_query_id, reserve_funded_total_ath: _reserve_funded_total_ath, sold_ath_total: _sold_ath_total, treasury_flushed_ton_total: _treasury_flushed_ton_total };
+    return { $$type: 'MarketStabilitySeller$Data' as const, genesis_config_hash: _genesis_config_hash, deployment_manifest_hash: _deployment_manifest_hash, ath_master_address: _ath_master_address, reserve_funder_address: _reserve_funder_address, official_ath_wallet_address: _official_ath_wallet_address, ton_treasury_receiver_address: _ton_treasury_receiver_address, reserve_funder_bound: _reserve_funder_bound, official_ath_wallet_bound: _official_ath_wallet_bound, treasury_bound: _treasury_bound, sealed: _sealed, phase: _phase, reserve_due_ath: _reserve_due_ath, treasury_due_ton: _treasury_due_ton, pending_query_id: _pending_query_id, pending_amount_ath: _pending_amount_ath, pending_paid_ton: _pending_paid_ton, pending_buyer: _pending_buyer, pending_recipient: _pending_recipient, pending_recipient_ath_wallet: _pending_recipient_ath_wallet, completed_tranche_count: _completed_tranche_count, current_tranche_sold_ath: _current_tranche_sold_ath, last_terminal_query_id: _last_terminal_query_id, reserve_funded_total_ath: _reserve_funded_total_ath, sold_ath_total: _sold_ath_total, treasury_flushed_ton_total: _treasury_flushed_ton_total };
 }
 
 export function storeTupleMarketStabilitySeller$Data(source: MarketStabilitySeller$Data) {
@@ -3773,11 +3672,7 @@ export function storeTupleMarketStabilitySeller$Data(source: MarketStabilitySell
     builder.writeBoolean(source.reserve_funder_bound);
     builder.writeBoolean(source.official_ath_wallet_bound);
     builder.writeBoolean(source.treasury_bound);
-    builder.writeBoolean(source.pricing_frozen);
     builder.writeBoolean(source.sealed);
-    builder.writeNumber(source.base_tranche_price_nanotons);
-    builder.writeNumber(source.evidence_x1_tranche_quote_nanotons);
-    builder.writeNumber(source.pricing_evidence_hash);
     builder.writeNumber(source.phase);
     builder.writeNumber(source.reserve_due_ath);
     builder.writeNumber(source.treasury_due_ton);
@@ -3956,15 +3851,14 @@ const ATHWallet_types: ABIType[] = [
     {"name":"BindMarketStabilityReserveFunder","header":1297306182,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"reserve_funder_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"BindMarketStabilityOfficialAthWallet","header":1297301847,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"BindMarketStabilityTreasury","header":1297306706,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"ton_treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"FreezeMarketStabilityPricing","header":1297305670,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"base_tranche_price_nanotons","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_x1_tranche_quote_nanotons","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pricing_evidence_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"SealMarketStabilityGenesis","header":1297306444,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"BuyMarketStabilityAth","header":1297302872,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"FlushMarketStabilityTreasuryTon","header":1297303124,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"MarketStabilityTopUpStorageReserve","header":2422309587,"fields":[]},
-    {"name":"MarketStabilitySellerConfigView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"reserve_funder_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"pricing_frozen","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"reserve_funder_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ton_treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"base_tranche_price_nanotons","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evidence_x1_tranche_quote_nanotons","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pricing_evidence_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"MarketStabilitySellerConfigView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"reserve_funder_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"pricing_frozen","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"reserve_funder_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ton_treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"base_tranche_price_nanotons","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"MarketStabilitySellerStateView","header":null,"fields":[{"name":"phase","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"reserve_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_amount_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_paid_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_buyer","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"completed_tranche_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_tranche_sold_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_multiplier","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_tranche_remaining_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_terminal_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"MarketStabilitySellerTotalsView","header":null,"fields":[{"name":"reserve_funded_total_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sold_ath_total","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_flushed_ton_total","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"MarketStabilitySeller$Data","header":null,"fields":[{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"reserve_funder_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ton_treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"reserve_funder_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"pricing_frozen","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"base_tranche_price_nanotons","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_x1_tranche_quote_nanotons","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pricing_evidence_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"phase","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"reserve_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_amount_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_paid_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_buyer","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"completed_tranche_count","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"current_tranche_sold_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"last_terminal_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"reserve_funded_total_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sold_ath_total","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_flushed_ton_total","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"MarketStabilitySeller$Data","header":null,"fields":[{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"reserve_funder_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ton_treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"reserve_funder_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"phase","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"reserve_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_amount_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_paid_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_buyer","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"completed_tranche_count","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"current_tranche_sold_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"last_terminal_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"reserve_funded_total_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sold_ath_total","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_flushed_ton_total","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
 ]
 
 const ATHWallet_opcodes = {
@@ -3998,7 +3892,6 @@ const ATHWallet_opcodes = {
     "BindMarketStabilityReserveFunder": 1297306182,
     "BindMarketStabilityOfficialAthWallet": 1297301847,
     "BindMarketStabilityTreasury": 1297306706,
-    "FreezeMarketStabilityPricing": 1297305670,
     "SealMarketStabilityGenesis": 1297306444,
     "BuyMarketStabilityAth": 1297302872,
     "FlushMarketStabilityTreasuryTon": 1297303124,
@@ -4072,6 +3965,7 @@ export const MARKET_STABILITY_BUY_EXEC_RESERVE = 2000000n;
 export const MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE = 2000000n;
 export const MARKET_STABILITY_MIN_TREASURY_FLUSH_TON = 2000000n;
 export const MARKET_STABILITY_EXCESS_REFUND_MIN_VALUE = 100000n;
+export const MARKET_STABILITY_BASE_TRANCHE_PRICE = 3000000000000n;
 export const MARKET_STABILITY_PHASE_IDLE = 0n;
 export const MARKET_STABILITY_PHASE_PENDING_ATH_TRANSFER = 1n;
 export const UINT64_MAX = 18446744073709551615n;

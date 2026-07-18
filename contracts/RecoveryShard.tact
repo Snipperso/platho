@@ -24,8 +24,18 @@
 const RS_RECOVERY_DOMAIN: Int = 0x42525331;       // "BRS1" — recovery digest preimage, MUST mirror CapsuleHub.tact
 const RS_SLOT_DOMAIN: Int = 0x52534C4B;           // "RSLK" — the slot IS the owner key: self_bucket_key = H(this ‖ owner_pubkey)
 const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15); permissionless evict after updated_at + this
-const RS_RECOVERY_ENDOWMENT: Int = 23200000;      // 79 cells (8K cap) x 64962 x 3yr x 1.5 — mirrors the monolith's measured value
-// The endowment above is calibrated for EXACTLY this many cells (79 x 64962 x 3 x 1.5 = 23_093_991 ~ 23_200_000), so
+// [MEASURED 2026-07-18] The endowment must cover the WHOLE ACCOUNT for the whole retention, not just the payload.
+// The old 23_200_000 was derived from the 79-cell blob alone (79 x 64962 x 3 x 1.5 = 23_093_991) and silently
+// omitted the shard's own code and persistent state. Unlike its two siblings this lane has no separate base
+// endowment (compare RS_BASE_ENDOWMENT in RecordShard and IS_BASE_ENDOWMENT in IntroShard), so this one constant is
+// everything the account ever keeps. Counted from the current build artifact: 17 code cells + 2 data cells, so the
+// worst case is 79 + 17 + 2 = 98 cells -> 3-year rent 19_098_828. The slot was still SOLVENT at the frozen rate,
+// which is why nothing failed — but the delivered margin was 1.215x, not the 1.5x the G8 rule states, and that
+// margin is the entire defence against a governance rate change on a contract that can never be repriced. This is
+// the durability lane: if the slot freezes, the K_root blob is lost and the user cannot recover their account.
+//   (79 + 17 + 2) x 64962 x 3yr x 1.5 = 28_648_242 -> 28_700_000
+const RS_RECOVERY_ENDOWMENT: Int = 28700000;
+// The endowment above is calibrated for EXACTLY the blob cap below, so
 // the blob MUST be capped at it. The monolith gated this as RECOVERY_MAX_SIZE_CLASS (13560); the sharded rewrite
 // dropped the gate, which let an oversized blob buy permanent storage for a fixed endowment — the slot then goes
 // rent-insolvent and the K_root blob is lost on freeze, the exact failure the endowment exists to prevent. Measured

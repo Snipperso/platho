@@ -63,7 +63,11 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
 
   beforeEach(async () => {
     blockchain = await Blockchain.create();
-    blockchain.now = 1_700_000_000;
+  // Clock set AFTER the Apr-2026 config-18 switch, deliberately. The rate is a SCHEDULE: before the switch a
+  // cell-year costs 240631 plus 481 per bit-year, after it 64962 with bits free — measured 486975 vs 64962 per
+  // full 64-byte cell in this very sandbox, differing by nothing but this line. These shards deploy after the
+  // switch, so a test clock in 2023 would price their rent ~7.5x high and quietly justify wrong endowments.
+    blockchain.now = 1_790_000_000;
     relay = await blockchain.treasury('rec-relay');
   });
 

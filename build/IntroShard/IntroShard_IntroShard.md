@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: IntroShard
-BoC Size: 1229 bytes
+BoC Size: 1348 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 17
@@ -61,22 +61,22 @@ Signature: `IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:in
 TL-B: `_ exists:bool r:int257 view_tag:int257 body_commit:int257 created_at:int257 = IntroEntryView`
 Signature: `IntroEntryView{exists:bool,r:int257,view_tag:int257,body_commit:int257,created_at:int257}`
 
-### IntroTagPage
-TL-B: `_ from_id:int257 count:int257 next_id:int257 evict_cursor:int257 tags:^cell = IntroTagPage`
-Signature: `IntroTagPage{from_id:int257,count:int257,next_id:int257,evict_cursor:int257,tags:^cell}`
+### IntroScanPage
+TL-B: `_ from_id:int257 count:int257 next_id:int257 evict_cursor:int257 pairs:^cell = IntroScanPage`
+Signature: `IntroScanPage{from_id:int257,count:int257,next_id:int257,evict_cursor:int257,pairs:^cell}`
 
 ### IntroShardView
-TL-B: `_ epoch:int257 bucket:int257 live_count:int257 next_id:int257 evict_cursor:int257 retention:int257 safe_cap:int257 min_value:int257 = IntroShardView`
-Signature: `IntroShardView{epoch:int257,bucket:int257,live_count:int257,next_id:int257,evict_cursor:int257,retention:int257,safe_cap:int257,min_value:int257}`
+TL-B: `_ epoch:int257 bucket:int257 live_count:int257 next_id:int257 evict_cursor:int257 retention:int257 safe_cap:int257 min_value:int257 protocol_fee:int257 accrued_fee:int257 evict_bounty:int257 accrued_bounty:int257 = IntroShardView`
+Signature: `IntroShardView{epoch:int257,bucket:int257,live_count:int257,next_id:int257,evict_cursor:int257,retention:int257,safe_cap:int257,min_value:int257,protocol_fee:int257,accrued_fee:int257,evict_bounty:int257,accrued_bounty:int257}`
 
 ### IntroShard$Data
-TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 live_count:uint32 evict_cursor:uint32 = IntroShard`
-Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32,live_count:uint32,evict_cursor:uint32}`
+TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 live_count:uint32 evict_cursor:uint32 accrued_fee:coins accrued_bounty:coins = IntroShard`
+Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32,live_count:uint32,evict_cursor:uint32,accrued_fee:coins,accrued_bounty:coins}`
 
 ## Get methods
 Total get methods: 3
 
-## get_view_tags
+## get_scan_page
 Argument: from_id
 Argument: max_count
 

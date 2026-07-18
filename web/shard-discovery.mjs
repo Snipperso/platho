@@ -80,11 +80,45 @@ export async function recoveryShardAddress(selfBucketKey) {
 }
 
 /**
+ * INTRO_READ_SPACE — how many buckets a recipient reads. [OWNER DECISION 2026-07-18: 1024.]
+ *
+ * This is a CLIENT convention, not a contract constant: IntroShard.init takes an arbitrary bucket, so this number
+ * lives here and nowhere on chain. Two consequences shape everything below.
+ *
+ * FIRST, the read space and the write space are separate, and only the read space needs agreement. A sender that
+ * mis-estimates how wide to write still writes INSIDE the read space, so its message is found — the failure mode
+ * is uneven bucket fill, not a lost first contact. That is what makes it safe to let the write space float with
+ * load while this stays fixed, and it removes the entire class of sender/scanner divergence bugs.
+ *
+ * SECOND, cost is per REQUEST, not per bucket, so this number should sit just under a request boundary. MEASURED
+ * against live toncenter v3 on 2026-07-18, using real IntroShard addresses:
+ *   - accountStates is capped by URL LENGTH at 64 KiB, not by any address count: 1149 addresses fit (65_553 B),
+ *     1150+ is refused with HTTP 414.
+ *   - The wire form matters. A url-safe friendly address encodes to 48 chars with NO percent-escaping (url-safe
+ *     base64 uses - and _), i.e. 57.1 B per address including "address=" and "&". Raw hex costs 77.1 B and only
+ *     850 fit — 35% worse. ALWAYS send the url-safe friendly form.
+ *   - Uninitialised accounts are OMITTED from the response entirely, so empty buckets cost nothing in bytes; a
+ *     live bucket costs ~439 B. Requests therefore track this constant, bytes track actual traffic.
+ * So 1024 buckets = ONE request per scan pass, with headroom. Minute-fresh first contact costs ~3 minutes of
+ * connection per day; a scan on app-open costs one request and about a second.
+ *
+ * CEILING AND HOW TO RAISE IT. 1024 x IS_SAFE_CAP (8000) = 8.2M first contacts per day network-wide, roughly
+ * three billion a year. If that is ever reached, this number CAN be raised without redeploying anything: widening
+ * the read side is backward-compatible, because scanners reading a wider range still find everything written in
+ * the narrower one. Ship the wider reader first, let it propagate, and only then let senders use the new range.
+ * Never narrow it — a sender still using the old width would be writing where nobody looks.
+ */
+export const INTRO_READ_SPACE = 1024;
+
+/**
  * The INTRO catch-up scan set: every (epoch, bucket) IntroShard a recipient must read to cover a time window.
  * The recipient does not know which bucket a sender used, so it reads all `bucketCount` buckets for each epoch in
  * [fromEpoch, toEpoch]. Returns a flat list of addresses. Kept a pure local computation (no I/O).
+ *
+ * `bucketCount` defaults to INTRO_READ_SPACE. Pass a larger value to over-read (always safe, costs only requests);
+ * passing a smaller one risks missing first contacts and should only ever be done in tests.
  */
-export async function introScanAddresses(fromEpoch, toEpoch, bucketCount) {
+export async function introScanAddresses(fromEpoch, toEpoch, bucketCount = INTRO_READ_SPACE) {
   const out = [];
   for (let e = fromEpoch; e <= toEpoch; e += 1) {
     for (let b = 0; b < bucketCount; b += 1) {

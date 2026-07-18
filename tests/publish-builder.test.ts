@@ -55,7 +55,11 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
 
   beforeEach(async () => {
     blockchain = await Blockchain.create();
-    blockchain.now = 1_700_000_000;
+  // Clock set AFTER the Apr-2026 config-18 switch, deliberately. The rate is a SCHEDULE: before the switch a
+  // cell-year costs 240631 plus 481 per bit-year, after it 64962 with bits free — measured 486975 vs 64962 per
+  // full 64-byte cell in this very sandbox, differing by nothing but this line. These shards deploy after the
+  // switch, so a test clock in 2023 would price their rent ~7.5x high and quietly justify wrong endowments.
+    blockchain.now = 1_790_000_000;
     epoch = epochOf(blockchain.now);
     payer = await blockchain.treasury('pb-payer');
   });
@@ -331,6 +335,70 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect((await rs.getGetView()).live_count).toBe(0n);
   }, 120_000);
 
+  it('PB-13: eviction pays out ONLY the endowments it freed — a top-up survives the evictor too', async () => {
+    // PB-11 pins that a top-up survives the next PUBLISH. Eviction was quietly taking the very same money by the
+    // very same mechanic: its reserve was absolute (base + live_count*endowment + fee), so the balance became a
+    // hard ceiling again and the first passer-by to call EvictRecords walked off with the whole surplus. The two
+    // paths contradicted each other about the same GRAM, and only one of them had a test.
+    //
+    // Inverting the sign alone (original - freed) would have opened the mirror hole: once rent has eaten in, a full
+    // `freed` payout comes out of LIVE records' endowments. So both bounds hold at once, and this pins both.
+    const wk = writeKey(0x75);
+    for (const seq of [1n, 2n]) {
+      const p = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') });
+      expect(exitOf(await send(p), p.to)).toBe(0);
+    }
+    const shard = (await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 3n, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') })).to;
+
+    const topUp = toNano('0.5');
+    await payer.send({ to: shard, value: topUp, bounce: false } as any);
+    const beforeEvict = (await blockchain.getContract(shard)).balance;
+
+    blockchain.now = blockchain.now! + 31536000 + 86400;
+    const rs = blockchain.openContract(RecordShard.fromAddress(shard));
+    const keeper = await blockchain.treasury('pb-keeper');
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecords', max_count: 64n } as any), shard)).toBe(0);
+
+    const afterEvict = (await blockchain.getContract(shard)).balance;
+    // The deliberate top-up is still in the shard. Under the absolute reserve this was ~0.
+    expect(afterEvict, 'the top-up did not leave with the evictor').toBeGreaterThan(topUp);
+    // And the shard did release something, or nobody would ever call eviction at all.
+    expect(beforeEvict - afterEvict, 'the freed endowments were released').toBeGreaterThan(0n);
+    // Bounded above by what actually aged out. Deliberately expressed RELATIVE to the top-up rather than as an
+    // absolute nanoton figure, so the assertion cannot be quietly invalidated by a storage-rate change (config-18
+    // is a schedule and has already moved once — see the clock note at the top of this file).
+    expect(beforeEvict - afterEvict, 'the payout is a couple of endowments, nothing like the top-up')
+      .toBeLessThan(topUp / 4n);
+    expect((await rs.getGetView()).live_count).toBe(0n);
+  }, 120_000);
+
+  it('PB-14: an underfunded INTRO is refused in COMPUTE (13682) — the fee IS the spam price on the open lane', async () => {
+    // 13682 had no test at all, which mattered more here than on CONV. INTRO is open by design: anyone may write to
+    // any bucket, and the recipient has to SCAN every live intro, so publishing junk degrades everyone's scan. There
+    // is no gate that can tell a real first contact from a fake one without breaking the stealth property, so the
+    // only lever is price — and an unenforced floor would mean no price at all.
+    const bucket = 91n;
+    const init = await IntroShard.init(BigInt(epoch), bucket);
+    const is = await deploy(blockchain.openContract(new IntroShard(contractAddress(0, init), init)));
+    const view = await is.getGetView();
+    expect(view.protocol_fee, 'INTRO now carries the same 0.01 GRAM per-message fee as CONV').toBe(10_000_000n);
+    expect(view.min_value, 'endowment + bounty + gas + fee').toBe(13_408_000n);
+    expect(view.evict_bounty, 'each intro pre-funds its own eviction').toBe(900_000n);
+
+    const built = await buildIntroPublish({
+      epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8),
+      value: view.min_value - 1n,   // one nanoton below the contract's own floor
+    });
+    expect(exitOf(await send(built), is.address), 'underfunded -> 13682').toBe(13682);
+    expect((await is.getGetView()).live_count, 'nothing stored').toBe(0n);
+    expect((await is.getGetEntry(0n)).exists).toBe(false);
+
+    // and the fee is actually retained, not handed back with the change
+    const ok = await buildIntroPublish({ epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8), value: toNano('0.05') });
+    expect(exitOf(await send(ok), is.address)).toBe(0);
+    expect((await is.getGetView()).accrued_fee, 'the fee stayed in the shard').toBe(10_000_000n);
+  }, 120_000);
+
   it('PB-07: the client value floors are pinned to the CONTRACT constants — silent drift is impossible', () => {
     // Clients fund a publish against the contract's COMPUTE gates. The shards now EXPOSE min_value in get_view, so a
     // client should read it rather than mirror it; this test pins the arithmetic so a constant change is loud.
@@ -339,6 +407,11 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
       if (!m) throw new Error(`contract constant ${name} not found — did it get renamed?`);
       return BigInt(m[1]);
     };
+    const minValueTerms = (src: string, name: string): string[] => {
+      const m = src.match(new RegExp(`const\\s+${name}\\s*:\\s*Int\\s*=\\s*([^;]+);`));
+      if (!m) throw new Error(`${name} not found`);
+      return m[1].split('+').map(t => t.trim());
+    };
     const rec = readFileSync('contracts/RecordShard.tact', 'utf8');
     const intro = readFileSync('contracts/IntroShard.tact', 'utf8');
     const recov = readFileSync('contracts/RecoveryShard.tact', 'utf8');
@@ -346,14 +419,34 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // RS_MIN_VALUE = rent + gas + the 0.01 GRAM protocol fee. The fee is the other half of the airdrop economics
     // (1.5M capsules -> 15M ATH out, 15k GRAM in) and is what keeps publishing from being cheaper than the reward.
     expect(constOf(rec, 'RS_PROTOCOL_FEE'), 'the service fee is 0.01 GRAM, as in the deleted CreditSale').toBe(10_000_000n);
-    expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS') + constOf(rec, 'RS_PROTOCOL_FEE'),
-      'RecordShard RS_MIN_VALUE').toBe(12_800_000n);
+    const recTerms = minValueTerms(rec, 'RS_MIN_VALUE');
+    expect(recTerms.sort(), 'RS_MIN_VALUE is endowment + bounty + gas + fee, nothing dropped')
+      .toEqual(['RS_EVICT_BOUNTY', 'RS_PROTOCOL_FEE', 'RS_PUBLISH_GAS', 'RS_RECORD_ENDOWMENT']);
+    expect(recTerms.reduce((a, t) => a + constOf(rec, t), 0n), 'RecordShard RS_MIN_VALUE').toBe(13_600_000n);
     // the record endowment carries the canonical G8 1.5x margin over its MEASURED 3 cells (not the 2 in the old note)
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT'), '3 cells x 64962 x 1yr x 1.5 = 292_329 -> 300_000').toBe(300_000n);
     // the airdrop pays 10 ATH per capsule, so a capsule must never cost LESS than the fee that backs it
     expect(constOf(rec, 'RS_PROTOCOL_FEE') * 1_500_000n, '1.5M capsules collect 15k GRAM').toBe(15_000_000_000_000n);
-    expect(constOf(intro, 'IS_INTRO_ENDOWMENT') + constOf(intro, 'IS_PUBLISH_GAS'), 'IntroShard IS_MIN_VALUE').toBe(2_508_000n);
-    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(31_200_000n);
+    // INTRO pays the SAME per-message fee (owner 2026-07-18). Assert against the DEFINITION of IS_MIN_VALUE, not
+    // against a sum we happen to write here: the previous revision pinned `endowment + gas` under the label
+    // "IS_MIN_VALUE", so when the fee term was added the assertion stayed green while its meaning silently drifted.
+    const introTerms = minValueTerms(intro, 'IS_MIN_VALUE');
+    expect(introTerms.sort(), 'IS_MIN_VALUE is endowment + gas + fee, nothing dropped')
+      .toEqual(['IS_EVICT_BOUNTY', 'IS_INTRO_ENDOWMENT', 'IS_PROTOCOL_FEE', 'IS_PUBLISH_GAS']);
+    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(13_408_000n);
+    // The bounty exists because a STORAGE endowment cannot fund eviction: it is consumed by the storage it bought.
+    // Both bounties are sized at measured marginal sweep gas x 1.5 — see tests/evict-incentive.test.ts.
+    // Sized at the WORST case the contract permits, because marginal gas grows with dictionary depth and the
+    // contract is immutable: measured 533_186/entry at RS_SAFE_CAP=4096 and 591_973 at IS_SAFE_CAP=8000, x1.5.
+    expect(constOf(intro, 'IS_EVICT_BOUNTY'), '591_973 at IS_SAFE_CAP x1.5').toBe(900_000n);
+    expect(constOf(rec, 'RS_EVICT_BOUNTY'), '533_186 at RS_SAFE_CAP x1.5').toBe(800_000n);
+    // one fee for the whole protocol — a first contact costs the same as a reply
+    expect(constOf(intro, 'IS_PROTOCOL_FEE'), 'INTRO charges the same 0.01 GRAM as CONV').toBe(constOf(rec, 'RS_PROTOCOL_FEE'));
+    // RECOVERY has no separate base endowment, so this one constant funds the WHOLE account for 3 years. It used to
+    // be derived from the 79-cell blob alone, omitting the shard's own 17 code + 2 data cells, which delivered a
+    // 1.215x margin instead of the canonical 1.5x on the one lane whose failure loses a user's account.
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT'), '(79 blob + 17 code + 2 data) x 64962 x 3yr x 1.5').toBe(28_700_000n);
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(36_700_000n);
     // the STORAGE+GAS part is still materially cheaper than the old two-hop floor (7_710_000) — the hop is gone
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS')).toBeLessThan(7_710_000n);
   });

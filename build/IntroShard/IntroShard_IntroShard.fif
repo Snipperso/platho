@@ -14,26 +14,27 @@ PROGRAM{
   DECLPROC $IntroShard$_store
   DECLPROC $IntroShard$_load
   DECLPROC $Context$_get_value
+  DECLPROC $IntroEntry$_get_r
   DECLPROC $IntroEntry$_get_view_tag
   DECLPROC $IntroEntry$_get_created_at
   DECLPROC $IntroEntryView$_to_external
-  DECLPROC $IntroTagPage$_to_external
+  DECLPROC $IntroScanPage$_to_external
   DECLPROC $IntroShardView$_to_external
   DECLPROC $IntroShard$init$_load
   DECLPROC $IntroShard$_contract_init
   DECLPROC $IntroShard$_contract_load
   DECLPROC $IntroShard$_contract_store
   DECLPROC $IntroShard$_fun_bodyCommit
-  DECLPROC $IntroShard$_fun_packTags
-  DECLPROC $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags
-  DECLPROC $IntroShard$_fun_get_view_tags
+  DECLPROC $IntroShard$_fun_packPairs
+  DECLPROC $IntroScanPage$_constructor_from_id_count_next_id_evict_cursor_pairs
+  DECLPROC $IntroShard$_fun_get_scan_page
   DECLPROC $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at
   DECLPROC $IntroShard$_fun_get_entry
-  DECLPROC $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value
+  DECLPROC $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty
   DECLPROC $IntroShard$_fun_get_view
   DECLPROC $IntroEntry$_constructor_r_view_tag_body_commit_created_at
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
-  110790 DECLMETHOD %get_view_tags
+  97744 DECLMETHOD %get_scan_page
   80118 DECLMETHOD %get_entry
   76114 DECLMETHOD %get_view
   DECLPROC recv_internal
@@ -139,14 +140,19 @@ PROGRAM{
     }>
   }>
   $IntroShard$_store PROCINLINE:<{
-    s5 s6 XCHG2
+    s7 s8 XCHG2
+    32 STU
+    s1 s5 XCHG
     32 STU
     s1 s3 XCHG
-    32 STU
     STDICT
     32 STU
     32 STU
     32 STU
+    SWAP
+    STVARUINT16
+    SWAP
+    STVARUINT16
   }>
   $IntroShard$_load PROCINLINE:<{
     32 LDU
@@ -155,10 +161,15 @@ PROGRAM{
     32 LDU
     32 LDU
     32 LDU
-    6 -ROLL
+    LDVARUINT16
+    LDVARUINT16
+    8 -ROLL
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $IntroEntry$_get_r PROCINLINE:<{
     3 BLKDROP
   }>
   $IntroEntry$_get_view_tag PROCINLINE:<{
@@ -170,7 +181,7 @@ PROGRAM{
   }>
   $IntroEntryView$_to_external PROCINLINE:<{
   }>
-  $IntroTagPage$_to_external PROCINLINE:<{
+  $IntroScanPage$_to_external PROCINLINE:<{
   }>
   $IntroShardView$_to_external PROCINLINE:<{
   }>
@@ -184,7 +195,8 @@ PROGRAM{
   $IntroShard$_contract_init PROCINLINE:<{
     PUSHNULL
     0 PUSHINT
-    s0 s0 PUSH2
+    s0 s0 s0 PUSH3
+    DUP
   }>
   $IntroShard$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -193,7 +205,7 @@ PROGRAM{
     SWAP
     IF:<{
       $IntroShard$_load INLINECALLDICT
-      1 6 BLKDROP2
+      1 8 BLKDROP2
     }>ELSE<{
       $IntroShard$init$_load INLINECALLDICT
       s0 s2 XCHG
@@ -207,7 +219,7 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    6 -ROLL
+    8 -ROLL
     $IntroShard$_store INLINECALLDICT
     ENDC
     c4 POP
@@ -228,7 +240,7 @@ PROGRAM{
         ENDC
         HASHCU
   }>
-  $IntroShard$_fun_packTags PROCREF:<{
+  $IntroShard$_fun_packPairs PROCREF:<{
         NEWC
         ENDC
     TRUE
@@ -237,7 +249,7 @@ PROGRAM{
       0 GTINT
     }>DO<{
       s2 PUSH
-      63 PUSHINT
+      3 PUSHINT
           MIN
       s4 s3 PUSH2
       ADD
@@ -252,16 +264,28 @@ PROGRAM{
         257 PUSHINT
         s3 s1 PUSH2
         ADD
-        s13 PUSH
+        s15 PUSH
         -ROT
         __tact_dict_get_int_cell INLINECALLDICT
         $IntroEntry$_load_opt INLINECALLDICT
         DUP
         ISNULL
         IF:<{
-          DROP
           0 PUSHINT
         }>ELSE<{
+          DUP
+          $IntroEntry$_not_null INLINECALLDICT
+          $IntroEntry$_get_r INLINECALLDICT
+        }>
+        s0 s3 XCHG2
+        256 STU
+        s2 PUSH
+        ISNULL
+        IF:<{
+          s2 POP
+          0 PUSHINT
+        }>ELSE<{
+          s0 s2 XCHG
           $IntroEntry$_not_null INLINECALLDICT
           $IntroEntry$_get_view_tag INLINECALLDICT
         }>
@@ -290,35 +314,37 @@ PROGRAM{
     s1 s3 XCHG
     3 BLKDROP
   }>
-  $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags PROCINLINE:<{
+  $IntroScanPage$_constructor_from_id_count_next_id_evict_cursor_pairs PROCINLINE:<{
   }>
-  $IntroShard$_fun_get_view_tags PROCREF:<{
-    s1 s2 XCPU
+  $IntroShard$_fun_get_scan_page PROCREF:<{
+    s1 s4 XCPU
         MAX
-    s4 s0 PUSH2
+    s6 s0 PUSH2
     GREATER
     IF:<{
-      s4 s0 PUSH2
+      s6 s0 PUSH2
       SUB
     }>ELSE<{
       0 PUSHINT
     }>
-    s0 s2 XCHG
+    0 PUSHINT
+    s0 s3 XCHG
     8 PUSHPOW2
         MIN
-    ROT
+    SWAP
         MIN
-    s4 s2 PUSH2
-    s5 s9 XCHG
-    s4 s8 XCHG
-    s3 s7 XCHG
-    s6 s9 s8 XCHG3
-    s7 s6 PUSH2
-    $IntroShard$_fun_packTags INLINECALLDICT
-    s4 s8 XCHG
-    s3 s7 XCHG
+    s1 s2 XCHG
+        MAX
+    s6 s4 PUSH2
+    8 4 BLKSWAP
+    s11 s10 PUSH2
+    $IntroShard$_fun_packPairs INLINECALLDICT
+    s4 s12 XCHG
+    s3 s11 XCHG
     s10 s9 s0 XCHG3
-    $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags INLINECALLDICT
+    $IntroScanPage$_constructor_from_id_count_next_id_evict_cursor_pairs INLINECALLDICT
+    s8 s12 XCHG
+    s7 s11 XCHG
     s6 s10 XCHG
     s5 s9 XCHG
   }>
@@ -326,7 +352,7 @@ PROGRAM{
   }>
   $IntroShard$_fun_get_entry PROCREF:<{
     257 PUSHINT
-    s5 PUSH
+    s7 PUSH
     s0 s2 XCHG
     __tact_dict_get_int_cell INLINECALLDICT
     $IntroEntry$_load_opt INLINECALLDICT
@@ -344,19 +370,22 @@ PROGRAM{
     4 -ROLL
     $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at INLINECALLDICT
   }>
-  $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value PROCINLINE:<{
+  $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty PROCINLINE:<{
   }>
   $IntroShard$_fun_get_view PROCREF:<{
     604800 PUSHINT
     8000 PUSHINT
-    2508000 PUSHINT
-    s8 PUSH
-    s3 s8 XCPU
-    s3 s6 XCPU
-    s3 s8 XCPU
-    s3 s7 XCPU
-    s1 s3 s3 XCHG3
-    $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value INLINECALLDICT
+    13408000 PUSHINT
+    10000000 PUSHINT
+    900000 PUSHINT
+    s12 PUSH
+    s5 s12 XCPU
+    s5 s10 XCPU
+    s5 s12 XCPU
+    s5 s11 XCPU
+    s11 s5 PUXC
+    s11 PUSH
+    $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty INLINECALLDICT
   }>
   $IntroEntry$_constructor_r_view_tag_body_commit_created_at PROCINLINE:<{
   }>
@@ -368,24 +397,24 @@ PROGRAM{
     PUSHNULL
     s0 s3 XCHG
   }>
-  %get_view_tags PROC:<{
+  %get_scan_page PROC:<{
     $IntroShard$_contract_load INLINECALLDICT
-    2 6 BLKSWAP
-    $IntroShard$_fun_get_view_tags INLINECALLDICT
-    6 5 BLKDROP2
-    $IntroTagPage$_to_external INLINECALLDICT
+    2 8 BLKSWAP
+    $IntroShard$_fun_get_scan_page INLINECALLDICT
+    8 5 BLKDROP2
+    $IntroScanPage$_to_external INLINECALLDICT
   }>
   %get_entry PROC:<{
     $IntroShard$_contract_load INLINECALLDICT
-    6 ROLL
+    8 ROLL
     $IntroShard$_fun_get_entry INLINECALLDICT
-    6 5 BLKDROP2
+    8 5 BLKDROP2
     $IntroEntryView$_to_external INLINECALLDICT
   }>
   %get_view PROC:<{
     $IntroShard$_contract_load INLINECALLDICT
     $IntroShard$_fun_get_view INLINECALLDICT
-    6 8 BLKDROP2
+    8 12 BLKDROP2
     $IntroShardView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -404,69 +433,95 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $IntroShard$_contract_load INLINECALLDICT
-    s0 s7 XCHG
+    s0 s9 XCHG
     IFJMP:<{
-      7 BLKDROP
+      9 BLKDROP
     }>
     0 PUSHINT
-    s6 PUSH
+    s8 PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 s6 XCHG
+      s0 s8 XCHG
       32 LDU
-      s0 s7 XCHG
+      s0 s9 XCHG
     }>
     OVER
     1230196785 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s5 XCHG
+      s0 s7 XCHG
       256 LDU
       16 LDU
       LDREF
       LDREF
       DROP
+          NOW
+      86400 PUSHINT
+      DIV
+      13684 PUSHINT
+      s11 PUSH
+      DEC
+      s2 s(-1) PUXC
+      GEQ
+      IF:<{
+        s11 PUSH
+        INC
+        s1 s2 XCHG
+        LEQ
+      }>ELSE<{
+        NIP
+        FALSE
+      }>
+      THROWANYIFNOT
       13682 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      2508000 PUSHINT
+      13408000 PUSHINT
       GEQ
       THROWANYIFNOT
       13680 PUSHINT
-      s9 PUSH
+      s6 PUSH
       8000 PUSHINT
       LESS
       THROWANYIFNOT
-      s5 PUSH
+      s7 PUSH
       257 PUSHINT
-      s6 PUSH
+      s8 PUSH
+      s9 s12 XCHG
+      s8 s11 XCHG
       s7 s10 XCHG
-      s6 s9 XCHG
-      s5 s8 XCHG
+      s6 s12 XCHG
+      s5 s11 XCHG
       s4 s10 XCHG
-      s3 s11 XCHG
-      s12 s10 s11 XCHG3
+      s3 s13 XCHG
+      s14 s10 s13 XCHG3
       $IntroShard$_fun_bodyCommit INLINECALLDICT
-      s4 POP
+      s6 POP
           NOW
-      s3 s8 XCHG
-      s7 s4 s0 XCHG3
+      s3 s11 XCHG
+      s10 s6 s0 XCHG3
       $IntroEntry$_constructor_r_view_tag_body_commit_created_at INLINECALLDICT
       NEWC
       $IntroEntry$_store_cell INLINECALLDICT
-      s3 s8 XCHG
-      s6 s7 s0 XCHG3
+      s3 s10 XCHG
+      s6 s9 s0 XCHG3
       __tact_dict_set_int_cell INLINECALLDICT
-      s0 s2 XCHG
+      s0 s3 XCHG
       INC
-      SWAP
+      s0 s6 XCHG
       INC
-      8000 PUSHINT
-      s2 PUSH
+      s0 s4 XCHG
+      10000000 PUSHINT
+      ADD
+      s0 s7 XCHG
+      900000 PUSHINT
+      ADD
+      10908000 PUSHINT
+      s7 PUSH
       1 EQINT
       IF:<{
         1000000 PUSHINT
@@ -547,7 +602,10 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      4 ROLL
+      s7 s6 s0 XCHG3
+      s3 s5 XCHG
+      s1 s4 XCHG
+      s3 s3 s0 XCHG3
       $IntroShard$_contract_store INLINECALLDICT
     }>
     OVER
@@ -555,7 +613,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s5 XCHG
+      s0 s7 XCHG
       16 LDU
       DROP
       0 PUSHINT
@@ -571,7 +629,7 @@ PROGRAM{
           FALSE
         }>
         IF:<{
-          s9 s4 PUSH2
+          s4 s6 PUSH2
           LESS
         }>ELSE<{
           FALSE
@@ -583,9 +641,9 @@ PROGRAM{
           FALSE
         }>
       }>DO<{
-        s5 PUSH
+        s7 PUSH
         257 PUSHINT
-        s11 PUSH
+        s6 PUSH
         __tact_dict_get_int_cell INLINECALLDICT
         $IntroEntry$_load_opt INLINECALLDICT
         s0 s2 XCHG
@@ -606,45 +664,58 @@ PROGRAM{
             PUSHNULL
             NEWC
             $IntroEntry$_store_opt INLINECALLDICT
-            s11 PUSH
-            s3 s8 XCHG
+            s6 PUSH
+            s3 s10 XCHG
             SWAP
             __tact_dict_set_int_cell INLINECALLDICT
-            s0 s8 XCHG
+            s0 s5 XCHG
             DEC
-            s0 s9 XCHG
+            s0 s4 XCHG
             INC
             s0 s2 XCHG
             INC
           }>ELSE<{
             DROP
-            s7 s8 XCHG
-            s4 s7 XCHG
             TRUE
-            s5 s1 s5 XCHG3
+            s0 s7 XCHG
+            s0 s5 XCHG
+            s4 s1 s4 XCHG3
           }>
         }>ELSE<{
           s2 POP
-          s0 s9 XCHG
+          s0 s4 XCHG
           INC
-          s8 s9 XCHG
-          s5 s8 XCHG
+          s4 s7 XCHG
+          s4 s5 XCHG
           s0 s2 XCHG
         }>
-        s0 s1 s9 XCHG3
-        s0 s8 XCHG
-        s0 s5 XCHG
+        s5 s7 XCHG
+        s4 s5 XCHG
+        s0 s1 s4 XCHG3
       }>
-      2DROP
+      s2 s3 XCHG
+      3 BLKDROP
       13683 PUSHINT
-      s2 POP
+      OVER
       0 GTINT
       THROWANYIFNOT
-      1000000 PUSHINT
-      s5 PUSH
-      8000 PUSHINT
+          BALANCE FIRST
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      SUB
+      SWAP
+      900000 PUSHINT
       MUL
-      ADD
+      s9 s9 XCPU
+      SUB
+      s0 s9 XCHG
+      SUB
+      DUP
+      0 LESSINT
+      IF:<{
+        DROP
+        0 PUSHINT
+      }>
       2 PUSHINT
           RAWRESERVE
       __tact_context_get_sender INLINECALLDICT
@@ -718,22 +789,22 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s3 s5 XCHG
-      2 3 BLKSWAP
+      s5 s7 XCHG
+      2 5 BLKSWAP
       $IntroShard$_contract_store INLINECALLDICT
     }>
-    s7 POP
+    s9 POP
     0 EQINT
-    s0 s6 XCHG
+    s0 s8 XCHG
     33 LESSINT
-    s1 s6 XCHG
+    s1 s8 XCHG
     AND
     IFJMP:<{
-      s3 s5 XCHG
-      2 3 BLKSWAP
+      s5 s7 XCHG
+      2 5 BLKSWAP
       $IntroShard$_contract_store INLINECALLDICT
     }>
-    6 BLKDROP
+    8 BLKDROP
     130 THROW
   }>
 }END>c
