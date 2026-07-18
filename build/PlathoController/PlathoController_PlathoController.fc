@@ -329,14 +329,14 @@ builder $PlathoController$_store(builder build_0, (cell, int, int, int, int, int
     throw_unless(25020, (~ $self'has_pending));
     $self'has_pending = true;
     $self'pending_kind = $kind;
-    $self'pending_effective_at = ($global_now() + 1209600);
+    $self'pending_effective_at = ($global_now() + 604800);
     $self'nonce = $self'nonce + 1;
     return (($self'signers, $self'nonce, $self'has_pending, $self'pending_kind, $self'pending_effective_at, $self'pending_manifest_hash, $self'pending_target_vault, $self'pending_successor_vault, $self'pending_rotate_slot, $self'pending_rotate_pubkey), ());
 }
 
 ((cell, int, int, int, int, int, slice, slice, int, int), (int, int, int, int, int, int, int, int, slice, slice, int, int)) $PlathoController$_fun_get_controller_state((cell, int, int, int, int, int, slice, slice, int, int) $self) impure inline_ref {
     var (($self'signers, $self'nonce, $self'has_pending, $self'pending_kind, $self'pending_effective_at, $self'pending_manifest_hash, $self'pending_target_vault, $self'pending_successor_vault, $self'pending_rotate_slot, $self'pending_rotate_pubkey)) = $self;
-    var $fresh$ret_1 = $ControllerStateView$_constructor_threshold_signer_count_nonce_timelock_seconds_has_pending_pending_kind_pending_effective_at_pending_manifest_hash_pending_target_vault_pending_successor_vault_pending_rotate_slot_pending_rotate_pubkey(3, 5, $self'nonce, 1209600, $self'has_pending, $self'pending_kind, $self'pending_effective_at, $self'pending_manifest_hash, $self'pending_target_vault, $self'pending_successor_vault, $self'pending_rotate_slot, $self'pending_rotate_pubkey);
+    var $fresh$ret_1 = $ControllerStateView$_constructor_threshold_signer_count_nonce_timelock_seconds_has_pending_pending_kind_pending_effective_at_pending_manifest_hash_pending_target_vault_pending_successor_vault_pending_rotate_slot_pending_rotate_pubkey(3, 5, $self'nonce, 604800, $self'has_pending, $self'pending_kind, $self'pending_effective_at, $self'pending_manifest_hash, $self'pending_target_vault, $self'pending_successor_vault, $self'pending_rotate_slot, $self'pending_rotate_pubkey);
     return (($self'signers, $self'nonce, $self'has_pending, $self'pending_kind, $self'pending_effective_at, $self'pending_manifest_hash, $self'pending_target_vault, $self'pending_successor_vault, $self'pending_rotate_slot, $self'pending_rotate_pubkey), $fresh$ret_1);
 }
 
