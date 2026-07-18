@@ -4,8 +4,9 @@
 //
 // DIRECT-PAID. [OWNER 2026-07-18: all external infrastructure is forbidden in this project and always has been.]
 // There is no token, no blind issuance, no issuer service and no relay: the client pays the record's rent straight to
-// the shard that stores it. Authorization to write a CONV bucket is simply KNOWING its bucket_key, which is derived
-// from the conversation's shared K_root — only the two participants can name that address. Anti-spam is the rent.
+// the shard that stores it. Authorization to write a CONV bucket is a SIGNATURE under the bucket's write key (derived
+// from the conversation's shared K_root) plus a monotonic seq — NOT merely knowing where to send, because the shard's
+// address is public the moment anything is published there. Anti-spam beyond that is the rent.
 //
 // The client publishes DIRECTLY to the terminal shard, which is also what makes the message deliverable at all: the
 // capsule cells ride in this transaction, so the ciphertext lives in the destination shard's transaction history,
@@ -27,6 +28,7 @@ import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routi
 // RecoveryShard.RS_RECOVERY_DOMAIN). The CONTRACT defines each commitment; these mirrors exist so a reader can
 // re-derive it locally to match a stored record against a body recovered from transaction history.
 const RS_FRAME_DOMAIN = 0x52534643n;   // "RSFC"
+const RS_WRITE_DOMAIN = 0x52535744n;   // "RSWD"
 const IS_BODY_DOMAIN = 0x49534243n;    // "ISBC"
 const RECOVERY_DOMAIN = 0x42525331n;   // "BRS1"
 
@@ -52,18 +54,25 @@ export function introBodyCommit(header0, body) {
 }
 
 /**
- * CONV publish: pay the record's rent straight to RecordShard(bucket_key, epoch). `minValue` should come from the
- * shard's own get_view().min_value so the client never funds below the contract's gate; the shard returns the change,
- * so paying a margin above it is safe.
+ * CONV publish. The shard's identity is the conversation-direction's WRITE PUBLIC KEY (conv-routing.convWritePublicKey),
+ * not a bare bucket hash: the address is public once anything is published there, so authorization has to be a
+ * signature, not knowledge of where to send. `writeSecret` signs (seq ‖ commitment); `seq` MUST strictly exceed the
+ * shard's last_seq (read get_view().last_seq; a fresh shard is 0), which is what stops a captured publish from being
+ * replayed to burn SAFE_CAP slots. Fund at or above get_view().min_value — the shard returns the change.
  */
-export async function buildConvPublish({ bucketKey, epoch, header0, header1, body, value }) {
+export async function buildConvPublish({ writePublicKey, writeSecret, seq, epoch, header0, header1, body, value }) {
+  const commit = frameCommit(header0, header1, body);
+  const digest = beginCell()
+    .storeUint(RS_WRITE_DOMAIN, 32).storeUint(BigInt(seq), 64).storeUint(commit, 256)
+    .endCell().hash();
   return {
-    to: await recordShardAddress(bucketKey, epoch),
+    to: await recordShardAddress(bytesToBig(writePublicKey), epoch),
     value,
     body: beginCell().store(storeCapsulePublish({
-      $$type: 'CapsulePublish', header_0: header0, header_1: header1, body,
+      $$type: 'CapsulePublish', seq: BigInt(seq), header_0: header0, header_1: header1, body,
+      sig: sigCell(ed25519.sign(digest, writeSecret)),
     })).endCell(),
-    commit: frameCommit(header0, header1, body),
+    commit,
   };
 }
 

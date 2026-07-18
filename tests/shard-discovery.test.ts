@@ -9,6 +9,7 @@ import {
   introScanAddresses, epochOf, addrKey,
 } from '../web/shard-discovery.mjs';
 import { buildConvPublish } from '../web/publish-builder.mjs';
+import { ed25519 } from '@noble/curves/ed25519.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // SHARD-DISCOVERY — the client computes every shard address LOCALLY and it matches where the contract deploys.
@@ -41,17 +42,19 @@ describe('SHARD-DISCOVERY — client-derived addresses match the on-chain shards
     blockchain.now = 1_700_000_000;
     const epoch = epochOf(blockchain.now);
     const payer = await blockchain.treasury('disc-payer');
-    const bucketKey = 0xC0FFEEn;
+    const writeSecret = new Uint8Array(32).fill(0x71);
+    const writePublicKey = ed25519.getPublicKey(writeSecret);
+    const bucketKey = BigInt('0x' + Buffer.from(writePublicKey).toString('hex'));
 
     // deploy the record shard lazily, then publish straight to it (direct-paid: no token, no relay)
-    const init = await RecordShard.init(BigInt(bucketKey), BigInt(epoch));
+    const init = await RecordShard.init(bucketKey, BigInt(epoch));
     const rs = blockchain.openContract(new RecordShard(contractAddress(0, init), init));
     await rs.send(payer.getSender(), { value: toNano('0.05') }, null);
 
     const h0 = beginCell().storeUint(0x11, 32).endCell();
     const h1 = beginCell().storeUint(0x22, 32).endCell();
     const body = beginCell().storeBuffer(Buffer.alloc(127, 0x33)).storeRef(beginCell().storeBuffer(Buffer.alloc(1, 0x34)).endCell()).endCell();
-    const built = await buildConvPublish({ bucketKey, epoch, header0: h0, header1: h1, body, value: toNano('0.02') });
+    const built = await buildConvPublish({ writePublicKey, writeSecret, seq: 1, epoch, header0: h0, header1: h1, body, value: toNano('0.02') });
     await payer.send({ to: built.to, value: built.value, body: built.body, bounce: true } as any);
 
     // the CLIENT computes the address from just (bucketKey, epoch) — no lookup — and reads the record there

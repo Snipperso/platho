@@ -7,6 +7,14 @@ import { IntroShard, loadIntroPublish } from '../build/IntroShard/IntroShard_Int
 import { RecoveryShard, loadRecoveryStore } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
 import { buildConvPublish, buildIntroPublish, buildRecoveryPublish, frameCommit, introBodyCommit } from '../web/publish-builder.mjs';
 import { addrKey, epochOf } from '../web/shard-discovery.mjs';
+import { ed25519 } from '@noble/curves/ed25519.js';
+
+// A conversation-direction's write key. In the client this is derived from the shared K_root
+// (conv-routing.convWritePublicKey); here any deterministic 32-byte secret stands in for it.
+const writeKey = (fill: number) => {
+  const secret = new Uint8Array(32).fill(fill);
+  return { secret, publicKey: ed25519.getPublicKey(secret) };
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PUBLISH-BUILDER — the DIRECT-PAID send path, and the proof that a message is actually DELIVERABLE.
@@ -60,11 +68,11 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     payer.send({ to: built.to, value: built.value, body: built.body, bounce: true } as any);
 
   it('PB-01: a CONV capsule is stored, and its BODY is recoverable from the shard transaction — the deliverability proof', async () => {
-    const bucketKey = 0xB0BA_F00Dn;
+    const wk = writeKey(0x51);
     const h0 = cellOf(0x11), h1 = cellOf(0x22), body = cellOf(0x33, 512);
-    const built = await buildConvPublish({ bucketKey, epoch, header0: h0, header1: h1, body, value: toNano('0.02') });
+    const built = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 1, epoch, header0: h0, header1: h1, body, value: toNano('0.02') });
 
-    const init = await RecordShard.init(bucketKey, BigInt(epoch));
+    const init = await RecordShard.init(BigInt('0x' + Buffer.from(wk.publicKey).toString('hex')), BigInt(epoch));
     const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, init), init)));
     expect(addrKey(built.to), 'builder targets the derived shard').toBe(addrKey(rs.address));
 
@@ -109,13 +117,14 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
   }, 120_000);
 
   it('PB-03: an underfunded publish is refused in COMPUTE and stores nothing (it bounces and refunds)', async () => {
-    const bucketKey = 0xDEADn;
-    const init = await RecordShard.init(bucketKey, BigInt(epoch));
+    const wk = writeKey(0x52);
+    const init = await RecordShard.init(BigInt('0x' + Buffer.from(wk.publicKey).toString('hex')), BigInt(epoch));
     const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, init), init)));
     const minValue = (await rs.getGetView()).min_value;
 
     const built = await buildConvPublish({
-      bucketKey, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3),
+      writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 1, epoch,
+      header0: cellOf(1), header1: cellOf(2), body: cellOf(3),
       value: minValue - 1n,   // one nanoton below the contract's own floor
     });
     const res = await send(built);
@@ -125,13 +134,14 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
   }, 120_000);
 
   it('PB-04: the payer gets change back — the shard keeps only its own rent', async () => {
-    const bucketKey = 0xCA4409n;
-    const init = await RecordShard.init(bucketKey, BigInt(epoch));
+    const wk = writeKey(0x53);
+    const init = await RecordShard.init(BigInt('0x' + Buffer.from(wk.publicKey).toString('hex')), BigInt(epoch));
     const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, init), init)));
 
     const before = await payer.getBalance();
     const built = await buildConvPublish({
-      bucketKey, epoch, header0: cellOf(7), header1: cellOf(8), body: cellOf(9, 256),
+      writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 1, epoch,
+      header0: cellOf(7), header1: cellOf(8), body: cellOf(9, 256),
       value: toNano('1'),   // deliberately fat
     });
     expect(exitOf(await send(built), rs.address)).toBe(0);
@@ -186,6 +196,50 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     const okRs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, okInit), okInit)));
     expect(exitOf(await send(okBuilt), okRs.address), 'in-cap blob accepted').toBe(0);
     expect((await okRs.getGetView()).bound).toBe(true);
+  }, 120_000);
+
+  it('PB-08: an OUTSIDER who knows the address cannot write — address privacy is not authorization', async () => {
+    // The measured hole in the first direct-pay draft: the bucket key goes into the ADDRESS, which is public the
+    // moment anyone publishes, so a stranger appended junk to a private conversation and could deny it for ~11 TON
+    // by filling SAFE_CAP. Authorization is now a signature under the bucket's own key.
+    const owner = writeKey(0x61), stranger = writeKey(0x62);
+    const init = await RecordShard.init(BigInt('0x' + Buffer.from(owner.publicKey).toString('hex')), BigInt(epoch));
+    const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, init), init)));
+
+    // the legitimate participant publishes; the address is now public in the chain
+    const good = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: owner.secret, seq: 1, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') });
+    expect(exitOf(await send(good), rs.address)).toBe(0);
+    expect((await rs.getGetView()).live_count).toBe(1n);
+
+    // the stranger sends to that SAME address, signing with a key they control — refused, nothing stored
+    const junk = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: stranger.secret, seq: 2, epoch, header0: cellOf(0xEE), header1: cellOf(0xEE), body: cellOf(0xEE), value: toNano('0.02') });
+    expect(addrKey(junk.to), 'the stranger really is aiming at the same shard').toBe(addrKey(rs.address));
+    expect(exitOf(await send(junk), rs.address), 'forged write -> 13654').toBe(13654);
+    expect((await rs.getGetView()).live_count, 'the conversation is untouched').toBe(1n);
+  }, 120_000);
+
+  it('PB-09: a captured publish cannot be REPLAYED — the signature alone would not have stopped the DoS', async () => {
+    // Without the monotonic seq an attacker could re-send a legitimate (cells, sig) pair over and over to burn
+    // SAFE_CAP slots at the same cost, so the signature would have closed forgery but not denial of service.
+    const owner = writeKey(0x63);
+    const init = await RecordShard.init(BigInt('0x' + Buffer.from(owner.publicKey).toString('hex')), BigInt(epoch));
+    const rs = await deploy(blockchain.openContract(new RecordShard(contractAddress(0, init), init)));
+
+    const built = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: owner.secret, seq: 5, epoch, header0: cellOf(4), header1: cellOf(5), body: cellOf(6), value: toNano('0.02') });
+    expect(exitOf(await send(built), rs.address)).toBe(0);
+    expect((await rs.getGetView()).last_seq).toBe(5n);
+
+    // byte-identical resend by anyone -> refused on the replay floor
+    expect(exitOf(await send(built), rs.address), 'replay -> 13653').toBe(13653);
+    // and an older seq is refused too
+    const older = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: owner.secret, seq: 3, epoch, header0: cellOf(7), header1: cellOf(8), body: cellOf(9), value: toNano('0.02') });
+    expect(exitOf(await send(older), rs.address), 'stale seq -> 13653').toBe(13653);
+    expect((await rs.getGetView()).live_count, 'still exactly one record').toBe(1n);
+
+    // the legitimate next message (higher seq) still goes through
+    const next = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: owner.secret, seq: 6, epoch, header0: cellOf(10), header1: cellOf(11), body: cellOf(12), value: toNano('0.02') });
+    expect(exitOf(await send(next), rs.address), 'the conversation still works').toBe(0);
+    expect((await rs.getGetView()).live_count).toBe(2n);
   }, 120_000);
 
   it('PB-07: the client value floors are pinned to the CONTRACT constants — silent drift is impossible', () => {

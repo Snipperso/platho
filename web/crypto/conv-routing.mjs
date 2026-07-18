@@ -33,6 +33,8 @@ export const CONV_RATCHET_SALT_DOMAIN = 'PLATHO.CONV.RATCHET.SALT.V1';
 export const CONV_RATCHET_INFO_DOMAIN = 'PLATHO.CONV.RATCHET.V1';
 export const CONV_BUCKET_SALT_DOMAIN = 'PLATHO.CONV.BUCKET.SALT.V1';
 export const CONV_BUCKET_INFO_DOMAIN = 'PLATHO.CONV.BUCKET.V1';
+export const CONV_WRITE_SALT_DOMAIN = 'PLATHO.CONV.WRITE.SALT.V1';
+export const CONV_WRITE_INFO_DOMAIN = 'PLATHO.CONV.WRITE.V1';
 
 // ---- FROZEN scalar pins ----
 export const CONV_EPOCH_SECONDS = 86400;            // 1 UTC day
@@ -240,12 +242,40 @@ export async function computeBucketKey(kEpoch, dirByte, epoch) {
   return hkdf256(assertBytes('kEpoch', kEpoch, CONV_KEY_BYTES), utf8(CONV_BUCKET_SALT_DOMAIN), info, CONV_KEY_BYTES);
 }
 
+// ---- the bucket's WRITE KEY: address privacy is not authorization ----
+// A shard's bucket_key ends up in its ADDRESS, and the address is public the moment anyone publishes (it is the
+// destination of that transaction). So "only participants can compute where the conversation lives" does NOT keep
+// outsiders from WRITING there — measured: a stranger who merely observed one publish appended junk to a private
+// conversation, and filling SAFE_CAP to deny a conversation-day cost ~11 TON.
+//
+// The fix needs no infrastructure: the shard's identity is a PUBLIC KEY derived from the same K_epoch, and a publish
+// must carry a signature under it. Knowing the address (a hash) does not let anyone sign. Both participants derive
+// the same key from the shared K_root, so both can write and nobody else can. Domain-separated from the bucketKey so
+// the identifier and the signing secret are never the same bytes.
+export async function convWriteSecret(kEpoch, dirByte, epoch) {
+  if (dirByte !== CONV_DIR_LO_TO_HI && dirByte !== CONV_DIR_HI_TO_LO) {
+    throw new RangeError(`dirByte must be 0x00 or 0x01, got ${dirByte}`);
+  }
+  const info = concatBytes(utf8(CONV_WRITE_INFO_DOMAIN), new Uint8Array([dirByte]), u32be(epoch));
+  return hkdf256(assertBytes('kEpoch', kEpoch, CONV_KEY_BYTES), utf8(CONV_WRITE_SALT_DOMAIN), info, CONV_KEY_BYTES);
+}
+
+/** The shard identity for a conversation-direction: the ed25519 public key a publish must be signed under. */
+export async function convWritePublicKey(kEpoch, dirByte, epoch) {
+  return ed25519.getPublicKey(await convWriteSecret(kEpoch, dirByte, epoch));
+}
+
 // Convenience: the bucketKey THIS party publishes its outgoing message into, for a capsule stamped createdAtSec.
 export async function outgoingBucketKey({ kRoot, selfKeyId, peerKeyId, createdAtSec }) {
   const { outgoingDir } = conversationOrder(selfKeyId, peerKeyId);
   const epoch = epochFromCreatedAtSeconds(createdAtSec);
   const kEpoch = await computeKEpoch(kRoot, epoch);
-  return { bucketKey: await computeBucketKey(kEpoch, outgoingDir, epoch), epoch, dir: outgoingDir };
+  return {
+    bucketKey: await computeBucketKey(kEpoch, outgoingDir, epoch),
+    writeSecret: await convWriteSecret(kEpoch, outgoingDir, epoch),
+    writePublicKey: await convWritePublicKey(kEpoch, outgoingDir, epoch),
+    epoch, dir: outgoingDir,
+  };
 }
 
 // Convenience: the set of INCOMING bucketKeys this party must scan for the window [epochNow-W .. epochNow].
@@ -255,7 +285,11 @@ export async function incomingBucketKeys({ kRoot, selfKeyId, peerKeyId, epochNow
   const out = [];
   for (let e = Math.max(0, now - windowW); e <= now; e += 1) {
     const kEpoch = await computeKEpoch(kRoot, e);
-    out.push({ epoch: e, dir: incomingDir, bucketKey: await computeBucketKey(kEpoch, incomingDir, e) });
+    out.push({
+      epoch: e, dir: incomingDir,
+      bucketKey: await computeBucketKey(kEpoch, incomingDir, e),
+      writePublicKey: await convWritePublicKey(kEpoch, incomingDir, e),
+    });
   }
   return out;
 }

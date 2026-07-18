@@ -8,11 +8,21 @@
 // closed the metadata-graph leak is the opaque bucket_key, and that is pure client-side crypto:
 //     bucket_key = HKDF(K_epoch ‖ dir ‖ epoch),  K_epoch = HKDF(K_root, epoch)
 //
-// WRITE CAPABILITY = KNOWING bucket_key. That is the whole authorization model, and it is stronger than it looks:
-// bucket_key is derived from the conversation's shared K_root, so only the two participants can name this address.
-// An outsider cannot aim at someone's conversation because they cannot compute where it lives. Anti-spam is the
-// rent itself — every record pays its own storage — bounded further by SAFE-CAP and 1-year eviction. This replaces
-// the old RS-AUTH gate (13650), which existed only to prove a nullifier had been burnt.
+// WRITE AUTHORIZATION = A SIGNATURE UNDER THE BUCKET'S OWN KEY. An earlier draft of this rewrite claimed that
+// merely KNOWING the bucket key was the capability, since only the two participants can derive it. That was WRONG
+// and was caught by measurement: the bucket key goes into this contract's ADDRESS, and the address is public the
+// instant anyone publishes (it is the destination of that transaction). A stranger who had only observed one publish
+// appended junk to a private conversation, and filling SAFE_CAP to deny a conversation-day cost ~11 TON.
+// ADDRESS PRIVACY IS NOT AUTHORIZATION.
+//
+// So the shard's identity is a PUBLIC KEY: write_pubkey = ed25519(HKDF(K_epoch ‖ dir ‖ epoch, "PLATHO.CONV.WRITE.V1")),
+// derived from the conversation's shared K_root. Knowing the address (a hash) does not let anyone sign. A publish
+// must carry a signature over (seq ‖ the commitment this contract computes), so an outsider can neither forge new
+// content nor splice a captured signature onto different cells.
+//
+// The monotonic `seq` closes REPLAY, which the signature alone does not: without it a captured (cells, sig) pair
+// could be re-sent to burn SAFE_CAP slots at the same ~11 TON, leaving the denial-of-service intact. It doubles as
+// the client's ordering key. Anti-spam beyond that is the rent itself, bounded by SAFE-CAP and 1-year eviction.
 //
 // BODY CARRIAGE — the bug this rewrite fixes. The two-hop design could not deliver a message at all: the forward
 // carried only {serial, frame_commit}, so the ciphertext existed nowhere on chain and the recipient had nothing to
@@ -35,6 +45,7 @@ const RS_EVICT_CAP: Int = 64;         // max records one EvictRecords call may s
 
 // frame_commit preimage tag. The CONTRACT defines the commitment, so client and reader cannot disagree about it.
 const RS_FRAME_DOMAIN: Int = 0x52534643;   // "RSFC"
+const RS_WRITE_DOMAIN: Int = 0x52535744;   // "RSWD" — the write-authorization digest preimage
 
 // [RE-MEASURE BEFORE SEAL] Storage is 64962 nanoton/cell/year (config-18, bits free).
 //   record endowment: 2 measured cells x 64962 x 1yr x 1.5 = 194_886 -> 200_000 (the record lives 1 year)
@@ -48,9 +59,11 @@ const RS_MIN_VALUE: Int = RS_RECORD_ENDOWMENT + RS_PUBLISH_GAS;   // minimum tha
 // The capsule a client publishes. The three cells are carried so they land in this account's transaction history;
 // they are NOT stored in state. frame_commit is recomputed here from their hashes — nothing is trusted from the sender.
 message(0x52535031) CapsulePublish {   // "RSP1"
+    seq: Int as uint64;               // strictly increasing per shard — closes replay, and orders records
     header_0: Cell;
     header_1: Cell;
     body: Cell;
+    sig: Cell;                        // ed25519 over H(RS_WRITE_DOMAIN ‖ seq ‖ frame_commit) under write_pubkey
 }
 
 message(0x52535032) EvictRecords {     // "RSP2" — permissionless FIFO eviction of records past the 1-year window
@@ -69,8 +82,9 @@ struct CapsuleRecordView {
 }
 
 struct RecordShardView {
-    bucket_key: Int;
+    write_pubkey: Int;
     epoch: Int;
+    last_seq: Int;
     record_count: Int;   // monotonic next id (total ever stored)
     live_count: Int;     // current live records (after eviction)
     evict_cursor: Int;
@@ -80,16 +94,18 @@ struct RecordShardView {
 }
 
 contract RecordShard {
-    bucket_key: Int as uint256;
+    write_pubkey: Int as uint256;     // the bucket's identity AND its write authority (see the header)
     epoch: Int as uint32;
+    last_seq: Int as uint64;          // replay floor: a publish must strictly exceed it
     records: map<Int, RecordEntry>;   // entry_id -> (frame_commit, created_at)
     record_count: Int as uint32;      // monotonic next id
     live_count: Int as uint32;
     evict_cursor: Int as uint32;      // FIFO low-water: lowest id not yet evicted
 
-    init(bucket_key: Int, epoch: Int) {
-        self.bucket_key = bucket_key;
+    init(write_pubkey: Int, epoch: Int) {
+        self.write_pubkey = write_pubkey;
         self.epoch = epoch;
+        self.last_seq = 0;
         self.records = emptyMap();
         self.record_count = 0;
         self.live_count = 0;
@@ -114,12 +130,21 @@ contract RecordShard {
         throwUnless(13652, context().value >= RS_MIN_VALUE);
         // SAFE-CAP in COMPUTE, so a full partition bounces instead of hitting code 50 in ACTION.
         throwUnless(13651, self.live_count < RS_SAFE_CAP);
+        // Replay floor: a captured (cells, sig) pair cannot be re-sent to burn slots.
+        throwUnless(13653, msg.seq > self.last_seq);
 
+        // WRITE AUTHORIZATION: the commitment is computed HERE from the attached cells, so the signature binds the
+        // exact capsule — a captured signature cannot be spliced onto different content, and an outsider who knows
+        // only the address cannot sign at all.
+        let commit: Int = self.frameCommit(msg.header_0, msg.header_1, msg.body);
+        let digest: Int = beginCell()
+            .storeUint(RS_WRITE_DOMAIN, 32).storeUint(msg.seq, 64).storeUint(commit, 256)
+            .endCell().hash();
+        throwUnless(13654, checkSignature(digest, msg.sig.beginParse(), self.write_pubkey));
+
+        self.last_seq = msg.seq;
         // created_at is stamped by the CONTRACT (now()), so eviction cannot be gamed by a client field.
-        self.records.set(self.record_count, RecordEntry{
-            frame_commit: self.frameCommit(msg.header_0, msg.header_1, msg.body),
-            created_at: now(),
-        });
+        self.records.set(self.record_count, RecordEntry{ frame_commit: commit, created_at: now() });
         self.record_count = self.record_count + 1;
         self.live_count = self.live_count + 1;
 
@@ -167,8 +192,9 @@ contract RecordShard {
 
     get fun get_view(): RecordShardView {
         return RecordShardView{
-            bucket_key: self.bucket_key,
+            write_pubkey: self.write_pubkey,
             epoch: self.epoch,
+            last_seq: self.last_seq,
             record_count: self.record_count,
             live_count: self.live_count,
             evict_cursor: self.evict_cursor,
