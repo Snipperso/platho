@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: AirdropPool
-BoC Size: 2062 bytes
+BoC Size: 2171 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 21
+Total structures: 22
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -52,6 +52,10 @@ Signature: `AirdropBindAthMaster{ath_master_address:address,pool_ath_wallet_addr
 ### AirdropBindCreditIssuer
 TL-B: `airdrop_bind_credit_issuer#41445202 credit_issuer_address:address = AirdropBindCreditIssuer`
 Signature: `AirdropBindCreditIssuer{credit_issuer_address:address}`
+
+### AirdropRebindCreditIssuer
+TL-B: `airdrop_rebind_credit_issuer#41445239 deployment_manifest_hash:uint256 credit_issuer_address:address = AirdropRebindCreditIssuer`
+Signature: `AirdropRebindCreditIssuer{deployment_manifest_hash:uint256,credit_issuer_address:address}`
 
 ### AirdropBindTreasury
 TL-B: `airdrop_bind_treasury#41445203 treasury_address:address = AirdropBindTreasury`

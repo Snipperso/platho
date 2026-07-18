@@ -51,6 +51,24 @@ message(0x41445202) AirdropBindCreditIssuer {           // "ADR2" — the SOLE a
     credit_issuer_address: Address;
 }
 
+// "ADR9" — POST-SEAL rebind of the distributor. [OWNER APPROVED 2026-07-18.]
+// This is the migration hook the whole clean-17 round exists for, and the reason it is needed is concrete: the
+// airdrop allocation used to live inside Vault, so abandoning Vault stranded it with no way out. AirdropPool was
+// split off precisely so a redeploy could not destroy the token allocation again — but that is only half the
+// problem. The coins survive a redeploy; the MECHANISM that hands them out does not, because the distributor is a
+// contract that gets redeployed with everything else. Bound one-shot and unsealed-only, the pool would sit after
+// the next redeploy holding 15M ATH it could never distribute.
+//
+// A contract is IMMUTABLE after seal, so this hook cannot be added later. Its scope is deliberately the narrowest
+// thing that solves the problem: it repoints the distributor and NOTHING else. It cannot move coins, cannot change
+// the accrual rate, cannot touch the treasury or the ATH master. The worst a compromised controller achieves is
+// directing future accruals to a distributor of its choosing — which is bad, and is strictly less bad than the
+// alternative of the allocation being unreachable forever.
+message(0x41445239) AirdropRebindCreditIssuer {
+    deployment_manifest_hash: Int as uint256;
+    credit_issuer_address: Address;
+}
+
 message(0x41445203) AirdropBindTreasury {               // "ADR3" — frozen residual sink
     treasury_address: Address;
 }
@@ -199,6 +217,20 @@ contract AirdropPool {
         throwUnless(26017, !self.treasury_bound);
         self.treasury_address = msg.treasury_address;
         self.treasury_bound = true;
+    }
+
+    // THE MIGRATION HOOK. Post-seal, controller-only, and it repoints the distributor and nothing else.
+    // Gated on `sealed` rather than `unsealed` on purpose: before the seal the ordinary one-shot bind above is the
+    // right path, and allowing both would give genesis two ways to set the same field. The manifest hash is
+    // checked so a rebind cannot be replayed against a different deployment.
+    receive(msg: AirdropRebindCreditIssuer) {
+        self.requireSealed();
+        self.requireController();
+        throwUnless(26013, msg.deployment_manifest_hash == self.deployment_manifest_hash);
+        throwUnless(26014, self.credit_issuer_bound);                              // nothing to rebind otherwise
+        throwUnless(26015, self.isBasechainAddress(msg.credit_issuer_address));
+        throwUnless(26016, msg.credit_issuer_address != myAddress());
+        self.credit_issuer_address = msg.credit_issuer_address;
     }
 
     // Genesis funding: the treasury wallet sends 15M ATH to THIS pool's wallet, which notifies us.
