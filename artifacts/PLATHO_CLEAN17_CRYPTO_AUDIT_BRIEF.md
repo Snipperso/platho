@@ -28,9 +28,28 @@
 Проверка on-chain: TVM checkSignature(serial, R'‖s, A).
 ```
 
+**РЕАЛИЗАЦИЯ, КОТОРУЮ НАДО АУДИРОВАТЬ (не только схему выше):** `web/crypto/blind-issuance.mjs` — боевой клиентский
+модуль, где прототип РАЗБИТ на реальный двухраундовый протокол клиент↔эмитент:
+```
+эмитент (офчейн, держит секрет CAC-подключа):  issuerCommit()      -> {r:[r0,r1], Rc:[R_c0,R_c1]}
+клиент:  blindChallenges({Rc, message, issuerPublicKey}) -> {challenges:[c'0,c'1], session:{al, Rp}}
+эмитент: issuerSignClause({r, challenges, secret})       -> {clause:b, sClause:s_b}     // b СЛУЧАЙНЫЙ
+клиент:  unblindToken({session, clause, sClause})        -> R'[b]‖s   (= issuer_sig)
+```
+Аудировать ИМЕННО этот код, а не только конструкцию: (а) источник случайности `al,be,r,b`
+(`crypto.getRandomValues`, редукция mod L — нет ли смещения/переиспользования); (б) что клиент коммитится к ОБЕИМ
+клаузам ДО того, как эмитент выбирает `b` (иначе клауза не даёт ROS-стойкости); (в) что `session` (al, R') не
+переживает сессию и не переиспользуется между выдачами; (г) что эмитент структурно НЕ получает `M` ни в одном
+раунде. Референс-эмитент в модуле — документация протокола; боевой эмитент офчейн.
+
 **ДОКАЗАНО (внутренне):**
 - VERIFY: 40/40 случайных жетонов принимает РЕАЛЬНЫЙ TVM checkSignature (`BLIND-CHECKSIG-01`) + кросс-проверка
   noble RFC-8032; подделка/чужой ключ отвергается (`BLIND-CHECKSIG-02`). JS-прототип прошёл 300/300.
+- РАЗБИТЫЙ протокол даёт то же самое: `BLIND-ISSUE-01` (20/20 жетонов принимает реальный TVM checkSignature),
+  `BLIND-ISSUE-02` — СКВОЗНОЙ: слепо выданный жетон проходит `publish-builder` и принимается шардом по гейту 13601;
+  `BLIND-ISSUE-04` — нет форжа под чужим/испорченным ключом. `BLIND-ISSUE-03` показывает лишь ПОВЕДЕНЧЕСКУЮ
+  неслинковываемость (одинаковый serial → разные жетоны, вызовы блайндинга рерандомизированы) — это НЕ доказательство
+  свойства 1 ниже.
 
 **НЕ ДОКАЗАНО — что требуется от аудитора:**
 1. **UNLINKABILITY.** Что выданный жетон `(R', s)` информационно-теоретически (или вычислительно) НЕ связывается
@@ -41,8 +60,25 @@
    (атака ROS, Benhamouda et al. 2020 / Wagner k-list). Здесь применён clause-blind (эмитент подписывает ОДНУ
    случайную из двух клауз) как контрмера. Проверить: действительно ли эта конкретная 2-клаузная схема стойка к
    ROS при N параллельных сессиях; корректны ли параметры; нет ли варианта Wagner-атаки, обходящего клаузу.
-3. **Домены/кодировки.** `M = serial = H(BSI1 ‖ spend_pubkey ‖ epoch ‖ nonce)`; challenge `H(R'‖A‖M)`. Проверить
-   отсутствие cross-protocol/domain-confusion между issuer_sig (над serial) и spend_sig (над frame — §3.3 монолита).
+3. **Домены/кодировки — ВСЯ поверхность привязок clean-17.** `M = serial = H(BSI1 ‖ spend_pubkey ‖ epoch ‖ nonce)`;
+   challenge `H(R'‖A‖M)`. Проверить отсутствие cross-protocol/domain-confusion между ПЯТЬЮ доменами, которые теперь
+   реализованы конкретно (каждый — TON cell-hash, 32-битный тег в начале прообраза):
+
+   | Домен | Тег | Прообраз | Подписывает | Гейт |
+   |---|---|---|---|---|
+   | serial | `BSI1` 0x42534931 | spend_pubkey‖epoch‖nonce | подключ эмитента (слепо) | 13601 |
+   | spend (рамка) | `BSP1` 0x42535031 | serial‖frameCommit | **spend-ключ клиента** | **13605** |
+   | frame-commit | `NSFR` 0x4E534652 | kind‖bucket_key‖frame_commit‖intro_bucket‖intro_r‖intro_view_tag | (внутр. хеш) | — |
+   | CAC-сертификат | `CAC1` 0x43414331 | subkey_pubkey‖valid_from‖valid_to | 2-из-3 корней | 13630-13636 |
+   | recovery | `BRS1` 0x42525331 | self_bucket_key‖seq‖ref(h0‖h1‖bh) | owner-ключ | 13574 |
+   | recovery-слот | `RSLK` 0x52534C4B | owner_pubkey | (привязка адреса) | **13575** |
+
+   Особо проверить: (а) **13605** — `spend_sig` над `H(BSP1‖serial‖H(NSFR‖вся рамка))` привязывает рамку к жетону
+   ВТОРЫМ фактором (владение spend-ключом, закоммиченным внутри serial). Это восстановленный `RT1-BLOCKER-1`: без
+   него жетон вырождается в bearer-token. Нужно подтвердить, что прообразы 13601 и 13605 нельзя спутать (issuer_sig
+   над «голым» serial vs spend_sig над доменированным дайджестом) и что покрыты ВСЕ поля маршрутизации.
+   (б) **13575** — адрес recovery-слота = `H(RSLK‖owner_pubkey)`; безопасность привязки опирается на стойкость к
+   прообразу (squatter'у нужен прообраз чужого self_bucket_key). Подтвердить достаточность.
 
 **Порядок при seal:** issuer-секрет НИКОГДА не на цепи, слепое подписание офчейн по Tor (§CreditIssuer). На цепи —
 только VERIFY. Значит стойкость выдачи = чисто офчейн-крипто-свойство, вне контракта → аудит обязателен.
@@ -94,13 +130,25 @@ redesign. Несущий гейт.
 real-time-наблюдение в момент контакта. Это НЕ предмет аудита — owner-подтверждённые остатки в границе угрозы.
 
 ## Ссылки на код
-`tests/blind-schnorr-checksig.test.ts` (blind-Schnorr VERIFY) · `tests/compact-mlkem-option.test.ts` ·
-`web/crypto/platho-crypto.mjs` (гибрид, ML-KEM, HKDF, stealth view_tag) · `contracts/NullifierShard.tact` (CAC-проверка
-подключа, 13601/13630-13636) · `artifacts/PLATHO_CLEAN16_HYBRID_CLOSED_SPEC.md` §9-11 (деривации) ·
-`artifacts/PLATHO_CLEAN17_SHARDED_SPEC.md` §4 (CAC).
+Слепая выдача: **`web/crypto/blind-issuance.mjs`** (боевой разбитый протокол — ГЛАВНЫЙ объект свойства 1) ·
+`tests/blind-issuance.test.ts` (BLIND-ISSUE-01..04, сквозной) · `tests/blind-schnorr-checksig.test.ts` (прототип VERIFY).
+Отправной путь: `web/publish-builder.mjs` (сборка сообщения, подпись `spend_sig` над рамкой).
+Гибрид/KEM: `web/crypto/platho-crypto.mjs` (ML-KEM, HKDF, stealth view_tag) · `web/crypto/conv-routing.mjs`
+(K_root/K_epoch/bucketKey, recoveryOwner-ключ) · `web/crypto/intro-handshake.mjs` (транскрипт INTRO) ·
+`tests/compact-mlkem-option.test.ts`.
+Контракты: `contracts/NullifierShard.tact` (CAC 13601/13630-13636 + **13605 привязка рамки**, `frameBindingDigest`) ·
+`contracts/RecoveryShard.tact` (**13575** `slotKeyForOwner`, 13574 owner_sig).
+Спеки: `artifacts/PLATHO_CLEAN16_HYBRID_CLOSED_SPEC.md` §9-11 (деривации) · `artifacts/PLATHO_CLEAN17_SHARDED_SPEC.md` §4 (CAC).
 
 ## Итог для владельца
 Два внешних аудита ОБЯЗАТЕЛЬНЫ до seal, оба несущие: **(1)** unlinkability + ROS слепой выдачи (иначе деанон
 отправителя / форж жетонов); **(2)** ANO-CCA key-privacy ML-KEM-конверта (иначе деанон получателя — главная угроза).
-Внутренне доказан только VERIFY жетона. Бюджет/время на key-blinding-обёртку заложить заранее — если аудит (2)
-отрицательный, её надо вшить ДО компиляции финального кода.
+
+Что внутренне доказано на сегодня: жетон ВАЛИДЕН и вся отправная цепочка сходится — слепая выдача → сборка сообщения →
+шард принимает (сквозной `BLIND-ISSUE-02`, гейт 13601), плюс восстановлена привязка рамки к жетону (13605,
+`RT1-BLOCKER-1`) и закрыт squat recovery-слота (13575). Это КОРРЕКТНОСТЬ, а не приватность: **ни unlinkability, ни
+ROS-стойкость функциональными тестами не доказываются** — зелёный тест их не устанавливает. Именно поэтому аудит (1)
+остаётся seal-блокером, и объект аудита теперь — реальный код `web/crypto/blind-issuance.mjs`, а не только схема.
+
+Бюджет/время на key-blinding-обёртку заложить заранее — если аудит (2) отрицательный, её надо вшить ДО компиляции
+финального кода.
