@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: IntroShard
-BoC Size: 883 bytes
+BoC Size: 967 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 16

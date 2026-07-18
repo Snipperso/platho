@@ -64,8 +64,11 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     await (c as any).send(payer.getSender(), { value: toNano('0.05') }, null);
     return c;
   }
-  const send = (built: { to: Address; value: bigint; body: any }) =>
-    payer.send({ to: built.to, value: built.value, body: built.body, bounce: true } as any);
+  // Send EXACTLY what the builder returns, init included. Attaching init is what lets a publish CREATE the shard:
+  // CONV/INTRO shards are lazily deployed and new every epoch, and a message to an uninitialised account has its
+  // compute phase skipped — nothing stored, no error, wallet reports success.
+  const send = (built: { to: Address; value: bigint; body: any; init?: any }) =>
+    payer.send({ to: built.to, value: built.value, body: built.body, init: built.init, bounce: true } as any);
 
   it('PB-01: a CONV capsule is stored, and its BODY is recoverable from the shard transaction — the deliverability proof', async () => {
     const wk = writeKey(0x51);
@@ -146,10 +149,16 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     });
     expect(exitOf(await send(built), rs.address)).toBe(0);
 
-    // the payer sent 1 GRAM and must get almost all of it back: net cost is rent + gas, well under 0.05
-    expect(before - (await payer.getBalance())).toBeLessThan(toNano('0.05'));
-    // and the shard did NOT pocket the fat value
-    expect((await blockchain.getContract(rs.address)).balance).toBeLessThan(toNano('0.05'));
+    // The payer sent 1 GRAM and must get almost all of it back: the net cost is this message's INCREMENT (record
+    // endowment + protocol fee + first-record base) plus gas — measured ~13.1M, so 0.02 is a tight-but-fair bound.
+    expect(before - (await payer.getBalance())).toBeLessThan(toNano('0.02'));
+    // The shard did NOT pocket the fat value: it holds the 0.05 deploy float it already had PLUS the increment, and
+    // nothing like the 1 GRAM that passed through. NOTE the bound deliberately EXCEEDS the deploy float — an earlier
+    // version asserted < 0.05 and only passed because the absolute reserve swept that float to the publisher, which
+    // is the very theft the increment reserve fixes (PB-11 pins the property directly).
+    const shardBalance = (await blockchain.getContract(rs.address)).balance;
+    expect(shardBalance).toBeGreaterThan(toNano('0.05'));   // the pre-existing float survived
+    expect(shardBalance).toBeLessThan(toNano('0.08'));      // but the fat 1 GRAM did not stay
   }, 120_000);
 
   it('PB-05: a RECOVERY blob is stored on chain at the owner-bound slot, and its frame hashes are now readable', async () => {
@@ -242,6 +251,53 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect((await rs.getGetView()).live_count).toBe(2n);
   }, 120_000);
 
+  it('PB-10: a publish DEPLOYS the shard it targets — nothing is pre-deployed, only the builder output is sent', async () => {
+    // The blocker this covers: every CONV/INTRO shard is new each epoch, and the builder used to omit StateInit, so
+    // the first (hence every) publish of a day landed on an uninit account — compute skipped, nothing stored, and
+    // the sender's wallet still reported success. Every other test here pre-deploys through the Tact wrapper, which
+    // is exactly why they were blind to it. This one deploys NOTHING.
+    const wk = writeKey(0x71);
+    const h0 = cellOf(0x21), h1 = cellOf(0x22), body = cellOf(0x23, 256);
+    const built = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 1, epoch, header0: h0, header1: h1, body, value: toNano('0.02') });
+
+    // prove the account really does not exist yet
+    expect((await blockchain.getContract(built.to)).accountState?.type ?? 'uninit').not.toBe('active');
+
+    const res = await send(built);
+    expect(exitOf(res, built.to), 'the publish deployed the shard and stored the record').toBe(0);
+
+    const rs = blockchain.openContract(RecordShard.fromAddress(built.to));
+    const rec = await rs.getGetRecord(0n);
+    expect(rec.exists, 'record stored on a shard that did not exist before this message').toBe(true);
+    expect(rec.frame_commit).toBe(built.commit);
+    // and a SECOND publish to the now-deployed shard still works with init re-attached (harmless duplicate)
+    const next = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 2, epoch, header0: h0, header1: h1, body: cellOf(0x24), value: toNano('0.02') });
+    expect(exitOf(await send(next), built.to), 're-sent init on a live shard is harmless').toBe(0);
+    expect((await rs.getGetView()).live_count).toBe(2n);
+  }, 120_000);
+
+  it('PB-11: a deliberate top-up is NOT swept by the next publisher (increment reserve)', async () => {
+    // The monolith reserves an increment on top of the pre-existing balance and says in as many words that an
+    // absolute reserve "would be WRONG — it would leak the sweepable surplus". All three shards had lost the flag,
+    // which made the balance a hard ceiling: any top-up, deploy float or mistaken transfer went to whoever published
+    // next, and in the open INTRO lane that is a stranger.
+    const wk = writeKey(0x72);
+    const first = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 1, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') });
+    expect(exitOf(await send(first), first.to)).toBe(0);
+
+    // somebody tops the shard up to extend the conversation's life — the only manual lever on an immutable contract
+    const topUp = toNano('0.5');
+    await payer.send({ to: first.to, value: topUp, bounce: false } as any);
+    const afterTopUp = (await blockchain.getContract(first.to)).balance;
+    expect(afterTopUp).toBeGreaterThan(topUp);
+
+    // the next publish must NOT carry that top-up away
+    const next = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 2, epoch, header0: cellOf(4), header1: cellOf(5), body: cellOf(6), value: toNano('0.02') });
+    expect(exitOf(await send(next), first.to)).toBe(0);
+    const afterPublish = (await blockchain.getContract(first.to)).balance;
+    expect(afterPublish, 'the top-up survived the next publish').toBeGreaterThan(topUp);
+  }, 120_000);
+
   it('PB-07: the client value floors are pinned to the CONTRACT constants — silent drift is impossible', () => {
     // Clients fund a publish against the contract's COMPUTE gates. The shards now EXPOSE min_value in get_view, so a
     // client should read it rather than mirror it; this test pins the arithmetic so a constant change is loud.
@@ -258,7 +314,9 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // (1.5M capsules -> 15M ATH out, 15k GRAM in) and is what keeps publishing from being cheaper than the reward.
     expect(constOf(rec, 'RS_PROTOCOL_FEE'), 'the service fee is 0.01 GRAM, as in the deleted CreditSale').toBe(10_000_000n);
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS') + constOf(rec, 'RS_PROTOCOL_FEE'),
-      'RecordShard RS_MIN_VALUE').toBe(12_700_000n);
+      'RecordShard RS_MIN_VALUE').toBe(12_800_000n);
+    // the record endowment carries the canonical G8 1.5x margin over its MEASURED 3 cells (not the 2 in the old note)
+    expect(constOf(rec, 'RS_RECORD_ENDOWMENT'), '3 cells x 64962 x 1yr x 1.5 = 292_329 -> 300_000').toBe(300_000n);
     // the airdrop pays 10 ATH per capsule, so a capsule must never cost LESS than the fee that backs it
     expect(constOf(rec, 'RS_PROTOCOL_FEE') * 1_500_000n, '1.5M capsules collect 15k GRAM').toBe(15_000_000_000_000n);
     expect(constOf(intro, 'IS_INTRO_ENDOWMENT') + constOf(intro, 'IS_PUBLISH_GAS'), 'IntroShard IS_MIN_VALUE').toBe(2_508_000n);

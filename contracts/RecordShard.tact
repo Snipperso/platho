@@ -48,10 +48,14 @@ const RS_FRAME_DOMAIN: Int = 0x52534643;   // "RSFC"
 const RS_WRITE_DOMAIN: Int = 0x52535744;   // "RSWD" — the write-authorization digest preimage
 
 // [RE-MEASURE BEFORE SEAL] Storage is 64962 nanoton/cell/year (config-18, bits free).
-//   record endowment: 2 measured cells x 64962 x 1yr x 1.5 = 194_886 -> 200_000 (the record lives 1 year)
+//   record endowment: 3 MEASURED cells x 64962 x 1yr x 1.5 = 292_329 -> 300_000 (the record lives 1 year).
+//     The earlier "2 cells" figure lost the G8 1.5x margin by coincidence: 2 x 64962 x 1.5 == 3 x 64962 == 194_886,
+//     so the number looked right while the real margin was 1.026x. config-18 is a SCHEDULE and has already moved
+//     (500/1 -> 135/0 in Apr 2026); a 3% rise would make a full shard rent-insolvent before its own retention ends,
+//     and an immutable contract cannot be repriced afterwards.
 //   base endowment:   the shard's own code+data rent over its 1-year life, with margin
 //   publish gas:      this contract's own compute + the change-return, measured ~1.6M on the old terminal hop
-const RS_RECORD_ENDOWMENT: Int = 200000;
+const RS_RECORD_ENDOWMENT: Int = 300000;
 const RS_BASE_ENDOWMENT: Int = 2000000;
 const RS_PUBLISH_GAS: Int = 2500000;
 
@@ -161,11 +165,17 @@ contract RecordShard {
         self.record_count = self.record_count + 1;
         self.live_count = self.live_count + 1;
 
-        // Keep only this shard's own rent (its base + one endowment per LIVE record) and hand the payer back the
-        // rest. ReserveAtMost never over-reserves; the 13652 gate guarantees the balance covers it, so the send
-        // below has funds. A message to the sender's wallet cannot fail, so ACTION stays safe.
-        // Retain the shard's own rent AND the collected fee (the fee is owed to the protocol, never to the payer).
-        nativeReserve(RS_BASE_ENDOWMENT + self.live_count * RS_RECORD_ENDOWMENT + self.accrued_fee, ReserveAtMost);
+        // Reserve the INCREMENT this message adds, ON TOP OF the balance the account already had
+        // (ReserveAddOriginalBalance), and return only THIS message's change. An absolute reserve was wrong and the
+        // monolith says so in as many words at CapsuleHub.tact:1722 — "reserve(protectedReserve) would be WRONG, it
+        // would leak the sweepable surplus". With an absolute target the balance becomes a hard ceiling: every
+        // surplus (a deliberate top-up to extend a conversation, a mistaken transfer, the deploy float) is swept to
+        // whoever publishes next, and the balance also becomes an exact public message counter. ReserveAtMost keeps
+        // it from ever exceeding the balance, so ACTION still cannot fail.
+        nativeReserve(
+            RS_RECORD_ENDOWMENT + RS_PROTOCOL_FEE + (self.record_count == 1 ? RS_BASE_ENDOWMENT : 0),
+            ReserveAtMost | ReserveAddOriginalBalance,
+        );
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
@@ -191,6 +201,14 @@ contract RecordShard {
             }
         }
         self.evict_cursor = cursor;
+        // PAY THE EVICTOR. Eviction is the only drain in an immutable contract and external keeper daemons are
+        // forbidden in this project, so it will only ever be called by an ordinary participant — who, before this,
+        // paid gas AND donated the rest of their value to the shard. Nobody rationally does that, which would have
+        // quietly voided every claim resting on eviction (bounded state, and the one-week INTRO retention that is
+        // the whole point of not persisting the first-contact graph). Here the reserve is deliberately ABSOLUTE:
+        // the freed endowments SHOULD be released, and they pay the caller.
+        nativeReserve(RS_BASE_ENDOWMENT + self.live_count * RS_RECORD_ENDOWMENT + self.accrued_fee, ReserveAtMost);
+        send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
     receive() {}   // plain top-up / lazy deploy carrier

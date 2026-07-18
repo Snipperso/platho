@@ -40,19 +40,43 @@ export function recoveryOwnerSlotKey(ownerPublicKey) {
   return BigInt('0x' + beginCell().storeUint(RECOVERY_SLOT_DOMAIN, 32).storeUint(pub, 256).endCell().hash().toString('hex'));
 }
 
+// Every shard is LAZILY DEPLOYED, and CONV/INTRO shards are new EVERY DAY (the epoch is part of their identity).
+// So a publisher must be able to CREATE the account, not just address it: a message sent to an uninitialised account
+// has its compute phase skipped entirely — nothing is stored, no error is raised, and the sender's wallet reports a
+// perfectly successful transaction. That is why these return the StateInit alongside the address, and why the
+// publish path must attach it (an extra init on an already-deployed account is harmless).
+
+/** StateInit + address of the CONV record shard for a conversation-direction bucket on a given day-epoch. */
+export async function recordShardState(bucketKey, epoch) {
+  const init = await RecordShard.init(BigInt(bucketKey), BigInt(epoch));
+  return { init, address: contractAddress(0, init) };
+}
+
+/** StateInit + address of the INTRO shard for a sender-chosen bucket on a given day-epoch. */
+export async function introShardState(epoch, bucket) {
+  const init = await IntroShard.init(BigInt(epoch), BigInt(bucket));
+  return { init, address: contractAddress(0, init) };
+}
+
+/** StateInit + address of the RECOVERY shard for a user's epoch-independent self-recovery key. */
+export async function recoveryShardState(selfBucketKey) {
+  const init = await RecoveryShard.init(BigInt(selfBucketKey));
+  return { init, address: contractAddress(0, init) };
+}
+
 /** Address of the CONV record shard for a conversation-direction bucket on a given day-epoch. */
 export async function recordShardAddress(bucketKey, epoch) {
-  return contractAddress(0, await RecordShard.init(BigInt(bucketKey), BigInt(epoch)));
+  return (await recordShardState(bucketKey, epoch)).address;
 }
 
 /** Address of the INTRO shard for a sender-chosen bucket on a given day-epoch (the recipient scans these). */
 export async function introShardAddress(epoch, bucket) {
-  return contractAddress(0, await IntroShard.init(BigInt(epoch), BigInt(bucket)));
+  return (await introShardState(epoch, bucket)).address;
 }
 
 /** Address of the RECOVERY shard for a user's epoch-independent self-recovery key. */
 export async function recoveryShardAddress(selfBucketKey) {
-  return contractAddress(0, await RecoveryShard.init(BigInt(selfBucketKey)));
+  return (await recoveryShardState(selfBucketKey)).address;
 }
 
 /**

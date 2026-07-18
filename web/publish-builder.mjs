@@ -21,7 +21,7 @@ import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 import { storeCapsulePublish } from '../build/RecordShard/RecordShard_RecordShard';
 import { storeIntroPublish } from '../build/IntroShard/IntroShard_IntroShard';
 import { storeRecoveryStore } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
-import { recordShardAddress, introShardAddress, recoveryShardAddress, recoveryOwnerSlotKey } from './shard-discovery.mjs';
+import { recordShardState, introShardState, recoveryShardState, recoveryOwnerSlotKey } from './shard-discovery.mjs';
 import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs';
 
 // Commitment domains — MUST mirror the contracts byte-for-byte (RecordShard.RS_FRAME_DOMAIN, IntroShard.IS_BODY_DOMAIN,
@@ -65,8 +65,10 @@ export async function buildConvPublish({ writePublicKey, writeSecret, seq, epoch
   const digest = beginCell()
     .storeUint(RS_WRITE_DOMAIN, 32).storeUint(BigInt(seq), 64).storeUint(commit, 256)
     .endCell().hash();
+  const target = await recordShardState(bytesToBig(writePublicKey), epoch);
   return {
-    to: await recordShardAddress(bytesToBig(writePublicKey), epoch),
+    to: target.address,
+    init: target.init,   // the shard is new every epoch; without this the first publish lands on an uninit account
     value,
     body: beginCell().store(storeCapsulePublish({
       $$type: 'CapsulePublish', seq: BigInt(seq), header_0: header0, header_1: header1, body,
@@ -82,8 +84,10 @@ export async function buildConvPublish({ writePublicKey, writeSecret, seq, epoch
  * view_tags, so nothing here reveals who it is addressed to.
  */
 export async function buildIntroPublish({ epoch, bucket, r, viewTag, header0, body, value }) {
+  const target = await introShardState(epoch, bucket);
   return {
-    to: await introShardAddress(epoch, bucket),
+    to: target.address,
+    init: target.init,
     value,
     body: beginCell().store(storeIntroPublish({
       $$type: 'IntroPublish', r: BigInt(r), view_tag: BigInt(viewTag), header_0: header0, body,
@@ -109,8 +113,10 @@ export async function buildRecoveryPublish({ seed, seq, h0, h1, bh, body, value 
     .storeRef(beginCell().storeUint(h0, 256).storeUint(h1, 256).storeUint(bh, 256).endCell())
     .endCell().hash();
 
+  const target = await recoveryShardState(slotKey);
   return {
-    to: await recoveryShardAddress(slotKey),
+    to: target.address,
+    init: target.init,
     value,
     body: beginCell().store(storeRecoveryStore({
       $$type: 'RecoveryStore',

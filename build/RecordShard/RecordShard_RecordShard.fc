@@ -433,7 +433,7 @@ builder $RecordShard$_store(builder build_0, (int, int, int, cell, int, int, int
 
 ((int, int, int, cell, int, int, int, int), (int, int, int, int, int, int, int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, int, cell, int, int, int, int) $self) impure inline_ref {
     var (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee)) = $self;
-    var $fresh$ret_3 = $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee($self'write_pubkey, $self'epoch, $self'last_seq, $self'record_count, $self'live_count, $self'evict_cursor, 4096, 31536000, 12700000, 10000000, $self'accrued_fee);
+    var $fresh$ret_3 = $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee($self'write_pubkey, $self'epoch, $self'last_seq, $self'record_count, $self'live_count, $self'evict_cursor, 4096, 31536000, 12800000, 10000000, $self'accrued_fee);
     return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee), $fresh$ret_3);
 }
 
@@ -491,7 +491,7 @@ _ %get_view() method_id(76114) {
         slice sc_1 = in_msg~load_ref().begin_parse();
         var $msg'body = sc_1~load_ref();
         var $msg'sig = sc_1~load_ref();
-        throw_unless(13652, ($Context$_get_value(__tact_context_get()) >= 12700000));
+        throw_unless(13652, ($Context$_get_value(__tact_context_get()) >= 12800000));
         throw_unless(13651, ($self'live_count < 4096));
         throw_unless(13653, ($msg'seq > $self'last_seq));
         int $commit = ($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee)~$RecordShard$_fun_frameCommit($msg'header_0, $msg'header_1, $msg'body);
@@ -502,7 +502,7 @@ _ %get_view() method_id(76114) {
         $self'records~__tact_dict_set_int_cell(257, $self'record_count, $RecordEntry$_store_cell($RecordEntry$_constructor_frame_commit_created_at($commit, $global_now()), begin_cell()));
         $self'record_count = ($self'record_count + 1);
         $self'live_count = ($self'live_count + 1);
-        $global_nativeReserve(((2000000 + ($self'live_count * 200000)) + $self'accrued_fee), 2);
+        $global_nativeReserve((10300000 + (($self'record_count == 1) ? 2000000 : 0)), 6);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecordShard$_contract_store(($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee));
         return ();
@@ -529,6 +529,8 @@ _ %get_view() method_id(76114) {
             }
         }
         $self'evict_cursor = $cursor;
+        $global_nativeReserve(((2000000 + ($self'live_count * 300000)) + $self'accrued_fee), 2);
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecordShard$_contract_store(($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee));
         return ();
     }

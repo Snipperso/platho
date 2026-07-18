@@ -487,7 +487,7 @@ _ %get_view() method_id(76114) {
         $self'intros~__tact_dict_set_int_cell(257, $self'next_id, $IntroEntry$_store_cell($IntroEntry$_constructor_r_view_tag_body_commit_created_at($msg'r, $msg'view_tag, ($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor)~$IntroShard$_fun_bodyCommit($msg'header_0, $msg'body), $global_now()), begin_cell()));
         $self'next_id = ($self'next_id + 1);
         $self'live_count = ($self'live_count + 1);
-        $global_nativeReserve((1000000 + ($self'live_count * 8000)), 2);
+        $global_nativeReserve((8000 + (($self'next_id == 1) ? 1000000 : 0)), 6);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor));
         return ();
@@ -514,6 +514,8 @@ _ %get_view() method_id(76114) {
             }
         }
         $self'evict_cursor = $cursor;
+        $global_nativeReserve((1000000 + ($self'live_count * 8000)), 2);
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor));
         return ();
     }

@@ -120,6 +120,7 @@ contract RecoveryShard {
         let blob: DataSize = msg.body.computeDataSize(RS_BLOB_PROBE_CELLS);
         throwUnless(13560, blob.cells <= RS_MAX_BLOB_CELLS);
 
+        let wasUnbound: Bool = !self.bound;
         if (!self.bound) {
             // First publish binds the owner. seq must be positive so a later rollback has no seq=0 floor to abuse.
             throwUnless(13573, msg.seq >= 1);
@@ -144,8 +145,13 @@ contract RecoveryShard {
         self.body = msg.body;
         self.updated_at = now();
 
-        // Keep exactly the endowment; return the owner's change. One outgoing to the sender — cannot fail in ACTION.
-        nativeReserve(RS_RECOVERY_ENDOWMENT, ReserveAtMost);
+        // Reserve the INCREMENT over the balance already held: the endowment only on the FIRST bind (the slot is
+        // funded once), zero on an overwrite. An absolute reserve would hand any top-up to whoever writes next —
+        // the monolith flags that exact mistake at CapsuleHub.tact:1722.
+        nativeReserve(
+            wasUnbound ? RS_RECOVERY_ENDOWMENT : 0,
+            ReserveAtMost | ReserveAddOriginalBalance,
+        );
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 

@@ -118,8 +118,13 @@ contract IntroShard {
         self.next_id = self.next_id + 1;
         self.live_count = self.live_count + 1;
 
-        // Keep only this shard's own rent; hand the payer back the rest (a send to the sender's wallet cannot fail).
-        nativeReserve(IS_BASE_ENDOWMENT + self.live_count * IS_INTRO_ENDOWMENT, ReserveAtMost);
+        // Reserve the INCREMENT on top of the balance already held (see RecordShard for the full reasoning and the
+        // monolith precedent). This lane is OPEN by design, so an absolute reserve was strictly worse here: any
+        // surplus on a funded IntroShard could be swept by a stranger publishing one intro.
+        nativeReserve(
+            IS_INTRO_ENDOWMENT + (self.next_id == 1 ? IS_BASE_ENDOWMENT : 0),
+            ReserveAtMost | ReserveAddOriginalBalance,
+        );
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
@@ -144,6 +149,10 @@ contract IntroShard {
             }
         }
         self.evict_cursor = cursor;
+        // Pay the evictor out of the freed endowments — absolute reserve on purpose (see RecordShard). Without this
+        // nobody calls eviction, and "the one-week eviction keeps the live set small" stops being true.
+        nativeReserve(IS_BASE_ENDOWMENT + self.live_count * IS_INTRO_ENDOWMENT, ReserveAtMost);
+        send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
     receive() {}
