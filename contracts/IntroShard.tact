@@ -27,6 +27,8 @@
 const IS_INTRO_RETENTION: Int = 604800;   // 1 week (owner 2026-07-17) — evict intros older than this
 const IS_SAFE_CAP: Int = 8000;            // intros per (epoch, bucket) — refuse in COMPUTE, not code 50 in ACTION
 const IS_EVICT_CAP: Int = 64;             // max intros one EvictIntros call may sweep (bounds gas; keepers repeat)
+const IS_TAG_PAGE_CAP: Int = 256;         // max view_tags one scan page may pack (bounds get-method gas)
+const IS_TAGS_PER_CELL: Int = 63;         // 1023 bits / 16 — how many tags fit one cell's data
 
 // body_commit preimage tag. The CONTRACT defines the commitment so publisher and scanner cannot disagree.
 const IS_BODY_DOMAIN: Int = 0x49534243;   // "ISBC"
@@ -65,6 +67,22 @@ struct IntroEntryView {
     view_tag: Int;
     body_commit: Int;
     created_at: Int;
+}
+
+// A page of the scan filter. Carries ONLY the 16-bit view_tags — never `r`, never the commitment — because that is
+// what makes a leak-free scan affordable: a recipient cannot ask "which of these is mine", so it must look at EVERY
+// live intro in the network, and the only question that matters is how many bytes that costs.
+//   measured: whole account state    85 B/intro   -> 229 MB/day/user at 2.7M first contacts/day network-wide
+//   measured: this page              2.03 B/intro ->   5.5 MB/day/user  (42x less, identical privacy)
+// The ids are IMPLICIT — tag i of the page is entry (from_id + i). That is sound because eviction is FIFO from the
+// bottom while intros append at the top, so the live range [evict_cursor, next_id) is always CONTIGUOUS and has no
+// holes to encode. A missing slot packs as 0, which is simply a candidate the second stage rejects.
+struct IntroTagPage {
+    from_id: Int;        // first entry id in this page
+    count: Int;          // how many tags are packed
+    next_id: Int;        // the shard's append cursor, so the caller knows whether more pages remain
+    evict_cursor: Int;   // the live floor, so the caller never asks for evicted ids
+    tags: Cell;          // `count` x uint16, 63 per cell, chained by ref
 }
 
 struct IntroShardView {
@@ -156,6 +174,50 @@ contract IntroShard {
     }
 
     receive() {}
+
+    // Pack the view_tags of [from_id, from_id+n) into a ref-chained cell, built from the END backwards so each cell
+    // can reference the one after it.
+    fun packTags(start: Int, n: Int): Cell {
+        let cell: Cell = beginCell().endCell();
+        let isTail: Bool = true;
+        let remaining: Int = n;
+        while (remaining > 0) {
+            let chunk: Int = min(remaining, IS_TAGS_PER_CELL);
+            let first: Int = start + remaining - chunk;
+            let b: Builder = beginCell();
+            let i: Int = 0;
+            while (i < chunk) {
+                let e: IntroEntry? = self.intros.get(first + i);
+                b = b.storeUint(e == null ? 0 : e!!.view_tag, 16);
+                i = i + 1;
+            }
+            if (isTail) {
+                cell = b.endCell();
+                isTail = false;
+            } else {
+                cell = b.storeRef(cell).endCell();
+            }
+            remaining = remaining - chunk;
+        }
+        return cell;
+    }
+
+    // THE SCAN PRIMITIVE. A recipient walks every live intro in its catch-up window through this, testing each tag
+    // against its own scan secret, and only fetches the full entry (get_entry) for the ~1-in-65536 that match.
+    // Clamped to the live range so a caller can never be handed evicted ids, and capped so the page cannot run the
+    // get-method out of gas.
+    get fun get_view_tags(from_id: Int, max_count: Int): IntroTagPage {
+        let start: Int = max(from_id, self.evict_cursor);
+        let available: Int = self.next_id > start ? self.next_id - start : 0;
+        let n: Int = min(min(max_count, IS_TAG_PAGE_CAP), available);
+        return IntroTagPage{
+            from_id: start,
+            count: n,
+            next_id: self.next_id,
+            evict_cursor: self.evict_cursor,
+            tags: self.packTags(start, n),
+        };
+    }
 
     get fun get_entry(entry_id: Int): IntroEntryView {
         let e: IntroEntry? = self.intros.get(entry_id);

@@ -14,20 +14,26 @@ PROGRAM{
   DECLPROC $IntroShard$_store
   DECLPROC $IntroShard$_load
   DECLPROC $Context$_get_value
+  DECLPROC $IntroEntry$_get_view_tag
   DECLPROC $IntroEntry$_get_created_at
   DECLPROC $IntroEntryView$_to_external
+  DECLPROC $IntroTagPage$_to_external
   DECLPROC $IntroShardView$_to_external
   DECLPROC $IntroShard$init$_load
   DECLPROC $IntroShard$_contract_init
   DECLPROC $IntroShard$_contract_load
   DECLPROC $IntroShard$_contract_store
   DECLPROC $IntroShard$_fun_bodyCommit
+  DECLPROC $IntroShard$_fun_packTags
+  DECLPROC $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags
+  DECLPROC $IntroShard$_fun_get_view_tags
   DECLPROC $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at
   DECLPROC $IntroShard$_fun_get_entry
   DECLPROC $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value
   DECLPROC $IntroShard$_fun_get_view
   DECLPROC $IntroEntry$_constructor_r_view_tag_body_commit_created_at
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
+  110790 DECLMETHOD %get_view_tags
   80118 DECLMETHOD %get_entry
   76114 DECLMETHOD %get_view
   DECLPROC recv_internal
@@ -155,10 +161,16 @@ PROGRAM{
     s1 s3 XCHG
     3 BLKDROP
   }>
+  $IntroEntry$_get_view_tag PROCINLINE:<{
+    s2 s3 XCHG
+    3 BLKDROP
+  }>
   $IntroEntry$_get_created_at PROCINLINE:<{
     3 1 BLKDROP2
   }>
   $IntroEntryView$_to_external PROCINLINE:<{
+  }>
+  $IntroTagPage$_to_external PROCINLINE:<{
   }>
   $IntroShardView$_to_external PROCINLINE:<{
   }>
@@ -216,6 +228,100 @@ PROGRAM{
         ENDC
         HASHCU
   }>
+  $IntroShard$_fun_packTags PROCREF:<{
+        NEWC
+        ENDC
+    TRUE
+    WHILE:<{
+      s2 PUSH
+      0 GTINT
+    }>DO<{
+      s2 PUSH
+      63 PUSHINT
+          MIN
+      s4 s3 PUSH2
+      ADD
+      OVER
+      SUB
+          NEWC
+      0 PUSHINT
+      WHILE:<{
+        s0 s3 PUSH2
+        LESS
+      }>DO<{
+        257 PUSHINT
+        s3 s1 PUSH2
+        ADD
+        s13 PUSH
+        -ROT
+        __tact_dict_get_int_cell INLINECALLDICT
+        $IntroEntry$_load_opt INLINECALLDICT
+        DUP
+        ISNULL
+        IF:<{
+          DROP
+          0 PUSHINT
+        }>ELSE<{
+          $IntroEntry$_not_null INLINECALLDICT
+          $IntroEntry$_get_view_tag INLINECALLDICT
+        }>
+        ROT
+        16 STU
+        SWAP
+        INC
+      }>
+      DROP
+      NIP
+      s2 PUSH
+      IF:<{
+        2 2 BLKDROP2
+            ENDC
+        FALSE
+      }>ELSE<{
+        s1 s3 XCHG
+            STREF
+            ENDC
+        SWAP
+      }>
+      2SWAP
+      SUB
+      -ROT
+    }>
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags PROCINLINE:<{
+  }>
+  $IntroShard$_fun_get_view_tags PROCREF:<{
+    s1 s2 XCPU
+        MAX
+    s4 s0 PUSH2
+    GREATER
+    IF:<{
+      s4 s0 PUSH2
+      SUB
+    }>ELSE<{
+      0 PUSHINT
+    }>
+    s0 s2 XCHG
+    8 PUSHPOW2
+        MIN
+    ROT
+        MIN
+    s4 s2 PUSH2
+    s5 s9 XCHG
+    s4 s8 XCHG
+    s3 s7 XCHG
+    s6 s9 s8 XCHG3
+    s7 s6 PUSH2
+    $IntroShard$_fun_packTags INLINECALLDICT
+    s4 s8 XCHG
+    s3 s7 XCHG
+    s10 s9 s0 XCHG3
+    $IntroTagPage$_constructor_from_id_count_next_id_evict_cursor_tags INLINECALLDICT
+    s6 s10 XCHG
+    s5 s9 XCHG
+  }>
   $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at PROCINLINE:<{
   }>
   $IntroShard$_fun_get_entry PROCREF:<{
@@ -261,6 +367,13 @@ PROGRAM{
     s4 s3 XCHG2
     PUSHNULL
     s0 s3 XCHG
+  }>
+  %get_view_tags PROC:<{
+    $IntroShard$_contract_load INLINECALLDICT
+    2 6 BLKSWAP
+    $IntroShard$_fun_get_view_tags INLINECALLDICT
+    6 5 BLKDROP2
+    $IntroTagPage$_to_external INLINECALLDICT
   }>
   %get_entry PROC:<{
     $IntroShard$_contract_load INLINECALLDICT
