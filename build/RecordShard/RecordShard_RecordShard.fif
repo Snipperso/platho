@@ -24,7 +24,7 @@ PROGRAM{
   DECLPROC $RecordShard$_fun_frameCommit
   DECLPROC $CapsuleRecordView$_constructor_exists_frame_commit_created_at
   DECLPROC $RecordShard$_fun_get_record
-  DECLPROC $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_safe_cap_retention_min_value
+  DECLPROC $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee
   DECLPROC $RecordShard$_fun_get_view
   DECLPROC $RecordEntry$_constructor_frame_commit_created_at
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
@@ -117,23 +117,29 @@ PROGRAM{
     }>
   }>
   $RecordShard$_store PROCINLINE:<{
-    s5 s6 XCHG2
+    s7 s8 XCHG2
     256 STU
-    s1 s3 XCHG
+    s1 s5 XCHG
     32 STU
+    s1 s3 XCHG
+    64 STU
     STDICT
     32 STU
     32 STU
     32 STU
+    SWAP
+    STVARUINT16
   }>
   $RecordShard$_load PROCINLINE:<{
     256 LDU
     32 LDU
+    64 LDU
     LDDICT
     32 LDU
     32 LDU
     32 LDU
-    6 -ROLL
+    LDVARUINT16
+    8 -ROLL
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -154,9 +160,10 @@ PROGRAM{
     -ROT
   }>
   $RecordShard$_contract_init PROCINLINE:<{
-    PUSHNULL
     0 PUSHINT
-    s0 s0 PUSH2
+    PUSHNULL
+    s1 s1 s1 PUSH3
+    DUP
   }>
   $RecordShard$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -165,7 +172,7 @@ PROGRAM{
     SWAP
     IF:<{
       $RecordShard$_load INLINECALLDICT
-      1 6 BLKDROP2
+      1 8 BLKDROP2
     }>ELSE<{
       $RecordShard$init$_load INLINECALLDICT
       s0 s2 XCHG
@@ -179,7 +186,7 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    6 -ROLL
+    8 -ROLL
     $RecordShard$_store INLINECALLDICT
     ENDC
     c4 POP
@@ -208,7 +215,7 @@ PROGRAM{
   }>
   $RecordShard$_fun_get_record PROCREF:<{
     257 PUSHINT
-    s5 PUSH
+    s6 PUSH
     s0 s2 XCHG
     __tact_dict_get_int_cell INLINECALLDICT
     $RecordEntry$_load_opt INLINECALLDICT
@@ -226,19 +233,22 @@ PROGRAM{
     -ROT
     $CapsuleRecordView$_constructor_exists_frame_commit_created_at INLINECALLDICT
   }>
-  $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_safe_cap_retention_min_value PROCINLINE:<{
+  $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee PROCINLINE:<{
   }>
   $RecordShard$_fun_get_view PROCREF:<{
     12 PUSHPOW2
     31536000 PUSHINT
-    2700000 PUSHINT
-    s8 PUSH
-    s3 s8 XCPU
-    s3 s7 XCPU
-    s3 s7 XCPU
-    s3 s7 XCPU
-    s1 s3 s3 XCHG3
-    $RecordShardView$_constructor_bucket_key_epoch_record_count_live_count_evict_cursor_safe_cap_retention_min_value INLINECALLDICT
+    12700000 PUSHINT
+    10000000 PUSHINT
+    s11 PUSH
+    s4 s11 XCPU
+    s4 s11 XCPU
+    s4 s10 XCPU
+    s4 s10 XCPU
+    s4 s10 XCPU
+    s4 s3 s4 XCHG3
+    s10 PUSH
+    $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee INLINECALLDICT
   }>
   $RecordEntry$_constructor_frame_commit_created_at PROCINLINE:<{
   }>
@@ -252,15 +262,15 @@ PROGRAM{
   }>
   %get_record PROC:<{
     $RecordShard$_contract_load INLINECALLDICT
-    6 ROLL
+    8 ROLL
     $RecordShard$_fun_get_record INLINECALLDICT
-    6 3 BLKDROP2
+    8 3 BLKDROP2
     $CapsuleRecordView$_to_external INLINECALLDICT
   }>
   %get_view PROC:<{
     $RecordShard$_contract_load INLINECALLDICT
     $RecordShard$_fun_get_view INLINECALLDICT
-    6 8 BLKDROP2
+    8 11 BLKDROP2
     $RecordShardView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -279,70 +289,95 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $RecordShard$_contract_load INLINECALLDICT
-    s0 s7 XCHG
+    s0 s9 XCHG
     IFJMP:<{
-      7 BLKDROP
+      9 BLKDROP
     }>
     0 PUSHINT
-    s6 PUSH
+    s8 PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 s6 XCHG
+      s0 s8 XCHG
       32 LDU
-      s0 s7 XCHG
+      s0 s9 XCHG
     }>
     OVER
     1381191729 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s5 XCHG
+      s0 s7 XCHG
+      64 LDU
       LDREF
+      LDREF
+      LDREF
+      DROP
+      CTOS
       LDREF
       LDREF
       DROP
       13652 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      2700000 PUSHINT
+      12700000 PUSHINT
       GEQ
       THROWANYIFNOT
       13651 PUSHINT
-      s8 PUSH
+      s6 PUSH
       12 PUSHPOW2
       LESS
       THROWANYIFNOT
-      s4 PUSH
-      257 PUSHINT
-      s5 PUSH
-      s8 s9 XCHG
-      s7 s9 XCHG
-      s6 s9 XCHG
-      s5 s9 XCHG
-      s4 s10 XCHG
-      s3 s11 XCHG
-      s9 s10 s11 XCHG3
+      13653 PUSHINT
+      s5 s9 PUSH2
+      GREATER
+      THROWANYIFNOT
+      s4 s11 XCHG
+      s0 s12 XCHG
+      3 -ROLL
       $RecordShard$_fun_frameCommit INLINECALLDICT
-      s4 POP
+      s6 POP
+          NEWC
+      1381193540 PUSHINT
+      SWAP
+      32 STU
+      s9 s(-1) PUXC
+      64 STU
+      s6 s(-1) PUXC
+      256 STU
+          ENDC
+          HASHCU
+      13654 PUSHINT
+      s0 s11 XCHG
+          CTOS
+      s9 PUSH
+          CHKSIGNU
+      s1 s10 XCHG
+      THROWANYIFNOT
+      s0 s8 XCHG
+      10000000 PUSHINT
+      ADD
+      257 PUSHINT
           NOW
-      s1 s4 XCHG
+      s1 s6 XCHG
       $RecordEntry$_constructor_frame_commit_created_at INLINECALLDICT
       NEWC
       $RecordEntry$_store_cell INLINECALLDICT
-      s3 s6 XCHG
-      s7 s8 s0 XCHG3
+      5 1 REVERSE
+      s3 s(-1) PUXC
       __tact_dict_set_int_cell INLINECALLDICT
-      s0 s4 XCHG
+      SWAP
       INC
-      s0 s5 XCHG
+      s0 s2 XCHG
       INC
       2000000 PUSHINT
       OVER
       200000 PUSHINT
       MUL
+      ADD
+      s4 PUSH
       ADD
       2 PUSHINT
           RAWRESERVE
@@ -417,8 +452,10 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s5 s0 s4 XCHG3
-      s0 s3 XCHG
+      s5 s7 XCHG
+      s0 s4 s3 XCHG3
+      s1 s6 XCHG
+      s1 s5 XCHG
       $RecordShard$_contract_store INLINECALLDICT
     }>
     OVER
@@ -426,7 +463,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s5 XCHG
+      s0 s7 XCHG
       16 LDU
       DROP
       0 PUSHINT
@@ -440,15 +477,15 @@ PROGRAM{
           FALSE
         }>
         IF:<{
-          s7 s2 PUSH2
+          s8 s3 PUSH2
           LESS
         }>ELSE<{
           FALSE
         }>
       }>DO<{
-        s3 PUSH
+        s4 PUSH
         257 PUSHINT
-        s9 PUSH
+        s10 PUSH
         __tact_dict_get_int_cell INLINECALLDICT
         $RecordEntry$_load_opt INLINECALLDICT
         DUP
@@ -466,50 +503,48 @@ PROGRAM{
             PUSHNULL
             NEWC
             $RecordEntry$_store_opt INLINECALLDICT
-            s9 PUSH
-            s3 s6 XCHG
+            s10 PUSH
+            s3 s7 XCHG
             SWAP
             __tact_dict_set_int_cell INLINECALLDICT
-            s0 s6 XCHG
+            s0 s2 XCHG
             DEC
-            s0 s7 XCHG
+            s0 s8 XCHG
             INC
-            s0 s3 XCHG
+            s0 s4 XCHG
             INC
           }>ELSE<{
             DROP
-            DUP
-            s6 s7 XCHG
-            s3 s6 XCHG
+            s7 s0 s0 XC2PU
+            s2 s4 XCHG
           }>
         }>ELSE<{
           DROP
-          s0 s7 XCHG
+          s0 s8 XCHG
           INC
-          s6 s7 XCHG
-          s0 s3 XCHG
-          s0 s6 XCHG
+          s8 s1 s4 XCHG3
+          s0 s2 XCHG
         }>
-        s3 s7 XCHG
-        s3 s6 XCHG
+        s4 s8 XCHG
+        s2 s4 XCHG
       }>
       2DROP
-      s3 s5 XCHG
-      2 3 BLKSWAP
+      s5 s7 XCHG
+      2 5 BLKSWAP
       $RecordShard$_contract_store INLINECALLDICT
     }>
-    s7 POP
+    s9 POP
     0 EQINT
-    s0 s6 XCHG
+    s0 s8 XCHG
     33 LESSINT
-    s1 s6 XCHG
+    s1 s8 XCHG
     AND
     IFJMP:<{
-      s3 s5 XCHG
-      2 3 BLKSWAP
+      s5 s7 XCHG
+      2 5 BLKSWAP
       $RecordShard$_contract_store INLINECALLDICT
     }>
-    6 BLKDROP
+    8 BLKDROP
     130 THROW
   }>
 }END>c

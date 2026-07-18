@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: RecordShard
-BoC Size: 816 bytes
+BoC Size: 915 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 16
@@ -46,8 +46,8 @@ TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
 ### CapsulePublish
-TL-B: `capsule_publish#52535031 header_0:^cell header_1:^cell body:^cell = CapsulePublish`
-Signature: `CapsulePublish{header_0:^cell,header_1:^cell,body:^cell}`
+TL-B: `capsule_publish#52535031 seq:uint64 header_0:^cell header_1:^cell body:^cell sig:^cell = CapsulePublish`
+Signature: `CapsulePublish{seq:uint64,header_0:^cell,header_1:^cell,body:^cell,sig:^cell}`
 
 ### EvictRecords
 TL-B: `evict_records#52535032 max_count:uint16 = EvictRecords`
@@ -62,12 +62,12 @@ TL-B: `_ exists:bool frame_commit:int257 created_at:int257 = CapsuleRecordView`
 Signature: `CapsuleRecordView{exists:bool,frame_commit:int257,created_at:int257}`
 
 ### RecordShardView
-TL-B: `_ bucket_key:int257 epoch:int257 record_count:int257 live_count:int257 evict_cursor:int257 safe_cap:int257 retention:int257 min_value:int257 = RecordShardView`
-Signature: `RecordShardView{bucket_key:int257,epoch:int257,record_count:int257,live_count:int257,evict_cursor:int257,safe_cap:int257,retention:int257,min_value:int257}`
+TL-B: `_ write_pubkey:int257 epoch:int257 last_seq:int257 record_count:int257 live_count:int257 evict_cursor:int257 safe_cap:int257 retention:int257 min_value:int257 protocol_fee:int257 accrued_fee:int257 = RecordShardView`
+Signature: `RecordShardView{write_pubkey:int257,epoch:int257,last_seq:int257,record_count:int257,live_count:int257,evict_cursor:int257,safe_cap:int257,retention:int257,min_value:int257,protocol_fee:int257,accrued_fee:int257}`
 
 ### RecordShard$Data
-TL-B: `_ bucket_key:uint256 epoch:uint32 records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}> record_count:uint32 live_count:uint32 evict_cursor:uint32 = RecordShard`
-Signature: `RecordShard{bucket_key:uint256,epoch:uint32,records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}>,record_count:uint32,live_count:uint32,evict_cursor:uint32}`
+TL-B: `_ write_pubkey:uint256 epoch:uint32 last_seq:uint64 records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}> record_count:uint32 live_count:uint32 evict_cursor:uint32 accrued_fee:coins = RecordShard`
+Signature: `RecordShard{write_pubkey:uint256,epoch:uint32,last_seq:uint64,records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}>,record_count:uint32,live_count:uint32,evict_cursor:uint32,accrued_fee:coins}`
 
 ## Get methods
 Total get methods: 2

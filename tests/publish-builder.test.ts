@@ -254,10 +254,16 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     const intro = readFileSync('contracts/IntroShard.tact', 'utf8');
     const recov = readFileSync('contracts/RecoveryShard.tact', 'utf8');
 
-    expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS'), 'RecordShard RS_MIN_VALUE').toBe(2_700_000n);
+    // RS_MIN_VALUE = rent + gas + the 0.01 GRAM protocol fee. The fee is the other half of the airdrop economics
+    // (1.5M capsules -> 15M ATH out, 15k GRAM in) and is what keeps publishing from being cheaper than the reward.
+    expect(constOf(rec, 'RS_PROTOCOL_FEE'), 'the service fee is 0.01 GRAM, as in the deleted CreditSale').toBe(10_000_000n);
+    expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS') + constOf(rec, 'RS_PROTOCOL_FEE'),
+      'RecordShard RS_MIN_VALUE').toBe(12_700_000n);
+    // the airdrop pays 10 ATH per capsule, so a capsule must never cost LESS than the fee that backs it
+    expect(constOf(rec, 'RS_PROTOCOL_FEE') * 1_500_000n, '1.5M capsules collect 15k GRAM').toBe(15_000_000_000_000n);
     expect(constOf(intro, 'IS_INTRO_ENDOWMENT') + constOf(intro, 'IS_PUBLISH_GAS'), 'IntroShard IS_MIN_VALUE').toBe(2_508_000n);
     expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(31_200_000n);
-    // the direct-paid CONV publish must be materially cheaper than the old two-hop floor (7_710_000)
+    // the STORAGE+GAS part is still materially cheaper than the old two-hop floor (7_710_000) — the hop is gone
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS')).toBeLessThan(7_710_000n);
   });
 });
