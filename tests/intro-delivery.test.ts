@@ -52,7 +52,7 @@ describe('INTRO-DELIVERY — from a hit to a readable message', () => {
   const readStates = async (addresses: any[]) => {
     const out = new Map<string, any>();
     for (const address of addresses) {
-      const contract = await blockchain.getContract(address);
+      const contract = await blockchain.getContract(Address.parse(String(address)));
       const state: any = contract.accountState;
       if (!state || state.type !== 'active') continue;
       out.set(addrKey(address), {
@@ -65,9 +65,9 @@ describe('INTRO-DELIVERY — from a hit to a readable message', () => {
   };
 
   const readScanPage = async (address: any, fromId: number, maxCount: number) => {
-    const contract = await blockchain.getContract(address);
+    const contract = await blockchain.getContract(Address.parse(String(address)));
     if (!contract.accountState || (contract.accountState as any).type !== 'active') return null;
-    return blockchain.openContract(IntroShard.fromAddress(address)).getGetScanPage(BigInt(fromId), BigInt(maxCount));
+    return blockchain.openContract(IntroShard.fromAddress(Address.parse(String(address)))).getGetScanPage(BigInt(fromId), BigInt(maxCount));
   };
 
   // The entry reader now goes through runGetMethod like the rest of the transport, so it needs no contract

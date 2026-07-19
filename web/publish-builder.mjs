@@ -16,13 +16,44 @@
 // The shard state stays thin — it keeps only (commitment, created_at) — so reading is: derive the address, list the
 // records, then fetch the matching bodies from that account's transaction history by commitment.
 
-import { beginCell } from '@ton/core';
+// NODE-ONLY REFERENCE. This builder speaks @ton/core and the compiled Tact wrappers, so it does not load in a
+// browser — web/intro-publish-browser.mjs is the shipping INTRO path. It is kept because it derives addresses
+// and StateInit INDEPENDENTLY of web/shard-discovery.mjs (which hand-rolls the same encoding for the browser),
+// and two independent implementations that must agree is the only real evidence for address derivation: a wrong
+// shard address cannot be caught at send time, because a message to an uninitialised account has its compute
+// phase skipped and vanishes with the wallet reporting success. Do NOT make this import shard-discovery.
+import { Address, beginCell, contractAddress } from '@ton/core';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
-import { storeCapsulePublish } from '../build/RecordShard/RecordShard_RecordShard';
-import { storeIntroPublish } from '../build/IntroShard/IntroShard_IntroShard';
-import { storeRecoveryStore } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
-import { recordShardState, introShardState, recoveryShardState, recoveryOwnerSlotKey } from './shard-discovery.mjs';
+import { storeCapsulePublish, RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
+import { storeIntroPublish, IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
+import { storeRecoveryStore, RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
 import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs';
+
+const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
+
+// MUST equal RS_SLOT_DOMAIN in RecoveryShard.tact ("RSLK"); mirrored here rather than imported, for the
+// independence reason above.
+const RECOVERY_SLOT_DOMAIN = 0x52534C4Bn;
+
+const recoveryOwnerSlotKey = (ownerPublicKey) => BigInt('0x' + beginCell()
+  .storeUint(RECOVERY_SLOT_DOMAIN, 32)
+  .storeUint(typeof ownerPublicKey === 'bigint' ? ownerPublicKey : bytesToBig(ownerPublicKey), 256)
+  .endCell().hash().toString('hex'));
+
+async function recordShardState(bucketKey, epoch) {
+  const init = await RecordShard.init(BigInt(bucketKey), BigInt(epoch));
+  return { init, address: contractAddress(0, init) };
+}
+
+async function introShardState(epoch, bucket) {
+  const init = await IntroShard.init(BigInt(epoch), BigInt(bucket));
+  return { init, address: contractAddress(0, init) };
+}
+
+async function recoveryShardState(selfBucketKey) {
+  const init = await RecoveryShard.init(BigInt(selfBucketKey));
+  return { init, address: contractAddress(0, init) };
+}
 
 // Commitment domains — MUST mirror the contracts byte-for-byte (RecordShard.RS_FRAME_DOMAIN, IntroShard.IS_BODY_DOMAIN,
 // RecoveryShard.RS_RECOVERY_DOMAIN). The CONTRACT defines each commitment; these mirrors exist so a reader can
@@ -32,7 +63,6 @@ const RS_WRITE_DOMAIN = 0x52535744n;   // "RSWD"
 const IS_BODY_DOMAIN = 0x49534243n;    // "ISBC"
 const RECOVERY_DOMAIN = 0x42525331n;   // "BRS1"
 
-const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
 const bufBig = (h) => BigInt('0x' + Buffer.from(h).toString('hex'));
 const sigCell = (sig) => beginCell().storeBuffer(Buffer.from(sig)).endCell();
 const cellBig = (c) => bufBig(c.hash());

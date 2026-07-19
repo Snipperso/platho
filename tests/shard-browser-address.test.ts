@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { recordShardAddress, introShardAddress, recoveryShardAddress } from '../web/shard-discovery.mjs';
+import { contractAddress } from '@ton/core';
+import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
+import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
+import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
 import { recordShardAddressBytes, introShardAddressBytes, recoveryShardAddressBytes, rawAddress } from '../web/shard-address.mjs';
 import { renderShardCodeModule } from '../scripts/generate_shard_code.mjs';
 
@@ -17,7 +20,15 @@ import { renderShardCodeModule } from '../scripts/generate_shard_code.mjs';
 // path hand-rolls the same encoding on top of the client's own cell primitives. These tests pin them together.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-const asRaw = (address: any) => address.toRawString();
+// The reference side derives STRAIGHT from the compiled Tact wrappers — deliberately not through
+// web/shard-discovery.mjs, which is itself built on the browser derivation under test. Routing the reference
+// through it would make this comparison circular and prove nothing.
+const referenceIntro = async (epoch: number, bucket: number) =>
+  contractAddress(0, await IntroShard.init(BigInt(epoch), BigInt(bucket))).toRawString();
+const referenceRecord = async (key: bigint, epoch: number) =>
+  contractAddress(0, await RecordShard.init(key, BigInt(epoch))).toRawString();
+const referenceRecovery = async (slot: bigint) =>
+  contractAddress(0, await RecoveryShard.init(slot)).toRawString();
 
 describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
   it('ADDR-01: INTRO shard addresses match the reference for a wide spread of arguments', async () => {
@@ -26,7 +37,7 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
       [20718, 4095], [65535, 65535], [1, 999983], [20000, 7], [2 ** 31 - 1, 2 ** 20],
     ];
     for (const [epoch, bucket] of cases) {
-      const reference = asRaw(await introShardAddress(epoch, bucket));
+      const reference = await referenceIntro(epoch, bucket);
       const browser = rawAddress(await introShardAddressBytes(epoch, bucket));
       expect(browser, `INTRO(${epoch}, ${bucket})`).toBe(reference);
     }
@@ -44,7 +55,7 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
     ];
     for (const key of keys) {
       for (const epoch of [0, 20718]) {
-        const reference = asRaw(await recordShardAddress(key, epoch));
+        const reference = await referenceRecord(key, epoch);
         const browser = rawAddress(await recordShardAddressBytes(key, epoch));
         expect(browser, `CONV(${key.toString(16)}, ${epoch})`).toBe(reference);
       }
@@ -53,7 +64,7 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
 
   it('ADDR-03: RECOVERY slot addresses match', async () => {
     for (const slot of [0n, 7n, (1n << 255n) + 12345n, (1n << 256n) - 1n]) {
-      const reference = asRaw(await recoveryShardAddress(slot));
+      const reference = await referenceRecovery(slot);
       const browser = rawAddress(await recoveryShardAddressBytes(slot));
       expect(browser, `RECOVERY(${slot.toString(16)})`).toBe(reference);
     }

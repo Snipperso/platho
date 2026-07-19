@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beginCell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain } from '@ton/sandbox';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
@@ -60,7 +60,7 @@ describe('SHARD-DISCOVERY — client-derived addresses match the on-chain shards
     // the CLIENT computes the address from just (bucketKey, epoch) — no lookup — and reads the record there
     const derived = await recordShardAddress(bucketKey, epoch);
     expect(addrKey(derived)).toBe(addrKey(rs.address));
-    const found = blockchain.openContract(RecordShard.fromAddress(derived));
+    const found = blockchain.openContract(RecordShard.fromAddress(Address.parse(String(derived))));
     const rec = await found.getGetRecord(0n);
     expect(rec.exists).toBe(true);
     expect(rec.frame_commit).toBe(built.commit);
