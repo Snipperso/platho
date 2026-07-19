@@ -7,6 +7,7 @@ import { buildIntroPublish } from '../web/publish-builder.mjs';
 import { scanIntros, scanIntroIndices } from '../web/intro-scan.mjs';
 import { computePrivateScanViewTag } from '../web/crypto/platho-crypto.mjs';
 import { parseScanPageStack } from '../web/intro-transport.mjs';
+import { unpackScanPage } from '../web/intro-receive.mjs';
 import { computeCellHashAndDepth } from '../web/pwa-contract-transactions.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -185,6 +186,39 @@ describe('INTRO SCAN PAGE — the scan input, and what it actually costs', () =>
 
     // The wire really is four items now; pin it so a future struct change is loud here rather than silent there.
     expect(wire.length, 'IntroScanPage is four stack items').toBe(4);
+  }, 120_000);
+
+  it('INTRO-SEAM-01: the production decoder feeds the production unpacker — this seam was BROKEN', async () => {
+    // THE BUG THIS PINS, found by audit on 2026-07-19 and reproduced before fixing: parseScanPageStack builds
+    // the CLIENT's own cell ({ data, bitLength, refs }), because it has to run in a browser where @ton/core does
+    // not load. unpackScanPage called `cur.beginParse()`, which exists only on an @ton/core Cell. So the real
+    // wiring — transport -> parseScanPageStack -> unpackScanPage — threw on every page with anything in it.
+    // NO FIRST CONTACT COULD HAVE BEEN RECEIVED BY ANYBODY.
+    //
+    // Nothing caught it because every other test stubs readScanPage a level ABOVE the parser and hands back a
+    // Tact-wrapper cell, so the two halves were never run against each other; and the browser-loadability guard
+    // checks imports, not runtime types. This test is the only place the two real implementations meet.
+    await publish(4, (i) => ({ r: BigInt(i + 1) * 555n, tag: 0x300 + i }));
+
+    const stack = await blockchain.runGetMethod(shard.address, 'get_scan_page', [
+      { type: 'int', value: 0n },
+      { type: 'int', value: 256n },
+    ] as any);
+    const wire = (stack.stack as any[]).map((item: any) =>
+      item.type === 'cell' || item.type === 'slice'
+        ? { type: 'cell', value: item.cell.toBoc().toString('base64') }
+        : { type: 'int', value: String(item.value) });
+
+    const page = parseScanPageStack(wire);                 // browser cell out
+    const pairs = unpackScanPage(page.pairs as any, Number(page.count));   // must be readable by the unpacker
+
+    expect(pairs.map((p) => p.r), 'the pairs survive the whole production path')
+      .toEqual([555n, 1110n, 1665n, 2220n]);
+    expect(pairs.map((p) => p.view_tag), 'and so do the tags').toEqual([0x300, 0x301, 0x302, 0x303]);
+
+    // Multi-cell too: 4 pairs is more than the 3 that fit one cell, so the ref chain was exercised above. Assert
+    // it explicitly rather than relying on the packing constant staying what it is.
+    expect(Number(page.count), 'the page really did span more than one cell').toBeGreaterThan(3);
   }, 120_000);
 
   it('SCAN-05: paging covers a range larger than one page, with no gaps or repeats', async () => {
