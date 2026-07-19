@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: RecordShard
-BoC Size: 1113 bytes
+BoC Size: 1441 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 16
+Total structures: 17
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -53,6 +53,10 @@ Signature: `CapsulePublish{seq:uint64,header_0:^cell,header_1:^cell,body:^cell,s
 TL-B: `evict_records#52535032 max_count:uint16 = EvictRecords`
 Signature: `EvictRecords{max_count:uint16}`
 
+### DepositProtocolFee
+TL-B: `deposit_protocol_fee#ff775609 amount:uint128 = DepositProtocolFee`
+Signature: `DepositProtocolFee{amount:uint128}`
+
 ### RecordEntry
 TL-B: `_ frame_commit:int257 created_at:int257 = RecordEntry`
 Signature: `RecordEntry{frame_commit:int257,created_at:int257}`
@@ -62,8 +66,8 @@ TL-B: `_ exists:bool frame_commit:int257 created_at:int257 = CapsuleRecordView`
 Signature: `CapsuleRecordView{exists:bool,frame_commit:int257,created_at:int257}`
 
 ### RecordShardView
-TL-B: `_ write_pubkey:int257 epoch:int257 last_seq:int257 record_count:int257 live_count:int257 evict_cursor:int257 safe_cap:int257 retention:int257 min_value:int257 protocol_fee:int257 accrued_fee:int257 evict_bounty:int257 accrued_bounty:int257 = RecordShardView`
-Signature: `RecordShardView{write_pubkey:int257,epoch:int257,last_seq:int257,record_count:int257,live_count:int257,evict_cursor:int257,safe_cap:int257,retention:int257,min_value:int257,protocol_fee:int257,accrued_fee:int257,evict_bounty:int257,accrued_bounty:int257}`
+TL-B: `_ write_pubkey:int257 epoch:int257 last_seq:int257 record_count:int257 live_count:int257 evict_cursor:int257 safe_cap:int257 retention:int257 min_value:int257 protocol_fee:int257 accrued_fee:int257 evict_bounty:int257 accrued_bounty:int257 fee_sink:address = RecordShardView`
+Signature: `RecordShardView{write_pubkey:int257,epoch:int257,last_seq:int257,record_count:int257,live_count:int257,evict_cursor:int257,safe_cap:int257,retention:int257,min_value:int257,protocol_fee:int257,accrued_fee:int257,evict_bounty:int257,accrued_bounty:int257,fee_sink:address}`
 
 ### RecordShard$Data
 TL-B: `_ write_pubkey:uint256 epoch:uint32 last_seq:uint64 records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}> record_count:uint32 live_count:uint32 evict_cursor:uint32 accrued_fee:coins accrued_bounty:coins = RecordShard`

@@ -78,6 +78,19 @@ Protocol fees ARE the TON side of initial liquidity. `15,000,000 ATH` of airdrop
 liquidity allocation gives the `0.001 GRAM` reference price exactly. The per-capsule fee is therefore
 structural — without it the pool has no TON side at all.
 
+The fee reaches `FeeAccumulator` from `RecordShard` and `IntroShard` through one `DepositProtocolFee` per shard,
+sent when a sweep first runs past the shard's publish window. Two deductions belong in the arithmetic above, and
+both are per SHARD rather than per capsule:
+
+| Deduction | Amount | Where it goes |
+| --- | ---: | --- |
+| `FeeAccumulator` deposit gate (15002) | `2,000,000` | Settles in the sink's balance, not in `accumulated_ton`. |
+| Forward-fee reserve | `500,000` | Message transport; the unused part returns to the evictor. Measured cost `~75,000`. |
+
+So a swept shard books `collected − 2,500,000`. A shard that is never swept books nothing — see the open
+eviction-bounty calibration in `artifacts/PLATHO_CLEAN17_MASTER_ROADMAP.md`, which is what decides how much of
+the long tail is actually collected.
+
 ## Post-Genesis Required State
 
 After `mainnet:genesis:verify` passes:

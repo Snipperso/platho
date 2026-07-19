@@ -66,6 +66,54 @@ const RS_PUBLISH_GAS: Int = 2500000;
 // Restoring it also removes what looked like an airdrop-farm: publishing must cost the fee, not just the rent.
 const RS_PROTOCOL_FEE: Int = 10000000;
 
+// THE FEE'S WAY OUT. Without this the fee was a one-way trap: accrued_fee only ever grew and was only ever
+// reserved, so the 15k GRAM that IS the pool's TON side would have been immured across millions of shards by an
+// immutable contract. The sink is FeeAccumulator, the same contract CapsuleHub already deposits into.
+//
+// THE ADDRESS IS A CONSTANT, NOT A BINDING. A shard deploys LAZILY and UNBOUND — the first publisher creates the
+// account — so any post-deploy bind receiver would let a stranger bind their own address and walk off with every
+// fee that shard ever collects. A constant is the only form that cannot be captured.
+// This was expected to force a genesis ordering constraint (sink address -> shard code -> shard addresses).
+// MEASURED 2026-07-19: it does not. FeeAccumulator.init takes only (treasury_receiver, buyback_burn) with NO
+// deployment_id, so its address is a pure function of its code and the owner's two wallets — the current build
+// reproduces the manifest address 0:126ccfb...f3fe3e exactly. The address is therefore already known and already
+// live, and it is pinned against a fresh derivation by tests/shard-fee-outlet.test.ts. If FeeAccumulator's code or
+// either owner wallet ever changes, that pin fails loudly instead of routing real money into a dead address.
+const RS_FEE_SINK: Address = address("EQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-PtQu");
+
+// FeeAccumulator's own gate 15002 demands context().value >= amount + FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE, so an
+// under-funded deposit is REFUSED and, being non-bounceable, would land as unaccounted balance — the exact defect
+// m31 fixed in CapsuleHub.FlushFees. Mirror its shape: send amount + the deposit reserve, fees paid separately.
+const RS_FEE_SINK_DEPOSIT_RESERVE: Int = 2000000;
+// The shard pays the forward fee for its OWN message. Charged to the account rather than taken out of the value,
+// it would otherwise come from the pool that mode-128 returns to the evictor — the caller would silently
+// subsidise the protocol's transfer.
+// MEASURED 2026-07-19: the whole eviction transaction's action phase pays 150_668 in forward fees for BOTH
+// outbound messages together, i.e. ~75_000 for this one, and the figure does not move with shard size because
+// the deposit body is a fixed 160 bits. The first revision reserved 2_000_000 here — 26x the real cost — and
+// every unused nanoton of that went to the EVICTOR rather than to the pool, so over-reserving is not free.
+// 500_000 keeps ~6.6x headroom against a config-25 repricing. Erring high is still the right direction: if the
+// real fee ever exceeded this the excess would come out of the evictor's change, which is millions, so the
+// failure is a slightly smaller bounty rather than a cliff.
+const RS_FEE_SINK_FWD_RESERVE: Int = 500000;
+const RS_FEE_REMIT_OVERHEAD: Int = RS_FEE_SINK_DEPOSIT_RESERVE + RS_FEE_SINK_FWD_RESERVE;
+
+// THE FEE PAYS FOR ITS OWN EXTRACTION. What reaches the pool is what the shard collected MINUS the cost of
+// moving it. This is not a preference, it is what the measurements forced:
+//   MEASURED 2026-07-19 — money a swept shard holds ABOVE its accrued fee, i.e. all that was ever available to
+//   fund the transfer:  CONV 736_636 at 1 record, 1_468_693 at 8, 3_978_604 at 32;  INTRO ~965_285 at 1 record
+//   rising only to 1_200_181 at 64 (its endowment covers one WEEK, so there is almost no margin at any size).
+// Against a 4_000_000 overhead the fee therefore could not leave AT ALL on the INTRO lane, and only from ~64
+// records upward on CONV — which is to say the outlet, as first written, did not work for ordinary shards.
+// Charging the overhead to the shard's spare balance was never viable; charging it to the first publisher would
+// have meant raising the publish gate for everyone. Charging it to the fee itself needs neither, and makes the
+// affordability test hold BY CONSTRUCTION: the publish path already reserves fee + endowment + bounty per
+// record, so a rent-solvent shard can always afford exactly this.
+// The cost is real and belongs in the owner's arithmetic: the pool receives the collected fee less ~4_000_000
+// per SHARD (not per capsule), of which the 2_000_000 deposit reserve is FeeAccumulator's immutable gate demand
+// and settles into its balance rather than into accumulated_ton.
+const RS_FEE_REMIT_MIN: Int = RS_FEE_REMIT_OVERHEAD + 1;   // below this, moving the fee would cost more than it is
+
 // EVICTION BOUNTY — what actually makes eviction happen. [MEASURED 2026-07-18.] The payout used to be the freed
 // RS_RECORD_ENDOWMENT, which cannot work for a structural reason rather than a tuning one: a storage endowment is
 // BY CONSTRUCTION consumed by the storage it paid for, so when a record finally ages out there is nothing left of
@@ -101,6 +149,12 @@ message(0x52535032) EvictRecords {     // "RSP2" — permissionless FIFO evictio
     max_count: Int as uint16;
 }
 
+// Declared locally with FeeAccumulator's opcode, exactly as CapsuleHub does — Tact compiles one contract per
+// project, so the sink's message type is mirrored rather than imported. The opcode is what must match.
+message(0xFF775609) DepositProtocolFee {
+    amount: Int as uint128;
+}
+
 struct RecordEntry {
     frame_commit: Int;
     created_at: Int;
@@ -126,6 +180,7 @@ struct RecordShardView {
     accrued_fee: Int;     // collected fee held here, awaiting routing to the fee sink
     evict_bounty: Int;    // what evicting one record pays its caller
     accrued_bounty: Int;  // bounties still owed for records that have not been evicted yet
+    fee_sink: Address;    // where accrued_fee is routed; a constant, readable so it needs no disassembly to check
 }
 
 contract RecordShard {
@@ -287,10 +342,67 @@ contract RecordShard {
         let original: Int = myBalance() - context().value;
         let payout: Int = evicted * RS_EVICT_BOUNTY;
         self.accrued_bounty = self.accrued_bounty - payout;
-        let keep: Int = original - payout;
+
+        // ROUTE THE PROTOCOL FEE OUT. One outbound fee message per shard, for the whole life of the shard.
+        //
+        // WHY ONE IS ENOUGH: the publish gate (13656) admits an epoch only within +/-1, so from epoch+2 onward
+        // nothing can ever be added to accrued_fee again. The figure is FINAL, not a running total, so there is
+        // no need for a flush loop, an operator, or a keeper — all of which are forbidden here anyway.
+        // The guard is redundant by arithmetic (a record can only be evicted after RS_RETENTION, which is a year,
+        // so any successful sweep is already far past epoch+1) and is kept because it is the actual invariant the
+        // single-message design rests on: it must fail closed if retention is ever shortened below two days.
+        //
+        // AFFORDABILITY IS CHECKED IN COMPUTE, NOT CLAMPED IN ACTION. This is the whole lesson of the design
+        // panel: three attackers compiled the winning proposal and broke it fatally. It put the explicit fee send
+        // AHEAD of the mode-128 payout with only a `keep < 0` clamp behind it — and the clamp does not hold the
+        // send back, it just lets the reserve collapse to zero, after which the fee is drawn from the CALLER's
+        // attached value. An ACTION-phase failure does not bounce either, so the shard would have silently eaten
+        // a stranger's money. Same class as the reserve defect fixed on this very receiver earlier.
+        // Checking here instead means a shard too poor to remit simply does not remit; nothing is clamped,
+        // nothing is billed to the evictor, and the fee waits for a later sweep.
+        //
+        // BOUNTIES OUTRANK THE FEE. What is left after the remit must still cover every bounty this shard still
+        // owes, or a later evictor is underpaid, stops calling, and the records are never swept — which would
+        // trade a funded fee outlet for an unbounded state, the exact failure the bounty exists to prevent.
+        // `spend` is what leaves for the sink INCLUDING the cost of sending it, and is exactly self.accrued_fee.
+        // `feeOut` is the principal the sink books. See RS_FEE_REMIT_MIN for why the overhead comes out of the
+        // fee rather than out of the shard or the publisher.
+        let feeOut: Int = 0;
+        let spend: Int = 0;
+        let nowEpoch: Int = now() / 86400;
+        if ((self.accrued_fee >= RS_FEE_REMIT_MIN) && (nowEpoch > self.epoch + 1)
+            && ((original - payout - self.accrued_fee) >= self.accrued_bounty)) {
+            feeOut = self.accrued_fee - RS_FEE_REMIT_OVERHEAD;
+            spend = self.accrued_fee;
+            self.accrued_fee = 0;
+        }
+
+        let keep: Int = original - payout - spend;
         if (keep < 0) { keep = 0; }
         nativeReserve(keep, ReserveAtMost);
+        if (feeOut > 0) {
+            message(MessageParameters {
+                to: RS_FEE_SINK,
+                value: feeOut + RS_FEE_SINK_DEPOSIT_RESERVE,
+                bounce: true,
+                mode: SendPayFwdFeesSeparately,
+                body: DepositProtocolFee{ amount: feeOut }.toCell()
+            });
+        }
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
+    }
+
+    // The sink refused the deposit or was unreachable. The value came back with the bounce, so the debt must come
+    // back with it — otherwise accrued_fee would read 0 while the money still sat here, unaccounted and unsendable.
+    // A later sweep retries.
+    // THE SENDER GATE IS LOAD-BEARING, not hygiene: the bounced flag is an ordinary message-header bit that any
+    // account may set, so without this check a stranger could forge a bounce and inflate accrued_fee at will.
+    // That does not pay them anything, but an inflated debt fails the affordability test above forever, which
+    // strands the real fee — a cheap, permanent denial of the outlet.
+    bounced(msg: bounced<DepositProtocolFee>) {
+        throwUnless(13657, sender() == RS_FEE_SINK);
+        throwUnless(13658, msg.amount > 0);
+        self.accrued_fee = self.accrued_fee + msg.amount;
     }
 
     receive() {}   // plain top-up / lazy deploy carrier
@@ -319,6 +431,7 @@ contract RecordShard {
             accrued_fee: self.accrued_fee,
             evict_bounty: RS_EVICT_BOUNTY,
             accrued_bounty: self.accrued_bounty,
+            fee_sink: RS_FEE_SINK,
         };
     }
 }

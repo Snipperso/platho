@@ -4,6 +4,9 @@ PROGRAM{
   DECLPROC __tact_context_get_sender
   DECLPROC __tact_dict_get_int_cell
   DECLPROC __tact_dict_set_int_cell
+  DECLPROC $DepositProtocolFee$_store
+  DECLPROC $DepositProtocolFee$_store_cell
+  DECLPROC $DepositProtocolFee$_load_bounced
   DECLPROC $IntroEntry$_store
   DECLPROC $IntroEntry$_store_cell
   DECLPROC $IntroEntry$_not_null
@@ -30,10 +33,12 @@ PROGRAM{
   DECLPROC $IntroShard$_fun_get_scan_page
   DECLPROC $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at
   DECLPROC $IntroShard$_fun_get_entry
-  DECLPROC $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty
+  DECLPROC $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty_fee_sink
   DECLPROC $IntroShard$_fun_get_view
   DECLPROC $IntroEntry$_constructor_r_view_tag_body_commit_created_at
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
+  DECLPROC $DepositProtocolFee$_constructor_amount
   97744 DECLMETHOD %get_scan_page
   80118 DECLMETHOD %get_entry
   76114 DECLMETHOD %get_view
@@ -71,6 +76,21 @@ PROGRAM{
       s1 s3 s3 XCHG3
       DICTISETREF
     }>
+  }>
+  $DepositProtocolFee$_store PROCINLINE:<{
+    4286010889 PUSHINT
+    ROT
+    32 STU
+    128 STU
+  }>
+  $DepositProtocolFee$_store_cell PROCINLINE:<{
+    SWAP
+    $DepositProtocolFee$_store INLINECALLDICT
+    ENDC
+  }>
+  $DepositProtocolFee$_load_bounced PROCINLINE:<{
+    128 LDU
+    SWAP
   }>
   $IntroEntry$_store PROCINLINE:<{
     s3 s4 XCHG2
@@ -370,7 +390,7 @@ PROGRAM{
     4 -ROLL
     $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at INLINECALLDICT
   }>
-  $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty PROCINLINE:<{
+  $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty_fee_sink PROCINLINE:<{
   }>
   $IntroShard$_fun_get_view PROCREF:<{
     604800 PUSHINT
@@ -378,14 +398,19 @@ PROGRAM{
     13408000 PUSHINT
     10000000 PUSHINT
     900000 PUSHINT
+        B{b5ee9c7241010101002400004380024d99f77f7c1108ab096a257a7e89c92ae29e0a2286da0140151b1fa41e7fc7d08ab073db} B>boc <s PUSHSLICE
+    s13 PUSH
+    s6 s13 XCPU
+    s6 s11 XCPU
+    s6 s13 XCPU
+    s6 s12 XCPU
+    s0 s6 XCHG
+    s4 s5 XCHG
+    s3 s4 XCHG
+    s1 s3 s0 XCHG3
     s12 PUSH
-    s5 s12 XCPU
-    s5 s10 XCPU
-    s5 s12 XCPU
-    s5 s11 XCPU
-    s11 s5 PUXC
-    s11 PUSH
-    $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty INLINECALLDICT
+    s12 s2 PUXC
+    $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty_fee_sink INLINECALLDICT
   }>
   $IntroEntry$_constructor_r_view_tag_body_commit_created_at PROCINLINE:<{
   }>
@@ -396,6 +421,11 @@ PROGRAM{
     s4 s3 XCHG2
     PUSHNULL
     s0 s3 XCHG
+  }>
+  $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
+    s3 s4 s3 XCHG3
+  }>
+  $DepositProtocolFee$_constructor_amount PROCINLINE:<{
   }>
   %get_scan_page PROC:<{
     $IntroShard$_contract_load INLINECALLDICT
@@ -414,7 +444,7 @@ PROGRAM{
   %get_view PROC:<{
     $IntroShard$_contract_load INLINECALLDICT
     $IntroShard$_fun_get_view INLINECALLDICT
-    8 12 BLKDROP2
+    8 13 BLKDROP2
     $IntroShardView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -435,6 +465,40 @@ PROGRAM{
     $IntroShard$_contract_load INLINECALLDICT
     s0 s9 XCHG
     IFJMP:<{
+      s0 s7 XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      0 PUSHINT
+      OVER
+      SBITS
+      31 GTINT
+      IF:<{
+        DROP
+        32 LDU
+        SWAP
+      }>
+      4286010889 PUSHINT
+      EQUAL
+      IFJMP:<{
+        $DepositProtocolFee$_load_bounced INLINECALLDICT
+        NIP
+        13685 PUSHINT
+        __tact_context_get_sender INLINECALLDICT
+            B{b5ee9c7241010101002400004380024d99f77f7c1108ab096a257a7e89c92ae29e0a2286da0140151b1fa41e7fc7d08ab073db} B>boc <s PUSHSLICE
+        SDEQ
+        THROWANYIFNOT
+        13686 PUSHINT
+        OVER
+        0 GTINT
+        THROWANYIFNOT
+        s1 s7 XCHG
+        ADD
+        s5 s7 XCHG
+        s4 s6 XCHG
+        s3 s5 XCHG
+        s4 s0 s3 XCHG3
+        $IntroShard$_contract_store INLINECALLDICT
+      }>
       9 BLKDROP
     }>
     0 PUSHINT
@@ -708,7 +772,43 @@ PROGRAM{
       MUL
       s9 s9 XCPU
       SUB
-      s0 s9 XCHG
+      0 PUSHINT
+      DUP
+          NOW
+      86400 PUSHINT
+      DIV
+      s11 PUSH
+      2500001 PUSHINT
+      GEQ
+      IF:<{
+        s10 PUSH
+        INC
+        GREATER
+      }>ELSE<{
+        DROP
+        FALSE
+      }>
+      IF:<{
+        s3 s11 PUSH2
+        SUB
+        s11 PUSH
+        SUB
+        s3 PUSH
+        GEQ
+      }>ELSE<{
+        FALSE
+      }>
+      IF:<{
+        2DROP
+        s8 PUSH
+        2500000 PUSHINT
+        SUB
+        0 PUSHINT
+        s0 s10 XCHG
+      }>
+      s3 s11 XCHG2
+      SUB
+      s0 s10 XCHG2
       SUB
       DUP
       0 LESSINT
@@ -718,6 +818,42 @@ PROGRAM{
       }>
       2 PUSHINT
           RAWRESERVE
+      DUP
+      0 GTINT
+      IF:<{
+            B{b5ee9c7241010101002400004380024d99f77f7c1108ab096a257a7e89c92ae29e0a2286da0140151b1fa41e7fc7d08ab073db} B>boc <s PUSHSLICE
+        OVER
+        2000000 PUSHINT
+        ADD
+        TRUE
+        1 PUSHINT
+        s0 s4 XCHG
+        $DepositProtocolFee$_constructor_amount INLINECALLDICT
+        NEWC
+        $DepositProtocolFee$_store_cell INLINECALLDICT
+        s3 s4 XCHG
+        s1 s3 s0 XCHG3
+        $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+            STZEROES
+            // → Stack state
+            // s0: Builder
+            // s1: `body`
+            // s2: `mode`
+            STDICT
+            ENDC
+            SWAP
+            SENDRAWMSG
+      }>ELSE<{
+        DROP
+      }>
       __tact_context_get_sender INLINECALLDICT
       0 PUSHINT
       130 PUSHINT
