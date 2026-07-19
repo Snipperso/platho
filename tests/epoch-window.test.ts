@@ -52,7 +52,7 @@ describe('EPOCH-WINDOW — a shard is writable only while it is current', () => 
     const res = await payer.send({ to: built.to, value: built.value, body: built.body, init: built.init, bounce: true } as any);
     const shard = blockchain.openContract(IntroShard.fromAddress(contractAddress(0, await IntroShard.init(BigInt(epoch), 3n))));
     let live = -1n;
-    try { live = (await shard.getGetView()).live_count; } catch { /* never deployed */ }
+    try { live = (await shard.getGetView()).next_id; } catch { /* never deployed */ }
     return { exit: exitOf(res, built.to), live };
   };
 
@@ -63,7 +63,7 @@ describe('EPOCH-WINDOW — a shard is writable only while it is current', () => 
     const res = await payer.send({ to: built.to, value: built.value, body: built.body, init: built.init, bounce: true } as any);
     const shard = blockchain.openContract(RecordShard.fromAddress(built.to));
     let live = -1n;
-    try { live = (await shard.getGetView()).live_count; } catch { /* never deployed */ }
+    try { live = (await shard.getGetView()).record_count; } catch { /* never deployed */ }
     return { exit: exitOf(res, built.to), live };
   };
 
@@ -109,7 +109,6 @@ describe('EPOCH-WINDOW — a shard is writable only while it is current', () => 
     expect(exitOf(res, built.to), 'a past epoch must refuse new writes').toBe(13684);
 
     const shard = blockchain.openContract(IntroShard.fromAddress(contractAddress(0, await IntroShard.init(BigInt(epoch), 3n))));
-    expect((await shard.getGetView()).live_count, 'its contents are frozen at what it held').toBe(1n);
-    expect((await shard.getGetView()).next_id, 'and the append cursor did not move').toBe(1n);
+    expect((await shard.getGetView()).next_id, 'its contents are frozen at what it held').toBe(1n);
   }, 180_000);
 });

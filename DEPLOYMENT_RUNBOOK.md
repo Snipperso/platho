@@ -46,6 +46,33 @@ order: `FeeAccumulator` code -> its StateInit address -> shard code -> shard add
 walking it out of order silently points every shard's fee at a dead address. Pinned by
 `tests/shard-fee-passthrough.test.ts` PT-04/PT-04b, which derive the address fresh rather than trusting a literal.
 
+RETENTION IS ENFORCED BY RETIREMENT, NOT EVICTION. Per-record eviction was deleted on 2026-07-19. One
+permissionless `RetireShard` call drops a shard's whole map and destroys the account; its compute is a MEASURED
+constant 5140 gas whatever the shard holds, against 425_835 to clear 64 of 1024 records entry by entry. The
+death instant is a pure function of the address — the publish gate admits only epoch +/-1, so everything is dead
+by `(epoch+2)*86400 + RETENTION` — and `get_view().retire_at` publishes it, so no client ever recomputes it.
+The INTRO gate adds four epochs of slack (`IS_RETIRE_SLACK`) because the bare instant coincided to the SECOND
+with the moment a shard leaves the client's scan window.
+
+WHY THE EVICTION BOUNTY WENT: it charged per RECORD for work that costs a flat amount per SHARD. At RS_SAFE_CAP
+it collected 3.28 GRAM to fund a 0.00096 GRAM job while still underfunding a one-record shard, where a real w5
+wallet LOST 191_740 sweeping. Every publisher paid 0.0008 GRAM for a service nobody would ever perform.
+
+PUBLISH PRICES, both published in `get_view`:
+
+| | steady-state `min_value` | first publish `deploy_min_value` |
+| --- | ---: | ---: |
+| CONV | `13,400,000` (0.0134 GRAM) | `16,900,000` (0.0169 GRAM) |
+| INTRO | `13,108,000` (0.013108 GRAM) | `15,608,000` (0.015608 GRAM) |
+
+A client MUST pay the deploy figure whenever the target account is absent OR `record_count`/`next_id` is 0. The
+extra funds the account's own life and the single call that ends it; charging it explicitly replaced leaving it
+to `ReserveAtMost`, which silently clamped and left a minimally-funded shard 201_469 short of its own target.
+
+Retiring pays its caller the shard's whole residual, top-up included. That is deliberate — it is the payment for
+cleanup on a shard a year past its last possible write — and it is why a one-record shard is worth retiring at
+all. The protection is the time gate, not a bound on the payout.
+
 The `10M` long-term vesting reserve is held by immutable `ATHVesting`, backed by its official ATH wallet, and unlocks `100,000 ATH` per 365-day period for `100` periods. It is not a liquid operations bucket.
 
 MarketStabilitySeller uses `20` tranches of `3,000,000 ATH`, from `x2` through `x21` of the initial pool price. Older lower-reserve, shorter-seller notes are obsolete and must not be used as an audit baseline for current archives.

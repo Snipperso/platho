@@ -35,12 +35,6 @@ builder $IntroEntry$_store(builder build_0, (int, int, int, int) v) inline;
 ;; $IntroEntry$_store_cell
 cell $IntroEntry$_store_cell((int, int, int, int) v, builder b) inline;
 
-;; $IntroEntry$_not_null
-((int, int, int, int)) $IntroEntry$_not_null(tuple v) inline;
-
-;; $IntroEntry$_store_opt
-cell $IntroEntry$_store_opt(tuple v, builder b) inline;
-
 ;; $IntroEntry$_load
 (slice, ((int, int, int, int))) $IntroEntry$_load(slice sc_0) inline;
 
@@ -51,10 +45,10 @@ tuple $IntroEntry$_as_optional((int, int, int, int) v) inline;
 tuple $IntroEntry$_load_opt(cell cl) inline;
 
 ;; $IntroShard$_store
-builder $IntroShard$_store(builder build_0, (int, int, cell, int, int, int, int) v) inline;
+builder $IntroShard$_store(builder build_0, (int, int, cell, int) v) inline;
 
 ;; $IntroShard$_load
-(slice, ((int, int, cell, int, int, int, int))) $IntroShard$_load(slice sc_0) inline;
+(slice, ((int, int, cell, int))) $IntroShard$_load(slice sc_0) inline;
 
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
@@ -65,53 +59,53 @@ _ $IntroEntry$_get_r((int, int, int, int) v) inline;
 ;; $IntroEntry$_get_view_tag
 _ $IntroEntry$_get_view_tag((int, int, int, int) v) inline;
 
-;; $IntroEntry$_get_created_at
-_ $IntroEntry$_get_created_at((int, int, int, int) v) inline;
+;; $IntroEntry$_not_null
+((int, int, int, int)) $IntroEntry$_not_null(tuple v) inline;
 
 ;; $IntroEntryView$_to_external
 (int, int, int, int, int) $IntroEntryView$_to_external(((int, int, int, int, int)) v) inline;
 
 ;; $IntroScanPage$_to_external
-(int, int, int, int, cell) $IntroScanPage$_to_external(((int, int, int, int, cell)) v) inline;
+(int, int, int, cell) $IntroScanPage$_to_external(((int, int, int, cell)) v) inline;
 
 ;; $IntroShardView$_to_external
-(int, int, int, int, int, int, int, int, int, int, int, slice) $IntroShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, slice)) v) inline;
+(int, int, int, int, int, int, int, int, int, slice) $IntroShardView$_to_external(((int, int, int, int, int, int, int, int, int, slice)) v) inline;
 
 ;; $IntroShard$init$_load
 (slice, ((int, int))) $IntroShard$init$_load(slice sc_0) inline;
 
 ;; $IntroShard$_contract_init
-(int, int, cell, int, int, int, int) $IntroShard$_contract_init(int $epoch, int $bucket) impure inline;
+(int, int, cell, int) $IntroShard$_contract_init(int $epoch, int $bucket) impure inline;
 
 ;; $IntroShard$_contract_load
-(int, int, cell, int, int, int, int) $IntroShard$_contract_load() impure inline;
+(int, int, cell, int) $IntroShard$_contract_load() impure inline;
 
 ;; $IntroShard$_contract_store
-() $IntroShard$_contract_store((int, int, cell, int, int, int, int) v) impure inline;
+() $IntroShard$_contract_store((int, int, cell, int) v) impure inline;
 
 ;; $IntroShard$_fun_bodyCommit
-((int, int, cell, int, int, int, int), int) $IntroShard$_fun_bodyCommit((int, int, cell, int, int, int, int) $self, cell $h0, cell $body) impure inline_ref;
+((int, int, cell, int), int) $IntroShard$_fun_bodyCommit((int, int, cell, int) $self, cell $h0, cell $body) impure inline_ref;
 
 ;; $IntroShard$_fun_packPairs
-((int, int, cell, int, int, int, int), cell) $IntroShard$_fun_packPairs((int, int, cell, int, int, int, int) $self, int $start, int $n) impure inline_ref;
+((int, int, cell, int), cell) $IntroShard$_fun_packPairs((int, int, cell, int) $self, int $start, int $n) impure inline_ref;
 
-;; $IntroScanPage$_constructor_from_id_count_next_id_evict_cursor_pairs
-((int, int, int, int, cell)) $IntroScanPage$_constructor_from_id_count_next_id_evict_cursor_pairs(int $from_id, int $count, int $next_id, int $evict_cursor, cell $pairs) inline;
+;; $IntroScanPage$_constructor_from_id_count_next_id_pairs
+((int, int, int, cell)) $IntroScanPage$_constructor_from_id_count_next_id_pairs(int $from_id, int $count, int $next_id, cell $pairs) inline;
 
 ;; $IntroShard$_fun_get_scan_page
-((int, int, cell, int, int, int, int), (int, int, int, int, cell)) $IntroShard$_fun_get_scan_page((int, int, cell, int, int, int, int) $self, int $from_id, int $max_count) impure inline_ref;
+((int, int, cell, int), (int, int, int, cell)) $IntroShard$_fun_get_scan_page((int, int, cell, int) $self, int $from_id, int $max_count) impure inline_ref;
 
 ;; $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at
 ((int, int, int, int, int)) $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(int $exists, int $r, int $view_tag, int $body_commit, int $created_at) inline;
 
 ;; $IntroShard$_fun_get_entry
-((int, int, cell, int, int, int, int), (int, int, int, int, int)) $IntroShard$_fun_get_entry((int, int, cell, int, int, int, int) $self, int $entry_id) impure inline_ref;
+((int, int, cell, int), (int, int, int, int, int)) $IntroShard$_fun_get_entry((int, int, cell, int) $self, int $entry_id) impure inline_ref;
 
-;; $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_evict_bounty_accrued_bounty_fee_sink
-((int, int, int, int, int, int, int, int, int, int, int, slice)) $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_evict_bounty_accrued_bounty_fee_sink(int $epoch, int $bucket, int $live_count, int $next_id, int $evict_cursor, int $retention, int $safe_cap, int $min_value, int $protocol_fee, int $evict_bounty, int $accrued_bounty, slice $fee_sink) inline;
+;; $IntroShardView$_constructor_epoch_bucket_next_id_retention_safe_cap_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink
+((int, int, int, int, int, int, int, int, int, slice)) $IntroShardView$_constructor_epoch_bucket_next_id_retention_safe_cap_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink(int $epoch, int $bucket, int $next_id, int $retention, int $safe_cap, int $min_value, int $deploy_min_value, int $retire_at, int $protocol_fee, slice $fee_sink) inline;
 
 ;; $IntroShard$_fun_get_view
-((int, int, cell, int, int, int, int), (int, int, int, int, int, int, int, int, int, int, int, slice)) $IntroShard$_fun_get_view((int, int, cell, int, int, int, int) $self) impure inline_ref;
+((int, int, cell, int), (int, int, int, int, int, int, int, int, int, slice)) $IntroShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref;
 
 ;; $IntroEntry$_constructor_r_view_tag_body_commit_created_at
 ((int, int, int, int)) $IntroEntry$_constructor_r_view_tag_body_commit_created_at(int $r, int $view_tag, int $body_commit, int $created_at) inline;
@@ -176,10 +170,6 @@ int $global_min(int $x, int $y) impure asm """
 
 int $global_max(int $x, int $y) impure asm """
     MAX
-""";
-
-int $global_myBalance() impure asm """
-    BALANCE FIRST
 """;
 
 () $global_nativeReserve(int $amount, int $mode) impure asm """
@@ -378,18 +368,6 @@ cell $IntroEntry$_store_cell((int, int, int, int) v, builder b) inline {
     return $IntroEntry$_store(b, v).end_cell();
 }
 
-((int, int, int, int)) $IntroEntry$_not_null(tuple v) inline {
-    var (int vvv'r, int vvv'view_tag, int vvv'body_commit, int vvv'created_at) = __tact_tuple_destroy_4(v);
-    return (vvv'r, vvv'view_tag, vvv'body_commit, vvv'created_at);
-}
-
-cell $IntroEntry$_store_opt(tuple v, builder b) inline {
-    if (null?(v)) {
-        return null();
-    }
-    return $IntroEntry$_store_cell($IntroEntry$_not_null(v), b);
-}
-
 (slice, ((int, int, int, int))) $IntroEntry$_load(slice sc_0) inline {
     var v'r = sc_0~load_int(257);
     var v'view_tag = sc_0~load_int(257);
@@ -422,9 +400,9 @@ _ $IntroEntry$_get_view_tag((int, int, int, int) v) inline {
     return v'view_tag;
 }
 
-_ $IntroEntry$_get_created_at((int, int, int, int) v) inline {
-    var (v'r, v'view_tag, v'body_commit, v'created_at) = v;
-    return v'created_at;
+((int, int, int, int)) $IntroEntry$_not_null(tuple v) inline {
+    var (int vvv'r, int vvv'view_tag, int vvv'body_commit, int vvv'created_at) = __tact_tuple_destroy_4(v);
+    return (vvv'r, vvv'view_tag, vvv'body_commit, vvv'created_at);
 }
 
 ((int, int, int, int)) $IntroEntry$_constructor_r_view_tag_body_commit_created_at(int $r, int $view_tag, int $body_commit, int $created_at) inline {
@@ -447,58 +425,52 @@ _ $IntroEntry$_get_created_at((int, int, int, int) v) inline {
 
 ;;
 ;; Type: IntroScanPage
-;; TLB: _ from_id:int257 count:int257 next_id:int257 evict_cursor:int257 pairs:^cell = IntroScanPage
+;; TLB: _ from_id:int257 count:int257 next_id:int257 pairs:^cell = IntroScanPage
 ;;
 
-(int, int, int, int, cell) $IntroScanPage$_to_external(((int, int, int, int, cell)) v) inline {
-    var (v'from_id, v'count, v'next_id, v'evict_cursor, v'pairs) = v; 
-    return (v'from_id, v'count, v'next_id, v'evict_cursor, v'pairs);
+(int, int, int, cell) $IntroScanPage$_to_external(((int, int, int, cell)) v) inline {
+    var (v'from_id, v'count, v'next_id, v'pairs) = v; 
+    return (v'from_id, v'count, v'next_id, v'pairs);
 }
 
-((int, int, int, int, cell)) $IntroScanPage$_constructor_from_id_count_next_id_evict_cursor_pairs(int $from_id, int $count, int $next_id, int $evict_cursor, cell $pairs) inline {
-    return ($from_id, $count, $next_id, $evict_cursor, $pairs);
+((int, int, int, cell)) $IntroScanPage$_constructor_from_id_count_next_id_pairs(int $from_id, int $count, int $next_id, cell $pairs) inline {
+    return ($from_id, $count, $next_id, $pairs);
 }
 
 ;;
 ;; Type: IntroShardView
-;; TLB: _ epoch:int257 bucket:int257 live_count:int257 next_id:int257 evict_cursor:int257 retention:int257 safe_cap:int257 min_value:int257 protocol_fee:int257 evict_bounty:int257 accrued_bounty:int257 fee_sink:address = IntroShardView
+;; TLB: _ epoch:int257 bucket:int257 next_id:int257 retention:int257 safe_cap:int257 min_value:int257 deploy_min_value:int257 protocol_fee:int257 retire_at:int257 fee_sink:address = IntroShardView
 ;;
 
-(int, int, int, int, int, int, int, int, int, int, int, slice) $IntroShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, slice)) v) inline {
-    var (v'epoch, v'bucket, v'live_count, v'next_id, v'evict_cursor, v'retention, v'safe_cap, v'min_value, v'protocol_fee, v'evict_bounty, v'accrued_bounty, v'fee_sink) = v; 
-    return (v'epoch, v'bucket, v'live_count, v'next_id, v'evict_cursor, v'retention, v'safe_cap, v'min_value, v'protocol_fee, v'evict_bounty, v'accrued_bounty, v'fee_sink);
+(int, int, int, int, int, int, int, int, int, slice) $IntroShardView$_to_external(((int, int, int, int, int, int, int, int, int, slice)) v) inline {
+    var (v'epoch, v'bucket, v'next_id, v'retention, v'safe_cap, v'min_value, v'deploy_min_value, v'protocol_fee, v'retire_at, v'fee_sink) = v; 
+    return (v'epoch, v'bucket, v'next_id, v'retention, v'safe_cap, v'min_value, v'deploy_min_value, v'protocol_fee, v'retire_at, v'fee_sink);
 }
 
-((int, int, int, int, int, int, int, int, int, int, int, slice)) $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_evict_bounty_accrued_bounty_fee_sink(int $epoch, int $bucket, int $live_count, int $next_id, int $evict_cursor, int $retention, int $safe_cap, int $min_value, int $protocol_fee, int $evict_bounty, int $accrued_bounty, slice $fee_sink) inline {
-    return ($epoch, $bucket, $live_count, $next_id, $evict_cursor, $retention, $safe_cap, $min_value, $protocol_fee, $evict_bounty, $accrued_bounty, $fee_sink);
+((int, int, int, int, int, int, int, int, int, slice)) $IntroShardView$_constructor_epoch_bucket_next_id_retention_safe_cap_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink(int $epoch, int $bucket, int $next_id, int $retention, int $safe_cap, int $min_value, int $deploy_min_value, int $retire_at, int $protocol_fee, slice $fee_sink) inline {
+    return ($epoch, $bucket, $next_id, $retention, $safe_cap, $min_value, $deploy_min_value, $protocol_fee, $retire_at, $fee_sink);
 }
 
 ;;
 ;; Type: IntroShard
-;; TLB: _ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 live_count:uint32 evict_cursor:uint32 accrued_bounty:coins = IntroShard
+;; TLB: _ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 = IntroShard
 ;;
 
-builder $IntroShard$_store(builder build_0, (int, int, cell, int, int, int, int) v) inline {
-    var (v'epoch, v'bucket, v'intros, v'next_id, v'live_count, v'evict_cursor, v'accrued_bounty) = v;
+builder $IntroShard$_store(builder build_0, (int, int, cell, int) v) inline {
+    var (v'epoch, v'bucket, v'intros, v'next_id) = v;
     build_0 = build_0.store_uint(v'epoch, 32);
     build_0 = build_0.store_uint(v'bucket, 32);
     build_0 = build_0.store_dict(v'intros);
     build_0 = build_0.store_uint(v'next_id, 32);
-    build_0 = build_0.store_uint(v'live_count, 32);
-    build_0 = build_0.store_uint(v'evict_cursor, 32);
-    build_0 = build_0.store_varuint16(v'accrued_bounty);
     return build_0;
 }
 
-(slice, ((int, int, cell, int, int, int, int))) $IntroShard$_load(slice sc_0) inline {
+(slice, ((int, int, cell, int))) $IntroShard$_load(slice sc_0) inline {
     var v'epoch = sc_0~load_uint(32);
     var v'bucket = sc_0~load_uint(32);
     var v'intros = sc_0~load_dict();
     var v'next_id = sc_0~load_uint(32);
-    var v'live_count = sc_0~load_uint(32);
-    var v'evict_cursor = sc_0~load_uint(32);
-    var v'accrued_bounty = sc_0~load_varuint16();
-    return (sc_0, (v'epoch, v'bucket, v'intros, v'next_id, v'live_count, v'evict_cursor, v'accrued_bounty));
+    return (sc_0, (v'epoch, v'bucket, v'intros, v'next_id));
 }
 
 (slice, ((int, int))) $IntroShard$init$_load(slice sc_0) inline {
@@ -507,7 +479,7 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int, int, int, int)
     return (sc_0, (v'epoch, v'bucket));
 }
 
-(int, int, cell, int, int, int, int) $IntroShard$_contract_load() impure inline {
+(int, int, cell, int) $IntroShard$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
@@ -520,7 +492,7 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int, int, int, int)
     }
 }
 
-() $IntroShard$_contract_store((int, int, cell, int, int, int, int) v) impure inline {
+() $IntroShard$_contract_store((int, int, cell, int) v) impure inline {
     builder b = begin_cell();
     b = b.store_int(true, 1);
     b = $IntroShard$_store(b, v);
@@ -531,26 +503,23 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int, int, int, int)
 ;; Contract IntroShard functions
 ;;
 
-(int, int, cell, int, int, int, int) $IntroShard$_contract_init(int $epoch, int $bucket) impure inline {
-    var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty)) = (null(), null(), null(), null(), null(), null(), null());
+(int, int, cell, int) $IntroShard$_contract_init(int $epoch, int $bucket) impure inline {
+    var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = (null(), null(), null(), null());
     $self'epoch = $epoch;
     $self'bucket = $bucket;
     $self'intros = null();
     $self'next_id = 0;
-    $self'live_count = 0;
-    $self'evict_cursor = 0;
-    $self'accrued_bounty = 0;
-    return ($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty);
+    return ($self'epoch, $self'bucket, $self'intros, $self'next_id);
 }
 
-((int, int, cell, int, int, int, int), int) $IntroShard$_fun_bodyCommit((int, int, cell, int, int, int, int) $self, cell $h0, cell $body) impure inline_ref {
-    var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty)) = $self;
+((int, int, cell, int), int) $IntroShard$_fun_bodyCommit((int, int, cell, int) $self, cell $h0, cell $body) impure inline_ref {
+    var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
     var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1230193219, 32), $Cell$_fun_hash($h0), 256), $Cell$_fun_hash($body), 256)));
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty), $fresh$ret_0);
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_0);
 }
 
-((int, int, cell, int, int, int, int), cell) $IntroShard$_fun_packPairs((int, int, cell, int, int, int, int) $self, int $start, int $n) impure inline_ref {
-    var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty)) = $self;
+((int, int, cell, int), cell) $IntroShard$_fun_packPairs((int, int, cell, int) $self, int $start, int $n) impure inline_ref {
+    var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
     cell $cell = $Builder$_fun_endCell($global_beginCell());
     int $isTail = true;
     int $remaining = $n;
@@ -573,34 +542,34 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int, int, int, int)
         $remaining = ($remaining - $chunk);
     }
     var $fresh$ret_1 = $cell;
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty), $fresh$ret_1);
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_1);
 }
 
-((int, int, cell, int, int, int, int), (int, int, int, int, cell)) $IntroShard$_fun_get_scan_page((int, int, cell, int, int, int, int) $self, int $from_id, int $max_count) impure inline_ref {
-    var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty)) = $self;
-    int $start = $global_max($from_id, $self'evict_cursor);
+((int, int, cell, int), (int, int, int, cell)) $IntroShard$_fun_get_scan_page((int, int, cell, int) $self, int $from_id, int $max_count) impure inline_ref {
+    var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
+    int $start = $global_max($from_id, 0);
     int $available = (($self'next_id > $start) ? ($self'next_id - $start) : 0);
     int $n = $global_max(0, $global_min($global_min($max_count, 256), $available));
-    var $fresh$ret_2 = $IntroScanPage$_constructor_from_id_count_next_id_evict_cursor_pairs($start, $n, $self'next_id, $self'evict_cursor, ($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty)~$IntroShard$_fun_packPairs($start, $n));
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty), $fresh$ret_2);
+    var $fresh$ret_2 = $IntroScanPage$_constructor_from_id_count_next_id_pairs($start, $n, $self'next_id, ($self'epoch, $self'bucket, $self'intros, $self'next_id)~$IntroShard$_fun_packPairs($start, $n));
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_2);
 }
 
-((int, int, cell, int, int, int, int), (int, int, int, int, int)) $IntroShard$_fun_get_entry((int, int, cell, int, int, int, int) $self, int $entry_id) impure inline_ref {
-    var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty)) = $self;
+((int, int, cell, int), (int, int, int, int, int)) $IntroShard$_fun_get_entry((int, int, cell, int) $self, int $entry_id) impure inline_ref {
+    var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
     tuple $e = $IntroEntry$_load_opt(__tact_dict_get_int_cell($self'intros, 257, $entry_id));
     if (null?($e)) {
         var $fresh$ret_3 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(false, 0, 0, 0, 0);
-        return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty), $fresh$ret_3);
+        return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_3);
     }
     var ($v'r, $v'view_tag, $v'body_commit, $v'created_at) = $IntroEntry$_not_null($e);
     var $fresh$ret_4 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(true, $v'r, $v'view_tag, $v'body_commit, $v'created_at);
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty), $fresh$ret_4);
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_4);
 }
 
-((int, int, cell, int, int, int, int), (int, int, int, int, int, int, int, int, int, int, int, slice)) $IntroShard$_fun_get_view((int, int, cell, int, int, int, int) $self) impure inline_ref {
-    var (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty)) = $self;
-    var $fresh$ret_5 = $IntroShardView$_constructor_epoch_bucket_live_count_next_id_evict_cursor_retention_safe_cap_min_value_protocol_fee_evict_bounty_accrued_bounty_fee_sink($self'epoch, $self'bucket, $self'live_count, $self'next_id, $self'evict_cursor, 604800, 8000, 14008000, 10000000, 900000, $self'accrued_bounty, __gen_slice_address_a12b050296d57b9749c31ebe3c3674122902f0dd6f2efb8070698bac3b62bd6b());
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty), $fresh$ret_5);
+((int, int, cell, int), (int, int, int, int, int, int, int, int, int, slice)) $IntroShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
+    var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
+    var $fresh$ret_5 = $IntroShardView$_constructor_epoch_bucket_next_id_retention_safe_cap_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'epoch, $self'bucket, $self'next_id, 604800, 8000, 13108000, 15608000, (((($self'epoch + 2) * 86400) + 604800) + 345600), 10000000, __gen_slice_address_a12b050296d57b9749c31ebe3c3674122902f0dd6f2efb8070698bac3b62bd6b());
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_5);
 }
 
 ;;
@@ -648,7 +617,7 @@ _ %get_view() method_id(76114) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty) = $IntroShard$_contract_load();
+    var ($self'epoch, $self'bucket, $self'intros, $self'next_id) = $IntroShard$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) {
@@ -663,7 +632,7 @@ _ %get_view() method_id(76114) {
             var ($msg'amount) = in_msg~$DepositProtocolFee$_load_bounced();
             throw_unless(13685, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_a12b050296d57b9749c31ebe3c3674122902f0dd6f2efb8070698bac3b62bd6b()) ));
             throw_unless(13686, ($msg'amount > 0));
-            $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty));
+            $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id));
             return ();
         }
         
@@ -682,60 +651,31 @@ _ %get_view() method_id(76114) {
         var $msg'body = in_msg~load_ref();
         int $nowEpoch = ($global_now() / 86400);
         throw_unless(13684, ( (($nowEpoch >= ($self'epoch - 1))) ? (($nowEpoch <= ($self'epoch + 1))) : (false) ));
-        throw_unless(13682, ($Context$_get_value(__tact_context_get()) >= 14008000));
-        throw_unless(13680, ($self'live_count < 8000));
-        $self'intros~__tact_dict_set_int_cell(257, $self'next_id, $IntroEntry$_store_cell($IntroEntry$_constructor_r_view_tag_body_commit_created_at($msg'r, $msg'view_tag, ($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty)~$IntroShard$_fun_bodyCommit($msg'header_0, $msg'body), $global_now()), begin_cell()));
+        throw_unless(13682, ($Context$_get_value(__tact_context_get()) >= (($self'next_id == 0) ? 15608000 : 13108000)));
+        throw_unless(13680, ($self'next_id < 8000));
+        $self'intros~__tact_dict_set_int_cell(257, $self'next_id, $IntroEntry$_store_cell($IntroEntry$_constructor_r_view_tag_body_commit_created_at($msg'r, $msg'view_tag, ($self'epoch, $self'bucket, $self'intros, $self'next_id)~$IntroShard$_fun_bodyCommit($msg'header_0, $msg'body), $global_now()), begin_cell()));
         $self'next_id = ($self'next_id + 1);
-        $self'live_count = ($self'live_count + 1);
-        $self'accrued_bounty = ($self'accrued_bounty + 900000);
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_a12b050296d57b9749c31ebe3c3674122902f0dd6f2efb8070698bac3b62bd6b(), 10400000, true, 1, $DepositProtocolFee$_store_cell($DepositProtocolFee$_constructor_amount(10000000), begin_cell())));
-        $global_nativeReserve((908000 + (($self'next_id == 1) ? 1000000 : 0)), 6);
+        $global_nativeReserve((8000 + (($self'next_id == 1) ? 2500000 : 0)), 6);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
-        $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty));
+        $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id));
         return ();
     }
     
-    ;; Receive EvictIntros message
-    if (op == 0x49535032) {
-        var $msg'max_count = in_msg~load_uint(16);
-        int $evicted = 0;
-        int $steps = 0;
-        int $cursor = $self'evict_cursor;
-        int $stop = false;
-        while (( (( (( (($steps < $msg'max_count)) ? (($steps < 64)) : (false) )) ? (($cursor < $self'next_id)) : (false) )) ? ((~ $stop)) : (false) )) {
-            tuple $e = $IntroEntry$_load_opt(__tact_dict_get_int_cell($self'intros, 257, $cursor));
-            $steps = ($steps + 1);
-            if ((~ null?($e))) {
-                if ((($IntroEntry$_get_created_at($IntroEntry$_not_null($e)) + 604800) < $global_now())) {
-                    $self'intros~__tact_dict_set_int_cell(257, $cursor, $IntroEntry$_store_opt(null(), begin_cell()));
-                    $self'live_count = ($self'live_count - 1);
-                    $cursor = ($cursor + 1);
-                    $evicted = ($evicted + 1);
-                } else {
-                    $stop = true;
-                }
-            } else {
-                $cursor = ($cursor + 1);
-            }
-        }
-        $self'evict_cursor = $cursor;
-        throw_unless(13683, ($evicted > 0));
-        int $original = ($global_myBalance() - $Context$_get_value(__tact_context_get()));
-        int $payout = ($evicted * 900000);
-        $self'accrued_bounty = ($self'accrued_bounty - $payout);
-        int $keep = ($original - $payout);
-        if (($keep < 0)) {
-            $keep = 0;
-        }
-        $global_nativeReserve($keep, 2);
-        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
-        $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty));
+    ;; Receive RetireShard message
+    if (op == 0x49535033) {
+        var $msg = empty_tuple();
+        throw_unless(13683, ($global_now() > (((($self'epoch + 2) * 86400) + 604800) + 345600)));
+        $self'intros = null();
+        $self'next_id = 0;
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 162, false));
+        $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
-        $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id, $self'live_count, $self'evict_cursor, $self'accrued_bounty));
+        $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id));
         return ();
     }
     ;; Throw if not handled

@@ -24,9 +24,20 @@
 //
 // TERMINAL + CARRY: stores the intro, returns the payer's change, keeps only its own rent.
 
-const IS_INTRO_RETENTION: Int = 604800;   // 1 week (owner 2026-07-17) — evict intros older than this
+const IS_INTRO_RETENTION: Int = 604800;   // 1 week (owner 2026-07-17)
 const IS_SAFE_CAP: Int = 8000;            // intros per (epoch, bucket) — refuse in COMPUTE, not code 50 in ACTION
-const IS_EVICT_CAP: Int = 64;             // max intros one EvictIntros call may sweep (bounds gas; keepers repeat)
+
+// RETIRE SLACK — the reason this lane's gate is not the bare death instant. MEASURED 2026-07-19: a shard of epoch
+// E leaves the client's scan window at exactly (E+9)*86400 (INTRO_SCAN_EPOCHS_BACK = 8, web/intro-receive.mjs:36),
+// and the bare death instant (E+2)*86400 + IS_INTRO_RETENTION is (E+9)*86400 TOO. A margin of ZERO SECONDS.
+// Today nothing exercises that edge because nobody evicts; making retirement actually happen would arm it, and
+// the failure is SILENT in the worst way this project knows — a destroyed account answers exit -256, the reader
+// reads that as "nothing here", marks the bucket drained and commits its cursor. First contacts stop arriving
+// with no error anywhere. Worse, the client constant is mutable JavaScript racing an immutable chain constant:
+// widening INTRO_SCAN_EPOCHS_BACK is a one-line change anybody might make.
+// Four epochs of slack costs about 0.00002 GRAM of extra rent per shard and buys the client room to grow its
+// window from 8 to 12 epochs. get_view().retire_at publishes the resulting instant so a client never recomputes it.
+const IS_RETIRE_SLACK: Int = 345600;      // 4 epochs
 // A scan page carries (r, view_tag) PAIRS, not bare tags. [CORRECTED 2026-07-18 — the tag-only page could not
 // serve a scan at all.] The recipient's filter is computePrivateScanViewTag(scan_secret, r): the tag is a function
 // of the intro's OWN ephemeral point, so it is unique per intro and the recipient cannot precompute "my tag" once
@@ -52,7 +63,9 @@ const IS_BODY_DOMAIN: Int = 0x49534243;   // "ISBC"
 //   intro endowment: measured 4 cells x 64962 x 7/365 x 1.5 -> 7500 -> 8000 (an intro lives 1 week)
 //   base endowment:  this shard's own code+data rent over its short life, with margin
 const IS_INTRO_ENDOWMENT: Int = 8000;
-const IS_BASE_ENDOWMENT: Int = 1000000;
+// The shard's own rent PLUS the cost of the one call that ends it (measured 956_872, flat in shard size).
+// Raised 1_000_000 -> 2_500_000 when per-entry eviction was deleted; see RecordShard for the full reasoning.
+const IS_BASE_ENDOWMENT: Int = 2500000;
 const IS_PUBLISH_GAS: Int = 2500000;
 
 // PROTOCOL FEE — 0.01 GRAM per published capsule, the SAME fee RecordShard charges (RS_PROTOCOL_FEE), because the
@@ -90,25 +103,16 @@ const IS_FEE_SINK_DEPOSIT_RESERVE: Int = 400000;
 const IS_FEE_SINK_FWD_RESERVE: Int = 200000;
 const IS_FEE_TRANSPORT: Int = IS_FEE_SINK_DEPOSIT_RESERVE + IS_FEE_SINK_FWD_RESERVE;
 
-// EVICTION BOUNTY — the money that actually makes the one-week retention happen. [MEASURED 2026-07-18.]
-// The payout used to come out of IS_INTRO_ENDOWMENT, and that could never work, for a structural reason rather
-// than a tuning one: the storage endowment is BY CONSTRUCTION consumed by the storage it paid for, so at the
-// moment an entry finally ages out there is nothing left of it to pay anyone. Measured on a full 64-entry sweep,
-// the caller LOST 19_012_953 nanoton — marginal cost is ~305_000 per entry (stable across two disjoint spans:
-// 283_671 over entries 16-32 and 304_505 over 32-64) against a payout of 8_000. Off by 38x.
-// Since keeper daemons are forbidden in this project, "nobody will ever call it" is not a risk but a certainty,
-// and everything resting on eviction was therefore false: the intro graph would persist for the life of the shard
-// and get_view_tags would keep serving it, so a later scan would find EVERYTHING. That is the exact opposite of
-// this lane's stated purpose. An immutable contract cannot be repriced afterwards, so it is fixed here.
-// SIZED AT THE WORST CASE THE CONTRACT PERMITS. Marginal gas per evicted intro grows with dictionary DEPTH, and
-// this lane's cap is the larger one — measured per entry: 512 intros 425_306 · 4000 -> 550_306 ·
-// 8000 (IS_SAFE_CAP) -> 591_973. A bounty calibrated on a shallow shard fails on a full one, and on the OPEN lane
-// a full shard is something a stranger can arrange.
-//   591_973 x 1.5 (G8) = 887_960 -> 900_000
-const IS_EVICT_BOUNTY: Int = 900000;
+// RETIRING A SHARD replaced per-entry eviction here too — see RecordShard for the measurements. This lane had
+// the sharper version of the same defect: IS_INTRO_ENDOWMENT is 8_000 against a 900_000 bounty, 112x apart, and
+// an attacker demonstrated that an ordinary full sweep drained a shard to EXACTLY ZERO while leaving the account
+// alive forever, because eviction and retirement shared one purse. One mechanism, one purse, no coupling.
 
-// gate 13682. IS_FEE_TRANSPORT is in here because the publisher pays it: the fee must reach the pool whole.
-const IS_MIN_VALUE: Int = IS_INTRO_ENDOWMENT + IS_EVICT_BOUNTY + IS_PUBLISH_GAS + IS_PROTOCOL_FEE + IS_FEE_TRANSPORT;
+// gate 13682, the STEADY-STATE publish. IS_FEE_TRANSPORT is here because the publisher pays it.
+const IS_MIN_VALUE: Int = IS_INTRO_ENDOWMENT + IS_PUBLISH_GAS + IS_PROTOCOL_FEE + IS_FEE_TRANSPORT;
+// The FIRST intro into a bucket-day also funds the account's life and its retirement. Charged explicitly rather
+// than left to ReserveAtMost, which silently clamps and under-endows — see RecordShard.
+const IS_DEPLOY_MIN_VALUE: Int = IS_MIN_VALUE + IS_BASE_ENDOWMENT;
 
 // A stealth first-contact publish. header_0 + body ride so they land in this account's transaction history; they are
 // NOT stored in state. body_commit is recomputed here from their hashes — nothing is trusted from the sender.
@@ -119,9 +123,8 @@ message(0x49535031) IntroPublish {        // "ISP1"
     body: Cell;
 }
 
-message(0x49535032) EvictIntros {         // "ISP2" — permissionless FIFO eviction of intros past the 1-week window
-    max_count: Int as uint16;
-}
+// "ISP3" — permissionless one-shot retirement: drop every intro and destroy the account.
+message(0x49535033) RetireShard {}
 
 // Mirrored from FeeAccumulator by opcode (Tact compiles one contract per project) — as CapsuleHub does.
 message(0xFF775609) DepositProtocolFee {
@@ -157,42 +160,38 @@ struct IntroScanPage {
     from_id: Int;        // first entry id in this page
     count: Int;          // how many pairs are packed
     next_id: Int;        // the shard's append cursor, so the caller knows whether more pages remain
-    evict_cursor: Int;   // the live floor, so the caller never asks for evicted ids
     pairs: Cell;         // `count` x (uint256 r, uint16 view_tag), 3 per cell, chained by ref
 }
+// NOTE: `evict_cursor` was removed from this struct when eviction was deleted — nothing removes an entry any
+// more, so the live floor is always 0 and the field carried no information. It is a WIRE FORMAT change: it
+// shifts `pairs` from stack index 4 to 3, and web/intro-transport.mjs parseScanPageStack is the production
+// decoder that reads it. That decoder is stubbed out in every existing test, so nothing would have caught the
+// break — tests/intro-scan-page.test.ts now drives it against a REAL getter stack.
 
 struct IntroShardView {
     epoch: Int;
     bucket: Int;
-    live_count: Int;
-    next_id: Int;
-    evict_cursor: Int;
+    next_id: Int;           // intros stored; also the SAFE-CAP counter, since nothing removes one
     retention: Int;
     safe_cap: Int;
-    min_value: Int;      // what a publish must bring (clients read this instead of hardcoding a mirror)
-    protocol_fee: Int;    // the per-capsule service fee included in min_value
-    evict_bounty: Int;    // what evicting one entry pays its caller
-    accrued_bounty: Int;  // bounties still owed for entries that have not been evicted yet
-    fee_sink: Address;    // where each publish forwards the fee; a constant, readable without disassembly
+    min_value: Int;         // what a further publish must bring (clients read this, never a hardcoded mirror)
+    deploy_min_value: Int;  // what the FIRST intro must bring — pay this whenever next_id == 0
+    protocol_fee: Int;      // the per-capsule service fee included in both figures
+    retire_at: Int;         // the exact second this shard becomes retireable; read it, never recompute it
+    fee_sink: Address;      // where each publish forwards the fee; a constant, readable without disassembly
 }
 
 contract IntroShard {
     epoch: Int as uint32;
     bucket: Int as uint32;
     intros: map<Int, IntroEntry>;
-    next_id: Int as uint32;
-    live_count: Int as uint32;
-    evict_cursor: Int as uint32;   // FIFO low-water: lowest id not yet evicted
-    accrued_bounty: Int as coins;  // held for the future evictor of each live entry; released only on eviction
+    next_id: Int as uint32;        // intros stored; nothing removes one, so this is also the live count
 
     init(epoch: Int, bucket: Int) {
         self.epoch = epoch;
         self.bucket = bucket;
         self.intros = emptyMap();
         self.next_id = 0;
-        self.live_count = 0;
-        self.evict_cursor = 0;
-        self.accrued_bounty = 0;
     }
 
     fun bodyCommit(h0: Cell, body: Cell): Int {
@@ -221,8 +220,8 @@ contract IntroShard {
         // because the recipient's scan window is the whole retention period, which is far wider than a day.
         let nowEpoch: Int = now() / 86400;
         throwUnless(13684, (nowEpoch >= self.epoch - 1) && (nowEpoch <= self.epoch + 1));
-        throwUnless(13682, context().value >= IS_MIN_VALUE);
-        throwUnless(13680, self.live_count < IS_SAFE_CAP);   // SAFE-CAP in COMPUTE
+        throwUnless(13682, context().value >= (self.next_id == 0 ? IS_DEPLOY_MIN_VALUE : IS_MIN_VALUE));
+        throwUnless(13680, self.next_id < IS_SAFE_CAP);   // SAFE-CAP in COMPUTE
 
         self.intros.set(self.next_id, IntroEntry{
             r: msg.r,
@@ -231,8 +230,6 @@ contract IntroShard {
             created_at: now(),   // the contract stamps the time, so eviction cannot be gamed by a client field
         });
         self.next_id = self.next_id + 1;
-        self.live_count = self.live_count + 1;
-        self.accrued_bounty = self.accrued_bounty + IS_EVICT_BOUNTY;
 
         // THE FEE LEAVES FIRST, AND THE ORDER IS THE SAFETY PROPERTY. Queued ahead of the reserve, the deposit is
         // drawn from the value this message brought, which gate 13682 has already checked covers
@@ -252,80 +249,25 @@ contract IntroShard {
         // surplus on a funded IntroShard could be swept by a stranger publishing one intro.
         // THE FEE IS NOT IN THIS SUM ANY MORE — it has already gone.
         nativeReserve(
-            IS_INTRO_ENDOWMENT + IS_EVICT_BOUNTY + (self.next_id == 1 ? IS_BASE_ENDOWMENT : 0),
+            IS_INTRO_ENDOWMENT + (self.next_id == 1 ? IS_BASE_ENDOWMENT : 0),
             ReserveAtMost | ReserveAddOriginalBalance,
         );
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
-    // Permissionless FIFO eviction of intros past the 1-week window. Intros are appended in order, so created_at is
-    // monotonic and a FIFO cursor drains oldest-first. This is what keeps the intro graph from persisting in state.
-    receive(msg: EvictIntros) {
-        // `evicted` is the REAL count; `steps` is the gas bound. They must be SEPARATE: the previous version
-        // overloaded one counter as both, assigning it max_count to break out when the oldest record was still
-        // fresh — so a "nothing was evicted" exit looked identical to a full sweep. Every iteration counts toward
-        // `steps`, including the already-gone branch, which previously advanced the cursor without any bound.
-        let evicted: Int = 0;
-        let steps: Int = 0;
-        let cursor: Int = self.evict_cursor;
-        let stop: Bool = false;
-        while ((steps < msg.max_count) && (steps < IS_EVICT_CAP) && (cursor < self.next_id) && !stop) {
-            let e: IntroEntry? = self.intros.get(cursor);
-            steps = steps + 1;
-            if (e != null) {
-                if ((e!!.created_at + IS_INTRO_RETENTION) < now()) {
-                    self.intros.set(cursor, null);
-                    self.live_count = self.live_count - 1;
-                    cursor = cursor + 1;
-                    evicted = evicted + 1;
-                } else {
-                    stop = true;   // oldest live entry is still inside the window -> nothing older remains
-                }
-            } else {
-                cursor = cursor + 1;   // already gone; advance the low-water mark
-            }
-        }
-        self.evict_cursor = cursor;
-        // REFUSE A NO-OP. Without this, EvictRecords{max_count: 0} — or any call made when nothing has aged out —
-        // skips the loop entirely and still falls through to the payout, letting any passer-by drain the shard's
-        // surplus for the price of gas. Throwing here reverts the cursor advance too, which is correct: nothing
-        // was reclaimed, so nothing is owed.
-        throwUnless(13683, evicted > 0);
-        // Pay the evictor out of the endowments this call actually freed — bounded on BOTH sides, see RecordShard
-        // for the full reasoning. Without any payout nobody calls eviction and "the one-week eviction keeps the
-        // live set small" stops being true; without the upper bound a top-up is swept; without the floor a shard
-        // that has fallen behind on rent pays the evictor out of live intros' endowments.
-        // RELEASE EXACTLY THE BOUNTIES THIS SWEEP FREED, AND NOTHING ELSE.
-        //
-        // The previous revision reserved `max(floor, original - freed - payout)` where floor counted
-        // `base + live*endowment + accrued_fee + accrued_bounty`. That was wrong for a reason worth spelling out,
-        // because it looks right: the publish path reserves RELATIVELY (original_balance + endowment + fee +
-        // bounty), which are exactly the terms the floor counts, so `balance == floor` holds identically while the
-        // shard sits idle. `original` is read AFTER the storage phase, so original = floor - R where R is all the
-        // rent settled in this transaction. The clamp therefore fired every time, and the evictor's take became
-        // `freed + payout - R`. In other words the shard's ENTIRE accumulated storage bill was deducted from the
-        // caller instead of from the entries that incurred it. Measured: +6_640_039 at 64 records but +839_978 at
-        // 80, -2_286_748 at 96, -17_460_321 at 160, and at 400 records after ten idle years the caller lost their
-        // whole attached value. RS_SAFE_CAP is 4096, so ~80 records is an ordinary day, not an edge case — the
-        // regression the bounty exists to prevent had simply moved to larger shards.
-        //
-        // Releasing the freed ENDOWMENTS was fiction in the first place: a storage endowment is consumed by the
-        // storage it paid for, so by the time an entry ages out there is nothing of it left to hand anyone. That is
-        // precisely why the bounty exists. So the reserve keeps everything the shard still holds and lets go of the
-        // bounty alone. A deliberate top-up is untouched by construction (it is part of `original`, and only
-        // `payout` is subtracted), which is the property PB-13 pins. The clamp at zero is the graceful end for a
-        // shard already too poor to honour the bounties it owes: pay out what is there and clear the entries.
-        let original: Int = myBalance() - context().value;
-        let payout: Int = evicted * IS_EVICT_BOUNTY;
-        self.accrued_bounty = self.accrued_bounty - payout;
-
-        // EVICTION NO LONGER CARRIES MONEY THAT IS NOT THE EVICTOR'S. The fee left at publish time, so this
-        // receiver is pure state cleanup plus the bounty — the solvency test, the bounties-outrank-the-fee
-        // ordering and the once-only remit all went with it.
-        let keep: Int = original - payout;
-        if (keep < 0) { keep = 0; }
-        nativeReserve(keep, ReserveAtMost);
-        send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
+    // RETIRE THE WHOLE SHARD — see RecordShard for the reasoning; the only difference here is IS_RETIRE_SLACK.
+    // The gate depends only on `epoch`, an init parameter and therefore part of the address, so no amount of
+    // money or timing lets anyone destroy a shard that is still live.
+    receive(msg: RetireShard) {
+        throwUnless(13683, now() > (self.epoch + 2) * 86400 + IS_INTRO_RETENTION + IS_RETIRE_SLACK);
+        self.intros = emptyMap();
+        self.next_id = 0;
+        send(SendParameters{
+            to: sender(),
+            value: 0,
+            mode: SendRemainingBalance | SendDestroyIfZero | SendIgnoreErrors,
+            bounce: false,
+        });
     }
 
     // The sink refused or was unreachable, so the value came back. There is no fee ledger to restore any more —
@@ -371,7 +313,7 @@ contract IntroShard {
     // Clamped to the live range so a caller can never be handed evicted ids, and capped so the page cannot run the
     // get-method out of gas.
     get fun get_scan_page(from_id: Int, max_count: Int): IntroScanPage {
-        let start: Int = max(from_id, self.evict_cursor);
+        let start: Int = max(from_id, 0);
         let available: Int = self.next_id > start ? self.next_id - start : 0;
         // max() against 0 as well: a negative max_count would otherwise return count < 0 beside an empty cell,
         // a page that contradicts itself and that a client has no sane way to read.
@@ -380,7 +322,6 @@ contract IntroShard {
             from_id: start,
             count: n,
             next_id: self.next_id,
-            evict_cursor: self.evict_cursor,
             pairs: self.packPairs(start, n),
         };
     }
@@ -398,15 +339,13 @@ contract IntroShard {
         return IntroShardView{
             epoch: self.epoch,
             bucket: self.bucket,
-            live_count: self.live_count,
             next_id: self.next_id,
-            evict_cursor: self.evict_cursor,
             retention: IS_INTRO_RETENTION,
             safe_cap: IS_SAFE_CAP,
             min_value: IS_MIN_VALUE,
+            deploy_min_value: IS_DEPLOY_MIN_VALUE,
+            retire_at: (self.epoch + 2) * 86400 + IS_INTRO_RETENTION + IS_RETIRE_SLACK,
             protocol_fee: IS_PROTOCOL_FEE,
-            evict_bounty: IS_EVICT_BOUNTY,
-            accrued_bounty: self.accrued_bounty,
             fee_sink: IS_FEE_SINK,
         };
     }

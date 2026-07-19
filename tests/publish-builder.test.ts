@@ -11,6 +11,10 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 
 // A conversation-direction's write key. In the client this is derived from the shared K_root
 // (conv-routing.convWritePublicKey); here any deterministic 32-byte secret stands in for it.
+// A FIRST publish into a fresh shard also funds the account's life and its retirement (RS_DEPLOY_MIN_VALUE);
+// later publishes pay the lower RS_MIN_VALUE. Clients read both from get_view.
+const RS_DEPLOY_MIN_VALUE = 16_900_000n;
+
 const writeKey = (fill: number) => {
   const secret = new Uint8Array(32).fill(fill);
   return { secret, publicKey: ed25519.getPublicKey(secret) };
@@ -136,7 +140,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     });
     const res = await send(built);
     expect(exitOf(res, rs.address), 'underfunded -> 13652').toBe(13652);
-    expect((await rs.getGetView()).live_count, 'nothing stored').toBe(0n);
+    expect((await rs.getGetView()).record_count, 'nothing stored').toBe(0n);
     expect((await rs.getGetRecord(0n)).exists).toBe(false);
   }, 120_000);
 
@@ -222,13 +226,13 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // the legitimate participant publishes; the address is now public in the chain
     const good = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: owner.secret, seq: 1, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') });
     expect(exitOf(await send(good), rs.address)).toBe(0);
-    expect((await rs.getGetView()).live_count).toBe(1n);
+    expect((await rs.getGetView()).record_count).toBe(1n);
 
     // the stranger sends to that SAME address, signing with a key they control — refused, nothing stored
     const junk = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: stranger.secret, seq: 2, epoch, header0: cellOf(0xEE), header1: cellOf(0xEE), body: cellOf(0xEE), value: toNano('0.02') });
     expect(addrKey(junk.to), 'the stranger really is aiming at the same shard').toBe(addrKey(rs.address));
     expect(exitOf(await send(junk), rs.address), 'forged write -> 13654').toBe(13654);
-    expect((await rs.getGetView()).live_count, 'the conversation is untouched').toBe(1n);
+    expect((await rs.getGetView()).record_count, 'the conversation is untouched').toBe(1n);
   }, 120_000);
 
   it('PB-09: a captured publish cannot be REPLAYED — the signature alone would not have stopped the DoS', async () => {
@@ -247,12 +251,12 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // and an older seq is refused too
     const older = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: owner.secret, seq: 3, epoch, header0: cellOf(7), header1: cellOf(8), body: cellOf(9), value: toNano('0.02') });
     expect(exitOf(await send(older), rs.address), 'stale seq -> 13653').toBe(13653);
-    expect((await rs.getGetView()).live_count, 'still exactly one record').toBe(1n);
+    expect((await rs.getGetView()).record_count, 'still exactly one record').toBe(1n);
 
     // the legitimate next message (higher seq) still goes through
     const next = await buildConvPublish({ writePublicKey: owner.publicKey, writeSecret: owner.secret, seq: 6, epoch, header0: cellOf(10), header1: cellOf(11), body: cellOf(12), value: toNano('0.02') });
     expect(exitOf(await send(next), rs.address), 'the conversation still works').toBe(0);
-    expect((await rs.getGetView()).live_count).toBe(2n);
+    expect((await rs.getGetView()).record_count).toBe(2n);
   }, 120_000);
 
   it('PB-10: a publish DEPLOYS the shard it targets — nothing is pre-deployed, only the builder output is sent', async () => {
@@ -277,7 +281,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // and a SECOND publish to the now-deployed shard still works with init re-attached (harmless duplicate)
     const next = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 2, epoch, header0: h0, header1: h1, body: cellOf(0x24), value: toNano('0.02') });
     expect(exitOf(await send(next), built.to), 're-sent init on a live shard is harmless').toBe(0);
-    expect((await rs.getGetView()).live_count).toBe(2n);
+    expect((await rs.getGetView()).record_count).toBe(2n);
   }, 120_000);
 
   it('PB-11: a deliberate top-up is NOT swept by the next publisher (increment reserve)', async () => {
@@ -302,74 +306,74 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect(afterPublish, 'the top-up survived the next publish').toBeGreaterThan(topUp);
   }, 120_000);
 
-  it('PB-12: a no-op eviction cannot drain the shard — the payout requires that something was actually reclaimed', async () => {
-    // Eviction pays the caller out of the freed endowments, which is what makes anyone willing to call it at all
-    // (keeper daemons are forbidden here). But the payout sat AFTER the loop with no proof the loop did anything:
-    // EvictRecords{max_count: 0} skips it entirely, and any call made before records age out sweeps nothing — so a
-    // passer-by could take the shard's surplus for the price of gas. Note the counter subtlety this depends on:
-    // "nothing was evicted" and "swept a full batch" used to be indistinguishable, because the loop signalled its
-    // early exit by assigning the counter max_count.
+  it('PB-12: a shard cannot be retired before its death instant — a stranger cannot drain it early', async () => {
+    // REPLACES the old no-op-eviction guard, which pinned that EvictRecords{max_count: 0} could not walk off with
+    // the shard's surplus. Eviction is gone; the equivalent risk is now that RetireShard DESTROYS the account and
+    // hands its whole balance to the caller, so the only thing standing between a live conversation and deletion
+    // is the time gate. It is arithmetic on `epoch`, which is an init parameter and therefore part of the address,
+    // so no amount of money can move it.
     const wk = writeKey(0x74);
-    const first = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 1, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') });
+    const first = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 1, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: RS_DEPLOY_MIN_VALUE });
     expect(exitOf(await send(first), first.to)).toBe(0);
     await payer.send({ to: first.to, value: toNano('0.5'), bounce: false } as any);   // surplus worth stealing
     const before = (await blockchain.getContract(first.to)).balance;
 
     const rs = blockchain.openContract(RecordShard.fromAddress(first.to));
     const thief = await blockchain.treasury('pb-thief');
+    const retire = { $$type: 'RetireShard' } as any;
 
-    // (a) explicit no-op: the loop is never entered
-    const zero = await rs.send(thief.getSender(), { value: toNano('0.05'), bounce: true }, { $$type: 'EvictRecords', max_count: 0n } as any);
-    expect(exitOf(zero, first.to), 'max_count 0 -> 13655').toBe(13655);
+    // Well inside the retention window: refused, and the account survives with its money.
+    expect(exitOf(await rs.send(thief.getSender(), { value: toNano('0.05'), bounce: true }, retire), first.to),
+      'a live shard refuses retirement -> 13655').toBe(13655);
 
-    // (b) honest-looking call while the record is still well inside its retention window: also nothing to reclaim
-    const early = await rs.send(thief.getSender(), { value: toNano('0.05'), bounce: true }, { $$type: 'EvictRecords', max_count: 64n } as any);
-    expect(exitOf(early, first.to), 'nothing aged out -> 13655').toBe(13655);
+    // One second before the published instant: still refused. The gate is `>`, so the instant itself is too early.
+    blockchain.now = Number((await rs.getGetView()).retire_at);
+    expect(exitOf(await rs.send(thief.getSender(), { value: toNano('0.05'), bounce: true }, retire), first.to),
+      'at the retire instant itself it is still refused').toBe(13655);
+    expect((await blockchain.getContract(first.to)).balance, 'the surplus is untouched')
+      .toBeGreaterThanOrEqual(before - toNano('0.01'));
+    expect((await rs.getGetView()).record_count, 'and the record is still there').toBe(1n);
 
-    expect((await blockchain.getContract(first.to)).balance, 'the surplus is untouched').toBeGreaterThanOrEqual(before - toNano('0.001'));
-
-    // and a GENUINE eviction past the retention window still works and still pays the caller
-    blockchain.now = blockchain.now! + 31536000 + 86400;
-    const real = await rs.send(thief.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecords', max_count: 64n } as any);
-    expect(exitOf(real, first.to), 'a real sweep is accepted').toBe(0);
-    expect((await rs.getGetView()).live_count).toBe(0n);
+    // One second later it works, and the account is gone.
+    blockchain.now = blockchain.now! + 1;
+    expect(exitOf(await rs.send(thief.getSender(), { value: toNano('0.05') }, retire), first.to)).toBe(0);
+    expect((await blockchain.getContract(first.to)).accountState?.type).not.toBe('active');
   }, 120_000);
 
-  it('PB-13: eviction pays out ONLY the endowments it freed — a top-up survives the evictor too', async () => {
-    // PB-11 pins that a top-up survives the next PUBLISH. Eviction was quietly taking the very same money by the
-    // very same mechanic: its reserve was absolute (base + live_count*endowment + fee), so the balance became a
-    // hard ceiling again and the first passer-by to call EvictRecords walked off with the whole surplus. The two
-    // paths contradicted each other about the same GRAM, and only one of them had a test.
+  it('PB-13: a top-up survives every PUBLISH — but the RETIRER takes it, and that is deliberate', async () => {
+    // PB-11 pins that a deliberate top-up survives the next publish, and that still holds: the publish path
+    // reserves relatively, so the balance never becomes a hard ceiling.
     //
-    // Inverting the sign alone (original - freed) would have opened the mirror hole: once rent has eaten in, a full
-    // `freed` payout comes out of LIVE records' endowments. So both bounds hold at once, and this pins both.
+    // WHAT CHANGED, AND IT IS AN OWNER-VISIBLE CHANGE RATHER THAN A BUG. The old eviction path was carefully
+    // bounded so a passer-by could not walk off with a top-up. RetireShard has no such bound: it destroys the
+    // account and sends the entire residual to whoever called it. That is the payment for the cleanup, and it is
+    // what makes retiring a one-record shard worth doing at all — the property that per-record bounties could
+    // never fund. The protection is not a bound on the payout, it is the time gate: nobody can reach that money
+    // until a full year past the shard's last possible write.
     const wk = writeKey(0x75);
     for (const seq of [1n, 2n]) {
-      const p = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') });
+      const p = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: seq === 1n ? RS_DEPLOY_MIN_VALUE : toNano('0.02') });
       expect(exitOf(await send(p), p.to)).toBe(0);
     }
     const shard = (await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 3n, epoch, header0: cellOf(1), header1: cellOf(2), body: cellOf(3), value: toNano('0.02') })).to;
+    const rs = blockchain.openContract(RecordShard.fromAddress(shard));
 
     const topUp = toNano('0.5');
     await payer.send({ to: shard, value: topUp, bounce: false } as any);
-    const beforeEvict = (await blockchain.getContract(shard)).balance;
 
-    blockchain.now = blockchain.now! + 31536000 + 86400;
-    const rs = blockchain.openContract(RecordShard.fromAddress(shard));
+    // Still there after another publish — the PB-11 property, unchanged.
+    const third = await buildConvPublish({ writePublicKey: wk.publicKey, writeSecret: wk.secret, seq: 3n, epoch, header0: cellOf(4), header1: cellOf(5), body: cellOf(6), value: toNano('0.02') });
+    expect(exitOf(await send(third), shard)).toBe(0);
+    expect((await blockchain.getContract(shard)).balance, 'a publish does not touch the top-up').toBeGreaterThan(topUp);
+
+    // And it leaves with the retirer, by design.
+    blockchain.now = Number((await rs.getGetView()).retire_at) + 1;
     const keeper = await blockchain.treasury('pb-keeper');
-    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecords', max_count: 64n } as any), shard)).toBe(0);
-
-    const afterEvict = (await blockchain.getContract(shard)).balance;
-    // The deliberate top-up is still in the shard. Under the absolute reserve this was ~0.
-    expect(afterEvict, 'the top-up did not leave with the evictor').toBeGreaterThan(topUp);
-    // And the shard did release something, or nobody would ever call eviction at all.
-    expect(beforeEvict - afterEvict, 'the freed endowments were released').toBeGreaterThan(0n);
-    // Bounded above by what actually aged out. Deliberately expressed RELATIVE to the top-up rather than as an
-    // absolute nanoton figure, so the assertion cannot be quietly invalidated by a storage-rate change (config-18
-    // is a schedule and has already moved once — see the clock note at the top of this file).
-    expect(beforeEvict - afterEvict, 'the payout is a couple of endowments, nothing like the top-up')
-      .toBeLessThan(topUp / 4n);
-    expect((await rs.getGetView()).live_count).toBe(0n);
+    const keeperBefore = (await blockchain.getContract(keeper.address)).balance;
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'RetireShard' } as any), shard)).toBe(0);
+    expect((await blockchain.getContract(keeper.address)).balance - keeperBefore,
+      'the retirer is paid the residual, top-up included').toBeGreaterThan(topUp / 2n);
+    expect((await blockchain.getContract(shard)).accountState?.type, 'and the account is destroyed').not.toBe('active');
   }, 120_000);
 
   it('PB-14: an underfunded INTRO is refused in COMPUTE (13682) — the fee IS the spam price on the open lane', async () => {
@@ -382,15 +386,16 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     const is = await deploy(blockchain.openContract(new IntroShard(contractAddress(0, init), init)));
     const view = await is.getGetView();
     expect(view.protocol_fee, 'INTRO now carries the same 0.01 GRAM per-message fee as CONV').toBe(10_000_000n);
-    expect(view.min_value, 'endowment + bounty + gas + fee + fee transport').toBe(14_008_000n);
-    expect(view.evict_bounty, 'each intro pre-funds its own eviction').toBe(900_000n);
+    expect(view.min_value, 'endowment + gas + fee + transport').toBe(13_108_000n);
 
     const built = await buildIntroPublish({
       epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8),
-      value: view.min_value - 1n,   // one nanoton below the contract's own floor
+      // One nanoton below the DEPLOY floor, which is what a first intro into a fresh bucket-day must bring: it
+      // funds the account's own life and the single call that eventually retires it, on top of the intro itself.
+      value: view.deploy_min_value - 1n,
     });
     expect(exitOf(await send(built), is.address), 'underfunded -> 13682').toBe(13682);
-    expect((await is.getGetView()).live_count, 'nothing stored').toBe(0n);
+    expect((await is.getGetView()).next_id, 'nothing stored').toBe(0n);
     expect((await is.getGetEntry(0n)).exists).toBe(false);
 
     // And the fee is actually TAKEN, not handed back with the change. Since 2026-07-19 the publish forwards it
@@ -398,7 +403,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // fixture has no FeeAccumulator deployed, so the deposit bounces and the money comes back — which is itself
     // worth asserting, because it is the error path the contract documents. What must NOT happen is the fee
     // quietly staying behind as though nothing was attempted.
-    const ok = await buildIntroPublish({ epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8), value: toNano('0.05') });
+    const ok = await buildIntroPublish({ epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8), value: toNano('0.05') });   // comfortably above the deploy floor
     const okResult = await send(ok);
     expect(exitOf(okResult, is.address)).toBe(0);
     const deposit = (okResult.transactions as any[]).some((t) => {
@@ -441,9 +446,15 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // RS_FEE_TRANSPORT joined the sum on 2026-07-19, when the fee stopped accumulating inside the shard and
     // started being forwarded to FeeAccumulator on every publish. [OWNER: the publisher pays the transport, so
     // the pool books the fee WHOLE — "естественно платит публикатор".] This guard is why that change was loud.
-    expect(recTerms.sort(), 'RS_MIN_VALUE is endowment + bounty + gas + fee + transport, nothing dropped')
-      .toEqual(['RS_EVICT_BOUNTY', 'RS_FEE_TRANSPORT', 'RS_PROTOCOL_FEE', 'RS_PUBLISH_GAS', 'RS_RECORD_ENDOWMENT']);
-    expect(recTerms.reduce((a, t) => a + constOf(rec, t), 0n), 'RecordShard RS_MIN_VALUE').toBe(14_200_000n);
+    // RS_EVICT_BOUNTY left this sum on 2026-07-19, when per-record eviction was deleted. Retiring a shard costs
+    // a flat amount whatever it holds, so an O(N) per-record levy was the wrong shape; the funding moved into the
+    // per-shard RS_BASE_ENDOWMENT and every publish got 0.0008 GRAM cheaper. A FIRST publish pays
+    // RS_DEPLOY_MIN_VALUE instead, which is this plus that endowment.
+    expect(recTerms.sort(), 'RS_MIN_VALUE is endowment + gas + fee + transport, nothing dropped')
+      .toEqual(['RS_FEE_TRANSPORT', 'RS_PROTOCOL_FEE', 'RS_PUBLISH_GAS', 'RS_RECORD_ENDOWMENT']);
+    expect(minValueTerms(rec, 'RS_DEPLOY_MIN_VALUE').sort(), 'the deploy price adds the base endowment')
+      .toEqual(['RS_BASE_ENDOWMENT', 'RS_MIN_VALUE']);
+    expect(recTerms.reduce((a, t) => a + constOf(rec, t), 0n), 'RecordShard RS_MIN_VALUE').toBe(13_400_000n);
     // the record endowment carries the canonical G8 1.5x margin over its MEASURED 3 cells (not the 2 in the old note)
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT'), '3 cells x 64962 x 1yr x 1.5 = 292_329 -> 300_000').toBe(300_000n);
     // the airdrop pays 10 ATH per capsule, so a capsule must never cost LESS than the fee that backs it
@@ -453,14 +464,14 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // "IS_MIN_VALUE", so when the fee term was added the assertion stayed green while its meaning silently drifted.
     const introTerms = minValueTerms(intro, 'IS_MIN_VALUE');
     expect(introTerms.sort(), 'IS_MIN_VALUE is endowment + gas + fee + transport, nothing dropped')
-      .toEqual(['IS_EVICT_BOUNTY', 'IS_FEE_TRANSPORT', 'IS_INTRO_ENDOWMENT', 'IS_PROTOCOL_FEE', 'IS_PUBLISH_GAS']);
-    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(14_008_000n);
+      .toEqual(['IS_FEE_TRANSPORT', 'IS_INTRO_ENDOWMENT', 'IS_PROTOCOL_FEE', 'IS_PUBLISH_GAS']);
+    expect(minValueTerms(intro, 'IS_DEPLOY_MIN_VALUE').sort(), 'the deploy price adds the base endowment')
+      .toEqual(['IS_BASE_ENDOWMENT', 'IS_MIN_VALUE']);
+    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(13_108_000n);
     // The bounty exists because a STORAGE endowment cannot fund eviction: it is consumed by the storage it bought.
     // Both bounties are sized at measured marginal sweep gas x 1.5 — see tests/evict-incentive.test.ts.
     // Sized at the WORST case the contract permits, because marginal gas grows with dictionary depth and the
     // contract is immutable: measured 533_186/entry at RS_SAFE_CAP=4096 and 591_973 at IS_SAFE_CAP=8000, x1.5.
-    expect(constOf(intro, 'IS_EVICT_BOUNTY'), '591_973 at IS_SAFE_CAP x1.5').toBe(900_000n);
-    expect(constOf(rec, 'RS_EVICT_BOUNTY'), '533_186 at RS_SAFE_CAP x1.5').toBe(800_000n);
     // one fee for the whole protocol — a first contact costs the same as a reply
     expect(constOf(intro, 'IS_PROTOCOL_FEE'), 'INTRO charges the same 0.01 GRAM as CONV').toBe(constOf(rec, 'RS_PROTOCOL_FEE'));
     // RECOVERY has no separate base endowment, so this one constant funds the WHOLE account for 3 years. It used to
