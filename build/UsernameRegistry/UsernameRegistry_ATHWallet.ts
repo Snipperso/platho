@@ -750,6 +750,130 @@ export function dictValueParserTopUpStorageReserve(): DictionaryValue<TopUpStora
     }
 }
 
+export type ProveUsernameOwnership = {
+    $$type: 'ProveUsernameOwnership';
+    query_id: bigint;
+    to: Address;
+}
+
+export function storeProveUsernameOwnership(src: ProveUsernameOwnership) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1431195730, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.to);
+    };
+}
+
+export function loadProveUsernameOwnership(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1431195730) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _to = sc_0.loadAddress();
+    return { $$type: 'ProveUsernameOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function loadTupleProveUsernameOwnership(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _to = source.readAddress();
+    return { $$type: 'ProveUsernameOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function loadGetterTupleProveUsernameOwnership(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _to = source.readAddress();
+    return { $$type: 'ProveUsernameOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function storeTupleProveUsernameOwnership(source: ProveUsernameOwnership) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.to);
+    return builder.build();
+}
+
+export function dictValueParserProveUsernameOwnership(): DictionaryValue<ProveUsernameOwnership> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeProveUsernameOwnership(src)).endCell());
+        },
+        parse: (src) => {
+            return loadProveUsernameOwnership(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type UsernameOwnershipProof = {
+    $$type: 'UsernameOwnershipProof';
+    query_id: bigint;
+    name_hash: bigint;
+    owner_wallet: Address;
+    username_len: bigint;
+    username: Slice;
+}
+
+export function storeUsernameOwnershipProof(src: UsernameOwnershipProof) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1431195727, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.name_hash, 256);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.username_len, 8);
+        b_0.storeBuilder(src.username.asBuilder());
+    };
+}
+
+export function loadUsernameOwnershipProof(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1431195727) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _name_hash = sc_0.loadUintBig(256);
+    const _owner_wallet = sc_0.loadAddress();
+    const _username_len = sc_0.loadUintBig(8);
+    const _username = sc_0;
+    return { $$type: 'UsernameOwnershipProof' as const, query_id: _query_id, name_hash: _name_hash, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadTupleUsernameOwnershipProof(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _name_hash = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'UsernameOwnershipProof' as const, query_id: _query_id, name_hash: _name_hash, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadGetterTupleUsernameOwnershipProof(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _name_hash = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'UsernameOwnershipProof' as const, query_id: _query_id, name_hash: _name_hash, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function storeTupleUsernameOwnershipProof(source: UsernameOwnershipProof) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.name_hash);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.username_len);
+    builder.writeSlice(source.username.asCell());
+    return builder.build();
+}
+
+export function dictValueParserUsernameOwnershipProof(): DictionaryValue<UsernameOwnershipProof> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUsernameOwnershipProof(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUsernameOwnershipProof(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameItemDeployedAck = {
     $$type: 'UsernameItemDeployedAck';
     name_hash: bigint;
@@ -5135,6 +5259,8 @@ const ATHWallet_types: ABIType[] = [
     {"name":"InitializeUsernameItem","header":1431193934,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ResendDeployedAck","header":1671232620,"fields":[]},
     {"name":"TopUpStorageReserve","header":665640843,"fields":[]},
+    {"name":"ProveUsernameOwnership","header":1431195730,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"to","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"UsernameOwnershipProof","header":1431195727,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"UsernameItemDeployedAck","header":3148082201,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"NftTransfer","header":1607220500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"NftOwnershipAssigned","header":85167505,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"previous_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
@@ -5205,6 +5331,8 @@ const ATHWallet_opcodes = {
     "InitializeUsernameItem": 1431193934,
     "ResendDeployedAck": 1671232620,
     "TopUpStorageReserve": 665640843,
+    "ProveUsernameOwnership": 1431195730,
+    "UsernameOwnershipProof": 1431195727,
     "UsernameItemDeployedAck": 3148082201,
     "NftTransfer": 1607220500,
     "NftOwnershipAssigned": 85167505,
@@ -5284,6 +5412,9 @@ export const USERNAME_ITEM_ACK_EXEC_RESERVE = 1000000n;
 export const USERNAME_ITEM_ACK_MAX_RESEND_VALUE = 20000000n;
 export const USERNAME_ITEM_TRANSFER_EXEC_RESERVE = 2000000n;
 export const USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE = 10000000n;
+export const USERNAME_ITEM_PROOF_FORWARD_RESERVE = 5000000n;
+export const USERNAME_ITEM_PROOF_EXEC_RESERVE = 1000000n;
+export const USERNAME_ITEM_PROOF_MAX_VALUE = 20000000n;
 export const USERNAME_ITEM_EXCESSES_MIN_VALUE = 100000n;
 export const USERNAME_ITEM_MAX_LENGTH = 16n;
 export const USERNAME_ITEM_NAME_HASH_DOMAIN = 3318512854n;
