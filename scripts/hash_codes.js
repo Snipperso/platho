@@ -14,6 +14,13 @@ USERNAME_REGISTRY_CODE_HASH:'build/UsernameRegistry/UsernameRegistry_UsernameReg
 PROFILE_REGISTRY_CODE_HASH:'build/ProfileRegistry/ProfileRegistry_ProfileRegistry.code.boc',
 MOCK_VAULT_ATH_WALLET_CODE_HASH:'build/MockVaultAthWallet/MockVaultAthWallet_MockVaultAthWallet.code.boc',
 MOCK_USERNAME_NFT_ITEM_NO_ACK_CODE_HASH:'build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck.code.boc',
+// The clean-17 shard lane. It was missing here entirely, which mattered more than a gap usually does: a shard's
+// ADDRESS is derived from its code hash, so every CONV, INTRO and RECOVERY address in the network moves when this
+// changes — and the release Stop Rule ("final manifest code hashes match current build outputs") could not see
+// any of it. Found by the 2026-07-19 consistency audit.
+RECORD_SHARD_CODE_HASH:'build/RecordShard/RecordShard_RecordShard.code.boc',
+INTRO_SHARD_CODE_HASH:'build/IntroShard/IntroShard_IntroShard.code.boc',
+RECOVERY_SHARD_CODE_HASH:'build/RecoveryShard/RecoveryShard_RecoveryShard.code.boc',
 };
 const productionKeys = [
   'ATH_WALLET_CODE_HASH',
@@ -27,6 +34,9 @@ const productionKeys = [
   'USERNAME_NFT_ITEM_CODE_HASH',
   'USERNAME_REGISTRY_CODE_HASH',
   'PROFILE_REGISTRY_CODE_HASH',
+  'RECORD_SHARD_CODE_HASH',
+  'INTRO_SHARD_CODE_HASH',
+  'RECOVERY_SHARD_CODE_HASH',
 ];
 const hashes = {};
 let out='';
