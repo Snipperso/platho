@@ -25,6 +25,19 @@ reference price exactly. Every 10 ATH handed out is paid for by the 0.01 GRAM co
 This is why the per-capsule fee is structural rather than a revenue line: remove it and the pool has no TON side.
 It must not be described as a liability owed to activity-airdrop users.
 
+How the fee actually reaches the sink: `RecordShard` and `IntroShard` each send exactly one `DepositProtocolFee`
+to `FeeAccumulator`, on the first sweep that runs past the shard's publish window. One message per shard suffices
+for the whole life of the shard because publish gates 13656/13684 admit only epoch +/-1, so from epoch+2 the
+accrued figure is final. The sink address is a compile-time constant in both contracts — a shard deploys lazily
+and unbound, so a bind receiver would let a stranger capture the fee. It needs no genesis ordering: `FeeAccumulator`
+has no `deployment_id`, so its address is fixed by its code and the two owner wallets, and is pinned by
+`tests/shard-fee-outlet.test.ts`.
+
+Deduct `2,500,000` per SHARD (not per capsule) from the `15,000 GRAM` figure: `2,000,000` is FeeAccumulator's own
+immutable deposit gate, which settles into its balance rather than `accumulated_ton`, and `500,000` is forward-fee
+reserve whose unused part returns to the evictor. A shard nobody ever sweeps books nothing at all, which makes the
+eviction-bounty calibration an economic question and not only a housekeeping one.
+
 The `10M` long-term vesting reserve is held by immutable `ATHVesting`, backed by its official ATH wallet, and unlocks `100,000 ATH` per 365-day period for `100` periods. It is not a liquid operations bucket.
 
 MarketStabilitySeller uses `20` tranches of `3,000,000 ATH`, from `x2` through `x21` of the initial pool price. Older lower-reserve, shorter-seller notes are obsolete and must not be used as an audit baseline for current archives.

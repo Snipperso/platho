@@ -20,6 +20,15 @@ cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
 ;; __tact_dict_set_int_cell
 (cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline;
 
+;; $DepositProtocolFee$_store
+builder $DepositProtocolFee$_store(builder build_0, (int) v) inline;
+
+;; $DepositProtocolFee$_store_cell
+cell $DepositProtocolFee$_store_cell((int) v, builder b) inline;
+
+;; $DepositProtocolFee$_load_bounced
+(slice, ((int))) $DepositProtocolFee$_load_bounced(slice sc_0) inline;
+
 ;; $RecordEntry$_store
 builder $RecordEntry$_store(builder build_0, (int, int) v) inline;
 
@@ -57,7 +66,7 @@ _ $RecordEntry$_get_created_at((int, int) v) inline;
 (int, int, int) $CapsuleRecordView$_to_external(((int, int, int)) v) inline;
 
 ;; $RecordShardView$_to_external
-(int, int, int, int, int, int, int, int, int, int, int, int, int) $RecordShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int, int)) v) inline;
+(int, int, int, int, int, int, int, int, int, int, int, int, int, slice) $RecordShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int, int, slice)) v) inline;
 
 ;; $RecordShard$init$_load
 (slice, ((int, int))) $RecordShard$init$_load(slice sc_0) inline;
@@ -80,17 +89,23 @@ _ $RecordEntry$_get_created_at((int, int) v) inline;
 ;; $RecordShard$_fun_get_record
 ((int, int, int, cell, int, int, int, int, int), (int, int, int)) $RecordShard$_fun_get_record((int, int, int, cell, int, int, int, int, int) $self, int $entry_id) impure inline_ref;
 
-;; $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty
-((int, int, int, int, int, int, int, int, int, int, int, int, int)) $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty(int $write_pubkey, int $epoch, int $last_seq, int $record_count, int $live_count, int $evict_cursor, int $safe_cap, int $retention, int $min_value, int $protocol_fee, int $accrued_fee, int $evict_bounty, int $accrued_bounty) inline;
+;; $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty_fee_sink
+((int, int, int, int, int, int, int, int, int, int, int, int, int, slice)) $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty_fee_sink(int $write_pubkey, int $epoch, int $last_seq, int $record_count, int $live_count, int $evict_cursor, int $safe_cap, int $retention, int $min_value, int $protocol_fee, int $accrued_fee, int $evict_bounty, int $accrued_bounty, slice $fee_sink) inline;
 
 ;; $RecordShard$_fun_get_view
-((int, int, int, cell, int, int, int, int, int), (int, int, int, int, int, int, int, int, int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, int, cell, int, int, int, int, int) $self) impure inline_ref;
+((int, int, int, cell, int, int, int, int, int), (int, int, int, int, int, int, int, int, int, int, int, int, int, slice)) $RecordShard$_fun_get_view((int, int, int, cell, int, int, int, int, int) $self) impure inline_ref;
 
 ;; $RecordEntry$_constructor_frame_commit_created_at
 ((int, int)) $RecordEntry$_constructor_frame_commit_created_at(int $frame_commit, int $created_at) inline;
 
 ;; $SendParameters$_constructor_to_value_mode_bounce
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
+
+;; $MessageParameters$_constructor_to_value_bounce_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
+
+;; $DepositProtocolFee$_constructor_amount
+((int)) $DepositProtocolFee$_constructor_amount(int $amount) inline;
 
 
 ;; RecordShard_RecordShard.stdlib.fc
@@ -147,6 +162,26 @@ int $global_myBalance() impure asm """
 
 () $global_nativeReserve(int $amount, int $mode) impure asm """
     RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
 """;
 
 () $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
@@ -240,6 +275,12 @@ int $Cell$_fun_hash(cell $self) impure asm """
     HASHCU
 """;
 
+;; RecordShard_RecordShard.constants.fc
+;; EQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-PtQu
+slice __gen_slice_address_0c567b5e7be78f0c23b3a09ad90557d16756618e4047eb4f00a0af468a0d3639() asm """
+    B{b5ee9c7241010101002400004380024d99f77f7c1108ab096a257a7e89c92ae29e0a2286da0140151b1fa41e7fc7d08ab073db} B>boc <s PUSHSLICE
+""";
+
 ;; RecordShard_RecordShard.storage.fc
 ;;
 ;; Type: Context
@@ -258,6 +299,41 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline {
     return ($mode, null(), null(), null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: DepositProtocolFee
+;; Header: 0xff775609
+;; TLB: deposit_protocol_fee#ff775609 amount:uint128 = DepositProtocolFee
+;;
+
+builder $DepositProtocolFee$_store(builder build_0, (int) v) inline {
+    var (v'amount) = v;
+    build_0 = store_uint(build_0, 4286010889, 32);
+    build_0 = build_0.store_uint(v'amount, 128);
+    return build_0;
+}
+
+cell $DepositProtocolFee$_store_cell((int) v, builder b) inline {
+    return $DepositProtocolFee$_store(b, v).end_cell();
+}
+
+(slice, ((int))) $DepositProtocolFee$_load_bounced(slice sc_0) inline {
+    var v'amount = sc_0~load_uint(128);
+    return (sc_0, (v'amount));
+}
+
+((int)) $DepositProtocolFee$_constructor_amount(int $amount) inline {
+    return ($amount);
 }
 
 ;;
@@ -332,16 +408,16 @@ _ $RecordEntry$_get_created_at((int, int) v) inline {
 
 ;;
 ;; Type: RecordShardView
-;; TLB: _ write_pubkey:int257 epoch:int257 last_seq:int257 record_count:int257 live_count:int257 evict_cursor:int257 safe_cap:int257 retention:int257 min_value:int257 protocol_fee:int257 accrued_fee:int257 evict_bounty:int257 accrued_bounty:int257 = RecordShardView
+;; TLB: _ write_pubkey:int257 epoch:int257 last_seq:int257 record_count:int257 live_count:int257 evict_cursor:int257 safe_cap:int257 retention:int257 min_value:int257 protocol_fee:int257 accrued_fee:int257 evict_bounty:int257 accrued_bounty:int257 fee_sink:address = RecordShardView
 ;;
 
-(int, int, int, int, int, int, int, int, int, int, int, int, int) $RecordShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int, int)) v) inline {
-    var (v'write_pubkey, v'epoch, v'last_seq, v'record_count, v'live_count, v'evict_cursor, v'safe_cap, v'retention, v'min_value, v'protocol_fee, v'accrued_fee, v'evict_bounty, v'accrued_bounty) = v; 
-    return (v'write_pubkey, v'epoch, v'last_seq, v'record_count, v'live_count, v'evict_cursor, v'safe_cap, v'retention, v'min_value, v'protocol_fee, v'accrued_fee, v'evict_bounty, v'accrued_bounty);
+(int, int, int, int, int, int, int, int, int, int, int, int, int, slice) $RecordShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int, int, slice)) v) inline {
+    var (v'write_pubkey, v'epoch, v'last_seq, v'record_count, v'live_count, v'evict_cursor, v'safe_cap, v'retention, v'min_value, v'protocol_fee, v'accrued_fee, v'evict_bounty, v'accrued_bounty, v'fee_sink) = v; 
+    return (v'write_pubkey, v'epoch, v'last_seq, v'record_count, v'live_count, v'evict_cursor, v'safe_cap, v'retention, v'min_value, v'protocol_fee, v'accrued_fee, v'evict_bounty, v'accrued_bounty, v'fee_sink);
 }
 
-((int, int, int, int, int, int, int, int, int, int, int, int, int)) $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty(int $write_pubkey, int $epoch, int $last_seq, int $record_count, int $live_count, int $evict_cursor, int $safe_cap, int $retention, int $min_value, int $protocol_fee, int $accrued_fee, int $evict_bounty, int $accrued_bounty) inline {
-    return ($write_pubkey, $epoch, $last_seq, $record_count, $live_count, $evict_cursor, $safe_cap, $retention, $min_value, $protocol_fee, $accrued_fee, $evict_bounty, $accrued_bounty);
+((int, int, int, int, int, int, int, int, int, int, int, int, int, slice)) $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty_fee_sink(int $write_pubkey, int $epoch, int $last_seq, int $record_count, int $live_count, int $evict_cursor, int $safe_cap, int $retention, int $min_value, int $protocol_fee, int $accrued_fee, int $evict_bounty, int $accrued_bounty, slice $fee_sink) inline {
+    return ($write_pubkey, $epoch, $last_seq, $record_count, $live_count, $evict_cursor, $safe_cap, $retention, $min_value, $protocol_fee, $accrued_fee, $evict_bounty, $accrued_bounty, $fee_sink);
 }
 
 ;;
@@ -438,9 +514,9 @@ builder $RecordShard$_store(builder build_0, (int, int, int, cell, int, int, int
     return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee, $self'accrued_bounty), $fresh$ret_2);
 }
 
-((int, int, int, cell, int, int, int, int, int), (int, int, int, int, int, int, int, int, int, int, int, int, int)) $RecordShard$_fun_get_view((int, int, int, cell, int, int, int, int, int) $self) impure inline_ref {
+((int, int, int, cell, int, int, int, int, int), (int, int, int, int, int, int, int, int, int, int, int, int, int, slice)) $RecordShard$_fun_get_view((int, int, int, cell, int, int, int, int, int) $self) impure inline_ref {
     var (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee, $self'accrued_bounty)) = $self;
-    var $fresh$ret_3 = $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty($self'write_pubkey, $self'epoch, $self'last_seq, $self'record_count, $self'live_count, $self'evict_cursor, 4096, 31536000, 13600000, 10000000, $self'accrued_fee, 800000, $self'accrued_bounty);
+    var $fresh$ret_3 = $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_live_count_evict_cursor_safe_cap_retention_min_value_protocol_fee_accrued_fee_evict_bounty_accrued_bounty_fee_sink($self'write_pubkey, $self'epoch, $self'last_seq, $self'record_count, $self'live_count, $self'evict_cursor, 4096, 31536000, 13600000, 10000000, $self'accrued_fee, 800000, $self'accrued_bounty, __gen_slice_address_0c567b5e7be78f0c23b3a09ad90557d16756618e4047eb4f00a0af468a0d3639());
     return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee, $self'accrued_bounty), $fresh$ret_3);
 }
 
@@ -484,7 +560,25 @@ _ %get_view() method_id(76114) {
     var ($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee, $self'accrued_bounty) = $RecordShard$_contract_load();
     
     ;; Handle bounced messages
-    if (msg_bounced) { return (); }
+    if (msg_bounced) {
+        ;; Skip 0xFFFFFFFF prefix of a bounced message
+        in_msg~skip_bits(32);
+        int op = 0;
+        if (slice_bits(in_msg) >= 32) {
+            op = in_msg~load_uint(32);
+        }
+        ;; Bounced handler for DepositProtocolFee message
+        if (op == 0xff775609) {
+            var ($msg'amount) = in_msg~$DepositProtocolFee$_load_bounced();
+            throw_unless(13657, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_0c567b5e7be78f0c23b3a09ad90557d16756618e4047eb4f00a0af468a0d3639()) ));
+            throw_unless(13658, ($msg'amount > 0));
+            $self'accrued_fee = ($self'accrued_fee + $msg'amount);
+            $RecordShard$_contract_store(($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee, $self'accrued_bounty));
+            return ();
+        }
+        
+        return ();
+    }
     int op = 0;
     int in_msg_length = slice_bits(in_msg);
     if (in_msg_length >= 32) {
@@ -546,11 +640,22 @@ _ %get_view() method_id(76114) {
         int $original = ($global_myBalance() - $Context$_get_value(__tact_context_get()));
         int $payout = ($evicted * 800000);
         $self'accrued_bounty = ($self'accrued_bounty - $payout);
-        int $keep = ($original - $payout);
+        int $feeOut = 0;
+        int $spend = 0;
+        int $nowEpoch = ($global_now() / 86400);
+        if (( (( (($self'accrued_fee >= 2500001)) ? (($nowEpoch > ($self'epoch + 1))) : (false) )) ? (((($original - $payout) - $self'accrued_fee) >= $self'accrued_bounty)) : (false) )) {
+            $feeOut = ($self'accrued_fee - 2500000);
+            $spend = $self'accrued_fee;
+            $self'accrued_fee = 0;
+        }
+        int $keep = (($original - $payout) - $spend);
         if (($keep < 0)) {
             $keep = 0;
         }
         $global_nativeReserve($keep, 2);
+        if (($feeOut > 0)) {
+            $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_0c567b5e7be78f0c23b3a09ad90557d16756618e4047eb4f00a0af468a0d3639(), ($feeOut + 2000000), true, 1, $DepositProtocolFee$_store_cell($DepositProtocolFee$_constructor_amount($feeOut), begin_cell())));
+        }
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecordShard$_contract_store(($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count, $self'live_count, $self'evict_cursor, $self'accrued_fee, $self'accrued_bounty));
         return ();
