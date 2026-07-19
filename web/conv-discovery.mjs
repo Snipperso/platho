@@ -8,7 +8,9 @@
 // epoch). So delivery works with no directory — proven in tests/conv-discovery.test.ts.
 
 import { outgoingBucketKey, incomingBucketKeys, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs';
-import { recordShardAddress, recoveryShardAddress, recoveryOwnerSlotKey } from './shard-discovery.mjs';
+import {
+  recordShardAddress, recoveryShardAddress, recoveryOwnerSlotKey, RECOVERY_MAX_SLOTS,
+} from './shard-discovery.mjs';
 
 // Portable big-endian bytes -> bigint (the on-chain bucket_key is a uint256 = the 32 HKDF bytes, big-endian).
 const bytesToInt = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
@@ -33,12 +35,37 @@ export async function outgoingRecordShard({ kRoot, selfKeyId, peerKeyId, created
 }
 
 /**
- * The RecoveryShard address for a user's own self-recovery snapshot, derived from the mnemonic seed. The slot COMMITS
- * to the recovery owner key (self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey)), so only the seed-holder can bind it
- * — the squat-close (gate 13575). Returns the owner pubkey (needed to sign the recovery publish) alongside the slot.
+ * The RecoveryShard address for ONE of a user's self-recovery slots, derived from the mnemonic seed. The slot COMMITS
+ * to the recovery owner key (self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index)), so only the seed-holder
+ * can bind any of them — the squat-close (gate 13575). Returns the owner pubkey (needed to sign the recovery publish)
+ * alongside the slot.
+ *
+ * `slotIndex` is required; recoveryOwnerSlotKey explains why it must not default.
  */
-export async function selfRecoveryShard(seed) {
+export async function selfRecoveryShard(seed, slotIndex) {
   const ownerPublicKey = await recoveryOwnerPublicKey(seed);
-  const slotKey = await recoveryOwnerSlotKey(ownerPublicKey);
-  return { ownerPublicKey, slotKey, address: await recoveryShardAddress(slotKey) };
+  const slotKey = await recoveryOwnerSlotKey(ownerPublicKey, slotIndex);
+  return { ownerPublicKey, slotKey, slotIndex, address: await recoveryShardAddress(slotKey) };
+}
+
+/**
+ * EVERY slot address a restoring client must look at, in index order.
+ *
+ * This is the whole recovery-discovery mechanism: nothing on chain enumerates a user's slots, so the client asks
+ * about all RECOVERY_MAX_SLOTS of them in one batched accountStates read and keeps whichever exist. Never-written
+ * slots simply have no row (toncenter omits addresses it has never seen), so the unused tail is free.
+ *
+ * PROBE THE WHOLE RANGE — never stop at the first gap. Slots are filled densely from 0, but a slot can be EVICTED
+ * after 3 years of inactivity while later ones stay live, which puts a hole in the middle. Stopping at the first
+ * miss would silently drop every conversation above the hole, and silent loss at restore time is the one failure
+ * this lane exists to prevent.
+ */
+export async function selfRecoveryShardSpace(seed) {
+  const ownerPublicKey = await recoveryOwnerPublicKey(seed);
+  const slots = [];
+  for (let slotIndex = 0; slotIndex < RECOVERY_MAX_SLOTS; slotIndex += 1) {
+    const slotKey = await recoveryOwnerSlotKey(ownerPublicKey, slotIndex);
+    slots.push({ slotIndex, slotKey, address: await recoveryShardAddress(slotKey) });
+  }
+  return { ownerPublicKey, slots };
 }

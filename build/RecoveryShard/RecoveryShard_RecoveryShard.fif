@@ -12,7 +12,7 @@ PROGRAM{
   DECLPROC $RecoveryShard$_contract_store
   DECLPROC $RecoveryShard$_fun_slotKeyForOwner
   DECLPROC $RecoveryShard$_fun_recoveryDigest
-  DECLPROC $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells
+  DECLPROC $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells
   DECLPROC $RecoveryShard$_fun_get_view
   DECLPROC $RecoveryShard$_fun_get_body
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
@@ -120,7 +120,9 @@ PROGRAM{
     1381190731 PUSHINT
     SWAP
     32 STU
+    s1 s2 XCHG
     256 STU
+    32 STU
         ENDC
         HASHCU
   }>
@@ -145,21 +147,22 @@ PROGRAM{
         ENDC
         HASHCU
   }>
-  $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells PROCINLINE:<{
+  $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells PROCINLINE:<{
   }>
   $RecoveryShard$_fun_get_view PROCREF:<{
     94608000 PUSHINT
     28700000 PUSHINT
+    8 PUSHPOW2
     79 PUSHINT
-    s11 PUSH
-    s3 s11 XCPU
-    s3 s11 XCPU
-    s3 s11 XCPU
-    s3 s7 XCPU
-    s1 s3 s3 XCHG3
-    s12 s11 s(-2) PU2XC
-    s12 s(-1) PUXC
-    $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells INLINECALLDICT
+    s12 PUSH
+    s4 s12 XCPU
+    s4 s12 XCPU
+    s4 s12 XCPU
+    s4 s8 XCPU
+    4 -ROLL
+    s13 s12 s(-2) PU2XC
+    s13 s(-1) PUXC
+    $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells INLINECALLDICT
   }>
   $RecoveryShard$_fun_get_body PROCREF:<{
     OVER
@@ -175,7 +178,7 @@ PROGRAM{
   %get_view PROC:<{
     $RecoveryShard$_contract_load INLINECALLDICT
     $RecoveryShard$_fun_get_view INLINECALLDICT
-    9 11 BLKDROP2
+    9 12 BLKDROP2
     $RecoveryShardView$_to_external INLINECALLDICT
   }>
   %get_body PROC:<{
@@ -221,6 +224,7 @@ PROGRAM{
       2DROP
       s0 s8 XCHG
       256 LDU
+      32 LDU
       64 LDU
       256 LDU
       256 LDU
@@ -267,43 +271,49 @@ PROGRAM{
       SWAP
       80 LESSINT
       THROWANYIFNOT
-      s12 PUSH
-      NOT
       s13 PUSH
+      NOT
+      s14 PUSH
       IF:<{
+        s7 POP
         13563 PUSHINT
         s8 s13 XCPU
         EQUAL
         s1 s8 XCHG
         THROWANYIFNOT
         13564 PUSHINT
-        s6 s11 PUSH2
+        s5 s11 PUSH2
         GREATER
         THROWANYIFNOT
       }>ELSE<{
         13573 PUSHINT
-        s7 s12 PUSH2
+        s7 s13 PUSH2
         GREATER
         THROWANYIFNOT
+        13576 PUSHINT
+        s8 PUSH
+        8 PUSHPOW2
+        LESS
+        THROWANYIFNOT
         13575 PUSHINT
-        s15 PUSH
+        16 s() PUSH
+        s9 17 s() XCHG
         s8 16 s() XCHG
         s7 s15 XCHG
         s6 s14 XCHG
         s5 s13 XCHG
         s4 s12 XCHG
         s3 s11 XCHG
-        s2 s10 XCHG
-        s1 17 s() XCHG
+        s2 18 s() XCHG
+        s1 19 s() XCHG
+        s10 s(-1) PUXC
         s0 18 s() XCHG
-        s9 PUSH
         $RecoveryShard$_fun_slotKeyForOwner INLINECALLDICT
         s7 POP
         s7 POP
-        s1 17 s() XCHG
-        s0 s5 XCHG
+        s15 s5 XCHG2
         EQUAL
-        s1 s15 XCHG
+        s1 16 s() XCHG
         THROWANYIFNOT
         s3 s14 XCHG
         s2 s13 XCHG
@@ -312,11 +322,10 @@ PROGRAM{
         s0 s12 XCHG
         s6 s11 XCHG
         s10 s9 s0 XCHG3
-        s3 s8 XCHG
+        5 4 REVERSE
+        s5 s6 XCHG
+        s3 s5 XCHG
         s0 s4 XCHG
-        s0 s7 XCHG
-        s0 s6 XCHG
-        s0 s3 XCHG
       }>
       s7 s13 XCHG
       s6 s12 XCHG
@@ -326,18 +335,18 @@ PROGRAM{
       s8 s13 s14 XCHG3
       13574 PUSHINT
       s0 16 s() XCHG
-      s12 s11 s10 PUSH3
-      s12 PUSH
+      s11 s10 s9 PUSH3
+      17 s() PUSH
       $RecoveryShard$_fun_recoveryDigest INLINECALLDICT
       6 1 BLKDROP2
-      s0 s10 XCHG
+      s0 s8 XCHG
           CTOS
-      s10 s0 s10 XC2PU
+      s8 s0 s8 XC2PU
           CHKSIGNU
       s1 s10 XCHG
       THROWANYIFNOT
           NOW
-      s0 s6 XCHG
+      s0 s5 XCHG
       IF:<{
         28700000 PUSHINT
       }>ELSE<{
@@ -418,8 +427,10 @@ PROGRAM{
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
       s0 s8 XCHG
       s0 s7 XCHG
-      s0 s6 XCHG
-      5 ROLL
+      s5 s6 XCHG
+      s3 s5 XCHG
+      s4 s0 s3 XCHG3
+      s0 s2 XCHG
       $RecoveryShard$_contract_store INLINECALLDICT
     }>
     s10 POP

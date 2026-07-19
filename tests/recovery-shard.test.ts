@@ -14,15 +14,18 @@ import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShar
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 const RECOVERY_DOMAIN = 0x42525331n; // "BRS1"
-const SLOT_DOMAIN = 0x52534C4Bn;     // "RSLK" — the slot IS the owner key: self_bucket_key = H(SLOT_DOMAIN ‖ owner_pubkey)
+const SLOT_DOMAIN = 0x52534C4Bn;     // "RSLK" — self_bucket_key = H(SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index)
+const MAX_SLOTS = 256;               // MUST equal RS_MAX_SLOTS
 const RETENTION = 94608000;          // 3 years
 const bufToInt = (b: Buffer): bigint => BigInt('0x' + b.toString('hex'));
 const cellOf = (b: Buffer) => beginCell().storeBuffer(b).endCell();
 
-// The slot identity, mirroring RecoveryShard.slotKeyForOwner — only the seed that derives owner_pubkey names it.
-const slotKeyForOwner = (ownerPub: bigint): bigint =>
-  bufToInt(beginCell().storeUint(SLOT_DOMAIN, 32).storeUint(ownerPub, 256).endCell().hash());
-const selfOf = (owner: KeyPair): bigint => slotKeyForOwner(bufToInt(owner.publicKey));
+// The slot identity, mirroring RecoveryShard.slotKeyForOwner — only the seed that derives owner_pubkey names it,
+// and the index selects which of that owner's RS_MAX_SLOTS books this is.
+const slotKeyForOwner = (ownerPub: bigint, slotIndex = 0): bigint =>
+  bufToInt(beginCell().storeUint(SLOT_DOMAIN, 32).storeUint(ownerPub, 256)
+    .storeUint(slotIndex, 32).endCell().hash());
+const selfOf = (owner: KeyPair, slotIndex = 0): bigint => slotKeyForOwner(bufToInt(owner.publicKey), slotIndex);
 
 function digest(shard: Address, selfBucket: bigint, seq: bigint, h0: bigint, h1: bigint, bh: bigint): Buffer {
   return beginCell()
@@ -36,7 +39,8 @@ function digest(shard: Address, selfBucket: bigint, seq: bigint, h0: bigint, h1:
 }
 
 // A recovery publish, signed by `owner`. h0/h1/bh vary with `fill` so successive versions differ.
-function store(owner: KeyPair, shard: Address, selfBucket: bigint, seq: bigint, fill: number, sigOwner?: KeyPair) {
+function store(owner: KeyPair, shard: Address, selfBucket: bigint, seq: bigint, fill: number, sigOwner?: KeyPair,
+               slotIndex = 0n) {
   const h0 = 0x100n + BigInt(fill), h1 = 0x200n + BigInt(fill);
   const body = beginCell().storeUint(0xDEADBEEFn + BigInt(fill), 256).endCell();
   // bh MUST be the body's own hash — gate 13557 binds the stored blob to the signed frame, so a relay cannot ship
@@ -46,6 +50,7 @@ function store(owner: KeyPair, shard: Address, selfBucket: bigint, seq: bigint, 
   return {
     $$type: 'RecoveryStore' as const,
     owner_pubkey: bufToInt(owner.publicKey),
+    slot_index: slotIndex,
     seq, h0, h1, bh, body,
     owner_sig: cellOf(sign(d, (sigOwner ?? owner).secretKey)),
   };
@@ -226,4 +231,90 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 2n, 5) as any), rs.address), 'owner re-binds').toBe(0);
     expect((await rs.getGetView()).owner_pubkey).toBe(bufToInt(owner.publicKey));
   }, 120_000);
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  // MULTI-SLOT [OWNER DECISION 2026-07-19]. One slot holds ~155 conversations; before indexing, that was a hard
+  // ceiling on what survives a reinstall, unraisable after seal because the derivation IS the address.
+  // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  it('RECOVERY-10: each slot index is a SEPARATE account with its own blob and its own seq', async () => {
+    // The whole point of indexing. If two indices collided, a user filling slot 1 would silently destroy slot 0 —
+    // both writes are validly signed and the higher seq wins, so nothing would refuse and nothing would warn.
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x31));
+    const s0 = selfOf(owner, 0), s1 = selfOf(owner, 1), s255 = selfOf(owner, 255);
+    expect(new Set([s0, s1, s255]).size, 'three indices, three distinct slot keys').toBe(3);
+
+    const rs0 = await shard(s0);
+    const rs1 = await shard(s1);
+    expect(rs0.address.toString()).not.toBe(rs1.address.toString());
+
+    // Both bind independently, and a HIGH seq in slot 1 does not raise slot 0's floor: the anti-rollback high-water
+    // mark is per-account, so slot 0 must still accept its own seq 2.
+    expect(exitOf(await rs0.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs0.address, s0, 1n, 0, undefined, 0n) as any), rs0.address)).toBe(0);
+    expect(exitOf(await rs1.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs1.address, s1, 90n, 1, undefined, 1n) as any), rs1.address)).toBe(0);
+    expect(exitOf(await rs0.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs0.address, s0, 2n, 2, undefined, 0n) as any), rs0.address)).toBe(0);
+
+    const v0 = await rs0.getGetView(), v1 = await rs1.getGetView();
+    expect(v0.seq, 'slot 0 keeps its own seq').toBe(2n);
+    expect(v1.seq, 'slot 1 keeps its own seq').toBe(90n);
+    expect(v0.bh, 'and its own blob').not.toBe(v1.bh);
+    expect(v0.max_slots, 'the cap is readable so a client need not mirror it blind').toBe(256n);
+  }, 120_000);
+
+  it('RECOVERY-11: an out-of-range slot index is refused (13576) — no write the scan would never find', async () => {
+    // A restoring client probes [0, RS_MAX_SLOTS) and nothing on chain enumerates slots, so a blob written above the
+    // cap is paid for and then never read again. The failure surfaces years later, at restore, which is the one
+    // moment it cannot be fixed. Refusing at publish time converts a silent loss into a loud one.
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x32));
+    const overCap = selfOf(owner, MAX_SLOTS);                    // index 256 — one past the last legal slot
+    const rs = await shard(overCap);
+
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true },
+      store(owner, rs.address, overCap, 1n, 0, undefined, BigInt(MAX_SLOTS)) as any);
+    expect(exitOf(res, rs.address), 'slot 256 -> 13576').toBe(13576);
+    expect((await rs.getGetView()).bound, 'nothing was stored').toBe(false);
+
+    // MUTATION CHECK on the gate's boundary: 255 is the LAST legal index and must still bind. Without this the test
+    // above would also pass against a gate written `< MAX_SLOTS - 1`, or one that refused everything.
+    const last = selfOf(owner, MAX_SLOTS - 1);
+    const rsLast = await shard(last);
+    expect(exitOf(await rsLast.send(relay.getSender(), { value: toNano('0.1') },
+      store(owner, rsLast.address, last, 1n, 0, undefined, BigInt(MAX_SLOTS - 1)) as any), rsLast.address),
+      'index 255 is legal').toBe(0);
+    expect((await rsLast.getGetView()).bound).toBe(true);
+  }, 120_000);
+
+  it('RECOVERY-12: [SQUAT-CLOSE] the index is part of the slot identity — a right-key/wrong-index bind is refused', async () => {
+    // The gate compares self_bucket_key against H(domain ‖ owner_pubkey ‖ slot_index), so claiming a different index
+    // than the address encodes must fail EVEN FOR THE TRUE OWNER. If the contract ignored the index in that
+    // comparison, an owner (or anything driving them) could bind slot 7's address while claiming slot 0 — and the
+    // client, which addresses slots by index, would then look for that blob at an address that does not hold it.
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x33));
+    const s7 = selfOf(owner, 7);
+    const rs = await shard(s7);
+
+    const wrongIndex = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true },
+      store(owner, rs.address, s7, 1n, 0, undefined, 0n) as any);   // this address is slot 7; the message says 0
+    expect(exitOf(wrongIndex, rs.address), 'right owner, wrong index -> 13575').toBe(13575);
+    expect((await rs.getGetView()).bound).toBe(false);
+
+    // the same message with the index the address actually encodes binds fine — so the refusal above was the index
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') },
+      store(owner, rs.address, s7, 1n, 0, undefined, 7n) as any), rs.address), 'index 7 matches the address').toBe(0);
+    expect((await rs.getGetView()).owner_pubkey).toBe(bufToInt(owner.publicKey));
+  }, 120_000);
+
+  it('RECOVERY-13: a squatter still cannot name ANY of the owner\'s slots', async () => {
+    // Indexing multiplied the addresses a user owns by 256; it must not have created 255 new squattable ones.
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x34));
+    const attacker = keyPairFromSeed(Buffer.alloc(32, 0x35));
+    for (const idx of [0, 1, 42, 255]) {
+      const slot = selfOf(owner, idx);
+      const rs = await shard(slot);
+      const squat = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true },
+        store(attacker, rs.address, slot, 5n, 0, undefined, BigInt(idx)) as any);
+      expect(exitOf(squat, rs.address), `squat on slot ${idx} -> 13575`).toBe(13575);
+      expect((await rs.getGetView()).bound, `slot ${idx} still free`).toBe(false);
+    }
+  }, 180_000);
 });
