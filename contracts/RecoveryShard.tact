@@ -39,17 +39,25 @@ const RS_SLOT_DOMAIN: Int = 0x52534C4B;           // "RSLK" — self_bucket_key 
 // 256 x ~155 = ~40k conversations, and 256 addresses still fit one batched read.
 const RS_MAX_SLOTS: Int = 256;
 const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15); permissionless evict after updated_at + this
-// [MEASURED 2026-07-18] The endowment must cover the WHOLE ACCOUNT for the whole retention, not just the payload.
-// The old 23_200_000 was derived from the 79-cell blob alone (79 x 64962 x 3 x 1.5 = 23_093_991) and silently
-// omitted the shard's own code and persistent state. Unlike its two siblings this lane has no separate base
-// endowment (compare RS_BASE_ENDOWMENT in RecordShard and IS_BASE_ENDOWMENT in IntroShard), so this one constant is
-// everything the account ever keeps. Counted from the current build artifact: 17 code cells + 2 data cells, so the
-// worst case is 79 + 17 + 2 = 98 cells -> 3-year rent 19_098_828. The slot was still SOLVENT at the frozen rate,
-// which is why nothing failed — but the delivered margin was 1.215x, not the 1.5x the G8 rule states, and that
-// margin is the entire defence against a governance rate change on a contract that can never be repriced. This is
-// the durability lane: if the slot freezes, the K_root blob is lost and the user cannot recover their account.
-//   (79 + 17 + 2) x 64962 x 3yr x 1.5 = 28_648_242 -> 28_700_000
-const RS_RECOVERY_ENDOWMENT: Int = 28700000;
+// The endowment must cover the WHOLE ACCOUNT for the whole retention, not just the payload. Unlike its two siblings
+// this lane has no separate base endowment (compare RS_BASE_ENDOWMENT in RecordShard and IS_BASE_ENDOWMENT in
+// IntroShard), so this one constant is everything the account ever keeps. If it falls short the slot freezes and the
+// recovery blob is lost at exactly the moment it is needed — the failure this whole lane exists to prevent.
+//
+// [MEASURED 2026-07-19] DERIVED BY MEASUREMENT, NOT BY COUNTING A MODEL, because counting a model is what got the
+// two previous values wrong. The first (23_200_000) priced the 79-cell blob alone and omitted the shard's own code
+// and state. The second (28_700_000) added those — "79 blob + 17 code + 2 data = 98 cells" — and still came up
+// short, because an account is 1 + code + data: the StateInit WRAPPER cell is not in either subtree. Measured at
+// three blob sizes, the storage stat is always exactly one more than the model predicts, so the worst case is 99
+// cells, not 98. The delivered margin was therefore 1.4875x, not the 1.5027x the arithmetic claimed.
+//
+// tests/recovery-rent-solvency.test.ts RENT-01 now reads the real figure off the STORAGE PHASE after advancing the
+// full retention, so this constant can never again be validated against a cell model that leaves something out:
+//   measured 3-year rent at the frozen rate = 19_293_761  ->  x1.5 = 28_940_642  ->  29_000_000 (margin 1.503x)
+// Both sibling lanes were raised pre-seal for this same class of error (RecordShard at 1.026x, IntroShard at
+// 1.21x). That margin is the entire defence against a governance rate change on a contract that can never be
+// repriced.
+const RS_RECOVERY_ENDOWMENT: Int = 29000000;
 // The endowment above is calibrated for EXACTLY the blob cap below, so
 // the blob MUST be capped at it. The monolith gated this as RECOVERY_MAX_SIZE_CLASS (13560); the sharded rewrite
 // dropped the gate, which let an oversized blob buy permanent storage for a fixed endowment — the slot then goes
@@ -212,8 +220,26 @@ contract RecoveryShard {
     }
 
     // Permissionless self-heal: after 3 years with no refresh, the slot may be cleared so the address is reusable
-    // (and the endowment reclaimed by the caller). A user active within 3 years never hits this — every recovery
-    // publish resets updated_at, so griefing is impossible while the user lives.
+    // (and the endowment reclaimed by the caller).
+    //
+    // THE RETENTION CLOCK IS PER-SLOT, AND THAT IS A CLIENT OBLIGATION, NOT A CONTRACT GUARANTEE. This comment used
+    // to read "a user active within 3 years never hits this — griefing is impossible while the user lives", and that
+    // was true only while one owner key named one address. Across RS_MAX_SLOTS it is FALSE: updated_at lives on each
+    // account separately, so a user who fills slot 0, then spends three years writing only slot 1, leaves slot 0
+    // untouched and evictable — and sweeping it is PROFITABLE, so it will not stay hypothetical. The user is
+    // demonstrably alive and still loses their oldest conversations.
+    //
+    // Nothing here can fix that: these are independent accounts and coupling them would cost a read per slot per
+    // write. The client MUST refresh every bound slot inside the retention window, not merely the slot it is
+    // writing. A refresh is an ordinary RecoveryStore with a higher seq; it costs gas plus the RS_MIN_VALUE float,
+    // which is returned.
+    //
+    // The 3-year clock also RESETS on every publish while the reserve increment is zero on an overwrite (see the
+    // nativeReserve note below), so a refresh moves the deadline without moving money. Funding therefore lasts a
+    // fixed ~4.4 years from the first bind however often the slot is refreshed. That is deliberate — an absolute
+    // reserve would hand any top-up to whoever writes next — but it means a long-lived slot eventually carries a
+    // retention promise it cannot fund. Freeze is still roughly two decades of continuous use away at the frozen
+    // rate, so this is a known and accepted horizon rather than an imminent loss.
     //
     // THIS LANE DELIBERATELY DOES NOT DESTROY ITS ACCOUNT, unlike RecordShard.RetireShard and
     // IntroShard.RetireShard, which do. The asymmetry is load-bearing and a future reader must not "tidy" it:

@@ -510,8 +510,14 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // RECOVERY has no separate base endowment, so this one constant funds the WHOLE account for 3 years. It used to
     // be derived from the 79-cell blob alone, omitting the shard's own 17 code + 2 data cells, which delivered a
     // 1.215x margin instead of the canonical 1.5x on the one lane whose failure loses a user's account.
-    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT'), '(79 blob + 17 code + 2 data) x 64962 x 3yr x 1.5').toBe(28_700_000n);
-    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(36_700_000n);
+    // Raised 28_700_000 -> 29_000_000 on 2026-07-19. The old figure was derived by counting a MODEL of the account
+    // ("79 blob + 17 code + 2 data = 98 cells") and an account is 1 + code + data — the StateInit wrapper cell was
+    // in neither subtree, so the model understated it by one cell and the delivered margin was 1.4875x, under the
+    // project 1.5x rule. The value below is the MEASURED 3-year rent x 1.5, and
+    // tests/recovery-rent-solvency.test.ts RENT-01 now reads that rent off the storage phase so this constant can
+    // never again be validated against a cell model that leaves something out.
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT'), 'measured 3yr rent 19_293_761 x 1.5 = 28_940_642 -> 29_000_000').toBe(29_000_000n);
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(37_000_000n);
     // the STORAGE+GAS part is still materially cheaper than the old two-hop floor (7_710_000) — the hop is gone
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS')).toBeLessThan(7_710_000n);
   });
