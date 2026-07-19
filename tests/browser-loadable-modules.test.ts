@@ -28,6 +28,7 @@ const BROWSER_ENTRY_POINTS = [
   'web/intro-transport.mjs',
   'web/intro-codec.mjs',
   'web/intro-publish-browser.mjs',
+  'web/intro-bucket.mjs',
 ];
 
 /** Imports that exist only in Node: the browser has no bundler step here, it loads these files as-is. */
