@@ -73,8 +73,10 @@ The initial liquidity allocation is not a user balance and is not a protocol lia
 Vesting, BuybackBurn, or MarketStabilitySeller at final genesis. It must have its own transaction
 proof when the ATH/TON pool is launched.
 
-Protocol fees collected before the pool launch are not expected to fully fund the TON side of initial
-liquidity. The launch may require project/treasury funding in addition to protocol revenue.
+Protocol fees ARE the TON side of initial liquidity. `15,000,000 ATH` of airdrop at `10 ATH` per capsule is
+`1,500,000` capsules; at `0.01 GRAM` each that is `15,000 GRAM`, which paired against the `15,000,000 ATH`
+liquidity allocation gives the `0.001 GRAM` reference price exactly. The per-capsule fee is therefore
+structural — without it the pool has no TON side at all.
 
 ## Post-Genesis Required State
 

@@ -17,9 +17,13 @@ The current canonical ATH model is:
 
 Short form: `15M` activity airdrop, `15M` initial liquidity, `10M` long-term vesting, and `60M` MarketStabilitySeller reserve.
 
-Protocol fees collected before pool launch are not expected to fully fund the TON side of initial liquidity. Initial
-liquidity may require project/treasury funding in addition to protocol revenue; this must not be described as a liability
-owed to activity-airdrop users.
+The protocol fee IS the TON side of initial liquidity, and the two numbers are one ledger, not two:
+`15,000,000 ATH` of activity airdrop at `10 ATH` per capsule is `1,500,000` capsules, and `1,500,000` capsules at
+`0.01 GRAM` is `15,000 GRAM`. Paired against the `15,000,000 ATH` liquidity allocation that is the `0.001 GRAM`
+reference price exactly. Every 10 ATH handed out is paid for by the 0.01 GRAM collected for the same capsule.
+
+This is why the per-capsule fee is structural rather than a revenue line: remove it and the pool has no TON side.
+It must not be described as a liability owed to activity-airdrop users.
 
 The `10M` long-term vesting reserve is held by immutable `ATHVesting`, backed by its official ATH wallet, and unlocks `100,000 ATH` per 365-day period for `100` periods. It is not a liquid operations bucket.
 
