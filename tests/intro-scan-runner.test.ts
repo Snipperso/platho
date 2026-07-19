@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { beginCell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { x25519 } from '@noble/curves/ed25519.js';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { buildIntroPublish } from '../web/publish-builder.mjs';
@@ -70,7 +70,7 @@ describe('INTRO-SCAN-RUNNER — the loop a user actually experiences', () => {
   const readStates = async (addresses: any[]) => {
     const out = new Map<string, any>();
     for (const address of addresses) {
-      const contract = await blockchain.getContract(address);
+      const contract = await blockchain.getContract(Address.parse(String(address)));
       const state: any = contract.accountState;
       if (!state || state.type !== 'active') continue;
       out.set(addrKey(address), {
@@ -82,9 +82,9 @@ describe('INTRO-SCAN-RUNNER — the loop a user actually experiences', () => {
     return out;
   };
   const readScanPage = async (address: any, fromId: number, maxCount: number) => {
-    const contract = await blockchain.getContract(address);
+    const contract = await blockchain.getContract(Address.parse(String(address)));
     if (!contract.accountState || (contract.accountState as any).type !== 'active') return null;
-    return blockchain.openContract(IntroShard.fromAddress(address)).getGetScanPage(BigInt(fromId), BigInt(maxCount));
+    return blockchain.openContract(IntroShard.fromAddress(Address.parse(String(address)))).getGetScanPage(BigInt(fromId), BigInt(maxCount));
   };
 
   async function publishIntroTo(ownerScanSecret: Uint8Array, bucket: number) {

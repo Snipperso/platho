@@ -13,14 +13,32 @@
 // (all external infrastructure is forbidden in this project). Writing a CONV bucket is authorized by KNOWING its
 // bucket_key, which only the conversation's two participants can derive.
 //
-// This module derives addresses from the compiled contract StateInit (via the build wrappers). It is transport-
-// agnostic: it returns Addresses; the caller reads them with whatever toncenter/indexer transport it already uses
-// (see web/capsulehub-ton-rpc-provider.mjs). Browser bundling transpiles the imported wrappers.
+// THIS MODULE MUST LOAD IN THE BROWSER. It used to derive addresses from `@ton/core` and the compiled Tact
+// wrappers under build/, which do not load there — and because intro-receive, intro-scan-runner, shard-reader
+// and conv-discovery all import it, that single dependency kept the ENTIRE receive path out of the browser.
+// It now derives everything through web/shard-address.mjs, which hand-rolls the same StateInit encoding and is
+// pinned address-for-address against @ton/core in tests/shard-browser-address.test.ts.
+//
+// The reference implementation still exists: web/publish-builder.mjs derives its own StateInit straight from
+// the compiled wrappers. That is deliberate — two independent implementations that must agree is the only
+// evidence worth having for address derivation, because a wrong address cannot be detected at send time (a
+// message to an uninitialised account has its compute phase skipped and simply vanishes).
+//
+// Addresses are returned as url-safe friendly STRINGS, which is the wire form toncenter packs 35% tighter than
+// raw hex (measured 2026-07-18) and what every consumer here ultimately needs.
 
-import { Address, beginCell, contractAddress } from '@ton/core';
-import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
-import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
-import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
+import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=33';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
+import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=1';
+import {
+  recordShardStateInit,
+  introShardStateInit,
+  recoveryShardStateInit,
+  recordShardAddressBytes,
+  introShardAddressBytes,
+  recoveryShardAddressBytes,
+  rawAddress,
+} from './shard-address.mjs?v=1';
 
 export const EPOCH_SECONDS = 86400;
 
@@ -35,9 +53,15 @@ const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | Bi
  * mirroring RecoveryShard.slotKeyForOwner. Binding the slot to the key is what closes the post-eviction squat
  * (gate 13575) — only the seed-holder who derived owner_pubkey can name this address.
  */
-export function recoveryOwnerSlotKey(ownerPublicKey) {
+// Async because the browser cell hasher is: there is no synchronous sha256 in the platform's crypto API.
+export async function recoveryOwnerSlotKey(ownerPublicKey) {
   const pub = typeof ownerPublicKey === 'bigint' ? ownerPublicKey : bytesToBig(ownerPublicKey);
-  return BigInt('0x' + beginCell().storeUint(RECOVERY_SLOT_DOMAIN, 32).storeUint(pub, 256).endCell().hash().toString('hex'));
+  const cell = beginCell()
+    .uint(RECOVERY_SLOT_DOMAIN, 32, 'RS_SLOT_DOMAIN')
+    .uint(pub, 256, 'owner_pubkey')
+    .endCell();
+  const { hash } = await computeCellHashAndDepth(cell);
+  return bytesToBig(hash);
 }
 
 // Every shard is LAZILY DEPLOYED, and CONV/INTRO shards are new EVERY DAY (the epoch is part of their identity).
@@ -48,20 +72,32 @@ export function recoveryOwnerSlotKey(ownerPublicKey) {
 
 /** StateInit + address of the CONV record shard for a conversation-direction bucket on a given day-epoch. */
 export async function recordShardState(bucketKey, epoch) {
-  const init = await RecordShard.init(BigInt(bucketKey), BigInt(epoch));
-  return { init, address: contractAddress(0, init) };
+  return {
+    init: recordShardStateInit(BigInt(bucketKey), BigInt(epoch)),
+    address: await friendly(recordShardAddressBytes(BigInt(bucketKey), BigInt(epoch))),
+  };
 }
 
 /** StateInit + address of the INTRO shard for a sender-chosen bucket on a given day-epoch. */
 export async function introShardState(epoch, bucket) {
-  const init = await IntroShard.init(BigInt(epoch), BigInt(bucket));
-  return { init, address: contractAddress(0, init) };
+  return {
+    init: introShardStateInit(BigInt(epoch), BigInt(bucket)),
+    address: await friendly(introShardAddressBytes(BigInt(epoch), BigInt(bucket))),
+  };
 }
 
 /** StateInit + address of the RECOVERY shard for a user's epoch-independent self-recovery key. */
 export async function recoveryShardState(selfBucketKey) {
-  const init = await RecoveryShard.init(BigInt(selfBucketKey));
-  return { init, address: contractAddress(0, init) };
+  return {
+    init: recoveryShardStateInit(BigInt(selfBucketKey)),
+    address: await friendly(recoveryShardAddressBytes(BigInt(selfBucketKey))),
+  };
+}
+
+/** The wire form: url-safe friendly, bounceable — 35% tighter in a toncenter query than raw hex. */
+async function friendly(addressBytesPromise) {
+  const { workchain, hash } = await addressBytesPromise;
+  return formatTonUserFriendlyAddress(rawAddress({ workchain, hash }), { bounceable: true });
 }
 
 /** Address of the CONV record shard for a conversation-direction bucket on a given day-epoch. */
@@ -128,5 +164,14 @@ export async function introScanAddresses(fromEpoch, toEpoch, bucketCount = INTRO
   return out;
 }
 
-/** Normalize any address-ish input to a comparable string (for matching a read account against a derived address). */
-export const addrKey = (a) => (a instanceof Address ? a : Address.parse(String(a))).toString();
+/**
+ * Normalize any address-ish input to one comparable key, so a derived address matches what an endpoint returned.
+ * Both forms occur in practice: we send url-safe friendly, toncenter answers in raw `0:HEX`. The canonical form
+ * is raw lowercase because it is unambiguous — friendly encodes bounceable/testnet flags that do not change
+ * which account is meant, so two friendly strings for the same account can differ.
+ */
+export function addrKey(a) {
+  const { workchain, hash } = parseTonAddress(String(a));
+  const hex = Array.from(hash, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${workchain}:${hex}`;
+}

@@ -39,6 +39,6 @@ export async function outgoingRecordShard({ kRoot, selfKeyId, peerKeyId, created
  */
 export async function selfRecoveryShard(seed) {
   const ownerPublicKey = await recoveryOwnerPublicKey(seed);
-  const slotKey = recoveryOwnerSlotKey(ownerPublicKey);
+  const slotKey = await recoveryOwnerSlotKey(ownerPublicKey);
   return { ownerPublicKey, slotKey, address: await recoveryShardAddress(slotKey) };
 }
