@@ -34,6 +34,11 @@ export function buildIntroPublishBody({ r, viewTag, header0, body }) {
  * The bucket is REFUSED if it lies outside the read space. IntroShard.init takes any uint32 and no contract gate
  * looks at it, while every reader is clamped to INTRO_READ_SPACE — so bucket 1024 and up is a publish that is
  * accepted, charged for, and read by nobody, for ever. Use chooseIntroBucket() to pick one.
+ *
+ * FUNDING: pass INTRO_PUBLISH_VALUE from web/publish-price.mjs — the DEPLOY figure — for every intro, not only
+ * the first into a bucket-day. Gate 13682 is state-dependent, and the obvious "pay more only when the account is
+ * absent" rule is forgeable on this lane in particular: the bucket space is public, so anyone can create a shard
+ * with a bare value message and leave it holding zero entries. Overpaying costs nothing; the shard returns it.
  */
 export async function buildIntroPublishBrowser({ epoch, bucket, r, viewTag, header0, body, value }) {
   assertReadableBucket(bucket);

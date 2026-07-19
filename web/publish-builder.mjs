@@ -88,7 +88,15 @@ export function introBodyCommit(header0, body) {
  * not a bare bucket hash: the address is public once anything is published there, so authorization has to be a
  * signature, not knowledge of where to send. `writeSecret` signs (seq ‖ commitment); `seq` MUST strictly exceed the
  * shard's last_seq (read get_view().last_seq; a fresh shard is 0), which is what stops a captured publish from being
- * replayed to burn SAFE_CAP slots. Fund at or above get_view().min_value — the shard returns the change.
+ * replayed to burn SAFE_CAP slots.
+ *
+ * FUNDING: attach CONV_PUBLISH_VALUE from web/publish-price.mjs — the DEPLOY figure — for every publish, not
+ * only the first. The gate is state-dependent (13652 demands the deploy figure while record_count == 0), and
+ * measurement shows that overpaying an existing shard simply comes back: a later publish attached at the deploy
+ * figure returned 3_137_794 of it. The alternative rules all read or infer state, and the obvious one — "pay
+ * more only when the account is absent" — is forgeable, because anyone can create a shard with a bare value
+ * message and leave it with zero entries. This used to read "fund at or above get_view().min_value", which is
+ * now wrong for the publish that matters most: the first one.
  */
 export async function buildConvPublish({ writePublicKey, writeSecret, seq, epoch, header0, header1, body, value }) {
   const commit = frameCommit(header0, header1, body);
