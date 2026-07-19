@@ -10,8 +10,8 @@
 // weakness. Leak-freedom comes from the payload, not from access control: the bucket reveals nothing about the
 // recipient (who is hidden behind the stealth view_tag), and the recipient SCANS — it reads the compact
 // (r, view_tag) of every live intro in its window and tests each against its scan secret. Spam is bounded by three
-// things: every intro pays its own rent, SAFE-CAP refuses a full partition in COMPUTE, and the one-week eviction
-// keeps the live set small.
+// things: every intro pays its own rent, SAFE-CAP refuses a full partition in COMPUTE, and the shard's own death
+// bounds how long any of it lasts.
 //
 // SHORT RETENTION + EVICTION (owner decision 2026-07-17: ONE WEEK): an intro only needs to live until the recipient
 // scans it. After a week it is evicted, so (a) the persistent intro graph never accumulates in state — the state
@@ -60,9 +60,16 @@ const IS_PAIRS_PER_CELL: Int = 3;         // 1023 bits / 272 — how many (r, ta
 const IS_BODY_DOMAIN: Int = 0x49534243;   // "ISBC"
 
 // [RE-MEASURE BEFORE SEAL] storage 64962 nanoton/cell/year (config-18, bits free).
-//   intro endowment: measured 4 cells x 64962 x 7/365 x 1.5 -> 7500 -> 8000 (an intro lives 1 week)
-//   base endowment:  this shard's own code+data rent over its short life, with margin
-const IS_INTRO_ENDOWMENT: Int = 8000;
+//   intro endowment: an intro no longer lives one week. Per-entry eviction is gone, so an entry persists until
+//     the whole shard is retired at (epoch+2)*86400 + IS_INTRO_RETENTION + IS_RETIRE_SLACK — about THIRTEEN
+//     days from the epoch, not seven. The old derivation (4 cells x 64962 x 7/365 x 1.5 -> 8000) therefore
+//     described a lifetime the contract no longer has.
+//     MEASURED 2026-07-19 over the real span, from publish to the retire instant: 6_624 per intro
+//     (rent 226_875 at n=1 and 644_235 at n=64, so 417_360 over 63 entries). 8000 covered it, but at 1.21x —
+//     below this project's G8 1.5x convention, and config-18 is a SCHEDULE that has already moved once. A 21%
+//     rise would have made a full shard rent-insolvent before it could be retired, in an immutable contract.
+//       6_624 x 1.5 = 9_936 -> 10_000
+const IS_INTRO_ENDOWMENT: Int = 10000;
 // The shard's own rent PLUS the cost of the one call that ends it (measured 956_872, flat in shard size).
 // Raised 1_000_000 -> 2_500_000 when per-entry eviction was deleted; see RecordShard for the full reasoning.
 const IS_BASE_ENDOWMENT: Int = 2500000;
@@ -85,7 +92,8 @@ const IS_PROTOCOL_FEE: Int = 10000000;
 // so gate 13682 is the only thing that can make the fee mandatory).
 // The address is a CONSTANT because an IntroShard deploys lazily and unbound, and this lane is OPEN by design:
 // a post-deploy bind receiver would let literally any stranger bind their own address and collect the fees of
-// every intro published to that bucket that day. Pinned against a fresh derivation in tests/shard-fee-outlet.test.ts.
+// every intro published to that bucket that day. Pinned against a fresh derivation in PT-04b, in
+// tests/shard-fee-passthrough.test.ts.
 // [MOVED 2026-07-19 — AND THIS IS THE ORDERING CONSTRAINT I WRONGLY DECLARED NON-EXISTENT.] Earlier today I
 // measured that FeeAccumulator.init carries no deployment_id, concluded its address is fixed forever, and told
 // the owner there was no genesis ordering to respect. That was true only while its CODE was untouched. Lowering

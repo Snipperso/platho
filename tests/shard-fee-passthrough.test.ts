@@ -34,7 +34,7 @@ const CLOCK = 1_790_000_000;
 const PROTOCOL_FEE = 10_000_000n;
 const RS_MIN_VALUE = 13_400_000n;        // 300_000 + 2_500_000 + 10_000_000 + 600_000
 const RS_DEPLOY_MIN_VALUE = 16_900_000n; // + RS_BASE_ENDOWMENT 3_500_000, charged on the FIRST publish only
-const IS_MIN_VALUE = 13_108_000n;        //     8_000 + 2_500_000 + 10_000_000 + 600_000
+const IS_MIN_VALUE = 13_110_000n;        //    10_000 + 2_500_000 + 10_000_000 + 600_000
 
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
 const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');
@@ -296,7 +296,7 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     expect((await bc.getContract(shard.address)).accountState?.type, 'and the account is gone').not.toBe('active');
   }, 600_000);
 
-  it('PT-08: the publish minimum is what the owner was told — 0.0134 CONV, 0.013108 INTRO', async () => {
+  it('PT-08: the publish minimum is what the owner was told — 0.0134 CONV, 0.013110 INTRO', async () => {
     // The owner priced this decision in GRAM and agreed to it. Pin the number so it cannot drift silently.
     const bc = await Blockchain.create();
     bc.now = CLOCK;

@@ -386,7 +386,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     const is = await deploy(blockchain.openContract(new IntroShard(contractAddress(0, init), init)));
     const view = await is.getGetView();
     expect(view.protocol_fee, 'INTRO now carries the same 0.01 GRAM per-message fee as CONV').toBe(10_000_000n);
-    expect(view.min_value, 'endowment + gas + fee + transport').toBe(13_108_000n);
+    expect(view.min_value, 'endowment + gas + fee + transport').toBe(13_110_000n);
 
     const built = await buildIntroPublish({
       epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8),
@@ -467,7 +467,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
       .toEqual(['IS_FEE_TRANSPORT', 'IS_INTRO_ENDOWMENT', 'IS_PROTOCOL_FEE', 'IS_PUBLISH_GAS']);
     expect(minValueTerms(intro, 'IS_DEPLOY_MIN_VALUE').sort(), 'the deploy price adds the base endowment')
       .toEqual(['IS_BASE_ENDOWMENT', 'IS_MIN_VALUE']);
-    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(13_108_000n);
+    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(13_110_000n);
     // The bounty exists because a STORAGE endowment cannot fund eviction: it is consumed by the storage it bought.
     // Both bounties are sized at measured marginal sweep gas x 1.5 — see tests/evict-incentive.test.ts.
     // Sized at the WORST case the contract permits, because marginal gas grows with dictionary depth and the

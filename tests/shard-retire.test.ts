@@ -29,7 +29,7 @@ const cell = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCell
 const CLOCK = 1_790_000_000;               // after the Apr-2026 config-18 storage switch
 
 const RS_DEPLOY_MIN_VALUE = 16_900_000n;
-const IS_DEPLOY_MIN_VALUE = 15_608_000n;
+const IS_DEPLOY_MIN_VALUE = 15_610_000n;
 
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
 const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');

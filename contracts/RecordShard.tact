@@ -22,7 +22,8 @@
 //
 // The monotonic `seq` closes REPLAY, which the signature alone does not: without it a captured (cells, sig) pair
 // could be re-sent to burn SAFE_CAP slots at the same ~11 TON, leaving the denial-of-service intact. It doubles as
-// the client's ordering key. Anti-spam beyond that is the rent itself, bounded by SAFE-CAP and 1-year eviction.
+// the client's ordering key. Anti-spam beyond that is the rent itself, bounded by SAFE-CAP and by the shard's
+// own death: nothing removes a single record, the whole shard is retired at once (see RetireShard).
 //
 // BODY CARRIAGE — the bug this rewrite fixes. The two-hop design could not deliver a message at all: the forward
 // carried only {serial, frame_commit}, so the ciphertext existed nowhere on chain and the recipient had nothing to
@@ -95,9 +96,13 @@ const RS_PROTOCOL_FEE: Int = 10000000;
 // This was expected to force a genesis ordering constraint (sink address -> shard code -> shard addresses).
 // MEASURED 2026-07-19: it does not. FeeAccumulator.init takes only (treasury_receiver, buyback_burn) with NO
 // deployment_id, so its address is a pure function of its code and the owner's two wallets — the current build
-// reproduces the manifest address 0:126ccfb...f3fe3e exactly. The address is therefore already known and already
-// live, and it is pinned against a fresh derivation by tests/shard-fee-outlet.test.ts. If FeeAccumulator's code or
-// either owner wallet ever changes, that pin fails loudly instead of routing real money into a dead address.
+// deployment_id, so its address is a pure function of its code and the owner's two addresses.
+// THAT TURNED OUT TO BE TRUE ONLY WHILE ITS CODE WAS UNTOUCHED. Lowering FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE
+// changed its code hash and moved its address, and the shards kept pointing at the old one — every publish's fee
+// bounced straight back, caught by tests/shard-fee-passthrough.test.ts. So the genesis ordering IS real and it is:
+// FeeAccumulator code -> its address -> shard code -> shard addresses. PT-04b derives the address fresh rather
+// than comparing against a literal, so changing that contract again fails loudly instead of routing real money
+// into a dead address.
 // [MOVED 2026-07-19 — AND THIS IS THE ORDERING CONSTRAINT I WRONGLY DECLARED NON-EXISTENT.] Earlier today I
 // measured that FeeAccumulator.init carries no deployment_id, concluded its address is fixed forever, and told
 // the owner there was no genesis ordering to respect. That was true only while its CODE was untouched. Lowering
@@ -113,8 +118,10 @@ const RS_FEE_SINK: Address = address("EQAUIujZ91zHBy5-PqpD1Oo6cXVIHYRP4BtyN6mUFZ
 // way; only the payer differs.
 //
 // Mirror of FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE, which gate 15002 demands on top of the principal. Measured
-// there at 199_068 against the live mainnet gas config and set to 200_000; if these two ever drift apart the
-// deposit is refused, so tests/shard-fee-outlet.test.ts pins them against each other.
+// there at 199_068 against the live mainnet gas config, then sized at 400_000 — 2x, because the surplus is
+// recoverable through FeeAccumulator.SweepUnaccounted while a shortfall is quietly paid by the owner. If the two
+// constants ever drift apart the deposit is refused, so PT-04 in tests/shard-fee-passthrough.test.ts reads both
+// out of the sources and pins them against each other.
 const RS_FEE_SINK_DEPOSIT_RESERVE: Int = 400000;
 // The forward fee for the deposit message. MEASURED 2026-07-19 at ~75_000, and flat in shard size because the
 // deposit body is a fixed 160 bits. 200_000 keeps ~2.7x headroom against a config-25 repricing; unlike the
@@ -258,7 +265,9 @@ contract RecordShard {
         throwUnless(13654, checkSignature(digest, msg.sig.beginParse(), self.write_pubkey));
 
         self.last_seq = msg.seq;
-        // created_at is stamped by the CONTRACT (now()), so eviction cannot be gamed by a client field.
+        // created_at is stamped by the CONTRACT (now()) rather than taken from the sender. Nothing reads it on
+        // chain any more — retirement is arithmetic on `epoch` alone — but a client orders and ages records by it,
+        // so a client-supplied field would still be worth forging.
         self.records.set(self.record_count, RecordEntry{ frame_commit: commit, created_at: now() });
         self.record_count = self.record_count + 1;
 
@@ -268,7 +277,8 @@ contract RecordShard {
         // after the reserve instead and it competes with money the reserve has just set aside; if the reserve
         // won, the explicit send would fail, and an ACTION-phase failure DOES NOT BOUNCE — the shard would
         // silently swallow the publisher's value. That is exactly the defect three attackers reproduced against
-        // the design panel's winner on the eviction path, and the reason every refusal here is a COMPUTE throw.
+        // the design panel's winner on what was then the eviction path, and the reason every refusal here is a
+        // COMPUTE throw.
         message(MessageParameters {
             to: RS_FEE_SINK,
             value: RS_PROTOCOL_FEE + RS_FEE_SINK_DEPOSIT_RESERVE,
@@ -285,7 +295,7 @@ contract RecordShard {
         // whoever publishes next, and the balance also becomes an exact public message counter. ReserveAtMost keeps
         // it from ever exceeding the balance, so ACTION still cannot fail.
         // THE FEE IS NOT IN THIS SUM ANY MORE. It has already gone; what stays is the shard's own rent and the
-        // bounty it owes whoever eventually evicts this record.
+        // record's own storage endowment, plus the base endowment on the publish that creates the shard.
         nativeReserve(
             RS_RECORD_ENDOWMENT + (self.record_count == 1 ? RS_BASE_ENDOWMENT : 0),
             ReserveAtMost | ReserveAddOriginalBalance,
@@ -331,7 +341,7 @@ contract RecordShard {
     // happens and it is an error path rather than the design. Handled explicitly so the bounce does not abort the
     // transaction; the sender gate stands because the bounced flag is an ordinary header bit any account may set.
     // This should be unreachable: the deposit carries exactly what gate 15002 demands, and FeeAccumulator is
-    // deployed at genesis and immutable. tests/shard-fee-outlet.test.ts covers it anyway.
+    // deployed at genesis and immutable. tests/shard-fee-passthrough.test.ts covers it anyway.
     bounced(msg: bounced<DepositProtocolFee>) {
         throwUnless(13657, sender() == RS_FEE_SINK);
         throwUnless(13658, msg.amount > 0);

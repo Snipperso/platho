@@ -90,7 +90,7 @@ holds no entries yet:
 | | steady-state | first publish |
 | --- | ---: | ---: |
 | CONV | `13,400,000` (0.0134 GRAM) | `16,900,000` (0.0169 GRAM) |
-| INTRO | `13,108,000` (0.013108 GRAM) | `15,608,000` (0.015608 GRAM) |
+| INTRO | `13,110,000` (0.013110 GRAM) | `15,610,000` (0.015610 GRAM) |
 
 Per-record eviction was deleted on 2026-07-19; a single `RetireShard` call ends a shard at a MEASURED constant
 5140 gas whatever it holds, and `get_view().retire_at` publishes the instant it becomes legal.
