@@ -127,9 +127,9 @@ describe('INTRO-BUCKET — the write-side rule, and the guard around it', () => 
     expect(bucket, 'a fresh epoch starts at the bottom').toBe(0);
 
     const built = await buildIntroPublish({
-      epoch, bucket, r: 5n, viewTag: 6n, header0: cellOf(3), body: cellOf(4), value: 15_608_000n,
+      epoch, bucket, r: 5n, viewTag: 6n, header0: cellOf(3), body: cellOf(4), value: 15_610_000n,
     });
-    const res = await payer.send({ to: built.to, value: 15_608_000n, body: built.body, init: built.init, bounce: true } as any);
+    const res = await payer.send({ to: built.to, value: 15_610_000n, body: built.body, init: built.init, bounce: true } as any);
     const tx = (res.transactions as any[]).find((t) => t.inMessage?.info?.dest?.equals?.(built.to));
     expect(tx?.description?.computePhase?.exitCode, 'the shard accepts the chosen bucket').toBe(0);
 

@@ -32,9 +32,9 @@ export const CONV_MIN_VALUE = 13_400_000n;
 export const CONV_PUBLISH_VALUE = 16_900_000n;
 
 /** IS_MIN_VALUE — what an intro into an EXISTING IntroShard must bring. */
-export const INTRO_MIN_VALUE = 13_108_000n;
+export const INTRO_MIN_VALUE = 13_110_000n;
 /** IS_DEPLOY_MIN_VALUE — what the first intro must bring; also what a client should always attach. */
-export const INTRO_PUBLISH_VALUE = 15_608_000n;
+export const INTRO_PUBLISH_VALUE = 15_610_000n;
 
 /**
  * What to attach to a publish on the given lane. Takes no state and asks nothing of the chain, on purpose —

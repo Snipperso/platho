@@ -63,7 +63,7 @@ PUBLISH PRICES, both published in `get_view`:
 | | steady-state `min_value` | first publish `deploy_min_value` |
 | --- | ---: | ---: |
 | CONV | `13,400,000` (0.0134 GRAM) | `16,900,000` (0.0169 GRAM) |
-| INTRO | `13,108,000` (0.013108 GRAM) | `15,608,000` (0.015608 GRAM) |
+| INTRO | `13,110,000` (0.013110 GRAM) | `15,610,000` (0.015610 GRAM) |
 
 A client MUST pay the deploy figure whenever the target account is absent OR `record_count`/`next_id` is 0. The
 extra funds the account's own life and the single call that ends it; charging it explicitly replaced leaving it

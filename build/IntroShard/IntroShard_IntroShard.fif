@@ -362,8 +362,8 @@ PROGRAM{
   $IntroShard$_fun_get_view PROCREF:<{
     604800 PUSHINT
     8000 PUSHINT
-    13108000 PUSHINT
-    15608000 PUSHINT
+    13110000 PUSHINT
+    15610000 PUSHINT
     s7 PUSH
     2 ADDCONST
     86400 PUSHINT
@@ -513,9 +513,9 @@ PROGRAM{
       s9 PUSH
       0 EQINT
       IF:<{
-        15608000 PUSHINT
+        15610000 PUSHINT
       }>ELSE<{
-        13108000 PUSHINT
+        13110000 PUSHINT
       }>
       GEQ
       THROWANYIFNOT
@@ -570,7 +570,7 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      8000 PUSHINT
+      10000 PUSHINT
       OVER
       1 EQINT
       IF:<{
