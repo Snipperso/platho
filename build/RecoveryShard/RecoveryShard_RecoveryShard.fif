@@ -151,7 +151,7 @@ PROGRAM{
   }>
   $RecoveryShard$_fun_get_view PROCREF:<{
     94608000 PUSHINT
-    28700000 PUSHINT
+    29000000 PUSHINT
     8 PUSHPOW2
     79 PUSHINT
     s12 PUSH
@@ -260,7 +260,7 @@ PROGRAM{
       13572 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      36700000 PUSHINT
+      37000000 PUSHINT
       GEQ
       THROWANYIFNOT
       OVER
@@ -348,7 +348,7 @@ PROGRAM{
           NOW
       s0 s5 XCHG
       IF:<{
-        28700000 PUSHINT
+        29000000 PUSHINT
       }>ELSE<{
         0 PUSHINT
       }>
