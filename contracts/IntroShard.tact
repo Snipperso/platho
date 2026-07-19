@@ -65,24 +65,30 @@ const IS_PUBLISH_GAS: Int = 2500000;
 // there is no gate that can distinguish a real first contact from a fake one without breaking the stealth property.
 const IS_PROTOCOL_FEE: Int = 10000000;
 
-// THE FEE'S WAY OUT — identical in shape to RecordShard's, see RS_FEE_SINK there for the full reasoning.
+// THE FEE PASSES THROUGH THIS SHARD — IT DOES NOT LIVE HERE. Identical in shape to RecordShard's; see the long
+// note there for why an accumulate-then-remit design existed at all (it was built around FeeAccumulator's
+// 2_000_000 deposit reserve, measured at 199_068 and fixed at the source) and why the fee must be routed through
+// the shard rather than paid by the client directly (a contract cannot see the other messages of a transaction,
+// so gate 13682 is the only thing that can make the fee mandatory).
 // The address is a CONSTANT because an IntroShard deploys lazily and unbound, and this lane is OPEN by design:
 // a post-deploy bind receiver would let literally any stranger bind their own address and collect the fees of
 // every intro published to that bucket that day. Pinned against a fresh derivation in tests/shard-fee-outlet.test.ts.
-const IS_FEE_SINK: Address = address("EQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-PtQu");
-const IS_FEE_SINK_DEPOSIT_RESERVE: Int = 2000000;   // FeeAccumulator gate 15002
-// MEASURED 2026-07-19: ~75_000 actually, constant in shard size (the deposit body is a fixed 160 bits); see
-// RS_FEE_SINK_FWD_RESERVE for why over-reserving is not free — the slack goes to the evictor, not the pool.
-const IS_FEE_SINK_FWD_RESERVE: Int = 500000;
-const IS_FEE_REMIT_OVERHEAD: Int = IS_FEE_SINK_DEPOSIT_RESERVE + IS_FEE_SINK_FWD_RESERVE;
+// [MOVED 2026-07-19 — AND THIS IS THE ORDERING CONSTRAINT I WRONGLY DECLARED NON-EXISTENT.] Earlier today I
+// measured that FeeAccumulator.init carries no deployment_id, concluded its address is fixed forever, and told
+// the owner there was no genesis ordering to respect. That was true only while its CODE was untouched. Lowering
+// FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE changed its code hash and therefore its address, and the shards kept
+// pointing at the old one — every publish's fee bounced straight back, caught by tests/shard-fee-passthrough.
+// So the constraint is real and it is this: FeeAccumulator code -> its address -> shard code -> shard addresses.
+// No cycle, but it must be walked in that order at genesis, and PT-04/PIN pins the result.
+const IS_FEE_SINK: Address = address("EQAUIujZ91zHBy5-PqpD1Oo6cXVIHYRP4BtyN6mUFZW4muQf");
 
-// THE FEE PAYS FOR ITS OWN EXTRACTION — and on this lane there was never an alternative. MEASURED 2026-07-19,
-// the money an INTRO shard holds above its accrued fee is ~965_285 at one intro and reaches only 1_200_181 at
-// 64: IS_INTRO_ENDOWMENT covers one WEEK, so unlike CONV the margin does not grow with size. Against a
-// 4_000_000 overhead the fee could not have left an IntroShard of ANY size. Taking the overhead out of the fee
-// makes the affordability test hold by construction, since the publish path already reserves fee + endowment +
-// bounty for every intro.
-const IS_FEE_REMIT_MIN: Int = IS_FEE_REMIT_OVERHEAD + 1;
+// TRANSPORT, PAID BY THE PUBLISHER [OWNER 2026-07-19], so the fee reaches the pool whole.
+// Mirror of FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE (gate 15002); pinned against it in tests.
+const IS_FEE_SINK_DEPOSIT_RESERVE: Int = 400000;
+// Forward fee for the deposit message; measured ~75_000 and flat in shard size. Slack here returns to the
+// publisher with their change, so generosity is free and tightness is not.
+const IS_FEE_SINK_FWD_RESERVE: Int = 200000;
+const IS_FEE_TRANSPORT: Int = IS_FEE_SINK_DEPOSIT_RESERVE + IS_FEE_SINK_FWD_RESERVE;
 
 // EVICTION BOUNTY — the money that actually makes the one-week retention happen. [MEASURED 2026-07-18.]
 // The payout used to come out of IS_INTRO_ENDOWMENT, and that could never work, for a structural reason rather
@@ -101,7 +107,8 @@ const IS_FEE_REMIT_MIN: Int = IS_FEE_REMIT_OVERHEAD + 1;
 //   591_973 x 1.5 (G8) = 887_960 -> 900_000
 const IS_EVICT_BOUNTY: Int = 900000;
 
-const IS_MIN_VALUE: Int = IS_INTRO_ENDOWMENT + IS_EVICT_BOUNTY + IS_PUBLISH_GAS + IS_PROTOCOL_FEE;   // gate 13682
+// gate 13682. IS_FEE_TRANSPORT is in here because the publisher pays it: the fee must reach the pool whole.
+const IS_MIN_VALUE: Int = IS_INTRO_ENDOWMENT + IS_EVICT_BOUNTY + IS_PUBLISH_GAS + IS_PROTOCOL_FEE + IS_FEE_TRANSPORT;
 
 // A stealth first-contact publish. header_0 + body ride so they land in this account's transaction history; they are
 // NOT stored in state. body_commit is recomputed here from their hashes — nothing is trusted from the sender.
@@ -164,10 +171,9 @@ struct IntroShardView {
     safe_cap: Int;
     min_value: Int;      // what a publish must bring (clients read this instead of hardcoding a mirror)
     protocol_fee: Int;    // the per-capsule service fee included in min_value
-    accrued_fee: Int;     // collected fee held here, awaiting routing to the fee sink
     evict_bounty: Int;    // what evicting one entry pays its caller
     accrued_bounty: Int;  // bounties still owed for entries that have not been evicted yet
-    fee_sink: Address;    // where accrued_fee is routed; a constant, readable so it needs no disassembly to check
+    fee_sink: Address;    // where each publish forwards the fee; a constant, readable without disassembly
 }
 
 contract IntroShard {
@@ -177,7 +183,6 @@ contract IntroShard {
     next_id: Int as uint32;
     live_count: Int as uint32;
     evict_cursor: Int as uint32;   // FIFO low-water: lowest id not yet evicted
-    accrued_fee: Int as coins;     // protocol fee collected here; routing to the fee sink is the open piece
     accrued_bounty: Int as coins;  // held for the future evictor of each live entry; released only on eviction
 
     init(epoch: Int, bucket: Int) {
@@ -187,7 +192,6 @@ contract IntroShard {
         self.next_id = 0;
         self.live_count = 0;
         self.evict_cursor = 0;
-        self.accrued_fee = 0;
         self.accrued_bounty = 0;
     }
 
@@ -228,14 +232,27 @@ contract IntroShard {
         });
         self.next_id = self.next_id + 1;
         self.live_count = self.live_count + 1;
-        self.accrued_fee = self.accrued_fee + IS_PROTOCOL_FEE;
         self.accrued_bounty = self.accrued_bounty + IS_EVICT_BOUNTY;
+
+        // THE FEE LEAVES FIRST, AND THE ORDER IS THE SAFETY PROPERTY. Queued ahead of the reserve, the deposit is
+        // drawn from the value this message brought, which gate 13682 has already checked covers
+        // IS_PROTOCOL_FEE + IS_FEE_TRANSPORT. Behind the reserve it would compete with money just set aside, and a
+        // losing explicit send fails the ACTION phase — which does NOT bounce, so the shard would silently swallow
+        // the publisher's value. That is the defect three attackers reproduced against the design panel's winner.
+        message(MessageParameters {
+            to: IS_FEE_SINK,
+            value: IS_PROTOCOL_FEE + IS_FEE_SINK_DEPOSIT_RESERVE,
+            bounce: true,
+            mode: SendPayFwdFeesSeparately,
+            body: DepositProtocolFee{ amount: IS_PROTOCOL_FEE }.toCell(),
+        });
 
         // Reserve the INCREMENT on top of the balance already held (see RecordShard for the full reasoning and the
         // monolith precedent). This lane is OPEN by design, so an absolute reserve was strictly worse here: any
         // surplus on a funded IntroShard could be swept by a stranger publishing one intro.
+        // THE FEE IS NOT IN THIS SUM ANY MORE — it has already gone.
         nativeReserve(
-            IS_INTRO_ENDOWMENT + IS_PROTOCOL_FEE + IS_EVICT_BOUNTY + (self.next_id == 1 ? IS_BASE_ENDOWMENT : 0),
+            IS_INTRO_ENDOWMENT + IS_EVICT_BOUNTY + (self.next_id == 1 ? IS_BASE_ENDOWMENT : 0),
             ReserveAtMost | ReserveAddOriginalBalance,
         );
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
@@ -302,50 +319,22 @@ contract IntroShard {
         let payout: Int = evicted * IS_EVICT_BOUNTY;
         self.accrued_bounty = self.accrued_bounty - payout;
 
-        // ROUTE THE PROTOCOL FEE OUT — one outbound fee message per shard, ever. See RecordShard's EvictIntros
-        // twin for the full reasoning; the three load-bearing points are the same.
-        // (1) The publish gate (13684) admits an epoch only within +/-1, so from epoch+2 accrued_fee is FINAL and
-        //     a single message suffices forever. Here the guard is not even close to redundant the way it is on
-        //     the CONV lane: IS_INTRO_RETENTION is one WEEK, so the first sweep lands around epoch+7 — much
-        //     nearer the boundary than CONV's year, and this lane is the one a stranger can fill on purpose.
-        // (2) Affordability is decided in COMPUTE. Clamping in ACTION was the fatal defect the design panel's
-        //     three attackers reproduced by compiling it: the explicit send is not held back by a `keep < 0`
-        //     clamp, so the fee comes out of the caller's attached value, and an ACTION-phase failure does not
-        //     bounce. A shard that cannot afford the remit simply does not remit.
-        // (3) Outstanding bounties outrank the fee — underpay a future evictor and the intro graph is never
-        //     swept, which is precisely what this lane's one-week retention exists to guarantee.
-        let feeOut: Int = 0;
-        let spend: Int = 0;
-        let nowEpoch: Int = now() / 86400;
-        if ((self.accrued_fee >= IS_FEE_REMIT_MIN) && (nowEpoch > self.epoch + 1)
-            && ((original - payout - self.accrued_fee) >= self.accrued_bounty)) {
-            feeOut = self.accrued_fee - IS_FEE_REMIT_OVERHEAD;
-            spend = self.accrued_fee;
-            self.accrued_fee = 0;
-        }
-
-        let keep: Int = original - payout - spend;
+        // EVICTION NO LONGER CARRIES MONEY THAT IS NOT THE EVICTOR'S. The fee left at publish time, so this
+        // receiver is pure state cleanup plus the bounty — the solvency test, the bounties-outrank-the-fee
+        // ordering and the once-only remit all went with it.
+        let keep: Int = original - payout;
         if (keep < 0) { keep = 0; }
         nativeReserve(keep, ReserveAtMost);
-        if (feeOut > 0) {
-            message(MessageParameters {
-                to: IS_FEE_SINK,
-                value: feeOut + IS_FEE_SINK_DEPOSIT_RESERVE,
-                bounce: true,
-                mode: SendPayFwdFeesSeparately,
-                body: DepositProtocolFee{ amount: feeOut }.toCell()
-            });
-        }
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
-    // The sink refused or was unreachable: the value came back, so the debt must too. The sender gate is
-    // load-bearing — the bounced flag is an ordinary header bit any account may set, and a forged bounce would
-    // inflate accrued_fee past the affordability test and strand the real fee permanently.
+    // The sink refused or was unreachable, so the value came back. There is no fee ledger to restore any more —
+    // the money stays in this account, mixed with the rent, which is the sole case where that happens and it is
+    // an error path rather than the design. Handled explicitly so the bounce does not abort; the sender gate
+    // stands because the bounced flag is an ordinary header bit any account may set. Should be unreachable.
     bounced(msg: bounced<DepositProtocolFee>) {
         throwUnless(13685, sender() == IS_FEE_SINK);
         throwUnless(13686, msg.amount > 0);
-        self.accrued_fee = self.accrued_fee + msg.amount;
     }
 
     receive() {}
@@ -416,7 +405,6 @@ contract IntroShard {
             safe_cap: IS_SAFE_CAP,
             min_value: IS_MIN_VALUE,
             protocol_fee: IS_PROTOCOL_FEE,
-            accrued_fee: self.accrued_fee,
             evict_bounty: IS_EVICT_BOUNTY,
             accrued_bounty: self.accrued_bounty,
             fee_sink: IS_FEE_SINK,

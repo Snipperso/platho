@@ -25,18 +25,26 @@ reference price exactly. Every 10 ATH handed out is paid for by the 0.01 GRAM co
 This is why the per-capsule fee is structural rather than a revenue line: remove it and the pool has no TON side.
 It must not be described as a liability owed to activity-airdrop users.
 
-How the fee actually reaches the sink: `RecordShard` and `IntroShard` each send exactly one `DepositProtocolFee`
-to `FeeAccumulator`, on the first sweep that runs past the shard's publish window. One message per shard suffices
-for the whole life of the shard because publish gates 13656/13684 admit only epoch +/-1, so from epoch+2 the
-accrued figure is final. The sink address is a compile-time constant in both contracts — a shard deploys lazily
-and unbound, so a bind receiver would let a stranger capture the fee. It needs no genesis ordering: `FeeAccumulator`
-has no `deployment_id`, so its address is fixed by its code and the two owner wallets, and is pinned by
-`tests/shard-fee-outlet.test.ts`.
+How the fee actually reaches the sink: every publish forwards it. `RecordShard` and `IntroShard` emit one
+`DepositProtocolFee` to `FeeAccumulator` in the same transaction that stores the record, so a shard's balance is
+its own rent and eviction bounties and NOTHING ELSE. The fee never accumulates on chain waiting for someone to
+extract it, and protocol revenue does not depend on anybody choosing to run eviction.
 
-Deduct `2,500,000` per SHARD (not per capsule) from the `15,000 GRAM` figure: `2,000,000` is FeeAccumulator's own
-immutable deposit gate, which settles into its balance rather than `accumulated_ton`, and `500,000` is forward-fee
-reserve whose unused part returns to the evictor. A shard nobody ever sweeps books nothing at all, which makes the
-eviction-bounty calibration an economic question and not only a housekeeping one.
+An earlier revision pooled the fee inside each shard and remitted it once per shard. That existed solely to pay
+`FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE` once instead of a million times — and that constant was wrong: sized for
+CapsuleHub's rare bulk flush at `2,000,000`, it was 18% of a per-capsule fee. Measured against the live mainnet
+gas config (config-21: flat 6667 for the first 100 units, then 66.667/unit), one deposit really costs `199,068`.
+The constant is now `400,000`, and `FeeAccumulator.SweepUnaccounted` reclaims whatever the gas does not burn.
+
+THE PUBLISHER PAYS TRANSPORT, so the pool books the fee whole and `1,500,000` capsules give exactly `15,000 GRAM`.
+Minimum publish is `14,200,000` nanotons on CONV and `14,008,000` on INTRO.
+
+GENESIS ORDERING — this is a real constraint and it was briefly documented as non-existent. `FeeAccumulator` has
+no `deployment_id`, so its address is fixed by its code and the two owner wallets; but its CODE changed in this
+release, which moved its address, and the shards carry that address as a compile-time constant. Build in this
+order: `FeeAccumulator` code -> its StateInit address -> shard code -> shard addresses. There is no cycle, but
+walking it out of order silently points every shard's fee at a dead address. Pinned by
+`tests/shard-fee-passthrough.test.ts` PT-04/PT-04b, which derive the address fresh rather than trusting a literal.
 
 The `10M` long-term vesting reserve is held by immutable `ATHVesting`, backed by its official ATH wallet, and unlocks `100,000 ATH` per 365-day period for `100` periods. It is not a liquid operations bucket.
 

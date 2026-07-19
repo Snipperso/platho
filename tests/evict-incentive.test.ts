@@ -71,12 +71,8 @@ describe('EVICT-INCENTIVE — eviction only happens if calling it pays', () => {
     expect((await shard.getGetView()).live_count, 'the sweep actually cleared the entries').toBe(0n);
     expect(net, `an INTRO sweep of ${n} must leave the caller ahead, not out of pocket`).toBeGreaterThan(0n);
     expect((await shard.getGetView()).accrued_bounty, 'the bounty was paid out, not double-held').toBe(0n);
-    // The fee belongs to the liquidity pool and must not follow the bounty out to the CALLER. It used to have
-    // nowhere else to go, so this asserted it stayed put; now it leaves for FeeAccumulator in the same sweep.
-    // FeeAccumulator is deliberately not deployed here, so the deposit bounces and the debt is restored — which
-    // is exactly the invariant worth pinning on this path: the caller never receives it either way.
-    expect((await shard.getGetView()).accrued_fee, 'the protocol fee did not go to the evictor')
-      .toBe(BigInt(n) * 10_000_000n - 2_500_000n);
+    // The protocol fee is no longer any of this receiver's business: it leaves at PUBLISH time, straight to
+    // FeeAccumulator, so eviction moves only the bounty. See tests/shard-fee-passthrough.test.ts.
   }, 300_000);
 
   it.each([16, 64])('a CONV sweep of %i pays its caller more than it costs', async (n) => {
@@ -105,10 +101,7 @@ describe('EVICT-INCENTIVE — eviction only happens if calling it pays', () => {
     expect((await shard.getGetView()).live_count).toBe(0n);
     expect(net, `a CONV sweep of ${n} must leave the caller ahead, not out of pocket`).toBeGreaterThan(0n);
     expect((await shard.getGetView()).accrued_bounty).toBe(0n);
-    // See the INTRO twin above: the fee now leaves for FeeAccumulator, which is not deployed in this file, so
-    // the deposit bounces and the debt is restored less the transfer cost. It never reaches the caller.
-    expect((await shard.getGetView()).accrued_fee, 'the protocol fee did not go to the evictor')
-      .toBe(BigInt(n) * 10_000_000n - 2_500_000n);
+    // The fee left at publish time; eviction moves only the bounty. See tests/shard-fee-passthrough.test.ts.
   }, 300_000);
 
   it('DEEP-01: a sweep of a FULL CONV shard still pays — the bounty is sized at RS_SAFE_CAP, not at a small batch', async () => {
@@ -165,15 +158,9 @@ describe('EVICT-INCENTIVE — eviction only happens if calling it pays', () => {
     const fresh = await run(1);
     const stale = await run(10);
     expect(fresh, 'a 1-year-idle sweep pays').toBeGreaterThan(0n);
-    // Exact equality held until the fee gained a way out. It no longer can, and the reason is legitimate: a
-    // decade of arrears can push the shard below the solvency test that guards the remit, so one run sends the
-    // fee and the other does not, and the unused part of the forward reserve differs between them. That is
-    // bounded by RS_FEE_SINK_FWD_RESERVE (500_000) and by nothing else — whereas the regression this test
-    // exists to catch billed the shard's ENTIRE accumulated rent to the caller, which at ten years is on the
-    // order of 250_000_000. The bound below still separates those by three orders of magnitude.
-    const drift = fresh > stale ? fresh - stale : stale - fresh;
-    expect(drift, `a 10-year-idle sweep must cost the caller no more than the remit reserve (drift ${drift})`)
-      .toBeLessThanOrEqual(500_000n);
+    // Exact equality is restored now that eviction carries no protocol money: nothing in this receiver depends
+    // on the shard's balance any more except the bounty itself, so idle time cannot enter the caller's ledger.
+    expect(stale, 'a 10-year-idle sweep pays the SAME — arrears are not the caller problem').toBe(fresh);
   }, 1_800_000);
 
   it('publishing and self-evicting is not a profit loop — the bounty is refunded, never minted', async () => {

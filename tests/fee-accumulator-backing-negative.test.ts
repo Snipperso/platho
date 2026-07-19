@@ -13,7 +13,12 @@ import {
 } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { createFundingEnvelopeProfileM19H } from '../scripts/buybackburn_funding_envelope_m19h';
 
-const DEPOSIT_EXEC_RESERVE = 2_000_000n;
+// Mirrors FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE. Lowered 2_000_000 -> 200_000 on 2026-07-19: the old figure was
+// sized for CapsuleHub's rare bulk flush, and the clean-17 shards deposit PER CAPSULE, where it was 18% of the
+// fee. Measured cost of one deposit is 199_068 against the live mainnet gas config (config-21: flat 6667 for
+// the first 100 units, then 66.667/unit; gasUsed 2986). See tests/shard-fee-passthrough.test.ts PT-04, which
+// pins this mirror against the contract so the two cannot drift — a drift refuses every publish's fee.
+const DEPOSIT_EXEC_RESERVE = 400_000n;
 const SPLIT_EXEC_RESERVE = 2_000_000n;
 const FLUSH_EXEC_RESERVE = 5_000_000n;
 const MIN_TREASURY_FLUSH_TON = FLUSH_EXEC_RESERVE;

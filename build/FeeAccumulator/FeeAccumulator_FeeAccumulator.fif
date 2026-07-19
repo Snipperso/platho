@@ -13,10 +13,11 @@ PROGRAM{
   DECLPROC $FeeAccumulator$_contract_init
   DECLPROC $FeeAccumulator$_contract_load
   DECLPROC $FeeAccumulator$_contract_store
-  DECLPROC $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address
+  DECLPROC $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton
   DECLPROC $FeeAccumulator$_fun_get_state
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
   DECLPROC $AcceptBurnReserve$_constructor_amount
+  DECLPROC $SendParameters$_constructor_to_value_mode_bounce
   86957 DECLMETHOD %get_state
   DECLPROC recv_internal
   DECLGLOBVAR __tact_context
@@ -46,14 +47,19 @@ PROGRAM{
     SWAP
   }>
   $FeeAccumulator$_store PROCINLINE:<{
-    s5 s6 XCHG2
+    s6 s7 XCHG2
     STSLICE
-    s1 s3 XCHG
+    s1 s4 XCHG
     STSLICE
+    s1 s2 XCHG
     128 STU
     128 STU
     128 STU
     1 STI
+    NEWC
+    ROT
+    STVARUINT16
+    STBREFR
   }>
   $FeeAccumulator$_load PROCINLINE:<{
     LDMSGADDR
@@ -62,7 +68,16 @@ PROGRAM{
     128 LDU
     128 LDU
     1 LDI
-    6 -ROLL
+    LDREF
+    SWAP
+    CTOS
+    LDVARUINT16
+    DROP
+    s1 s7 XCHG
+    s1 s6 XCHG
+    s1 s5 XCHG
+    s1 s4 XCHG
+    s3 s3 s0 XCHG3
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -79,6 +94,7 @@ PROGRAM{
     0 PUSHINT
     s0 s0 PUSH2
     FALSE
+    OVER
   }>
   $FeeAccumulator$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -87,7 +103,7 @@ PROGRAM{
     SWAP
     IF:<{
       $FeeAccumulator$_load INLINECALLDICT
-      1 6 BLKDROP2
+      1 7 BLKDROP2
     }>ELSE<{
       $FeeAccumulator$init$_load INLINECALLDICT
       s0 s2 XCHG
@@ -101,27 +117,36 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    6 -ROLL
+    7 -ROLL
     $FeeAccumulator$_store INLINECALLDICT
     ENDC
     c4 POP
   }>
-  $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address PROCINLINE:<{
+  $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton PROCINLINE:<{
   }>
   $FeeAccumulator$_fun_get_state PROCREF:<{
-    s3 s2 s1 PUSH3
-    s3 s8 s7 PUSH3
-    $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address INLINECALLDICT
+    s4 s3 s2 PUSH3
+    s4 s9 s8 PUSH3
+    s6 PUSH
+    $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton INLINECALLDICT
   }>
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
   }>
   $AcceptBurnReserve$_constructor_amount PROCINLINE:<{
   }>
+  $SendParameters$_constructor_to_value_mode_bounce PROCINLINE:<{
+    s1 s3 XCHG
+    PUSHNULL
+    PUSHNULL
+    s4 s3 XCHG2
+    PUSHNULL
+    s0 s3 XCHG
+  }>
   %get_state PROC:<{
     $FeeAccumulator$_contract_load INLINECALLDICT
     $FeeAccumulator$_fun_get_state INLINECALLDICT
-    6 6 BLKDROP2
+    7 7 BLKDROP2
     $FeeAccumulatorStateView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -140,9 +165,9 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $FeeAccumulator$_contract_load INLINECALLDICT
-    s0 s7 XCHG
+    s0 s8 XCHG
     IFJMP:<{
-      s0 s5 XCHG
+      s0 s6 XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -161,38 +186,37 @@ PROGRAM{
         NIP
         15032 PUSHINT
         __tact_context_get_sender INLINECALLDICT
-        s5 PUSH
+        s6 PUSH
         SDEQ
         THROWANYIFNOT
         15033 PUSHINT
         OVER
         0 GTINT
         THROWANYIFNOT
-        s1 s5 XCHG
         ADD
-        s3 s5 XCHG
-        s4 s0 s3 XCHG3
+        s4 s6 XCHG
+        2 4 BLKSWAP
         $FeeAccumulator$_contract_store INLINECALLDICT
       }>
-      7 BLKDROP
+      8 BLKDROP
     }>
     0 PUSHINT
-    s6 PUSH
+    s7 PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 s6 XCHG
-      32 LDU
       s0 s7 XCHG
+      32 LDU
+      s0 s8 XCHG
     }>
     OVER
     4286010889 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s5 XCHG
+      s0 s6 XCHG
       128 LDU
       DROP
       15001 PUSHINT
@@ -203,14 +227,15 @@ PROGRAM{
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       s2 PUSH
-      2000000 PUSHINT
+      400000 PUSHINT
       ADD
       GEQ
       THROWANYIFNOT
-      s1 s2 XCHG
+      s1 s3 XCHG
       ADD
+      s4 s6 XCHG
       s3 s5 XCHG
-      s1 s4 s3 XCHG3
+      s3 s4 XCHG2
       $FeeAccumulator$_contract_store INLINECALLDICT
     }>
     OVER
@@ -218,9 +243,9 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s5 POP
+      s6 POP
       15010 PUSHINT
-      s2 PUSH
+      s3 PUSH
       0 GTINT
       THROWANYIFNOT
       15011 PUSHINT
@@ -231,28 +256,31 @@ PROGRAM{
       THROWANYIFNOT
       s5 PUSH
       IFNOTJMP:<{
+        SWAP
         0 PUSHINT
-        s0 s2 XCHG
+        s0 s3 XCHG
         ADD
+        s4 s6 XCHG
         s3 s5 XCHG
-        2 3 BLKSWAP
+        s4 s3 s3 XCHG3
+        s0 s2 XCHG
         $FeeAccumulator$_contract_store INLINECALLDICT
       }>
-      OVER
+      s2 PUSH
       5000 PUSHINT
       MUL
       10000 PUSHINT
       DIV
-      s2 s2 XCPU
+      s3 s3 XCPU
       SUB
-      SWAP
+      s0 s2 XCHG
       0 PUSHINT
-      s0 s3 XCHG
+      s0 s4 XCHG
       ADD
-      s5 s5 XCHG2
+      s0 s2 XCHG
       ADD
-      s3 s5 XCHG
-      s4 s0 s3 XCHG3
+      s4 s6 XCHG
+      2 4 BLKSWAP
       $FeeAccumulator$_contract_store INLINECALLDICT
     }>
     OVER
@@ -260,10 +288,10 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s5 POP
+      s6 POP
       15012 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s5 PUSH
+      s6 PUSH
       SDEQ
       THROWANYIFNOT
       15013 PUSHINT
@@ -277,16 +305,18 @@ PROGRAM{
       2000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      DUP
+      OVER
       0 GTINT
       IF:<{
-        s1 s4 XCHG
+        SWAP
         ADD
-        s0 s3 XCHG
         0 PUSHINT
+        SWAP
       }>
+      s3 s5 XCHG
       2 3 BLKSWAP
       TRUE
+      SWAP
       $FeeAccumulator$_contract_store INLINECALLDICT
     }>
     OVER
@@ -294,7 +324,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s5 XCHG
+      s0 s6 XCHG
       128 LDU
       DROP
       15020 PUSHINT
@@ -302,7 +332,7 @@ PROGRAM{
       0 GTINT
       THROWANYIFNOT
       15021 PUSHINT
-      s1 s2 PUSH2
+      s1 s3 PUSH2
       LEQ
       THROWANYIFNOT
       15023 PUSHINT
@@ -312,7 +342,7 @@ PROGRAM{
       IF:<{
         TRUE
       }>ELSE<{
-        s1 s2 PUSH2
+        s1 s3 PUSH2
         EQUAL
       }>
       THROWANYIFNOT
@@ -322,10 +352,10 @@ PROGRAM{
       5000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      TUCK
+      s2 s2 XCPU
       SUB
       FALSE
-      s5 s2 s2 PUXC2
+      s6 s3 s3 PUXC2
       1 PUSHINT
       PUSHNULL
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
@@ -346,8 +376,8 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s3 s5 XCHG
-      2 3 BLKSWAP
+      s4 s6 XCHG
+      2 4 BLKSWAP
       $FeeAccumulator$_contract_store INLINECALLDICT
     }>
     OVER
@@ -355,7 +385,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s5 XCHG
+      s0 s6 XCHG
       128 LDU
       DROP
       15030 PUSHINT
@@ -368,7 +398,7 @@ PROGRAM{
       EQUAL
       THROWANYIFNOT
       15031 PUSHINT
-      s1 s6 PUSH2
+      s1 s2 PUSH2
       LEQ
       THROWANYIFNOT
       15035 PUSHINT
@@ -377,20 +407,20 @@ PROGRAM{
       7000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      s5 s5 XCPU
+      TUCK
       SUB
-      s5 PUSH
+      OVER
       2000000 PUSHINT
       ADD
       TRUE
       1 PUSHINT
-      s0 s8 XCHG
+      s0 s4 XCHG
       $AcceptBurnReserve$_constructor_amount INLINECALLDICT
       NEWC
       $AcceptBurnReserve$_store_cell INLINECALLDICT
-      s6 PUSH
+      s7 PUSH
       s0 s4 XCHG
-      s9 s9 XCHG2
+      s5 s5 XCHG2
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -409,34 +439,146 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s3 s5 XCHG
-      2 3 BLKSWAP
+      s4 s6 XCHG
+      2 4 BLKSWAP
       $FeeAccumulator$_contract_store INLINECALLDICT
     }>
-    s7 POP
+    s8 POP
     DUP
     2275594951 PUSHINT
     EQUAL
     IFJMP:<{
       DROP
-      s5 POP
+      s6 POP
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s1 s7 XCHG
+      ADD
+      s4 s6 XCHG
       s3 s5 XCHG
-      2 3 BLKSWAP
+      s4 s3 s0 XCHG3
+      $FeeAccumulator$_contract_store INLINECALLDICT
+    }>
+    DUP
+    1398232398 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s6 POP
+          BALANCE FIRST
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      SUB
+      2OVER
+      ADD
+      s2 PUSH
+      ADD
+      s8 PUSH
+      ADD
+      15040 PUSHINT
+      OVER
+      1000000 PUSHINT
+      ADD
+      s3 s(-1) PUXC
+      GREATER
+      THROWANYIFNOT
+      s1 s(-1) PUXC
+      SUB
+      1000000 PUSHINT
+      SUB
+      s1 s4 XCHG
+      ADD
+      s0 s3 XCHG
+      2 PUSHINT
+          RAWRESERVE
+      __tact_context_get_sender INLINECALLDICT
+      0 PUSHINT
+      130 PUSHINT
+      FALSE
+      $SendParameters$_constructor_to_value_mode_bounce INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+          // → Stack state
+          // s0: Builder
+          // s1: `data`
+          // s2: `code`
+          // s3: `body`
+          // s4: `mode`
+          // Group 2: Placing the Builder after code and data, then checking those for nullability
+          s2 XCHG0
+          DUP2
+          ISNULL
+          SWAP
+          ISNULL
+          AND
+          // → Stack state
+          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+          // s1: `code`
+          // s2: `data`
+          // s3: Builder
+          // s4: `body`
+          // s5: `mode`
+          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+          <{
+              DROP2 // drop `data` and `code`, since either of those is null
+              b{0} STSLICECONST
+          }> PUSHCONT
+          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+          <{
+              // _ split_depth:(Maybe (## 5))
+              //   special:(Maybe TickTock)
+              //   code:(Maybe ^Cell)
+              //   data:(Maybe ^Cell)
+              //   library:(Maybe ^Cell)
+              // = StateInit;
+              ROT                // place message Builder on top
+              b{10} STSLICECONST // store Maybe = true, Either = false
+              // Start composing inlined StateInit
+              b{00} STSLICECONST // store split_depth and special first
+              STDICT             // store code
+              STDICT             // store data
+              b{0} STSLICECONST  // store library
+          }> PUSHCONT
+          // Group 3: IFELSE that does the branching shown above
+          IFELSE
+          // → Stack state
+          // s0: Builder
+          // s1: null or StateInit
+          // s2: `body`
+          // s3: `mode`
+          // Group 4: Finalizing the message
+          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+          ENDC
+          // → Stack state
+          // s0: Cell
+          // s1: `mode`
+          // Group 5: Sending the message, with `mode` on top
+          SWAP
+          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      s4 s6 XCHG
+      2 4 BLKSWAP
       $FeeAccumulator$_contract_store INLINECALLDICT
     }>
     0 EQINT
-    s0 s6 XCHG
+    s0 s7 XCHG
     33 LESSINT
-    s1 s6 XCHG
+    s1 s7 XCHG
     AND
     IFJMP:<{
       15099 PUSHINT
       THROWANY
-      s3 s5 XCHG
-      2 3 BLKSWAP
+      s4 s6 XCHG
+      2 4 BLKSWAP
       $FeeAccumulator$_contract_store INLINECALLDICT
     }>
-    6 BLKDROP
+    7 BLKDROP
     130 THROW
   }>
 }END>c

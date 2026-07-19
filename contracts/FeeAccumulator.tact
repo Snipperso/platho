@@ -6,7 +6,40 @@
 
 const SPLIT_BASE_BPS: Int = 10000;
 const TREASURY_SHARE_BPS: Int = 5000;
-const FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE: Int = 2000000;
+// What a depositor must bring ON TOP of the principal, to fund this contract's own execution.
+//
+// WAS 2_000_000, AND THAT NUMBER DECIDED AN ARCHITECTURE. It was sized for CapsuleHub, which flushes rarely and
+// in large amounts, where 2 TON of slack is noise. The clean-17 shards deposit PER CAPSULE — 1.5M times over the
+// airdrop — and at that rate the reserve is not slack, it is 18% of the fee. That is the only reason the shards
+// were built to ACCUMULATE the fee and remit it once per shard: the accumulation existed purely to pay this
+// constant once instead of a million times. [OWNER 2026-07-19: the fee must not sit in a shard at all — "в шарде
+// должна быть только его рента, а моя комиссия это моя комиссия".] Fixing the constant removes the reason.
+//
+// MEASURED 2026-07-19 against the LIVE mainnet config, not from memory (a recalled "400 nanoton per gas unit"
+// nearly caused the correct measurement to be discarded — see below):
+//   config-21 basechain: flat_gas_limit 100, flat_gas_price 6667, gas_price 4369067/65536 = 66.667 nanoton/unit
+//   one DepositProtocolFee: gasUsed 2986  ->  6667 + 2886 * 66.667 = 199_067 predicted
+//   sandbox measurement:                                              199_068 actual
+// Agreement to one nanoton, which also proves @ton/sandbox prices gas at the live mainnet rate.
+//
+// SIZED HIGH, WITH THE SURPLUS MADE RECOVERABLE. I first reasoned the opposite — err low, because a shortfall
+// only drains this contract gradually while a surplus strands forever — and the owner corrected the premise:
+//   [OWNER 2026-07-19] "Если мы ошибаемся вниз, то пользователь просто меньше платит за сообщение, а потом мне
+//   из своего кармана надо оплачивать ошибку? Если так, то пусть лучше пользователь платит с запасом."
+// That is right, and my version had the payer wrong. The publisher's cost is the deposit message's value, so a
+// smaller reserve means the USER pays less while accumulated_ton is still credited in full — the shortfall
+// lands on the owner at flush time. Erring low spends the owner's money to save the user a rounding error.
+//
+// So: 400_000 against a measured 199_068 (2x margin against any plausible gas repricing), and SweepUnaccounted
+// below makes the leftover recoverable instead of immured. The asymmetry that made a thin margin look prudent
+// is gone once the surplus has an exit.
+const FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE: Int = 400000;
+
+// A last-resort cushion the sweep never touches. Deliberate funding is now COUNTED (storage_reserve_ton) rather
+// than defended by a guessed floor, so this is not the storage budget — it only guarantees the contract can still
+// execute its own next transaction if genesis ever under-funded it. Kept small deliberately: an oversized floor
+// silently makes small surpluses unsweepable, which is how the first attempt at this failed its own test.
+const FEEACCUMULATOR_STORAGE_FLOOR: Int = 1000000;
 const FEEACCUMULATOR_SPLIT_EXEC_RESERVE: Int = 2000000;
 const FEEACCUMULATOR_FLUSH_EXEC_RESERVE: Int = 5000000;
 const FEEACCUMULATOR_MIN_TREASURY_FLUSH_TON: Int = FEEACCUMULATOR_FLUSH_EXEC_RESERVE;
@@ -33,6 +66,8 @@ message(0xB3D2C52D) FlushBuybackDue {
 
 message(0x87A2D2C7) TopUpStorageReserve {}
 
+message(0x5357554E) SweepUnaccounted {}   // "SWUN"
+
 // Message body sent to BuybackBurn. Opcode matches Platho.V1.BuybackBurn.AcceptBurnReserve.
 // Field order is intentional so bounced<AcceptBurnReserve> can recover amount.
 message(0x594BA505) AcceptBurnReserve {
@@ -46,6 +81,7 @@ struct FeeAccumulatorStateView {
     buyback_split_enabled: Bool;
     treasury_receiver_address: Address;
     buyback_burn_address: Address;
+    storage_reserve_ton: Int;   // deliberate top-ups, tracked so SweepUnaccounted cannot mistake them for surplus
 }
 
 contract FeeAccumulator {
@@ -55,6 +91,7 @@ contract FeeAccumulator {
     treasury_due_ton: Int as uint128;
     buyback_due_ton: Int as uint128;
     buyback_split_enabled: Bool;
+    storage_reserve_ton: Int as coins;
 
     init(treasury_receiver_address: Address, buyback_burn_address: Address) {
         self.treasury_receiver_address = treasury_receiver_address;
@@ -63,6 +100,7 @@ contract FeeAccumulator {
         self.treasury_due_ton = 0;
         self.buyback_due_ton = 0;
         self.buyback_split_enabled = false;
+        self.storage_reserve_ton = 0;
     }
 
     receive(msg: DepositProtocolFee) {
@@ -151,6 +189,43 @@ contract FeeAccumulator {
 
     receive(msg: TopUpStorageReserve) {
         // Accept TON for FeeAccumulator storage reserve only. Due buckets and receivers are unchanged.
+        // COUNTED, because SweepUnaccounted must be able to tell a deliberate top-up from deposit surplus.
+        // Leaving it untracked reproduced a defect this project has already made twice: a balance-derived
+        // sweep that cannot see intent carries off money somebody meant to leave behind. Caught here by
+        // tests/shard-fee-passthrough.test.ts PT-09, where the sweep ate the fixture's own 1 GRAM of funding.
+        // It never decreases as rent consumes it, so the figure only ever over-protects — the sweep
+        // under-credits rather than over-credits, which is the safe direction.
+        self.storage_reserve_ton += context().value;
+    }
+
+    // RECLAIM THE UNACCOUNTED BALANCE. Every deposit arrives carrying FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE on top
+    // of its principal, and only the principal is booked; the difference between that reserve and the gas
+    // actually burnt settles here as raw balance. Before this receiver existed there was no path out of it at
+    // all — FlushTreasuryDue can only send what SplitAccumulated moved into treasury_due_ton, which only ever
+    // comes from a declared deposit amount. Across the airdrop's 1.5M capsules that would have immured a few
+    // hundred GRAM of the owner's own money.
+    // [OWNER 2026-07-19, on the surplus: "разве нельзя вывести и излишки, если они будут?"] Now it can: this
+    // credits it to accumulated_ton, from which it splits and flushes like any other protocol fee.
+    //
+    // PERMISSIONLESS ON PURPOSE, and safe because it cannot move value ANYWHERE. It only relabels balance this
+    // contract already holds from "unaccounted" to "accumulated" — both of which are the owner's. A caller can
+    // only pay gas to do the owner a favour. It also cannot over-credit: the floor is subtracted first and the
+    // gate refuses unless there is a genuine surplus above every accounted bucket, so an under-funded contract
+    // (the case where deposits cost more gas than their reserve) simply refuses instead of inventing money.
+    receive(msg: SweepUnaccounted) {
+        let held: Int = myBalance() - context().value;
+        let accounted: Int = self.accumulated_ton + self.treasury_due_ton + self.buyback_due_ton
+            + self.storage_reserve_ton;
+        throwUnless(15040, held > accounted + FEEACCUMULATOR_STORAGE_FLOOR);
+        self.accumulated_ton += held - accounted - FEEACCUMULATOR_STORAGE_FLOOR;
+
+        // RETURN THE CALLER'S CHANGE, which also makes the operation IDEMPOTENT. Without this the caller's own
+        // attached value stays behind as fresh unaccounted balance, so the very next sweep finds a "surplus"
+        // that is really just the previous caller's gas money — the call would never settle, and repeating it
+        // would quietly convert callers' funds into the owner's bucket. Reserving exactly what the contract
+        // already held before this message means mode-128 hands back the attached value less gas.
+        nativeReserve(held, ReserveAtMost);
+        send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
     get fun get_state(): FeeAccumulatorStateView {
@@ -160,7 +235,8 @@ contract FeeAccumulator {
             buyback_due_ton: self.buyback_due_ton,
             buyback_split_enabled: self.buyback_split_enabled,
             treasury_receiver_address: self.treasury_receiver_address,
-            buyback_burn_address: self.buyback_burn_address
+            buyback_burn_address: self.buyback_burn_address,
+            storage_reserve_ton: self.storage_reserve_ton
         };
     }
 

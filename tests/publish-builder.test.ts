@@ -382,7 +382,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     const is = await deploy(blockchain.openContract(new IntroShard(contractAddress(0, init), init)));
     const view = await is.getGetView();
     expect(view.protocol_fee, 'INTRO now carries the same 0.01 GRAM per-message fee as CONV').toBe(10_000_000n);
-    expect(view.min_value, 'endowment + bounty + gas + fee').toBe(13_408_000n);
+    expect(view.min_value, 'endowment + bounty + gas + fee + fee transport').toBe(14_008_000n);
     expect(view.evict_bounty, 'each intro pre-funds its own eviction').toBe(900_000n);
 
     const built = await buildIntroPublish({
@@ -393,19 +393,37 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect((await is.getGetView()).live_count, 'nothing stored').toBe(0n);
     expect((await is.getGetEntry(0n)).exists).toBe(false);
 
-    // and the fee is actually retained, not handed back with the change
+    // And the fee is actually TAKEN, not handed back with the change. Since 2026-07-19 the publish forwards it
+    // straight to FeeAccumulator, so the check is that the shard tries to send exactly the fee onward. This
+    // fixture has no FeeAccumulator deployed, so the deposit bounces and the money comes back — which is itself
+    // worth asserting, because it is the error path the contract documents. What must NOT happen is the fee
+    // quietly staying behind as though nothing was attempted.
     const ok = await buildIntroPublish({ epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8), value: toNano('0.05') });
-    expect(exitOf(await send(ok), is.address)).toBe(0);
-    expect((await is.getGetView()).accrued_fee, 'the fee stayed in the shard').toBe(10_000_000n);
+    const okResult = await send(ok);
+    expect(exitOf(okResult, is.address)).toBe(0);
+    const deposit = (okResult.transactions as any[]).some((t) => {
+      const body = t.inMessage?.body?.beginParse?.();
+      if (!body || body.remainingBits < 32) return false;
+      return body.loadUint(32) === 0xFF775609;                 // DepositProtocolFee
+    });
+    expect(deposit, 'the publish must emit a DepositProtocolFee carrying the fee out').toBe(true);
+    // tests/shard-fee-passthrough.test.ts deploys the real sink and checks the far end of that wire.
   }, 120_000);
 
   it('PB-07: the client value floors are pinned to the CONTRACT constants — silent drift is impossible', () => {
     // Clients fund a publish against the contract's COMPUTE gates. The shards now EXPOSE min_value in get_view, so a
     // client should read it rather than mirror it; this test pins the arithmetic so a constant change is loud.
-    const constOf = (src: string, name: string): bigint => {
-      const m = src.match(new RegExp(`const\\s+${name}\\s*:\\s*Int\\s*=\\s*(\\d+)`));
+    // Resolves a constant to a number, following DERIVED ones (`const A: Int = B + C;`) down to their leaves.
+    // RS_FEE_TRANSPORT is defined that way — it is the sum of the FeeAccumulator deposit reserve and the forward
+    // reserve — and the flat `= (\d+)` form threw on it, which is a test that cannot read the contract it guards.
+    const constOf = (src: string, name: string, depth = 0): bigint => {
+      if (depth > 4) throw new Error(`constant ${name} nests too deeply — is there a cycle?`);
+      const m = src.match(new RegExp(`const\\s+${name}\\s*:\\s*Int\\s*=\\s*([^;]+);`));
       if (!m) throw new Error(`contract constant ${name} not found — did it get renamed?`);
-      return BigInt(m[1]);
+      const expr = m[1].trim();
+      if (/^\d+$/.test(expr)) return BigInt(expr);
+      return expr.split('+').map((t) => t.trim())
+        .reduce((sum, t) => sum + (/^\d+$/.test(t) ? BigInt(t) : constOf(src, t, depth + 1)), 0n);
     };
     const minValueTerms = (src: string, name: string): string[] => {
       const m = src.match(new RegExp(`const\\s+${name}\\s*:\\s*Int\\s*=\\s*([^;]+);`));
@@ -420,9 +438,12 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // (1.5M capsules -> 15M ATH out, 15k GRAM in) and is what keeps publishing from being cheaper than the reward.
     expect(constOf(rec, 'RS_PROTOCOL_FEE'), 'the service fee is 0.01 GRAM, as in the deleted CreditSale').toBe(10_000_000n);
     const recTerms = minValueTerms(rec, 'RS_MIN_VALUE');
-    expect(recTerms.sort(), 'RS_MIN_VALUE is endowment + bounty + gas + fee, nothing dropped')
-      .toEqual(['RS_EVICT_BOUNTY', 'RS_PROTOCOL_FEE', 'RS_PUBLISH_GAS', 'RS_RECORD_ENDOWMENT']);
-    expect(recTerms.reduce((a, t) => a + constOf(rec, t), 0n), 'RecordShard RS_MIN_VALUE').toBe(13_600_000n);
+    // RS_FEE_TRANSPORT joined the sum on 2026-07-19, when the fee stopped accumulating inside the shard and
+    // started being forwarded to FeeAccumulator on every publish. [OWNER: the publisher pays the transport, so
+    // the pool books the fee WHOLE — "естественно платит публикатор".] This guard is why that change was loud.
+    expect(recTerms.sort(), 'RS_MIN_VALUE is endowment + bounty + gas + fee + transport, nothing dropped')
+      .toEqual(['RS_EVICT_BOUNTY', 'RS_FEE_TRANSPORT', 'RS_PROTOCOL_FEE', 'RS_PUBLISH_GAS', 'RS_RECORD_ENDOWMENT']);
+    expect(recTerms.reduce((a, t) => a + constOf(rec, t), 0n), 'RecordShard RS_MIN_VALUE').toBe(14_200_000n);
     // the record endowment carries the canonical G8 1.5x margin over its MEASURED 3 cells (not the 2 in the old note)
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT'), '3 cells x 64962 x 1yr x 1.5 = 292_329 -> 300_000').toBe(300_000n);
     // the airdrop pays 10 ATH per capsule, so a capsule must never cost LESS than the fee that backs it
@@ -431,9 +452,9 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // against a sum we happen to write here: the previous revision pinned `endowment + gas` under the label
     // "IS_MIN_VALUE", so when the fee term was added the assertion stayed green while its meaning silently drifted.
     const introTerms = minValueTerms(intro, 'IS_MIN_VALUE');
-    expect(introTerms.sort(), 'IS_MIN_VALUE is endowment + gas + fee, nothing dropped')
-      .toEqual(['IS_EVICT_BOUNTY', 'IS_INTRO_ENDOWMENT', 'IS_PROTOCOL_FEE', 'IS_PUBLISH_GAS']);
-    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(13_408_000n);
+    expect(introTerms.sort(), 'IS_MIN_VALUE is endowment + gas + fee + transport, nothing dropped')
+      .toEqual(['IS_EVICT_BOUNTY', 'IS_FEE_TRANSPORT', 'IS_INTRO_ENDOWMENT', 'IS_PROTOCOL_FEE', 'IS_PUBLISH_GAS']);
+    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(14_008_000n);
     // The bounty exists because a STORAGE endowment cannot fund eviction: it is consumed by the storage it bought.
     // Both bounties are sized at measured marginal sweep gas x 1.5 — see tests/evict-incentive.test.ts.
     // Sized at the WORST case the contract permits, because marginal gas grows with dictionary depth and the
