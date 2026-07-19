@@ -76,7 +76,10 @@ export function createIntroScanRunner({
       const msSinceFullSweep = force ? Infinity : now() - (meta.lastFullSweepAt ?? 0);
 
       const plan = planIntroScan({
-        highestLiveBucket: meta.highestLiveBucket ?? -1,
+        // The hot range is sized by a COUNT of live buckets, not by the highest index seen — a maximum is
+        // poisoned by a single intro written high, see intro-scan-policy.mjs.
+        distinctLiveBuckets: meta.distinctLiveBuckets ?? 0,
+        liveBucketIndices: meta.liveBucketIndices ?? [],
         liveBuckets: meta.liveBuckets ?? 0,
         readSpace,
         currentEpoch,
@@ -91,6 +94,7 @@ export function createIntroScanRunner({
         toEpoch: plan.epochs?.to ?? currentEpoch + INTRO_SCAN_EPOCHS_FORWARD,
         readSpace,
         buckets: plan.buckets,
+        extraBuckets: plan.extraBuckets,
         cursors,
         readStates,
         readScanPage,
@@ -128,9 +132,19 @@ export function createIntroScanRunner({
       // may lower highestLiveBucket, or the hot range could shrink below where senders are actually writing and
       // stay there. Raising it is always safe.
       const seenHighest = result.stats.highestLiveBucket ?? -1;
+      const seenDistinct = result.stats.distinctLiveBuckets ?? 0;
       const nextMeta = {
         ...meta,
         liveBuckets: plan.full ? result.stats.live : Math.max(meta.liveBuckets ?? 0, result.stats.live),
+        // Same ratchet, same reason: a hot pass saw only part of the space, so it may RAISE this figure but
+        // never lower it; only a full sweep, which saw everything, may lower it.
+        distinctLiveBuckets: plan.full ? seenDistinct : Math.max(meta.distinctLiveBuckets ?? 0, seenDistinct),
+        // Same ratchet: a full sweep saw everything and may replace the list; a hot pass saw only part of the
+        // space, so it may only ADD to what it already knew.
+        liveBucketIndices: plan.full
+          ? (result.stats.liveBucketIndices ?? [])
+          : [...new Set([...(meta.liveBucketIndices ?? []), ...(result.stats.liveBucketIndices ?? [])])]
+            .sort((a, b) => a - b),
         highestLiveBucket: plan.full ? seenHighest : Math.max(meta.highestLiveBucket ?? -1, seenHighest),
         lastFullSweepAt: plan.full ? now() : (meta.lastFullSweepAt ?? 0),
         lastPassAt: now(),

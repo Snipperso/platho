@@ -55,8 +55,12 @@ export const DEFAULT_POLICY = {
   budgetBytesPerDay: 30 * 1024 * 1024,   // what the scan may spend on a phone in a day
   minIntervalMs: 60_000,                 // never poll faster than this, however cheap it looks
   maxIntervalMs: 60 * 60_000,            // never slower than this, however expensive
-  fullSweepEveryMs: 30 * 60_000,         // the safety net that notices writes above the hot range
-  hotMarginBuckets: 4,                   // headroom above the highest live bucket seen
+  // THE SAFETY NET, AND IT WAS RUNNING 48 TIMES A DAY. A full sweep costs 10 epochs x 1024 buckets x 57 B =
+  // 583_680 B, so at the old 30-minute cadence it spent 26.7 MiB of a 30 MiB daily budget — the net alone ate
+  // almost the entire allowance, leaving the frequent poll it was supposed to protect with nothing. At six
+  // hours it costs 2.2 MiB/day and still catches a sender writing above the hot range within one sweep.
+  fullSweepEveryMs: 6 * 60 * 60_000,
+  hotMarginBuckets: 4,                   // headroom above the live bucket COUNT (see planIntroScan)
 };
 
 /** How many buckets the network can be expected to be using, from its daily first-contact volume. */
@@ -87,7 +91,8 @@ export function passCostBytes({ asked, live, epochs = 1 }) {
  * sweep instead. The interval is derived from the budget, so it degrades on its own as the network grows.
  */
 export function planIntroScan({
-  highestLiveBucket = -1,
+  distinctLiveBuckets = 0,
+  liveBucketIndices = null,
   liveBuckets = 0,
   readSpace,
   currentEpoch = null,
@@ -98,9 +103,15 @@ export function planIntroScan({
   if (!Number.isInteger(readSpace) || readSpace < 1) throw new Error('planIntroScan requires readSpace');
 
   const full = msSinceFullSweep >= p.fullSweepEveryMs;
+  // THE HOT RANGE TRACKS A COUNT, NOT A MAXIMUM. It used to be `highestLiveBucket + 1 + margin`, and a maximum
+  // is trivially poisoned: one intro written to bucket 1023 costs an attacker 0.0134 GRAM and dragged every
+  // scanner in the network from a handful of buckets to all 1024 — with a ratchet that only a full sweep could
+  // release. Counting distinct live buckets instead makes that same intro worth exactly one extra bucket.
+  // It is also the CORRECT statistic, not merely a hardened one: senders pack densely from the bottom
+  // (web/intro-bucket.mjs), so the live set is 0..k-1 and the count is the frontier.
   const hotTo = full
     ? readSpace
-    : Math.min(readSpace, Math.max(1, highestLiveBucket + 1 + p.hotMarginBuckets));
+    : Math.min(readSpace, Math.max(1, distinctLiveBuckets + p.hotMarginBuckets));
 
   // A full sweep covers the whole retention window; a hot pass covers only the epochs that can still change.
   const epochs = full ? WINDOW_EPOCHS : HOT_EPOCHS;
@@ -109,22 +120,46 @@ export function planIntroScan({
   const live = Math.min(liveBuckets, hotTo * epochs) * (full ? 1 : HOT_EPOCHS / WINDOW_EPOCHS);
   const cost = passCostBytes({ asked, live, epochs });
 
-  // How often can we afford this? A pass that costs nothing still respects minIntervalMs — polling faster than a
-  // minute buys freshness nobody perceives and costs battery, which no byte budget accounts for.
-  const affordablePassesPerDay = cost > 0 ? p.budgetBytesPerDay / cost : Infinity;
-  const intervalMs = Number.isFinite(affordablePassesPerDay)
+  // THE INTERVAL IS ALWAYS DERIVED FROM A HOT PASS, NEVER FROM THE SWEEP THAT JUST RAN. Deriving it from the
+  // completed pass looked reasonable and produced a bad product bug: a full sweep costs ~570 KiB, so the client
+  // scheduled its next poll 26.7 MINUTES out — and a brand-new install's very first pass is always a full sweep,
+  // because it has no record of one. Someone installs the app, is written to a minute later, and sees nothing
+  // for half an hour. The sweep's own cost is instead amortised out of the daily budget up front, which is where
+  // it belongs: it is a fixed overhead, not a reason to go quiet.
+  const sweepsPerDay = 86_400_000 / p.fullSweepEveryMs;
+  const fullCost = passCostBytes({ asked: readSpace, live: liveBuckets, epochs: WINDOW_EPOCHS });
+  const hotCost = full
+    ? passCostBytes({
+      asked: Math.min(readSpace, Math.max(1, distinctLiveBuckets + p.hotMarginBuckets)),
+      live: Math.min(liveBuckets, readSpace * HOT_EPOCHS) * (HOT_EPOCHS / WINDOW_EPOCHS),
+      epochs: HOT_EPOCHS,
+    })
+    : cost;
+  const hotBudget = Math.max(0, p.budgetBytesPerDay - sweepsPerDay * fullCost);
+
+  // A pass that costs nothing still respects minIntervalMs — polling faster than a minute buys freshness nobody
+  // perceives and costs battery, which no byte budget accounts for.
+  const affordablePassesPerDay = hotCost > 0 ? hotBudget / hotCost : Infinity;
+  const intervalMs = Number.isFinite(affordablePassesPerDay) && affordablePassesPerDay > 0
     ? Math.min(p.maxIntervalMs, Math.max(p.minIntervalMs, Math.round(86_400_000 / affordablePassesPerDay)))
-    : p.minIntervalMs;
+    : (affordablePassesPerDay === 0 ? p.maxIntervalMs : p.minIntervalMs);
 
   const epochRange = currentEpoch === null ? null : (full
     ? { from: currentEpoch - (WINDOW_EPOCHS - 2), to: currentEpoch + 1 }
     : { from: currentEpoch - 1, to: currentEpoch + 1 });
+
+  // Buckets known to be live that sit ABOVE the dense prefix. Naming them costs ~57 B each and is what stops a
+  // non-conforming sender's intro from being visible only to the six-hourly full sweep — otherwise this sizing
+  // would have swapped the poisoning it fixes for a six-hour delivery delay. An outlier costs one address per
+  // pass; it can no longer drag the prefix to the full read space.
+  const extraBuckets = full ? [] : (liveBucketIndices ?? []).filter((b) => b >= hotTo && b < readSpace);
 
   return {
     full,
     epochs: epochRange,
     epochCount: epochs,
     buckets: { from: 0, to: hotTo },
+    extraBuckets,
     intervalMs,
     estimatedPassBytes: cost,
     estimatedDailyBytes: Math.round(cost * (86_400_000 / intervalMs)),
