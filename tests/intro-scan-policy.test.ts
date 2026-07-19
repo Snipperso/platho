@@ -44,7 +44,10 @@ describe('INTRO-SCAN-POLICY — cost in bytes, not in requests', () => {
     const at = (introsPerDay: number) => {
       const live = liveBucketsFor(introsPerDay);
       // live shards across the whole window: one set per epoch
-      return planIntroScan({ highestLiveBucket: live - 1, liveBuckets: live * 10, readSpace: INTRO_READ_SPACE, msSinceFullSweep: 0 });
+      // The hot range is sized by the COUNT of live buckets since 2026-07-19, not by the highest index seen —
+      // a maximum was poisoned by a single intro written high (tests/intro-scan-hot-range.test.ts HOT-01).
+      // Under the write rule the live set is 0..live-1, so the count and the old frontier coincide here.
+      return planIntroScan({ distinctLiveBuckets: live, liveBuckets: live * 10, readSpace: INTRO_READ_SPACE, msSinceFullSweep: 0 });
     };
     const small = at(8_000);
     const medium = at(1_000_000);

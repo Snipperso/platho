@@ -55,7 +55,7 @@ export function unpackScanPage(pairs, count) {
  * One scan pass over the INTRO lane.
  *
  * `readStates(addresses)`   -> Map(addrKey -> state), as web/shard-reader.readAccountStates produces.
- * `readScanPage(address, fromId, maxCount)` -> { from_id, count, next_id, evict_cursor, pairs } or null if the
+ * `readScanPage(address, fromId, maxCount)` -> { from_id, count, next_id, pairs } or null if the
  *                              shard does not exist. Both are injected so this stays transport-agnostic.
  * `cursors` is the caller's memory across passes: addrKey -> { marker, nextId }. Pass the returned one back in.
  * `buckets` is the range to look at, `{from, to}` (to exclusive). Defaults to the whole read space. A narrower
@@ -72,6 +72,7 @@ export async function scanIntroWindow({
   fromEpoch = (currentEpoch ?? toEpoch) - INTRO_SCAN_EPOCHS_BACK,
   readSpace = INTRO_READ_SPACE,
   buckets = null,
+  extraBuckets = null,   // live bucket indices outside the dense prefix; see the union note below
   cursors = new Map(),
   readStates,
   readScanPage,
@@ -85,11 +86,26 @@ export async function scanIntroWindow({
 
   // Pass 1 — ask about the whole range at once. Buckets nobody has written to simply do not come back, so an
   // over-wide range costs only the addresses in the request URL, never anything in the response.
+  //
+  // The range is a DENSE PREFIX plus, optionally, the specific bucket indices already known to be live. The
+  // union matters: the prefix is sized from a COUNT of live buckets, which says how many there are but not
+  // where. Under the write rule (web/intro-bucket.mjs) they are 0..k-1 and the prefix covers everything, but a
+  // sender that ignores the rule would otherwise be visible only to the six-hourly full sweep — trading the
+  // poisoning this sizing was meant to fix for a six-hour delivery delay. Naming the known-live buckets costs
+  // ~57 B each and closes that, while an outlier still cannot drag the prefix upward.
   const from = Math.max(0, buckets?.from ?? 0);
   const to = Math.min(readSpace, buckets?.to ?? readSpace);
+  const wanted = new Set();
+  for (let bucket = from; bucket < to; bucket += 1) wanted.add(bucket);
+  for (const bucket of extraBuckets ?? []) {
+    const b = Number(bucket);
+    if (Number.isInteger(b) && b >= 0 && b < readSpace) wanted.add(b);
+  }
+  const bucketList = [...wanted].sort((a, b) => a - b);
+
   const targets = [];
   for (let epoch = fromEpoch; epoch <= toEpoch; epoch += 1) {
-    for (let bucket = from; bucket < to; bucket += 1) {
+    for (const bucket of bucketList) {
       targets.push({ epoch, bucket, address: await introShardAddress(epoch, bucket) });
     }
   }
@@ -166,9 +182,25 @@ export async function scanIntroWindow({
       buckets: [from, to],
       probed: targets.length,
       live: states.size,
-      // the highest bucket actually in use — this is what lets the caller size its hot range without agreeing
-      // anything with anyone; a full sweep updates it, a hot pass can only confirm what it already covers
+      // The highest bucket actually in use. Kept for diagnostics, NOT for sizing the hot range any more — see
+      // distinctLiveBuckets below for why a maximum is the wrong statistic to steer on.
       highestLiveBucket: [...states.keys()].reduce((max, key) => Math.max(max, byKey.get(key)?.bucket ?? -1), -1),
+      // HOW MANY DISTINCT BUCKET INDICES ARE IN USE, which is what actually sizes the hot range.
+      //
+      // The hot range used to track `highestLiveBucket`, and a maximum is trivially poisoned: ONE intro written
+      // to bucket 1023 — 0.0134 GRAM — dragged every scanner's range from a handful of buckets to the full 1024
+      // and held it there, because the runner ratchets the figure upward and only a full sweep can lower it.
+      // A count cannot be poisoned that way: the same outlier adds ONE bucket, not a thousand.
+      //
+      // It is the right statistic now rather than merely a robust one, because senders pack densely from the
+      // bottom (web/intro-bucket.mjs). Under that rule the live set is 0..k-1, so the count IS the frontier.
+      // A sender that ignores the rule is caught by the periodic full sweep, which is precisely its job.
+      distinctLiveBuckets: new Set([...states.keys()].map((key) => byKey.get(key)?.bucket)).size,
+      // WHICH buckets are live, so the next pass can name them even if they sit above the dense prefix. Sorted
+      // and de-duplicated; bounded by readSpace, so it cannot grow without limit.
+      liveBucketIndices: [...new Set([...states.keys()]
+        .map((key) => byKey.get(key)?.bucket)
+        .filter((b) => Number.isInteger(b)))].sort((a, b) => a - b),
       changed: changed.length,
       pagesRead,
       candidates: candidates.length,
