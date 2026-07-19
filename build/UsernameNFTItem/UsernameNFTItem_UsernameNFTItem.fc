@@ -29,6 +29,12 @@ cell __tact_string_builder_end(tuple builders) inline;
 ;; __tact_dict_set_uint_cell
 (cell, ()) __tact_dict_set_uint_cell(cell d, int kl, int k, cell v) inline;
 
+;; $UsernameOwnershipProof$_store
+builder $UsernameOwnershipProof$_store(builder build_0, (int, int, slice, int, slice) v) inline;
+
+;; $UsernameOwnershipProof$_store_cell
+cell $UsernameOwnershipProof$_store_cell((int, int, slice, int, slice) v, builder b) inline;
+
 ;; $UsernameItemDeployedAck$_store
 builder $UsernameItemDeployedAck$_store(builder build_0, (int, slice) v) inline;
 
@@ -79,6 +85,9 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $UsernameNFTItem$_contract_store
 () $UsernameNFTItem$_contract_store((int, slice, slice, int, int, cell) v) impure inline;
+
+;; $Cell$_fun_asSlice
+slice $Cell$_fun_asSlice(cell $self) impure inline;
 
 ;; $UsernameNFTItem$_fun_isBasechainAddress
 ((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_isBasechainAddress((int, slice, slice, int, int, cell) $self, slice $address) impure inline_ref;
@@ -133,6 +142,9 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $MessageParameters$_constructor_to_value_mode_bounce_body
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline;
+
+;; $UsernameOwnershipProof$_constructor_query_id_name_hash_owner_wallet_username_len_username
+((int, int, slice, int, slice)) $UsernameOwnershipProof$_constructor_query_id_name_hash_owner_wallet_username_len_username(int $query_id, int $name_hash, slice $owner_wallet, int $username_len, slice $username) inline;
 
 ;; $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload
 ((int, slice, slice)) $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload(int $query_id, slice $previous_owner, slice $forward_payload) inline;
@@ -301,6 +313,11 @@ slice $Cell$_fun_beginParse(cell $self) impure asm """
     CTOS
 """;
 
+slice $Cell$_fun_asSlice(cell $self) impure inline {
+    var ($self) = $self;
+    return $Cell$_fun_beginParse($self);
+}
+
 int $Cell$_fun_hash(cell $self) impure asm """
     HASHCU
 """;
@@ -356,6 +373,31 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline {
     return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: UsernameOwnershipProof
+;; Header: 0x554e504f
+;; TLB: username_ownership_proof#554e504f query_id:uint64 name_hash:uint256 owner_wallet:address username_len:uint8 username:remainder<slice> = UsernameOwnershipProof
+;;
+
+builder $UsernameOwnershipProof$_store(builder build_0, (int, int, slice, int, slice) v) inline {
+    var (v'query_id, v'name_hash, v'owner_wallet, v'username_len, v'username) = v;
+    build_0 = store_uint(build_0, 1431195727, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'name_hash, 256);
+    build_0 = build_0.store_slice(v'owner_wallet);
+    build_0 = build_0.store_uint(v'username_len, 8);
+    build_0 = build_0.store_slice(v'username);
+    return build_0;
+}
+
+cell $UsernameOwnershipProof$_store_cell((int, int, slice, int, slice) v, builder b) inline {
+    return $UsernameOwnershipProof$_store(b, v).end_cell();
+}
+
+((int, int, slice, int, slice)) $UsernameOwnershipProof$_constructor_query_id_name_hash_owner_wallet_username_len_username(int $query_id, int $name_hash, slice $owner_wallet, int $username_len, slice $username) inline {
+    return ($query_id, $name_hash, $owner_wallet, $username_len, $username);
 }
 
 ;;
@@ -727,6 +769,19 @@ _ %get_nft_data() method_id(102351) {
         throw_unless(18021, ($Context$_get_value(__tact_context_get()) >= 4000000));
         throw_unless(18022, ($Context$_get_value(__tact_context_get()) <= 20000000));
         ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_sendDeployedAck();
+        $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username));
+        return ();
+    }
+    
+    ;; Receive ProveUsernameOwnership message
+    if (op == 0x554e5052) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'to = in_msg~load_msg_addr();
+        throw_unless(18040, $self'initialized);
+        throw_unless(18041, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isBasechainAddress($msg'to));
+        throw_unless(18042, ($Context$_get_value(__tact_context_get()) >= 6000000));
+        throw_unless(18043, ($Context$_get_value(__tact_context_get()) <= 20000000));
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'to, 5000000, 1, true, $UsernameOwnershipProof$_store_cell($UsernameOwnershipProof$_constructor_query_id_name_hash_owner_wallet_username_len_username($msg'query_id, $self'name_hash, $self'owner_wallet, $self'username_len, $Cell$_fun_asSlice($self'username)), begin_cell())));
         $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username));
         return ();
     }

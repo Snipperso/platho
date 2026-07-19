@@ -3,7 +3,7 @@ Contract: ATHWallet
 BoC Size: 6666 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 77
+Total structures: 79
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -56,6 +56,14 @@ Signature: `ResendDeployedAck{}`
 ### TopUpStorageReserve
 TL-B: `top_up_storage_reserve#27acdf8b  = TopUpStorageReserve`
 Signature: `TopUpStorageReserve{}`
+
+### ProveUsernameOwnership
+TL-B: `prove_username_ownership#554e5052 query_id:uint64 to:address = ProveUsernameOwnership`
+Signature: `ProveUsernameOwnership{query_id:uint64,to:address}`
+
+### UsernameOwnershipProof
+TL-B: `username_ownership_proof#554e504f query_id:uint64 name_hash:uint256 owner_wallet:address username_len:uint8 username:remainder<slice> = UsernameOwnershipProof`
+Signature: `UsernameOwnershipProof{query_id:uint64,name_hash:uint256,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
 
 ### UsernameItemDeployedAck
 TL-B: `username_item_deployed_ack#bba3ec19 name_hash:uint256 owner_wallet:address = UsernameItemDeployedAck`

@@ -750,6 +750,130 @@ export function dictValueParserTopUpStorageReserve(): DictionaryValue<TopUpStora
     }
 }
 
+export type ProveUsernameOwnership = {
+    $$type: 'ProveUsernameOwnership';
+    query_id: bigint;
+    to: Address;
+}
+
+export function storeProveUsernameOwnership(src: ProveUsernameOwnership) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1431195730, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.to);
+    };
+}
+
+export function loadProveUsernameOwnership(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1431195730) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _to = sc_0.loadAddress();
+    return { $$type: 'ProveUsernameOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function loadTupleProveUsernameOwnership(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _to = source.readAddress();
+    return { $$type: 'ProveUsernameOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function loadGetterTupleProveUsernameOwnership(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _to = source.readAddress();
+    return { $$type: 'ProveUsernameOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function storeTupleProveUsernameOwnership(source: ProveUsernameOwnership) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.to);
+    return builder.build();
+}
+
+export function dictValueParserProveUsernameOwnership(): DictionaryValue<ProveUsernameOwnership> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeProveUsernameOwnership(src)).endCell());
+        },
+        parse: (src) => {
+            return loadProveUsernameOwnership(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type UsernameOwnershipProof = {
+    $$type: 'UsernameOwnershipProof';
+    query_id: bigint;
+    name_hash: bigint;
+    owner_wallet: Address;
+    username_len: bigint;
+    username: Slice;
+}
+
+export function storeUsernameOwnershipProof(src: UsernameOwnershipProof) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1431195727, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.name_hash, 256);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.username_len, 8);
+        b_0.storeBuilder(src.username.asBuilder());
+    };
+}
+
+export function loadUsernameOwnershipProof(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1431195727) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _name_hash = sc_0.loadUintBig(256);
+    const _owner_wallet = sc_0.loadAddress();
+    const _username_len = sc_0.loadUintBig(8);
+    const _username = sc_0;
+    return { $$type: 'UsernameOwnershipProof' as const, query_id: _query_id, name_hash: _name_hash, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadTupleUsernameOwnershipProof(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _name_hash = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'UsernameOwnershipProof' as const, query_id: _query_id, name_hash: _name_hash, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadGetterTupleUsernameOwnershipProof(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _name_hash = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'UsernameOwnershipProof' as const, query_id: _query_id, name_hash: _name_hash, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function storeTupleUsernameOwnershipProof(source: UsernameOwnershipProof) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.name_hash);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.username_len);
+    builder.writeSlice(source.username.asCell());
+    return builder.build();
+}
+
+export function dictValueParserUsernameOwnershipProof(): DictionaryValue<UsernameOwnershipProof> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUsernameOwnershipProof(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUsernameOwnershipProof(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameItemDeployedAck = {
     $$type: 'UsernameItemDeployedAck';
     name_hash: bigint;
@@ -1256,7 +1380,7 @@ function initUsernameNFTItem_init_args(src: UsernameNFTItem_init_args) {
 }
 
 async function UsernameNFTItem_init(username_registry_address: Address, name_hash: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241021f010006df000114ff00f4a413f4bcf2c80b01020162021103f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019fd200fa40fa40d3ffd307d455506c168e1cfa40810101d7005902d10181465121c300f2f4702270c8c910351024e207925f07e07026d74920c21f953106d31f07de218210554e494ebae302218210639cfc6cbae3022182105fcc3d14ba03080a04c05b05fa40d30781465af84226c705f2f481465b27b3f2f410465e32505781465c5197db3c1af2f481465d543968db3c1af2f481465e5198db3c355b335112ba16f2f481465ff8416f24135f0382083d0900bef2f47fc85005cf16c910451034120c04060701deeda2edfb555127db3c936c2670e126d74928aa02bd936c2670e026c702936c2670e170935308b98e3907d30721c2609321c17b9170e222c22f9322c13a9170e223c02d92337f9303c05fe20192327f9102e292317f9101e296306c2670db31e107a4e8303705c7001046103544301205001420c20392c111923070e20020c88210c5cc7cd601cb1f01cf16c9f9000130db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed540901905b3581466424f2f4814665f8416f24135f0382083d0900bef2f4814666f8416f24135f038209312d00bbf2f410355512db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed5409006a82082dc6c07f715357c8598210bba3ec195003cb1fcbffcec92755304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001b0e3023720821027acdf8bba8e1c303510355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e0c00006c12116b08e1f8146b3f2f010355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e05f06f2c0820b03fc5b05d33f81466e26f2f481466ff84226c705f2f4fa4010465e3250578146705196db3c1af2f427d70b01c3006d218e943008fa4010461035465681467151b6db3c1cf2f4990972d7210644941513e206d2000192d431defa008208989680f8416f24fa40fa0071d721fa00fa00306c6170f83aaa00b609f8416f24135f030c0c0d000afa4430c00003f282081e8480a123a101a181467321c2fff2f45392c2008ec5104745737150ae7007db3c544d99c85520821005138d915004cb1f12cb3fcecec9104b103a4e60441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00491346569336395be2089625820186a0be9170e2951026333430e30d103544130e0f10001820c700973070c8ca00c9d0e00064717008c8018210d53276db58cb1fcb3fc9104510374180441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0003002cc87f01ca0055505056ca0013cececbffcb07ccc9ed5402012012150177be9d6f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3633c1301285475435475435555db3c106c105b104a1039487014001a21c0049171e021c0059172e0730177bc7e7f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3632c160130547523271059104810374698db3c104810374a90106a10591703f655226d8307507682f082a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce8906db3c10394870206e953059f45b30944133f417e28307507682f0c9046f7a37ad0ea7cee73355984fa5428982f8b37c8f7bcec91f7ac71a7cd10406db3c10394870206e953059f45b30944133f417e2700118191e0026c87001cb0721d0cf1682102e61746801cb1fc90242c87001cb076f00016f8c6d6f8c89db3c6f2201c993216eb396016f2259ccc9e8311a1d01fe5072697661746520636f72726573706f6e64656e636520697320612072696768742c206e6f7420612070726976696c6567652e2054686973206973206120757365726e616d65204e465420666f7220506c6174686f20e280942074686520616e6f6e796d6f75732c20706f73742d7175616e74756d2d656e637279707465641b01fe2c20756e63656e736f7261626c65206d657373656e6765722e2041207065726d616e656e742c207472616e7366657261626c652c2066756c6c79206f6e2d636861696e2068616e646c653a20746865206e616d65206f746865727320726561636820796f752062792c2068656c64206279206e6f206f6e652062757420796f1c001a752e20706c6174686f2e61707000b620d74a21d7499720c20022c200b18e48036f22807f22cf31ab02a105ab025155b60820c2009a20aa0215d71803ce4014de596f025341a1c20099c8016f025044a1aa028e123133c20099d430d020d74a21d749927020e2e2e85f030018c85902cb07f400c910364540d0e05244');
+    const __code = Cell.fromHex('b5ee9c7241022101000790000114ff00f4a413f4bcf2c80b01020162021303f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019fd200fa40fa40d3ffd307d455506c168e1cfa40810101d7005902d10181465121c300f2f4702270c8c910351024e207925f07e07026d74920c21f953106d31f07de218210554e494ebae302218210639cfc6cbae302218210554e5052ba03080a04c05b05fa40d30781465af84226c705f2f481465b27b3f2f410465e32505781465c5197db3c1af2f481465d543968db3c1af2f481465e5198db3c355b335112ba16f2f481465ff8416f24135f0382083d0900bef2f47fc85005cf16c910451034120e04060701deeda2edfb555127db3c936c2670e126d74928aa02bd936c2670e026c702936c2670e170935308b98e3907d30721c2609321c17b9170e222c22f9322c13a9170e223c02d92337f9303c05fe20192327f9102e292317f9101e296306c2670db31e107a4e8303705c7001046103544301205001420c20392c111923070e20020c88210c5cc7cd601cb1f01cf16c9f9000130db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed540901905b3581466424f2f4814665f8416f24135f0382083d0900bef2f4814666f8416f24135f038209312d00bbf2f410355512db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed5409006a82082dc6c07f715357c8598210bba3ec195003cb1fcbffcec92755304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002c4e3022182105fcc3d14bae3023720821027acdf8bba8e1c303510355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e0c00006c12116b08e1f8146b3f2f010355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e05f06f2c0820b0d02fc5b05d33ffa403081467826f2f450561443308146795187db3c19f2f481467af8416f24135f0382085b8d80bef2f481467bf8416f24135f038209312d00bbf2f482084c4b40717f2ad0542950546860c855408210554e504f5006cb1f14cb3f12cbffcecb07cec91049413018441359c8cf8580ca00cf8440ce01fa02806a0e0c0044cf40f400c901fb0045334414c87f01ca0055505056ca0013cececbffcb07ccc9ed5403fc5b05d33f81466e26f2f481466ff84226c705f2f4fa4010465e3250578146705196db3c1af2f427d70b01c3006d218e943008fa4010461035465681467151b6db3c1cf2f4990972d7210644941513e206d2000192d431defa008208989680f8416f24fa40fa0071d721fa00fa00306c6170f83aaa00b609f8416f24135f030e0e0f000afa4430c00003f282081e8480a123a101a181467321c2fff2f45392c2008ec5104745737150ae7007db3c544d99c85520821005138d915004cb1f12cb3fcecec9104b103a4e60441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00491346569336395be2089625820186a0be9170e2951026333430e30d10354413101112001820c700973070c8ca00c9d0e00064717008c8018210d53276db58cb1fcb3fc9104510374180441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0003002cc87f01ca0055505056ca0013cececbffcb07ccc9ed5402012014170177be9d6f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3633c1501285475435475435555db3c106c105b104a1039487016001a21c0049171e021c0059172e0730177bc7e7f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3632c180130547523271059104810374698db3c104810374a90106a10591903f655226d8307507682f082a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce8906db3c10394870206e953059f45b30944133f417e28307507682f0c9046f7a37ad0ea7cee73355984fa5428982f8b37c8f7bcec91f7ac71a7cd10406db3c10394870206e953059f45b30944133f417e270011a1b200026c87001cb0721d0cf1682102e61746801cb1fc90242c87001cb076f00016f8c6d6f8c89db3c6f2201c993216eb396016f2259ccc9e8311c1f01fe5072697661746520636f72726573706f6e64656e636520697320612072696768742c206e6f7420612070726976696c6567652e2054686973206973206120757365726e616d65204e465420666f7220506c6174686f20e280942074686520616e6f6e796d6f75732c20706f73742d7175616e74756d2d656e637279707465641d01fe2c20756e63656e736f7261626c65206d657373656e6765722e2041207065726d616e656e742c207472616e7366657261626c652c2066756c6c79206f6e2d636861696e2068616e646c653a20746865206e616d65206f746865727320726561636820796f752062792c2068656c64206279206e6f206f6e652062757420796f1e001a752e20706c6174686f2e61707000b620d74a21d7499720c20022c200b18e48036f22807f22cf31ab02a105ab025155b60820c2009a20aa0215d71803ce4014de596f025341a1c20099c8016f025044a1aa028e123133c20099d430d020d74a21d749927020e2e2e85f030018c85902cb07f400c910364540ffecdc81');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initUsernameNFTItem_init_args({ $$type: 'UsernameNFTItem_init_args', username_registry_address, name_hash })(builder);
@@ -1356,6 +1480,8 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"InitializeUsernameItem","header":1431193934,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ResendDeployedAck","header":1671232620,"fields":[]},
     {"name":"TopUpStorageReserve","header":665640843,"fields":[]},
+    {"name":"ProveUsernameOwnership","header":1431195730,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"to","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"UsernameOwnershipProof","header":1431195727,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"UsernameItemDeployedAck","header":3148082201,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"NftTransfer","header":1607220500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"NftOwnershipAssigned","header":85167505,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"previous_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
@@ -1370,6 +1496,8 @@ const UsernameNFTItem_opcodes = {
     "InitializeUsernameItem": 1431193934,
     "ResendDeployedAck": 1671232620,
     "TopUpStorageReserve": 665640843,
+    "ProveUsernameOwnership": 1431195730,
+    "UsernameOwnershipProof": 1431195727,
     "UsernameItemDeployedAck": 3148082201,
     "NftTransfer": 1607220500,
     "NftOwnershipAssigned": 85167505,
@@ -1389,6 +1517,7 @@ export const UsernameNFTItem_getterMapping: { [key: string]: string } = {
 const UsernameNFTItem_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"InitializeUsernameItem"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ResendDeployedAck"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"ProveUsernameOwnership"}},
     {"receiver":"internal","message":{"kind":"typed","type":"NftTransfer"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TopUpStorageReserve"}},
     {"receiver":"internal","message":{"kind":"empty"}},
@@ -1399,6 +1528,9 @@ export const USERNAME_ITEM_ACK_EXEC_RESERVE = 1000000n;
 export const USERNAME_ITEM_ACK_MAX_RESEND_VALUE = 20000000n;
 export const USERNAME_ITEM_TRANSFER_EXEC_RESERVE = 2000000n;
 export const USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE = 10000000n;
+export const USERNAME_ITEM_PROOF_FORWARD_RESERVE = 5000000n;
+export const USERNAME_ITEM_PROOF_EXEC_RESERVE = 1000000n;
+export const USERNAME_ITEM_PROOF_MAX_VALUE = 20000000n;
 export const USERNAME_ITEM_EXCESSES_MIN_VALUE = 100000n;
 export const USERNAME_ITEM_MAX_LENGTH = 16n;
 export const USERNAME_ITEM_NAME_HASH_DOMAIN = 3318512854n;
@@ -1439,7 +1571,7 @@ export class UsernameNFTItem implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: InitializeUsernameItem | ResendDeployedAck | NftTransfer | TopUpStorageReserve | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: InitializeUsernameItem | ResendDeployedAck | ProveUsernameOwnership | NftTransfer | TopUpStorageReserve | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'InitializeUsernameItem') {
@@ -1447,6 +1579,9 @@ export class UsernameNFTItem implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ResendDeployedAck') {
             body = beginCell().store(storeResendDeployedAck(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ProveUsernameOwnership') {
+            body = beginCell().store(storeProveUsernameOwnership(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'NftTransfer') {
             body = beginCell().store(storeNftTransfer(message)).endCell();

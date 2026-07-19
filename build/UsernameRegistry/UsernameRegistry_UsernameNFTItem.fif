@@ -7,6 +7,8 @@ PROGRAM{
   DECLPROC __tact_string_builder_end
   DECLPROC __tact_string_builder_append
   DECLPROC __tact_dict_set_uint_cell
+  DECLPROC $UsernameOwnershipProof$_store
+  DECLPROC $UsernameOwnershipProof$_store_cell
   DECLPROC $UsernameItemDeployedAck$_store
   DECLPROC $UsernameItemDeployedAck$_store_cell
   DECLPROC $NftOwnershipAssigned$_store
@@ -24,6 +26,7 @@ PROGRAM{
   DECLPROC $UsernameNFTItem$_contract_init
   DECLPROC $UsernameNFTItem$_contract_load
   DECLPROC $UsernameNFTItem$_contract_store
+  DECLPROC $Cell$_fun_asSlice
   DECLPROC $UsernameNFTItem$_fun_isBasechainAddress
   DECLPROC $UsernameNFTItem$_fun_isValidNameLength
   DECLPROC $UsernameNFTItem$_fun_isValidUsernameBytes
@@ -42,6 +45,7 @@ PROGRAM{
   DECLPROC $UsernameNftDataView$_constructor_initialized_index_collection_address_owner_address_individual_content
   DECLPROC $UsernameNFTItem$_fun_get_nft_data
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
+  DECLPROC $UsernameOwnershipProof$_constructor_query_id_name_hash_owner_wallet_username_len_username
   DECLPROC $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload
   DECLPROC $NftExcesses$_constructor_query_id
   86957 DECLMETHOD %get_state
@@ -168,6 +172,23 @@ PROGRAM{
       DICTUSETREF
     }>
   }>
+  $UsernameOwnershipProof$_store PROCINLINE:<{
+    1431195727 PUSHINT
+    s0 s6 XCHG2
+    32 STU
+    s1 s4 XCHG
+    64 STU
+    s1 s2 XCHG
+    256 STU
+    STSLICE
+    8 STU
+    STSLICE
+  }>
+  $UsernameOwnershipProof$_store_cell PROCINLINE:<{
+    5 -ROLL
+    $UsernameOwnershipProof$_store INLINECALLDICT
+    ENDC
+  }>
   $UsernameItemDeployedAck$_store PROCINLINE:<{
     3148082201 PUSHINT
     s0 s3 XCHG2
@@ -286,6 +307,9 @@ PROGRAM{
     $UsernameNFTItem$_store INLINECALLDICT
     ENDC
     c4 POP
+  }>
+  $Cell$_fun_asSlice PROCINLINE:<{
+        CTOS
   }>
   $UsernameNFTItem$_fun_isBasechainAddress PROCREF:<{
         REWRITESTDADDR
@@ -542,6 +566,8 @@ PROGRAM{
     s4 s1 s3 XCHG3
     -ROT
   }>
+  $UsernameOwnershipProof$_constructor_query_id_name_hash_owner_wallet_username_len_username PROCINLINE:<{
+  }>
   $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload PROCINLINE:<{
   }>
   $NftExcesses$_constructor_query_id PROCINLINE:<{
@@ -670,6 +696,73 @@ PROGRAM{
       s3 s5 XCHG
       2 3 BLKSWAP
       $UsernameNFTItem$_fun_sendDeployedAck INLINECALLDICT
+      $UsernameNFTItem$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1431195730 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s5 XCHG
+      64 LDU
+      LDMSGADDR
+      DROP
+      18040 PUSHINT
+      s6 PUSH
+      THROWANYIFNOT
+      s5 s6 XCHG2
+      s1 s4 XCHG
+      s3 s3 s0 XCHG3
+      18041 PUSHINT
+      s8 s7 XCPU
+      $UsernameNFTItem$_fun_isBasechainAddress INLINECALLDICT
+      s1 s9 XCHG
+      THROWANYIFNOT
+      18042 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      6000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      18043 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      20000000 PUSHINT
+      LEQ
+      THROWANYIFNOT
+      5000000 PUSHINT
+      1 PUSHINT
+      TRUE
+      s10 PUSH
+      $Cell$_fun_asSlice INLINECALLDICT
+      s9 s5 s(-1) XCPUXC
+      s8 s5 s(-2) PU2XC
+      $UsernameOwnershipProof$_constructor_query_id_name_hash_owner_wallet_username_len_username INLINECALLDICT
+      NEWC
+      $UsernameOwnershipProof$_store_cell INLINECALLDICT
+      s4 s9 XCHG
+      s1 s3 s0 XCHG3
+      s1 s8 XCHG
+      $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s5 s3 s3 XCHG3
+      s4 s1 s4 XCHG3
       $UsernameNFTItem$_contract_store INLINECALLDICT
     }>
     OVER

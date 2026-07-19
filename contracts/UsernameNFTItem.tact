@@ -7,6 +7,9 @@ const USERNAME_ITEM_ACK_EXEC_RESERVE: Int = 1000000;
 const USERNAME_ITEM_ACK_MAX_RESEND_VALUE: Int = 20000000;
 const USERNAME_ITEM_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE: Int = 10000000;
+const USERNAME_ITEM_PROOF_FORWARD_RESERVE: Int = 5000000;
+const USERNAME_ITEM_PROOF_EXEC_RESERVE: Int = 1000000;
+const USERNAME_ITEM_PROOF_MAX_VALUE: Int = 20000000;
 const USERNAME_ITEM_EXCESSES_MIN_VALUE: Int = 100000;
 const USERNAME_ITEM_MAX_LENGTH: Int = 16;
 const USERNAME_ITEM_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
@@ -22,6 +25,28 @@ message(0x554E494E) InitializeUsernameItem {
 message(0x639CFC6C) ResendDeployedAck {}
 
 message(0x27ACDF8B) TopUpStorageReserve {}
+
+// Cross-generation migration. A contract redeploy gives the next generation's registry an empty name map, so
+// without this the names bought here would look free there and could be taken by anyone — the owner keeps the
+// NFT but loses the name in the system that is actually live.
+//
+// This is the ONLY half of the mechanism that cannot be added later: once minted, this item is immutable
+// forever, so a registry that does not exist yet can only learn who owns the name if the item can state it
+// itself. The consuming side belongs to the generation that consumes it and is written then.
+message(0x554E5052) ProveUsernameOwnership {
+    query_id: Int as uint64;
+    to: Address;
+}
+
+// Everything the next generation needs to recreate the name, in ONE message: name_hash is not reversible, so
+// the username bytes travel with it, and a claim needs no second correlated transaction.
+message(0x554E504F) UsernameOwnershipProof {
+    query_id: Int as uint64;
+    name_hash: Int as uint256;
+    owner_wallet: Address;
+    username_len: Int as uint8;
+    username: Slice as remaining;
+}
 
 message(0xBBA3EC19) UsernameItemDeployedAck {
     name_hash: Int as uint256;
@@ -209,6 +234,39 @@ contract UsernameNFTItem {
         throwUnless(18021, context().value >= USERNAME_ITEM_ACK_FORWARD_RESERVE + USERNAME_ITEM_ACK_EXEC_RESERVE);
         throwUnless(18022, context().value <= USERNAME_ITEM_ACK_MAX_RESEND_VALUE);
         self.sendDeployedAck();
+    }
+
+    // The item states its own public facts — the same ones get_nft_data already exposes — so this is
+    // permissionless. That is deliberate: it lets anyone migrate a name on the owner's behalf, and it means a
+    // name is never stranded because its owner went quiet. It cannot be abused to move a name, because the
+    // proof always names the CURRENT owner, whoever triggers it.
+    //
+    // Crucially the item is NOT transferred. The owner keeps it and may prove as many times as needed, so a
+    // refused or mistimed claim costs nothing — unlike a transfer-based proof, where a name already taken on
+    // the other side would leave the claimant with neither the item nor the name.
+    receive(msg: ProveUsernameOwnership) {
+        throwUnless(18040, self.initialized);
+        throwUnless(18041, self.isBasechainAddress(msg.to));
+        throwUnless(18042, context().value >= USERNAME_ITEM_PROOF_FORWARD_RESERVE + USERNAME_ITEM_PROOF_EXEC_RESERVE);
+        // Capped exactly like the ack-resend path: the item forwards to a caller-chosen address, so without a
+        // ceiling it would be a value relay. The item never pays out of its own storage endowment.
+        throwUnless(18043, context().value <= USERNAME_ITEM_PROOF_MAX_VALUE);
+
+        message(MessageParameters {
+            to: msg.to,
+            value: USERNAME_ITEM_PROOF_FORWARD_RESERVE,
+            mode: SendPayFwdFeesSeparately,
+            // Bounceable so a proof aimed at a non-existent or refusing registry returns the value here
+            // instead of burning it into an uninitialised account.
+            bounce: true,
+            body: UsernameOwnershipProof {
+                query_id: msg.query_id,
+                name_hash: self.name_hash,
+                owner_wallet: self.owner_wallet,
+                username_len: self.username_len,
+                username: self.username.asSlice()
+            }.toCell()
+        });
     }
 
     receive(msg: NftTransfer) {
