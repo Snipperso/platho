@@ -29,9 +29,19 @@ const SCAN_REQUEST_OPTIONS = Object.freeze({
   skipIfRateLimited: true,
 });
 
+/**
+ * The v3 endpoint for `leaf`, derived from whatever base is configured.
+ *
+ * AN EXPLICIT ENDPOINT IS STILL A BASE, not a final URL, and that distinction is the whole point. The first
+ * version returned `explicit` verbatim, which broke the moment both readers were given the same configuration:
+ * the caller passes ONE endpoint, so the messages reader dutifully asked /accountStates for a shard's history,
+ * got an accounts response, found no messages, and every first contact arrived with a null body. The tag matched,
+ * the hit was delivered, and the message had no content. In production it would have hidden, because production
+ * passes no endpoint at all and each reader derives its own leaf from the globals.
+ */
 function resolveEndpoint(leaf, explicit) {
-  if (explicit) return explicit;
-  const base = globalThis.plathoTonRpcEndpoint
+  const base = explicit
+    ?? globalThis.plathoTonRpcEndpoint
     ?? globalThis.plathoTonRpcConfig?.endpoint
     ?? globalThis.PLATHO_TON_RPC_ENDPOINT
     ?? null;

@@ -31,6 +31,7 @@ const BROWSER_ENTRY_POINTS = [
   'web/intro-bucket.mjs',
   'web/publish-price.mjs',
   'web/shard-rpc.mjs',
+  'web/intro-lane.mjs',
 ];
 
 /** Imports that exist only in Node: the browser has no bundler step here, it loads these files as-is. */
