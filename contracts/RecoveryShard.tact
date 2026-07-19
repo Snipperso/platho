@@ -178,6 +178,18 @@ contract RecoveryShard {
     // Permissionless self-heal: after 3 years with no refresh, the slot may be cleared so the address is reusable
     // (and the endowment reclaimed by the caller). A user active within 3 years never hits this — every recovery
     // publish resets updated_at, so griefing is impossible while the user lives.
+    //
+    // THIS LANE DELIBERATELY DOES NOT DESTROY ITS ACCOUNT, unlike RecordShard.RetireShard and
+    // IntroShard.RetireShard, which do. The asymmetry is load-bearing and a future reader must not "tidy" it:
+    // destroying an account resets its state to init, and `seq` below is retained precisely so that it CANNOT be
+    // reset — it is the anti-rollback high-water mark, and a fresh seq of 0 would make every previously signed
+    // RecoveryStore valid again, letting anyone re-bind the freed slot with the owner's own OUTDATED blob and
+    // roll their K_root back to a key they had rotated away from.
+    // The other two lanes are safe to destroy because their identity carries no such monotonic guard: a
+    // resurrected RecordShard/IntroShard is refused by the epoch gate, so nothing can be written into it at all.
+    // This one also needs no destroy to be economical — clearing the slot is already O(1) and the caller already
+    // takes the whole residual through mode 128, which is exactly the shape the other two lanes had to be
+    // rebuilt to reach. It never carried a per-entry bounty, so it never had the defect that removed them.
     receive(_: EvictRecovery) {
         throwUnless(13561, self.bound);
         throwUnless(13562, (self.updated_at + RS_RECOVERY_RETENTION) < now());

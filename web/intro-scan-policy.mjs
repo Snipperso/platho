@@ -7,8 +7,20 @@
 //
 // MEASURED INPUTS (live toncenter v3, 2026-07-18):
 //   - Asking about a bucket costs ~57 B UP (its address in the request URL) whether or not it exists.
-//   - A bucket that exists costs ~439 B DOWN. One that does not costs zero — uninit accounts are omitted.
+//   - A bucket that exists costs ~439 B DOWN. One that does not costs zero.
 //   - Up to 1149 addresses fit one request (64 KiB URL wall).
+//
+// THE "COSTS ZERO" RULE IS NARROWER THAN IT READS, re-probed against the live endpoint 2026-07-19. What is
+// omitted is an address the indexer has NEVER SEEN. An address that was touched at some point and is now empty
+// comes back as a full `uninit` row costing ~525 B — nearly as much as the ~654 B of a live one. Measured with
+// three addresses in one request: a never-touched address returned no row at all, while an address with a
+// transaction history returned `status: "uninit"` with balance, hashes and lt.
+//
+// That matters because a RETIRED shard has a transaction history and will therefore keep returning a row. It
+// does not touch this budget only because retirement is deliberately placed OUTSIDE the scan window: an INTRO
+// shard of epoch E leaves the window at (E+9)*86400 and becomes retireable at (E+13)*86400 — the four epochs of
+// IS_RETIRE_SLACK. A scanner never asks about a shard that could be gone. If that slack is ever reduced, this
+// cost reappears in every pass, on top of the silent-loss risk the slack exists to prevent.
 //
 // THE TWO LEVERS, and they compose:
 //
