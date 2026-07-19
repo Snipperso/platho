@@ -317,10 +317,15 @@ export async function selfRecoveryBucketKey(seed) {
 
 // ---- recovery-lane owner key (§12 durability): the RecoveryShard slot address COMMITS to this pubkey ----
 // The RecoveryShard is a distinct lane from the CONV self-capsule above. Its slot key is NOT the CONV bucketKey — it
-// is self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey) (see shard-discovery.recoveryOwnerSlotKey). That binding is
-// the squat-close gate 13575: only the holder of the seed that derives owner_pubkey can name — hence bind — the
-// slot, even after a 3-year eviction frees it. Deterministic from the seed so a reinstalled client re-derives the
-// same signing key; the recovery publish signs owner_sig with recoveryOwnerSecret.
+// is self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index) (see shard-discovery.recoveryOwnerSlotKey).
+// That binding is the squat-close gate 13575: only the holder of the seed that derives owner_pubkey can name — hence
+// bind — any of the slots, even after a 3-year eviction frees one. Deterministic from the seed so a reinstalled
+// client re-derives the same signing key; the recovery publish signs owner_sig with recoveryOwnerSecret.
+//
+// ONE OWNER KEY, RS_MAX_SLOTS SLOTS [owner decision 2026-07-19]. The index used to be absent, which made a user's
+// single slot a hard ceiling of about 155 conversations surviving a reinstall — unraisable after seal, because the
+// derivation IS the address. The owner key is shared across all of them: the signing key here is per-user, not
+// per-slot, and each slot carries its own independent seq.
 export async function recoveryOwnerSecret(seed) {
   return hkdf256(assertBytes('seed', seed), utf8(RECOVERY_OWNER_SALT_DOMAIN), utf8(RECOVERY_OWNER_INFO_DOMAIN), 32);
 }
