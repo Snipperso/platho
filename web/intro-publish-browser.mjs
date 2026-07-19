@@ -15,6 +15,7 @@
 import { beginCell } from './pwa-contract-transactions.mjs?v=1';
 import { introShardAddressBytes, introShardStateInit, rawAddress } from './shard-address.mjs?v=1';
 import { INTRO_PUBLISH_OPCODE } from './intro-codec.mjs?v=1';
+import { assertReadableBucket } from './intro-bucket.mjs?v=1';
 
 /** Mirrors `message(0x49535031) IntroPublish` — op | r:uint256 | view_tag:uint16 | ^header_0 | ^body. */
 export function buildIntroPublishBody({ r, viewTag, header0, body }) {
@@ -27,8 +28,15 @@ export function buildIntroPublishBody({ r, viewTag, header0, body }) {
   return builder.endCell();
 }
 
-/** Everything a wallet needs to publish a first contact: where to send, how much, the body, and the StateInit. */
+/**
+ * Everything a wallet needs to publish a first contact: where to send, how much, the body, and the StateInit.
+ *
+ * The bucket is REFUSED if it lies outside the read space. IntroShard.init takes any uint32 and no contract gate
+ * looks at it, while every reader is clamped to INTRO_READ_SPACE — so bucket 1024 and up is a publish that is
+ * accepted, charged for, and read by nobody, for ever. Use chooseIntroBucket() to pick one.
+ */
 export async function buildIntroPublishBrowser({ epoch, bucket, r, viewTag, header0, body, value }) {
+  assertReadableBucket(bucket);
   const address = await introShardAddressBytes(epoch, bucket);
   return {
     to: rawAddress(address),

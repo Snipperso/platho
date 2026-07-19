@@ -113,7 +113,18 @@ export async function buildConvPublish({ writePublicKey, writeSecret, seq, epoch
  * existing intro handshake (crypto/intro-handshake.mjs → {ephemeralR, viewTag}); the recipient finds it by scanning
  * view_tags, so nothing here reveals who it is addressed to.
  */
+// Mirrors INTRO_READ_SPACE in web/shard-discovery.mjs, held BY HAND on purpose: this file is the INDEPENDENT
+// reference the browser derivation is pinned against, so importing from it would make their agreement prove
+// nothing. tests/intro-bucket.test.ts pins the two mirrors against each other.
+const INTRO_READ_SPACE_MIRROR = 1024;
+
 export async function buildIntroPublish({ epoch, bucket, r, viewTag, header0, body, value }) {
+  // A bucket outside the read space is ACCEPTED by the contract — IntroShard.init takes any uint32 and no gate
+  // looks at it — charged for, and then read by nobody, for ever. Refuse rather than clamp: silently rewriting
+  // the caller's bucket sends their message somewhere they did not ask for, which is the same surprise moved.
+  if (!(BigInt(bucket) >= 0n && BigInt(bucket) < BigInt(INTRO_READ_SPACE_MIRROR))) {
+    throw new Error(`INTRO bucket ${bucket} is outside the read space of ${INTRO_READ_SPACE_MIRROR}`);
+  }
   const target = await introShardState(epoch, bucket);
   return {
     to: target.address,
