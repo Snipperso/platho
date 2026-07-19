@@ -153,8 +153,6 @@ export interface MainnetGenesisVerifyInput {
     username_registry: BaseSnapshot & {
       official_ath_wallet_bound: boolean;
       official_ath_wallet_address: string;
-      vault_bound: boolean;
-      vault_address: string;
       ath_master_address: string;
       treasury_ath_receiver: string;
       name_record_count: string;
@@ -172,8 +170,6 @@ export interface MainnetGenesisVerifyInput {
     profile_registry: BaseSnapshot & {
       official_ath_wallet_bound: boolean;
       official_ath_wallet_address: string;
-      vault_bound: boolean;
-      vault_address: string;
       ath_master_address: string;
       treasury_ath_receiver: string;
       profile_count: string;
@@ -890,8 +886,6 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
         official_ath_wallet_bound: true,
         official_ath_wallet_address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
-        vault_bound: true,
-        vault_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         treasury_ath_receiver: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
         name_record_count: '0',
@@ -914,8 +908,6 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
         official_ath_wallet_bound: true,
         official_ath_wallet_address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
-        vault_bound: true,
-        vault_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         treasury_ath_receiver: 'REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS',
         profile_count: '0',
@@ -1424,9 +1416,6 @@ export function verifyMainnetGenesisSnapshot(
   checkSealed(issues, manifest, s.username_registry, 'username_registry');
   addTrue(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_NOT_BOUND', s.username_registry.official_ath_wallet_bound, 'username_registry.official_ath_wallet_bound');
   addAddressEq(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_MISMATCH', s.username_registry.official_ath_wallet_address, manifest.addresses.username_registry_official_ath_wallet, 'username_registry.official_ath_wallet_address');
-  addTrue(issues, 'USERNAME_REGISTRY_VAULT_NOT_BOUND', s.username_registry.vault_bound, 'username_registry.vault_bound');
-  addAddressEq(issues, 'USERNAME_REGISTRY_VAULT_ADDRESS_MISMATCH', s.username_registry.vault_address, manifest.addresses.vault, 'username_registry.vault_address');
-  addBasechainAddress(issues, 'USERNAME_REGISTRY_VAULT_ADDRESS_NOT_BASECHAIN', s.username_registry.vault_address, 'username_registry.vault_address');
   addAddressEq(issues, 'USERNAME_REGISTRY_ATH_MASTER_MISMATCH', s.username_registry.ath_master_address, manifest.addresses.ath_master, 'username_registry.ath_master_address');
   addBasechainAddress(issues, 'USERNAME_REGISTRY_ATH_MASTER_NOT_BASECHAIN', s.username_registry.ath_master_address, 'username_registry.ath_master_address');
   addAddressEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.username_registry.treasury_ath_receiver, manifest.addresses.treasury_ath_receiver, 'username_registry.treasury_ath_receiver');
@@ -1459,9 +1448,6 @@ export function verifyMainnetGenesisSnapshot(
   checkSealed(issues, manifest, s.profile_registry, 'profile_registry');
   addTrue(issues, 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_NOT_BOUND', s.profile_registry.official_ath_wallet_bound, 'profile_registry.official_ath_wallet_bound');
   addAddressEq(issues, 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_MISMATCH', s.profile_registry.official_ath_wallet_address, manifest.addresses.profile_registry_official_ath_wallet, 'profile_registry.official_ath_wallet_address');
-  addTrue(issues, 'PROFILE_REGISTRY_VAULT_NOT_BOUND', s.profile_registry.vault_bound, 'profile_registry.vault_bound');
-  addAddressEq(issues, 'PROFILE_REGISTRY_VAULT_ADDRESS_MISMATCH', s.profile_registry.vault_address, manifest.addresses.vault, 'profile_registry.vault_address');
-  addBasechainAddress(issues, 'PROFILE_REGISTRY_VAULT_ADDRESS_NOT_BASECHAIN', s.profile_registry.vault_address, 'profile_registry.vault_address');
   addAddressEq(issues, 'PROFILE_REGISTRY_ATH_MASTER_MISMATCH', s.profile_registry.ath_master_address, manifest.addresses.ath_master, 'profile_registry.ath_master_address');
   addBasechainAddress(issues, 'PROFILE_REGISTRY_ATH_MASTER_NOT_BASECHAIN', s.profile_registry.ath_master_address, 'profile_registry.ath_master_address');
   addAddressEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.profile_registry.treasury_ath_receiver, manifest.addresses.profile_registry_treasury_ath_receiver, 'profile_registry.treasury_ath_receiver');

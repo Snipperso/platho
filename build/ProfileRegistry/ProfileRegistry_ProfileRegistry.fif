@@ -68,7 +68,7 @@ PROGRAM{
   DECLPROC $ProfileRegistry$_fun_clearPendingBurnFlush
   DECLPROC $ProfileAvatarRecord$_constructor_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at
   DECLPROC $ProfileRegistry$_fun_acceptAvatarPayment
-  DECLPROC $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_vault_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_vault_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count
+  DECLPROC $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count
   DECLPROC $ProfileRegistry$_fun_get_global
   DECLPROC $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at
   DECLPROC $ProfileRegistry$_fun_get_avatar_version
@@ -320,39 +320,35 @@ PROGRAM{
     }>
   }>
   $ProfileRegistry$_store PROCINLINE:<{
-    s1 19 s() XCHG
-    s0 20 s() XCHG
-    STSLICE
     s1 17 s() XCHG
+    s0 18 s() XCHG
     STSLICE
     s1 s15 XCHG
     STSLICE
-    s0 s13 XCHG
-    NEWC
+    s1 s13 XCHG
     STSLICE
-    s1 s12 XCHG
+    s1 s11 XCHG
     1 STI
-    s1 s10 XCHG
+    s1 s9 XCHG
     1 STI
-    s1 s8 XCHG
-    1 STI
+    s0 s7 XCHG
+    NEWC
+    256 STU
     s1 s6 XCHG
     256 STU
     s1 s4 XCHG
-    256 STU
-    s0 s2 XCHG
-    NEWC
     STSLICE
-    64 STU
     s1 s2 XCHG
     64 STU
-    s1 s2 XCHG
+    64 STU
+    SWAP
+    NEWC
     128 STU
     s1 s2 XCHG
     128 STU
-    s1 s2 XCHG
+    s1 s3 XCHG
     STDICT
-    s1 s2 XCHG
+    s1 s3 XCHG
     STDICT
     s1 s3 XCHG
     STDICT
@@ -369,21 +365,19 @@ PROGRAM{
     LDMSGADDR
     LDMSGADDR
     LDMSGADDR
+    1 LDI
+    1 LDI
     LDREF
     SWAP
     CTOS
+    256 LDU
+    256 LDU
     LDMSGADDR
-    1 LDI
-    1 LDI
-    1 LDI
-    256 LDU
-    256 LDU
+    64 LDU
+    64 LDU
     LDREF
     DROP
     CTOS
-    LDMSGADDR
-    64 LDU
-    64 LDU
     128 LDU
     128 LDU
     LDDICT
@@ -393,9 +387,11 @@ PROGRAM{
     LDDICT
     64 LDU
     DROP
-    17 s() 20 s() XCHG
-    17 s() 19 s() XCHG
-    17 s() 18 s() XCHG
+    s13 18 s() XCHG
+    s13 17 s() XCHG
+    s13 16 s() XCHG
+    s13 s15 XCHG
+    s13 s14 XCHG
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -445,8 +441,6 @@ PROGRAM{
     s3 s4 XCHG
   }>
   $ProfileRegistry$_contract_init PROCINLINE:<{
-    s6 PUSH
-    FALSE
     FALSE
     0 PUSHINT
     s0 s0 s0 PUSH3
@@ -456,14 +450,9 @@ PROGRAM{
     s3 PUSH
     PUSHNULL
     OVER
-    s12 19 s() XCHG
-    s12 18 s() XCHG
-    s12 17 s() XCHG
-    s12 16 s() XCHG
-    s11 s15 XCHG
     s10 s14 XCHG
-    s12 s13 XCHG
-    s11 s12 XCHG
+    s10 s13 XCHG
+    s10 s12 XCHG
     s10 s11 XCHG
   }>
   $ProfileRegistry$_contract_load PROCINLINE:<{
@@ -473,9 +462,7 @@ PROGRAM{
     SWAP
     IF:<{
       $ProfileRegistry$_load INLINECALLDICT
-      20 s() POP
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
+      18 s() POP
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
@@ -492,8 +479,6 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    s0 20 s() XCHG
-    s0 19 s() XCHG
     s0 18 s() XCHG
     s0 17 s() XCHG
     s0 16 s() XCHG
@@ -581,7 +566,7 @@ PROGRAM{
     DROP
     0 PUSHINT
     ROT
-    20 s() PUSH
+    19 s() PUSH
     $ATHWallet$_init_child INLINECALLDICT
     $global_contractAddressExt INLINECALLDICT
   }>
@@ -597,35 +582,33 @@ PROGRAM{
         HASHCU
   }>
   $ProfileRegistry$_fun_requireValidAvatarPointerFields PROCREF:<{
-    19 s() 24 s() XCHG
-    18 s() 23 s() XCHG
     17 s() 22 s() XCHG
     16 s() 21 s() XCHG
     s15 20 s() XCHG
-    s14 24 s() XCHG
-    s13 23 s() XCHG
+    s14 19 s() XCHG
+    s13 18 s() XCHG
     s12 22 s() XCHG
     s11 21 s() XCHG
     s10 20 s() XCHG
-    s9 24 s() XCHG
-    s8 23 s() XCHG
+    s9 19 s() XCHG
+    s8 18 s() XCHG
     s7 22 s() XCHG
     s6 21 s() XCHG
     s5 20 s() XCHG
-    s4 24 s() XCHG
-    s3 23 s() XCHG
+    s4 19 s() XCHG
+    s3 18 s() XCHG
     s2 22 s() XCHG
     s1 21 s() XCHG
     s0 20 s() XCHG
     21120 PUSHINT
-    s0 25 s() XCHG
+    s0 20 s() XCHG
     $ProfileRegistry$_fun_isBasechainAddress INLINECALLDICT
-    s1 25 s() XCHG
+    s1 20 s() XCHG
     THROWANYIFNOT
     21121 PUSHINT
-    s0 23 s() XCHG
+    s0 18 s() XCHG
     0 NEQINT
-    s1 23 s() XCHG
+    s1 18 s() XCHG
     THROWANYIFNOT
     21122 PUSHINT
     s0 21 s() XCHG
@@ -646,8 +629,6 @@ PROGRAM{
     1 EQINT
     s1 17 s() XCHG
     THROWANYIFNOT
-    s14 19 s() XCHG
-    s13 18 s() XCHG
     s12 17 s() XCHG
     s11 16 s() XCHG
     s10 s15 XCHG
@@ -828,8 +809,6 @@ PROGRAM{
     100000000000 PUSHINT
     EQUAL
     THROWANYIFNOT
-    19 s() 28 s() XCHG
-    18 s() 27 s() XCHG
     17 s() 26 s() XCHG
     16 s() 25 s() XCHG
     s15 24 s() XCHG
@@ -837,8 +816,8 @@ PROGRAM{
     s13 22 s() XCHG
     s12 21 s() XCHG
     s11 20 s() XCHG
-    s10 28 s() XCHG
-    s9 27 s() XCHG
+    s10 19 s() XCHG
+    s9 18 s() XCHG
     s8 26 s() XCHG
     s7 25 s() XCHG
     s6 24 s() XCHG
@@ -846,13 +825,13 @@ PROGRAM{
     s4 22 s() XCHG
     s3 21 s() XCHG
     s2 20 s() XCHG
-    s1 28 s() XCHG
-    s0 27 s() XCHG
+    s1 19 s() XCHG
+    s0 18 s() XCHG
     23 s() PUSH
     23 s() PUSH
     22 s() PUSH
-    31 s() PUSH
-    31 s() PUSH
+    22 s() PUSH
+    22 s() PUSH
     $ProfileRegistry$_fun_requireValidAvatarPointerFields INLINECALLDICT
     s5 PUSH
     267 PUSHINT
@@ -890,28 +869,26 @@ PROGRAM{
       INC
       s0 s12 XCHG
     }>
-    19 s() 22 s() XCHG
-    18 s() 21 s() XCHG
     17 s() 20 s() XCHG
-    16 s() 22 s() XCHG
-    s15 21 s() XCHG
+    16 s() 19 s() XCHG
+    s15 18 s() XCHG
     s14 20 s() XCHG
-    s13 22 s() XCHG
-    s12 21 s() XCHG
+    s13 19 s() XCHG
+    s12 18 s() XCHG
     s11 20 s() XCHG
-    s10 22 s() XCHG
-    s9 21 s() XCHG
+    s10 19 s() XCHG
+    s9 18 s() XCHG
     s8 20 s() XCHG
-    s7 22 s() XCHG
-    s6 21 s() XCHG
+    s7 19 s() XCHG
+    s6 18 s() XCHG
     s5 20 s() XCHG
-    s4 22 s() XCHG
-    s3 21 s() XCHG
+    s4 19 s() XCHG
+    s3 18 s() XCHG
     s2 20 s() XCHG
-    s1 22 s() XCHG
-    s0 21 s() XCHG
+    s1 19 s() XCHG
+    s0 18 s() XCHG
     26 s() PUSH
-    22 s() PUSH
+    19 s() PUSH
     $ProfileRegistry$_fun_computeAvatarRecordId INLINECALLDICT
     21114 PUSHINT
     s6 PUSH
@@ -924,14 +901,14 @@ PROGRAM{
         NOW
     29 s() PUSH
     s0 s6 XCHG
-    25 s() PUSH
+    22 s() PUSH
     s0 s6 XCHG
     s5 30 s() XCHG
     s4 29 s() XCHG
     s3 28 s() XCHG
-    s2 36 s() XCHG
-    s1 35 s() XCHG
-    s0 36 s() XCHG
+    s2 27 s() XCHG
+    s1 26 s() XCHG
+    s0 27 s() XCHG
     $ProfileAvatarRecord$_constructor_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at INLINECALLDICT
     NEWC
     $ProfileAvatarRecord$_store_cell INLINECALLDICT
@@ -943,8 +920,7 @@ PROGRAM{
     267 PUSHINT
     SWAP
     22 s() PUSH
-    SWAP
-    s0 18 s() XCHG
+    s0 s15 XCHG2
     257 PUSHINT
     __tact_dict_set_slice_int INLINECALLDICT
     s0 s2 XCHG
@@ -953,8 +929,6 @@ PROGRAM{
     ISNULL
     NOT
     IF:<{
-      s13 20 s() XCHG
-      s12 19 s() XCHG
       s11 18 s() XCHG
       s10 17 s() XCHG
       s9 16 s() XCHG
@@ -966,12 +940,11 @@ PROGRAM{
       s3 s10 XCHG
       s8 s9 XCHG2
       s3 s7 XCHG
-      s6 s5 s0 XCHG3
-      s3 24 s() XCHG
-      s2 25 s() XCHG
-      25 s() PUSH
+      s0 s3 s6 XCHG3
+      s1 19 s() XCHG
+      20 s() PUSH
       SWAP
-      s0 25 s() XCHG
+      s0 20 s() XCHG
       $ProfileRegistry$_fun_computeAvatarRecordId INLINECALLDICT
       s5 PUSH
       257 PUSHINT
@@ -989,21 +962,17 @@ PROGRAM{
       }>ELSE<{
         DROP
       }>
-      s1 24 s() XCHG
-      s2 23 s() XCHG
-      s1 19 s() XCHG
       s0 18 s() XCHG
       s3 17 s() XCHG
       s6 16 s() XCHG
-      s2 s15 XCHG
-      s4 s14 XCHG
+      s14 s15 s0 XCHG3
       s8 s13 XCHG
-      s12 s11 XCHG2
+      s0 s12 XCHG
+      s4 s11 XCHG
       s3 s10 XCHG
       s6 s9 XCHG
-      s2 s8 XCHG
-      s4 s7 XCHG
-      s6 s5 s4 XCHG3
+      s7 s8 s5 XCHG3
+      s6 s0 s6 XCHG3
     }>ELSE<{
       s14 POP
     }>
@@ -1020,8 +989,6 @@ PROGRAM{
     s0 17 s() XCHG
     SWAP
     ADD
-    s12 21 s() XCHG
-    s11 20 s() XCHG
     s10 19 s() XCHG
     s9 18 s() XCHG
     s8 17 s() XCHG
@@ -1033,80 +1000,61 @@ PROGRAM{
     s2 s11 XCHG
     s4 s10 XCHG
     s7 s9 XCHG
-    s0 s8 XCHG
+    s6 s7 s8 XCHG3
     s0 s5 XCHG
-    s7 s6 XCHG2
-    s4 23 s() XCHG
-    s3 24 s() XCHG
-    s1 s2 XCHG
+    s1 s3 s4 XCHG3
     22 s() PUSH
     s0 s2 XCHG
-    s1 25 s() XCHG
+    s1 22 s() XCHG
+    s0 21 s() XCHG
     $ProfileRegistry$_fun_sendAthNotificationAck INLINECALLDICT
-    19 s() 22 s() XCHG
-    18 s() 21 s() XCHG
     17 s() 20 s() XCHG
     16 s() 19 s() XCHG
     s15 18 s() XCHG
     s14 17 s() XCHG
     s13 16 s() XCHG
     s12 s15 XCHG
-    s11 s14 XCHG
-    s10 s13 XCHG
-    s9 s12 XCHG
-    s8 s11 XCHG
-    s7 s10 XCHG
-    s6 s9 XCHG
-    s5 s8 XCHG
-    s4 s7 XCHG
-    s3 s6 XCHG
-    s5 s3 s3 XCHG3
-    s0 s4 XCHG
+    3 12 BLKSWAP
     $ProfileRegistry$_fun_refundAvatarExcess INLINECALLDICT
   }>
-  $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_vault_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_vault_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count PROCINLINE:<{
+  $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count PROCINLINE:<{
   }>
   $ProfileRegistry$_fun_get_global PROCREF:<{
-    s13 s15 s14 PUSH3
-    s15 s14 PUSH2
-    24 s() PUSH
-    24 s() PUSH
-    24 s() PUSH
-    24 s() PUSH
-    19 s() PUSH
-    19 s() PUSH
-    19 s() PUSH
-    19 s() PUSH
-    19 s() PUSH
-    16 s() PUSH
-    s15 PUSH
-    $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_vault_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_vault_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count INLINECALLDICT
+    s13 s14 s12 PUSH3
+    s14 PUSH
+    21 s() PUSH
+    21 s() PUSH
+    21 s() PUSH
+    17 s() PUSH
+    17 s() PUSH
+    17 s() PUSH
+    17 s() PUSH
+    17 s() PUSH
+    s14 s12 PUSH2
+    $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count INLINECALLDICT
   }>
   $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at PROCINLINE:<{
   }>
   $ProfileRegistry$_fun_get_avatar_version PROCREF:<{
-    19 s() 21 s() XCHG
-    18 s() 20 s() XCHG
-    17 s() 21 s() XCHG
-    16 s() 20 s() XCHG
-    s15 21 s() XCHG
-    s14 20 s() XCHG
-    s13 21 s() XCHG
-    s12 20 s() XCHG
-    s11 21 s() XCHG
-    s10 20 s() XCHG
-    s9 21 s() XCHG
-    s8 20 s() XCHG
-    s7 21 s() XCHG
-    s6 20 s() XCHG
-    s5 21 s() XCHG
-    s4 20 s() XCHG
-    s3 21 s() XCHG
-    s2 20 s() XCHG
-    s1 21 s() XCHG
-    s0 20 s() XCHG
-    21 s() PUSH
-    21 s() PUSH
+    17 s() 19 s() XCHG
+    5 15 REVERSE
+    s14 18 s() XCHG
+    s13 19 s() XCHG
+    s12 18 s() XCHG
+    s11 19 s() XCHG
+    s10 18 s() XCHG
+    s9 19 s() XCHG
+    s8 18 s() XCHG
+    s7 19 s() XCHG
+    s6 18 s() XCHG
+    s5 19 s() XCHG
+    s4 18 s() XCHG
+    s3 19 s() XCHG
+    s2 18 s() XCHG
+    s1 19 s() XCHG
+    s0 18 s() XCHG
+    19 s() PUSH
+    19 s() PUSH
     $ProfileRegistry$_fun_computeAvatarRecordId INLINECALLDICT
     257 PUSHINT
     s6 PUSH
@@ -1122,11 +1070,9 @@ PROGRAM{
       s0 s0 s0 PUSH3
       s0 s0 PUSH2
       s6 s8 XCHG
-      s7 28 s() XCHG
-      s6 27 s() XCHG
+      s7 26 s() XCHG
+      s6 25 s() XCHG
       $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at INLINECALLDICT
-      26 s() 28 s() XCHG
-      25 s() 27 s() XCHG
       24 s() 26 s() XCHG
       23 s() 25 s() XCHG
       22 s() 24 s() XCHG
@@ -1145,15 +1091,13 @@ PROGRAM{
       s9 s11 XCHG
       s9 s10 XCHG
     }>
-    21 s() POP
-    21 s() POP
-    s0 19 s() XCHG
+    19 s() POP
+    19 s() POP
+    s0 17 s() XCHG
     $ProfileAvatarRecord$_not_null INLINECALLDICT
     TRUE
     8 -ROLL
     $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at INLINECALLDICT
-    26 s() 28 s() XCHG
-    25 s() 27 s() XCHG
     24 s() 26 s() XCHG
     23 s() 25 s() XCHG
     22 s() 24 s() XCHG
@@ -1209,7 +1153,7 @@ PROGRAM{
       FALSE
       0 PUSHINT
       DUP
-      19 s() PUSH
+      18 s() PUSH
       SWAP
       $PendingProfileTreasuryFlushView$_constructor_exists_amount_recipient_ath_wallet_created_at INLINECALLDICT
     }>
@@ -1251,46 +1195,23 @@ PROGRAM{
   %get_global PROC:<{
     $ProfileRegistry$_contract_load INLINECALLDICT
     $ProfileRegistry$_fun_get_global INLINECALLDICT
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    16 s() POP
-    4 12 BLKSWAP
+    14 14 BLKDROP2
+    4 14 BLKDROP2
     $ProfileRegistryGlobalView$_to_external INLINECALLDICT
   }>
   %get_avatar PROC:<{
     $ProfileRegistry$_contract_load INLINECALLDICT
-    19 s() 20 s() XCHG
-    18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
     s15 16 s() XCHG
     15 ROLL
     $ProfileRegistry$_fun_get_avatar INLINECALLDICT
     9 9 BLKDROP2
-    11 9 BLKDROP2
+    9 9 BLKDROP2
     $ProfileAvatarView$_to_external INLINECALLDICT
   }>
   %get_avatar_version PROC:<{
     $ProfileRegistry$_contract_load INLINECALLDICT
-    19 s() 21 s() XCHG
-    18 s() 20 s() XCHG
     17 s() 19 s() XCHG
     16 s() 18 s() XCHG
     s15 17 s() XCHG
@@ -1298,13 +1219,11 @@ PROGRAM{
     2 14 BLKSWAP
     $ProfileRegistry$_fun_get_avatar_version INLINECALLDICT
     9 9 BLKDROP2
-    11 9 BLKDROP2
+    9 9 BLKDROP2
     $ProfileAvatarView$_to_external INLINECALLDICT
   }>
   %get_ath_wallet_address PROC:<{
     $ProfileRegistry$_contract_load INLINECALLDICT
-    19 s() 20 s() XCHG
-    18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
     s15 16 s() XCHG
@@ -1312,32 +1231,28 @@ PROGRAM{
     $ProfileRegistry$_fun_get_ath_wallet_address INLINECALLDICT
     16 s() POP
     15 BLKDROP
-    4 1 BLKDROP2
+    2 1 BLKDROP2
   }>
   %get_pending_treasury_flush PROC:<{
     $ProfileRegistry$_contract_load INLINECALLDICT
-    19 s() 20 s() XCHG
-    18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
     s15 16 s() XCHG
     15 ROLL
     $ProfileRegistry$_fun_get_pending_treasury_flush INLINECALLDICT
     12 4 BLKDROP2
-    8 4 BLKDROP2
+    6 4 BLKDROP2
     $PendingProfileTreasuryFlushView$_to_external INLINECALLDICT
   }>
   %get_pending_burn_flush PROC:<{
     $ProfileRegistry$_contract_load INLINECALLDICT
-    19 s() 20 s() XCHG
-    18 s() 19 s() XCHG
     17 s() 18 s() XCHG
     16 s() 17 s() XCHG
     s15 16 s() XCHG
     15 ROLL
     $ProfileRegistry$_fun_get_pending_burn_flush INLINECALLDICT
     15 3 BLKDROP2
-    5 3 BLKDROP2
+    3 3 BLKDROP2
     $PendingProfileBurnFlushView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -1356,9 +1271,9 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $ProfileRegistry$_contract_load INLINECALLDICT
-    s0 21 s() XCHG
+    s0 19 s() XCHG
     IFJMP:<{
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -1377,31 +1292,27 @@ PROGRAM{
         DROP
         $ATHTransferRequest$_load_bounced INLINECALLDICT
         s2 POP
-        s1 20 s() XCHG
-        s0 21 s() XCHG
+        s1 18 s() XCHG
+        s0 19 s() XCHG
         $ProfileRegistry$_fun_requireSealed INLINECALLDICT
         21320 PUSHINT
         __tact_context_get_sender INLINECALLDICT
-        21 s() PUSH
+        19 s() PUSH
         SDEQ
         THROWANYIFNOT
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
         15 ROLL
-        s0 21 s() XCHG
+        s0 19 s() XCHG
         $ProfileRegistry$_fun_clearPendingTreasuryFlush INLINECALLDICT
         2DROP
         DUP
         21321 PUSHINT
-        s0 23 s() XCHG
+        s0 21 s() XCHG
         EQUAL
-        s1 22 s() XCHG
+        s1 20 s() XCHG
         THROWANYIFNOT
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
@@ -1414,31 +1325,27 @@ PROGRAM{
       IFJMP:<{
         $ATHBurn$_load_bounced INLINECALLDICT
         s2 POP
-        s1 20 s() XCHG
-        s0 21 s() XCHG
+        s1 18 s() XCHG
+        s0 19 s() XCHG
         $ProfileRegistry$_fun_requireSealed INLINECALLDICT
         21350 PUSHINT
         __tact_context_get_sender INLINECALLDICT
-        21 s() PUSH
+        19 s() PUSH
         SDEQ
         THROWANYIFNOT
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
         15 ROLL
-        s0 21 s() XCHG
+        s0 19 s() XCHG
         $ProfileRegistry$_fun_clearPendingBurnFlush INLINECALLDICT
         DROP
         DUP
         21351 PUSHINT
-        s0 23 s() XCHG
+        s0 21 s() XCHG
         EQUAL
-        s1 22 s() XCHG
+        s1 20 s() XCHG
         THROWANYIFNOT
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
         17 s() 18 s() XCHG
         16 s() 17 s() XCHG
         s15 16 s() XCHG
@@ -1447,38 +1354,38 @@ PROGRAM{
         $ProfileRegistry$_contract_store INLINECALLDICT
       }>
       15 BLKDROP
-      6 BLKDROP
+      4 BLKDROP
     }>
     0 PUSHINT
-    20 s() PUSH
+    18 s() PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 20 s() XCHG
+      s0 18 s() XCHG
       32 LDU
-      s0 21 s() XCHG
+      s0 19 s() XCHG
     }>
     OVER
     1353060609 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       256 LDU
       LDMSGADDR
       DROP
-      s1 20 s() XCHG
-      s0 21 s() XCHG
+      s1 18 s() XCHG
+      s0 19 s() XCHG
       $ProfileRegistry$_fun_requireUnsealed INLINECALLDICT
       $ProfileRegistry$_fun_requireGenesisController INLINECALLDICT
       21031 PUSHINT
-      21 s() PUSH
+      19 s() PUSH
       1 GTINT
       THROWANYIFNOT
       21032 PUSHINT
-      16 s() PUSH
+      s15 PUSH
       NOT
       THROWANYIFNOT
       21033 PUSHINT
@@ -1492,121 +1399,55 @@ PROGRAM{
         TRUE
       }>ELSE<{
         s13 PUSH
-        22 s() PUSH
+        20 s() PUSH
         EQUAL
       }>
       THROWANYIFNOT
       21035 PUSHINT
           MYADDR
-      20 s() 21 s() XCHG
-      19 s() 21 s() XCHG
-      18 s() 21 s() XCHG
-      17 s() 21 s() XCHG
-      16 s() 21 s() XCHG
-      s15 21 s() XCHG
-      s14 21 s() XCHG
-      s13 21 s() XCHG
-      s12 21 s() XCHG
-      s11 21 s() XCHG
-      s10 21 s() XCHG
-      s9 21 s() XCHG
-      s8 21 s() XCHG
-      s7 21 s() XCHG
-      s6 21 s() XCHG
-      s5 21 s() XCHG
-      s4 21 s() XCHG
-      s3 21 s() XCHG
-      s2 21 s() XCHG
-      s1 21 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 19 s() XCHG
+      s15 19 s() XCHG
+      s14 19 s() XCHG
+      s13 19 s() XCHG
+      s12 19 s() XCHG
+      s11 19 s() XCHG
+      s10 19 s() XCHG
+      s9 19 s() XCHG
+      s8 19 s() XCHG
+      s7 19 s() XCHG
+      s6 19 s() XCHG
+      s5 19 s() XCHG
+      s4 19 s() XCHG
+      s3 19 s() XCHG
+      s2 19 s() XCHG
+      s1 19 s() XCHG
       $ProfileRegistry$_fun_deriveAthWalletAddress INLINECALLDICT
       s12 POP
       s12 POP
-      s14 POP
-      17 s() POP
-      19 s() PUSH
+      s13 POP
+      s15 POP
+      17 s() PUSH
       s0 s9 XCHG2
       SDEQ
-      s1 17 s() XCHG
+      s1 s15 XCHG
       THROWANYIFNOT
-      s13 16 s() XCHG
-      s12 s15 XCHG
-      s11 s14 XCHG
-      1 PUSHINT
-      TRUE
-      s0 s15 XCHG
       s11 s14 XCHG
       s10 s13 XCHG
-      s11 s12 XCHG2
+      1 PUSHINT
+      TRUE
+      s0 s14 XCHG
+      s10 s13 XCHG
+      s10 s12 XCHG
+      s1 s11 XCHG
       s7 s10 XCHG
       s6 s9 XCHG
       s5 s8 XCHG
       s4 s7 XCHG
       s3 s6 XCHG
-      s5 s0 s4 XCHG3
-      s0 s1 s3 XCHG3
-      $ProfileRegistry$_contract_store INLINECALLDICT
-    }>
-    OVER
-    1353060610 PUSHINT
-    EQUAL
-    IFJMP:<{
-      2DROP
-      s0 19 s() XCHG
-      256 LDU
-      LDMSGADDR
-      DROP
-      s1 20 s() XCHG
-      s0 21 s() XCHG
-      $ProfileRegistry$_fun_requireUnsealed INLINECALLDICT
-      $ProfileRegistry$_fun_requireGenesisController INLINECALLDICT
-      21036 PUSHINT
-      21 s() PUSH
-      1 GTINT
-      THROWANYIFNOT
-      21037 PUSHINT
-      s15 PUSH
-      NOT
-      THROWANYIFNOT
-      s12 PUSH
-      21038 PUSHINT
-      s0 22 s() XCHG
-      EQUAL
-      s1 21 s() XCHG
-      THROWANYIFNOT
-      21039 PUSHINT
-      s0 20 s() XCHG
-      21 s() PUSH
-      $ProfileRegistry$_fun_isBasechainAddress INLINECALLDICT
-      s15 POP
-      18 s() POP
-      s1 19 s() XCHG
-      s0 s13 XCHG
-      THROWANYIFNOT
-      21045 PUSHINT
-          MYADDR
-      20 s() PUSH
-      SWAP
-      SDEQ
-      NOT
-      THROWANYIFNOT
-      16 s() 18 s() XCHG
-      16 s() 17 s() XCHG
-      s14 16 s() XCHG
-      s13 s15 XCHG
-      s12 s14 XCHG
-      TRUE
-      s0 s14 XCHG
-      s11 s13 XCHG
-      s10 s12 XCHG
-      s9 s11 XCHG
-      s8 s10 XCHG
-      s7 s9 XCHG
-      s6 s8 XCHG
-      s5 s7 XCHG
-      s4 s6 XCHG
-      s3 s5 XCHG
-      s4 s3 s0 XCHG3
-      s1 s2 XCHG
+      s0 s1 s5 XCHG3
+      s0 s3 XCHG
       $ProfileRegistry$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1614,11 +1455,9 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       256 LDU
       DROP
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
@@ -1633,57 +1472,53 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 20 s() XCHG
+      s0 18 s() XCHG
       s1 s3 s0 XCHG3
       $ProfileRegistry$_fun_requireUnsealed INLINECALLDICT
       $ProfileRegistry$_fun_requireGenesisController INLINECALLDICT
       21040 PUSHINT
-      21 s() PUSH
+      19 s() PUSH
       1 GTINT
       THROWANYIFNOT
       21041 PUSHINT
       s13 PUSH
-      22 s() PUSH
+      20 s() PUSH
       EQUAL
       THROWANYIFNOT
       21042 PUSHINT
-      16 s() PUSH
+      s15 PUSH
       THROWANYIFNOT
       21043 PUSHINT
-      20 s() PUSH
+      18 s() PUSH
           MYADDR
-      20 s() 22 s() XCHG
-      19 s() 21 s() XCHG
-      18 s() 22 s() XCHG
-      17 s() 21 s() XCHG
-      16 s() 22 s() XCHG
-      s15 21 s() XCHG
-      s14 22 s() XCHG
-      s13 21 s() XCHG
-      s12 22 s() XCHG
-      s11 21 s() XCHG
-      s10 22 s() XCHG
-      s9 21 s() XCHG
-      s8 22 s() XCHG
-      s7 21 s() XCHG
-      s6 22 s() XCHG
-      s5 21 s() XCHG
-      s4 22 s() XCHG
-      s3 21 s() XCHG
-      s2 22 s() XCHG
-      s1 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 20 s() XCHG
+      s15 19 s() XCHG
+      s14 20 s() XCHG
+      s13 19 s() XCHG
+      s12 20 s() XCHG
+      s11 19 s() XCHG
+      s10 20 s() XCHG
+      s9 19 s() XCHG
+      s8 20 s() XCHG
+      s7 19 s() XCHG
+      s6 20 s() XCHG
+      s5 19 s() XCHG
+      s4 20 s() XCHG
+      s3 19 s() XCHG
+      s2 20 s() XCHG
+      s1 19 s() XCHG
       $ProfileRegistry$_fun_deriveAthWalletAddress INLINECALLDICT
-      s1 21 s() XCHG
+      s1 19 s() XCHG
       SDEQ
-      s1 21 s() XCHG
+      s1 19 s() XCHG
       THROWANYIFNOT
-      17 s() 18 s() XCHG
-      16 s() 17 s() XCHG
       s15 16 s() XCHG
+      s14 s15 XCHG
       21044 PUSHINT
-      s15 PUSH
-      s0 17 s() XCHG
-      s15 16 s() XCHG
+      s14 PUSH
+      s0 16 s() XCHG
       s14 s15 XCHG
       s13 s14 XCHG
       s12 s13 XCHG
@@ -1697,56 +1532,31 @@ PROGRAM{
       s4 s5 XCHG
       s3 s4 XCHG
       s2 s3 XCHG
-      s2 21 s() XCHG
+      s2 19 s() XCHG
       SWAP
-      s0 21 s() XCHG
-      $ProfileRegistry$_fun_isBasechainAddress INLINECALLDICT
-      s1 21 s() XCHG
-      THROWANYIFNOT
-      21046 PUSHINT
-      s14 PUSH
-      THROWANYIFNOT
-      21047 PUSHINT
-      18 s() PUSH
-      s1 21 s() XCHG
+      s0 19 s() XCHG
       $ProfileRegistry$_fun_isBasechainAddress INLINECALLDICT
       s12 POP
       s13 POP
-      s1 19 s() XCHG
+      s1 17 s() XCHG
       s0 s10 XCHG
-      THROWANYIFNOT
-      21048 PUSHINT
-          MYADDR
-      17 s() PUSH
-      SWAP
-      SDEQ
-      NOT
       THROWANYIFNOT
       21049 PUSHINT
           MYADDR
-      s15 s(-1) PUXC
+      s14 s(-1) PUXC
       SDEQ
       NOT
       THROWANYIFNOT
       21050 PUSHINT
-      s14 PUSH
-      18 s() PUSH
-      SDEQ
-      NOT
-      THROWANYIFNOT
-      21051 PUSHINT
-      s14 PUSH
-      17 s() PUSH
+      s13 s15 PUSH2
       SDEQ
       NOT
       THROWANYIFNOT
       21052 PUSHINT
-      s14 s15 PUSH2
+      s13 s14 PUSH2
       SDEQ
       NOT
       THROWANYIFNOT
-      16 s() 18 s() XCHG
-      s15 17 s() XCHG
       s14 16 s() XCHG
       s13 s15 XCHG
       s12 s14 XCHG
@@ -1769,7 +1579,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       64 LDU
       160 LDU
       128 LDU
@@ -1784,30 +1594,28 @@ PROGRAM{
       16 LDU
       8 LDU
       DROP
-      19 s() 27 s() XCHG
-      18 s() 26 s() XCHG
       17 s() 25 s() XCHG
       16 s() 24 s() XCHG
       s15 23 s() XCHG
       s14 22 s() XCHG
       s13 21 s() XCHG
       s12 20 s() XCHG
-      s11 27 s() XCHG
-      s10 26 s() XCHG
+      s11 19 s() XCHG
+      s10 18 s() XCHG
       s9 25 s() XCHG
       s8 24 s() XCHG
       s7 23 s() XCHG
       s6 22 s() XCHG
       s5 21 s() XCHG
       s4 20 s() XCHG
-      s3 27 s() XCHG
-      s2 26 s() XCHG
-      s1 28 s() XCHG
-      s0 29 s() XCHG
+      s3 19 s() XCHG
+      s2 18 s() XCHG
+      s1 26 s() XCHG
+      s0 27 s() XCHG
       $ProfileRegistry$_fun_requireSealed INLINECALLDICT
       21160 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      21 s() PUSH
+      19 s() PUSH
       SDEQ
       THROWANYIFNOT
       21 s() PUSH
@@ -1816,8 +1624,6 @@ PROGRAM{
       SDEQ
       s1 23 s() XCHG
       THROWANYIFNOT
-      18 s() 28 s() XCHG
-      17 s() 27 s() XCHG
       16 s() 26 s() XCHG
       s15 25 s() XCHG
       s14 24 s() XCHG
@@ -1836,9 +1642,9 @@ PROGRAM{
       s1 s9 XCHG
       s4 s8 XCHG
       s3 s7 XCHG
-      s6 s1 s5 XCHG3
-      s0 s3 s3 XCHG3
+      s6 s5 s5 XCHG3
       s0 s4 XCHG
+      s3 s1 s3 XCHG3
       $ProfileRegistry$_fun_acceptAvatarPayment INLINECALLDICT
       $ProfileRegistry$_contract_store INLINECALLDICT
     }>
@@ -1847,11 +1653,9 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       64 LDU
       DROP
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
@@ -1866,14 +1670,14 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 20 s() XCHG
+      s0 18 s() XCHG
       s1 s3 s0 XCHG3
       $ProfileRegistry$_fun_requireSealed INLINECALLDICT
       21250 PUSHINT
-      21 s() PUSH
+      19 s() PUSH
       0 GTINT
       THROWANYIFNOT
-      20 s() PUSH
+      18 s() PUSH
       $ProfileRegistry$_fun_requireNoDueFlushQuery INLINECALLDICT
       21251 PUSHINT
       s8 PUSH
@@ -1885,32 +1689,29 @@ PROGRAM{
       50000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      18 s() 19 s() XCHG
-      17 s() 19 s() XCHG
-      16 s() 19 s() XCHG
+      16 s() 17 s() XCHG
+      s15 17 s() XCHG
       21253 PUSHINT
-      20 s() PUSH
-      s0 17 s() XCHG
+      18 s() PUSH
       s0 16 s() XCHG
       15 -ROLL
-      s0 21 s() XCHG
+      s0 19 s() XCHG
       $ProfileRegistry$_fun_isBasechainAddress INLINECALLDICT
-      s1 21 s() XCHG
+      s1 19 s() XCHG
       THROWANYIFNOT
       0 PUSHINT
-      16 s() PUSH
-      s1 s8 XCHG
-      s1 21 s() XCHG
+      s7 s15 XCPU
+      s1 19 s() XCHG
       $ProfileRegistry$_fun_deriveAthWalletAddress INLINECALLDICT
       257 PUSHINT
           NOW
-      23 s() PUSH
+      21 s() PUSH
       s0 s3 s3 XCHG3
       $PendingProfileTreasuryFlush$_constructor_amount_recipient_ath_wallet_created_at INLINECALLDICT
       NEWC
       $PendingProfileTreasuryFlush$_store_cell INLINECALLDICT
       s2 s5 XCHG
-      23 s() PUSH
+      21 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
       s0 s2 XCHG
@@ -1919,17 +1720,17 @@ PROGRAM{
       1 PUSHINT
       TRUE
           MYADDR
-      s2 25 s() XCHG
-      s1 24 s() XCHG
-      20 s() PUSH
+      s2 23 s() XCHG
+      s1 22 s() XCHG
+      19 s() PUSH
       SWAP
       $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination INLINECALLDICT
       NEWC
       $ATHTransferRequest$_store_cell INLINECALLDICT
-      21 s() PUSH
+      19 s() PUSH
       s3 s1 s4 XCHG3
-      s2 24 s() XCHG
-      s0 23 s() XCHG
+      s2 22 s() XCHG
+      s0 21 s() XCHG
       SWAP
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
@@ -1949,8 +1750,6 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      17 s() 19 s() XCHG
-      16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
       s13 s15 XCHG
@@ -1973,11 +1772,9 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       64 LDU
       DROP
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
@@ -1992,14 +1789,14 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 20 s() XCHG
+      s0 18 s() XCHG
       s1 s3 s0 XCHG3
       $ProfileRegistry$_fun_requireSealed INLINECALLDICT
       21260 PUSHINT
-      21 s() PUSH
+      19 s() PUSH
       0 GTINT
       THROWANYIFNOT
-      20 s() PUSH
+      18 s() PUSH
       $ProfileRegistry$_fun_requireNoDueFlushQuery INLINECALLDICT
       21261 PUSHINT
       s7 PUSH
@@ -2019,7 +1816,7 @@ PROGRAM{
       NEWC
       $PendingProfileBurnFlush$_store_cell INLINECALLDICT
       s2 s4 XCHG
-      23 s() PUSH
+      21 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
       SWAP
@@ -2028,14 +1825,14 @@ PROGRAM{
       1 PUSHINT
       TRUE
           MYADDR
-      s2 25 s() XCHG
+      s2 23 s() XCHG
       s1 s11 XCHG
       $ATHBurn$_constructor_query_id_amount_response_destination INLINECALLDICT
       NEWC
       $ATHBurn$_store_cell INLINECALLDICT
-      22 s() PUSH
+      20 s() PUSH
       s3 s1 s4 XCHG3
-      s2 24 s() XCHG
+      s2 22 s() XCHG
       s10 s10 XCHG2
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
@@ -2055,8 +1852,6 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
@@ -2079,15 +1874,13 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       64 LDU
       128 LDU
       DROP
-      s1 20 s() XCHG
-      s0 21 s() XCHG
+      s1 18 s() XCHG
+      s0 19 s() XCHG
       $ProfileRegistry$_fun_requireSealed INLINECALLDICT
-      19 s() 20 s() XCHG
-      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -2096,19 +1889,17 @@ PROGRAM{
       DROP
       SWAP
       21300 PUSHINT
-      s0 23 s() XCHG
+      s0 21 s() XCHG
       EQUAL
-      s1 22 s() XCHG
+      s1 20 s() XCHG
       THROWANYIFNOT
       21301 PUSHINT
       __tact_context_get_sender INLINECALLDICT
       SWAP
-      s0 22 s() XCHG
+      s0 20 s() XCHG
       SDEQ
-      s1 21 s() XCHG
+      s1 19 s() XCHG
       THROWANYIFNOT
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
@@ -2119,20 +1910,18 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       64 LDU
       128 LDU
       DROP
-      s1 20 s() XCHG
-      s0 21 s() XCHG
+      s1 18 s() XCHG
+      s0 19 s() XCHG
       $ProfileRegistry$_fun_requireSealed INLINECALLDICT
       21310 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      21 s() PUSH
+      19 s() PUSH
       SDEQ
       THROWANYIFNOT
-      19 s() 20 s() XCHG
-      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -2141,12 +1930,10 @@ PROGRAM{
       2DROP
       DUP
       21311 PUSHINT
-      s0 23 s() XCHG
+      s0 21 s() XCHG
       EQUAL
-      s1 22 s() XCHG
+      s1 20 s() XCHG
       THROWANYIFNOT
-      19 s() 20 s() XCHG
-      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -2159,45 +1946,41 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       64 LDU
       128 LDU
       LDMSGADDR
       DROP
-      19 s() 20 s() XCHG
-      18 s() 20 s() XCHG
-      17 s() 20 s() XCHG
-      16 s() 20 s() XCHG
-      s15 20 s() XCHG
-      s14 20 s() XCHG
-      s13 20 s() XCHG
-      s12 20 s() XCHG
-      s11 20 s() XCHG
-      s10 20 s() XCHG
-      s9 20 s() XCHG
-      s8 20 s() XCHG
-      s7 20 s() XCHG
-      s6 20 s() XCHG
-      s5 20 s() XCHG
-      s4 20 s() XCHG
-      s3 20 s() XCHG
-      s2 20 s() XCHG
-      s1 21 s() XCHG
-      s0 22 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 18 s() XCHG
+      s15 18 s() XCHG
+      s14 18 s() XCHG
+      s13 18 s() XCHG
+      s12 18 s() XCHG
+      s11 18 s() XCHG
+      s10 18 s() XCHG
+      s9 18 s() XCHG
+      s8 18 s() XCHG
+      s7 18 s() XCHG
+      s6 18 s() XCHG
+      s5 18 s() XCHG
+      s4 18 s() XCHG
+      s3 18 s() XCHG
+      s2 18 s() XCHG
+      s1 19 s() XCHG
+      s0 20 s() XCHG
       $ProfileRegistry$_fun_requireSealed INLINECALLDICT
       21330 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      19 s() PUSH
+      18 s() PUSH
       SDEQ
       THROWANYIFNOT
       21332 PUSHINT
           MYADDR
-      s1 24 s() XCHG
+      s1 22 s() XCHG
       SDEQ
-      s1 23 s() XCHG
+      s1 21 s() XCHG
       THROWANYIFNOT
-      18 s() 20 s() XCHG
-      17 s() 19 s() XCHG
       16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
@@ -2213,17 +1996,15 @@ PROGRAM{
       s4 s6 XCHG
       s3 s5 XCHG
       s0 s1 s4 XCHG3
-      s0 21 s() XCHG
+      s0 19 s() XCHG
       s0 s3 XCHG2
       $ProfileRegistry$_fun_clearPendingBurnFlush INLINECALLDICT
       DROP
       21331 PUSHINT
-      s0 22 s() XCHG
+      s0 20 s() XCHG
       EQUAL
-      s1 21 s() XCHG
+      s1 19 s() XCHG
       THROWANYIFNOT
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
@@ -2234,20 +2015,18 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 19 s() XCHG
+      s0 17 s() XCHG
       64 LDU
       128 LDU
       DROP
-      s1 20 s() XCHG
-      s0 21 s() XCHG
+      s1 18 s() XCHG
+      s0 19 s() XCHG
       $ProfileRegistry$_fun_requireSealed INLINECALLDICT
       21340 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      21 s() PUSH
+      19 s() PUSH
       SDEQ
       THROWANYIFNOT
-      19 s() 20 s() XCHG
-      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -2256,12 +2035,10 @@ PROGRAM{
       DROP
       DUP
       21341 PUSHINT
-      s0 23 s() XCHG
+      s0 21 s() XCHG
       EQUAL
-      s1 22 s() XCHG
+      s1 20 s() XCHG
       THROWANYIFNOT
-      19 s() 20 s() XCHG
-      18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
       s15 16 s() XCHG
@@ -2269,15 +2046,13 @@ PROGRAM{
       $ProfileRegistry$_fun_restoreBurnDue INLINECALLDICT
       $ProfileRegistry$_contract_store INLINECALLDICT
     }>
-    21 s() POP
+    19 s() POP
     DUP
     1353060640 PUSHINT
     EQUAL
     IFJMP:<{
       DROP
-      19 s() POP
-      17 s() 19 s() XCHG
-      16 s() 18 s() XCHG
+      17 s() POP
       s15 17 s() XCHG
       s14 16 s() XCHG
       s13 s15 XCHG
@@ -2285,15 +2060,13 @@ PROGRAM{
       $ProfileRegistry$_contract_store INLINECALLDICT
     }>
     0 EQINT
-    s0 20 s() XCHG
+    s0 18 s() XCHG
     33 LESSINT
-    s1 20 s() XCHG
+    s1 18 s() XCHG
     AND
     IFJMP:<{
       21400 PUSHINT
       THROWANY
-      17 s() 19 s() XCHG
-      16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
       s13 s15 XCHG
@@ -2301,7 +2074,7 @@ PROGRAM{
       $ProfileRegistry$_contract_store INLINECALLDICT
     }>
     15 BLKDROP
-    5 BLKDROP
+    3 BLKDROP
     130 THROW
   }>
 }END>c

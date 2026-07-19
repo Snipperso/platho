@@ -3526,59 +3526,6 @@ export function dictValueParserBindOfficialAthWallet(): DictionaryValue<BindOffi
     }
 }
 
-export type BindUsernameVault = {
-    $$type: 'BindUsernameVault';
-    deployment_manifest_hash: bigint;
-    vault_address: Address;
-}
-
-export function storeBindUsernameVault(src: BindUsernameVault) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1621496068, 32);
-        b_0.storeUint(src.deployment_manifest_hash, 256);
-        b_0.storeAddress(src.vault_address);
-    };
-}
-
-export function loadBindUsernameVault(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1621496068) { throw Error('Invalid prefix'); }
-    const _deployment_manifest_hash = sc_0.loadUintBig(256);
-    const _vault_address = sc_0.loadAddress();
-    return { $$type: 'BindUsernameVault' as const, deployment_manifest_hash: _deployment_manifest_hash, vault_address: _vault_address };
-}
-
-export function loadTupleBindUsernameVault(source: TupleReader) {
-    const _deployment_manifest_hash = source.readBigNumber();
-    const _vault_address = source.readAddress();
-    return { $$type: 'BindUsernameVault' as const, deployment_manifest_hash: _deployment_manifest_hash, vault_address: _vault_address };
-}
-
-export function loadGetterTupleBindUsernameVault(source: TupleReader) {
-    const _deployment_manifest_hash = source.readBigNumber();
-    const _vault_address = source.readAddress();
-    return { $$type: 'BindUsernameVault' as const, deployment_manifest_hash: _deployment_manifest_hash, vault_address: _vault_address };
-}
-
-export function storeTupleBindUsernameVault(source: BindUsernameVault) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.deployment_manifest_hash);
-    builder.writeAddress(source.vault_address);
-    return builder.build();
-}
-
-export function dictValueParserBindUsernameVault(): DictionaryValue<BindUsernameVault> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeBindUsernameVault(src)).endCell());
-        },
-        parse: (src) => {
-            return loadBindUsernameVault(src.loadRef().beginParse());
-        }
-    }
-}
-
 export type SealGenesis = {
     $$type: 'SealGenesis';
     deployment_manifest_hash: bigint;
@@ -3959,11 +3906,9 @@ export type UsernameRegistryGlobalView = {
     $$type: 'UsernameRegistryGlobalView';
     sealed: boolean;
     official_ath_wallet_bound: boolean;
-    vault_bound: boolean;
     deployment_manifest_hash: bigint;
     genesis_config_hash: bigint;
     official_ath_wallet_address: Address;
-    vault_address: Address;
     genesis_controller_address: Address;
     name_record_count: bigint;
     pending_mint_count: bigint;
@@ -3979,20 +3924,18 @@ export function storeUsernameRegistryGlobalView(src: UsernameRegistryGlobalView)
         const b_0 = builder;
         b_0.storeBit(src.sealed);
         b_0.storeBit(src.official_ath_wallet_bound);
-        b_0.storeBit(src.vault_bound);
         b_0.storeInt(src.deployment_manifest_hash, 257);
         b_0.storeInt(src.genesis_config_hash, 257);
         b_0.storeAddress(src.official_ath_wallet_address);
         const b_1 = new Builder();
-        b_1.storeAddress(src.vault_address);
         b_1.storeAddress(src.genesis_controller_address);
         b_1.storeInt(src.name_record_count, 257);
+        b_1.storeInt(src.pending_mint_count, 257);
         const b_2 = new Builder();
-        b_2.storeInt(src.pending_mint_count, 257);
         b_2.storeInt(src.treasury_due_ath, 257);
         b_2.storeInt(src.burn_due_ath, 257);
+        b_2.storeInt(src.pending_treasury_flush_count, 257);
         const b_3 = new Builder();
-        b_3.storeInt(src.pending_treasury_flush_count, 257);
         b_3.storeInt(src.pending_burn_flush_count, 257);
         b_3.storeInt(src.pending_mint_stale_ttl, 257);
         b_2.storeRef(b_3.endCell());
@@ -4005,33 +3948,29 @@ export function loadUsernameRegistryGlobalView(slice: Slice) {
     const sc_0 = slice;
     const _sealed = sc_0.loadBit();
     const _official_ath_wallet_bound = sc_0.loadBit();
-    const _vault_bound = sc_0.loadBit();
     const _deployment_manifest_hash = sc_0.loadIntBig(257);
     const _genesis_config_hash = sc_0.loadIntBig(257);
     const _official_ath_wallet_address = sc_0.loadAddress();
     const sc_1 = sc_0.loadRef().beginParse();
-    const _vault_address = sc_1.loadAddress();
     const _genesis_controller_address = sc_1.loadAddress();
     const _name_record_count = sc_1.loadIntBig(257);
+    const _pending_mint_count = sc_1.loadIntBig(257);
     const sc_2 = sc_1.loadRef().beginParse();
-    const _pending_mint_count = sc_2.loadIntBig(257);
     const _treasury_due_ath = sc_2.loadIntBig(257);
     const _burn_due_ath = sc_2.loadIntBig(257);
+    const _pending_treasury_flush_count = sc_2.loadIntBig(257);
     const sc_3 = sc_2.loadRef().beginParse();
-    const _pending_treasury_flush_count = sc_3.loadIntBig(257);
     const _pending_burn_flush_count = sc_3.loadIntBig(257);
     const _pending_mint_stale_ttl = sc_3.loadIntBig(257);
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function loadTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _sealed = source.readBoolean();
     const _official_ath_wallet_bound = source.readBoolean();
-    const _vault_bound = source.readBoolean();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
     const _official_ath_wallet_address = source.readAddress();
-    const _vault_address = source.readAddress();
     const _genesis_controller_address = source.readAddress();
     const _name_record_count = source.readBigNumber();
     const _pending_mint_count = source.readBigNumber();
@@ -4040,17 +3979,15 @@ export function loadTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flush_count = source.readBigNumber();
     const _pending_mint_stale_ttl = source.readBigNumber();
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function loadGetterTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _sealed = source.readBoolean();
     const _official_ath_wallet_bound = source.readBoolean();
-    const _vault_bound = source.readBoolean();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
     const _official_ath_wallet_address = source.readAddress();
-    const _vault_address = source.readAddress();
     const _genesis_controller_address = source.readAddress();
     const _name_record_count = source.readBigNumber();
     const _pending_mint_count = source.readBigNumber();
@@ -4059,18 +3996,16 @@ export function loadGetterTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flush_count = source.readBigNumber();
     const _pending_mint_stale_ttl = source.readBigNumber();
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function storeTupleUsernameRegistryGlobalView(source: UsernameRegistryGlobalView) {
     const builder = new TupleBuilder();
     builder.writeBoolean(source.sealed);
     builder.writeBoolean(source.official_ath_wallet_bound);
-    builder.writeBoolean(source.vault_bound);
     builder.writeNumber(source.deployment_manifest_hash);
     builder.writeNumber(source.genesis_config_hash);
     builder.writeAddress(source.official_ath_wallet_address);
-    builder.writeAddress(source.vault_address);
     builder.writeAddress(source.genesis_controller_address);
     builder.writeNumber(source.name_record_count);
     builder.writeNumber(source.pending_mint_count);
@@ -4890,11 +4825,9 @@ export function dictValueParserSealCollectionMeta(): DictionaryValue<SealCollect
 export type UsernameRegistry$Data = {
     $$type: 'UsernameRegistry$Data';
     official_ath_wallet_address: Address;
-    vault_address: Address;
     ath_master_address: Address;
     treasury_ath_receiver_address: Address;
     official_ath_wallet_bound: boolean;
-    vault_bound: boolean;
     sealed: boolean;
     deployment_manifest_hash: bigint;
     genesis_config_hash: bigint;
@@ -4922,36 +4855,32 @@ export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeAddress(src.official_ath_wallet_address);
-        b_0.storeAddress(src.vault_address);
         b_0.storeAddress(src.ath_master_address);
+        b_0.storeAddress(src.treasury_ath_receiver_address);
+        b_0.storeBit(src.official_ath_wallet_bound);
+        b_0.storeBit(src.sealed);
         const b_1 = new Builder();
-        b_1.storeAddress(src.treasury_ath_receiver_address);
-        b_1.storeBit(src.official_ath_wallet_bound);
-        b_1.storeBit(src.vault_bound);
-        b_1.storeBit(src.sealed);
         b_1.storeUint(src.deployment_manifest_hash, 256);
         b_1.storeUint(src.genesis_config_hash, 256);
         b_1.storeUint(src.name_record_count, 64);
         b_1.storeUint(src.pending_mint_count, 64);
+        b_1.storeUint(src.treasury_due_ath, 128);
+        b_1.storeUint(src.burn_due_ath, 128);
+        b_1.storeDict(src.name_records, Dictionary.Keys.BigInt(257), dictValueParserNameRecord());
+        b_1.storeDict(src.pending_mints, Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint());
+        b_1.storeDict(src.pending_item_to_name_hash, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
         const b_2 = new Builder();
-        b_2.storeUint(src.treasury_due_ath, 128);
-        b_2.storeUint(src.burn_due_ath, 128);
-        b_2.storeDict(src.name_records, Dictionary.Keys.BigInt(257), dictValueParserNameRecord());
-        b_2.storeDict(src.pending_mints, Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint());
-        b_2.storeDict(src.pending_item_to_name_hash, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
-        const b_3 = new Builder();
-        b_3.storeDict(src.pending_treasury_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush());
-        b_3.storeUint(src.pending_treasury_flush_count, 64);
-        b_3.storeDict(src.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush());
-        b_3.storeUint(src.pending_burn_flush_count, 64);
-        b_3.storeAddress(src.genesis_controller_address);
-        b_3.storeDict(src.art, Dictionary.Keys.Uint(16), Dictionary.Values.Cell());
-        b_3.storeUint(src.art_count, 16);
-        b_3.storeBit(src.art_sealed);
-        b_3.storeDict(src.meta, Dictionary.Keys.Uint(16), Dictionary.Values.Cell());
-        b_3.storeUint(src.meta_count, 16);
-        b_3.storeBit(src.meta_sealed);
-        b_2.storeRef(b_3.endCell());
+        b_2.storeDict(src.pending_treasury_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush());
+        b_2.storeUint(src.pending_treasury_flush_count, 64);
+        b_2.storeDict(src.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush());
+        b_2.storeUint(src.pending_burn_flush_count, 64);
+        b_2.storeAddress(src.genesis_controller_address);
+        b_2.storeDict(src.art, Dictionary.Keys.Uint(16), Dictionary.Values.Cell());
+        b_2.storeUint(src.art_count, 16);
+        b_2.storeBit(src.art_sealed);
+        b_2.storeDict(src.meta, Dictionary.Keys.Uint(16), Dictionary.Values.Cell());
+        b_2.storeUint(src.meta_count, 16);
+        b_2.storeBit(src.meta_sealed);
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
@@ -4960,45 +4889,40 @@ export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
 export function loadUsernameRegistry$Data(slice: Slice) {
     const sc_0 = slice;
     const _official_ath_wallet_address = sc_0.loadAddress();
-    const _vault_address = sc_0.loadAddress();
     const _ath_master_address = sc_0.loadAddress();
+    const _treasury_ath_receiver_address = sc_0.loadAddress();
+    const _official_ath_wallet_bound = sc_0.loadBit();
+    const _sealed = sc_0.loadBit();
     const sc_1 = sc_0.loadRef().beginParse();
-    const _treasury_ath_receiver_address = sc_1.loadAddress();
-    const _official_ath_wallet_bound = sc_1.loadBit();
-    const _vault_bound = sc_1.loadBit();
-    const _sealed = sc_1.loadBit();
     const _deployment_manifest_hash = sc_1.loadUintBig(256);
     const _genesis_config_hash = sc_1.loadUintBig(256);
     const _name_record_count = sc_1.loadUintBig(64);
     const _pending_mint_count = sc_1.loadUintBig(64);
+    const _treasury_due_ath = sc_1.loadUintBig(128);
+    const _burn_due_ath = sc_1.loadUintBig(128);
+    const _name_records = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserNameRecord(), sc_1);
+    const _pending_mints = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), sc_1);
+    const _pending_item_to_name_hash = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_1);
     const sc_2 = sc_1.loadRef().beginParse();
-    const _treasury_due_ath = sc_2.loadUintBig(128);
-    const _burn_due_ath = sc_2.loadUintBig(128);
-    const _name_records = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserNameRecord(), sc_2);
-    const _pending_mints = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), sc_2);
-    const _pending_item_to_name_hash = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_2);
-    const sc_3 = sc_2.loadRef().beginParse();
-    const _pending_treasury_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush(), sc_3);
-    const _pending_treasury_flush_count = sc_3.loadUintBig(64);
-    const _pending_burn_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), sc_3);
-    const _pending_burn_flush_count = sc_3.loadUintBig(64);
-    const _genesis_controller_address = sc_3.loadAddress();
-    const _art = Dictionary.load(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), sc_3);
-    const _art_count = sc_3.loadUintBig(16);
-    const _art_sealed = sc_3.loadBit();
-    const _meta = Dictionary.load(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), sc_3);
-    const _meta_count = sc_3.loadUintBig(16);
-    const _meta_sealed = sc_3.loadBit();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
+    const _pending_treasury_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush(), sc_2);
+    const _pending_treasury_flush_count = sc_2.loadUintBig(64);
+    const _pending_burn_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), sc_2);
+    const _pending_burn_flush_count = sc_2.loadUintBig(64);
+    const _genesis_controller_address = sc_2.loadAddress();
+    const _art = Dictionary.load(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), sc_2);
+    const _art_count = sc_2.loadUintBig(16);
+    const _art_sealed = sc_2.loadBit();
+    const _meta = Dictionary.load(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), sc_2);
+    const _meta_count = sc_2.loadUintBig(16);
+    const _meta_sealed = sc_2.loadBit();
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
 }
 
 export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _official_ath_wallet_address = source.readAddress();
-    const _vault_address = source.readAddress();
     const _ath_master_address = source.readAddress();
     const _treasury_ath_receiver_address = source.readAddress();
     const _official_ath_wallet_bound = source.readBoolean();
-    const _vault_bound = source.readBoolean();
     const _sealed = source.readBoolean();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
@@ -5007,9 +4931,9 @@ export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
     const _name_records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserNameRecord(), source.readCellOpt());
-    source = source.readTuple();
     const _pending_mints = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), source.readCellOpt());
     const _pending_item_to_name_hash = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
+    source = source.readTuple();
     const _pending_treasury_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush(), source.readCellOpt());
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), source.readCellOpt());
@@ -5021,16 +4945,14 @@ export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _meta = Dictionary.loadDirect(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), source.readCellOpt());
     const _meta_count = source.readBigNumber();
     const _meta_sealed = source.readBoolean();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
 }
 
 export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
     const _official_ath_wallet_address = source.readAddress();
-    const _vault_address = source.readAddress();
     const _ath_master_address = source.readAddress();
     const _treasury_ath_receiver_address = source.readAddress();
     const _official_ath_wallet_bound = source.readBoolean();
-    const _vault_bound = source.readBoolean();
     const _sealed = source.readBoolean();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
@@ -5052,17 +4974,15 @@ export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
     const _meta = Dictionary.loadDirect(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), source.readCellOpt());
     const _meta_count = source.readBigNumber();
     const _meta_sealed = source.readBoolean();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed, meta: _meta, meta_count: _meta_count, meta_sealed: _meta_sealed };
 }
 
 export function storeTupleUsernameRegistry$Data(source: UsernameRegistry$Data) {
     const builder = new TupleBuilder();
     builder.writeAddress(source.official_ath_wallet_address);
-    builder.writeAddress(source.vault_address);
     builder.writeAddress(source.ath_master_address);
     builder.writeAddress(source.treasury_ath_receiver_address);
     builder.writeBoolean(source.official_ath_wallet_bound);
-    builder.writeBoolean(source.vault_bound);
     builder.writeBoolean(source.sealed);
     builder.writeNumber(source.deployment_manifest_hash);
     builder.writeNumber(source.genesis_config_hash);
@@ -5254,7 +5174,6 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
     {"name":"BindOfficialAthWallet","header":1715335229,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"BindUsernameVault","header":1621496068,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"FlushTreasuryAthDue","header":1621736923,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"FlushBurnAthDue","header":3919758027,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
@@ -5262,7 +5181,7 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"UsernameRegistryTopUpStorageReserve","header":179986205,"fields":[]},
     {"name":"PendingUsernameMint","header":null,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"price_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"NameRecord","header":null,"fields":[{"name":"minter_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"UsernameRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"UsernameRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernamePriceView","header":null,"fields":[{"name":"valid_length","type":{"kind":"simple","type":"bool","optional":false}},{"name":"price_ath_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernameNameRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"minter_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingUsernameMintView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sender_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"price_paid","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
@@ -5277,7 +5196,7 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"SealArt","header":3513294426,"fields":[]},
     {"name":"UploadCollectionMeta","header":3151574565,"fields":[{"name":"key","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"data","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"SealCollectionMeta","header":1935875654,"fields":[]},
-    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"art","type":{"kind":"dict","key":"uint","keyFormat":16,"value":"cell","valueFormat":"ref"}},{"name":"art_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"art_sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"meta","type":{"kind":"dict","key":"uint","keyFormat":16,"value":"cell","valueFormat":"ref"}},{"name":"meta_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"meta_sealed","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"art","type":{"kind":"dict","key":"uint","keyFormat":16,"value":"cell","valueFormat":"ref"}},{"name":"art_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"art_sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"meta","type":{"kind":"dict","key":"uint","keyFormat":16,"value":"cell","valueFormat":"ref"}},{"name":"meta_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"meta_sealed","type":{"kind":"simple","type":"bool","optional":false}}]},
 ]
 
 const UsernameNFTItem_opcodes = {
@@ -5316,7 +5235,6 @@ const UsernameNFTItem_opcodes = {
     "JettonExcesses": 3576854235,
     "ATHWalletTopUpStorageReserve": 1096042503,
     "BindOfficialAthWallet": 1715335229,
-    "BindUsernameVault": 1621496068,
     "SealGenesis": 974311853,
     "FlushTreasuryAthDue": 1621736923,
     "FlushBurnAthDue": 3919758027,
@@ -5409,7 +5327,6 @@ export const USERNAME_META_KEY_COVER_IMAGE = 3n;
 export const USERNAME_META_PART_COUNT = 3n;
 export const USERNAME_COLLECTION_UNORDERED_NEXT_INDEX = -1n;
 export const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET = 1715335229n;
-export const OP_USERNAME_BIND_VAULT = 1621496068n;
 export const OP_SEAL_GENESIS = 974311853n;
 
 export class UsernameNFTItem implements Contract {

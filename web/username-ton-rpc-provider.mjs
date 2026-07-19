@@ -218,25 +218,23 @@ export function decodePendingAthBurnFlushStack(result) {
 
 export function decodeUsernameRegistryGlobalStack(result) {
   const stack = extractStack(result);
-  if (stack.length !== 15) {
-    throw new UsernameTonRpcProviderError(`UsernameRegistry get_global ABI mismatch: expected 15 stack items, got ${stack.length}`);
+  if (stack.length !== 13) {
+    throw new UsernameTonRpcProviderError(`UsernameRegistry get_global ABI mismatch: expected 13 stack items, got ${stack.length}`);
   }
   return {
     sealed: readStackBool(stack, 0, 'UsernameRegistry sealed'),
     official_ath_wallet_bound: readStackBool(stack, 1, 'UsernameRegistry official wallet bound'),
-    vault_bound: readStackBool(stack, 2, 'UsernameRegistry vault bound'),
-    deployment_manifest_hash: readStackInt(stack, 3, 'UsernameRegistry manifest hash'),
-    genesis_config_hash: readStackInt(stack, 4, 'UsernameRegistry genesis config hash'),
-    official_ath_wallet_address: readStackAddress(stack, 5, 'UsernameRegistry official ATH wallet'),
-    vault_address: readStackAddress(stack, 6, 'UsernameRegistry vault'),
-    genesis_controller_address: readStackAddress(stack, 7, 'UsernameRegistry genesis controller'),
-    name_record_count: readStackInt(stack, 8, 'UsernameRegistry name record count'),
-    pending_mint_count: readStackInt(stack, 9, 'UsernameRegistry pending mint count'),
-    treasury_due_ath: readStackInt(stack, 10, 'UsernameRegistry treasury due'),
-    burn_due_ath: readStackInt(stack, 11, 'UsernameRegistry burn due'),
-    pending_treasury_flush_count: readStackInt(stack, 12, 'UsernameRegistry pending treasury flush count'),
-    pending_burn_flush_count: readStackInt(stack, 13, 'UsernameRegistry pending burn flush count'),
-    pending_mint_stale_ttl: readStackInt(stack, 14, 'UsernameRegistry pending mint stale ttl'),
+    deployment_manifest_hash: readStackInt(stack, 2, 'UsernameRegistry manifest hash'),
+    genesis_config_hash: readStackInt(stack, 3, 'UsernameRegistry genesis config hash'),
+    official_ath_wallet_address: readStackAddress(stack, 4, 'UsernameRegistry official ATH wallet'),
+    genesis_controller_address: readStackAddress(stack, 5, 'UsernameRegistry genesis controller'),
+    name_record_count: readStackInt(stack, 6, 'UsernameRegistry name record count'),
+    pending_mint_count: readStackInt(stack, 7, 'UsernameRegistry pending mint count'),
+    treasury_due_ath: readStackInt(stack, 8, 'UsernameRegistry treasury due'),
+    burn_due_ath: readStackInt(stack, 9, 'UsernameRegistry burn due'),
+    pending_treasury_flush_count: readStackInt(stack, 10, 'UsernameRegistry pending treasury flush count'),
+    pending_burn_flush_count: readStackInt(stack, 11, 'UsernameRegistry pending burn flush count'),
+    pending_mint_stale_ttl: readStackInt(stack, 12, 'UsernameRegistry pending mint stale ttl'),
   };
 }
 

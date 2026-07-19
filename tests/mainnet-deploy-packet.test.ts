@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { buildPacket } from '../scripts/mainnet_deploy_packet';
 
 const ADDR = {
@@ -138,9 +139,7 @@ function draft() {
       ['Vault.BindUsernameRegistry', ADDR.usernameRegistry],
       ['CapsuleHub.BindDeploymentManifest.counterpart', ADDR.vault],
       ['UsernameRegistry.BindOfficialAthWallet', ADDR.usernameOfficialWallet],
-      ['UsernameRegistry.BindUsernameVault', ADDR.vault],
       ['ProfileRegistry.BindProfileOfficialAthWallet', ADDR.profileOfficialWallet],
-      ['ProfileRegistry.BindProfileVault', ADDR.vault],
     ],
   } as any;
 }
@@ -217,9 +216,7 @@ describe('mainnet deploy packet funding semantics', () => {
       ['Vault.BindUsernameRegistry', ADDR.usernameRegistry],
       ['CapsuleHub.BindDeploymentManifest.counterpart', ADDR.vault],
       ['UsernameRegistry.BindOfficialAthWallet', ADDR.usernameOfficialWallet],
-      ['UsernameRegistry.BindUsernameVault', ADDR.vault],
       ['ProfileRegistry.BindProfileOfficialAthWallet', ADDR.profileOfficialWallet],
-      ['ProfileRegistry.BindProfileVault', ADDR.vault],
     ]);
   });
 
@@ -249,9 +246,9 @@ describe('mainnet deploy packet funding semantics', () => {
 
     const mismatched = draft();
     mismatched.pre_seal_bindings = mismatched.pre_seal_bindings.map(([message, value]: [string, string]) => (
-      message === 'ProfileRegistry.BindProfileVault' ? [message, ADDR.profileRegistry] : [message, value]
+      message === 'ProfileRegistry.BindProfileOfficialAthWallet' ? [message, ADDR.profileRegistry] : [message, value]
     ));
-    expect(() => buildPacket(mismatched)).toThrow(/ProfileRegistry\.BindProfileVault target mismatch/);
+    expect(() => buildPacket(mismatched)).toThrow(/ProfileRegistry\.BindProfileOfficialAthWallet target mismatch/);
   });
 
   it('H-DEP-STATE-01: deploy packet refuses stale or mismatched initial StateInit evidence', () => {
@@ -330,5 +327,26 @@ describe('mainnet deploy packet funding semantics', () => {
     source.manifest.addresses.market_stability_reserve_funder = source.manifest.addresses.market_stability_seller;
 
     expect(() => buildPacket(source)).toThrow(/MarketStabilitySeller reserve funder must not equal protocol role market_stability_seller/);
+  });
+
+  // The genesis ceremony is executed ONCE, by hand, by a human reading DEPLOYMENT_RUNBOOK.md. Nothing forced
+  // that prose to agree with the code, so removing a bind message left the runbook still ordering an operator
+  // to send a message the contract no longer has — caught only by review. This closes the loop in BOTH
+  // directions: a binding in the code but missing from the runbook is a step the operator would skip, and a
+  // binding in the runbook but missing from the code is a message that no longer exists.
+  it('H-DEP-BIND-03: the runbook lists exactly the pre-seal bindings the packet builder requires', () => {
+    const runbook = readFileSync('DEPLOYMENT_RUNBOOK.md', 'utf8');
+    const step = runbook.slice(
+      runbook.indexOf('7. Perform pre-seal bindings by'),
+      runbook.indexOf('8. Fund the genesis-backed official ATH wallets'),
+    );
+    expect(step, 'step 7 of the runbook must be findable').not.toBe('');
+
+    const documented = [...step.matchAll(/`([A-Za-z]+\.Bind[A-Za-z.]+)`/g)].map((m) => m[1]).sort();
+    // buildPacket already rejects a draft whose bindings are missing or unexpected, so a draft that builds
+    // carries exactly the required set — which makes it a sound reference for the runbook.
+    const required = buildPacket(draft()).phase_2_pre_seal_bindings.map((s: any) => s.message).sort();
+
+    expect(documented, 'runbook step 7 vs. the required pre-seal binding set').toEqual(required);
   });
 });

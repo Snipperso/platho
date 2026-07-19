@@ -779,7 +779,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/assertVaultProfileAvatarCanStart/);
     expect(app).toMatch(/submitVaultProfileAvatarRegistration/);
     expect(app).toMatch(/requireProfileRegistryVaultRoute/);
-    expect(app).toMatch(/ProfileRegistry is not bound back to Vault/);
     expect(app).toMatch(/ProfileRegistry official ATH wallet is not the derived registry wallet/);
     expect(enCopy).toMatch(/avatar not active yet/);
     expect(app).toMatch(/setProfileAvatarStatus\(t\('avatar\.notActiveYet'\), 'error'\)/);
@@ -815,7 +814,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/assertVaultUsernameMintCanStart/);
     expect(app).toMatch(/submitVaultUsernameMint/);
     expect(app).toMatch(/requireUsernameRegistryVaultRoute/);
-    expect(app).toMatch(/UsernameRegistry is not bound back to Vault/);
     expect(app).toMatch(/UsernameRegistry official ATH wallet is not the derived registry wallet/);
     expect(enCopy).toMatch(/ATH; 50% goes to burn/);
     expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ GRAM fee/);

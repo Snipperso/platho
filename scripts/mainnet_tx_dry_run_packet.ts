@@ -27,12 +27,10 @@ import {
 import {
   ProfileRegistry,
   storeBindProfileOfficialAthWallet,
-  storeBindProfileVault,
   storeSealGenesis as storeProfileSealGenesis,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import {
   UsernameRegistry,
-  storeBindUsernameVault,
   storeBindOfficialAthWallet as storeUsernameBindOfficialAthWallet,
   storeSealGenesis as storeUsernameSealGenesis,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -580,23 +578,6 @@ async function buildDryRunPacket(draft: Draft) {
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.usernameRegistry),
-      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
-      body: txBody(
-        'UsernameRegistry.BindUsernameVault',
-        bodyCell(storeBindUsernameVault({
-          $$type: 'BindUsernameVault',
-          deployment_manifest_hash: manifestHash,
-          vault_address: derived.addresses.vault,
-        })),
-        { deployment_manifest_hash_hex: mh, vault_address: friendly(derived.addresses.vault) },
-      ),
-    },
-    {
-      id: 'B13',
-      phase: 'pre_seal_binding',
-      signer_role: 'genesis_controller_one_shot',
-      signer_address: friendly(derived.addresses.genesisController),
       target_address: friendly(derived.addresses.profileRegistry),
       value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
       body: txBody(
@@ -607,23 +588,6 @@ async function buildDryRunPacket(draft: Draft) {
           official_ath_wallet_address: manifestAddress(draft, 'profile_registry_official_ath_wallet'),
         })),
         { deployment_manifest_hash_hex: mh, official_ath_wallet_address: draft.manifest.addresses.profile_registry_official_ath_wallet },
-      ),
-    },
-    {
-      id: 'B14',
-      phase: 'pre_seal_binding',
-      signer_role: 'genesis_controller_one_shot',
-      signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.profileRegistry),
-      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
-      body: txBody(
-        'ProfileRegistry.BindProfileVault',
-        bodyCell(storeBindProfileVault({
-          $$type: 'BindProfileVault',
-          deployment_manifest_hash: manifestHash,
-          vault_address: derived.addresses.vault,
-        })),
-        { deployment_manifest_hash_hex: mh, vault_address: friendly(derived.addresses.vault) },
       ),
     },
     {

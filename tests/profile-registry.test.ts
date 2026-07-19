@@ -10,7 +10,6 @@ import {
   ATHTransferFailed,
   AthTransferNotificationVaultProfileAvatar,
   BindProfileOfficialAthWallet,
-  BindProfileVault,
   FlushProfileBurnAthDue,
   FlushProfileTreasuryAthDue,
   ProfileRegistry,
@@ -82,11 +81,6 @@ async function deploySealedProfileRegistry() {
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindProfileOfficialAthWallet);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindProfileVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindProfileVault);
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
@@ -132,11 +126,6 @@ async function deployProfileRegistryReadyToSeal(options: {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindProfileOfficialAthWallet);
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindProfileVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindProfileVault);
 
   return { registry, deployer, address, officialAthWalletAddress, athMasterAddress, vaultAddress };
 }
@@ -215,11 +204,6 @@ async function deployProfileRegistryWithAthSystem(options: { officialWalletBalan
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindProfileOfficialAthWallet);
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindProfileVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindProfileVault);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
@@ -300,7 +284,7 @@ async function deployAthWallet(blockchain: Blockchain, owner: Address, athMaster
 }
 
 describe('ProfileRegistry wallet avatar pointers', () => {
-  it('PROFILE-00: SealGenesis requires the bound Vault for Vault-funded avatar support', async () => {
+  it('PROFILE-00: SealGenesis requires the bound official ATH wallet', async () => {
     const blockchain = await Blockchain.create();
     blockchain.now = 1_700_000_000;
     const deployer = await blockchain.treasury('profile-seal-vault-deployer');
@@ -329,6 +313,18 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     const registry = blockchain.openContract(new ProfileRegistry(address, init));
     const officialAthWalletAddress = await registry.getGetAthWalletAddress(address);
 
+    // The seal must refuse while the official ATH wallet is unbound. That wallet is the ONLY thing that
+    // authenticates a paying avatar notification, so sealing without it would freeze a registry that can
+    // never accept a payment — and after the seal there is no second chance to bind it.
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+
+    let global = await registry.getGetGlobal();
+    expect(global.sealed, 'unbound official ATH wallet must block the seal').toBe(false);
+    expect(global.official_ath_wallet_bound).toBe(false);
+
     await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindProfileOfficialAthWallet',
       deployment_manifest_hash: MANIFEST_HASH,
@@ -339,24 +335,8 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       deployment_manifest_hash: MANIFEST_HASH,
     } as SealGenesis);
 
-    let global = await registry.getGetGlobal();
-    expect(global.sealed).toBe(false);
-    expect(global.vault_bound).toBe(false);
-
-    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindProfileVault',
-      deployment_manifest_hash: MANIFEST_HASH,
-      vault_address: vaultAddress,
-    } as BindProfileVault);
-    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as SealGenesis);
-
     global = await registry.getGetGlobal();
     expect(global.sealed).toBe(true);
-    expect(global.vault_bound).toBe(true);
-    expect(global.vault_address.equals(vaultAddress)).toBe(true);
   });
 
   it('PROFILE-00B: SealGenesis rejects protocol-owned treasury ATH receivers', async () => {
@@ -384,17 +364,6 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       deployment_manifest_hash: MANIFEST_HASH,
     } as SealGenesis);
     expect((await officialTreasury.registry.getGetGlobal()).sealed).toBe(false);
-
-    const vaultAddress = fixtureAddress('SEAL_TREASURY_AS_VAULT');
-    const vaultTreasury = await deployProfileRegistryReadyToSeal({
-      treasuryAthReceiver: vaultAddress,
-      vaultAddress,
-    });
-    await vaultTreasury.registry.send(vaultTreasury.deployer.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as SealGenesis);
-    expect((await vaultTreasury.registry.getGetGlobal()).sealed).toBe(false);
 
     const athMasterAddress = fixtureAddress('SEAL_TREASURY_AS_ATH_MASTER');
     const masterTreasury = await deployProfileRegistryReadyToSeal({

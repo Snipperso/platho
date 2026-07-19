@@ -3,7 +3,7 @@ Contract: ATHWallet
 BoC Size: 6666 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 57
+Total structures: 56
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -177,10 +177,6 @@ Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:a
 TL-B: `bind_profile_official_ath_wallet#50a61101 deployment_manifest_hash:uint256 official_ath_wallet_address:address = BindProfileOfficialAthWallet`
 Signature: `BindProfileOfficialAthWallet{deployment_manifest_hash:uint256,official_ath_wallet_address:address}`
 
-### BindProfileVault
-TL-B: `bind_profile_vault#50a61102 deployment_manifest_hash:uint256 vault_address:address = BindProfileVault`
-Signature: `BindProfileVault{deployment_manifest_hash:uint256,vault_address:address}`
-
 ### SealGenesis
 TL-B: `seal_genesis#3a12d1ad deployment_manifest_hash:uint256 = SealGenesis`
 Signature: `SealGenesis{deployment_manifest_hash:uint256}`
@@ -226,12 +222,12 @@ TL-B: `_ exists:bool amount:int257 created_at:int257 = PendingProfileBurnFlushVi
 Signature: `PendingProfileBurnFlushView{exists:bool,amount:int257,created_at:int257}`
 
 ### ProfileRegistryGlobalView
-TL-B: `_ sealed:bool official_ath_wallet_bound:bool vault_bound:bool deployment_manifest_hash:int257 genesis_config_hash:int257 official_ath_wallet_address:address vault_address:address ath_master_address:address treasury_ath_receiver_address:address genesis_controller_address:address profile_count:int257 avatar_record_count:int257 treasury_due_ath:int257 burn_due_ath:int257 pending_treasury_flush_count:int257 pending_burn_flush_count:int257 = ProfileRegistryGlobalView`
-Signature: `ProfileRegistryGlobalView{sealed:bool,official_ath_wallet_bound:bool,vault_bound:bool,deployment_manifest_hash:int257,genesis_config_hash:int257,official_ath_wallet_address:address,vault_address:address,ath_master_address:address,treasury_ath_receiver_address:address,genesis_controller_address:address,profile_count:int257,avatar_record_count:int257,treasury_due_ath:int257,burn_due_ath:int257,pending_treasury_flush_count:int257,pending_burn_flush_count:int257}`
+TL-B: `_ sealed:bool official_ath_wallet_bound:bool deployment_manifest_hash:int257 genesis_config_hash:int257 official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address genesis_controller_address:address profile_count:int257 avatar_record_count:int257 treasury_due_ath:int257 burn_due_ath:int257 pending_treasury_flush_count:int257 pending_burn_flush_count:int257 = ProfileRegistryGlobalView`
+Signature: `ProfileRegistryGlobalView{sealed:bool,official_ath_wallet_bound:bool,deployment_manifest_hash:int257,genesis_config_hash:int257,official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,genesis_controller_address:address,profile_count:int257,avatar_record_count:int257,treasury_due_ath:int257,burn_due_ath:int257,pending_treasury_flush_count:int257,pending_burn_flush_count:int257}`
 
 ### ProfileRegistry$Data
-TL-B: `_ official_ath_wallet_address:address vault_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 genesis_controller_address:address profile_count:uint64 avatar_record_count:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 current_avatar_versions:dict<address, int> avatar_records:dict<int, ^ProfileAvatarRecord{owner_wallet:address,version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8,updated_at:uint64}> pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}> pending_burn_flush_count:uint64 = ProfileRegistry`
-Signature: `ProfileRegistry{official_ath_wallet_address:address,vault_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,genesis_controller_address:address,profile_count:uint64,avatar_record_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,current_avatar_versions:dict<address, int>,avatar_records:dict<int, ^ProfileAvatarRecord{owner_wallet:address,version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8,updated_at:uint64}>,pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}>,pending_burn_flush_count:uint64}`
+TL-B: `_ official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 genesis_controller_address:address profile_count:uint64 avatar_record_count:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 current_avatar_versions:dict<address, int> avatar_records:dict<int, ^ProfileAvatarRecord{owner_wallet:address,version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8,updated_at:uint64}> pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}> pending_burn_flush_count:uint64 = ProfileRegistry`
+Signature: `ProfileRegistry{official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,genesis_controller_address:address,profile_count:uint64,avatar_record_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,current_avatar_versions:dict<address, int>,avatar_records:dict<int, ^ProfileAvatarRecord{owner_wallet:address,version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8,updated_at:uint64}>,pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}>,pending_burn_flush_count:uint64}`
 
 ## Get methods
 Total get methods: 2

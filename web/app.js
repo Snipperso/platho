@@ -22588,11 +22588,6 @@ async function requireProfileRegistryVaultRoute(global, options = {}) {
   const derivedOfficialWallet = await resolved.provider.getAthWalletAddress(registry, { profileRegistryAddress: registry, ...readOptions });
   if (registryGlobal.sealed !== true) throw new Error('ProfileRegistry is not sealed on this network');
   if (registryGlobal.official_ath_wallet_bound !== true) throw new Error('ProfileRegistry official ATH wallet is not bound');
-  if (registryGlobal.vault_bound !== true) throw new Error('ProfileRegistry is not bound back to Vault');
-  const boundVault = requireBasechainAddress(registryGlobal.vault_address, 'ProfileRegistry Vault');
-  if (boundVault !== requireBasechainAddress(requireVaultAddress(), 'Vault')) {
-    throw new Error('ProfileRegistry Vault binding does not match this app config');
-  }
   requireManifestHashMatch(registryGlobal.deployment_manifest_hash, 'ProfileRegistry');
   const officialWallet = requireBasechainAddress(registryGlobal.official_ath_wallet_address, 'ProfileRegistry official ATH wallet');
   const derivedWallet = requireBasechainAddress(derivedOfficialWallet, 'ProfileRegistry derived ATH wallet');
@@ -22659,11 +22654,6 @@ async function requireUsernameRegistryVaultRoute(global, options = {}) {
     : null;
   if (registryGlobal.sealed !== true) throw new Error('UsernameRegistry is not sealed on this network');
   if (registryGlobal.official_ath_wallet_bound !== true) throw new Error('UsernameRegistry official ATH wallet is not bound');
-  if (registryGlobal.vault_bound !== true) throw new Error('UsernameRegistry is not bound back to Vault');
-  const boundVault = requireBasechainAddress(registryGlobal.vault_address, 'UsernameRegistry Vault');
-  if (boundVault !== requireBasechainAddress(requireVaultAddress(), 'Vault')) {
-    throw new Error('UsernameRegistry Vault binding does not match this app config');
-  }
   requireManifestHashMatch(registryGlobal.deployment_manifest_hash, 'UsernameRegistry');
   const officialWallet = requireBasechainAddress(registryGlobal.official_ath_wallet_address, 'UsernameRegistry official ATH wallet');
   const derivedWallet = requireBasechainAddress(derivedOfficialWallet, 'UsernameRegistry derived ATH wallet');

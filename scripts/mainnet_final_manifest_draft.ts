@@ -500,9 +500,7 @@ async function buildDraft(rolesPath: string) {
       ['Vault.BindUsernameRegistry', friendly(usernameRegistryAddress)],
       ['CapsuleHub.BindDeploymentManifest.counterpart', friendly(vaultAddress)],
       ['UsernameRegistry.BindOfficialAthWallet', friendly(usernameRegistryOfficialAthWalletAddress)],
-      ['UsernameRegistry.BindUsernameVault', friendly(vaultAddress)],
       ['ProfileRegistry.BindProfileOfficialAthWallet', friendly(profileRegistryOfficialAthWalletAddress)],
-      ['ProfileRegistry.BindProfileVault', friendly(vaultAddress)],
     ],
     warnings: [
       'This is a local ignored draft. It is not a live getter snapshot and does not prove production deployment.',

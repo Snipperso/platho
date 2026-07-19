@@ -30,11 +30,6 @@ message(0x50A61101) BindProfileOfficialAthWallet {
     official_ath_wallet_address: Address;
 }
 
-message(0x50A61102) BindProfileVault {
-    deployment_manifest_hash: Int as uint256;
-    vault_address: Address;
-}
-
 message(0x3A12D1AD) SealGenesis {
     deployment_manifest_hash: Int as uint256;
 }
@@ -105,11 +100,9 @@ struct PendingProfileBurnFlushView {
 struct ProfileRegistryGlobalView {
     sealed: Bool;
     official_ath_wallet_bound: Bool;
-    vault_bound: Bool;
     deployment_manifest_hash: Int;
     genesis_config_hash: Int;
     official_ath_wallet_address: Address;
-    vault_address: Address;
     ath_master_address: Address;
     treasury_ath_receiver_address: Address;
     genesis_controller_address: Address;
@@ -123,11 +116,9 @@ struct ProfileRegistryGlobalView {
 
 contract ProfileRegistry {
     official_ath_wallet_address: Address;
-    vault_address: Address;
     ath_master_address: Address;
     treasury_ath_receiver_address: Address;
     official_ath_wallet_bound: Bool;
-    vault_bound: Bool;
     sealed: Bool;
     deployment_manifest_hash: Int as uint256;
     genesis_config_hash: Int as uint256;
@@ -145,11 +136,9 @@ contract ProfileRegistry {
 
     init(official_ath_wallet_address: Address, ath_master_address: Address, treasury_ath_receiver_address: Address, sealed: Bool, deployment_manifest_hash: Int, genesis_config_hash: Int, genesis_controller_address: Address) {
         self.official_ath_wallet_address = official_ath_wallet_address;
-        self.vault_address = official_ath_wallet_address;
         self.ath_master_address = ath_master_address;
         self.treasury_ath_receiver_address = treasury_ath_receiver_address;
         self.official_ath_wallet_bound = false;
-        self.vault_bound = false;
         self.sealed = sealed;
         self.deployment_manifest_hash = deployment_manifest_hash;
         self.genesis_config_hash = genesis_config_hash;
@@ -348,18 +337,6 @@ contract ProfileRegistry {
         self.official_ath_wallet_bound = true;
     }
 
-    receive(msg: BindProfileVault) {
-        self.requireUnsealed();
-        self.requireGenesisController();
-        throwUnless(21036, msg.deployment_manifest_hash > 1);
-        throwUnless(21037, !self.vault_bound);
-        throwUnless(21038, self.deployment_manifest_hash == msg.deployment_manifest_hash);
-        throwUnless(21039, self.isBasechainAddress(msg.vault_address));
-        throwUnless(21045, msg.vault_address != myAddress());
-        self.vault_address = msg.vault_address;
-        self.vault_bound = true;
-    }
-
     receive(msg: SealGenesis) {
         self.requireUnsealed();
         self.requireGenesisController();
@@ -368,12 +345,8 @@ contract ProfileRegistry {
         throwUnless(21042, self.official_ath_wallet_bound);
         throwUnless(21043, self.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
         throwUnless(21044, self.isBasechainAddress(self.treasury_ath_receiver_address));
-        throwUnless(21046, self.vault_bound);
-        throwUnless(21047, self.isBasechainAddress(self.vault_address));
-        throwUnless(21048, self.vault_address != myAddress());
         throwUnless(21049, self.treasury_ath_receiver_address != myAddress());
         throwUnless(21050, self.treasury_ath_receiver_address != self.official_ath_wallet_address);
-        throwUnless(21051, self.treasury_ath_receiver_address != self.vault_address);
         throwUnless(21052, self.treasury_ath_receiver_address != self.ath_master_address);
         self.genesis_config_hash = msg.deployment_manifest_hash;
         self.sealed = true;
@@ -521,11 +494,9 @@ contract ProfileRegistry {
         return ProfileRegistryGlobalView {
             sealed: self.sealed,
             official_ath_wallet_bound: self.official_ath_wallet_bound,
-            vault_bound: self.vault_bound,
             deployment_manifest_hash: self.deployment_manifest_hash,
             genesis_config_hash: self.genesis_config_hash,
             official_ath_wallet_address: self.official_ath_wallet_address,
-            vault_address: self.vault_address,
             ath_master_address: self.ath_master_address,
             treasury_ath_receiver_address: self.treasury_ath_receiver_address,
             genesis_controller_address: self.genesis_controller_address,

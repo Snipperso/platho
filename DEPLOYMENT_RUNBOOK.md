@@ -192,9 +192,7 @@ Keep deploy order simple and auditable.
    - `Vault.BindUsernameRegistry`;
    - `CapsuleHub.BindDeploymentManifest.counterpart`;
    - `UsernameRegistry.BindOfficialAthWallet`;
-   - `UsernameRegistry.BindUsernameVault`;
-   - `ProfileRegistry.BindProfileOfficialAthWallet`;
-   - `ProfileRegistry.BindProfileVault`.
+   - `ProfileRegistry.BindProfileOfficialAthWallet`.
 8. Fund the genesis-backed official ATH wallets before Vault/CapsuleHub become usable:
    - transfer exactly `15,000,000 ATH` from the treasury ATH wallet to `vault_official_ath_wallet`;
    - transfer exactly `10,000,000 ATH` from the treasury ATH wallet to `ath_long_term_vesting_official_ath_wallet`.

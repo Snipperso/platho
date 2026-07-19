@@ -31,13 +31,11 @@ import { MockUsernameNFTItemNoAck } from '../build/MockUsernameNFTItemNoAck/Mock
 import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 import {
   BindProfileOfficialAthWallet,
-  BindProfileVault,
   ProfileRegistry,
   SealGenesis as ProfileSealGenesis,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import {
   BindOfficialAthWallet as UsernameBindOfficialAthWallet,
-  BindUsernameVault,
   SealGenesis as UsernameSealGenesis,
   UsernameItemDeployedAck,
   UsernameRegistry,
@@ -313,11 +311,6 @@ async function setupProfileAvatarRoute() {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialProfileAthWallet,
   } as BindProfileOfficialAthWallet);
-  await profileRegistry.send(controller.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindProfileVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindProfileVault);
   await vault.send(controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
@@ -503,11 +496,6 @@ async function setupUsernameMintRoute(options: { registryAthMaster?: Address } =
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialUsernameAthWallet,
   } as UsernameBindOfficialAthWallet);
-  await usernameRegistry.send(controller.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindUsernameVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindUsernameVault);
   await vault.send(controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,

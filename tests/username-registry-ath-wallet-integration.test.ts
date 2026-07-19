@@ -7,7 +7,6 @@ import {
   UsernameRegistry,
   AthTransferNotificationVaultMintUsername,
   BindOfficialAthWallet,
-  BindUsernameVault,
   SealGenesis,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
@@ -102,11 +101,6 @@ async function setup() {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
-  await registry.send(controller.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindUsernameVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindUsernameVault);
   await registry.send(controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,

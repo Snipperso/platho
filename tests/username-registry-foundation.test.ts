@@ -5,7 +5,6 @@ import { createHash } from 'crypto';
 import {
   UsernameRegistry,
   BindOfficialAthWallet,
-  BindUsernameVault,
   SealGenesis,
   UsernameRegistryTopUpStorageReserve,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -99,11 +98,6 @@ async function deployRegistryReadyToSeal(options: {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWallet,
   } as BindOfficialAthWallet);
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindUsernameVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindUsernameVault);
 
   return { registry, deployer, registryAddress, officialAthWallet, athMasterAddress, vaultAddress };
 }
@@ -203,7 +197,6 @@ describe('UsernameRegistry foundation milestone', () => {
     const { deployer, registry, registryAddress } = await deployRegistry();
     const officialAthWallet = await registry.getGetAthWalletAddress(registryAddress);
     const attackerWallet = fixtureAddress('USERNAME_REGISTRY_ATTACKER_ATH_WALLET');
-    const vaultAddress = fixtureAddress('USERNAME_REGISTRY_BOUND_VAULT');
 
     await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
@@ -224,23 +217,8 @@ describe('UsernameRegistry foundation milestone', () => {
     } as SealGenesis);
 
     state = await registry.getGetGlobal();
-    expect(state.sealed).toBe(false);
-
-    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindUsernameVault',
-      deployment_manifest_hash: MANIFEST_HASH,
-      vault_address: vaultAddress,
-    } as BindUsernameVault);
-    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as SealGenesis);
-
-    state = await registry.getGetGlobal();
     expect(state.sealed).toBe(true);
     expect(state.genesis_config_hash).toBe(MANIFEST_HASH);
-    expect(state.vault_bound).toBe(true);
-    expect(state.vault_address.equals(vaultAddress)).toBe(true);
 
     await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
@@ -279,17 +257,6 @@ describe('UsernameRegistry foundation milestone', () => {
       deployment_manifest_hash: MANIFEST_HASH,
     } as SealGenesis);
     expect((await officialTreasury.registry.getGetGlobal()).sealed).toBe(false);
-
-    const vaultAddress = fixtureAddress('USERNAME_REGISTRY_SEAL_TREASURY_AS_VAULT');
-    const vaultTreasury = await deployRegistryReadyToSeal({
-      treasuryAthReceiver: vaultAddress,
-      vaultAddress,
-    });
-    await vaultTreasury.registry.send(vaultTreasury.deployer.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as SealGenesis);
-    expect((await vaultTreasury.registry.getGetGlobal()).sealed).toBe(false);
 
     const athMasterAddress = fixtureAddress('USERNAME_REGISTRY_SEAL_TREASURY_AS_ATH_MASTER');
     const masterTreasury = await deployRegistryReadyToSeal({

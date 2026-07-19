@@ -9,8 +9,8 @@ import {
   BindMarketStabilityTreasury as MarketSellerBindTreasury,
   SealMarketStabilityGenesis as MarketSellerSeal,
 } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
-import { ProfileRegistry, BindProfileOfficialAthWallet as ProfileBindAth, BindProfileVault as ProfileBindVault, SealGenesis as ProfileSeal } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
-import { UsernameRegistry, BindOfficialAthWallet as UsernameBindAth, BindUsernameVault as UsernameBindVault, SealGenesis as UsernameSeal } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
+import { ProfileRegistry, BindProfileOfficialAthWallet as ProfileBindAth, SealGenesis as ProfileSeal } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
+import { UsernameRegistry, BindOfficialAthWallet as UsernameBindAth, SealGenesis as UsernameSeal } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
   Vault,
   BindDeploymentManifest as VaultBind,
@@ -149,21 +149,11 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
       deployment_manifest_hash: manifestHash,
       official_ath_wallet_address: parsed.usernameRegistryOfficialAthWalletAddress,
     } as UsernameBindAth);
-    await usernameRegistry.send(genesisController, { value: toNano('0.05') }, {
-      $$type: 'BindUsernameVault',
-      deployment_manifest_hash: manifestHash,
-      vault_address: parsed.vaultAddress,
-    } as UsernameBindVault);
     await profileRegistry.send(genesisController, { value: toNano('0.05') }, {
       $$type: 'BindProfileOfficialAthWallet',
       deployment_manifest_hash: manifestHash,
       official_ath_wallet_address: parsed.profileRegistryOfficialAthWalletAddress,
     } as ProfileBindAth);
-    await profileRegistry.send(genesisController, { value: toNano('0.05') }, {
-      $$type: 'BindProfileVault',
-      deployment_manifest_hash: manifestHash,
-      vault_address: parsed.vaultAddress,
-    } as ProfileBindVault);
     await marketSeller.send(genesisController, { value: toNano('0.05') }, {
       $$type: 'BindMarketStabilityReserveFunder',
       deployment_manifest_hash: manifestHash,

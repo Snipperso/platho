@@ -7,7 +7,6 @@ import * as path from 'path';
 import {
   AthTransferNotificationVaultProfileAvatar,
   BindProfileOfficialAthWallet,
-  BindProfileVault,
   ProfileRegistry,
   SealGenesis,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
@@ -107,11 +106,6 @@ async function setupRegistry(label: string) {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWallet,
   } as BindProfileOfficialAthWallet);
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindProfileVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vault,
-  } as BindProfileVault);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,

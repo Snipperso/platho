@@ -625,7 +625,6 @@ describe('PWA contract transaction builders', () => {
     expect(route?.[0]).toContain('resolved.provider.getAthWalletAddress(registry');
     expect(route?.[0]).toContain('registryGlobal.official_ath_wallet_address');
     expect(route?.[0]).toContain('ProfileRegistry official ATH wallet is not the derived registry wallet');
-    expect(route?.[0]).toContain('ProfileRegistry Vault binding does not match this app config');
     expect(route?.[0]).toContain('ProfileRegistry ATHMaster binding does not match this app config');
   });
 

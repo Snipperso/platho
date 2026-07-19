@@ -14,7 +14,6 @@ const ITEM = `0:${'33'.repeat(32)}`;
 const OFFICIAL = `0:${'44'.repeat(32)}`;
 const CONTROLLER = `0:${'55'.repeat(32)}`;
 const ATH_WALLET = `0:${'66'.repeat(32)}`;
-const VAULT = `0:${'77'.repeat(32)}`;
 
 function num(value: bigint | number | string) {
   const bigint = typeof value === 'bigint' ? value : BigInt(value);
@@ -107,11 +106,9 @@ describe('Username TON RPC providers', () => {
             stack: [
               num(-1n),
               num(-1n),
-              num(-1n),
               num(1n),
               num(2n),
               addr(OFFICIAL),
-              addr(VAULT),
               addr(CONTROLLER),
               num(10n),
               num(11n),
@@ -144,9 +141,7 @@ describe('Username TON RPC providers', () => {
     await expect(provider.getGlobal()).resolves.toMatchObject({
       sealed: true,
       official_ath_wallet_bound: true,
-      vault_bound: true,
       official_ath_wallet_address: OFFICIAL,
-      vault_address: VAULT,
       pending_mint_stale_ttl: 86_400n,
     });
 
@@ -231,15 +226,13 @@ describe('Username TON RPC providers', () => {
     });
   });
 
-  it('USERNAME-RPC-02B: get_global requires the current vault-bound ABI and forwards fresh critical options', async () => {
+  it('USERNAME-RPC-02B: get_global requires the current ABI arity and forwards fresh critical options', async () => {
     const currentGlobalStack = [
-      num(-1n),
       num(-1n),
       num(-1n),
       num(1n),
       num(2n),
       addr(OFFICIAL),
-      addr(VAULT),
       addr(CONTROLLER),
       num(10n),
       num(11n),
@@ -264,8 +257,6 @@ describe('Username TON RPC providers', () => {
       priority: 'critical',
       cacheTtlMs: 0,
     })).resolves.toMatchObject({
-      vault_bound: true,
-      vault_address: VAULT,
       official_ath_wallet_address: OFFICIAL,
       pending_mint_stale_ttl: 86_400n,
     });
@@ -281,11 +272,11 @@ describe('Username TON RPC providers', () => {
       usernameRegistryAddress: REGISTRY,
       transport: {
         async runGetMethod() {
-          return { stack: currentGlobalStack.slice(0, 13) };
+          return { stack: currentGlobalStack.slice(0, 11) };
         },
       },
     });
-    await expect(oldAbiProvider.getGlobal()).rejects.toThrow(/expected 15 stack items/);
+    await expect(oldAbiProvider.getGlobal()).rejects.toThrow(/expected 13 stack items/);
   });
 
   it('USERNAME-RPC-02C: identity and price getters forward critical read options', async () => {
