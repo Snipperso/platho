@@ -193,8 +193,8 @@ const STAGED_BIND_SEAL_INITIAL_STATE: Record<string, string> = {
   market_stability_seller: 'bind reserve funder, official ATH wallet, and treasury before SealMarketStabilityGenesis',
   vault: 'bind CapsuleHub, official ATH wallet, ProfileRegistry, and UsernameRegistry before SealGenesis',
   capsulehub: 'bind Vault before SealGenesis',
-  username_registry: 'bind official ATH wallet and Vault before SealGenesis',
-  profile_registry: 'bind official ATH wallet and Vault before SealGenesis',
+  username_registry: 'bind official ATH wallet before SealGenesis',
+  profile_registry: 'bind official ATH wallet before SealGenesis',
 };
 
 function isNonZeroInitialScalar(value: unknown): boolean {
@@ -255,9 +255,7 @@ function requiredPreSealBindings(draft: Draft): Array<[string, string]> {
     ['Vault.BindUsernameRegistry', address(draft, 'username_registry')],
     ['CapsuleHub.BindDeploymentManifest.counterpart', address(draft, 'vault')],
     ['UsernameRegistry.BindOfficialAthWallet', address(draft, 'username_registry_official_ath_wallet')],
-    ['UsernameRegistry.BindUsernameVault', address(draft, 'vault')],
     ['ProfileRegistry.BindProfileOfficialAthWallet', address(draft, 'profile_registry_official_ath_wallet')],
-    ['ProfileRegistry.BindProfileVault', address(draft, 'vault')],
   ];
 }
 

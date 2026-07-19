@@ -7,7 +7,6 @@ import * as path from 'path';
 import {
   AthTransferNotificationVaultMintUsername,
   BindOfficialAthWallet,
-  BindUsernameVault,
   SealGenesis,
   UsernameRegistry,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -158,11 +157,6 @@ async function setupRegistry(label: string) {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWallet,
   } as BindOfficialAthWallet);
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindUsernameVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindUsernameVault);
   // Art upload is DECOUPLED from the genesis seal (locked separately by SealArt), so the
   // storage-economics model — which measures mint/refund value flow, not rendering — seals
   // the genesis with an empty art dict (uploading 56 parts x 7 cases would only add latency).

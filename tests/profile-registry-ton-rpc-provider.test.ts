@@ -9,7 +9,6 @@ const ATH_MASTER = `0:${'44'.repeat(32)}`;
 const TREASURY = `0:${'55'.repeat(32)}`;
 const CONTROLLER = `0:${'66'.repeat(32)}`;
 const ATH_WALLET = `0:${'77'.repeat(32)}`;
-const VAULT = `0:${'88'.repeat(32)}`;
 
 function num(value: bigint | number | string) {
   const bigint = typeof value === 'bigint' ? value : BigInt(value);
@@ -54,11 +53,9 @@ describe('ProfileRegistry TON RPC provider', () => {
             stack: [
               num(-1n),
               num(-1n),
-              num(-1n),
               num(1n),
               num(2n),
               stackAddr(OFFICIAL),
-              stackAddr(VAULT),
               stackAddr(ATH_MASTER, 'cell'),
               stackAddr(TREASURY),
               stackAddr(CONTROLLER, 'cell'),
@@ -93,9 +90,7 @@ describe('ProfileRegistry TON RPC provider', () => {
     await expect(provider.getGlobal()).resolves.toMatchObject({
       sealed: true,
       official_ath_wallet_bound: true,
-      vault_bound: true,
       official_ath_wallet_address: OFFICIAL,
-      vault_address: VAULT,
       ath_master_address: ATH_MASTER,
       treasury_ath_receiver_address: TREASURY,
       profile_count: 3n,
@@ -111,16 +106,14 @@ describe('ProfileRegistry TON RPC provider', () => {
     ]);
   });
 
-  it('PROFILE-RPC-02: get_global requires the current vault-bound ABI and forwards fresh critical options', async () => {
+  it('PROFILE-RPC-02: get_global requires the current ABI arity and forwards fresh critical options', async () => {
     let seenCall: any = null;
     const currentGlobalStack = [
-      num(-1n),
       num(-1n),
       num(-1n),
       num(1n),
       num(2n),
       stackAddr(OFFICIAL),
-      stackAddr(VAULT),
       stackAddr(ATH_MASTER),
       stackAddr(TREASURY),
       stackAddr(CONTROLLER),
@@ -145,8 +138,6 @@ describe('ProfileRegistry TON RPC provider', () => {
       priority: 'critical',
       cacheTtlMs: 0,
     })).resolves.toMatchObject({
-      vault_bound: true,
-      vault_address: VAULT,
       official_ath_wallet_address: OFFICIAL,
     });
     expect(seenCall).toMatchObject({
@@ -159,11 +150,11 @@ describe('ProfileRegistry TON RPC provider', () => {
 
     const oldAbiTransport = {
       async runGetMethod() {
-        return { stack: currentGlobalStack.slice(0, 14) };
+        return { stack: currentGlobalStack.slice(0, 12) };
       },
     };
     const oldAbiProvider = createProfileRegistryTonRpcProvider({ profileRegistryAddress: REGISTRY, transport: oldAbiTransport });
-    await expect(oldAbiProvider.getGlobal()).rejects.toThrow(/expected 16 stack items/);
+    await expect(oldAbiProvider.getGlobal()).rejects.toThrow(/expected 14 stack items/);
   });
 
   it('PROFILE-RPC-03: avatar getters forward critical read options to the transport', async () => {

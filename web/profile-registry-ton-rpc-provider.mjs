@@ -121,26 +121,24 @@ export function decodeProfileAvatarStack(result) {
 
 export function decodeProfileRegistryGlobalStack(result) {
   const stack = extractStack(result);
-  if (stack.length !== 16) {
-    throw new ProfileRegistryTonRpcProviderError(`ProfileRegistry get_global ABI mismatch: expected 16 stack items, got ${stack.length}`);
+  if (stack.length !== 14) {
+    throw new ProfileRegistryTonRpcProviderError(`ProfileRegistry get_global ABI mismatch: expected 14 stack items, got ${stack.length}`);
   }
   return {
     sealed: readStackBool(stack, 0, 'ProfileRegistry sealed'),
     official_ath_wallet_bound: readStackBool(stack, 1, 'ProfileRegistry official wallet bound'),
-    vault_bound: readStackBool(stack, 2, 'ProfileRegistry vault bound'),
-    deployment_manifest_hash: readStackInt(stack, 3, 'ProfileRegistry manifest hash'),
-    genesis_config_hash: readStackInt(stack, 4, 'ProfileRegistry genesis config hash'),
-    official_ath_wallet_address: readStackAddress(stack, 5, 'ProfileRegistry official ATH wallet'),
-    vault_address: readStackAddress(stack, 6, 'ProfileRegistry Vault'),
-    ath_master_address: readStackAddress(stack, 7, 'ProfileRegistry ATHMaster'),
-    treasury_ath_receiver_address: readStackAddress(stack, 8, 'ProfileRegistry treasury ATH receiver'),
-    genesis_controller_address: readStackAddress(stack, 9, 'ProfileRegistry genesis controller'),
-    profile_count: readStackInt(stack, 10, 'ProfileRegistry profile count'),
-    avatar_record_count: readStackInt(stack, 11, 'ProfileRegistry avatar record count'),
-    treasury_due_ath: readStackInt(stack, 12, 'ProfileRegistry treasury due'),
-    burn_due_ath: readStackInt(stack, 13, 'ProfileRegistry burn due'),
-    pending_treasury_flush_count: readStackInt(stack, 14, 'ProfileRegistry pending treasury flush count'),
-    pending_burn_flush_count: readStackInt(stack, 15, 'ProfileRegistry pending burn flush count'),
+    deployment_manifest_hash: readStackInt(stack, 2, 'ProfileRegistry manifest hash'),
+    genesis_config_hash: readStackInt(stack, 3, 'ProfileRegistry genesis config hash'),
+    official_ath_wallet_address: readStackAddress(stack, 4, 'ProfileRegistry official ATH wallet'),
+    ath_master_address: readStackAddress(stack, 5, 'ProfileRegistry ATHMaster'),
+    treasury_ath_receiver_address: readStackAddress(stack, 6, 'ProfileRegistry treasury ATH receiver'),
+    genesis_controller_address: readStackAddress(stack, 7, 'ProfileRegistry genesis controller'),
+    profile_count: readStackInt(stack, 8, 'ProfileRegistry profile count'),
+    avatar_record_count: readStackInt(stack, 9, 'ProfileRegistry avatar record count'),
+    treasury_due_ath: readStackInt(stack, 10, 'ProfileRegistry treasury due'),
+    burn_due_ath: readStackInt(stack, 11, 'ProfileRegistry burn due'),
+    pending_treasury_flush_count: readStackInt(stack, 12, 'ProfileRegistry pending treasury flush count'),
+    pending_burn_flush_count: readStackInt(stack, 13, 'ProfileRegistry pending burn flush count'),
   };
 }
 

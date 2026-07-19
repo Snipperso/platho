@@ -251,8 +251,6 @@ function finalInput(): MainnetGenesisVerifyInput {
         deployment_manifest_hash: manifestHash,
         official_ath_wallet_bound: true,
         official_ath_wallet_address: addresses.username_registry_official_ath_wallet,
-        vault_bound: true,
-        vault_address: addresses.vault,
         ath_master_address: addresses.ath_master,
         treasury_ath_receiver: addresses.treasury_ath_receiver,
         name_record_count: '0',
@@ -276,8 +274,6 @@ function finalInput(): MainnetGenesisVerifyInput {
         deployment_manifest_hash: manifestHash,
         official_ath_wallet_bound: true,
         official_ath_wallet_address: addresses.profile_registry_official_ath_wallet,
-        vault_bound: true,
-        vault_address: addresses.vault,
         ath_master_address: addresses.ath_master,
         treasury_ath_receiver: addresses.profile_registry_treasury_ath_receiver,
         profile_count: '0',
@@ -382,7 +378,7 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toEqual([]);
   });
 
-  it('rejects ProfileRegistry and UsernameRegistry final genesis when Vault binding is absent or mismatched', () => {
+  it('rejects final genesis when the Vault side of the registry bindings is absent or mismatched', () => {
     const vaultProfileUnbound = finalInput();
     vaultProfileUnbound.snapshot.vault.profile_registry_bound = false;
     let report = verifyMainnetGenesisSnapshot(vaultProfileUnbound);
@@ -406,30 +402,6 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     report = verifyMainnetGenesisSnapshot(vaultUsernameMismatched);
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('VAULT_USERNAME_REGISTRY_ADDRESS_MISMATCH');
-
-    const usernameUnbound = finalInput();
-    usernameUnbound.snapshot.username_registry.vault_bound = false;
-    report = verifyMainnetGenesisSnapshot(usernameUnbound);
-    expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('USERNAME_REGISTRY_VAULT_NOT_BOUND');
-
-    const usernameMismatched = finalInput();
-    usernameMismatched.snapshot.username_registry.vault_address = addr('wrong_username_registry_vault');
-    report = verifyMainnetGenesisSnapshot(usernameMismatched);
-    expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('USERNAME_REGISTRY_VAULT_ADDRESS_MISMATCH');
-
-    const unbound = finalInput();
-    unbound.snapshot.profile_registry.vault_bound = false;
-    report = verifyMainnetGenesisSnapshot(unbound);
-    expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('PROFILE_REGISTRY_VAULT_NOT_BOUND');
-
-    const mismatched = finalInput();
-    mismatched.snapshot.profile_registry.vault_address = addr('wrong_profile_registry_vault');
-    report = verifyMainnetGenesisSnapshot(mismatched);
-    expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('PROFILE_REGISTRY_VAULT_ADDRESS_MISMATCH');
   });
 
   it('rejects final genesis when core Vault/CapsuleHub/Profile/Username roles collapse to one address', () => {

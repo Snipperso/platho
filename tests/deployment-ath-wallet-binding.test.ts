@@ -20,7 +20,6 @@ import {
 import {
   ProfileRegistry,
   BindProfileOfficialAthWallet as ProfileBindAth,
-  BindProfileVault as ProfileBindVault,
   SealGenesis as ProfileSeal,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 
@@ -225,14 +224,8 @@ describe('Deployment ATH wallet binding profile', () => {
     } as ProfileSeal);
 
     let sealed = await profile.getGetGlobal();
-    expect(sealed.sealed).toBe(false);
+    expect(sealed.sealed).toBe(true);
 
-    const vaultAddress = fixtureAddress('PROFILE_DEPLOY_BOUND_VAULT');
-    await profile.send(deployer.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindProfileVault',
-      deployment_manifest_hash: MANIFEST_HASH,
-      vault_address: vaultAddress,
-    } as ProfileBindVault);
     await profile.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
       deployment_manifest_hash: MANIFEST_HASH,
@@ -241,8 +234,6 @@ describe('Deployment ATH wallet binding profile', () => {
     sealed = await profile.getGetGlobal();
     expect(sealed.sealed).toBe(true);
     expect(sealed.official_ath_wallet_address.equals(officialAthWallet)).toBe(true);
-    expect(sealed.vault_bound).toBe(true);
-    expect(sealed.vault_address.equals(vaultAddress)).toBe(true);
 
     const wrong = fixtureAddress('PROFILE_POST_SEAL_WRONG_ATH_WALLET');
     await profile.send(deployer.getSender(), { value: toNano('0.05') }, {
