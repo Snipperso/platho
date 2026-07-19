@@ -1,7 +1,8 @@
 // RecoveryShard — clean-17 sharded anon-publish, RECOVERY lane. Durability of the K_root self-recovery blob.
 //
-// One partition per user's self-recovery key (self_bucket_key, epoch-INDEPENDENT — §12 self-lane), deployed lazily
-// at address = f(StateInit{self_bucket_key}). Unlike the CONV RecordShard, it does NOT die daily: the recovery
+// RS_MAX_SLOTS partitions per user (self_bucket_key = H(domain ‖ owner_pubkey ‖ slot_index), epoch-INDEPENDENT —
+// §12 self-lane), deployed lazily at address = f(StateInit{self_bucket_key}) and filled densely from index 0. A user
+// pays for a slot only when they fill one. Unlike the CONV RecordShard, it does NOT die daily: the recovery
 // blob must survive so a user who reinstalls after a long absence can recover their whole contact graph. Retention
 // is 3 years (owner decision 2026-07-15), refreshed on every recovery publish.
 //
@@ -22,7 +23,21 @@
 // surface: an overwrite reuses the slot (no growth); a new bind adds one blob, gated in COMPUTE.
 
 const RS_RECOVERY_DOMAIN: Int = 0x42525331;       // "BRS1" — recovery digest preimage, MUST mirror CapsuleHub.tact
-const RS_SLOT_DOMAIN: Int = 0x52534C4B;           // "RSLK" — the slot IS the owner key: self_bucket_key = H(this ‖ owner_pubkey)
+const RS_SLOT_DOMAIN: Int = 0x52534C4B;           // "RSLK" — self_bucket_key = H(this ‖ owner_pubkey ‖ slot_index)
+// [OWNER DECISION 2026-07-19] A slot holds RS_MAX_BLOB_CELLS of blob — about 155 conversations at 64 bytes each.
+// The derivation used to be H(domain ‖ owner_pubkey) with NO index, so one owner key named exactly ONE address and
+// that ~155 was a HARD CEILING on how many conversations survive a reinstall. It could not be raised later: the
+// derivation is the address, and the address is immutable once sealed. Indexing the slot lifts the ceiling to
+// RS_MAX_SLOTS x ~155 while keeping the squat-close intact — the address still commits to owner_pubkey, so a
+// stranger still cannot name it (see 13575).
+//
+// THE CAP IS ENFORCED HERE, NOT ONLY IN THE CLIENT, and that is the load-bearing half. A restoring client finds its
+// slots by probing [0, RS_MAX_SLOTS) in one batched accountStates read — it has no other way to learn how many exist,
+// since nothing on chain enumerates them. A client that wrote to slot 5000 would therefore create a blob NOBODY EVER
+// READS AGAIN: the write succeeds, the money is spent, and the loss surfaces years later at the one moment the user
+// needs it. Refusing out-of-range here turns that silent loss into a loud refusal at publish time.
+// 256 x ~155 = ~40k conversations, and 256 addresses still fit one batched read.
+const RS_MAX_SLOTS: Int = 256;
 const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15); permissionless evict after updated_at + this
 // [MEASURED 2026-07-18] The endowment must cover the WHOLE ACCOUNT for the whole retention, not just the payload.
 // The old 23_200_000 was derived from the 79-cell blob alone (79 x 64962 x 3 x 1.5 = 23_093_991) and silently
@@ -47,6 +62,13 @@ const RS_MIN_VALUE: Int = RS_RECOVERY_ENDOWMENT + RS_RECOVERY_PATH_GAS;
 
 message(0x52435631) RecoveryStore {               // "RCV1"
     owner_pubkey: Int as uint256;                 // bound on the first publish; must match on every later write
+    // Which of the owner's slots this is. Checked ONLY against self_bucket_key on the first bind (13575) and ignored
+    // on an overwrite, because by then the slot's identity is already fixed and owner_pubkey alone authorises.
+    // DELIBERATELY NOT in the signed digest: self_bucket_key already commits to it by construction, and the digest
+    // commits to self_bucket_key — so the signature is bound to this exact slot transitively. Adding it again would
+    // be redundant. Tampering with it in flight can only make 13575 refuse a first bind (a self-evident, retryable
+    // failure), never redirect a write to the wrong slot.
+    slot_index: Int as uint32;
     seq: Int as uint64;                           // strictly increasing — the anti-rollback bind
     h0: Int as uint256;
     h1: Int as uint256;
@@ -65,6 +87,7 @@ struct RecoveryShardView {
     updated_at: Int;
     retention: Int;
     endowment: Int;
+    max_slots: Int;        // clients probe [0, this) on restore instead of hardcoding a mirror of RS_MAX_SLOTS
     // The frame hashes were stored but never exposed, so a client could fetch the blob with nothing to check it
     // against — the monolith returned body_hash alongside the body, making the read self-verifying. Restored.
     h0: Int;
@@ -98,10 +121,17 @@ contract RecoveryShard {
 
     // digest = H(RECOVERY_DOMAIN ‖ self_bucket_key ‖ seq ‖ h0 ‖ h1 ‖ bh). Binds the signature to THIS slot, THIS
     // seq, and THIS frame — so a signed publish cannot be replayed into a different slot, reordered, or downgraded.
-    // [SQUAT-CLOSE] The slot's identity IS the owner key. self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey), so
-    // only the holder of the seed that derives owner_pubkey can name (hence bind) this address.
-    fun slotKeyForOwner(ownerPubkey: Int): Int {
-        return beginCell().storeUint(RS_SLOT_DOMAIN, 32).storeUint(ownerPubkey, 256).endCell().hash();
+    // [SQUAT-CLOSE] The slot's identity IS the owner key. self_bucket_key = H(RS_SLOT_DOMAIN ‖ owner_pubkey ‖
+    // slot_index), so only the holder of the seed that derives owner_pubkey can name (hence bind) any of these
+    // addresses. Indexing does not weaken that: every index still hashes the owner key, so all RS_MAX_SLOTS
+    // addresses of a user are equally unnameable by anyone else.
+    fun slotKeyForOwner(ownerPubkey: Int, slotIndex: Int): Int {
+        return beginCell()
+            .storeUint(RS_SLOT_DOMAIN, 32)
+            .storeUint(ownerPubkey, 256)
+            .storeUint(slotIndex, 32)
+            .endCell()
+            .hash();
     }
 
     fun recoveryDigest(seq: Int, h0: Int, h1: Int, bh: Int): Int {
@@ -148,7 +178,13 @@ contract RecoveryShard {
             // a squatter re-binding an evicted (or fresh) slot would need a hash preimage of the victim's
             // self_bucket_key — infeasible. Anti-hijack no longer rests on "first writer wins": ONLY the owner key
             // that names the slot can bind it, even after a 3-year eviction frees it.
-            throwUnless(13575, self.self_bucket_key == self.slotKeyForOwner(msg.owner_pubkey));
+            // [RANGE] Refuse a slot the recovery scan would never look at. A restoring client probes [0, RS_MAX_SLOTS)
+            // and nothing on chain enumerates a user's slots, so an out-of-range bind writes a blob that is never read
+            // again — money spent, write reported successful, loss discovered years later. Checked ONLY on the bind,
+            // where slot_index actually decides something: on an overwrite the slot identity is already fixed and a
+            // stale index in the message must not be able to block the anti-rollback update path.
+            throwUnless(13576, (msg.slot_index >= 0) && (msg.slot_index < RS_MAX_SLOTS));
+            throwUnless(13575, self.self_bucket_key == self.slotKeyForOwner(msg.owner_pubkey, msg.slot_index));
             self.bound = true;
             self.owner_pubkey = msg.owner_pubkey;
         } else {
@@ -218,6 +254,7 @@ contract RecoveryShard {
             updated_at: self.updated_at,
             retention: RS_RECOVERY_RETENTION,
             endowment: RS_RECOVERY_ENDOWMENT,
+            max_slots: RS_MAX_SLOTS,
             h0: self.h0,
             h1: self.h1,
             bh: self.bh,

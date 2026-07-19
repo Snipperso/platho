@@ -172,7 +172,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
   it('PB-05: a RECOVERY blob is stored on chain at the owner-bound slot, and its frame hashes are now readable', async () => {
     const seed = new Uint8Array(32).fill(0x64);
     const blob = cellOf(0xAB, 128);
-    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x111n, h1: 0x222n, body: blob, value: toNano('0.05') });
+    const built = await buildRecoveryPublish({ seed, slotIndex: 0, seq: 1, h0: 0x111n, h1: 0x222n, body: blob, value: toNano('0.05') });
 
     const init = await RecoveryShard.init(built.slotKey);
     const rs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, init), init)));
@@ -197,7 +197,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     for (let i = 0; i < 100; i += 1) {   // past RS_MAX_BLOB_CELLS (79) but under the probe limit, so 13560 fires
       oversized = beginCell().storeBuffer(Buffer.alloc(64, i & 0xff)).storeRef(oversized).endCell();
     }
-    const built = await buildRecoveryPublish({ seed, seq: 1, h0: 0x1n, h1: 0x2n, body: oversized, value: toNano('0.1') });
+    const built = await buildRecoveryPublish({ seed, slotIndex: 0, seq: 1, h0: 0x1n, h1: 0x2n, body: oversized, value: toNano('0.1') });
     const init = await RecoveryShard.init(built.slotKey);
     const rs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, init), init)));
 
@@ -208,7 +208,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
 
     // and a blob WITHIN the cap on the same (fresh) slot is accepted, so the cap is not simply rejecting everything
     const okSeed = new Uint8Array(32).fill(0x66);
-    const okBuilt = await buildRecoveryPublish({ seed: okSeed, seq: 1, h0: 0x1n, h1: 0x2n, body: cellOf(0xCD, 512), value: toNano('0.1') });
+    const okBuilt = await buildRecoveryPublish({ seed: okSeed, slotIndex: 0, seq: 1, h0: 0x1n, h1: 0x2n, body: cellOf(0xCD, 512), value: toNano('0.1') });
     const okInit = await RecoveryShard.init(okBuilt.slotKey);
     const okRs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, okInit), okInit)));
     expect(exitOf(await send(okBuilt), okRs.address), 'in-cap blob accepted').toBe(0);

@@ -44,21 +44,40 @@ export const EPOCH_SECONDS = 86400;
 
 export const epochOf = (unixSeconds) => Math.floor(unixSeconds / EPOCH_SECONDS);
 
-// MUST equal RS_SLOT_DOMAIN in RecoveryShard.tact ("RSLK"). The recovery slot IS the owner key.
+// MUST equal RS_SLOT_DOMAIN in RecoveryShard.tact ("RSLK"). The recovery slot IS the owner key plus its index.
 const RECOVERY_SLOT_DOMAIN = 0x52534C4Bn;
 const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
 
 /**
- * The RecoveryShard self_bucket_key that commits to an owner pubkey: H(RS_SLOT_DOMAIN ‖ owner_pubkey) as a uint256,
- * mirroring RecoveryShard.slotKeyForOwner. Binding the slot to the key is what closes the post-eviction squat
- * (gate 13575) — only the seed-holder who derived owner_pubkey can name this address.
+ * RECOVERY_MAX_SLOTS — MUST equal RS_MAX_SLOTS in RecoveryShard.tact.
+ *
+ * A restoring client probes [0, this) in ONE batched accountStates read, because nothing on chain enumerates a
+ * user's slots. That makes this number the recovery horizon: a blob outside it is written, paid for, and never read
+ * again. The contract gates the same bound (13576) so an out-of-range write is refused loudly instead of vanishing
+ * quietly — but a client that probed a SHORTER range than it writes would reintroduce the same silent loss on its
+ * own, which is why this is one named constant rather than a literal at each site.
+ */
+export const RECOVERY_MAX_SLOTS = 256;
+
+/**
+ * The RecoveryShard self_bucket_key for one of an owner's slots: H(RS_SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index) as a
+ * uint256, mirroring RecoveryShard.slotKeyForOwner. Binding the slot to the key is what closes the post-eviction
+ * squat (gate 13575) — only the seed-holder who derived owner_pubkey can name any of these addresses.
+ *
+ * `slotIndex` is REQUIRED and deliberately has no default. It decides which address this is, and a caller who
+ * silently got 0 when they meant 3 would overwrite the blob in slot 0 — a valid signature and a higher seq, so the
+ * contract accepts it and the real slot-0 conversations are gone. An explicit argument makes that unmissable.
  */
 // Async because the browser cell hasher is: there is no synchronous sha256 in the platform's crypto API.
-export async function recoveryOwnerSlotKey(ownerPublicKey) {
+export async function recoveryOwnerSlotKey(ownerPublicKey, slotIndex) {
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= RECOVERY_MAX_SLOTS) {
+    throw new Error(`recoveryOwnerSlotKey: slotIndex must be an integer in [0, ${RECOVERY_MAX_SLOTS}), got ${slotIndex}`);
+  }
   const pub = typeof ownerPublicKey === 'bigint' ? ownerPublicKey : bytesToBig(ownerPublicKey);
   const cell = beginCell()
     .uint(RECOVERY_SLOT_DOMAIN, 32, 'RS_SLOT_DOMAIN')
     .uint(pub, 256, 'owner_pubkey')
+    .uint(BigInt(slotIndex), 32, 'slot_index')
     .endCell();
   const { hash } = await computeCellHashAndDepth(cell);
   return bytesToBig(hash);

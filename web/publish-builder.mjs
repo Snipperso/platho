@@ -35,10 +35,19 @@ const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | Bi
 // independence reason above.
 const RECOVERY_SLOT_DOMAIN = 0x52534C4Bn;
 
-const recoveryOwnerSlotKey = (ownerPublicKey) => BigInt('0x' + beginCell()
-  .storeUint(RECOVERY_SLOT_DOMAIN, 32)
-  .storeUint(typeof ownerPublicKey === 'bigint' ? ownerPublicKey : bytesToBig(ownerPublicKey), 256)
-  .endCell().hash().toString('hex'));
+// MUST equal RS_MAX_SLOTS in RecoveryShard.tact; mirrored here for the same independence reason as the domain.
+const RECOVERY_MAX_SLOTS = 256;
+
+const recoveryOwnerSlotKey = (ownerPublicKey, slotIndex) => {
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= RECOVERY_MAX_SLOTS) {
+    throw new Error(`buildRecoveryPublish: slotIndex must be an integer in [0, ${RECOVERY_MAX_SLOTS}), got ${slotIndex}`);
+  }
+  return BigInt('0x' + beginCell()
+    .storeUint(RECOVERY_SLOT_DOMAIN, 32)
+    .storeUint(typeof ownerPublicKey === 'bigint' ? ownerPublicKey : bytesToBig(ownerPublicKey), 256)
+    .storeUint(slotIndex, 32)
+    .endCell().hash().toString('hex'));
+};
 
 async function recordShardState(bucketKey, epoch) {
   const init = await RecordShard.init(BigInt(bucketKey), BigInt(epoch));
@@ -151,11 +160,15 @@ export async function buildIntroPublish({ epoch, bucket, r, viewTag, header0, bo
  * (gate 13575). `seq` MUST be strictly greater than the slot's current seq — read get_view().seq first; a fresh
  * slot is 0 (after an eviction it is the retained high-water mark). The blob is capped at max_blob_cells (13560),
  * and `bh` is derived from `body` — do not pass it.
+ *
+ * `slotIndex` selects which of the owner's RS_MAX_SLOTS books this is, and is REQUIRED — see recoveryOwnerSlotKey
+ * for why it must not default. Each slot carries its own independent `seq`; they are separate accounts, so reading
+ * one slot's get_view().seq says nothing about another's.
  */
-export async function buildRecoveryPublish({ seed, seq, h0, h1, body, value }) {
+export async function buildRecoveryPublish({ seed, slotIndex, seq, h0, h1, body, value }) {
   const ownerSecret = await recoveryOwnerSecret(seed);
   const ownerPub = await recoveryOwnerPublicKey(seed);
-  const slotKey = recoveryOwnerSlotKey(ownerPub);
+  const slotKey = recoveryOwnerSlotKey(ownerPub, slotIndex);
   const target = await recoveryShardState(slotKey);
   // bh is DERIVED from the body, never supplied: the contract requires body.hash() == bh (gate 13557), so letting a
   // caller pass it separately only creates a way to get it wrong and have the publish bounce.
@@ -175,10 +188,11 @@ export async function buildRecoveryPublish({ seed, seq, h0, h1, body, value }) {
     value,
     body: beginCell().store(storeRecoveryStore({
       $$type: 'RecoveryStore',
-      owner_pubkey: bytesToBig(ownerPub), seq: BigInt(seq), h0, h1, bh, body,
+      owner_pubkey: bytesToBig(ownerPub), slot_index: BigInt(slotIndex), seq: BigInt(seq), h0, h1, bh, body,
       owner_sig: sigCell(ed25519.sign(digest, ownerSecret)),
     })).endCell(),
     slotKey,
+    slotIndex,
     ownerPublicKey: ownerPub,
   };
 }

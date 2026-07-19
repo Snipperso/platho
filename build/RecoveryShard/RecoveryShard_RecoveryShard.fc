@@ -24,7 +24,7 @@ builder $RecoveryShard$_store(builder build_0, (int, int, int, int, int, int, in
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $RecoveryShardView$_to_external
-(int, int, int, int, int, int, int, int, int, int, int) $RecoveryShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int)) v) inline;
+(int, int, int, int, int, int, int, int, int, int, int, int) $RecoveryShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int)) v) inline;
 
 ;; $RecoveryShard$init$_load
 (slice, ((int))) $RecoveryShard$init$_load(slice sc_0) inline;
@@ -39,16 +39,16 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 () $RecoveryShard$_contract_store((int, int, int, int, int, int, int, cell, int) v) impure inline;
 
 ;; $RecoveryShard$_fun_slotKeyForOwner
-((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_slotKeyForOwner((int, int, int, int, int, int, int, cell, int) $self, int $ownerPubkey) impure inline_ref;
+((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_slotKeyForOwner((int, int, int, int, int, int, int, cell, int) $self, int $ownerPubkey, int $slotIndex) impure inline_ref;
 
 ;; $RecoveryShard$_fun_recoveryDigest
 ((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_recoveryDigest((int, int, int, int, int, int, int, cell, int) $self, int $seq, int $h0, int $h1, int $bh) impure inline_ref;
 
-;; $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells
-((int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells(int $self_bucket_key, int $bound, int $owner_pubkey, int $seq, int $updated_at, int $retention, int $endowment, int $h0, int $h1, int $bh, int $max_blob_cells) inline;
+;; $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells
+((int, int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells(int $self_bucket_key, int $bound, int $owner_pubkey, int $seq, int $updated_at, int $retention, int $endowment, int $max_slots, int $h0, int $h1, int $bh, int $max_blob_cells) inline;
 
 ;; $RecoveryShard$_fun_get_view
-((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref;
+((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref;
 
 ;; $RecoveryShard$_fun_get_body
 ((int, int, int, int, int, int, int, cell, int), cell) $RecoveryShard$_fun_get_body((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref;
@@ -216,16 +216,16 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 
 ;;
 ;; Type: RecoveryShardView
-;; TLB: _ self_bucket_key:int257 bound:bool owner_pubkey:int257 seq:int257 updated_at:int257 retention:int257 endowment:int257 h0:int257 h1:int257 bh:int257 max_blob_cells:int257 = RecoveryShardView
+;; TLB: _ self_bucket_key:int257 bound:bool owner_pubkey:int257 seq:int257 updated_at:int257 retention:int257 endowment:int257 max_slots:int257 h0:int257 h1:int257 bh:int257 max_blob_cells:int257 = RecoveryShardView
 ;;
 
-(int, int, int, int, int, int, int, int, int, int, int) $RecoveryShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int)) v) inline {
-    var (v'self_bucket_key, v'bound, v'owner_pubkey, v'seq, v'updated_at, v'retention, v'endowment, v'h0, v'h1, v'bh, v'max_blob_cells) = v; 
-    return (v'self_bucket_key, v'bound, v'owner_pubkey, v'seq, v'updated_at, v'retention, v'endowment, v'h0, v'h1, v'bh, v'max_blob_cells);
+(int, int, int, int, int, int, int, int, int, int, int, int) $RecoveryShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int)) v) inline {
+    var (v'self_bucket_key, v'bound, v'owner_pubkey, v'seq, v'updated_at, v'retention, v'endowment, v'max_slots, v'h0, v'h1, v'bh, v'max_blob_cells) = v; 
+    return (v'self_bucket_key, v'bound, v'owner_pubkey, v'seq, v'updated_at, v'retention, v'endowment, v'max_slots, v'h0, v'h1, v'bh, v'max_blob_cells);
 }
 
-((int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells(int $self_bucket_key, int $bound, int $owner_pubkey, int $seq, int $updated_at, int $retention, int $endowment, int $h0, int $h1, int $bh, int $max_blob_cells) inline {
-    return ($self_bucket_key, $bound, $owner_pubkey, $seq, $updated_at, $retention, $endowment, $h0, $h1, $bh, $max_blob_cells);
+((int, int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells(int $self_bucket_key, int $bound, int $owner_pubkey, int $seq, int $updated_at, int $retention, int $endowment, int $max_slots, int $h0, int $h1, int $bh, int $max_blob_cells) inline {
+    return ($self_bucket_key, $bound, $owner_pubkey, $seq, $updated_at, $retention, $endowment, $max_slots, $h0, $h1, $bh, $max_blob_cells);
 }
 
 ;;
@@ -306,9 +306,9 @@ builder $RecoveryShard$_store(builder build_0, (int, int, int, int, int, int, in
     return ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at);
 }
 
-((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_slotKeyForOwner((int, int, int, int, int, int, int, cell, int) $self, int $ownerPubkey) impure inline_ref {
+((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_slotKeyForOwner((int, int, int, int, int, int, int, cell, int) $self, int $ownerPubkey, int $slotIndex) impure inline_ref {
     var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
-    var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1381190731, 32), $ownerPubkey, 256)));
+    var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1381190731, 32), $ownerPubkey, 256), $slotIndex, 32)));
     return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_0);
 }
 
@@ -318,9 +318,9 @@ builder $RecoveryShard$_store(builder build_0, (int, int, int, int, int, int, in
     return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_1);
 }
 
-((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
+((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
     var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
-    var $fresh$ret_2 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_h0_h1_bh_max_blob_cells($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 28700000, $self'h0, $self'h1, $self'bh, 79);
+    var $fresh$ret_2 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 28700000, 256, $self'h0, $self'h1, $self'bh, 79);
     return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_2);
 }
 
@@ -378,6 +378,7 @@ _ %get_body() method_id(104539) {
     ;; Receive RecoveryStore message
     if (op == 0x52435631) {
         var $msg'owner_pubkey = in_msg~load_uint(256);
+        var $msg'slot_index = in_msg~load_uint(32);
         var $msg'seq = in_msg~load_uint(64);
         var $msg'h0 = in_msg~load_uint(256);
         var $msg'h1 = in_msg~load_uint(256);
@@ -393,7 +394,8 @@ _ %get_body() method_id(104539) {
         int $wasUnbound = (~ $self'bound);
         ifnot ($self'bound) {
             throw_unless(13573, ($msg'seq > $self'seq));
-            throw_unless(13575, ($self'self_bucket_key == ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)~$RecoveryShard$_fun_slotKeyForOwner($msg'owner_pubkey)));
+            throw_unless(13576, ( (($msg'slot_index >= 0)) ? (($msg'slot_index < 256)) : (false) ));
+            throw_unless(13575, ($self'self_bucket_key == ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)~$RecoveryShard$_fun_slotKeyForOwner($msg'owner_pubkey, $msg'slot_index)));
             $self'bound = true;
             $self'owner_pubkey = $msg'owner_pubkey;
         } else {

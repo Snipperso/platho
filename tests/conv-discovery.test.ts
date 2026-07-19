@@ -47,15 +47,15 @@ describe('CONV-DISCOVERY — A publishes where B reads', () => {
 
   it('CONV-DISC-04: the self-recovery shard is deterministic AND commits to the owner key (squat-close binding)', async () => {
     const seed = new Uint8Array(32).fill(0x99);
-    const r1 = await selfRecoveryShard(seed);
-    const r2 = await selfRecoveryShard(seed);
+    const r1 = await selfRecoveryShard(seed, 0);
+    const r2 = await selfRecoveryShard(seed, 0);
     expect(addrKey(r1.address)).toBe(addrKey(r2.address));
     // the slot IS the owner key: self_bucket_key == H(RS_SLOT_DOMAIN ‖ owner_pubkey). This is exactly what makes the
     // slot bindable only by the seed-holder (gate 13575) — a reinstalled client re-derives the same owner key and
     // finds its slot in one lookup, but no one else can name it.
-    expect(r1.slotKey).toBe(await recoveryOwnerSlotKey(r1.ownerPublicKey));
+    expect(r1.slotKey).toBe(await recoveryOwnerSlotKey(r1.ownerPublicKey, 0));
     // a different seed -> a different owner key -> a different recovery shard
-    const other = await selfRecoveryShard(new Uint8Array(32).fill(0x98));
+    const other = await selfRecoveryShard(new Uint8Array(32).fill(0x98), 0);
     expect(addrKey(r1.address)).not.toBe(addrKey(other.address));
     expect(r1.slotKey).not.toBe(other.slotKey);
   });

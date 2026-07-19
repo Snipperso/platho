@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: RecoveryShard
-BoC Size: 900 bytes
+BoC Size: 931 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 14
@@ -46,16 +46,16 @@ TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
 ### RecoveryStore
-TL-B: `recovery_store#52435631 owner_pubkey:uint256 seq:uint64 h0:uint256 h1:uint256 bh:uint256 body:^cell owner_sig:^cell = RecoveryStore`
-Signature: `RecoveryStore{owner_pubkey:uint256,seq:uint64,h0:uint256,h1:uint256,bh:uint256,body:^cell,owner_sig:^cell}`
+TL-B: `recovery_store#52435631 owner_pubkey:uint256 slot_index:uint32 seq:uint64 h0:uint256 h1:uint256 bh:uint256 body:^cell owner_sig:^cell = RecoveryStore`
+Signature: `RecoveryStore{owner_pubkey:uint256,slot_index:uint32,seq:uint64,h0:uint256,h1:uint256,bh:uint256,body:^cell,owner_sig:^cell}`
 
 ### EvictRecovery
 TL-B: `evict_recovery#52435632  = EvictRecovery`
 Signature: `EvictRecovery{}`
 
 ### RecoveryShardView
-TL-B: `_ self_bucket_key:int257 bound:bool owner_pubkey:int257 seq:int257 updated_at:int257 retention:int257 endowment:int257 h0:int257 h1:int257 bh:int257 max_blob_cells:int257 = RecoveryShardView`
-Signature: `RecoveryShardView{self_bucket_key:int257,bound:bool,owner_pubkey:int257,seq:int257,updated_at:int257,retention:int257,endowment:int257,h0:int257,h1:int257,bh:int257,max_blob_cells:int257}`
+TL-B: `_ self_bucket_key:int257 bound:bool owner_pubkey:int257 seq:int257 updated_at:int257 retention:int257 endowment:int257 max_slots:int257 h0:int257 h1:int257 bh:int257 max_blob_cells:int257 = RecoveryShardView`
+Signature: `RecoveryShardView{self_bucket_key:int257,bound:bool,owner_pubkey:int257,seq:int257,updated_at:int257,retention:int257,endowment:int257,max_slots:int257,h0:int257,h1:int257,bh:int257,max_blob_cells:int257}`
 
 ### RecoveryShard$Data
 TL-B: `_ self_bucket_key:uint256 bound:bool owner_pubkey:uint256 seq:uint64 h0:uint256 h1:uint256 bh:uint256 body:^cell updated_at:uint64 = RecoveryShard`
