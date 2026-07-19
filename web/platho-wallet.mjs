@@ -345,11 +345,29 @@ export async function deriveMessagingIdentityFromWallet(wallet, suite) {
   return createMessagingIdentity({ encryptionKeyPair, signingSecretKey, scanSecretKey });
 }
 
-function storeInternalMessage(message) {
+/**
+ * One outgoing internal message.
+ *
+ * `message.stateInit` — A DESTINATION StateInit, attached by reference. This is NOT the wallet's own deploy
+ * StateInit (that rides the EXTERNAL message and is the `includeStateInit` option elsewhere in this file); it is
+ * the init of the account being SENT TO.
+ *
+ * It has to exist because the clean-17 shards are deployed LAZILY: a CONV or INTRO shard is a fresh account
+ * every epoch, and the first publish into one is what creates it. Without the StateInit that message lands on an
+ * uninitialised account, its COMPUTE PHASE IS SKIPPED, nothing is stored, no error is raised and the wallet
+ * reports a perfectly successful transaction. Until this branch existed, every first write into a bucket-day
+ * would have vanished exactly that way — the worst failure mode this project has, on the send path that signs
+ * every transfer.
+ *
+ * TL-B: message$_ info:CommonMsgInfo init:(Maybe (Either StateInit ^StateInit)) body:(Either X ^X)
+ * The Maybe/Either pair below is `1` then `1` — present, and by reference.
+ */
+export function storeInternalMessage(message) {
   const destination = parseTonAddress(message.address);
   const value = BigInt(message.amount ?? 0);
   const body = message.payload ? parseBocBase64(message.payload) : beginCell().endCell();
-  return beginCell()
+  const stateInit = message.stateInit ?? null;
+  const builder = beginCell()
     .uint(0n, 1, 'int_msg_info.tag')
     .uint(1n, 1, 'int_msg_info.ihr_disabled')
     .uint(message.bounce === false ? 0n : 1n, 1, 'int_msg_info.bounce')
@@ -361,8 +379,16 @@ function storeInternalMessage(message) {
     .coins(0n, 'int_msg_info.ihr_fee')
     .coins(0n, 'int_msg_info.fwd_fee')
     .uint(0n, 64, 'int_msg_info.created_lt')
-    .uint(0n, 32, 'int_msg_info.created_at')
-    .uint(0n, 1, 'message.init_none')
+    .uint(0n, 32, 'int_msg_info.created_at');
+  if (stateInit) {
+    builder
+      .uint(1n, 1, 'message.init_some')
+      .uint(1n, 1, 'message.init_ref')
+      .ref(stateInit, 'message.init');
+  } else {
+    builder.uint(0n, 1, 'message.init_none');
+  }
+  return builder
     .uint(1n, 1, 'message.body_ref')
     .ref(body, 'message.body')
     .endCell();
