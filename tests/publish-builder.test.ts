@@ -188,6 +188,39 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect((await rs.getGetBody()).equals(blob), 'the blob itself is on chain').toBe(true);
   }, 120_000);
 
+  it('PB-05b: the CLIENT slot derivation matches the CONTRACT for a NON-ZERO index, end to end', async () => {
+    // The client mirrors slotKeyForOwner in two independent places (shard-discovery with the browser hasher,
+    // publish-builder with @ton/core) and the contract recomputes it in Tact. Three implementations of one hash.
+    // If any drifts, the client addresses a slot the contract will not bind — and under lazy deploy an unbindable
+    // address is not an error, it is a message that vanishes with the wallet reporting success.
+    //
+    // PB-05 only ever exercised index 0, where a derivation that DROPPED the index entirely still agrees with one
+    // that keeps it: H(d ‖ pub ‖ 0) is what both compute only because both were given 0. A non-zero index is the
+    // first input that can tell those two implementations apart, which is the whole reason this case exists.
+    const seed = new Uint8Array(32).fill(0x66);
+    const blob = cellOf(0xCE, 96);
+    const built = await buildRecoveryPublish({ seed, slotIndex: 7, seq: 1, h0: 0x333n, h1: 0x444n, body: blob, value: toNano('0.05') });
+
+    const init = await RecoveryShard.init(built.slotKey);
+    const rs = await deploy(blockchain.openContract(new RecoveryShard(contractAddress(0, init), init)));
+
+    // Exit 0 here IS the cross-check: the contract recomputes H(domain ‖ owner_pubkey ‖ 7) and compares it to the
+    // self_bucket_key the CLIENT chose. A mismatch of even one bit is gate 13575, not a silent pass.
+    expect(exitOf(await send(built), rs.address), 'contract agrees with the client on slot 7').toBe(0);
+    expect((await rs.getGetView()).bound).toBe(true);
+
+    // and slot 7 is genuinely a different account from slot 0 for the same seed
+    const at0 = await buildRecoveryPublish({ seed, slotIndex: 0, seq: 1, h0: 0x333n, h1: 0x444n, body: blob, value: toNano('0.05') });
+    expect(at0.slotKey, 'index 0 and index 7 are different slots').not.toBe(built.slotKey);
+    expect(addrKey(at0.to)).not.toBe(addrKey(built.to));
+
+    // the builder refuses an index the recovery scan would never probe, before any money moves
+    await expect(buildRecoveryPublish({ seed, slotIndex: 256, seq: 1, h0: 0x1n, h1: 0x2n, body: blob, value: toNano('0.05') }))
+      .rejects.toThrow(/slotIndex/);
+    await expect(buildRecoveryPublish({ seed, seq: 1, h0: 0x1n, h1: 0x2n, body: blob, value: toNano('0.05') } as any))
+      .rejects.toThrow(/slotIndex/);
+  }, 120_000);
+
   it('PB-06: an oversized RECOVERY blob is refused (13560 restored) — a fixed endowment cannot buy unbounded storage', async () => {
     // The sharded rewrite dropped the monolith's blob cap while keeping the endowment calibrated for it, so an
     // oversized blob would buy 3 years of storage it did not pay for and starve the slot. Positive tests are blind
