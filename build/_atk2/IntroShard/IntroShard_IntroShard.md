@@ -1,9 +1,9 @@
 # Tact compilation report
-Contract: RecordShard
-BoC Size: 1316 bytes
+Contract: IntroShard
+BoC Size: 1706 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 17
+Total structures: 18
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -45,38 +45,46 @@ Signature: `VarAddress{workchain:int32,address:^slice}`
 TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
-### CapsulePublish
-TL-B: `capsule_publish#52535031 seq:uint64 header_0:^cell header_1:^cell body:^cell sig:^cell = CapsulePublish`
-Signature: `CapsulePublish{seq:uint64,header_0:^cell,header_1:^cell,body:^cell,sig:^cell}`
+### IntroPublish
+TL-B: `intro_publish#49535031 r:uint256 view_tag:uint16 header_0:^cell body:^cell = IntroPublish`
+Signature: `IntroPublish{r:uint256,view_tag:uint16,header_0:^cell,body:^cell}`
 
-### EvictRecords
-TL-B: `evict_records#52535032 max_count:uint16 = EvictRecords`
-Signature: `EvictRecords{max_count:uint16}`
+### EvictIntros
+TL-B: `evict_intros#49535032 max_count:uint16 = EvictIntros`
+Signature: `EvictIntros{max_count:uint16}`
 
 ### DepositProtocolFee
 TL-B: `deposit_protocol_fee#ff775609 amount:uint128 = DepositProtocolFee`
 Signature: `DepositProtocolFee{amount:uint128}`
 
-### RecordEntry
-TL-B: `_ frame_commit:int257 created_at:int257 = RecordEntry`
-Signature: `RecordEntry{frame_commit:int257,created_at:int257}`
+### IntroEntry
+TL-B: `_ r:int257 view_tag:int257 body_commit:int257 created_at:int257 = IntroEntry`
+Signature: `IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}`
 
-### CapsuleRecordView
-TL-B: `_ exists:bool frame_commit:int257 created_at:int257 = CapsuleRecordView`
-Signature: `CapsuleRecordView{exists:bool,frame_commit:int257,created_at:int257}`
+### IntroEntryView
+TL-B: `_ exists:bool r:int257 view_tag:int257 body_commit:int257 created_at:int257 = IntroEntryView`
+Signature: `IntroEntryView{exists:bool,r:int257,view_tag:int257,body_commit:int257,created_at:int257}`
 
-### RecordShardView
-TL-B: `_ write_pubkey:int257 epoch:int257 last_seq:int257 record_count:int257 live_count:int257 evict_cursor:int257 safe_cap:int257 retention:int257 min_value:int257 protocol_fee:int257 evict_bounty:int257 accrued_bounty:int257 fee_sink:address = RecordShardView`
-Signature: `RecordShardView{write_pubkey:int257,epoch:int257,last_seq:int257,record_count:int257,live_count:int257,evict_cursor:int257,safe_cap:int257,retention:int257,min_value:int257,protocol_fee:int257,evict_bounty:int257,accrued_bounty:int257,fee_sink:address}`
+### IntroScanPage
+TL-B: `_ from_id:int257 count:int257 next_id:int257 evict_cursor:int257 pairs:^cell = IntroScanPage`
+Signature: `IntroScanPage{from_id:int257,count:int257,next_id:int257,evict_cursor:int257,pairs:^cell}`
 
-### RecordShard$Data
-TL-B: `_ write_pubkey:uint256 epoch:uint32 last_seq:uint64 records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}> record_count:uint32 live_count:uint32 evict_cursor:uint32 accrued_bounty:coins = RecordShard`
-Signature: `RecordShard{write_pubkey:uint256,epoch:uint32,last_seq:uint64,records:dict<int, ^RecordEntry{frame_commit:int257,created_at:int257}>,record_count:uint32,live_count:uint32,evict_cursor:uint32,accrued_bounty:coins}`
+### IntroShardView
+TL-B: `_ epoch:int257 bucket:int257 live_count:int257 next_id:int257 evict_cursor:int257 retention:int257 safe_cap:int257 min_value:int257 protocol_fee:int257 accrued_fee:int257 evict_bounty:int257 accrued_bounty:int257 fee_sink:address = IntroShardView`
+Signature: `IntroShardView{epoch:int257,bucket:int257,live_count:int257,next_id:int257,evict_cursor:int257,retention:int257,safe_cap:int257,min_value:int257,protocol_fee:int257,accrued_fee:int257,evict_bounty:int257,accrued_bounty:int257,fee_sink:address}`
+
+### IntroShard$Data
+TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 live_count:uint32 evict_cursor:uint32 accrued_fee:coins accrued_bounty:coins = IntroShard`
+Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32,live_count:uint32,evict_cursor:uint32,accrued_fee:coins,accrued_bounty:coins}`
 
 ## Get methods
-Total get methods: 2
+Total get methods: 3
 
-## get_record
+## get_scan_page
+Argument: from_id
+Argument: max_count
+
+## get_entry
 Argument: entry_id
 
 ## get_view
@@ -124,13 +132,13 @@ No arguments
 
 ```mermaid
 graph TD
-RecordShard
-RecordShard --> BaseTrait
+IntroShard
+IntroShard --> BaseTrait
 ```
 
 ## Contract dependency diagram
 
 ```mermaid
 graph TD
-RecordShard
+IntroShard
 ```

@@ -93,7 +93,18 @@ describe('Storage top-up ABI coverage', () => {
     await fee.send(donor.getSender(), { value: toNano('0.05') }, {
       $$type: 'TopUpStorageReserve',
     } as FeeAccumulatorTopUpStorageReserve);
-    expect(normalizeState(await fee.getGetState())).toEqual(normalizeState(feeBefore));
+    // FeeAccumulator now COUNTS the top-up (storage_reserve_ton). That is a state change, so the blanket
+    // "state is byte-identical afterwards" form no longer expresses this test's actual invariant, which is that
+    // a top-up grants no authority and moves no accounting bucket. It is counted because SweepUnaccounted has
+    // to tell deliberate funding apart from deposit surplus — leaving it untracked meant the sweep carried off
+    // money somebody meant to leave behind, which is a defect class this project has already shipped twice.
+    const feeAfter = await fee.getGetState();
+    const { storage_reserve_ton: reserveAfter, ...feeAfterRest } = feeAfter as any;
+    const { storage_reserve_ton: reserveBefore, ...feeBeforeRest } = feeBefore as any;
+    expect(normalizeState(feeAfterRest), 'no bucket, flag or address may move on a top-up')
+      .toEqual(normalizeState(feeBeforeRest));
+    expect(reserveAfter - reserveBefore, 'the top-up is recorded at exactly its attached value')
+      .toBe(toNano('0.05'));
     expect(await contractBalance(blockchain, fee.address)).toBeGreaterThan(feeBalanceBefore);
 
     const buybackInit = await BuybackBurn.init(0x1234n, athMaster);

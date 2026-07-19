@@ -24,40 +24,43 @@ cell $AcceptBurnReserve$_store_cell((int) v, builder b) inline;
 (slice, ((int))) $AcceptBurnReserve$_load_bounced(slice sc_0) inline;
 
 ;; $FeeAccumulator$_store
-builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, int) v) inline;
+builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, int, int) v) inline;
 
 ;; $FeeAccumulator$_load
-(slice, ((slice, slice, int, int, int, int))) $FeeAccumulator$_load(slice sc_0) inline;
+(slice, ((slice, slice, int, int, int, int, int))) $FeeAccumulator$_load(slice sc_0) inline;
 
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $FeeAccumulatorStateView$_to_external
-(int, int, int, int, slice, slice) $FeeAccumulatorStateView$_to_external(((int, int, int, int, slice, slice)) v) inline;
+(int, int, int, int, slice, slice, int) $FeeAccumulatorStateView$_to_external(((int, int, int, int, slice, slice, int)) v) inline;
 
 ;; $FeeAccumulator$init$_load
 (slice, ((slice, slice))) $FeeAccumulator$init$_load(slice sc_0) inline;
 
 ;; $FeeAccumulator$_contract_init
-(slice, slice, int, int, int, int) $FeeAccumulator$_contract_init(slice $treasury_receiver_address, slice $buyback_burn_address) impure inline;
+(slice, slice, int, int, int, int, int) $FeeAccumulator$_contract_init(slice $treasury_receiver_address, slice $buyback_burn_address) impure inline;
 
 ;; $FeeAccumulator$_contract_load
-(slice, slice, int, int, int, int) $FeeAccumulator$_contract_load() impure inline;
+(slice, slice, int, int, int, int, int) $FeeAccumulator$_contract_load() impure inline;
 
 ;; $FeeAccumulator$_contract_store
-() $FeeAccumulator$_contract_store((slice, slice, int, int, int, int) v) impure inline;
+() $FeeAccumulator$_contract_store((slice, slice, int, int, int, int, int) v) impure inline;
 
-;; $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address
-((int, int, int, int, slice, slice)) $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address(int $accumulated_ton, int $treasury_due_ton, int $buyback_due_ton, int $buyback_split_enabled, slice $treasury_receiver_address, slice $buyback_burn_address) inline;
+;; $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton
+((int, int, int, int, slice, slice, int)) $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton(int $accumulated_ton, int $treasury_due_ton, int $buyback_due_ton, int $buyback_split_enabled, slice $treasury_receiver_address, slice $buyback_burn_address, int $storage_reserve_ton) inline;
 
 ;; $FeeAccumulator$_fun_get_state
-((slice, slice, int, int, int, int), (int, int, int, int, slice, slice)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int, int) $self) impure inline_ref;
+((slice, slice, int, int, int, int, int), (int, int, int, int, slice, slice, int)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int, int, int) $self) impure inline_ref;
 
 ;; $MessageParameters$_constructor_to_value_bounce_mode_body
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
 
 ;; $AcceptBurnReserve$_constructor_amount
 ((int)) $AcceptBurnReserve$_constructor_amount(int $amount) inline;
+
+;; $SendParameters$_constructor_to_value_mode_bounce
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
 
 
 ;; FeeAccumulator_FeeAccumulator.stdlib.fc
@@ -73,6 +76,14 @@ global int __tact_randomized;
 slice __tact_context_get_sender() inline {
     return __tact_context_sender;
 }
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
 
 () $global_message((int, cell, int, slice, int) $params) impure asm """
     NEWC
@@ -94,6 +105,81 @@ slice __tact_context_get_sender() inline {
     SENDRAWMSG
 """;
 
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
 ;; FeeAccumulator_FeeAccumulator.storage.fc
 ;;
 ;; Type: Context
@@ -103,6 +189,15 @@ slice __tact_context_get_sender() inline {
 _ $Context$_get_value((int, slice, int, slice) v) inline {
     var (v'bounceable, v'sender, v'value, v'raw) = v;
     return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline {
+    return ($mode, null(), null(), null(), $value, $to, $bounce);
 }
 
 ;;
@@ -142,42 +237,47 @@ cell $AcceptBurnReserve$_store_cell((int) v, builder b) inline {
 
 ;;
 ;; Type: FeeAccumulatorStateView
-;; TLB: _ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 buyback_split_enabled:bool treasury_receiver_address:address buyback_burn_address:address = FeeAccumulatorStateView
+;; TLB: _ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 buyback_split_enabled:bool treasury_receiver_address:address buyback_burn_address:address storage_reserve_ton:int257 = FeeAccumulatorStateView
 ;;
 
-(int, int, int, int, slice, slice) $FeeAccumulatorStateView$_to_external(((int, int, int, int, slice, slice)) v) inline {
-    var (v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'treasury_receiver_address, v'buyback_burn_address) = v; 
-    return (v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'treasury_receiver_address, v'buyback_burn_address);
+(int, int, int, int, slice, slice, int) $FeeAccumulatorStateView$_to_external(((int, int, int, int, slice, slice, int)) v) inline {
+    var (v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'treasury_receiver_address, v'buyback_burn_address, v'storage_reserve_ton) = v; 
+    return (v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'treasury_receiver_address, v'buyback_burn_address, v'storage_reserve_ton);
 }
 
-((int, int, int, int, slice, slice)) $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address(int $accumulated_ton, int $treasury_due_ton, int $buyback_due_ton, int $buyback_split_enabled, slice $treasury_receiver_address, slice $buyback_burn_address) inline {
-    return ($accumulated_ton, $treasury_due_ton, $buyback_due_ton, $buyback_split_enabled, $treasury_receiver_address, $buyback_burn_address);
+((int, int, int, int, slice, slice, int)) $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton(int $accumulated_ton, int $treasury_due_ton, int $buyback_due_ton, int $buyback_split_enabled, slice $treasury_receiver_address, slice $buyback_burn_address, int $storage_reserve_ton) inline {
+    return ($accumulated_ton, $treasury_due_ton, $buyback_due_ton, $buyback_split_enabled, $treasury_receiver_address, $buyback_burn_address, $storage_reserve_ton);
 }
 
 ;;
 ;; Type: FeeAccumulator
-;; TLB: _ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 buyback_split_enabled:bool = FeeAccumulator
+;; TLB: _ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 buyback_split_enabled:bool storage_reserve_ton:coins = FeeAccumulator
 ;;
 
-builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, int) v) inline {
-    var (v'treasury_receiver_address, v'buyback_burn_address, v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled) = v;
+builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, int, int) v) inline {
+    var (v'treasury_receiver_address, v'buyback_burn_address, v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'storage_reserve_ton) = v;
     build_0 = build_0.store_slice(v'treasury_receiver_address);
     build_0 = build_0.store_slice(v'buyback_burn_address);
     build_0 = build_0.store_uint(v'accumulated_ton, 128);
     build_0 = build_0.store_uint(v'treasury_due_ton, 128);
     build_0 = build_0.store_uint(v'buyback_due_ton, 128);
     build_0 = build_0.store_int(v'buyback_split_enabled, 1);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_varuint16(v'storage_reserve_ton);
+    build_0 = store_builder_ref(build_0, build_1);
     return build_0;
 }
 
-(slice, ((slice, slice, int, int, int, int))) $FeeAccumulator$_load(slice sc_0) inline {
+(slice, ((slice, slice, int, int, int, int, int))) $FeeAccumulator$_load(slice sc_0) inline {
     var v'treasury_receiver_address = sc_0~load_msg_addr();
     var v'buyback_burn_address = sc_0~load_msg_addr();
     var v'accumulated_ton = sc_0~load_uint(128);
     var v'treasury_due_ton = sc_0~load_uint(128);
     var v'buyback_due_ton = sc_0~load_uint(128);
     var v'buyback_split_enabled = sc_0~load_int(1);
-    return (sc_0, (v'treasury_receiver_address, v'buyback_burn_address, v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled));
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'storage_reserve_ton = sc_1~load_varuint16();
+    return (sc_0, (v'treasury_receiver_address, v'buyback_burn_address, v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'storage_reserve_ton));
 }
 
 (slice, ((slice, slice))) $FeeAccumulator$init$_load(slice sc_0) inline {
@@ -186,7 +286,7 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
     return (sc_0, (v'treasury_receiver_address, v'buyback_burn_address));
 }
 
-(slice, slice, int, int, int, int) $FeeAccumulator$_contract_load() impure inline {
+(slice, slice, int, int, int, int, int) $FeeAccumulator$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
@@ -199,7 +299,7 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
     }
 }
 
-() $FeeAccumulator$_contract_store((slice, slice, int, int, int, int) v) impure inline {
+() $FeeAccumulator$_contract_store((slice, slice, int, int, int, int, int) v) impure inline {
     builder b = begin_cell();
     b = b.store_int(true, 1);
     b = $FeeAccumulator$_store(b, v);
@@ -210,21 +310,22 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
 ;; Contract FeeAccumulator functions
 ;;
 
-(slice, slice, int, int, int, int) $FeeAccumulator$_contract_init(slice $treasury_receiver_address, slice $buyback_burn_address) impure inline {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled)) = (null(), null(), null(), null(), null(), null());
+(slice, slice, int, int, int, int, int) $FeeAccumulator$_contract_init(slice $treasury_receiver_address, slice $buyback_burn_address) impure inline {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton)) = (null(), null(), null(), null(), null(), null(), null());
     $self'treasury_receiver_address = $treasury_receiver_address;
     $self'buyback_burn_address = $buyback_burn_address;
     $self'accumulated_ton = 0;
     $self'treasury_due_ton = 0;
     $self'buyback_due_ton = 0;
     $self'buyback_split_enabled = false;
-    return ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled);
+    $self'storage_reserve_ton = 0;
+    return ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton);
 }
 
-((slice, slice, int, int, int, int), (int, int, int, int, slice, slice)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int, int) $self) impure inline_ref {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled)) = $self;
-    var $fresh$ret_0 = $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address($self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'treasury_receiver_address, $self'buyback_burn_address);
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled), $fresh$ret_0);
+((slice, slice, int, int, int, int, int), (int, int, int, int, slice, slice, int)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton)) = $self;
+    var $fresh$ret_0 = $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton($self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'treasury_receiver_address, $self'buyback_burn_address, $self'storage_reserve_ton);
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton), $fresh$ret_0);
 }
 
 ;;
@@ -257,7 +358,7 @@ _ %get_state() method_id(86957) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled) = $FeeAccumulator$_contract_load();
+    var ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton) = $FeeAccumulator$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) {
@@ -273,7 +374,7 @@ _ %get_state() method_id(86957) {
             throw_unless(15032, ( equal_slices_bits(__tact_context_get_sender(), $self'buyback_burn_address) ));
             throw_unless(15033, ($msg'amount > 0));
             $self'buyback_due_ton = $self'buyback_due_ton + $msg'amount;
-            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
             return ();
         }
         
@@ -288,9 +389,9 @@ _ %get_state() method_id(86957) {
     if (op == 0xff775609) {
         var $msg'amount = in_msg~load_uint(128);
         throw_unless(15001, ($msg'amount > 0));
-        throw_unless(15002, ($Context$_get_value(__tact_context_get()) >= ($msg'amount + 2000000)));
+        throw_unless(15002, ($Context$_get_value(__tact_context_get()) >= ($msg'amount + 400000)));
         $self'accumulated_ton = $self'accumulated_ton + $msg'amount;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
         return ();
     }
     
@@ -303,7 +404,7 @@ _ %get_state() method_id(86957) {
         ifnot ($self'buyback_split_enabled) {
             $self'accumulated_ton = 0;
             $self'treasury_due_ton = $self'treasury_due_ton + $amount;
-            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
             return ();
         }
         int $treasury_amount = (($amount * 5000) / 10000);
@@ -311,7 +412,7 @@ _ %get_state() method_id(86957) {
         $self'accumulated_ton = 0;
         $self'treasury_due_ton = $self'treasury_due_ton + $treasury_amount;
         $self'buyback_due_ton = $self'buyback_due_ton + $buyback_amount;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
         return ();
     }
     
@@ -326,7 +427,7 @@ _ %get_state() method_id(86957) {
             $self'accumulated_ton = 0;
         }
         $self'buyback_split_enabled = true;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
         return ();
     }
     
@@ -339,7 +440,7 @@ _ %get_state() method_id(86957) {
         throw_unless(15022, ($Context$_get_value(__tact_context_get()) >= 5000000));
         $self'treasury_due_ton = $self'treasury_due_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'treasury_receiver_address, $msg'amount, false, 1, null()));
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
         return ();
     }
     
@@ -352,21 +453,35 @@ _ %get_state() method_id(86957) {
         throw_unless(15035, ($Context$_get_value(__tact_context_get()) >= 7000000));
         $self'buyback_due_ton = $self'buyback_due_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'buyback_burn_address, ($msg'amount + 2000000), true, 1, $AcceptBurnReserve$_store_cell($AcceptBurnReserve$_constructor_amount($msg'amount), begin_cell())));
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
         return ();
     }
     
     ;; Receive TopUpStorageReserve message
     if (op == 0x87a2d2c7) {
         var $msg = empty_tuple();
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+        $self'storage_reserve_ton = $self'storage_reserve_ton + $Context$_get_value(__tact_context_get());
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
+        return ();
+    }
+    
+    ;; Receive SweepUnaccounted message
+    if (op == 0x5357554e) {
+        var $msg = empty_tuple();
+        int $held = ($global_myBalance() - $Context$_get_value(__tact_context_get()));
+        int $accounted = ((($self'accumulated_ton + $self'treasury_due_ton) + $self'buyback_due_ton) + $self'storage_reserve_ton);
+        throw_unless(15040, ($held > ($accounted + 1000000)));
+        $self'accumulated_ton = $self'accumulated_ton + (($held - $accounted) - 1000000);
+        $global_nativeReserve($held, 2);
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(15099);
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton));
         return ();
     }
     ;; Throw if not handled

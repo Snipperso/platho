@@ -989,7 +989,6 @@ export type IntroShardView = {
     safe_cap: bigint;
     min_value: bigint;
     protocol_fee: bigint;
-    accrued_fee: bigint;
     evict_bounty: bigint;
     accrued_bounty: bigint;
     fee_sink: Address;
@@ -1010,12 +1009,9 @@ export function storeIntroShardView(src: IntroShardView) {
         b_2.storeInt(src.min_value, 257);
         b_2.storeInt(src.protocol_fee, 257);
         const b_3 = new Builder();
-        b_3.storeInt(src.accrued_fee, 257);
         b_3.storeInt(src.evict_bounty, 257);
         b_3.storeInt(src.accrued_bounty, 257);
-        const b_4 = new Builder();
-        b_4.storeAddress(src.fee_sink);
-        b_3.storeRef(b_4.endCell());
+        b_3.storeAddress(src.fee_sink);
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
@@ -1036,12 +1032,10 @@ export function loadIntroShardView(slice: Slice) {
     const _min_value = sc_2.loadIntBig(257);
     const _protocol_fee = sc_2.loadIntBig(257);
     const sc_3 = sc_2.loadRef().beginParse();
-    const _accrued_fee = sc_3.loadIntBig(257);
     const _evict_bounty = sc_3.loadIntBig(257);
     const _accrued_bounty = sc_3.loadIntBig(257);
-    const sc_4 = sc_3.loadRef().beginParse();
-    const _fee_sink = sc_4.loadAddress();
-    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
+    const _fee_sink = sc_3.loadAddress();
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
 }
 
 export function loadTupleIntroShardView(source: TupleReader) {
@@ -1054,11 +1048,10 @@ export function loadTupleIntroShardView(source: TupleReader) {
     const _safe_cap = source.readBigNumber();
     const _min_value = source.readBigNumber();
     const _protocol_fee = source.readBigNumber();
-    const _accrued_fee = source.readBigNumber();
     const _evict_bounty = source.readBigNumber();
     const _accrued_bounty = source.readBigNumber();
     const _fee_sink = source.readAddress();
-    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
 }
 
 export function loadGetterTupleIntroShardView(source: TupleReader) {
@@ -1071,11 +1064,10 @@ export function loadGetterTupleIntroShardView(source: TupleReader) {
     const _safe_cap = source.readBigNumber();
     const _min_value = source.readBigNumber();
     const _protocol_fee = source.readBigNumber();
-    const _accrued_fee = source.readBigNumber();
     const _evict_bounty = source.readBigNumber();
     const _accrued_bounty = source.readBigNumber();
     const _fee_sink = source.readAddress();
-    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
+    return { $$type: 'IntroShardView' as const, epoch: _epoch, bucket: _bucket, live_count: _live_count, next_id: _next_id, evict_cursor: _evict_cursor, retention: _retention, safe_cap: _safe_cap, min_value: _min_value, protocol_fee: _protocol_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
 }
 
 export function storeTupleIntroShardView(source: IntroShardView) {
@@ -1089,7 +1081,6 @@ export function storeTupleIntroShardView(source: IntroShardView) {
     builder.writeNumber(source.safe_cap);
     builder.writeNumber(source.min_value);
     builder.writeNumber(source.protocol_fee);
-    builder.writeNumber(source.accrued_fee);
     builder.writeNumber(source.evict_bounty);
     builder.writeNumber(source.accrued_bounty);
     builder.writeAddress(source.fee_sink);
@@ -1115,7 +1106,6 @@ export type IntroShard$Data = {
     next_id: bigint;
     live_count: bigint;
     evict_cursor: bigint;
-    accrued_fee: bigint;
     accrued_bounty: bigint;
 }
 
@@ -1128,7 +1118,6 @@ export function storeIntroShard$Data(src: IntroShard$Data) {
         b_0.storeUint(src.next_id, 32);
         b_0.storeUint(src.live_count, 32);
         b_0.storeUint(src.evict_cursor, 32);
-        b_0.storeCoins(src.accrued_fee);
         b_0.storeCoins(src.accrued_bounty);
     };
 }
@@ -1141,9 +1130,8 @@ export function loadIntroShard$Data(slice: Slice) {
     const _next_id = sc_0.loadUintBig(32);
     const _live_count = sc_0.loadUintBig(32);
     const _evict_cursor = sc_0.loadUintBig(32);
-    const _accrued_fee = sc_0.loadCoins();
     const _accrued_bounty = sc_0.loadCoins();
-    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_bounty: _accrued_bounty };
 }
 
 export function loadTupleIntroShard$Data(source: TupleReader) {
@@ -1153,9 +1141,8 @@ export function loadTupleIntroShard$Data(source: TupleReader) {
     const _next_id = source.readBigNumber();
     const _live_count = source.readBigNumber();
     const _evict_cursor = source.readBigNumber();
-    const _accrued_fee = source.readBigNumber();
     const _accrued_bounty = source.readBigNumber();
-    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_bounty: _accrued_bounty };
 }
 
 export function loadGetterTupleIntroShard$Data(source: TupleReader) {
@@ -1165,9 +1152,8 @@ export function loadGetterTupleIntroShard$Data(source: TupleReader) {
     const _next_id = source.readBigNumber();
     const _live_count = source.readBigNumber();
     const _evict_cursor = source.readBigNumber();
-    const _accrued_fee = source.readBigNumber();
     const _accrued_bounty = source.readBigNumber();
-    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
+    return { $$type: 'IntroShard$Data' as const, epoch: _epoch, bucket: _bucket, intros: _intros, next_id: _next_id, live_count: _live_count, evict_cursor: _evict_cursor, accrued_bounty: _accrued_bounty };
 }
 
 export function storeTupleIntroShard$Data(source: IntroShard$Data) {
@@ -1178,7 +1164,6 @@ export function storeTupleIntroShard$Data(source: IntroShard$Data) {
     builder.writeNumber(source.next_id);
     builder.writeNumber(source.live_count);
     builder.writeNumber(source.evict_cursor);
-    builder.writeNumber(source.accrued_fee);
     builder.writeNumber(source.accrued_bounty);
     return builder.build();
 }
@@ -1209,7 +1194,7 @@ function initIntroShard_init_args(src: IntroShard_init_args) {
 }
 
 async function IntroShard_init(epoch: bigint, bucket: bigint) {
-    const __code = Cell.fromHex('b5ee9c724102190100069e000114ff00f4a413f4bcf2c80b01020162020f04f0d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e14d31fd31ff404d31fd31fd31ffa00fa0055706c188e14810101d700810101d7005902d1016d7054700020e209e3027028d74920c21f953108d31f09de21821049535031bae30221821049535032bae30239c00008c12118b00305090e01fc078020d7217021d749c21f9430d31f01de8210ff775609ba8e63d37f0131813575f8428d08600093667ddfdf04422ac25a895e9fa2724ab8a78288a1b680500546c7e9079ff1f4c705f2f481357621c200f2f417a01057104610354403c87f01ca0055705078cb1f15cb1f13f400cb1fcb1fcb1f01fa0201fa02c9ed54e00400045f0902fe5b07d3ffd30fd4d430f82382015180a9048135742ba55220be942ba412bb923170e2f2f4813572f8416f24135f038208cc9700bef2f481357026811f40b9f2f42781010128109c108b107a106c105b104a103d4eaddb3c36f823103b4a60c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc9103a469006070032c882104953424301cb1f02f90058cbff01f90001cbffc9f90001f4206e953059f45a30944133f415e203a406a4048208989680a00782080dbba0a08208a6716027c0019582080f42409170e2a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0047601035144330080040c87f01ca0055705078cb1f15cb1f13f400cb1fcb1fcb1f01fa0201fa02c9ed5402fc5b07d30f307020708e175313b99321c1409170e2935346b99170e29220b39170e28ecc278101012659f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e202a4226eb3983204a41047104502e30d105710454014e810235f0381357321c200f2f4f8270a0b00bc026f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e226103a01206e953059f45a30944133f415e205a504a402a496307f07054414e202fe6f10f8416f24135f03a10182080dbba0a85199a17020f82382015180a9042b82082625a1be932aa4bc923070e297533ba12ba123be9170e29a5b2882082625a0a1700ade503ba1500aa120c100923070de72fb0220c2009130e30df8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016e0c0d00b28d08600093667ddfdf04422ac25a895e9fa2724ab8a78288a1b680500546c7e9079ff1f42182081e8480a07f7104c8018210ff77560958cb1fcb7fc9103441304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00007cb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010575514c87f01ca0055705078cb1f15cb1f13f400cb1fcb1fcb1f01fa0201fa02c9ed5400588e2410575514c87f01ca0055705078cb1f15cb1f13f400cb1fcb1fcb1f01fa0201fa02c9ed54e05f08f2c082020148101502015811130173b254bb5134348000638534c7f4c7fd0134c7f4c7f4c7fe803e80155c1b06238520404075c020404075c01640b4405b5c151c000838b6cf1b236012009c8208093a80811f408208cc9700820898968082080dbba08d08600093667ddfdf04422ac25a895e9fa2724ab8a78288a1b680500546c7e9079ff1f42d516d516b516d516c061045103441302c52c30177b23dbb5134348000638534c7f4c7fd0134c7f4c7f4c7fe803e80155c1b06238520404075c020404075c01640b4405b5c151c0008389541f6cf1b216014008a810101270259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f55300177bbdd0ed44d0d200018e14d31fd31ff404d31fd31fd31ffa00fa0055706c188e14810101d700810101d7005902d1016d7054700020e25517db3c6c8581601605114b6095360bc935360a19170e270038307b60801b60812b6095364557353badb3c104c103b4a90108c107b106a1059170118c8c97f9322c2008ae8135f031800fc2273b6085343a021a1c870935303b98e5b8101015331a02f5959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e917095206f245f03e25003cbff226e92327097026f2410235f03e258cb0f01a4e8303122946c22c9709413ccc901e25aa1598cd6981f');
+    const __code = Cell.fromHex('b5ee9c7241021701000633000114ff00f4a413f4bcf2c80b01020162020d04ead001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e12d31fd31ff404d31fd31fd31ffa0055606c178e13810101d700810101d7005902d1016d70547000e208e3027027d74920c21f953107d31f08de21821049535031bae30221821049535032bae30238c00007c12117b00304090c00ee068020d7217021d749c21f9430d31f01de8210ff775609ba8e5ad37f0131813575f8428d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d4c705f2f481357601c200f2f410465513c87f01ca0055605067cb1f14cb1f12f400cb1fcb1fcb1f01fa02c9ed54e05f0802fa5b06d3ffd30fd4d430f82382015180a9048135742aa55220be942aa412bb923170e2f2f4813572f8416f24135f038208d5bec0bef2f481357025811f40b9f2f42681010127108b107a1069105b104a103c4dacdb3c35f82310384a50c855305034810101cf00810101cf00810101cf0001c8810101cf00cdc91039468005060032c882104953424301cb1f02f90058cbff01f90001cbffc9f90002fc206e953059f45a30944133f415e205a402a40382080dbba0a08d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d482089eb1007f718208989680c8018210ff77560958cb1fcb7fc94343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080ddae023c0019170e30da0760708000a82080f424000c2fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0016155e21c87f01ca0055605067cb1f14cb1f12f400cb1fcb1fcb1f01fa02c9ed5402fc5b06d30f307020708e175313b99321c1409170e2935395b99170e29220b39170e28ecc268101012b59f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e202a4226eb3983209a41049104602e30d102910464014e810235f0381357321c200f2f4f8270a0b00be026f246c318208093a80a0f823b98e468101016dc8216e925b6d8e21016f24550355305034810101cf00810101cf00810101cf0001c8810101cf00cdc9e22b103901206e953059f45a30944133f415e204a509a402a4973010387f064414e200fe6f10f8416f24135f03a10182080dbba0a85188a108a120c100923070de72fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010465513c87f01ca0055605067cb1f14cb1f12f400cb1fcb1fcb1f01fa02c9ed5400528e2110465513c87f01ca0055605067cb1f14cb1f12f400cb1fcb1fcb1f01fa02c9ed54e05f07f2c0820201480e130201580f11016db254bb51343480006384b4c7f4c7fd0134c7f4c7f4c7fe8015581b05e384e0404075c020404075c01640b4405b5c151c0038b6cf1b1f201000928208093a80811f408208d5bec0820898968082080dbba08d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d42c516c516a516c516b06550452b00171b23dbb51343480006384b4c7f4c7fd0134c7f4c7f4c7fe8015581b05e384e0404075c020404075c01640b4405b5c151c00389541b6cf1b1d6012008a810101260259f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e96307070547000e06f247f55300171bbdd0ed44d0d200018e12d31fd31ff404d31fd31fd31ffa0055606c178e13810101d700810101d7005902d1016d70547000e25516db3c6c75814016c5113b6095350bc935350a19170e270038307b60801b60812b6095353106a1059104810374a98537adb3c1048103b4a90107b106a1059150118c8c97f9322c2008ae8135f031600fc2273b6085343a021a1c870935303b98e5b8101015331a02e5959f40d6fa192306ddf206e92306d8e20d0810101d700810101d700810101d700d401d0810101d700301443306c146f04e2206e917095206f245f03e25003cbff226e92327097026f2410235f03e258cb0f01a4e8303122946c22c9709413ccc901e25aa159ab5e58d9');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initIntroShard_init_args({ $$type: 'IntroShard_init_args', epoch, bucket })(builder);
@@ -1312,8 +1297,8 @@ const IntroShard_types: ABIType[] = [
     {"name":"IntroEntry","header":null,"fields":[{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"IntroEntryView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"r","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"view_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"IntroScanPage","header":null,"fields":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pairs","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"IntroShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bucket","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"protocol_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"fee_sink","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"IntroShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"bucket","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"intros","type":{"kind":"dict","key":"int","value":"IntroEntry","valueFormat":"ref"}},{"name":"next_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"accrued_fee","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"accrued_bounty","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
+    {"name":"IntroShardView","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bucket","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"protocol_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"fee_sink","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"IntroShard$Data","header":null,"fields":[{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"bucket","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"intros","type":{"kind":"dict","key":"int","value":"IntroEntry","valueFormat":"ref"}},{"name":"next_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"accrued_bounty","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
 ]
 
 const IntroShard_opcodes = {
@@ -1350,13 +1335,12 @@ export const IS_INTRO_ENDOWMENT = 8000n;
 export const IS_BASE_ENDOWMENT = 1000000n;
 export const IS_PUBLISH_GAS = 2500000n;
 export const IS_PROTOCOL_FEE = 10000000n;
-export const IS_FEE_SINK = address("EQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-PtQu");
-export const IS_FEE_SINK_DEPOSIT_RESERVE = 2000000n;
-export const IS_FEE_SINK_FWD_RESERVE = 500000n;
-export const IS_FEE_REMIT_OVERHEAD = 2500000n;
-export const IS_FEE_REMIT_MIN = 2500001n;
+export const IS_FEE_SINK = address("EQAUIujZ91zHBy5-PqpD1Oo6cXVIHYRP4BtyN6mUFZW4muQf");
+export const IS_FEE_SINK_DEPOSIT_RESERVE = 400000n;
+export const IS_FEE_SINK_FWD_RESERVE = 200000n;
+export const IS_FEE_TRANSPORT = 600000n;
 export const IS_EVICT_BOUNTY = 900000n;
-export const IS_MIN_VALUE = 13408000n;
+export const IS_MIN_VALUE = 14008000n;
 
 export class IntroShard implements Contract {
     

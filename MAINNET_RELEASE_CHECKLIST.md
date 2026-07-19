@@ -78,18 +78,21 @@ Protocol fees ARE the TON side of initial liquidity. `15,000,000 ATH` of airdrop
 liquidity allocation gives the `0.001 GRAM` reference price exactly. The per-capsule fee is therefore
 structural — without it the pool has no TON side at all.
 
-The fee reaches `FeeAccumulator` from `RecordShard` and `IntroShard` through one `DepositProtocolFee` per shard,
-sent when a sweep first runs past the shard's publish window. Two deductions belong in the arithmetic above, and
-both are per SHARD rather than per capsule:
+The fee reaches `FeeAccumulator` from `RecordShard` and `IntroShard` as one `DepositProtocolFee` per published
+capsule, emitted by the publish path itself. A shard holds only its own rent and eviction bounties; no protocol
+money waits on chain to be extracted, and no protocol revenue depends on eviction being called.
 
-| Deduction | Amount | Where it goes |
-| --- | ---: | --- |
-| `FeeAccumulator` deposit gate (15002) | `2,000,000` | Settles in the sink's balance, not in `accumulated_ton`. |
-| Forward-fee reserve | `500,000` | Message transport; the unused part returns to the evictor. Measured cost `~75,000`. |
+The publisher funds the transport, so the pool books the fee WHOLE and the `15,000 GRAM` figure above is exact.
+Minimum publish: `14,200,000` nanotons CONV, `14,008,000` INTRO.
 
-So a swept shard books `collected − 2,500,000`. A shard that is never swept books nothing — see the open
-eviction-bounty calibration in `artifacts/PLATHO_CLEAN17_MASTER_ROADMAP.md`, which is what decides how much of
-the long tail is actually collected.
+| Component | Required state |
+| --- | --- |
+| `FeeAccumulator.FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE` | `400,000` — measured cost of one deposit is `199,068`. |
+| Shard mirrors of that reserve | Must equal it exactly, or gate 15002 refuses every publish's fee. |
+| Shard `fee_sink` constant | Must equal the deployed `FeeAccumulator` StateInit address. |
+
+Build order at genesis is `FeeAccumulator` code -> its address -> shard code -> shard addresses. Out of order,
+every shard routes its fee to a dead address and nothing complains until the money is gone.
 
 ## Post-Genesis Required State
 

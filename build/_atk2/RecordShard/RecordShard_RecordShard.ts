@@ -609,6 +609,127 @@ export function dictValueParserBasechainAddress(): DictionaryValue<BasechainAddr
     }
 }
 
+export type CapsulePublish = {
+    $$type: 'CapsulePublish';
+    seq: bigint;
+    header_0: Cell;
+    header_1: Cell;
+    body: Cell;
+    sig: Cell;
+}
+
+export function storeCapsulePublish(src: CapsulePublish) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1381191729, 32);
+        b_0.storeUint(src.seq, 64);
+        b_0.storeRef(src.header_0);
+        b_0.storeRef(src.header_1);
+        const b_1 = new Builder();
+        b_1.storeRef(src.body);
+        b_1.storeRef(src.sig);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadCapsulePublish(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1381191729) { throw Error('Invalid prefix'); }
+    const _seq = sc_0.loadUintBig(64);
+    const _header_0 = sc_0.loadRef();
+    const _header_1 = sc_0.loadRef();
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _body = sc_1.loadRef();
+    const _sig = sc_1.loadRef();
+    return { $$type: 'CapsulePublish' as const, seq: _seq, header_0: _header_0, header_1: _header_1, body: _body, sig: _sig };
+}
+
+export function loadTupleCapsulePublish(source: TupleReader) {
+    const _seq = source.readBigNumber();
+    const _header_0 = source.readCell();
+    const _header_1 = source.readCell();
+    const _body = source.readCell();
+    const _sig = source.readCell();
+    return { $$type: 'CapsulePublish' as const, seq: _seq, header_0: _header_0, header_1: _header_1, body: _body, sig: _sig };
+}
+
+export function loadGetterTupleCapsulePublish(source: TupleReader) {
+    const _seq = source.readBigNumber();
+    const _header_0 = source.readCell();
+    const _header_1 = source.readCell();
+    const _body = source.readCell();
+    const _sig = source.readCell();
+    return { $$type: 'CapsulePublish' as const, seq: _seq, header_0: _header_0, header_1: _header_1, body: _body, sig: _sig };
+}
+
+export function storeTupleCapsulePublish(source: CapsulePublish) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.seq);
+    builder.writeCell(source.header_0);
+    builder.writeCell(source.header_1);
+    builder.writeCell(source.body);
+    builder.writeCell(source.sig);
+    return builder.build();
+}
+
+export function dictValueParserCapsulePublish(): DictionaryValue<CapsulePublish> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeCapsulePublish(src)).endCell());
+        },
+        parse: (src) => {
+            return loadCapsulePublish(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type EvictRecords = {
+    $$type: 'EvictRecords';
+    max_count: bigint;
+}
+
+export function storeEvictRecords(src: EvictRecords) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1381191730, 32);
+        b_0.storeUint(src.max_count, 16);
+    };
+}
+
+export function loadEvictRecords(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1381191730) { throw Error('Invalid prefix'); }
+    const _max_count = sc_0.loadUintBig(16);
+    return { $$type: 'EvictRecords' as const, max_count: _max_count };
+}
+
+export function loadTupleEvictRecords(source: TupleReader) {
+    const _max_count = source.readBigNumber();
+    return { $$type: 'EvictRecords' as const, max_count: _max_count };
+}
+
+export function loadGetterTupleEvictRecords(source: TupleReader) {
+    const _max_count = source.readBigNumber();
+    return { $$type: 'EvictRecords' as const, max_count: _max_count };
+}
+
+export function storeTupleEvictRecords(source: EvictRecords) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.max_count);
+    return builder.build();
+}
+
+export function dictValueParserEvictRecords(): DictionaryValue<EvictRecords> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeEvictRecords(src)).endCell());
+        },
+        parse: (src) => {
+            return loadEvictRecords(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type DepositProtocolFee = {
     $$type: 'DepositProtocolFee';
     amount: bigint;
@@ -656,503 +777,366 @@ export function dictValueParserDepositProtocolFee(): DictionaryValue<DepositProt
     }
 }
 
-export type SplitAccumulated = {
-    $$type: 'SplitAccumulated';
+export type RecordEntry = {
+    $$type: 'RecordEntry';
+    frame_commit: bigint;
+    created_at: bigint;
 }
 
-export function storeSplitAccumulated(src: SplitAccumulated) {
+export function storeRecordEntry(src: RecordEntry) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(2066016771, 32);
+        b_0.storeInt(src.frame_commit, 257);
+        b_0.storeInt(src.created_at, 257);
     };
 }
 
-export function loadSplitAccumulated(slice: Slice) {
+export function loadRecordEntry(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2066016771) { throw Error('Invalid prefix'); }
-    return { $$type: 'SplitAccumulated' as const };
+    const _frame_commit = sc_0.loadIntBig(257);
+    const _created_at = sc_0.loadIntBig(257);
+    return { $$type: 'RecordEntry' as const, frame_commit: _frame_commit, created_at: _created_at };
 }
 
-export function loadTupleSplitAccumulated(source: TupleReader) {
-    return { $$type: 'SplitAccumulated' as const };
+export function loadTupleRecordEntry(source: TupleReader) {
+    const _frame_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'RecordEntry' as const, frame_commit: _frame_commit, created_at: _created_at };
 }
 
-export function loadGetterTupleSplitAccumulated(source: TupleReader) {
-    return { $$type: 'SplitAccumulated' as const };
+export function loadGetterTupleRecordEntry(source: TupleReader) {
+    const _frame_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'RecordEntry' as const, frame_commit: _frame_commit, created_at: _created_at };
 }
 
-export function storeTupleSplitAccumulated(source: SplitAccumulated) {
+export function storeTupleRecordEntry(source: RecordEntry) {
     const builder = new TupleBuilder();
+    builder.writeNumber(source.frame_commit);
+    builder.writeNumber(source.created_at);
     return builder.build();
 }
 
-export function dictValueParserSplitAccumulated(): DictionaryValue<SplitAccumulated> {
+export function dictValueParserRecordEntry(): DictionaryValue<RecordEntry> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeSplitAccumulated(src)).endCell());
+            builder.storeRef(beginCell().store(storeRecordEntry(src)).endCell());
         },
         parse: (src) => {
-            return loadSplitAccumulated(src.loadRef().beginParse());
+            return loadRecordEntry(src.loadRef().beginParse());
         }
     }
 }
 
-export type EnableBuybackSplit = {
-    $$type: 'EnableBuybackSplit';
+export type CapsuleRecordView = {
+    $$type: 'CapsuleRecordView';
+    exists: boolean;
+    frame_commit: bigint;
+    created_at: bigint;
 }
 
-export function storeEnableBuybackSplit(src: EnableBuybackSplit) {
+export function storeCapsuleRecordView(src: CapsuleRecordView) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(2374970392, 32);
+        b_0.storeBit(src.exists);
+        b_0.storeInt(src.frame_commit, 257);
+        b_0.storeInt(src.created_at, 257);
     };
 }
 
-export function loadEnableBuybackSplit(slice: Slice) {
+export function loadCapsuleRecordView(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2374970392) { throw Error('Invalid prefix'); }
-    return { $$type: 'EnableBuybackSplit' as const };
+    const _exists = sc_0.loadBit();
+    const _frame_commit = sc_0.loadIntBig(257);
+    const _created_at = sc_0.loadIntBig(257);
+    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit, created_at: _created_at };
 }
 
-export function loadTupleEnableBuybackSplit(source: TupleReader) {
-    return { $$type: 'EnableBuybackSplit' as const };
+export function loadTupleCapsuleRecordView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _frame_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit, created_at: _created_at };
 }
 
-export function loadGetterTupleEnableBuybackSplit(source: TupleReader) {
-    return { $$type: 'EnableBuybackSplit' as const };
+export function loadGetterTupleCapsuleRecordView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _frame_commit = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'CapsuleRecordView' as const, exists: _exists, frame_commit: _frame_commit, created_at: _created_at };
 }
 
-export function storeTupleEnableBuybackSplit(source: EnableBuybackSplit) {
+export function storeTupleCapsuleRecordView(source: CapsuleRecordView) {
     const builder = new TupleBuilder();
+    builder.writeBoolean(source.exists);
+    builder.writeNumber(source.frame_commit);
+    builder.writeNumber(source.created_at);
     return builder.build();
 }
 
-export function dictValueParserEnableBuybackSplit(): DictionaryValue<EnableBuybackSplit> {
+export function dictValueParserCapsuleRecordView(): DictionaryValue<CapsuleRecordView> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeEnableBuybackSplit(src)).endCell());
+            builder.storeRef(beginCell().store(storeCapsuleRecordView(src)).endCell());
         },
         parse: (src) => {
-            return loadEnableBuybackSplit(src.loadRef().beginParse());
+            return loadCapsuleRecordView(src.loadRef().beginParse());
         }
     }
 }
 
-export type FlushTreasuryDue = {
-    $$type: 'FlushTreasuryDue';
-    amount: bigint;
+export type RecordShardView = {
+    $$type: 'RecordShardView';
+    write_pubkey: bigint;
+    epoch: bigint;
+    last_seq: bigint;
+    record_count: bigint;
+    live_count: bigint;
+    evict_cursor: bigint;
+    safe_cap: bigint;
+    retention: bigint;
+    min_value: bigint;
+    protocol_fee: bigint;
+    accrued_fee: bigint;
+    evict_bounty: bigint;
+    accrued_bounty: bigint;
+    fee_sink: Address;
 }
 
-export function storeFlushTreasuryDue(src: FlushTreasuryDue) {
+export function storeRecordShardView(src: RecordShardView) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(3718989377, 32);
-        b_0.storeUint(src.amount, 128);
-    };
-}
-
-export function loadFlushTreasuryDue(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 3718989377) { throw Error('Invalid prefix'); }
-    const _amount = sc_0.loadUintBig(128);
-    return { $$type: 'FlushTreasuryDue' as const, amount: _amount };
-}
-
-export function loadTupleFlushTreasuryDue(source: TupleReader) {
-    const _amount = source.readBigNumber();
-    return { $$type: 'FlushTreasuryDue' as const, amount: _amount };
-}
-
-export function loadGetterTupleFlushTreasuryDue(source: TupleReader) {
-    const _amount = source.readBigNumber();
-    return { $$type: 'FlushTreasuryDue' as const, amount: _amount };
-}
-
-export function storeTupleFlushTreasuryDue(source: FlushTreasuryDue) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.amount);
-    return builder.build();
-}
-
-export function dictValueParserFlushTreasuryDue(): DictionaryValue<FlushTreasuryDue> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeFlushTreasuryDue(src)).endCell());
-        },
-        parse: (src) => {
-            return loadFlushTreasuryDue(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type FlushBuybackDue = {
-    $$type: 'FlushBuybackDue';
-    amount: bigint;
-}
-
-export function storeFlushBuybackDue(src: FlushBuybackDue) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(3016934701, 32);
-        b_0.storeUint(src.amount, 128);
-    };
-}
-
-export function loadFlushBuybackDue(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 3016934701) { throw Error('Invalid prefix'); }
-    const _amount = sc_0.loadUintBig(128);
-    return { $$type: 'FlushBuybackDue' as const, amount: _amount };
-}
-
-export function loadTupleFlushBuybackDue(source: TupleReader) {
-    const _amount = source.readBigNumber();
-    return { $$type: 'FlushBuybackDue' as const, amount: _amount };
-}
-
-export function loadGetterTupleFlushBuybackDue(source: TupleReader) {
-    const _amount = source.readBigNumber();
-    return { $$type: 'FlushBuybackDue' as const, amount: _amount };
-}
-
-export function storeTupleFlushBuybackDue(source: FlushBuybackDue) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.amount);
-    return builder.build();
-}
-
-export function dictValueParserFlushBuybackDue(): DictionaryValue<FlushBuybackDue> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeFlushBuybackDue(src)).endCell());
-        },
-        parse: (src) => {
-            return loadFlushBuybackDue(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type TopUpStorageReserve = {
-    $$type: 'TopUpStorageReserve';
-}
-
-export function storeTopUpStorageReserve(src: TopUpStorageReserve) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(2275594951, 32);
-    };
-}
-
-export function loadTopUpStorageReserve(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2275594951) { throw Error('Invalid prefix'); }
-    return { $$type: 'TopUpStorageReserve' as const };
-}
-
-export function loadTupleTopUpStorageReserve(source: TupleReader) {
-    return { $$type: 'TopUpStorageReserve' as const };
-}
-
-export function loadGetterTupleTopUpStorageReserve(source: TupleReader) {
-    return { $$type: 'TopUpStorageReserve' as const };
-}
-
-export function storeTupleTopUpStorageReserve(source: TopUpStorageReserve) {
-    const builder = new TupleBuilder();
-    return builder.build();
-}
-
-export function dictValueParserTopUpStorageReserve(): DictionaryValue<TopUpStorageReserve> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeTopUpStorageReserve(src)).endCell());
-        },
-        parse: (src) => {
-            return loadTopUpStorageReserve(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type SweepUnaccounted = {
-    $$type: 'SweepUnaccounted';
-}
-
-export function storeSweepUnaccounted(src: SweepUnaccounted) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1398232398, 32);
-    };
-}
-
-export function loadSweepUnaccounted(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1398232398) { throw Error('Invalid prefix'); }
-    return { $$type: 'SweepUnaccounted' as const };
-}
-
-export function loadTupleSweepUnaccounted(source: TupleReader) {
-    return { $$type: 'SweepUnaccounted' as const };
-}
-
-export function loadGetterTupleSweepUnaccounted(source: TupleReader) {
-    return { $$type: 'SweepUnaccounted' as const };
-}
-
-export function storeTupleSweepUnaccounted(source: SweepUnaccounted) {
-    const builder = new TupleBuilder();
-    return builder.build();
-}
-
-export function dictValueParserSweepUnaccounted(): DictionaryValue<SweepUnaccounted> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeSweepUnaccounted(src)).endCell());
-        },
-        parse: (src) => {
-            return loadSweepUnaccounted(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type AcceptBurnReserve = {
-    $$type: 'AcceptBurnReserve';
-    amount: bigint;
-}
-
-export function storeAcceptBurnReserve(src: AcceptBurnReserve) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1498129669, 32);
-        b_0.storeUint(src.amount, 128);
-    };
-}
-
-export function loadAcceptBurnReserve(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1498129669) { throw Error('Invalid prefix'); }
-    const _amount = sc_0.loadUintBig(128);
-    return { $$type: 'AcceptBurnReserve' as const, amount: _amount };
-}
-
-export function loadTupleAcceptBurnReserve(source: TupleReader) {
-    const _amount = source.readBigNumber();
-    return { $$type: 'AcceptBurnReserve' as const, amount: _amount };
-}
-
-export function loadGetterTupleAcceptBurnReserve(source: TupleReader) {
-    const _amount = source.readBigNumber();
-    return { $$type: 'AcceptBurnReserve' as const, amount: _amount };
-}
-
-export function storeTupleAcceptBurnReserve(source: AcceptBurnReserve) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.amount);
-    return builder.build();
-}
-
-export function dictValueParserAcceptBurnReserve(): DictionaryValue<AcceptBurnReserve> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeAcceptBurnReserve(src)).endCell());
-        },
-        parse: (src) => {
-            return loadAcceptBurnReserve(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type FeeAccumulatorStateView = {
-    $$type: 'FeeAccumulatorStateView';
-    accumulated_ton: bigint;
-    treasury_due_ton: bigint;
-    buyback_due_ton: bigint;
-    buyback_split_enabled: boolean;
-    treasury_receiver_address: Address;
-    buyback_burn_address: Address;
-    storage_reserve_ton: bigint;
-}
-
-export function storeFeeAccumulatorStateView(src: FeeAccumulatorStateView) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeInt(src.accumulated_ton, 257);
-        b_0.storeInt(src.treasury_due_ton, 257);
-        b_0.storeInt(src.buyback_due_ton, 257);
-        b_0.storeBit(src.buyback_split_enabled);
+        b_0.storeInt(src.write_pubkey, 257);
+        b_0.storeInt(src.epoch, 257);
+        b_0.storeInt(src.last_seq, 257);
         const b_1 = new Builder();
-        b_1.storeAddress(src.treasury_receiver_address);
-        b_1.storeAddress(src.buyback_burn_address);
-        b_1.storeInt(src.storage_reserve_ton, 257);
+        b_1.storeInt(src.record_count, 257);
+        b_1.storeInt(src.live_count, 257);
+        b_1.storeInt(src.evict_cursor, 257);
+        const b_2 = new Builder();
+        b_2.storeInt(src.safe_cap, 257);
+        b_2.storeInt(src.retention, 257);
+        b_2.storeInt(src.min_value, 257);
+        const b_3 = new Builder();
+        b_3.storeInt(src.protocol_fee, 257);
+        b_3.storeInt(src.accrued_fee, 257);
+        b_3.storeInt(src.evict_bounty, 257);
+        const b_4 = new Builder();
+        b_4.storeInt(src.accrued_bounty, 257);
+        b_4.storeAddress(src.fee_sink);
+        b_3.storeRef(b_4.endCell());
+        b_2.storeRef(b_3.endCell());
+        b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
 }
 
-export function loadFeeAccumulatorStateView(slice: Slice) {
+export function loadRecordShardView(slice: Slice) {
     const sc_0 = slice;
-    const _accumulated_ton = sc_0.loadIntBig(257);
-    const _treasury_due_ton = sc_0.loadIntBig(257);
-    const _buyback_due_ton = sc_0.loadIntBig(257);
-    const _buyback_split_enabled = sc_0.loadBit();
+    const _write_pubkey = sc_0.loadIntBig(257);
+    const _epoch = sc_0.loadIntBig(257);
+    const _last_seq = sc_0.loadIntBig(257);
     const sc_1 = sc_0.loadRef().beginParse();
-    const _treasury_receiver_address = sc_1.loadAddress();
-    const _buyback_burn_address = sc_1.loadAddress();
-    const _storage_reserve_ton = sc_1.loadIntBig(257);
-    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, storage_reserve_ton: _storage_reserve_ton };
+    const _record_count = sc_1.loadIntBig(257);
+    const _live_count = sc_1.loadIntBig(257);
+    const _evict_cursor = sc_1.loadIntBig(257);
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _safe_cap = sc_2.loadIntBig(257);
+    const _retention = sc_2.loadIntBig(257);
+    const _min_value = sc_2.loadIntBig(257);
+    const sc_3 = sc_2.loadRef().beginParse();
+    const _protocol_fee = sc_3.loadIntBig(257);
+    const _accrued_fee = sc_3.loadIntBig(257);
+    const _evict_bounty = sc_3.loadIntBig(257);
+    const sc_4 = sc_3.loadRef().beginParse();
+    const _accrued_bounty = sc_4.loadIntBig(257);
+    const _fee_sink = sc_4.loadAddress();
+    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
 }
 
-export function loadTupleFeeAccumulatorStateView(source: TupleReader) {
-    const _accumulated_ton = source.readBigNumber();
-    const _treasury_due_ton = source.readBigNumber();
-    const _buyback_due_ton = source.readBigNumber();
-    const _buyback_split_enabled = source.readBoolean();
-    const _treasury_receiver_address = source.readAddress();
-    const _buyback_burn_address = source.readAddress();
-    const _storage_reserve_ton = source.readBigNumber();
-    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, storage_reserve_ton: _storage_reserve_ton };
+export function loadTupleRecordShardView(source: TupleReader) {
+    const _write_pubkey = source.readBigNumber();
+    const _epoch = source.readBigNumber();
+    const _last_seq = source.readBigNumber();
+    const _record_count = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    const _safe_cap = source.readBigNumber();
+    const _retention = source.readBigNumber();
+    const _min_value = source.readBigNumber();
+    const _protocol_fee = source.readBigNumber();
+    const _accrued_fee = source.readBigNumber();
+    const _evict_bounty = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    const _fee_sink = source.readAddress();
+    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
 }
 
-export function loadGetterTupleFeeAccumulatorStateView(source: TupleReader) {
-    const _accumulated_ton = source.readBigNumber();
-    const _treasury_due_ton = source.readBigNumber();
-    const _buyback_due_ton = source.readBigNumber();
-    const _buyback_split_enabled = source.readBoolean();
-    const _treasury_receiver_address = source.readAddress();
-    const _buyback_burn_address = source.readAddress();
-    const _storage_reserve_ton = source.readBigNumber();
-    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, storage_reserve_ton: _storage_reserve_ton };
+export function loadGetterTupleRecordShardView(source: TupleReader) {
+    const _write_pubkey = source.readBigNumber();
+    const _epoch = source.readBigNumber();
+    const _last_seq = source.readBigNumber();
+    const _record_count = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    const _safe_cap = source.readBigNumber();
+    const _retention = source.readBigNumber();
+    const _min_value = source.readBigNumber();
+    const _protocol_fee = source.readBigNumber();
+    const _accrued_fee = source.readBigNumber();
+    const _evict_bounty = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    const _fee_sink = source.readAddress();
+    return { $$type: 'RecordShardView' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, safe_cap: _safe_cap, retention: _retention, min_value: _min_value, protocol_fee: _protocol_fee, accrued_fee: _accrued_fee, evict_bounty: _evict_bounty, accrued_bounty: _accrued_bounty, fee_sink: _fee_sink };
 }
 
-export function storeTupleFeeAccumulatorStateView(source: FeeAccumulatorStateView) {
+export function storeTupleRecordShardView(source: RecordShardView) {
     const builder = new TupleBuilder();
-    builder.writeNumber(source.accumulated_ton);
-    builder.writeNumber(source.treasury_due_ton);
-    builder.writeNumber(source.buyback_due_ton);
-    builder.writeBoolean(source.buyback_split_enabled);
-    builder.writeAddress(source.treasury_receiver_address);
-    builder.writeAddress(source.buyback_burn_address);
-    builder.writeNumber(source.storage_reserve_ton);
+    builder.writeNumber(source.write_pubkey);
+    builder.writeNumber(source.epoch);
+    builder.writeNumber(source.last_seq);
+    builder.writeNumber(source.record_count);
+    builder.writeNumber(source.live_count);
+    builder.writeNumber(source.evict_cursor);
+    builder.writeNumber(source.safe_cap);
+    builder.writeNumber(source.retention);
+    builder.writeNumber(source.min_value);
+    builder.writeNumber(source.protocol_fee);
+    builder.writeNumber(source.accrued_fee);
+    builder.writeNumber(source.evict_bounty);
+    builder.writeNumber(source.accrued_bounty);
+    builder.writeAddress(source.fee_sink);
     return builder.build();
 }
 
-export function dictValueParserFeeAccumulatorStateView(): DictionaryValue<FeeAccumulatorStateView> {
+export function dictValueParserRecordShardView(): DictionaryValue<RecordShardView> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeFeeAccumulatorStateView(src)).endCell());
+            builder.storeRef(beginCell().store(storeRecordShardView(src)).endCell());
         },
         parse: (src) => {
-            return loadFeeAccumulatorStateView(src.loadRef().beginParse());
+            return loadRecordShardView(src.loadRef().beginParse());
         }
     }
 }
 
-export type FeeAccumulator$Data = {
-    $$type: 'FeeAccumulator$Data';
-    treasury_receiver_address: Address;
-    buyback_burn_address: Address;
-    accumulated_ton: bigint;
-    treasury_due_ton: bigint;
-    buyback_due_ton: bigint;
-    buyback_split_enabled: boolean;
-    storage_reserve_ton: bigint;
+export type RecordShard$Data = {
+    $$type: 'RecordShard$Data';
+    write_pubkey: bigint;
+    epoch: bigint;
+    last_seq: bigint;
+    records: Dictionary<bigint, RecordEntry>;
+    record_count: bigint;
+    live_count: bigint;
+    evict_cursor: bigint;
+    accrued_fee: bigint;
+    accrued_bounty: bigint;
 }
 
-export function storeFeeAccumulator$Data(src: FeeAccumulator$Data) {
+export function storeRecordShard$Data(src: RecordShard$Data) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeAddress(src.treasury_receiver_address);
-        b_0.storeAddress(src.buyback_burn_address);
-        b_0.storeUint(src.accumulated_ton, 128);
-        b_0.storeUint(src.treasury_due_ton, 128);
-        b_0.storeUint(src.buyback_due_ton, 128);
-        b_0.storeBit(src.buyback_split_enabled);
-        const b_1 = new Builder();
-        b_1.storeCoins(src.storage_reserve_ton);
-        b_0.storeRef(b_1.endCell());
+        b_0.storeUint(src.write_pubkey, 256);
+        b_0.storeUint(src.epoch, 32);
+        b_0.storeUint(src.last_seq, 64);
+        b_0.storeDict(src.records, Dictionary.Keys.BigInt(257), dictValueParserRecordEntry());
+        b_0.storeUint(src.record_count, 32);
+        b_0.storeUint(src.live_count, 32);
+        b_0.storeUint(src.evict_cursor, 32);
+        b_0.storeCoins(src.accrued_fee);
+        b_0.storeCoins(src.accrued_bounty);
     };
 }
 
-export function loadFeeAccumulator$Data(slice: Slice) {
+export function loadRecordShard$Data(slice: Slice) {
     const sc_0 = slice;
-    const _treasury_receiver_address = sc_0.loadAddress();
-    const _buyback_burn_address = sc_0.loadAddress();
-    const _accumulated_ton = sc_0.loadUintBig(128);
-    const _treasury_due_ton = sc_0.loadUintBig(128);
-    const _buyback_due_ton = sc_0.loadUintBig(128);
-    const _buyback_split_enabled = sc_0.loadBit();
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _storage_reserve_ton = sc_1.loadCoins();
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton };
+    const _write_pubkey = sc_0.loadUintBig(256);
+    const _epoch = sc_0.loadUintBig(32);
+    const _last_seq = sc_0.loadUintBig(64);
+    const _records = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserRecordEntry(), sc_0);
+    const _record_count = sc_0.loadUintBig(32);
+    const _live_count = sc_0.loadUintBig(32);
+    const _evict_cursor = sc_0.loadUintBig(32);
+    const _accrued_fee = sc_0.loadCoins();
+    const _accrued_bounty = sc_0.loadCoins();
+    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
-export function loadTupleFeeAccumulator$Data(source: TupleReader) {
-    const _treasury_receiver_address = source.readAddress();
-    const _buyback_burn_address = source.readAddress();
-    const _accumulated_ton = source.readBigNumber();
-    const _treasury_due_ton = source.readBigNumber();
-    const _buyback_due_ton = source.readBigNumber();
-    const _buyback_split_enabled = source.readBoolean();
-    const _storage_reserve_ton = source.readBigNumber();
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton };
+export function loadTupleRecordShard$Data(source: TupleReader) {
+    const _write_pubkey = source.readBigNumber();
+    const _epoch = source.readBigNumber();
+    const _last_seq = source.readBigNumber();
+    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserRecordEntry(), source.readCellOpt());
+    const _record_count = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    const _accrued_fee = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
-export function loadGetterTupleFeeAccumulator$Data(source: TupleReader) {
-    const _treasury_receiver_address = source.readAddress();
-    const _buyback_burn_address = source.readAddress();
-    const _accumulated_ton = source.readBigNumber();
-    const _treasury_due_ton = source.readBigNumber();
-    const _buyback_due_ton = source.readBigNumber();
-    const _buyback_split_enabled = source.readBoolean();
-    const _storage_reserve_ton = source.readBigNumber();
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton };
+export function loadGetterTupleRecordShard$Data(source: TupleReader) {
+    const _write_pubkey = source.readBigNumber();
+    const _epoch = source.readBigNumber();
+    const _last_seq = source.readBigNumber();
+    const _records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserRecordEntry(), source.readCellOpt());
+    const _record_count = source.readBigNumber();
+    const _live_count = source.readBigNumber();
+    const _evict_cursor = source.readBigNumber();
+    const _accrued_fee = source.readBigNumber();
+    const _accrued_bounty = source.readBigNumber();
+    return { $$type: 'RecordShard$Data' as const, write_pubkey: _write_pubkey, epoch: _epoch, last_seq: _last_seq, records: _records, record_count: _record_count, live_count: _live_count, evict_cursor: _evict_cursor, accrued_fee: _accrued_fee, accrued_bounty: _accrued_bounty };
 }
 
-export function storeTupleFeeAccumulator$Data(source: FeeAccumulator$Data) {
+export function storeTupleRecordShard$Data(source: RecordShard$Data) {
     const builder = new TupleBuilder();
-    builder.writeAddress(source.treasury_receiver_address);
-    builder.writeAddress(source.buyback_burn_address);
-    builder.writeNumber(source.accumulated_ton);
-    builder.writeNumber(source.treasury_due_ton);
-    builder.writeNumber(source.buyback_due_ton);
-    builder.writeBoolean(source.buyback_split_enabled);
-    builder.writeNumber(source.storage_reserve_ton);
+    builder.writeNumber(source.write_pubkey);
+    builder.writeNumber(source.epoch);
+    builder.writeNumber(source.last_seq);
+    builder.writeCell(source.records.size > 0 ? beginCell().storeDictDirect(source.records, Dictionary.Keys.BigInt(257), dictValueParserRecordEntry()).endCell() : null);
+    builder.writeNumber(source.record_count);
+    builder.writeNumber(source.live_count);
+    builder.writeNumber(source.evict_cursor);
+    builder.writeNumber(source.accrued_fee);
+    builder.writeNumber(source.accrued_bounty);
     return builder.build();
 }
 
-export function dictValueParserFeeAccumulator$Data(): DictionaryValue<FeeAccumulator$Data> {
+export function dictValueParserRecordShard$Data(): DictionaryValue<RecordShard$Data> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeFeeAccumulator$Data(src)).endCell());
+            builder.storeRef(beginCell().store(storeRecordShard$Data(src)).endCell());
         },
         parse: (src) => {
-            return loadFeeAccumulator$Data(src.loadRef().beginParse());
+            return loadRecordShard$Data(src.loadRef().beginParse());
         }
     }
 }
 
- type FeeAccumulator_init_args = {
-    $$type: 'FeeAccumulator_init_args';
-    treasury_receiver_address: Address;
-    buyback_burn_address: Address;
+ type RecordShard_init_args = {
+    $$type: 'RecordShard_init_args';
+    write_pubkey: bigint;
+    epoch: bigint;
 }
 
-function initFeeAccumulator_init_args(src: FeeAccumulator_init_args) {
+function initRecordShard_init_args(src: RecordShard_init_args) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeAddress(src.treasury_receiver_address);
-        b_0.storeAddress(src.buyback_burn_address);
+        b_0.storeInt(src.write_pubkey, 257);
+        b_0.storeInt(src.epoch, 257);
     };
 }
 
-async function FeeAccumulator_init(treasury_receiver_address: Address, buyback_burn_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241020f01000464000114ff00f4a413f4bcf2c80b01020162020d04ecd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e1afa40fa40d37fd37fd37fd200d401d0fa00301716151443306c179dfa40fa405902d1017053007021e208e3027027d74920c21f953107d31f08de218210ff775609bae3022182107b24ea03bae3022182108d8f2c18ba0304050600aa068020d7217021d749c21f9430d31f01de8210594ba505ba8e38d37f0131813ab8f84226c705f2f4813ab921c200f2f4a010465513c87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed54e05f08008c5b06d37f30813a9921c200f2f4813a9af8416f24135f03228208061a80a0bef2f413a0104610355034c87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed5400f85b36813aa223c200f2f4813aa3f8416f24135f0382081e8480bef2f4258e28017003a010461035443302c87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed54e122811388a8812710a9045133a1027004a002a010465513c87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed5404f88e525b36813aa4f84226c705f2f4813aa506b316f2f4813aa6f8416f24135f0382081e8480bef2f421c2009401a07001de103555127f01c87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed54e0218210ddab4641bae302218210b3d2c52dbae3023820821087a2d2c7bae3022082105357554eba0708090a00fa5b06d37f30813aac21c200f2f4813aad5313bbf2f4813aaf2182084c4b40be917f935313bae2f2f4813aaef8416f24135f0382084c4b40bef2f45122a170544644716d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010465513c87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed5401e05b06d37f30813ab621c200f2f4813aba2182180be2d12e80baf2f4813ab75312bbf2f4813abbf8416f24135f0382086acfc0bef2f466a12182081e8480a07f7104c8018210594ba50558cb1fcb7fc9270450554343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00104655130b005c3036f8416f24135f0317a0104610354430c87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed5402fc8ef43036f8276f10f8416f24135f03a15da022a028a0813ac02182080f4240a05230bcf2f45210a182080f4240a114a00372fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010465513e0c00007c12117b00b0c003ac87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed54005c8e26813afbf2f010465513c87f01ca0055605067ce14ce12cb7fcb7fcb7fca00c858fa02cdc9ed54e05f07f2c082016fa0a75bda89a1a400031c35f481f481a6ffa6ffa6ffa401a803a1f400602e2c2a288660d82f3bf481f480b205a202e0a600e043c5b678d8ef0e000e54743254749826f265a602');
+async function RecordShard_init(write_pubkey: bigint, epoch: bigint) {
+    const __code = Cell.fromHex('b5ee9c7241021401000595000114ff00f4a413f4bcf2c80b01020162020f02f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e16d3ffd31fd33ff404d31fd31fd31ffa00fa0055806c198e15810101d700810101d7005902d101706d5471115300e20a8e9c088020d7217021d749c21f9430d31f01de8210ff775609bae3025f0ae07029d74920c21f953109d31f0ade030400d2d37f0131813559f8428d08600093667ddfdf04422ac25a895e9fa2724ab8a78288a1b680500546c7e9079ff1f4c705f2f481355a21c200f2f418a01068105710461035440302c87f01ca0055805089cbff16cb1f14cb3f12f400cb1fcb1fcb1f01fa0201fa02c9ed54029621821052535031bae30221821052535032bae3023ac00009c12119b08e2710685515c87f01ca0055805089cbff16cb1f14cb3f12f400cb1fcb1fcb1f01fa0201fa02c9ed54e05f09f2c082050902fe5b08d33fd4d4d430d0d4d430f82382015180a9048135582ca55220be942ca412bb923170e2f2f4813554f8416f24135f038208cf8500bef2f481355327830bb9f2f4813555535abcf2f4104c0d5520db3c37c882105253574401cb1f52a0cb3f5270cbffc9f9008135560cd02af9101bf2f48208989680a00982080c3500a006070040c882105253464301cb1f03f9005003cbff01f90001cbff01f90001cbffc9f90001fe810101f82317c85902810101cf00810101cf00c945605240206e953059f45a30944133f415e202a401a48208a95f6022c0019582081e84809170e2a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010680800561057105645134004c87f01ca0055805089cbff16cb1f14cb3f12f400cb1fcb1fcb1f01fa0201fa02c9ed5402fe5b08d30f307020708e175313b99321c1409170e2935346b99170e29220b39170e28ebc278101012659f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e202a4226eb3983204a41047104502e30d105710454014e810235f0381355721c200f2f4f8276f10f8416f24135f03a10182080c3500a80a0b009a026f22318209e13380a0f823b98e368101016dc8216e925b6d8e11016f22585902810101cf00810101cf00c9e226103a01206e953059f45a30944133f415e205a504a402a496307f07054414e203fe51aaa17020f82382015180a9042c82082625a1be932aa4bc923070e297533ca12ca123be9170e29a5b2982082625a0a1700bde503ca1500ba120c100923070de72fb0220c2009130e30df8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901fb00106855150c0d0e00b28d08600093667ddfdf04422ac25a895e9fa2724ab8a78288a1b680500546c7e9079ff1f42182081e8480a07f7104c8018210ff77560958cb1fcb7fc9103441304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00001a58cf8680cf8480f400f400cf810046c87f01ca0055805089cbff16cb1f14cb3f12f400cb1fcb1fcb1f01fa0201fa02c9ed540201201012018bbd4a976a268690000c70b69ffe98fe99ffa02698fe98fe98ffd007d002ac0360cc70ac08080eb80408080eb802c816880b836aa3888a980716d9e1f1f1f1f1f1f1f1f1f2ac24110094830b8209e133808208cf8500820898968082080c35008d08600093667ddfdf04422ac25a895e9fa2724ab8a78288a1b680500546c7e9079ff1f42e516e516e516d516d516d544d0752d0017dbe200f6a268690000c70b69ffe98fe99ffa02698fe98fe98ffd007d002ac0360cc70ac08080eb80408080eb802c816880b836aa3888a980712a846d9e3649c130064810101270259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e2206e9430707020e06f227f5940c254c8');
     const builder = beginCell();
     builder.storeUint(0, 1);
-    initFeeAccumulator_init_args({ $$type: 'FeeAccumulator_init_args', treasury_receiver_address, buyback_burn_address })(builder);
+    initRecordShard_init_args({ $$type: 'RecordShard_init_args', write_pubkey, epoch })(builder);
     const __data = builder.endCell();
     return { code: __code, data: __data };
 }
 
-export const FeeAccumulator_errors = {
+export const RecordShard_errors = {
     2: { message: "Stack underflow" },
     3: { message: "Stack overflow" },
     4: { message: "Integer overflow" },
@@ -1191,7 +1175,7 @@ export const FeeAccumulator_errors = {
     138: { message: "Not a basechain address" },
 } as const
 
-export const FeeAccumulator_errors_backward = {
+export const RecordShard_errors_backward = {
     "Stack underflow": 2,
     "Stack overflow": 3,
     "Integer overflow": 4,
@@ -1230,7 +1214,7 @@ export const FeeAccumulator_errors_backward = {
     "Not a basechain address": 138,
 } as const
 
-const FeeAccumulator_types: ABIType[] = [
+const RecordShard_types: ABIType[] = [
     {"name":"DataSize","header":null,"fields":[{"name":"cells","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bits","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"refs","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"SignedBundle","header":null,"fields":[{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signedData","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"StateInit","header":null,"fields":[{"name":"code","type":{"kind":"simple","type":"cell","optional":false}},{"name":"data","type":{"kind":"simple","type":"cell","optional":false}}]},
@@ -1241,85 +1225,81 @@ const FeeAccumulator_types: ABIType[] = [
     {"name":"StdAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":8}},{"name":"address","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
+    {"name":"CapsulePublish","header":1381191729,"fields":[{"name":"seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"sig","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"EvictRecords","header":1381191730,"fields":[{"name":"max_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
     {"name":"DepositProtocolFee","header":4286010889,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"SplitAccumulated","header":2066016771,"fields":[]},
-    {"name":"EnableBuybackSplit","header":2374970392,"fields":[]},
-    {"name":"FlushTreasuryDue","header":3718989377,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"FlushBuybackDue","header":3016934701,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"TopUpStorageReserve","header":2275594951,"fields":[]},
-    {"name":"SweepUnaccounted","header":1398232398,"fields":[]},
-    {"name":"AcceptBurnReserve","header":1498129669,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"FeeAccumulatorStateView","header":null,"fields":[{"name":"accumulated_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_split_enabled","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"storage_reserve_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"FeeAccumulator$Data","header":null,"fields":[{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"accumulated_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_split_enabled","type":{"kind":"simple","type":"bool","optional":false}},{"name":"storage_reserve_ton","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
+    {"name":"RecordEntry","header":null,"fields":[{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"CapsuleRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"RecordShardView","header":null,"fields":[{"name":"write_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_seq","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"live_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_cursor","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"protocol_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evict_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"accrued_bounty","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"fee_sink","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"RecordShard$Data","header":null,"fields":[{"name":"write_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"last_seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"records","type":{"kind":"dict","key":"int","value":"RecordEntry","valueFormat":"ref"}},{"name":"record_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"live_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"evict_cursor","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"accrued_fee","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"accrued_bounty","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
 ]
 
-const FeeAccumulator_opcodes = {
+const RecordShard_opcodes = {
+    "CapsulePublish": 1381191729,
+    "EvictRecords": 1381191730,
     "DepositProtocolFee": 4286010889,
-    "SplitAccumulated": 2066016771,
-    "EnableBuybackSplit": 2374970392,
-    "FlushTreasuryDue": 3718989377,
-    "FlushBuybackDue": 3016934701,
-    "TopUpStorageReserve": 2275594951,
-    "SweepUnaccounted": 1398232398,
-    "AcceptBurnReserve": 1498129669,
 }
 
-const FeeAccumulator_getters: ABIGetter[] = [
-    {"name":"get_state","methodId":86957,"arguments":[],"returnType":{"kind":"simple","type":"FeeAccumulatorStateView","optional":false}},
+const RecordShard_getters: ABIGetter[] = [
+    {"name":"get_record","methodId":115713,"arguments":[{"name":"entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"CapsuleRecordView","optional":false}},
+    {"name":"get_view","methodId":76114,"arguments":[],"returnType":{"kind":"simple","type":"RecordShardView","optional":false}},
 ]
 
-export const FeeAccumulator_getterMapping: { [key: string]: string } = {
-    'get_state': 'getGetState',
+export const RecordShard_getterMapping: { [key: string]: string } = {
+    'get_record': 'getGetRecord',
+    'get_view': 'getGetView',
 }
 
-const FeeAccumulator_receivers: ABIReceiver[] = [
-    {"receiver":"internal","message":{"kind":"typed","type":"DepositProtocolFee"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"SplitAccumulated"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"EnableBuybackSplit"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"FlushTreasuryDue"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"FlushBuybackDue"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"TopUpStorageReserve"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"SweepUnaccounted"}},
+const RecordShard_receivers: ABIReceiver[] = [
+    {"receiver":"internal","message":{"kind":"typed","type":"CapsulePublish"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"EvictRecords"}},
     {"receiver":"internal","message":{"kind":"empty"}},
 ]
 
-export const SPLIT_BASE_BPS = 10000n;
-export const TREASURY_SHARE_BPS = 5000n;
-export const FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE = 400000n;
-export const FEEACCUMULATOR_STORAGE_FLOOR = 1000000n;
-export const FEEACCUMULATOR_SPLIT_EXEC_RESERVE = 2000000n;
-export const FEEACCUMULATOR_FLUSH_EXEC_RESERVE = 5000000n;
-export const FEEACCUMULATOR_MIN_TREASURY_FLUSH_TON = 5000000n;
-export const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE = 2000000n;
-export const BUYBACK_FUNDING_ENVELOPE_NANOTONS = 51050000000n;
+export const RS_SAFE_CAP = 4096n;
+export const RS_RETENTION = 31536000n;
+export const RS_EVICT_CAP = 64n;
+export const RS_FRAME_DOMAIN = 1381189187n;
+export const RS_WRITE_DOMAIN = 1381193540n;
+export const RS_RECORD_ENDOWMENT = 300000n;
+export const RS_BASE_ENDOWMENT = 2000000n;
+export const RS_PUBLISH_GAS = 2500000n;
+export const RS_PROTOCOL_FEE = 10000000n;
+export const RS_FEE_SINK = address("EQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-PtQu");
+export const RS_FEE_SINK_DEPOSIT_RESERVE = 2000000n;
+export const RS_FEE_SINK_FWD_RESERVE = 500000n;
+export const RS_FEE_REMIT_OVERHEAD = 2500000n;
+export const RS_FEE_REMIT_MIN = 2500001n;
+export const RS_EVICT_BOUNTY = 800000n;
+export const RS_MIN_VALUE = 13600000n;
 
-export class FeeAccumulator implements Contract {
+export class RecordShard implements Contract {
     
     public static readonly storageReserve = 0n;
-    public static readonly errors = FeeAccumulator_errors_backward;
-    public static readonly opcodes = FeeAccumulator_opcodes;
+    public static readonly errors = RecordShard_errors_backward;
+    public static readonly opcodes = RecordShard_opcodes;
     
-    static async init(treasury_receiver_address: Address, buyback_burn_address: Address) {
-        return await FeeAccumulator_init(treasury_receiver_address, buyback_burn_address);
+    static async init(write_pubkey: bigint, epoch: bigint) {
+        return await RecordShard_init(write_pubkey, epoch);
     }
     
-    static async fromInit(treasury_receiver_address: Address, buyback_burn_address: Address) {
-        const __gen_init = await FeeAccumulator_init(treasury_receiver_address, buyback_burn_address);
+    static async fromInit(write_pubkey: bigint, epoch: bigint) {
+        const __gen_init = await RecordShard_init(write_pubkey, epoch);
         const address = contractAddress(0, __gen_init);
-        return new FeeAccumulator(address, __gen_init);
+        return new RecordShard(address, __gen_init);
     }
     
     static fromAddress(address: Address) {
-        return new FeeAccumulator(address);
+        return new RecordShard(address);
     }
     
     readonly address: Address; 
     readonly init?: { code: Cell, data: Cell };
     readonly abi: ContractABI = {
-        types:  FeeAccumulator_types,
-        getters: FeeAccumulator_getters,
-        receivers: FeeAccumulator_receivers,
-        errors: FeeAccumulator_errors,
+        types:  RecordShard_types,
+        getters: RecordShard_getters,
+        receivers: RecordShard_receivers,
+        errors: RecordShard_errors,
     };
     
     constructor(address: Address, init?: { code: Cell, data: Cell }) {
@@ -1327,29 +1307,14 @@ export class FeeAccumulator implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: DepositProtocolFee | SplitAccumulated | EnableBuybackSplit | FlushTreasuryDue | FlushBuybackDue | TopUpStorageReserve | SweepUnaccounted | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: CapsulePublish | EvictRecords | null) {
         
         let body: Cell | null = null;
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'DepositProtocolFee') {
-            body = beginCell().store(storeDepositProtocolFee(message)).endCell();
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'CapsulePublish') {
+            body = beginCell().store(storeCapsulePublish(message)).endCell();
         }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'SplitAccumulated') {
-            body = beginCell().store(storeSplitAccumulated(message)).endCell();
-        }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'EnableBuybackSplit') {
-            body = beginCell().store(storeEnableBuybackSplit(message)).endCell();
-        }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'FlushTreasuryDue') {
-            body = beginCell().store(storeFlushTreasuryDue(message)).endCell();
-        }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'FlushBuybackDue') {
-            body = beginCell().store(storeFlushBuybackDue(message)).endCell();
-        }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TopUpStorageReserve') {
-            body = beginCell().store(storeTopUpStorageReserve(message)).endCell();
-        }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'SweepUnaccounted') {
-            body = beginCell().store(storeSweepUnaccounted(message)).endCell();
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'EvictRecords') {
+            body = beginCell().store(storeEvictRecords(message)).endCell();
         }
         if (message === null) {
             body = new Cell();
@@ -1360,10 +1325,18 @@ export class FeeAccumulator implements Contract {
         
     }
     
-    async getGetState(provider: ContractProvider) {
+    async getGetRecord(provider: ContractProvider, entry_id: bigint) {
         const builder = new TupleBuilder();
-        const source = (await provider.get('get_state', builder.build())).stack;
-        const result = loadGetterTupleFeeAccumulatorStateView(source);
+        builder.writeNumber(entry_id);
+        const source = (await provider.get('get_record', builder.build())).stack;
+        const result = loadGetterTupleCapsuleRecordView(source);
+        return result;
+    }
+    
+    async getGetView(provider: ContractProvider) {
+        const builder = new TupleBuilder();
+        const source = (await provider.get('get_view', builder.build())).stack;
+        const result = loadGetterTupleRecordShardView(source);
         return result;
     }
     
