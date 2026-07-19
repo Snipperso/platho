@@ -32,8 +32,9 @@ const cell = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCell
 const CLOCK = 1_790_000_000;
 
 const PROTOCOL_FEE = 10_000_000n;
-const RS_MIN_VALUE = 14_200_000n;      // 300_000 + 800_000 + 2_500_000 + 10_000_000 + 600_000
-const IS_MIN_VALUE = 14_008_000n;      //   8_000 + 900_000 + 2_500_000 + 10_000_000 + 600_000
+const RS_MIN_VALUE = 13_400_000n;        // 300_000 + 2_500_000 + 10_000_000 + 600_000
+const RS_DEPLOY_MIN_VALUE = 16_900_000n; // + RS_BASE_ENDOWMENT 3_500_000, charged on the FIRST publish only
+const IS_MIN_VALUE = 13_108_000n;        //     8_000 + 2_500_000 + 10_000_000 + 600_000
 
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
 const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');
@@ -43,6 +44,20 @@ async function deploySink(bc: Blockchain) {
   const funder = await bc.treasury('sink-funder');
   await sink.send(funder.getSender(), { value: toNano('1') }, { $$type: 'TopUpStorageReserve' } as any);
   return sink;
+}
+
+/** One publish at EXACTLY the given value, with no deploy-price correction — for testing the gate itself. */
+async function publishConvRaw(bc: Blockchain, seed: number, value: bigint) {
+  const epoch = epochOf(bc.now!);
+  const payer = await bc.treasury(`pt-raw-${seed}`);
+  const secret = new Uint8Array(32).fill(seed);
+  const publicKey = ed25519.getPublicKey(secret);
+  const b = await buildConvPublish({
+    writePublicKey: publicKey, writeSecret: secret, seq: 1n, epoch,
+    header0: cell(1), header1: cell(2), body: cell(3), value,
+  });
+  const last = await payer.send({ to: b.to, value, body: b.body, init: b.init, bounce: true } as any);
+  return { shard: bc.openContract(RecordShard.fromAddress(b.to)), payer, last };
 }
 
 async function publishConv(bc: Blockchain, n: number, seed: number, value = toNano('0.05')) {
@@ -58,7 +73,10 @@ async function publishConv(bc: Blockchain, n: number, seed: number, value = toNa
       header0: cell(i & 255), header1: cell((i + 1) & 255), body: cell((i + 2) & 255), value,
     });
     to = b.to;
-    last = await payer.send({ to: b.to, value, body: b.body, init: b.init, bounce: true } as any);
+    // The first publish into a fresh shard funds the account's life and its retirement, so it costs more. A
+    // client learns which price applies from get_view().deploy_min_value, or from the account being absent.
+    const due = i === 0 && value < RS_DEPLOY_MIN_VALUE ? RS_DEPLOY_MIN_VALUE : value;
+    last = await payer.send({ to: b.to, value: due, body: b.body, init: b.init, bounce: true } as any);
   }
   return { shard: bc.openContract(RecordShard.fromAddress(to)), payer, last };
 }
@@ -76,7 +94,7 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     // 1.5M capsules x 0.01 GRAM must be 15_000 GRAM, not 15_000 minus a per-message shave.
     expect((await sink.getGetState()).accumulated_ton - before, 'the pool books the fee whole')
       .toBe(5n * PROTOCOL_FEE);
-    expect((await shard.getGetView()).live_count).toBe(5n);
+    expect((await shard.getGetView()).record_count).toBe(5n);
   }, 300_000);
 
   it('PT-02: an INTRO publish does the same', async () => {
@@ -97,10 +115,11 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     expect((await sink.getGetState()).accumulated_ton - before).toBe(5n * PROTOCOL_FEE);
   }, 300_000);
 
-  it('PT-03: the shard holds ONLY its rent and bounties — no fee sits in it', async () => {
+  it('PT-03: the shard holds ONLY its rent — no fee sits in it', async () => {
     // The property the owner asked for, asserted as an equation rather than a vibe. What a shard holds after n
-    // publishes must be exactly the storage endowment plus the eviction bounties plus its own base endowment.
-    // If any fee were retained this would be short by n x 10_000_000.
+    // publishes must be exactly the per-record storage endowment plus its own base endowment — which since
+    // 2026-07-19 also funds the single call that retires it. If any fee were retained this would be short by
+    // n x 10_000_000.
     const bc = await Blockchain.create();
     bc.now = CLOCK;
     await deploySink(bc);
@@ -108,11 +127,11 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     const { shard } = await publishConv(bc, n, 0x31);
 
     const held = (await bc.getContract(shard.address)).balance;
-    const expected = BigInt(n) * (300_000n + 800_000n) + 2_000_000n;
+    const expected = BigInt(n) * 300_000n + 3_500_000n;
     expect(held, `shard holds ${held}, expected exactly rent+bounty+base = ${expected}`).toBe(expected);
 
     const view = await shard.getGetView();
-    expect(view.accrued_bounty, 'bounties are still owed and still held').toBe(BigInt(n) * 800_000n);
+    expect(view.record_count, 'and the records are all there').toBe(BigInt(n));
   }, 300_000);
 
   it('PT-04: the deposit reserve MATCHES FeeAccumulator gate 15002 — a drift refuses every deposit', async () => {
@@ -179,11 +198,11 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     const sink = await deploySink(bc);
     const before = (await sink.getGetState()).accumulated_ton;
 
-    const { shard, last } = await publishConv(bc, 1, 0x41, RS_MIN_VALUE);
+    const { shard, last } = await publishConv(bc, 1, 0x41, RS_DEPLOY_MIN_VALUE);
 
     const aborted = (last.transactions as any[]).filter((t) => t.description?.aborted === true);
     expect(aborted.length, 'no transaction may abort on a minimum-funded publish').toBe(0);
-    expect((await shard.getGetView()).live_count, 'the record was stored').toBe(1n);
+    expect((await shard.getGetView()).record_count, 'the record was stored').toBe(1n);
     expect((await sink.getGetState()).accumulated_ton - before, 'and the fee still reached the pool whole')
       .toBe(PROTOCOL_FEE);
   }, 300_000);
@@ -194,7 +213,7 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     const bc = await Blockchain.create();
     bc.now = CLOCK;
     await deploySink(bc);
-    const { shard, last } = await publishConv(bc, 1, 0x51, RS_MIN_VALUE - 1n);
+    const { shard, last } = await publishConvRaw(bc, 0x51, RS_DEPLOY_MIN_VALUE - 1n);
 
     const shardTx = (last.transactions as any[]).find((t) => t.inMessage?.info?.dest?.equals?.(shard.address));
     expect(shardTx?.description?.computePhase?.exitCode, 'gate 13652 must refuse in COMPUTE').toBe(13652);
@@ -255,27 +274,29 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     expect((await sink.getGetState()).accumulated_ton, 'nothing credited').toBe(0n);
   }, 300_000);
 
-  it('PT-07: eviction no longer moves protocol money — it only pays the bounty', async () => {
+  it('PT-07: retiring a shard moves no protocol money — the fee left long ago at publish time', async () => {
     // Everything the fee used to force onto this receiver is gone: no remit, no solvency test, no ordering
     // against outstanding bounties, no fee stranded because nobody swept. What remains must still pay its caller.
     const bc = await Blockchain.create();
     bc.now = CLOCK;
     const sink = await deploySink(bc);
-    const { shard } = await publishConv(bc, 64, 0x61);
+    const { shard } = await publishConv(bc, 8, 0x61);
     const booked = (await sink.getGetState()).accumulated_ton;
 
-    bc.now = bc.now! + 31536000 + 86400;
+    // Read the retire instant from the CHAIN rather than recomputing it here. A test that mirrors the contract's
+    // arithmetic proves only that I can copy; reading get_view().retire_at is also exactly what a client must do.
+    bc.now = Number((await shard.getGetView()).retire_at) + 1;
     const keeper = await bc.treasury('pt07-keeper');
     const b = (await bc.getContract(keeper.address)).balance;
-    await shard.send(keeper.getSender(), { value: toNano('0.5') }, { $$type: 'EvictRecords', max_count: 64n } as any);
+    await shard.send(keeper.getSender(), { value: toNano('0.5') }, { $$type: 'RetireShard' } as any);
     const net = (await bc.getContract(keeper.address)).balance - b;
 
-    expect((await shard.getGetView()).live_count).toBe(0n);
-    expect(net, 'the sweep still pays its caller').toBeGreaterThan(0n);
-    expect((await sink.getGetState()).accumulated_ton, 'eviction moves no protocol money at all').toBe(booked);
+    expect(net, 'retiring the shard still pays its caller').toBeGreaterThan(0n);
+    expect((await sink.getGetState()).accumulated_ton, 'retirement moves no protocol money at all').toBe(booked);
+    expect((await bc.getContract(shard.address)).accountState?.type, 'and the account is gone').not.toBe('active');
   }, 600_000);
 
-  it('PT-08: the publish minimum is what the owner was told — 0.0142 CONV, 0.0140 INTRO', async () => {
+  it('PT-08: the publish minimum is what the owner was told — 0.0134 CONV, 0.013108 INTRO', async () => {
     // The owner priced this decision in GRAM and agreed to it. Pin the number so it cannot drift silently.
     const bc = await Blockchain.create();
     bc.now = CLOCK;

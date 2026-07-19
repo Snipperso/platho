@@ -71,16 +71,27 @@ function isStructurallyAbsent(error) {
   return status === 404;
 }
 
-/** IntroScanPage comes back as five stack items in declaration order. */
+/**
+ * IntroScanPage comes back as FOUR stack items in declaration order: from_id, count, next_id, pairs.
+ *
+ * IT WAS FIVE UNTIL 2026-07-19, when per-entry eviction was deleted and `evict_cursor` went with it — nothing
+ * removes an intro any more, so the live floor is always 0 and the field carried no information. That dropped
+ * `pairs` from index 4 to index 3.
+ *
+ * THIS FUNCTION IS WHY THAT CHANGE WAS DANGEROUS. It is the DEFAULT decoder on the production scan path, and
+ * every test in the suite stubs `readScanPage` a level above it — so a stale index here would have thrown on
+ * every bucket, stopping all first contacts, while the whole suite stayed green. tests/intro-scan-page.test.ts
+ * now drives it against a REAL getter stack from the compiled contract instead of a hand-written fixture.
+ */
 export function parseScanPageStack(stack) {
-  if (!Array.isArray(stack) || stack.length < 5) throw new Error(`get_scan_page returned ${stack?.length ?? 0} stack items, expected 5`);
+  if (!Array.isArray(stack) || stack.length < 4) throw new Error(`get_scan_page returned ${stack?.length ?? 0} stack items, expected 4`);
   const num = (i) => BigInt(stack[i]?.value ?? 0);
   const cell = (i) => {
     const value = stack[i]?.value;
     if (!value) return beginCell().endCell();
     return typeof value === 'string' ? cellFromBase64(value) : value;
   };
-  return { from_id: num(0), count: num(1), next_id: num(2), evict_cursor: num(3), pairs: cell(4) };
+  return { from_id: num(0), count: num(1), next_id: num(2), pairs: cell(3) };
 }
 
 const cellFromBase64 = (value) => parseBocBase64(value);

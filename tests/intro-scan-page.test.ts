@@ -6,6 +6,8 @@ import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { buildIntroPublish } from '../web/publish-builder.mjs';
 import { scanIntros, scanIntroIndices } from '../web/intro-scan.mjs';
 import { computePrivateScanViewTag } from '../web/crypto/platho-crypto.mjs';
+import { parseScanPageStack } from '../web/intro-transport.mjs';
+import { computeCellHashAndDepth } from '../web/pwa-contract-transactions.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // INTRO SCAN PAGE — the primitive that decides whether a leak-free first-contact scan is affordable at all.
@@ -141,17 +143,48 @@ describe('INTRO SCAN PAGE — the scan input, and what it actually costs', () =>
     console.log(`      MEASURED: page ${perIntro.toFixed(2)} B/intro vs raw state ${(stateBytes / n).toFixed(1)} B/intro -> ${ratio.toFixed(2)}x`);
   }, 180_000);
 
-  it('SCAN-04: the page is clamped to the LIVE range — evicted ids can never be handed out', async () => {
-    await publish(10, (i) => ({ r: BigInt(i + 1), tag: 0x1000 + i }));
-    blockchain.now = blockchain.now! + 604800 + 86400;
-    const keeper = await blockchain.treasury('tag-keeper');
-    await shard.send(keeper.getSender(), { value: toNano('0.1') }, { $$type: 'EvictIntros', max_count: 32n } as any);
-    expect((await shard.getGetView()).live_count).toBe(0n);
+  it('SCAN-04: the page decodes through the PRODUCTION parser, against a real getter stack', async () => {
+    // THIS TEST REPLACES a clamp-to-live-range guard that eviction made necessary, and it exists because of what
+    // that deletion nearly did. IntroScanPage lost its `evict_cursor` field when nothing could remove an entry any
+    // more, which shifted `pairs` from stack index 4 to index 3 — and web/intro-transport.mjs parseScanPageStack,
+    // the DEFAULT decoder on the production scan path, reads by index. A stale index there throws on every bucket
+    // and stops all first contacts, and NOTHING in this suite would have noticed: every other test calls the Tact
+    // wrapper or stubs readScanPage a level above the parser.
+    //
+    // So this drives the real parser against a real getter stack from the compiled contract. It is the only test
+    // in the repo that touches parseScanPageStack at all.
+    await publish(7, (i) => ({ r: BigInt(i + 1) * 1001n, tag: 0x2000 + i }));
 
-    const page = await shard.getGetScanPage(0n, 256n);
-    expect(page.evict_cursor).toBe(10n);
-    expect(page.from_id, 'clamped up to the live floor').toBe(10n);
-    expect(page.count, 'nothing live remains').toBe(0n);
+    const stack = await blockchain.runGetMethod(shard.address, 'get_scan_page', [
+      { type: 'int', value: 0n },
+      { type: 'int', value: 256n },
+    ] as any);
+    expect(stack.exitCode, 'the getter itself must succeed').toBe(0);
+
+    // Shape it the way an RPC endpoint hands it over, so the parser sees what it will see in production.
+    const wire = (stack.stack as any[]).map((item: any) =>
+      item.type === 'cell' || item.type === 'slice'
+        ? { type: 'cell', value: item.cell.toBoc().toString('base64') }
+        : { type: 'int', value: String(item.value) });
+
+    const page = parseScanPageStack(wire);
+    expect(page.from_id, 'from_id survives the wire').toBe(0n);
+    expect(page.count, 'count survives the wire').toBe(7n);
+    expect(page.next_id, 'next_id survives the wire').toBe(7n);
+
+    // `pairs` must be the CELL, not an integer read out of the wrong slot — which is exactly what an index shift
+    // produces and what a length-only guard would have missed. The parser is a BROWSER module, so its cells are
+    // the hand-rolled kind rather than @ton/core's; comparing hashes is the way to check them against the
+    // reference wrapper without dragging one implementation into the other.
+    const reference = await shard.getGetScanPage(0n, 256n);
+    const parsedHash = Buffer.from((await computeCellHashAndDepth(page.pairs as any)).hash).toString('hex');
+    expect(parsedHash, "the parsed pairs cell IS the getter's own pairs cell")
+      .toBe(reference.pairs.hash().toString('hex'));
+    expect(unpackPairs(reference.pairs, Number(reference.count)).map((d) => d.r),
+      'and it holds what was published').toEqual([1001n, 2002n, 3003n, 4004n, 5005n, 6006n, 7007n]);
+
+    // The wire really is four items now; pin it so a future struct change is loud here rather than silent there.
+    expect(wire.length, 'IntroScanPage is four stack items').toBe(4);
   }, 120_000);
 
   it('SCAN-05: paging covers a range larger than one page, with no gaps or repeats', async () => {

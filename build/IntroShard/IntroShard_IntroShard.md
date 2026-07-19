@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: IntroShard
-BoC Size: 1599 bytes
+BoC Size: 1280 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 18
@@ -49,9 +49,9 @@ Signature: `BasechainAddress{hash:Maybe int257}`
 TL-B: `intro_publish#49535031 r:uint256 view_tag:uint16 header_0:^cell body:^cell = IntroPublish`
 Signature: `IntroPublish{r:uint256,view_tag:uint16,header_0:^cell,body:^cell}`
 
-### EvictIntros
-TL-B: `evict_intros#49535032 max_count:uint16 = EvictIntros`
-Signature: `EvictIntros{max_count:uint16}`
+### RetireShard
+TL-B: `retire_shard#49535033  = RetireShard`
+Signature: `RetireShard{}`
 
 ### DepositProtocolFee
 TL-B: `deposit_protocol_fee#ff775609 amount:uint128 = DepositProtocolFee`
@@ -66,16 +66,16 @@ TL-B: `_ exists:bool r:int257 view_tag:int257 body_commit:int257 created_at:int2
 Signature: `IntroEntryView{exists:bool,r:int257,view_tag:int257,body_commit:int257,created_at:int257}`
 
 ### IntroScanPage
-TL-B: `_ from_id:int257 count:int257 next_id:int257 evict_cursor:int257 pairs:^cell = IntroScanPage`
-Signature: `IntroScanPage{from_id:int257,count:int257,next_id:int257,evict_cursor:int257,pairs:^cell}`
+TL-B: `_ from_id:int257 count:int257 next_id:int257 pairs:^cell = IntroScanPage`
+Signature: `IntroScanPage{from_id:int257,count:int257,next_id:int257,pairs:^cell}`
 
 ### IntroShardView
-TL-B: `_ epoch:int257 bucket:int257 live_count:int257 next_id:int257 evict_cursor:int257 retention:int257 safe_cap:int257 min_value:int257 protocol_fee:int257 evict_bounty:int257 accrued_bounty:int257 fee_sink:address = IntroShardView`
-Signature: `IntroShardView{epoch:int257,bucket:int257,live_count:int257,next_id:int257,evict_cursor:int257,retention:int257,safe_cap:int257,min_value:int257,protocol_fee:int257,evict_bounty:int257,accrued_bounty:int257,fee_sink:address}`
+TL-B: `_ epoch:int257 bucket:int257 next_id:int257 retention:int257 safe_cap:int257 min_value:int257 deploy_min_value:int257 protocol_fee:int257 retire_at:int257 fee_sink:address = IntroShardView`
+Signature: `IntroShardView{epoch:int257,bucket:int257,next_id:int257,retention:int257,safe_cap:int257,min_value:int257,deploy_min_value:int257,protocol_fee:int257,retire_at:int257,fee_sink:address}`
 
 ### IntroShard$Data
-TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 live_count:uint32 evict_cursor:uint32 accrued_bounty:coins = IntroShard`
-Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32,live_count:uint32,evict_cursor:uint32,accrued_bounty:coins}`
+TL-B: `_ epoch:uint32 bucket:uint32 intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}> next_id:uint32 = IntroShard`
+Signature: `IntroShard{epoch:uint32,bucket:uint32,intros:dict<int, ^IntroEntry{r:int257,view_tag:int257,body_commit:int257,created_at:int257}>,next_id:uint32}`
 
 ## Get methods
 Total get methods: 3

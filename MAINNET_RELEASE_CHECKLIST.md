@@ -83,7 +83,17 @@ capsule, emitted by the publish path itself. A shard holds only its own rent and
 money waits on chain to be extracted, and no protocol revenue depends on eviction being called.
 
 The publisher funds the transport, so the pool books the fee WHOLE and the `15,000 GRAM` figure above is exact.
-Minimum publish: `14,200,000` nanotons CONV, `14,008,000` INTRO.
+
+Publish prices, both readable from `get_view` — a client pays the deploy figure whenever the account is absent or
+holds no entries yet:
+
+| | steady-state | first publish |
+| --- | ---: | ---: |
+| CONV | `13,400,000` (0.0134 GRAM) | `16,900,000` (0.0169 GRAM) |
+| INTRO | `13,108,000` (0.013108 GRAM) | `15,608,000` (0.015608 GRAM) |
+
+Per-record eviction was deleted on 2026-07-19; a single `RetireShard` call ends a shard at a MEASURED constant
+5140 gas whatever it holds, and `get_view().retire_at` publishes the instant it becomes legal.
 
 | Component | Required state |
 | --- | --- |
