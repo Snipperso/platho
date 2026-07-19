@@ -768,7 +768,9 @@ async function toncenterHttpErrorWithBody(label, response, fallbackBackoffMs = T
   return error;
 }
 
-function deriveToncenterV3Endpoint(endpoint, leaf) {
+// Exported for web/shard-rpc.mjs, which needs the accountStates and messages leaves of the same v3 base the
+// transport uses. Deriving them independently would be a second place to get the endpoint wrong.
+export function deriveToncenterV3Endpoint(endpoint, leaf) {
   const url = new URL(assertString(endpoint, 'TON RPC endpoint'));
   const parts = url.pathname.split('/');
   if (parts.length === 0 || parts[parts.length - 1] === '') {
