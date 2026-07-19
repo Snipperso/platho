@@ -37,16 +37,49 @@ export const INTRO_SCAN_EPOCHS_BACK = 8;
 export const INTRO_SCAN_EPOCHS_FORWARD = 1;
 export const INTRO_SCAN_EPOCHS = INTRO_SCAN_EPOCHS_BACK + INTRO_SCAN_EPOCHS_FORWARD + 1;
 
-/** Unpack a get_scan_page payload: (uint256 r, uint16 view_tag) pairs, 3 per cell, in ascending id order. */
+/**
+ * Unpack a get_scan_page payload: (uint256 r, uint16 view_tag) pairs, 3 per cell, in ascending id order.
+ *
+ * IT READS BOTH CELL TYPES, AND THAT IS NOT TIDINESS — THE SHIPPING SEAM WAS BROKEN. The production decoder is
+ * web/intro-transport.mjs parseScanPageStack, which builds the CLIENT's own cell ({ data, bitLength, refs })
+ * because it has to run in a browser, where @ton/core does not load at all. This function called
+ * `cur.beginParse()`, which exists only on an @ton/core Cell, so the real wiring —
+ *     transport -> parseScanPageStack -> unpackScanPage
+ * threw "cur.beginParse is not a function" on every page that contained anything. No first contact could have
+ * been received by anybody.
+ *
+ * NOTHING CAUGHT IT, and the reason is worth keeping: every test stubs readScanPage a level above this and hands
+ * back a Tact-wrapper cell, so the two halves of the receive path were never run against each other. The
+ * browser-loadability guard could not see it either — it checks IMPORTS, not runtime types. INTRO-SEAM-01 in
+ * tests/intro-scan-page.test.ts now drives the real decoder into this function.
+ */
 export function unpackScanPage(pairs, count) {
   const out = [];
   let cur = pairs;
   while (cur && out.length < count) {
-    const slice = cur.beginParse();
-    while (slice.remainingBits >= 272 && out.length < count) {
-      out.push({ r: slice.loadUintBig(256), view_tag: slice.loadUint(16) });
+    if (typeof cur.beginParse === 'function') {
+      // An @ton/core Cell: what the compiled Tact wrapper returns, and what the tests hand in.
+      const slice = cur.beginParse();
+      while (slice.remainingBits >= 272 && out.length < count) {
+        out.push({ r: slice.loadUintBig(256), view_tag: slice.loadUint(16) });
+      }
+    } else {
+      // The client's own cell: a byte array plus a bit length. Read the same 272-bit pairs straight out of it.
+      const bytes = cur.data ?? new Uint8Array(0);
+      const bitLength = Number(cur.bitLength ?? bytes.length * 8);
+      let bit = 0;
+      const take = (width) => {
+        let value = 0n;
+        for (let i = 0; i < width; i += 1, bit += 1) {
+          value = (value << 1n) | BigInt(((bytes[bit >> 3] ?? 0) >> (7 - (bit & 7))) & 1);
+        }
+        return value;
+      };
+      while (bitLength - bit >= 272 && out.length < count) {
+        out.push({ r: take(256), view_tag: Number(take(16)) });
+      }
     }
-    cur = cur.refs.length > 0 ? cur.refs[0] : null;
+    cur = (cur.refs && cur.refs.length > 0) ? cur.refs[0] : null;
   }
   return out;
 }
