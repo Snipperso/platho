@@ -65,7 +65,7 @@ describe('FEE ACCUMULATOR ACCRUAL — a capsule fee becomes a credit, and only a
 
     const body = {
       $$type: 'DepositCapsuleFee', amount: RS_PROTOCOL_FEE,
-      write_pubkey: 0x1234n, epoch: 20290n, publisher: publisher.address,
+      lane: 0n, init_arg0: 0x1234n, init_arg1: 20290n, publisher: publisher.address,
     } as any;
 
     // A stranger claiming to be a shard is the whole farm: 10 ATH per call, for the price of a message.
@@ -91,8 +91,9 @@ describe('FEE ACCUMULATOR ACCRUAL — a capsule fee becomes a credit, and only a
 
     await fa.send(bc.sender(shard), { value: toNano('0.05') }, {
       $$type: 'DepositCapsuleFee', amount: RS_PROTOCOL_FEE,
-      write_pubkey: 0x9999n,          // not the key this address derives from
-      epoch: 20290n, publisher: publisher.address,
+      lane: 0n,
+      init_arg0: 0x9999n,             // not the key this address derives from
+      init_arg1: 20290n, publisher: publisher.address,
     } as any);
 
     expect((await fa.getGetState()).accumulated_ton, 'a mismatched identity must be refused').toBe(0n);
@@ -107,7 +108,7 @@ describe('FEE ACCUMULATOR ACCRUAL — a capsule fee becomes a credit, and only a
 
     const deposit = (n: number) => fa.send(bc.sender(shard), { value: toNano('0.05') }, {
       $$type: 'DepositCapsuleFee', amount: RS_PROTOCOL_FEE,
-      write_pubkey: 0x1234n, epoch: 20290n, publisher: publisher.address,
+      lane: 0n, init_arg0: 0x1234n, init_arg1: 20290n, publisher: publisher.address,
     } as any);
 
     const first = await deposit(1);          // ticket does not exist -> StateInit actually deploys it

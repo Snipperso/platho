@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: FeeAccumulator
-BoC Size: 2394 bytes
+BoC Size: 2628 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 28
+Total structures: 29
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -78,8 +78,8 @@ TL-B: `accept_burn_reserve#594ba505 amount:uint128 = AcceptBurnReserve`
 Signature: `AcceptBurnReserve{amount:uint128}`
 
 ### DepositCapsuleFee
-TL-B: `deposit_capsule_fee#52535046 amount:uint128 write_pubkey:uint256 epoch:uint32 publisher:address = DepositCapsuleFee`
-Signature: `DepositCapsuleFee{amount:uint128,write_pubkey:uint256,epoch:uint32,publisher:address}`
+TL-B: `deposit_capsule_fee#52535046 amount:uint128 lane:uint8 init_arg0:int257 init_arg1:int257 publisher:address = DepositCapsuleFee`
+Signature: `DepositCapsuleFee{amount:uint128,lane:uint8,init_arg0:int257,init_arg1:int257,publisher:address}`
 
 ### TicketCredit
 TL-B: `ticket_credit#41544331  = TicketCredit`
@@ -105,6 +105,10 @@ Signature: `BindShardCode{shard_code:^cell}`
 TL-B: `bind_ticket_code#fa110002 ticket_code:^cell = BindTicketCode`
 Signature: `BindTicketCode{ticket_code:^cell}`
 
+### BindIntroShardCode
+TL-B: `bind_intro_shard_code#fa110004 intro_shard_code:^cell = BindIntroShardCode`
+Signature: `BindIntroShardCode{intro_shard_code:^cell}`
+
 ### BindAirdropPool
 TL-B: `bind_airdrop_pool#fa110003 airdrop_pool_address:address = BindAirdropPool`
 Signature: `BindAirdropPool{airdrop_pool_address:address}`
@@ -114,8 +118,8 @@ TL-B: `_ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 b
 Signature: `FeeAccumulatorStateView{accumulated_ton:int257,treasury_due_ton:int257,buyback_due_ton:int257,buyback_split_enabled:bool,treasury_receiver_address:address,buyback_burn_address:address,storage_reserve_ton:int257}`
 
 ### FeeAccumulator$Data
-TL-B: `_ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 buyback_split_enabled:bool storage_reserve_ton:coins shard_code:Maybe ^cell ticket_code:Maybe ^cell airdrop_pool_address:address accrual_seq:uint64 = FeeAccumulator`
-Signature: `FeeAccumulator{treasury_receiver_address:address,buyback_burn_address:address,accumulated_ton:uint128,treasury_due_ton:uint128,buyback_due_ton:uint128,buyback_split_enabled:bool,storage_reserve_ton:coins,shard_code:Maybe ^cell,ticket_code:Maybe ^cell,airdrop_pool_address:address,accrual_seq:uint64}`
+TL-B: `_ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 buyback_split_enabled:bool storage_reserve_ton:coins shard_code:Maybe ^cell intro_shard_code:Maybe ^cell ticket_code:Maybe ^cell airdrop_pool_address:address accrual_seq:uint64 = FeeAccumulator`
+Signature: `FeeAccumulator{treasury_receiver_address:address,buyback_burn_address:address,accumulated_ton:uint128,treasury_due_ton:uint128,buyback_due_ton:uint128,buyback_split_enabled:bool,storage_reserve_ton:coins,shard_code:Maybe ^cell,intro_shard_code:Maybe ^cell,ticket_code:Maybe ^cell,airdrop_pool_address:address,accrual_seq:uint64}`
 
 ## Get methods
 Total get methods: 1

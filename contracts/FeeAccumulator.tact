@@ -95,10 +95,19 @@ const FEEACCUMULATOR_REDEEM_EXEC_RESERVE: Int = 2000000;
 // The shard's fee deposit, carrying what the pool needs and the shard alone can prove: its own identity
 // (write_pubkey, epoch — stamped from the shard's state, never from a message body) and the publisher it
 // took the value from (sender(), stamped by the VM).
+// CAUGHT 2026-07-20, before it shipped: the first version of this named the fields (write_pubkey, epoch) and
+// derived every shard with RecordShard's layout. IntroShard's init is (epoch, bucket) — DIFFERENT ARGUMENTS in
+// a DIFFERENT order — so that derivation would have compiled, typechecked, and quietly authenticated the wrong
+// address for the entire INTRO lane. Both lanes happen to take exactly two Int init args, so the honest form is
+// to carry them POSITIONALLY and let `lane` choose which bound code they belong to. Naming them write_pubkey
+// and epoch was the bug: it made a CONV-shaped assumption look like a fact.
+//   lane 0 = CONV  -> RecordShard.init(write_pubkey, epoch)
+//   lane 1 = INTRO -> IntroShard.init(epoch, bucket)
 message(0x52535046) DepositCapsuleFee {
     amount: Int as uint128;
-    write_pubkey: Int as uint256;
-    epoch: Int as uint32;
+    lane: Int as uint8;
+    init_arg0: Int as int257;
+    init_arg1: Int as int257;
     publisher: Address;
 }
 
@@ -126,6 +135,7 @@ message(0x41445210) AirdropAccrue {
 // EnableBuybackSplit already uses (15012). Each is one-shot, so nothing here can be repointed later.
 message(0xFA110001) BindShardCode { shard_code: Cell }
 message(0xFA110002) BindTicketCode { ticket_code: Cell }
+message(0xFA110004) BindIntroShardCode { intro_shard_code: Cell }
 message(0xFA110003) BindAirdropPool { airdrop_pool_address: Address }
 
 struct FeeAccumulatorStateView {
@@ -150,12 +160,14 @@ contract FeeAccumulator {
     // exactly the "accrual is off" state, and the deposit path below simply skips crediting — so a genesis
     // that never binds them yields a working fee accumulator with no airdrop, not a broken one.
     shard_code: Cell?;
+    intro_shard_code: Cell?;
     ticket_code: Cell?;
     airdrop_pool_address: Address?;
     accrual_seq: Int as uint64;
 
     init(treasury_receiver_address: Address, buyback_burn_address: Address) {
         self.shard_code = null;
+        self.intro_shard_code = null;
         self.ticket_code = null;
         self.airdrop_pool_address = null;
         self.accrual_seq = 0;
@@ -189,6 +201,12 @@ contract FeeAccumulator {
         self.shard_code = msg.shard_code;
     }
 
+    receive(msg: BindIntroShardCode) {
+        self.requireTreasury();
+        throwUnless(15057, self.intro_shard_code == null);
+        self.intro_shard_code = msg.intro_shard_code;
+    }
+
     receive(msg: BindTicketCode) {
         self.requireTreasury();
         throwUnless(15052, self.ticket_code == null);
@@ -210,12 +228,19 @@ contract FeeAccumulator {
         return contractAddressExt(0, code, data);
     }
 
-    fun shardAddress(write_pubkey: Int, epoch: Int): Address {
-        return self.deriveFromBoundCode(self.shard_code!!, beginCell()
+    // One derivation for BOTH lanes, because both shards take exactly two Int init args — the difference is
+    // only WHICH code cell they belong to, never the layout. Positional on purpose: see DepositCapsuleFee.
+    fun laneShardAddress(lane: Int, arg0: Int, arg1: Int): Address {
+        let code: Cell = lane == 0 ? self.shard_code!! : self.intro_shard_code!!;
+        return self.deriveFromBoundCode(code, beginCell()
             .storeUint(0, 1)
-            .storeInt(write_pubkey, 257)
-            .storeInt(epoch, 257)
+            .storeInt(arg0, 257)
+            .storeInt(arg1, 257)
             .endCell());
+    }
+
+    fun laneCodeBound(lane: Int): Bool {
+        return lane == 0 ? self.shard_code != null : self.intro_shard_code != null;
     }
 
     fun ticketAddress(owner: Address): Address {
@@ -229,7 +254,9 @@ contract FeeAccumulator {
     // airdrop, so an open door here would mint 10 ATH per call to anyone. 15055 is what closes it.
     receive(msg: DepositCapsuleFee) {
         throwUnless(15054, msg.amount > 0);
-        throwUnless(15055, self.shard_code != null && sender() == self.shardAddress(msg.write_pubkey, msg.epoch));
+        throwUnless(15058, msg.lane == 0 || msg.lane == 1);
+        throwUnless(15055, self.laneCodeBound(msg.lane)
+            && sender() == self.laneShardAddress(msg.lane, msg.init_arg0, msg.init_arg1));
         throwUnless(15056, context().value >= msg.amount + FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE);
 
         // The fee is accounted exactly as a plain deposit — the airdrop changes who gets credited, never how
