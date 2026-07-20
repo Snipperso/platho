@@ -970,12 +970,21 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const { blockchain, vault, user, userAthWallet, officialVaultAthWallet } = await setup();
 
     await depositAth({ vault, user, userAthWallet, amount: 1_000n, queryId: 42n });
-    // KEPT FAILING (unrelated to the name_records migration — see the note on ATH_TRANSFER_NOTIFY_MIN_VALUE above).
-    // The replayed query_id is no longer refused at the ATHWallet: the wallet's `processed_notifications` replay
-    // tombstone was deleted in clean-17, so the duplicate now travels all the way to the Vault, which dedupes on
-    // its own ledger (ath_balance stays 1_000) but answers with an ACK — so the 700 units are DEBITED from the
-    // source wallet and parked on the official wallet with nobody credited. That is precisely the loss this test
-    // is named for. Measured: source 3_300 (not 4_000), official 1_700 (not 1_000).
+    // KEPT FAILING DELIBERATELY. It is a REAL loss, it is on the VAULT lane only, and the resolution is to remove
+    // Vault rather than to patch it — so this stays red as the evidence for that, and must not be relaxed.
+    //
+    // What happens, measured: source 3_300 (not 4_000), official 1_700 (not 1_000), vault credits 1_000. The
+    // clean-17 deletion of ATHWallet's `processed_notifications` tombstone means a replayed query_id is no longer
+    // refused at the wallet, so the duplicate reaches the consumer. ATHWallet's own note argues that is safe
+    // because "a resend is paid for by a SECOND debit, so it is a second genuine purchase" — true wherever the
+    // consumer's semantic key REFUSES and refunds (UsernameRegistry via the item's 18011 + bounce; ProfileRegistry
+    // via 21115), and FALSE here: the Vault dedupes on its own ledger and replies ACK, so the second debit buys
+    // nothing and the ATH is stranded on the official wallet, credited to no one. ATHWallet.tact now records that
+    // narrowing next to the deletion.
+    //
+    // Vault is cancelled in clean-17 but the deploy scripts still ship it (one of the two "cancelled but still
+    // deployed" mines in the ceiling sweep). This failure is one more reason that removal is real work and not
+    // bookkeeping. Any FUTURE consumer of ATHTransferNotification must refund a duplicate, never ACK it.
     await depositAth({ vault, user, userAthWallet, amount: 700n, queryId: 42n });
 
     const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));

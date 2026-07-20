@@ -343,11 +343,26 @@ contract ATHWallet {
     //      closed by 14315/14565/14665, which are untouched.
     // Replay safety now lives on the SEMANTIC key at the consumer, which is both stronger and the pattern this
     // contract already uses: the TEP-74 lane below (`JettonInternalTransfer`) has never written a tombstone, and
-    // says so explicitly. UsernameRegistry rejects a repeat by name_hash (19172/19173); ProfileRegistry rejects a
-    // repeat of the current avatar pointer at 21115, added in the same change because it had no guard at all.
+    // says so explicitly.
+    //   * UsernameRegistry rejects a repeat by name_hash. [UPDATED 2026-07-20 — this used to name gates
+    //     19172/19173, and 19172 no longer exists: the registry's name_records map was deleted (it was that
+    //     contract's ~21,500-name ceiling, the same disease as this tombstone). The property is unchanged and the
+    //     refusal simply moved to the contract that always owned it — the per-name UsernameNFTItem refuses
+    //     re-initialisation at its own gate 18011, the message bounces, and the buyer's ATH is refunded. 19173
+    //     still guards an in-flight duplicate.]
+    //   * ProfileRegistry rejects a repeat of the current avatar pointer at 21115, added in the same change
+    //     because it had no guard at all.
     //
-    // Residual, stated plainly: a resend with the same query_id now reaches the registry. It is paid for by a
-    // SECOND debit, so it is a second genuine purchase, not minted value.
+    // Residual, and it is NARROWER than this note first claimed. "A resend with the same query_id is paid for by
+    // a SECOND debit, so it is a second genuine purchase" holds only where the consumer's semantic key produces a
+    // REFUSAL — which is the registry lanes above, both of which refund. It does NOT hold for a consumer that
+    // dedupes silently and answers ACK: there the second debit buys nothing and the ATH is stranded on the
+    // recipient's official wallet, credited to no one.
+    // MEASURED (tests/vault-ath-integration.test.ts VAULT-ATH-04): a replayed deposit query_id leaves the payer
+    // 700 units short, parks them on the official wallet, and the Vault credits 1,000 — because the Vault dedupes
+    // on its own ledger and replies ACK instead of refunding. That is a real loss on the VAULT lane, and it is one
+    // more reason Vault must actually leave the clean-17 deploy set rather than merely be called cancelled while
+    // the scripts still deploy it. Any future consumer of this notification must REFUND a duplicate, not ACK it.
     pending_notifications: map<Int, PendingAthTransferNotification>;
     pending_outgoing_transfers: map<Int, PendingAthOutgoingTransfer>;
 
