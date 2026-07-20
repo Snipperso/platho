@@ -32,9 +32,12 @@ const cell = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCell
 const CLOCK = 1_790_000_000;
 
 const PROTOCOL_FEE = 10_000_000n;
-const RS_MIN_VALUE = 13_400_000n;        // 300_000 + 2_500_000 + 10_000_000 + 600_000
-const RS_DEPLOY_MIN_VALUE = 16_900_000n; // + RS_BASE_ENDOWMENT 3_500_000, charged on the FIRST publish only
-const IS_MIN_VALUE = 13_110_000n;        //    10_000 + 2_500_000 + 10_000_000 + 600_000
+// Fee transport rose 600_000 -> 1_600_000 (deposit reserve 400_000 -> 1_400_000) when the deposit began
+// carrying an airdrop credit: FeeAccumulator gate 15056 demands amount + 1_200_000. The 10_000_000 protocol
+// fee is unchanged and still reaches the pool whole — only the publisher's transport grew.
+const RS_MIN_VALUE = 14_400_000n;        // 300_000 + 2_500_000 + 10_000_000 + 1_600_000
+const RS_DEPLOY_MIN_VALUE = 17_900_000n; // + RS_BASE_ENDOWMENT 3_500_000, charged on the FIRST publish only
+const IS_MIN_VALUE = 14_110_000n;        //    10_000 + 2_500_000 + 10_000_000 + 1_600_000
 
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
 const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');
