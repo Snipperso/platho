@@ -3,6 +3,7 @@ import { Address, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import { ATHWallet, ATHTransferRequest } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { AirdropPool } from '../build/AirdropPool/AirdropPool_AirdropPool';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // WHAT ONE 10-ATH AIRDROP PAYOUT ACTUALLY COSTS.
@@ -112,5 +113,94 @@ describe('AIRDROP DELIVERY COST — what paying one user 10 ATH really costs', (
     // The claim under test: the 48M constant sum is NOT the cost. If this ever fails, the allowances stopped
     // being returned and the airdrop economics need re-deriving from scratch.
     expect(warm.burned, 'real burn must be far below the 48M attach requirement').toBeLessThan(10_000_000n);
+  }, 600_000);
+
+  it('AIRCOST-02: the FULL path through AirdropPool — and what the pool keeps forever', async () => {
+    // AIRCOST-01 measured only the ATHWallet leg and treated value parked in the recipient's own wallet as
+    // not-a-cost. Both were too kind. This measures the path a publish would really trigger — caller ->
+    // AirdropPool -> pool's ATHWallet -> recipient — and separates the money by WHERE IT ENDS UP, because the
+    // categories have completely different meanings:
+    //   * burned            — gone, nobody's
+    //   * kept by the pool  — GONE TOO. AirdropSweepResidualToTreasury moves `remaining_budget`, which is ATH.
+    //                         There is no TON exit from AirdropPool at all, so every nanoton the caller
+    //                         over-attaches is immured for the life of the contract.
+    //   * in the recipient's own ATHWallet — the user's money, funding their own wallet's rent, not a loss
+    // The decisive question for the wiring is whether this cost is per-CAPSULE or per-DELIVERY, so the same
+    // measurement runs at credits_k = 1 and credits_k = 1000.
+    const MANIFEST = 0x41495244524f505f504f4f4c5f4d414e49464553545f483031000000000001n;
+    const TOTAL_POOL = 15_000_000_000_000_000n;
+
+    async function measureThroughPool(creditsK: bigint) {
+      const bc = await Blockchain.create();
+      bc.now = 1_790_000_000;
+      const deployer = await bc.treasury('aircost-pool-deployer');
+      const distributor = await bc.treasury('aircost-distributor');
+      const treasury = await bc.treasury('aircost-treasury');
+      const user = await bc.treasury('aircost-recipient');
+      const athMaster = fixtureAddress('POOL_MASTER');
+
+      const pool = bc.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false));
+      await pool.send(deployer.getSender(), { value: toNano('1') }, null);
+
+      // The pool's OWN ATHWallet, real, holding the whole budget — the leg that actually moves ATH.
+      const poolWallet = await deployWallet(bc, pool.address, athMaster, TOTAL_POOL, '1');
+      const dep = (body: any, v = '0.05') => pool.send(deployer.getSender(), { value: toNano(v) }, body);
+      await dep({ $$type: 'AirdropBindAthMaster', ath_master_address: athMaster, pool_ath_wallet_address: poolWallet.address });
+      await dep({ $$type: 'AirdropBindCreditIssuer', credit_issuer_address: distributor.address });
+      await dep({ $$type: 'AirdropBindTreasury', treasury_address: treasury.address });
+      await pool.send(bc.sender(poolWallet.address), { value: toNano('0.1') }, {
+        $$type: 'AthTransferNotification', query_id: 1n, sender_key: 0n, amount: TOTAL_POOL, sender_wallet: treasury.address,
+      } as any);
+      await dep({ $$type: 'AirdropSealGenesis', deployment_manifest_hash: MANIFEST }, '0.1');
+
+      const recipientWalletAddress = contractAddress(0, await ATHWallet.init(0n, user.address, athMaster));
+      const poolBefore = await balanceOf(bc, pool.address);
+      const callerBefore = await balanceOf(bc, distributor.address);
+
+      const result = await pool.send(distributor.getSender(), { value: 60_000_000n }, {
+        $$type: 'AirdropAccrue', purchase_id: 1n, buyer: user.address, credits_k: creditsK,
+      } as any);
+
+      const burned = result.transactions.reduce((s, tx) => s + tx.totalFees.coins, 0n);
+      const delivered = (await bc.openContract(new ATHWallet(recipientWalletAddress)).getGetWalletData()).balance;
+      return {
+        creditsK,
+        callerPaid: callerBefore - (await balanceOf(bc, distributor.address)),
+        poolKept: (await balanceOf(bc, pool.address)) - poolBefore,
+        recipientHolds: await balanceOf(bc, recipientWalletAddress),
+        burned,
+        delivered,
+      };
+    }
+
+    const one = await measureThroughPool(1n);
+    const many = await measureThroughPool(1000n);
+
+    const gram = (n: bigint) => (Number(n) / 1e9).toFixed(6);
+    const row = (r: any) => [
+      `  credits_k=${String(r.creditsK).padStart(4)}`,
+      `caller paid ${r.callerPaid.toString().padStart(11)} (${gram(r.callerPaid)})`,
+      `burned ${r.burned.toString().padStart(9)}`,
+      `pool KEEPS ${r.poolKept.toString().padStart(10)}`,
+      `recipient wallet ${r.recipientHolds.toString().padStart(10)}`,
+      `ATH delivered ${r.delivered}`,
+    ].join('  ');
+
+    // eslint-disable-next-line no-console
+    console.log([
+      '[AIRCOST-02] one delivery through AirdropPool',
+      row(one),
+      row(many),
+      '',
+      `  cost is per-DELIVERY, not per-credit: caller pays the same for 1 and for 1000 -> ${one.callerPaid === many.callerPaid}`,
+      `  unrecoverable per delivery (burn + pool retention): ${one.burned + one.poolKept} = ${gram(one.burned + one.poolKept)} GRAM`,
+      `  against the 10,000,000 fee one capsule collects: ${(Number(one.burned + one.poolKept) / 1e7).toFixed(2)}x`,
+    ].join('\n'));
+
+    expect(one.delivered, '1 credit delivers 10 ATH').toBe(AIRDROP_ATH_PER_CREDIT);
+    expect(many.delivered, '1000 credits deliver 10000 ATH in ONE message').toBe(AIRDROP_ATH_PER_CREDIT * 1000n);
+    // THE FINDING THE WIRING TURNS ON. If this ever becomes false, batching stops being the answer.
+    expect(many.callerPaid, 'delivering 1000 credits costs the caller exactly what delivering 1 costs').toBe(one.callerPaid);
+    expect(one.poolKept, 'the pool really does keep TON it can never release').toBeGreaterThan(0n);
   }, 600_000);
 });
