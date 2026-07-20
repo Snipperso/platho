@@ -28,6 +28,7 @@ const INTRO = read('contracts/IntroShard.tact');
 const RECOVERY = read('contracts/RecoveryShard.tact');
 const MSS = read('contracts/MarketStabilitySeller.tact');
 const ATH_WALLET = read('contracts/ATHWallet.tact');
+const BUYBACK = read('contracts/BuybackBurn.tact');
 const OPEN_VALUES = read('artifacts/platho_v1_open_values_v0_6.md');
 const SPEC = read('artifacts/PLATHO_CLEAN17_SHARDED_SPEC.md');
 const ROADMAP = read('artifacts/PLATHO_CLEAN17_MASTER_ROADMAP.md');
@@ -90,6 +91,23 @@ describe('CONST-SOURCE — the docs may not contradict the contracts', () => {
       const quoted = OPEN_VALUES.match(new RegExp(`^${name} = [\\d.]+ TON = ([\\d_]+) nanotons`, 'm'));
       expect(quoted, `open_values must state ${name}`).not.toBeNull();
       expect(Number(quoted![1].replace(/_/g, '')), `open_values must quote the CURRENT ${name}`).toBe(value);
+    }
+  });
+
+  it('CONST-SOURCE-01C: every forward_ton_amount the protocol itself sends clears ATHWallet\'s floor', () => {
+    // A CAUGHT NEAR-MISS, 2026-07-20. ATH_TRANSFER_NOTIFY_MIN_VALUE was raised 30M -> 45M so a refused registry
+    // purchase could still refund. BuybackBurn's two route constants are forward_ton_amount values on TEP-74
+    // transfers that land on an ATHWallet, where gates 14703/14713 demand exactly that floor — and the raise put
+    // both of them UNDER it, which would have refused every STON.fi swap output and broken the buyback burn on
+    // protocol revenue. The raise had been verified against the ath-*, profile and registry suites; this
+    // consequence lived two contracts away and was missed by reasoning about it.
+    //
+    // These are therefore NOT independent numbers. Anything the protocol forwards to an ATH wallet is derived
+    // from that floor, and this test is what makes the dependency fail loudly instead of silently.
+    const floor = constOf(ATH_WALLET, 'ATH_TRANSFER_NOTIFY_MIN_VALUE');
+    for (const name of ['BUYBACK_ROUTE_NOTIFY_MIN_VALUE', 'BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS_NANOTONS']) {
+      expect(constOf(BUYBACK, name), `${name} must clear ATHWallet's forward floor (${floor})`)
+        .toBeGreaterThanOrEqual(floor);
     }
   });
 

@@ -638,7 +638,7 @@ PROGRAM{
         STVARUINT16
     33 s() PUSH
         STSLICER
-    40000000 PUSHINT
+    55000000 PUSHINT
         STVARUINT16
     s1 38 s() XCHG
         1 STI
@@ -2296,7 +2296,7 @@ PROGRAM{
       THROWANYIFNOT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      35000000 PUSHINT
+      50000000 PUSHINT
       LESS
       IFJMP:<{
         35 s() POP
@@ -2418,7 +2418,7 @@ PROGRAM{
       s1 s3 XCHG
       s4 s4 s0 XCHG3
       s1 38 s() XCHG
-      35000000 PUSHINT
+      50000000 PUSHINT
       $BuybackBurn$_fun_creditRouteNotifySurplus INLINECALLDICT
       35 s() 37 s() XCHG
       34 s() 36 s() XCHG

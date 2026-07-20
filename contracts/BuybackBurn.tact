@@ -13,8 +13,18 @@ const BUYBACK_PTON_TRANSFER_GAS_NANOTONS: Int = 50000000;
 const BUYBACK_FUNDING_ENVELOPE_NANOTONS: Int = 51050000000;
 const BUYBACK_ATH_NOTIFY_ACK_VALUE: Int = 1000000;
 const BUYBACK_ATH_BURN_REQUEST_VALUE: Int = 30000000;
-const BUYBACK_ROUTE_NOTIFY_MIN_VALUE: Int = 35000000;
-const BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS_NANOTONS: Int = 40000000;
+// [RAISED 2026-07-20, 35M/40M -> 50M/55M] BOTH of these are forward_ton_amount values on a TEP-74 transfer that
+// lands on an ATHWallet, and ATHWallet gates that at 14703/14713:
+//     forward_ton_amount == 0 || forward_ton_amount >= ATH_TRANSFER_NOTIFY_MIN_VALUE
+// That floor was raised 30M -> 45M so a refused registry purchase could still refund (see ATHWallet.tact), which
+// silently put both of these UNDER it — a STON.fi swap output routed to BuybackBurn would have been refused
+// outright, breaking the buyback burn on protocol revenue. Caught by buybackburn-production, not by reasoning:
+// the raise was verified against the ath-*, profile and registry suites and this consequence was missed.
+//
+// So these are not independent numbers. They are ATH_TRANSFER_NOTIFY_MIN_VALUE plus headroom, and if that floor
+// ever moves again these MUST move with it — pinned by BUYBACK-NOTIFY-FLOOR in the production suite.
+const BUYBACK_ROUTE_NOTIFY_MIN_VALUE: Int = 50000000;
+const BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS_NANOTONS: Int = 55000000;
 const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_ROUTE_REFUND_EXEC_RESERVE: Int = 2000000;
