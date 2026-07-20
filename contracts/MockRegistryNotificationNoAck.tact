@@ -1,7 +1,7 @@
-// Test-only registry sink that accepts Vault-funded ATH notifications without ACKing.
+// Test-only registry sink that accepts registry-funded ATH notifications without ACKing.
 // Not part of Platho v1 production contracts.
 
-message(0xA11A7002) AthTransferNotificationVaultProfileAvatar {
+message(0xA11A7002) AthTransferNotificationRegistryProfileAvatar {
     query_id: Int as uint64;
     sender_key: Int as uint160;
     amount: Int as uint128;
@@ -14,7 +14,7 @@ message(0xA11A7002) AthTransferNotificationVaultProfileAvatar {
     media_format: Int as uint8;
 }
 
-message(0x89129D60) AthTransferNotificationVaultMintUsername {
+message(0x89129D60) AthTransferNotificationRegistryMintUsername {
     query_id: Int as uint64;
     sender_key: Int as uint160;
     amount: Int as uint128;
@@ -41,12 +41,12 @@ contract MockRegistryNotificationNoAck {
         self.last_query_id = 0;
     }
 
-    receive(msg: AthTransferNotificationVaultProfileAvatar) {
+    receive(msg: AthTransferNotificationRegistryProfileAvatar) {
         self.profile_count += 1;
         self.last_query_id = msg.query_id;
     }
 
-    receive(msg: AthTransferNotificationVaultMintUsername) {
+    receive(msg: AthTransferNotificationRegistryMintUsername) {
         self.username_count += 1;
         self.last_query_id = msg.query_id;
     }

@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
-import { ATHWallet, storeATHTransferRequestVaultMintUsername } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHWallet, storeATHTransferRequestRegistryMintUsername } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const OP_ATH_TRANSFER_NOTIFICATION_VAULT_MINT_USERNAME = 0x89129D60n;
@@ -44,8 +44,8 @@ function mintPayload(payer: Address, owner: Address, name: string, amount: bigin
 }
 
 function mintRequestPayload(vault: Address, owner: Address, registryAddress: Address, name: string, amount: bigint, queryId = 1n) {
-  return beginCell().store(storeATHTransferRequestVaultMintUsername({
-    $$type: 'ATHTransferRequestVaultMintUsername',
+  return beginCell().store(storeATHTransferRequestRegistryMintUsername({
+    $$type: 'ATHTransferRequestRegistryMintUsername',
     query_id: queryId,
     amount,
     recipient: registryAddress,

@@ -6,7 +6,7 @@ import {
   UsernameRegistry,
   BindOfficialAthWallet,
   SealGenesis,
-  AthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
   FlushTreasuryAthDue,
   FlushBurnAthDue,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -178,7 +178,7 @@ async function deployRegistryWithAthSystem(officialWalletBalance: bigint) {
 
 async function sendMint(registry: any, officialSender: any, ownerWallet: Address, name: string, amount: bigint, value: bigint, payerWallet: Address) {
   await registry.send(officialSender.getSender(), { value }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 77n,
     amount,
     sender_key: 0n,
@@ -186,12 +186,12 @@ async function sendMint(registry: any, officialSender: any, ownerWallet: Address
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
 }
 
 async function sendMintFromAddress(blockchain: Blockchain, registry: any, officialAddress: Address, ownerWallet: Address, name: string, amount: bigint, payerWallet: Address, value = toNano('1.2')) {
   await registry.send(blockchain.sender(officialAddress), { value }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 88n,
     amount,
     sender_key: 0n,
@@ -199,7 +199,7 @@ async function sendMintFromAddress(blockchain: Blockchain, registry: any, offici
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
 }
 
 describe('UsernameRegistry value/storage boundary negative matrix', () => {

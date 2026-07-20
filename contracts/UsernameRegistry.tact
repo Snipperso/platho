@@ -550,7 +550,7 @@ contract UsernameRegistry {
     // mint an UNOWNED name (to the client-supplied owner_wallet) — owned-name theft stays impossible (acceptUsernameMint
     // rejects a taken/pending name; the NFT item is one-shot + transfer owner-only). Because nothing references a Vault,
     // the registry is Vault-INDEPENDENT and survives every future Vault redeploy → frozen once, reused forever.
-    receive(msg: AthTransferNotificationVaultMintUsername) {
+    receive(msg: AthTransferNotificationRegistryMintUsername) {
         self.requireSealed();
         throwUnless(19180, sender() == self.official_ath_wallet_address);
         throwUnless(19183, self.isBasechainAddress(msg.payer_wallet));

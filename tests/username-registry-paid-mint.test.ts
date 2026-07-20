@@ -7,8 +7,8 @@ import {
   UsernameRegistry,
   BindOfficialAthWallet,
   SealGenesis,
-  AthTransferNotificationVaultMintUsername,
-  storeAthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
+  storeAthTransferNotificationRegistryMintUsername,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
   NftTransfer,
@@ -112,7 +112,7 @@ async function sendMint(
   payerWallet = fixtureAddress('USERNAME_REGISTRY_VAULT'),
 ) {
   return registry.send(officialAthWallet.getSender(), { value }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 1n,
     amount,
     sender_key: 0n,
@@ -120,12 +120,12 @@ async function sendMint(
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
 }
 
 function vaultMintNotificationBody(ownerWallet: Address, name: string, amount: bigint, payerWallet = fixtureAddress('USERNAME_REGISTRY_VAULT')) {
-  return beginCell().store(storeAthTransferNotificationVaultMintUsername({
-    $$type: 'AthTransferNotificationVaultMintUsername',
+  return beginCell().store(storeAthTransferNotificationRegistryMintUsername({
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 1n,
     amount,
     sender_key: 0n,
@@ -565,7 +565,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const ownerWallet = fixtureAddress('USERNAME_M10_SPOOF_OWNER');
 
     await registry.send(attacker.getSender(), { value: toNano('0.1') }, {
-      $$type: 'AthTransferNotificationVaultMintUsername',
+      $$type: 'AthTransferNotificationRegistryMintUsername',
       query_id: 1n,
       amount: PRICE_6_PLUS,
       sender_key: 0n,
@@ -573,7 +573,7 @@ describe('UsernameRegistry paid mint milestone', () => {
       owner_wallet: ownerWallet,
       username_len: 6n,
       username: usernameSlice('platho'),
-    } as AthTransferNotificationVaultMintUsername);
+    } as AthTransferNotificationRegistryMintUsername);
 
     const global = await registry.getGetGlobal();
     expect(global.name_record_count).toBe(0n);

@@ -6,7 +6,7 @@ import {
   UsernameRegistry,
   BindOfficialAthWallet,
   SealGenesis,
-  AthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
   FlushTreasuryAthDue,
   FlushBurnAthDue,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -106,7 +106,7 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
 async function mintValidName(blockchain: Blockchain, registry: any, officialAthWalletAddress: Address, ownerWallet: Address, name: string, payerWallet: Address) {
   // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M), so the mint notification must carry >= that.
   await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('1.2') }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 7001n,
     amount: PRICE_6_PLUS,
     sender_key: 0n,
@@ -114,7 +114,7 @@ async function mintValidName(blockchain: Blockchain, registry: any, officialAthW
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
 }
 
 describe('UsernameRegistry treasury/burn due flush milestone', () => {

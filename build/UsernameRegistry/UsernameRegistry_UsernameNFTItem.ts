@@ -1955,8 +1955,8 @@ export function dictValueParserPruneStaleNotification(): DictionaryValue<PruneSt
     }
 }
 
-export type AthTransferNotificationVaultMintUsername = {
-    $$type: 'AthTransferNotificationVaultMintUsername';
+export type AthTransferNotificationRegistryMintUsername = {
+    $$type: 'AthTransferNotificationRegistryMintUsername';
     query_id: bigint;
     sender_key: bigint;
     amount: bigint;
@@ -1966,7 +1966,7 @@ export type AthTransferNotificationVaultMintUsername = {
     username: Slice;
 }
 
-export function storeAthTransferNotificationVaultMintUsername(src: AthTransferNotificationVaultMintUsername) {
+export function storeAthTransferNotificationRegistryMintUsername(src: AthTransferNotificationRegistryMintUsername) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(2299698528, 32);
@@ -1980,7 +1980,7 @@ export function storeAthTransferNotificationVaultMintUsername(src: AthTransferNo
     };
 }
 
-export function loadAthTransferNotificationVaultMintUsername(slice: Slice) {
+export function loadAthTransferNotificationRegistryMintUsername(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2299698528) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
@@ -1990,10 +1990,10 @@ export function loadAthTransferNotificationVaultMintUsername(slice: Slice) {
     const _owner_wallet = sc_0.loadAddress();
     const _username_len = sc_0.loadUintBig(8);
     const _username = sc_0;
-    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function loadTupleAthTransferNotificationVaultMintUsername(source: TupleReader) {
+export function loadTupleAthTransferNotificationRegistryMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _sender_key = source.readBigNumber();
     const _amount = source.readBigNumber();
@@ -2001,10 +2001,10 @@ export function loadTupleAthTransferNotificationVaultMintUsername(source: TupleR
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function loadGetterTupleAthTransferNotificationVaultMintUsername(source: TupleReader) {
+export function loadGetterTupleAthTransferNotificationRegistryMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _sender_key = source.readBigNumber();
     const _amount = source.readBigNumber();
@@ -2012,10 +2012,10 @@ export function loadGetterTupleAthTransferNotificationVaultMintUsername(source: 
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function storeTupleAthTransferNotificationVaultMintUsername(source: AthTransferNotificationVaultMintUsername) {
+export function storeTupleAthTransferNotificationRegistryMintUsername(source: AthTransferNotificationRegistryMintUsername) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
     builder.writeNumber(source.sender_key);
@@ -2027,19 +2027,19 @@ export function storeTupleAthTransferNotificationVaultMintUsername(source: AthTr
     return builder.build();
 }
 
-export function dictValueParserAthTransferNotificationVaultMintUsername(): DictionaryValue<AthTransferNotificationVaultMintUsername> {
+export function dictValueParserAthTransferNotificationRegistryMintUsername(): DictionaryValue<AthTransferNotificationRegistryMintUsername> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeAthTransferNotificationVaultMintUsername(src)).endCell());
+            builder.storeRef(beginCell().store(storeAthTransferNotificationRegistryMintUsername(src)).endCell());
         },
         parse: (src) => {
-            return loadAthTransferNotificationVaultMintUsername(src.loadRef().beginParse());
+            return loadAthTransferNotificationRegistryMintUsername(src.loadRef().beginParse());
         }
     }
 }
 
-export type AthTransferNotificationVaultProfileAvatar = {
-    $$type: 'AthTransferNotificationVaultProfileAvatar';
+export type AthTransferNotificationRegistryProfileAvatar = {
+    $$type: 'AthTransferNotificationRegistryProfileAvatar';
     query_id: bigint;
     sender_key: bigint;
     amount: bigint;
@@ -2052,7 +2052,7 @@ export type AthTransferNotificationVaultProfileAvatar = {
     media_format: bigint;
 }
 
-export function storeAthTransferNotificationVaultProfileAvatar(src: AthTransferNotificationVaultProfileAvatar) {
+export function storeAthTransferNotificationRegistryProfileAvatar(src: AthTransferNotificationRegistryProfileAvatar) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(2702864386, 32);
@@ -2071,7 +2071,7 @@ export function storeAthTransferNotificationVaultProfileAvatar(src: AthTransferN
     };
 }
 
-export function loadAthTransferNotificationVaultProfileAvatar(slice: Slice) {
+export function loadAthTransferNotificationRegistryProfileAvatar(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2702864386) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
@@ -2085,10 +2085,10 @@ export function loadAthTransferNotificationVaultProfileAvatar(slice: Slice) {
     const _avatar_stream_id = sc_1.loadUintBig(128);
     const _avatar_part_count = sc_1.loadUintBig(16);
     const _media_format = sc_1.loadUintBig(8);
-    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'AthTransferNotificationRegistryProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function loadTupleAthTransferNotificationVaultProfileAvatar(source: TupleReader) {
+export function loadTupleAthTransferNotificationRegistryProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _sender_key = source.readBigNumber();
     const _amount = source.readBigNumber();
@@ -2099,10 +2099,10 @@ export function loadTupleAthTransferNotificationVaultProfileAvatar(source: Tuple
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'AthTransferNotificationRegistryProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function loadGetterTupleAthTransferNotificationVaultProfileAvatar(source: TupleReader) {
+export function loadGetterTupleAthTransferNotificationRegistryProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _sender_key = source.readBigNumber();
     const _amount = source.readBigNumber();
@@ -2113,10 +2113,10 @@ export function loadGetterTupleAthTransferNotificationVaultProfileAvatar(source:
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'AthTransferNotificationRegistryProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function storeTupleAthTransferNotificationVaultProfileAvatar(source: AthTransferNotificationVaultProfileAvatar) {
+export function storeTupleAthTransferNotificationRegistryProfileAvatar(source: AthTransferNotificationRegistryProfileAvatar) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
     builder.writeNumber(source.sender_key);
@@ -2131,13 +2131,13 @@ export function storeTupleAthTransferNotificationVaultProfileAvatar(source: AthT
     return builder.build();
 }
 
-export function dictValueParserAthTransferNotificationVaultProfileAvatar(): DictionaryValue<AthTransferNotificationVaultProfileAvatar> {
+export function dictValueParserAthTransferNotificationRegistryProfileAvatar(): DictionaryValue<AthTransferNotificationRegistryProfileAvatar> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeAthTransferNotificationVaultProfileAvatar(src)).endCell());
+            builder.storeRef(beginCell().store(storeAthTransferNotificationRegistryProfileAvatar(src)).endCell());
         },
         parse: (src) => {
-            return loadAthTransferNotificationVaultProfileAvatar(src.loadRef().beginParse());
+            return loadAthTransferNotificationRegistryProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
@@ -2287,8 +2287,8 @@ export function dictValueParserATHTransferRequestWithNotify(): DictionaryValue<A
     }
 }
 
-export type ATHTransferRequestVaultProfileAvatar = {
-    $$type: 'ATHTransferRequestVaultProfileAvatar';
+export type ATHTransferRequestRegistryProfileAvatar = {
+    $$type: 'ATHTransferRequestRegistryProfileAvatar';
     query_id: bigint;
     amount: bigint;
     recipient: Address;
@@ -2302,7 +2302,7 @@ export type ATHTransferRequestVaultProfileAvatar = {
     media_format: bigint;
 }
 
-export function storeATHTransferRequestVaultProfileAvatar(src: ATHTransferRequestVaultProfileAvatar) {
+export function storeATHTransferRequestRegistryProfileAvatar(src: ATHTransferRequestRegistryProfileAvatar) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(1096042522, 32);
@@ -2322,7 +2322,7 @@ export function storeATHTransferRequestVaultProfileAvatar(src: ATHTransferReques
     };
 }
 
-export function loadATHTransferRequestVaultProfileAvatar(slice: Slice) {
+export function loadATHTransferRequestRegistryProfileAvatar(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1096042522) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
@@ -2337,10 +2337,10 @@ export function loadATHTransferRequestVaultProfileAvatar(slice: Slice) {
     const _avatar_stream_id = sc_1.loadUintBig(128);
     const _avatar_part_count = sc_1.loadUintBig(16);
     const _media_format = sc_1.loadUintBig(8);
-    return { $$type: 'ATHTransferRequestVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'ATHTransferRequestRegistryProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function loadTupleATHTransferRequestVaultProfileAvatar(source: TupleReader) {
+export function loadTupleATHTransferRequestRegistryProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _recipient = source.readAddress();
@@ -2352,10 +2352,10 @@ export function loadTupleATHTransferRequestVaultProfileAvatar(source: TupleReade
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'ATHTransferRequestVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'ATHTransferRequestRegistryProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function loadGetterTupleATHTransferRequestVaultProfileAvatar(source: TupleReader) {
+export function loadGetterTupleATHTransferRequestRegistryProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _recipient = source.readAddress();
@@ -2367,10 +2367,10 @@ export function loadGetterTupleATHTransferRequestVaultProfileAvatar(source: Tupl
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'ATHTransferRequestVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'ATHTransferRequestRegistryProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function storeTupleATHTransferRequestVaultProfileAvatar(source: ATHTransferRequestVaultProfileAvatar) {
+export function storeTupleATHTransferRequestRegistryProfileAvatar(source: ATHTransferRequestRegistryProfileAvatar) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
     builder.writeNumber(source.amount);
@@ -2386,19 +2386,19 @@ export function storeTupleATHTransferRequestVaultProfileAvatar(source: ATHTransf
     return builder.build();
 }
 
-export function dictValueParserATHTransferRequestVaultProfileAvatar(): DictionaryValue<ATHTransferRequestVaultProfileAvatar> {
+export function dictValueParserATHTransferRequestRegistryProfileAvatar(): DictionaryValue<ATHTransferRequestRegistryProfileAvatar> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeATHTransferRequestVaultProfileAvatar(src)).endCell());
+            builder.storeRef(beginCell().store(storeATHTransferRequestRegistryProfileAvatar(src)).endCell());
         },
         parse: (src) => {
-            return loadATHTransferRequestVaultProfileAvatar(src.loadRef().beginParse());
+            return loadATHTransferRequestRegistryProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
 
-export type ATHTransferRequestVaultMintUsername = {
-    $$type: 'ATHTransferRequestVaultMintUsername';
+export type ATHTransferRequestRegistryMintUsername = {
+    $$type: 'ATHTransferRequestRegistryMintUsername';
     query_id: bigint;
     amount: bigint;
     recipient: Address;
@@ -2409,7 +2409,7 @@ export type ATHTransferRequestVaultMintUsername = {
     username: Slice;
 }
 
-export function storeATHTransferRequestVaultMintUsername(src: ATHTransferRequestVaultMintUsername) {
+export function storeATHTransferRequestRegistryMintUsername(src: ATHTransferRequestRegistryMintUsername) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(1096042524, 32);
@@ -2426,7 +2426,7 @@ export function storeATHTransferRequestVaultMintUsername(src: ATHTransferRequest
     };
 }
 
-export function loadATHTransferRequestVaultMintUsername(slice: Slice) {
+export function loadATHTransferRequestRegistryMintUsername(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1096042524) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
@@ -2438,10 +2438,10 @@ export function loadATHTransferRequestVaultMintUsername(slice: Slice) {
     const _owner_wallet = sc_1.loadAddress();
     const _username_len = sc_1.loadUintBig(8);
     const _username = sc_1;
-    return { $$type: 'ATHTransferRequestVaultMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'ATHTransferRequestRegistryMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function loadTupleATHTransferRequestVaultMintUsername(source: TupleReader) {
+export function loadTupleATHTransferRequestRegistryMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _recipient = source.readAddress();
@@ -2450,10 +2450,10 @@ export function loadTupleATHTransferRequestVaultMintUsername(source: TupleReader
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'ATHTransferRequestVaultMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'ATHTransferRequestRegistryMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function loadGetterTupleATHTransferRequestVaultMintUsername(source: TupleReader) {
+export function loadGetterTupleATHTransferRequestRegistryMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _recipient = source.readAddress();
@@ -2462,10 +2462,10 @@ export function loadGetterTupleATHTransferRequestVaultMintUsername(source: Tuple
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'ATHTransferRequestVaultMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'ATHTransferRequestRegistryMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function storeTupleATHTransferRequestVaultMintUsername(source: ATHTransferRequestVaultMintUsername) {
+export function storeTupleATHTransferRequestRegistryMintUsername(source: ATHTransferRequestRegistryMintUsername) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
     builder.writeNumber(source.amount);
@@ -2478,13 +2478,13 @@ export function storeTupleATHTransferRequestVaultMintUsername(source: ATHTransfe
     return builder.build();
 }
 
-export function dictValueParserATHTransferRequestVaultMintUsername(): DictionaryValue<ATHTransferRequestVaultMintUsername> {
+export function dictValueParserATHTransferRequestRegistryMintUsername(): DictionaryValue<ATHTransferRequestRegistryMintUsername> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeATHTransferRequestVaultMintUsername(src)).endCell());
+            builder.storeRef(beginCell().store(storeATHTransferRequestRegistryMintUsername(src)).endCell());
         },
         parse: (src) => {
-            return loadATHTransferRequestVaultMintUsername(src.loadRef().beginParse());
+            return loadATHTransferRequestRegistryMintUsername(src.loadRef().beginParse());
         }
     }
 }
@@ -2634,8 +2634,8 @@ export function dictValueParserATHInternalTransferWithNotify(): DictionaryValue<
     }
 }
 
-export type ATHInternalTransferVaultProfileAvatar = {
-    $$type: 'ATHInternalTransferVaultProfileAvatar';
+export type ATHInternalTransferRegistryProfileAvatar = {
+    $$type: 'ATHInternalTransferRegistryProfileAvatar';
     query_id: bigint;
     amount: bigint;
     sender_owner: Address;
@@ -2649,7 +2649,7 @@ export type ATHInternalTransferVaultProfileAvatar = {
     media_format: bigint;
 }
 
-export function storeATHInternalTransferVaultProfileAvatar(src: ATHInternalTransferVaultProfileAvatar) {
+export function storeATHInternalTransferRegistryProfileAvatar(src: ATHInternalTransferRegistryProfileAvatar) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(1096042523, 32);
@@ -2669,7 +2669,7 @@ export function storeATHInternalTransferVaultProfileAvatar(src: ATHInternalTrans
     };
 }
 
-export function loadATHInternalTransferVaultProfileAvatar(slice: Slice) {
+export function loadATHInternalTransferRegistryProfileAvatar(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1096042523) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
@@ -2684,10 +2684,10 @@ export function loadATHInternalTransferVaultProfileAvatar(slice: Slice) {
     const _avatar_stream_id = sc_1.loadUintBig(128);
     const _avatar_part_count = sc_1.loadUintBig(16);
     const _media_format = sc_1.loadUintBig(8);
-    return { $$type: 'ATHInternalTransferVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'ATHInternalTransferRegistryProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function loadTupleATHInternalTransferVaultProfileAvatar(source: TupleReader) {
+export function loadTupleATHInternalTransferRegistryProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _sender_owner = source.readAddress();
@@ -2699,10 +2699,10 @@ export function loadTupleATHInternalTransferVaultProfileAvatar(source: TupleRead
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'ATHInternalTransferVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'ATHInternalTransferRegistryProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function loadGetterTupleATHInternalTransferVaultProfileAvatar(source: TupleReader) {
+export function loadGetterTupleATHInternalTransferRegistryProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _sender_owner = source.readAddress();
@@ -2714,10 +2714,10 @@ export function loadGetterTupleATHInternalTransferVaultProfileAvatar(source: Tup
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'ATHInternalTransferVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'ATHInternalTransferRegistryProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function storeTupleATHInternalTransferVaultProfileAvatar(source: ATHInternalTransferVaultProfileAvatar) {
+export function storeTupleATHInternalTransferRegistryProfileAvatar(source: ATHInternalTransferRegistryProfileAvatar) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
     builder.writeNumber(source.amount);
@@ -2733,19 +2733,19 @@ export function storeTupleATHInternalTransferVaultProfileAvatar(source: ATHInter
     return builder.build();
 }
 
-export function dictValueParserATHInternalTransferVaultProfileAvatar(): DictionaryValue<ATHInternalTransferVaultProfileAvatar> {
+export function dictValueParserATHInternalTransferRegistryProfileAvatar(): DictionaryValue<ATHInternalTransferRegistryProfileAvatar> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeATHInternalTransferVaultProfileAvatar(src)).endCell());
+            builder.storeRef(beginCell().store(storeATHInternalTransferRegistryProfileAvatar(src)).endCell());
         },
         parse: (src) => {
-            return loadATHInternalTransferVaultProfileAvatar(src.loadRef().beginParse());
+            return loadATHInternalTransferRegistryProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
 
-export type ATHInternalTransferVaultMintUsername = {
-    $$type: 'ATHInternalTransferVaultMintUsername';
+export type ATHInternalTransferRegistryMintUsername = {
+    $$type: 'ATHInternalTransferRegistryMintUsername';
     query_id: bigint;
     amount: bigint;
     sender_owner: Address;
@@ -2756,7 +2756,7 @@ export type ATHInternalTransferVaultMintUsername = {
     username: Slice;
 }
 
-export function storeATHInternalTransferVaultMintUsername(src: ATHInternalTransferVaultMintUsername) {
+export function storeATHInternalTransferRegistryMintUsername(src: ATHInternalTransferRegistryMintUsername) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(1096042525, 32);
@@ -2773,7 +2773,7 @@ export function storeATHInternalTransferVaultMintUsername(src: ATHInternalTransf
     };
 }
 
-export function loadATHInternalTransferVaultMintUsername(slice: Slice) {
+export function loadATHInternalTransferRegistryMintUsername(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1096042525) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
@@ -2785,10 +2785,10 @@ export function loadATHInternalTransferVaultMintUsername(slice: Slice) {
     const _owner_wallet = sc_1.loadAddress();
     const _username_len = sc_1.loadUintBig(8);
     const _username = sc_1;
-    return { $$type: 'ATHInternalTransferVaultMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'ATHInternalTransferRegistryMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function loadTupleATHInternalTransferVaultMintUsername(source: TupleReader) {
+export function loadTupleATHInternalTransferRegistryMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _sender_owner = source.readAddress();
@@ -2797,10 +2797,10 @@ export function loadTupleATHInternalTransferVaultMintUsername(source: TupleReade
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'ATHInternalTransferVaultMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'ATHInternalTransferRegistryMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function loadGetterTupleATHInternalTransferVaultMintUsername(source: TupleReader) {
+export function loadGetterTupleATHInternalTransferRegistryMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _sender_owner = source.readAddress();
@@ -2809,10 +2809,10 @@ export function loadGetterTupleATHInternalTransferVaultMintUsername(source: Tupl
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'ATHInternalTransferVaultMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'ATHInternalTransferRegistryMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function storeTupleATHInternalTransferVaultMintUsername(source: ATHInternalTransferVaultMintUsername) {
+export function storeTupleATHInternalTransferRegistryMintUsername(source: ATHInternalTransferRegistryMintUsername) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
     builder.writeNumber(source.amount);
@@ -2825,13 +2825,13 @@ export function storeTupleATHInternalTransferVaultMintUsername(source: ATHIntern
     return builder.build();
 }
 
-export function dictValueParserATHInternalTransferVaultMintUsername(): DictionaryValue<ATHInternalTransferVaultMintUsername> {
+export function dictValueParserATHInternalTransferRegistryMintUsername(): DictionaryValue<ATHInternalTransferRegistryMintUsername> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeATHInternalTransferVaultMintUsername(src)).endCell());
+            builder.storeRef(beginCell().store(storeATHInternalTransferRegistryMintUsername(src)).endCell());
         },
         parse: (src) => {
-            return loadATHInternalTransferVaultMintUsername(src.loadRef().beginParse());
+            return loadATHInternalTransferRegistryMintUsername(src.loadRef().beginParse());
         }
     }
 }
@@ -3528,7 +3528,6 @@ export type ATHWallet$Data = {
     owner_address: Address;
     ath_master_address: Address;
     pending_notifications: Dictionary<bigint, PendingAthTransferNotification>;
-    processed_notifications: Dictionary<bigint, bigint>;
     pending_outgoing_transfers: Dictionary<bigint, PendingAthOutgoingTransfer>;
 }
 
@@ -3539,7 +3538,6 @@ export function storeATHWallet$Data(src: ATHWallet$Data) {
         b_0.storeAddress(src.owner_address);
         b_0.storeAddress(src.ath_master_address);
         b_0.storeDict(src.pending_notifications, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification());
-        b_0.storeDict(src.processed_notifications, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
         b_0.storeDict(src.pending_outgoing_transfers, Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer());
     };
 }
@@ -3550,9 +3548,8 @@ export function loadATHWallet$Data(slice: Slice) {
     const _owner_address = sc_0.loadAddress();
     const _ath_master_address = sc_0.loadAddress();
     const _pending_notifications = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), sc_0);
-    const _processed_notifications = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
     const _pending_outgoing_transfers = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), sc_0);
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function loadTupleATHWallet$Data(source: TupleReader) {
@@ -3560,9 +3557,8 @@ export function loadTupleATHWallet$Data(source: TupleReader) {
     const _owner_address = source.readAddress();
     const _ath_master_address = source.readAddress();
     const _pending_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), source.readCellOpt());
-    const _processed_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pending_outgoing_transfers = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), source.readCellOpt());
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function loadGetterTupleATHWallet$Data(source: TupleReader) {
@@ -3570,9 +3566,8 @@ export function loadGetterTupleATHWallet$Data(source: TupleReader) {
     const _owner_address = source.readAddress();
     const _ath_master_address = source.readAddress();
     const _pending_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), source.readCellOpt());
-    const _processed_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pending_outgoing_transfers = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), source.readCellOpt());
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function storeTupleATHWallet$Data(source: ATHWallet$Data) {
@@ -3581,7 +3576,6 @@ export function storeTupleATHWallet$Data(source: ATHWallet$Data) {
     builder.writeAddress(source.owner_address);
     builder.writeAddress(source.ath_master_address);
     builder.writeCell(source.pending_notifications.size > 0 ? beginCell().storeDictDirect(source.pending_notifications, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification()).endCell() : null);
-    builder.writeCell(source.processed_notifications.size > 0 ? beginCell().storeDictDirect(source.processed_notifications, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
     builder.writeCell(source.pending_outgoing_transfers.size > 0 ? beginCell().storeDictDirect(source.pending_outgoing_transfers, Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer()).endCell() : null);
     return builder.build();
 }
@@ -5277,16 +5271,16 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
     {"name":"AthTransferNotificationRefund","header":1096042526,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
     {"name":"PruneStaleNotification","header":1347309650,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
-    {"name":"AthTransferNotificationVaultMintUsername","header":2299698528,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
-    {"name":"AthTransferNotificationVaultProfileAvatar","header":2702864386,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"AthTransferNotificationRegistryMintUsername","header":2299698528,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"AthTransferNotificationRegistryProfileAvatar","header":2702864386,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHTransferRequestWithNotify","header":1096042516,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"ATHTransferRequestVaultProfileAvatar","header":1096042522,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
-    {"name":"ATHTransferRequestVaultMintUsername","header":1096042524,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"ATHTransferRequestRegistryProfileAvatar","header":1096042522,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"ATHTransferRequestRegistryMintUsername","header":1096042524,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHInternalTransfer","header":1096042514,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHInternalTransferWithNotify","header":1096042517,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"ATHInternalTransferVaultProfileAvatar","header":1096042523,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
-    {"name":"ATHInternalTransferVaultMintUsername","header":1096042525,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"ATHInternalTransferRegistryProfileAvatar","header":1096042523,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"ATHInternalTransferRegistryMintUsername","header":1096042525,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHTransferAck","header":1096042513,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferFailed","header":1096042515,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"JettonTransfer","header":260734629,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"custom_payload","type":{"kind":"simple","type":"cell","optional":true}},{"name":"forward_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
@@ -5298,7 +5292,7 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
+    {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
     {"name":"BindOfficialAthWallet","header":1715335229,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"FlushTreasuryAthDue","header":1621736923,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
@@ -5345,16 +5339,16 @@ const UsernameNFTItem_opcodes = {
     "AthTransferNotificationAck": 1194171774,
     "AthTransferNotificationRefund": 1096042526,
     "PruneStaleNotification": 1347309650,
-    "AthTransferNotificationVaultMintUsername": 2299698528,
-    "AthTransferNotificationVaultProfileAvatar": 2702864386,
+    "AthTransferNotificationRegistryMintUsername": 2299698528,
+    "AthTransferNotificationRegistryProfileAvatar": 2702864386,
     "ATHTransferRequest": 1096042512,
     "ATHTransferRequestWithNotify": 1096042516,
-    "ATHTransferRequestVaultProfileAvatar": 1096042522,
-    "ATHTransferRequestVaultMintUsername": 1096042524,
+    "ATHTransferRequestRegistryProfileAvatar": 1096042522,
+    "ATHTransferRequestRegistryMintUsername": 1096042524,
     "ATHInternalTransfer": 1096042514,
     "ATHInternalTransferWithNotify": 1096042517,
-    "ATHInternalTransferVaultProfileAvatar": 1096042523,
-    "ATHInternalTransferVaultMintUsername": 1096042525,
+    "ATHInternalTransferRegistryProfileAvatar": 1096042523,
+    "ATHInternalTransferRegistryMintUsername": 1096042525,
     "ATHTransferAck": 1096042513,
     "ATHTransferFailed": 1096042515,
     "JettonTransfer": 260734629,
@@ -5407,11 +5401,11 @@ export const USERNAME_ITEM_NAME_HASH_DOMAIN = 3318512854n;
 export const USERNAME_ITEM_METADATA_KEY_NAME = 59089242681608890680090686026688704441792375738894456860693970539822503415433n;
 export const USERNAME_ITEM_METADATA_KEY_DESCRIPTION = 90922719342317012409671596374183159143637506542604000676488204638996496437508n;
 export const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1000000n;
-export const ATH_VAULT_RESPONSE_ACK_VALUE = 3000000n;
+export const ATH_REGISTRY_RESPONSE_ACK_VALUE = 3000000n;
 export const ATH_INTERNAL_TRANSFER_ACK_VALUE = 3000000n;
 export const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1000000n;
 export const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE = 21000000n;
-export const ATH_VAULT_PROFILE_AVATAR_FWD_FEE_ALLOWANCE = 2000000n;
+export const ATH_REGISTRY_PROFILE_AVATAR_FWD_FEE_ALLOWANCE = 2000000n;
 export const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30000000n;
 export const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 20000000n;
 export const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2000000n;
@@ -5429,6 +5423,7 @@ export const ATH_NOTIFY_REFUND_QUERY_DOMAIN = 1096045126n;
 export const ATH_QUERY_ID_MOD = 18446744073709551616n;
 export const ATH_SENDER_KEY_MOD = 1461501637330902918203684832716283019655932542976n;
 export const ATH_PENDING_NOTIFICATION_TTL = 86400n;
+export const ATH_REGISTRY_PENDING_TTL = 604800n;
 export const JETTON_EXCESSES_VALUE = 1000000n;
 export const USERNAME_PRICE_4_CHARS = 10000000000000n;
 export const USERNAME_PRICE_5_CHARS = 1000000000000n;

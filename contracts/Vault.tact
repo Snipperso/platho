@@ -1710,7 +1710,7 @@ contract Vault {
         if (!pending.tombstone) { self.pending_ath_withdrawal_count -= 1; } // L6/#18: tombstone already decremented
     }
 
-    bounced(msg: bounced<ATHTransferRequestVaultProfileAvatar>) {
+    bounced(msg: bounced<ATHTransferRequestRegistryProfileAvatar>) {
         self.requireSealed();
         throwUnless(16635, sender() == self.vault_ath_wallet_address);
         throwUnless(16636, msg.amount > 0);
@@ -1721,7 +1721,7 @@ contract Vault {
         self.restorePendingProfileAvatarPayment(msg.query_id, pendingProfile);
     }
 
-    bounced(msg: bounced<ATHTransferRequestVaultMintUsername>) {
+    bounced(msg: bounced<ATHTransferRequestRegistryMintUsername>) {
         self.requireSealed();
         throwUnless(16675, sender() == self.vault_ath_wallet_address);
         throwUnless(16676, msg.amount > 0);
@@ -2311,7 +2311,7 @@ contract Vault {
             value: VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE,
             bounce: true,
             mode: SendPayGasSeparately,
-            body: ATHTransferRequestVaultProfileAvatar {
+            body: ATHTransferRequestRegistryProfileAvatar {
                 query_id: queryId,
                 amount: PROFILE_AVATAR_PRICE_ATH,
                 recipient: self.profile_registry_address,
@@ -2423,7 +2423,7 @@ contract Vault {
             value: VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE,
             bounce: true,
             mode: SendPayGasSeparately,
-            body: ATHTransferRequestVaultMintUsername {
+            body: ATHTransferRequestRegistryMintUsername {
                 query_id: queryId,
                 amount: price,
                 recipient: self.username_registry_address,

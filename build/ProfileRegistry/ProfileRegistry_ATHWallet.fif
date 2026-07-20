@@ -15,24 +15,24 @@ PROGRAM{
   DECLPROC $AthTransferNotification$_store
   DECLPROC $AthTransferNotification$_store_cell
   DECLPROC $AthTransferNotification$_load_bounced
-  DECLPROC $AthTransferNotificationVaultMintUsername$_store
-  DECLPROC $AthTransferNotificationVaultMintUsername$_store_cell
-  DECLPROC $AthTransferNotificationVaultMintUsername$_load_bounced
-  DECLPROC $AthTransferNotificationVaultProfileAvatar$_store
-  DECLPROC $AthTransferNotificationVaultProfileAvatar$_store_cell
-  DECLPROC $AthTransferNotificationVaultProfileAvatar$_load_bounced
+  DECLPROC $AthTransferNotificationRegistryMintUsername$_store
+  DECLPROC $AthTransferNotificationRegistryMintUsername$_store_cell
+  DECLPROC $AthTransferNotificationRegistryMintUsername$_load_bounced
+  DECLPROC $AthTransferNotificationRegistryProfileAvatar$_store
+  DECLPROC $AthTransferNotificationRegistryProfileAvatar$_store_cell
+  DECLPROC $AthTransferNotificationRegistryProfileAvatar$_load_bounced
   DECLPROC $ATHInternalTransfer$_store
   DECLPROC $ATHInternalTransfer$_store_cell
   DECLPROC $ATHInternalTransfer$_load_bounced
   DECLPROC $ATHInternalTransferWithNotify$_store
   DECLPROC $ATHInternalTransferWithNotify$_store_cell
   DECLPROC $ATHInternalTransferWithNotify$_load_bounced
-  DECLPROC $ATHInternalTransferVaultProfileAvatar$_store
-  DECLPROC $ATHInternalTransferVaultProfileAvatar$_store_cell
-  DECLPROC $ATHInternalTransferVaultProfileAvatar$_load_bounced
-  DECLPROC $ATHInternalTransferVaultMintUsername$_store
-  DECLPROC $ATHInternalTransferVaultMintUsername$_store_cell
-  DECLPROC $ATHInternalTransferVaultMintUsername$_load_bounced
+  DECLPROC $ATHInternalTransferRegistryProfileAvatar$_store
+  DECLPROC $ATHInternalTransferRegistryProfileAvatar$_store_cell
+  DECLPROC $ATHInternalTransferRegistryProfileAvatar$_load_bounced
+  DECLPROC $ATHInternalTransferRegistryMintUsername$_store
+  DECLPROC $ATHInternalTransferRegistryMintUsername$_store_cell
+  DECLPROC $ATHInternalTransferRegistryMintUsername$_load_bounced
   DECLPROC $ATHTransferAck$_store
   DECLPROC $ATHTransferAck$_store_cell
   DECLPROC $ATHTransferFailed$_store
@@ -79,7 +79,7 @@ PROGRAM{
   DECLPROC $ATHWallet$_fun_compute_pending_outgoing_key
   DECLPROC $ATHWallet$_fun_compute_notify_refund_query_id
   DECLPROC $ATHWallet$_fun_notify_transfer_value
-  DECLPROC $ATHWallet$_fun_vault_notify_transfer_value
+  DECLPROC $ATHWallet$_fun_registry_notify_transfer_value
   DECLPROC $PendingAthOutgoingTransfer$_constructor_recipient_wallet_response_destination_amount_created_at
   DECLPROC $ATHWallet$_fun_store_pending_outgoing
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
@@ -101,15 +101,15 @@ PROGRAM{
   DECLPROC $ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination
   DECLPROC $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address
   DECLPROC $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value
-  DECLPROC $ATHInternalTransferVaultMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username
-  DECLPROC $ATHInternalTransferVaultProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
+  DECLPROC $ATHInternalTransferRegistryMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username
+  DECLPROC $ATHInternalTransferRegistryProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
   DECLPROC $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload
   DECLPROC $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload
   DECLPROC $JettonExcesses$_constructor_query_id
   DECLPROC $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at
   DECLPROC $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet
-  DECLPROC $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username
-  DECLPROC $AthTransferNotificationVaultProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
+  DECLPROC $AthTransferNotificationRegistryMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username
+  DECLPROC $AthTransferNotificationRegistryProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
   97026 DECLMETHOD %get_wallet_data
   78277 DECLMETHOD %get_pending_notification
   DECLPROC recv_internal
@@ -219,7 +219,7 @@ PROGRAM{
     160 LDU
     -ROT
   }>
-  $AthTransferNotificationVaultMintUsername$_store PROCINLINE:<{
+  $AthTransferNotificationRegistryMintUsername$_store PROCINLINE:<{
     2299698528 PUSHINT
     s0 s8 XCHG2
     32 STU
@@ -234,17 +234,17 @@ PROGRAM{
     8 STU
     STSLICE
   }>
-  $AthTransferNotificationVaultMintUsername$_store_cell PROCINLINE:<{
+  $AthTransferNotificationRegistryMintUsername$_store_cell PROCINLINE:<{
     7 -ROLL
-    $AthTransferNotificationVaultMintUsername$_store INLINECALLDICT
+    $AthTransferNotificationRegistryMintUsername$_store INLINECALLDICT
     ENDC
   }>
-  $AthTransferNotificationVaultMintUsername$_load_bounced PROCINLINE:<{
+  $AthTransferNotificationRegistryMintUsername$_load_bounced PROCINLINE:<{
     64 LDU
     160 LDU
     -ROT
   }>
-  $AthTransferNotificationVaultProfileAvatar$_store PROCINLINE:<{
+  $AthTransferNotificationRegistryProfileAvatar$_store PROCINLINE:<{
     2702864386 PUSHINT
     s0 s11 XCHG2
     32 STU
@@ -270,12 +270,12 @@ PROGRAM{
     8 STU
     STBREFR
   }>
-  $AthTransferNotificationVaultProfileAvatar$_store_cell PROCINLINE:<{
+  $AthTransferNotificationRegistryProfileAvatar$_store_cell PROCINLINE:<{
     10 -ROLL
-    $AthTransferNotificationVaultProfileAvatar$_store INLINECALLDICT
+    $AthTransferNotificationRegistryProfileAvatar$_store INLINECALLDICT
     ENDC
   }>
-  $AthTransferNotificationVaultProfileAvatar$_load_bounced PROCINLINE:<{
+  $AthTransferNotificationRegistryProfileAvatar$_load_bounced PROCINLINE:<{
     64 LDU
     160 LDU
     -ROT
@@ -327,7 +327,7 @@ PROGRAM{
     128 LDU
     -ROT
   }>
-  $ATHInternalTransferVaultProfileAvatar$_store PROCREF:<{
+  $ATHInternalTransferRegistryProfileAvatar$_store PROCREF:<{
     1096042523 PUSHINT
     s0 s12 XCHG2
     32 STU
@@ -356,17 +356,17 @@ PROGRAM{
     8 STU
     STBREFR
   }>
-  $ATHInternalTransferVaultProfileAvatar$_store_cell PROCINLINE:<{
+  $ATHInternalTransferRegistryProfileAvatar$_store_cell PROCINLINE:<{
     11 -ROLL
-    $ATHInternalTransferVaultProfileAvatar$_store INLINECALLDICT
+    $ATHInternalTransferRegistryProfileAvatar$_store INLINECALLDICT
     ENDC
   }>
-  $ATHInternalTransferVaultProfileAvatar$_load_bounced PROCINLINE:<{
+  $ATHInternalTransferRegistryProfileAvatar$_load_bounced PROCINLINE:<{
     64 LDU
     128 LDU
     -ROT
   }>
-  $ATHInternalTransferVaultMintUsername$_store PROCINLINE:<{
+  $ATHInternalTransferRegistryMintUsername$_store PROCINLINE:<{
     1096042525 PUSHINT
     s0 s9 XCHG2
     32 STU
@@ -387,12 +387,12 @@ PROGRAM{
     STSLICE
     STBREFR
   }>
-  $ATHInternalTransferVaultMintUsername$_store_cell PROCINLINE:<{
+  $ATHInternalTransferRegistryMintUsername$_store_cell PROCINLINE:<{
     8 -ROLL
-    $ATHInternalTransferVaultMintUsername$_store INLINECALLDICT
+    $ATHInternalTransferRegistryMintUsername$_store INLINECALLDICT
     ENDC
   }>
-  $ATHInternalTransferVaultMintUsername$_load_bounced PROCINLINE:<{
+  $ATHInternalTransferRegistryMintUsername$_load_bounced PROCINLINE:<{
     64 LDU
     128 LDU
     -ROT
@@ -756,7 +756,7 @@ PROGRAM{
     20000000 PUSHINT
     ADD
   }>
-  $ATHWallet$_fun_vault_notify_transfer_value PROCREF:<{
+  $ATHWallet$_fun_registry_notify_transfer_value PROCREF:<{
     3000000 PUSHINT
     ADD
     1000000 PUSHINT
@@ -1224,9 +1224,9 @@ PROGRAM{
   }>
   $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value PROCINLINE:<{
   }>
-  $ATHInternalTransferVaultMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username PROCINLINE:<{
+  $ATHInternalTransferRegistryMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username PROCINLINE:<{
   }>
-  $ATHInternalTransferVaultProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format PROCINLINE:<{
+  $ATHInternalTransferRegistryProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format PROCINLINE:<{
   }>
   $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload PROCINLINE:<{
   }>
@@ -1238,9 +1238,9 @@ PROGRAM{
   }>
   $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet PROCINLINE:<{
   }>
-  $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username PROCINLINE:<{
+  $AthTransferNotificationRegistryMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username PROCINLINE:<{
   }>
-  $AthTransferNotificationVaultProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format PROCINLINE:<{
+  $AthTransferNotificationRegistryProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format PROCINLINE:<{
   }>
   %get_wallet_data PROC:<{
     $ATHWallet$_contract_load INLINECALLDICT
@@ -1366,7 +1366,7 @@ PROGRAM{
       EQUAL
       IFJMP:<{
         DROP
-        $ATHInternalTransferVaultMintUsername$_load_bounced INLINECALLDICT
+        $ATHInternalTransferRegistryMintUsername$_load_bounced INLINECALLDICT
         s2 POP
         s4 s6 XCHG
         s3 s5 XCHG
@@ -1379,7 +1379,7 @@ PROGRAM{
       EQUAL
       IFJMP:<{
         DROP
-        $ATHInternalTransferVaultProfileAvatar$_load_bounced INLINECALLDICT
+        $ATHInternalTransferRegistryProfileAvatar$_load_bounced INLINECALLDICT
         s2 POP
         s4 s6 XCHG
         s3 s5 XCHG
@@ -1423,7 +1423,7 @@ PROGRAM{
       EQUAL
       IFJMP:<{
         DROP
-        $AthTransferNotificationVaultMintUsername$_load_bounced INLINECALLDICT
+        $AthTransferNotificationRegistryMintUsername$_load_bounced INLINECALLDICT
         s2 POP
         14570 PUSHINT
         __tact_context_get_sender INLINECALLDICT
@@ -1439,7 +1439,7 @@ PROGRAM{
       2702864386 PUSHINT
       EQUAL
       IFJMP:<{
-        $AthTransferNotificationVaultProfileAvatar$_load_bounced INLINECALLDICT
+        $AthTransferNotificationRegistryProfileAvatar$_load_bounced INLINECALLDICT
         s2 POP
         14670 PUSHINT
         __tact_context_get_sender INLINECALLDICT
@@ -1964,7 +1964,7 @@ PROGRAM{
       THROWANYIFNOT
       4 ROLL
       s9 PUSH
-      $ATHWallet$_fun_vault_notify_transfer_value INLINECALLDICT
+      $ATHWallet$_fun_registry_notify_transfer_value INLINECALLDICT
       DUP
       10000000 PUSHINT
       ADD
@@ -2002,9 +2002,9 @@ PROGRAM{
       s2 16 s() XCHG
       s1 19 s() XCHG
       s0 20 s() XCHG
-      $ATHInternalTransferVaultMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username INLINECALLDICT
+      $ATHInternalTransferRegistryMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username INLINECALLDICT
       NEWC
-      $ATHInternalTransferVaultMintUsername$_store_cell INLINECALLDICT
+      $ATHInternalTransferRegistryMintUsername$_store_cell INLINECALLDICT
       s4 s5 XCHG
       s4 s10 XCHG
       s1 s9 XCHG
@@ -2146,7 +2146,7 @@ PROGRAM{
       THROWANYIFNOT
       4 ROLL
       s6 PUSH
-      $ATHWallet$_fun_vault_notify_transfer_value INLINECALLDICT
+      $ATHWallet$_fun_registry_notify_transfer_value INLINECALLDICT
       DUP
       10000000 PUSHINT
       ADD
@@ -2186,9 +2186,9 @@ PROGRAM{
       s2 19 s() XCHG
       s1 22 s() XCHG
       s0 23 s() XCHG
-      $ATHInternalTransferVaultProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format INLINECALLDICT
+      $ATHInternalTransferRegistryProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format INLINECALLDICT
       NEWC
-      $ATHInternalTransferVaultProfileAvatar$_store_cell INLINECALLDICT
+      $ATHInternalTransferRegistryProfileAvatar$_store_cell INLINECALLDICT
       s1 s5 XCHG
       s4 s10 XCHG
       s3 s9 XCHG
@@ -2943,9 +2943,9 @@ PROGRAM{
       s0 s4 XCHG
       s3 s9 XCHG
       s14 s13 s12 XCHG3
-      $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username INLINECALLDICT
+      $AthTransferNotificationRegistryMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username INLINECALLDICT
       NEWC
-      $AthTransferNotificationVaultMintUsername$_store_cell INLINECALLDICT
+      $AthTransferNotificationRegistryMintUsername$_store_cell INLINECALLDICT
       s7 PUSH
       s0 s4 XCHG
       s3 s10 XCHG
@@ -3107,9 +3107,9 @@ PROGRAM{
       s2 17 s() XCHG
       s1 16 s() XCHG
       s0 s15 XCHG
-      $AthTransferNotificationVaultProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format INLINECALLDICT
+      $AthTransferNotificationRegistryProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format INLINECALLDICT
       NEWC
-      $AthTransferNotificationVaultProfileAvatar$_store_cell INLINECALLDICT
+      $AthTransferNotificationRegistryProfileAvatar$_store_cell INLINECALLDICT
       s2 s0 s3 XC2PU
       s10 s9 s9 XCHG3
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT

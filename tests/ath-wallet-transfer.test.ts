@@ -6,8 +6,8 @@ import { createHash } from 'crypto';
 import {
   ATHWallet,
   ATHInternalTransfer,
-  ATHInternalTransferVaultMintUsername,
-  ATHInternalTransferVaultProfileAvatar,
+  ATHInternalTransferRegistryMintUsername,
+  ATHInternalTransferRegistryProfileAvatar,
   ATHInternalTransferWithNotify,
   ATHTransferRequest,
   ATHTransferRequestWithNotify,
@@ -15,8 +15,8 @@ import {
   AthTransferNotificationRefund,
   PruneStaleNotification,
   storeATHInternalTransfer,
-  storeATHInternalTransferVaultMintUsername,
-  storeATHInternalTransferVaultProfileAvatar,
+  storeATHInternalTransferRegistryMintUsername,
+  storeATHInternalTransferRegistryProfileAvatar,
   storeATHInternalTransferWithNotify,
   storeATHTransferRequestWithNotify,
   storeAthTransferNotification,
@@ -162,8 +162,8 @@ describe('ATH wallet transfer profile', () => {
         notify_destination: owner.address,
         notify_value: toNano('0.03'),
       } as ATHInternalTransferWithNotify)).endCell(),
-      beginCell().store(storeATHInternalTransferVaultMintUsername({
-        $$type: 'ATHInternalTransferVaultMintUsername',
+      beginCell().store(storeATHInternalTransferRegistryMintUsername({
+        $$type: 'ATHInternalTransferRegistryMintUsername',
         query_id: 303n,
         amount,
         sender_owner: owner.address,
@@ -172,9 +172,9 @@ describe('ATH wallet transfer profile', () => {
         owner_wallet: owner.address,
         username_len: BigInt(username.length),
         username: beginCell().storeBuffer(username).endCell().beginParse(),
-      } as ATHInternalTransferVaultMintUsername)).endCell(),
-      beginCell().store(storeATHInternalTransferVaultProfileAvatar({
-        $$type: 'ATHInternalTransferVaultProfileAvatar',
+      } as ATHInternalTransferRegistryMintUsername)).endCell(),
+      beginCell().store(storeATHInternalTransferRegistryProfileAvatar({
+        $$type: 'ATHInternalTransferRegistryProfileAvatar',
         query_id: 304n,
         amount,
         sender_owner: owner.address,
@@ -186,7 +186,7 @@ describe('ATH wallet transfer profile', () => {
         avatar_stream_id: 2n,
         avatar_part_count: 1n,
         media_format: 1n,
-      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
+      } as ATHInternalTransferRegistryProfileAvatar)).endCell(),
     ];
 
     for (const body of forgedBodies) {
@@ -706,8 +706,8 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientAddress,
       value: toNano('0.07'),
-      body: beginCell().store(storeATHInternalTransferVaultMintUsername({
-        $$type: 'ATHInternalTransferVaultMintUsername',
+      body: beginCell().store(storeATHInternalTransferRegistryMintUsername({
+        $$type: 'ATHInternalTransferRegistryMintUsername',
         query_id: queryId,
         amount: 70n,
         sender_owner: sourceOwner.address,
@@ -716,7 +716,7 @@ describe('ATH wallet transfer profile', () => {
         owner_wallet: recipientOwner.address,
         username_len: BigInt(username.length),
         username: beginCell().storeBuffer(username).endCell().beginParse(),
-      } as ATHInternalTransferVaultMintUsername)).endCell(),
+      } as ATHInternalTransferRegistryMintUsername)).endCell(),
     }));
 
     expect(findTransaction(usernameReuse.transactions, {
@@ -729,8 +729,8 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientAddress,
       value: toNano('0.07'),
-      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
-        $$type: 'ATHInternalTransferVaultProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferRegistryProfileAvatar({
+        $$type: 'ATHInternalTransferRegistryProfileAvatar',
         query_id: queryId,
         amount: 80n,
         sender_owner: sourceOwner.address,
@@ -742,7 +742,7 @@ describe('ATH wallet transfer profile', () => {
         avatar_stream_id: 2n,
         avatar_part_count: 1n,
         media_format: 1n,
-      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
+      } as ATHInternalTransferRegistryProfileAvatar)).endCell(),
     }));
 
     expect(findTransaction(profileReuse.transactions, {
@@ -785,8 +785,8 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.07'),
-      body: beginCell().store(storeATHInternalTransferVaultMintUsername({
-        $$type: 'ATHInternalTransferVaultMintUsername',
+      body: beginCell().store(storeATHInternalTransferRegistryMintUsername({
+        $$type: 'ATHInternalTransferRegistryMintUsername',
         query_id: queryId,
         amount,
         sender_owner: sourceOwner.address,
@@ -795,7 +795,7 @@ describe('ATH wallet transfer profile', () => {
         owner_wallet: recipientOwner.address,
         username_len: BigInt(username.length),
         username: beginCell().storeBuffer(username).endCell().beginParse(),
-      } as ATHInternalTransferVaultMintUsername)).endCell(),
+      } as ATHInternalTransferRegistryMintUsername)).endCell(),
     }));
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
@@ -851,8 +851,8 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.07'),
-      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
-        $$type: 'ATHInternalTransferVaultProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferRegistryProfileAvatar({
+        $$type: 'ATHInternalTransferRegistryProfileAvatar',
         query_id: queryId,
         amount,
         sender_owner: sourceOwner.address,
@@ -864,7 +864,7 @@ describe('ATH wallet transfer profile', () => {
         avatar_stream_id: 8n,
         avatar_part_count: 2n,
         media_format: 1n,
-      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
+      } as ATHInternalTransferRegistryProfileAvatar)).endCell(),
     }));
 
     expect((await sourceWallet.getGetWalletData()).balance).toBe(0n);
@@ -929,8 +929,8 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.07'),
-      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
-        $$type: 'ATHInternalTransferVaultProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferRegistryProfileAvatar({
+        $$type: 'ATHInternalTransferRegistryProfileAvatar',
         query_id: queryId,
         amount,
         sender_owner: sourceOwner.address,
@@ -942,7 +942,7 @@ describe('ATH wallet transfer profile', () => {
         avatar_stream_id: 8n,
         avatar_part_count: 2n,
         media_format: 1n,
-      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
+      } as ATHInternalTransferRegistryProfileAvatar)).endCell(),
     }));
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
@@ -1024,8 +1024,8 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWalletAddress,
       to: recipientWallet.address,
       value: toNano('0.07'),
-      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
-        $$type: 'ATHInternalTransferVaultProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferRegistryProfileAvatar({
+        $$type: 'ATHInternalTransferRegistryProfileAvatar',
         query_id: queryId,
         amount,
         sender_owner: sourceOwner.address,
@@ -1037,7 +1037,7 @@ describe('ATH wallet transfer profile', () => {
         avatar_stream_id: 8n,
         avatar_part_count: 2n,
         media_format: 1n,
-      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
+      } as ATHInternalTransferRegistryProfileAvatar)).endCell(),
     }));
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
@@ -1118,8 +1118,8 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.07'),
-      body: beginCell().store(storeATHInternalTransferVaultMintUsername({
-        $$type: 'ATHInternalTransferVaultMintUsername',
+      body: beginCell().store(storeATHInternalTransferRegistryMintUsername({
+        $$type: 'ATHInternalTransferRegistryMintUsername',
         query_id: 552n,
         amount,
         sender_owner: sourceOwner.address,
@@ -1128,14 +1128,14 @@ describe('ATH wallet transfer profile', () => {
         owner_wallet: recipientOwner.address,
         username_len: BigInt(username.length),
         username: beginCell().storeBuffer(username).endCell().beginParse(),
-      } as ATHInternalTransferVaultMintUsername)).endCell(),
+      } as ATHInternalTransferRegistryMintUsername)).endCell(),
     }));
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.07'),
-      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
-        $$type: 'ATHInternalTransferVaultProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferRegistryProfileAvatar({
+        $$type: 'ATHInternalTransferRegistryProfileAvatar',
         query_id: 553n,
         amount,
         sender_owner: sourceOwner.address,
@@ -1147,7 +1147,7 @@ describe('ATH wallet transfer profile', () => {
         avatar_stream_id: 8n,
         avatar_part_count: 2n,
         media_format: 1n,
-      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
+      } as ATHInternalTransferRegistryProfileAvatar)).endCell(),
     }));
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount * 3n);

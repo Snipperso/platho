@@ -5,13 +5,13 @@ import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import {
   UsernameRegistry,
-  AthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
   BindOfficialAthWallet,
   SealGenesis,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
   ATHWallet,
-  ATHTransferRequestVaultMintUsername,
+  ATHTransferRequestRegistryMintUsername,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x7171717100000000000000000000000000000000000000000000000000001111n;
@@ -124,7 +124,7 @@ async function mintViaVaultOfficialWallet(params: {
   requestValue?: bigint;
 }) {
   return await params.vaultAthWallet.send(params.blockchain.sender(params.vaultAddress), { value: params.requestValue ?? USERNAME_MINT_VAULT_REQUEST_VALUE }, {
-    $$type: 'ATHTransferRequestVaultMintUsername',
+    $$type: 'ATHTransferRequestRegistryMintUsername',
     query_id: params.queryId,
     amount: params.amount,
     recipient: params.registry.address,
@@ -133,7 +133,7 @@ async function mintViaVaultOfficialWallet(params: {
     owner_wallet: params.ownerWallet,
     username_len: BigInt(Buffer.from(params.username, 'ascii').length),
     username: usernameSlice(params.username),
-  } as ATHTransferRequestVaultMintUsername);
+  } as ATHTransferRequestRegistryMintUsername);
 }
 
 describe('UsernameRegistry integration with Vault-owned ATHWallet', () => {
@@ -181,7 +181,7 @@ describe('UsernameRegistry integration with Vault-owned ATHWallet', () => {
     const hash = nameHash(username);
 
     await registry.send(user.getSender(), { value: toNano('0.15') }, {
-      $$type: 'AthTransferNotificationVaultMintUsername',
+      $$type: 'AthTransferNotificationRegistryMintUsername',
       query_id: 420n,
       amount: PRICE_6_PLUS,
       sender_key: 0n,
@@ -189,7 +189,7 @@ describe('UsernameRegistry integration with Vault-owned ATHWallet', () => {
       owner_wallet: user.address,
       username_len: BigInt(Buffer.from(username, 'ascii').length),
       username: usernameSlice(username),
-    } as AthTransferNotificationVaultMintUsername);
+    } as AthTransferNotificationRegistryMintUsername);
 
     const global = await registry.getGetGlobal();
     expect((await registry.getGetNameRecord(hash)).exists).toBe(false);

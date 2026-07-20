@@ -609,8 +609,8 @@ export function dictValueParserBasechainAddress(): DictionaryValue<BasechainAddr
     }
 }
 
-export type AthTransferNotificationVaultProfileAvatar = {
-    $$type: 'AthTransferNotificationVaultProfileAvatar';
+export type AthTransferNotificationRegistryProfileAvatar = {
+    $$type: 'AthTransferNotificationRegistryProfileAvatar';
     query_id: bigint;
     sender_key: bigint;
     amount: bigint;
@@ -623,7 +623,7 @@ export type AthTransferNotificationVaultProfileAvatar = {
     media_format: bigint;
 }
 
-export function storeAthTransferNotificationVaultProfileAvatar(src: AthTransferNotificationVaultProfileAvatar) {
+export function storeAthTransferNotificationRegistryProfileAvatar(src: AthTransferNotificationRegistryProfileAvatar) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(2702864386, 32);
@@ -642,7 +642,7 @@ export function storeAthTransferNotificationVaultProfileAvatar(src: AthTransferN
     };
 }
 
-export function loadAthTransferNotificationVaultProfileAvatar(slice: Slice) {
+export function loadAthTransferNotificationRegistryProfileAvatar(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2702864386) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
@@ -656,10 +656,10 @@ export function loadAthTransferNotificationVaultProfileAvatar(slice: Slice) {
     const _avatar_stream_id = sc_1.loadUintBig(128);
     const _avatar_part_count = sc_1.loadUintBig(16);
     const _media_format = sc_1.loadUintBig(8);
-    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'AthTransferNotificationRegistryProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function loadTupleAthTransferNotificationVaultProfileAvatar(source: TupleReader) {
+export function loadTupleAthTransferNotificationRegistryProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _sender_key = source.readBigNumber();
     const _amount = source.readBigNumber();
@@ -670,10 +670,10 @@ export function loadTupleAthTransferNotificationVaultProfileAvatar(source: Tuple
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'AthTransferNotificationRegistryProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function loadGetterTupleAthTransferNotificationVaultProfileAvatar(source: TupleReader) {
+export function loadGetterTupleAthTransferNotificationRegistryProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _sender_key = source.readBigNumber();
     const _amount = source.readBigNumber();
@@ -684,10 +684,10 @@ export function loadGetterTupleAthTransferNotificationVaultProfileAvatar(source:
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'AthTransferNotificationRegistryProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
-export function storeTupleAthTransferNotificationVaultProfileAvatar(source: AthTransferNotificationVaultProfileAvatar) {
+export function storeTupleAthTransferNotificationRegistryProfileAvatar(source: AthTransferNotificationRegistryProfileAvatar) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
     builder.writeNumber(source.sender_key);
@@ -702,19 +702,19 @@ export function storeTupleAthTransferNotificationVaultProfileAvatar(source: AthT
     return builder.build();
 }
 
-export function dictValueParserAthTransferNotificationVaultProfileAvatar(): DictionaryValue<AthTransferNotificationVaultProfileAvatar> {
+export function dictValueParserAthTransferNotificationRegistryProfileAvatar(): DictionaryValue<AthTransferNotificationRegistryProfileAvatar> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeAthTransferNotificationVaultProfileAvatar(src)).endCell());
+            builder.storeRef(beginCell().store(storeAthTransferNotificationRegistryProfileAvatar(src)).endCell());
         },
         parse: (src) => {
-            return loadAthTransferNotificationVaultProfileAvatar(src.loadRef().beginParse());
+            return loadAthTransferNotificationRegistryProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
 
-export type AthTransferNotificationVaultMintUsername = {
-    $$type: 'AthTransferNotificationVaultMintUsername';
+export type AthTransferNotificationRegistryMintUsername = {
+    $$type: 'AthTransferNotificationRegistryMintUsername';
     query_id: bigint;
     sender_key: bigint;
     amount: bigint;
@@ -724,7 +724,7 @@ export type AthTransferNotificationVaultMintUsername = {
     username: Slice;
 }
 
-export function storeAthTransferNotificationVaultMintUsername(src: AthTransferNotificationVaultMintUsername) {
+export function storeAthTransferNotificationRegistryMintUsername(src: AthTransferNotificationRegistryMintUsername) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(2299698528, 32);
@@ -738,7 +738,7 @@ export function storeAthTransferNotificationVaultMintUsername(src: AthTransferNo
     };
 }
 
-export function loadAthTransferNotificationVaultMintUsername(slice: Slice) {
+export function loadAthTransferNotificationRegistryMintUsername(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2299698528) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
@@ -748,10 +748,10 @@ export function loadAthTransferNotificationVaultMintUsername(slice: Slice) {
     const _owner_wallet = sc_0.loadAddress();
     const _username_len = sc_0.loadUintBig(8);
     const _username = sc_0;
-    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function loadTupleAthTransferNotificationVaultMintUsername(source: TupleReader) {
+export function loadTupleAthTransferNotificationRegistryMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _sender_key = source.readBigNumber();
     const _amount = source.readBigNumber();
@@ -759,10 +759,10 @@ export function loadTupleAthTransferNotificationVaultMintUsername(source: TupleR
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function loadGetterTupleAthTransferNotificationVaultMintUsername(source: TupleReader) {
+export function loadGetterTupleAthTransferNotificationRegistryMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
     const _sender_key = source.readBigNumber();
     const _amount = source.readBigNumber();
@@ -770,10 +770,10 @@ export function loadGetterTupleAthTransferNotificationVaultMintUsername(source: 
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
-export function storeTupleAthTransferNotificationVaultMintUsername(source: AthTransferNotificationVaultMintUsername) {
+export function storeTupleAthTransferNotificationRegistryMintUsername(source: AthTransferNotificationRegistryMintUsername) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
     builder.writeNumber(source.sender_key);
@@ -785,13 +785,13 @@ export function storeTupleAthTransferNotificationVaultMintUsername(source: AthTr
     return builder.build();
 }
 
-export function dictValueParserAthTransferNotificationVaultMintUsername(): DictionaryValue<AthTransferNotificationVaultMintUsername> {
+export function dictValueParserAthTransferNotificationRegistryMintUsername(): DictionaryValue<AthTransferNotificationRegistryMintUsername> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeAthTransferNotificationVaultMintUsername(src)).endCell());
+            builder.storeRef(beginCell().store(storeAthTransferNotificationRegistryMintUsername(src)).endCell());
         },
         parse: (src) => {
-            return loadAthTransferNotificationVaultMintUsername(src.loadRef().beginParse());
+            return loadAthTransferNotificationRegistryMintUsername(src.loadRef().beginParse());
         }
     }
 }
@@ -1018,15 +1018,15 @@ const MockRegistryNotificationNoAck_types: ABIType[] = [
     {"name":"StdAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":8}},{"name":"address","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
-    {"name":"AthTransferNotificationVaultProfileAvatar","header":2702864386,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
-    {"name":"AthTransferNotificationVaultMintUsername","header":2299698528,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"AthTransferNotificationRegistryProfileAvatar","header":2702864386,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"AthTransferNotificationRegistryMintUsername","header":2299698528,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"MockRegistryNotificationNoAckStateView","header":null,"fields":[{"name":"profile_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"MockRegistryNotificationNoAck$Data","header":null,"fields":[{"name":"profile_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"username_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"last_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
 ]
 
 const MockRegistryNotificationNoAck_opcodes = {
-    "AthTransferNotificationVaultProfileAvatar": 2702864386,
-    "AthTransferNotificationVaultMintUsername": 2299698528,
+    "AthTransferNotificationRegistryProfileAvatar": 2702864386,
+    "AthTransferNotificationRegistryMintUsername": 2299698528,
 }
 
 const MockRegistryNotificationNoAck_getters: ABIGetter[] = [
@@ -1038,8 +1038,8 @@ export const MockRegistryNotificationNoAck_getterMapping: { [key: string]: strin
 }
 
 const MockRegistryNotificationNoAck_receivers: ABIReceiver[] = [
-    {"receiver":"internal","message":{"kind":"typed","type":"AthTransferNotificationVaultProfileAvatar"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"AthTransferNotificationVaultMintUsername"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"AthTransferNotificationRegistryProfileAvatar"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"AthTransferNotificationRegistryMintUsername"}},
     {"receiver":"internal","message":{"kind":"empty"}},
 ]
 
@@ -1078,14 +1078,14 @@ export class MockRegistryNotificationNoAck implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: AthTransferNotificationVaultProfileAvatar | AthTransferNotificationVaultMintUsername | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: AthTransferNotificationRegistryProfileAvatar | AthTransferNotificationRegistryMintUsername | null) {
         
         let body: Cell | null = null;
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'AthTransferNotificationVaultProfileAvatar') {
-            body = beginCell().store(storeAthTransferNotificationVaultProfileAvatar(message)).endCell();
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'AthTransferNotificationRegistryProfileAvatar') {
+            body = beginCell().store(storeAthTransferNotificationRegistryProfileAvatar(message)).endCell();
         }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'AthTransferNotificationVaultMintUsername') {
-            body = beginCell().store(storeAthTransferNotificationVaultMintUsername(message)).endCell();
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'AthTransferNotificationRegistryMintUsername') {
+            body = beginCell().store(storeAthTransferNotificationRegistryMintUsername(message)).endCell();
         }
         if (message === null) {
             body = new Cell();

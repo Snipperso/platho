@@ -5,8 +5,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
-  ATHInternalTransferVaultMintUsername,
-  ATHInternalTransferVaultProfileAvatar,
+  ATHInternalTransferRegistryMintUsername,
+  ATHInternalTransferRegistryProfileAvatar,
   ATHInternalTransferWithNotify,
   ATHWallet,
   AthTransferNotificationAck,
@@ -18,7 +18,7 @@ const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544E49n;
 const ATH_SENDER_KEY_MOD = 1n << 160n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1_000_000n;
-const ATH_VAULT_RESPONSE_ACK_VALUE = 3_000_000n;
+const ATH_REGISTRY_RESPONSE_ACK_VALUE = 3_000_000n;
 const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1_000_000n;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 7_000_000n;
 const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 20_000_000n;
@@ -166,7 +166,7 @@ const caseSpecs: CaseSpec[] = [
     terminal: 'ack',
     vaultResponse: true,
     message: (ctx) => ({
-      $$type: 'ATHInternalTransferVaultMintUsername',
+      $$type: 'ATHInternalTransferRegistryMintUsername',
       query_id: ctx.queryId,
       amount: AMOUNT,
       sender_owner: ctx.sourceOwner,
@@ -175,14 +175,14 @@ const caseSpecs: CaseSpec[] = [
       owner_wallet: ctx.ownerWallet,
       username_len: 6n,
       username: usernameSlice(),
-    } as ATHInternalTransferVaultMintUsername),
+    } as ATHInternalTransferRegistryMintUsername),
   },
   {
     label: 'VAULT_PROFILE_NOTIFY_ACK',
     terminal: 'ack',
     vaultResponse: true,
     message: (ctx) => ({
-      $$type: 'ATHInternalTransferVaultProfileAvatar',
+      $$type: 'ATHInternalTransferRegistryProfileAvatar',
       query_id: ctx.queryId,
       amount: AMOUNT,
       sender_owner: ctx.sourceOwner,
@@ -194,7 +194,7 @@ const caseSpecs: CaseSpec[] = [
       avatar_stream_id: 2n,
       avatar_part_count: 1n,
       media_format: 1n,
-    } as ATHInternalTransferVaultProfileAvatar),
+    } as ATHInternalTransferRegistryProfileAvatar),
   },
   // clean-12: the standard Lane A path (JettonInternalTransfer forward_ton>0) no longer creates a pending-notification
   // tombstone -- it emits the standard fire-and-forget 0x7362D09C JettonTransferNotification. So there is no
@@ -217,7 +217,7 @@ const caseSpecs: CaseSpec[] = [
 async function measureCase(spec: CaseSpec): Promise<AthWalletTombstoneEconomicsCase> {
   const { blockchain, wallet, recipientOwner, ctx } = await setup(spec.label);
   const key = senderKey(ctx.sourceOwner, ctx.queryId);
-  const responseAckValue = spec.vaultResponse ? ATH_VAULT_RESPONSE_ACK_VALUE : ATH_TRANSFER_NOTIFY_ACK_VALUE;
+  const responseAckValue = spec.vaultResponse ? ATH_REGISTRY_RESPONSE_ACK_VALUE : ATH_TRANSFER_NOTIFY_ACK_VALUE;
   const inbound = notifyInboundValue(responseAckValue);
   const beforeBalance = await contractBalance(blockchain, wallet.address);
   const publishResult = await wallet.send(blockchain.sender(ctx.sourceWalletAddress), { value: inbound }, spec.message(ctx));
