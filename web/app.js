@@ -24156,8 +24156,6 @@ async function resolveUsernameRegistryProvider() {
     ?? createUsernameRegistryTonRpcProvider({ usernameRegistryAddress: requireUsernameRegistryAddress() });
   if (
     !provider?.getUsernamePrice
-    || !provider?.getNameRecordByUsername
-    || !provider?.getNameRecord
     || !provider?.getUsernameItemAddress
     || !provider?.getGlobal
     || !provider?.getAthWalletAddress
@@ -24180,23 +24178,67 @@ async function readUsernameMintPriceForOwnVaultAction(provider, registry, userna
   return priceAtomic;
 }
 
+// Is the name already minted? Asked of the ITEM, because since 2026-07-20 the registry keeps no name_records map
+// — the per-name contract IS the record, and it is the only source that follows a TEP-62 transfer.
+//
+// THE HARD PART IS NOT "IS IT THERE", IT IS "DID I ACTUALLY FIND OUT". A get-method against an account that does
+// not exist fails the same way a get-method fails when toncenter is having a bad minute, and the two must not be
+// collapsed: reading a hiccup as "free" sends the buyer into a mint that bounces. So an error is never treated as
+// an answer — we ask the ACCOUNT, which reports uninitialised as DATA rather than as a failure, exactly as
+// walletAccountIsUninitialized does for a never-deployed wallet. If neither question can be answered, this
+// refuses rather than guesses: being told "could not verify" costs a retry, guessing wrong costs a failed mint.
+async function usernameItemIsMinted(itemAddress) {
+  const itemProvider = await resolveUsernameNftItemProvider();
+  try {
+    const state = await itemProvider.getState({ address: itemAddress, ...criticalChainReadOptions() });
+    return state?.initialized === true;
+  } catch (getMethodError) {
+    const transport = globalThis.plathoTonRpcTransport;
+    if (typeof transport?.getAccountState === 'function') {
+      try {
+        const account = await transport.getAccountState({ address: itemAddress }, { skipIfRateLimited: false });
+        const status = String(
+          account?.state ?? account?.status ?? account?.account_state
+          ?? account?.result?.state ?? account?.result?.status ?? account?.result?.account_state ?? '',
+        ).trim().toLowerCase();
+        // An account that has never existed is the definitive "this name is free".
+        if (status === 'uninit' || status === 'uninitialized' || status === 'nonexist' || status === 'non_exist') {
+          return false;
+        }
+        // NO `active` BRANCH, deliberately. An earlier version of this returned false here with the comment
+        // "it exists but its get_state failed — that is a read problem", which contradicted itself: a read
+        // problem must fall through to the refusal below, not be answered. Worse, `active` is evidence of the
+        // OPPOSITE of free — with name_records deleted, the deployed per-name item IS the record that the name
+        // is taken. So on a toncenter hiccup against a genuinely registered name it reported "free" and sent the
+        // buyer into a mint that bounces: the exact hazard this helper exists to prevent, in its worst form,
+        // because the chain had actually answered and said the item was there.
+        // Falling through is also the conservative reading: `active` does not by itself prove initialized.
+      } catch { /* fall through to the refusal below */ }
+    }
+    const error = new Error('Could not verify whether this username is taken');
+    error.cause = getMethodError;
+    throw error;
+  }
+}
+
 async function readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username) {
-  if (!provider?.getNameRecordByUsername || !provider?.getPendingMint) {
+  if (!provider?.getUsernameItemAddress || !provider?.getPendingMint) {
     throw new Error('UsernameRegistry provider cannot verify username availability');
   }
   const readOptions = { address: registry, ...criticalChainReadOptions() };
   const nameHash = await computeUsernameNameHash(username);
   // Sequential, not Promise.all: concurrent toncenter reads stall the iOS run loop (v509 class). Pure
-  // availability reads on the username-mint pre-sign path — sequential preserves the same record/pending.
-  const record = await provider.getNameRecordByUsername(username, readOptions);
+  // availability reads on the username-mint pre-sign path — sequential preserves the same item/pending.
+  const itemAddress = await provider.getUsernameItemAddress(nameHash, readOptions);
+  const minted = await usernameItemIsMinted(itemAddress);
   const pending = await provider.getPendingMint(nameHash, readOptions);
-  if (record?.exists === true) {
+  if (minted) {
     throw new Error('Username is already registered');
   }
   if (pending?.exists === true) {
     throw new Error('Username mint is already pending');
   }
-  return { nameHash, record, pending };
+  return { nameHash, itemAddress, minted, pending };
 }
 
 async function resolveUsernameNftItemProvider() {
@@ -24218,31 +24260,41 @@ async function resolvePlathoUsernameOwner(label) {
   const displayLabel = `${username}.ath`;
   const registryAddress = requireUsernameRegistryAddress();
   const registryProvider = await resolveUsernameRegistryProvider();
-  if (!registryProvider?.getNameRecordByUsername || !registryProvider?.getNameRecord) {
+  if (!registryProvider?.getUsernameItemAddress) {
     throw new Error('UsernameRegistry provider cannot resolve .ath names');
   }
-  const record = await registryProvider.getNameRecordByUsername(displayLabel, {
+  // The registry's name_records map is gone (2026-07-20). It was never the right source anyway: it recorded the
+  // MINTER and a TEP-62 transfer left it stale, so this function already went to the item for the real owner and
+  // used the record only to learn the item's address. That address is a pure function of the name, so we ask for
+  // the derivation and drop the record entirely — one RPC round trip fewer, and no stale copy in the path.
+  const nameHash = await computeUsernameNameHash(displayLabel);
+  const itemAddress = await registryProvider.getUsernameItemAddress(nameHash, {
     address: registryAddress,
     ...criticalChainReadOptions(),
   });
-  if (record.exists !== true) throw new UsernameNotRegisteredError(`${displayLabel} is not registered`);
 
   const itemProvider = await resolveUsernameNftItemProvider();
   const proof = await resolveAuthoritativeUsernameItemOwnership({
     registryProvider,
     itemProvider,
-    itemAddress: record.item_address,
+    itemAddress,
     registryAddress,
     registryCallOptions: { address: registryAddress, ...criticalChainReadOptions() },
-    itemCallOptions: { address: record.item_address, ...criticalChainReadOptions() },
+    itemCallOptions: { address: itemAddress, ...criticalChainReadOptions() },
   });
+  // "Not registered" is now the item saying it was never initialised, which is the same fact the map used to
+  // carry — and it must stay a DISTINCT error from a failed read, because callers branch on it to decide whether
+  // to refuse a dialog outright or fall back and retry.
+  if (proof.reason === 'item_not_initialized') {
+    throw new UsernameNotRegisteredError(`${displayLabel} is not registered`);
+  }
   if (proof.authoritative !== true || !proof.owner_wallet) {
     throw new Error(`${displayLabel} ownership is not authoritative`);
   }
   return {
     label: displayLabel,
     ownerWallet: requireBasechainAddress(proof.owner_wallet, `${displayLabel} owner`),
-    record,
+    itemAddress,
     proof,
   };
 }
