@@ -487,7 +487,10 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
       .toEqual(['RS_FEE_TRANSPORT', 'RS_PROTOCOL_FEE', 'RS_PUBLISH_GAS', 'RS_RECORD_ENDOWMENT']);
     expect(minValueTerms(rec, 'RS_DEPLOY_MIN_VALUE').sort(), 'the deploy price adds the base endowment')
       .toEqual(['RS_BASE_ENDOWMENT', 'RS_MIN_VALUE']);
-    expect(recTerms.reduce((a, t) => a + constOf(rec, t), 0n), 'RecordShard RS_MIN_VALUE').toBe(13_400_000n);
+    // 13_400_000 -> 14_400_000 -> 15_600_000. Both moves are RS_FEE_TRANSPORT growing to carry the airdrop credit
+    // the deposit now sends; the 0.01 GRAM fee inside is untouched. The second figure was reasoned and wrong — the
+    // sink was measured LOSING 705_535 per capsule at it (tests/shard-fee-passthrough PT-04c).
+    expect(recTerms.reduce((a, t) => a + constOf(rec, t), 0n), 'RecordShard RS_MIN_VALUE').toBe(15_600_000n);
     // the record endowment carries the canonical G8 1.5x margin over its MEASURED 3 cells (not the 2 in the old note)
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT'), '3 cells x 64962 x 1yr x 1.5 = 292_329 -> 300_000').toBe(300_000n);
     // the airdrop pays 10 ATH per capsule, so a capsule must never cost LESS than the fee that backs it
@@ -500,7 +503,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
       .toEqual(['IS_FEE_TRANSPORT', 'IS_INTRO_ENDOWMENT', 'IS_PROTOCOL_FEE', 'IS_PUBLISH_GAS']);
     expect(minValueTerms(intro, 'IS_DEPLOY_MIN_VALUE').sort(), 'the deploy price adds the base endowment')
       .toEqual(['IS_BASE_ENDOWMENT', 'IS_MIN_VALUE']);
-    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(13_110_000n);
+    expect(introTerms.reduce((a, t) => a + constOf(intro, t), 0n), 'IntroShard IS_MIN_VALUE').toBe(15_310_000n);
     // The bounty exists because a STORAGE endowment cannot fund eviction: it is consumed by the storage it bought.
     // Both bounties are sized at measured marginal sweep gas x 1.5 — see tests/evict-incentive.test.ts.
     // Sized at the WORST case the contract permits, because marginal gas grows with dictionary depth and the
