@@ -431,9 +431,19 @@ describe('ATH wallet transfer profile', () => {
       notify_value: toNano('0.05'),
     } as ATHTransferRequestWithNotify);
 
-    expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
-    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    // [REWRITTEN 2026-07-19 with the tombstone removal.] This tail used to assert that the resend was BLOCKED —
+    // source still 900, recipient still 100 — because the permanent tombstone remembered the query_id forever.
+    // That tombstone is gone (see the state declaration in ATHWallet.tact for why it never protected the balance),
+    // so a resend after a prune now goes through. The property that matters is not that it is blocked, but that it
+    // is PAID FOR: the second transfer debits the source a second time, so it is a second genuine purchase and not
+    // value minted out of a replayed message. That is the exact residual the change accepts, so it is asserted here
+    // rather than left implicit.
+    expect((await sourceWallet.getGetWalletData()).balance, 'the resend debited the source a SECOND time').toBe(830n);
+    expect((await recipientWallet.getGetWalletData()).balance, 'and credited the recipient exactly that amount').toBe(170n);
+    // Conservation: every nanoATH credited is backed by one debited. 830 + 170 == 1000, the source's opening balance.
+    const srcBal = (await sourceWallet.getGetWalletData()).balance;
+    const dstBal = (await recipientWallet.getGetWalletData()).balance;
+    expect(srcBal + dstBal, 'nothing was minted and nothing was lost').toBe(1_000n);
   });
 
   it('ATH-XFER-05A: processed notification tombstone blocks duplicate refund after ACK', async () => {
@@ -653,7 +663,15 @@ describe('ATH wallet transfer profile', () => {
     expect((await recipientWallet.getGetPendingNotification(queryId, keyB)).exists).toBe(true);
   });
 
-  it('ATH-XFER-05C: processed notify tombstone is shared by username and profile-avatar variants', async () => {
+  // [REWRITTEN 2026-07-19 with the tombstone removal.] This case used to assert that the PERMANENT tombstone was
+  // shared across the plain / username / profile-avatar lanes, so a query_id burned on one was burned on all three
+  // forever. The tombstone is gone. What is still shared — and is the guard that actually protects the balance — is
+  // the IN-FLIGHT check (14315 / 14565 / 14665) over one common key derivation: while a notification is pending on
+  // any lane, the same key is refused on every lane. That is the only reachable double-processing window, so it is
+  // what this case now pins. The "a resend is paid for by a second debit" property is covered by ATH-XFER-05, which
+  // drives the real transfer path; here the reuse is a synthetic message from the source wallet's address and so
+  // does not debit it.
+  it('ATH-XFER-05C: the in-flight notify guard is shared by the username and profile-avatar lanes', async () => {
     const blockchain = await Blockchain.create();
     blockchain.now = 1_700_200_000;
     const sourceOwner = await blockchain.treasury('ath-transfer-shared-domain-source');
@@ -678,12 +696,10 @@ describe('ATH wallet transfer profile', () => {
       notify_value: toNano('0.03'),
     } as ATHTransferRequestWithNotify);
 
-    blockchain.now = (blockchain.now ?? 0) + ATH_PENDING_NOTIFICATION_TTL + 1;
-    await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
-      $$type: 'PruneStaleNotification',
-      query_id: queryId,
-      sender_key: key,
-    } as PruneStaleNotification);
+    // The notification is now PENDING. Both other lanes must refuse the same key while it is in flight — that is
+    // the shared guard, and the prune below deliberately comes AFTER these two probes so the refusals can only be
+    // the in-flight check and not anything left over from a prune.
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists, 'pending is in flight').toBe(true);
 
     const username = Buffer.from('platho', 'ascii');
     const usernameReuse = await blockchain.sendMessage(internal({
@@ -734,8 +750,20 @@ describe('ATH wallet transfer profile', () => {
       to: recipientAddress,
       success: false,
     })).toBeDefined();
-    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    // Neither refused message moved money, and the pending entry is untouched by the refusals.
+    expect((await recipientWallet.getGetWalletData()).balance, 'a refused lane credits nothing').toBe(100n);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists, 'and leaves the pending alone').toBe(true);
+
+    // Once the pending is genuinely cleared, the key is free again — a later transfer reusing it is a NEW transfer
+    // that must pay its own way, which is the behaviour the tombstone used to forbid outright. Pruning now FREES
+    // the entry rather than converting it into a permanent tombstone, so the wallet does not grow.
+    blockchain.now = (blockchain.now ?? 0) + ATH_PENDING_NOTIFICATION_TTL + 1;
+    await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'PruneStaleNotification',
+      query_id: queryId,
+      sender_key: key,
+    } as PruneStaleNotification);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists, 'prune cleared it').toBe(false);
   });
 
   it('ATH-XFER-05C2: Vault/system notification cannot be pruned after TTL', async () => {
