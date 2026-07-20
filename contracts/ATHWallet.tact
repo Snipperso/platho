@@ -286,8 +286,33 @@ contract ATHWallet {
     balance: Int as uint128;
     owner_address: Address;
     ath_master_address: Address;
+    // [DELETED 2026-07-19: processed_notifications, the permanent replay tombstone. DO NOT RESTORE IT.]
+    //
+    // It was one permanent map entry per inbound notification, with ZERO `.del` anywhere in this contract, on an
+    // account that is a SINGLETON for its owner — a jetton wallet is one per (owner, master) by TEP-74 and cannot be
+    // sharded. Measured: 3.00 cells/entry => ~21,845 inbound notifications, ever, then the ~65536-cell account
+    // ceiling is hit and writes fail SILENTLY (compute exit 0, ACTION code 50, wallet reports success). Since a
+    // .ath name and a paid avatar are both bought with ATH and land on the registry's ONE official wallet, that
+    // capped usernames and profiles at ~21,845 for the whole product, against a million-user target, forever.
+    //
+    // IT NEVER PROTECTED THE BALANCE, which is why deleting it is safe rather than a trade:
+    //   1. `derive_wallet_address` returns contractAddressExt(workchain, code, data) — the address IS the hash of
+    //      code+data, so gate 14311/14561/14661 proves the sender runs THIS EXACT bytecode. A forged sender wallet
+    //      cannot exist.
+    //   2. That same bytecode debits before sending and restores only via bounce, where the pending key is `.del`ed,
+    //      so a restore happens exactly once. Every credit is therefore backed by exactly one debit.
+    //   3. The credit happens on the INBOUND message; the tombstone was written LATER, on the ack. It could not
+    //      guard money that had already moved.
+    //   4. The one reachable double-processing window — a duplicate arriving while the first is still pending — is
+    //      closed by 14315/14565/14665, which are untouched.
+    // Replay safety now lives on the SEMANTIC key at the consumer, which is both stronger and the pattern this
+    // contract already uses: the TEP-74 lane below (`JettonInternalTransfer`) has never written a tombstone, and
+    // says so explicitly. UsernameRegistry rejects a repeat by name_hash (19172/19173); ProfileRegistry gained an
+    // equivalent gate on the full avatar pointer in the same change.
+    //
+    // Residual, stated plainly: a resend with the same query_id now reaches the registry. It is paid for by a
+    // SECOND debit, so it is a second genuine purchase, not minted value.
     pending_notifications: map<Int, PendingAthTransferNotification>;
-    processed_notifications: map<Int, Int>;
     pending_outgoing_transfers: map<Int, PendingAthOutgoingTransfer>;
 
     init(balance: Int, owner_address: Address, ath_master_address: Address) {
@@ -295,7 +320,6 @@ contract ATHWallet {
         self.owner_address = owner_address;
         self.ath_master_address = ath_master_address;
         self.pending_notifications = emptyMap();
-        self.processed_notifications = emptyMap();
         self.pending_outgoing_transfers = emptyMap();
     }
 
@@ -816,9 +840,11 @@ contract ATHWallet {
         throwUnless(14314, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
         let sender_key: Int = self.compute_sender_key(msg.query_id, msg.sender_owner);
         let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
+        // [14315 IS THE BALANCE GUARD, AND IT STAYS.] It blocks a duplicate while the first is still in flight —
+        // the only reachable double-processing window. The permanent tombstone that used to sit beside it (14317)
+        // was DELETED 2026-07-19; see the state declaration for why it never protected the balance.
         throwUnless(14315, !self.pending_notifications.exists(pending_key));
         throwUnless(14316, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14317, !self.processed_notifications.exists(pending_key));
 
         self.balance += msg.amount;
         self.pending_notifications.set(pending_key, PendingAthTransferNotification {
@@ -873,9 +899,11 @@ contract ATHWallet {
         throwUnless(14564, self.is_basechain_address(msg.owner_wallet));
         let sender_key: Int = self.compute_sender_key(msg.query_id, msg.sender_owner);
         let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
+        // 14565 is this lane's in-flight guard (see 14315). Its permanent-tombstone twin (14567) was deleted
+        // 2026-07-19; the username lane's replay guard is UsernameRegistry's own name_hash check (19172/19173),
+        // which is strictly stronger because it keys on WHAT was bought rather than on a message id.
         throwUnless(14565, !self.pending_notifications.exists(pending_key));
         throwUnless(14566, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14567, !self.processed_notifications.exists(pending_key));
 
         self.balance += msg.amount;
         self.pending_notifications.set(pending_key, PendingAthTransferNotification {
@@ -922,9 +950,11 @@ contract ATHWallet {
         throwUnless(14664, self.is_basechain_address(msg.owner_wallet));
         let sender_key: Int = self.compute_sender_key(msg.query_id, msg.sender_owner);
         let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
+        // 14665 is this lane's in-flight guard (see 14315). Its permanent-tombstone twin (14667) was deleted
+        // 2026-07-19. NOTE: unlike the username lane, ProfileRegistry carries NO replay guard of its own, so the
+        // avatar lane's protection now rests entirely on the pointer gate added there in the same change.
         throwUnless(14665, !self.pending_notifications.exists(pending_key));
         throwUnless(14666, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14667, !self.processed_notifications.exists(pending_key));
 
         self.balance += msg.amount;
         self.pending_notifications.set(pending_key, PendingAthTransferNotification {
@@ -983,15 +1013,18 @@ contract ATHWallet {
         let pending_key: Int = self.compute_pending_notification_key(msg.query_id, msg.sender_key);
         let pendingOpt: PendingAthTransferNotification? = self.pending_notifications.get(pending_key);
         if (pendingOpt == null) {
-            let processedAmount: Int? = self.processed_notifications.get(pending_key);
-            throwUnless(14342, processedAmount != null);
-            throwUnless(14345, processedAmount!! == msg.amount);
+            // A LATE OR DUPLICATE ACK IS A TOLERATED NO-OP, and that property is load-bearing: the owner is a
+            // registry, and a registry that acks twice (or acks after a prune) must not have its message bounce.
+            // This branch used to prove the ack matched a TOMBSTONE (14342/14345). With the tombstone gone there is
+            // nothing left to prove and nothing to do — this handler moves NO money, it only clears the pending
+            // entry and forwards a response ack, and with no pending there is neither. Returning quietly is the
+            // whole correct behaviour. Note 14340 above already restricts this receiver to the owner, so a stranger
+            // cannot reach it at all.
             return;
         }
         let pending: PendingAthTransferNotification = pendingOpt!!;
         throwUnless(14343, pending.amount == msg.amount);
         throwUnless(14344, self.compute_sender_key(msg.query_id, pending.sender_owner) == msg.sender_key);
-        self.processed_notifications.set(pending_key, msg.amount);
         self.pending_notifications.del(pending_key);
 
         message(MessageParameters {
@@ -1020,7 +1053,9 @@ contract ATHWallet {
         throwUnless(14351, self.compute_sender_key(msg.query_id, pending.sender_owner) == msg.sender_key);
         throwUnless(14352, now() >= pending.created_at + ATH_PENDING_NOTIFICATION_TTL);
         throwUnless(14353, pending.response_ack_value != ATH_VAULT_RESPONSE_ACK_VALUE);
-        self.processed_notifications.set(pending_key, pending.amount);
+        // Pruning now genuinely FREES the entry. It used to convert pending into a permanent tombstone, so the
+        // "prune" only moved the cost from one map to another that could never be reclaimed — the stale entry was
+        // cleared and the account grew anyway. With the tombstone gone this is a real reclaim.
         self.pending_notifications.del(pending_key);
     }
 
