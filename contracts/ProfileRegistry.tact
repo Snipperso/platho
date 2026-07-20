@@ -282,6 +282,30 @@ contract ProfileRegistry {
         let nextVersion: Int = 1;
         if (currentVersionOpt != null) {
             throwUnless(21113, currentVersionOpt!! < 4294967295);
+            // IDEMPOTENCY ON THE FULL AVATAR POINTER (21115). ATHWallet's permanent replay tombstone was deleted on
+            // 2026-07-19 because it capped the whole product at ~21,845 purchases; replay safety moved to the
+            // SEMANTIC key at the consumer, which is where UsernameRegistry already keeps it (19172/19173 on
+            // name_hash). This is that gate for the avatar lane: a payment that would rewrite the CURRENT pointer
+            // with the identical pointer is refused, so an accidental duplicate submit is bounced and REFUNDED
+            // (ATHWallet.refund_bounced_notification) instead of silently charging the user a second time.
+            //
+            // Deliberately compared against the CURRENT record only — NOT against a map of every pointer ever seen.
+            // Such a map would be permanent per-avatar state on an account whose ceiling is already the binding
+            // limit here (~13,100 profiles measured), i.e. it would rebuild the exact disease just cured.
+            //
+            // Deliberately the FULL pointer, not avatar_hash alone. The same image re-uploaded into a new stream
+            // after retention is a NEW stream_id/entry_id, and a hash-only gate would refuse it forever — the user
+            // would permanently lose the ability to restore their own avatar. A->B->A also stays legal: when A
+            // returns, the current pointer is B.
+            let currentRecordOpt: ProfileAvatarRecord? = self.avatar_records.get(self.computeAvatarRecordId(owner_wallet, currentVersionOpt!!));
+            if (currentRecordOpt != null) {
+                let current: ProfileAvatarRecord = currentRecordOpt!!;
+                let samePointer: Bool = (current.avatar_hash == avatar_hash)
+                    && (current.avatar_stream_id == avatar_stream_id)
+                    && (current.avatar_entry_id == avatar_entry_id)
+                    && (current.media_format == media_format);
+                throwUnless(21115, !samePointer);
+            }
             nextVersion = currentVersionOpt!! + 1;
         } else {
             self.profile_count += 1;

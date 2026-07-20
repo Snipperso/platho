@@ -1026,6 +1026,12 @@ builder $ProfileRegistry$_store(builder build_0, (slice, slice, slice, int, int,
     int $nextVersion = 1;
     if ((~ null?($currentVersionOpt))) {
         throw_unless(21113, ($currentVersionOpt < 4294967295));
+        tuple $currentRecordOpt = $ProfileAvatarRecord$_load_opt(__tact_dict_get_int_cell($self'avatar_records, 257, ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_computeAvatarRecordId($owner_wallet, $currentVersionOpt)));
+        if ((~ null?($currentRecordOpt))) {
+            var ($current'owner_wallet, $current'version, $current'avatar_hash, $current'avatar_entry_id, $current'avatar_stream_id, $current'avatar_part_count, $current'media_format, $current'updated_at) = $ProfileAvatarRecord$_not_null($currentRecordOpt);
+            int $samePointer = ( (( (( (($current'avatar_hash == $avatar_hash)) ? (($current'avatar_stream_id == $avatar_stream_id)) : (false) )) ? (($current'avatar_entry_id == $avatar_entry_id)) : (false) )) ? (($current'media_format == $media_format)) : (false) );
+            throw_unless(21115, (~ $samePointer));
+        }
         $nextVersion = ($currentVersionOpt + 1);
     } else {
         $self'profile_count = $self'profile_count + 1;
