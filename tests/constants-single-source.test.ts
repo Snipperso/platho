@@ -111,6 +111,27 @@ describe('CONST-SOURCE — the docs may not contradict the contracts', () => {
     }
   });
 
+  it('CONST-SOURCE-01D: every contract that names FeeAccumulator by address names the SAME one', () => {
+    // ESTABLISHED 2026-07-20, by probing mainnet rather than reasoning: the address these three constants carry
+    // has NO ACCOUNT AT ALL. toncenter omits only what has never existed, so nothing was ever deployed there.
+    // It is a PRE-GENESIS PLACEHOLDER — clean-17 has had no ceremony — and it must be recomputed from the final
+    // build and re-baked before one. Time was lost trying to "reproduce" it from ceremony-15 parameters; there
+    // was never anything to reproduce.
+    //
+    // Until that regeneration, the one thing that must hold is AGREEMENT: RecordShard, IntroShard and
+    // AirdropTicket all route the protocol fee and the airdrop credit through the same contract, and a fee sink
+    // that differs between the CONV lane, the INTRO lane and the ticket would split the airdrop in half
+    // silently — INTRO publishes would pay their fee somewhere no credit is ever minted.
+    const named = ['contracts/RecordShard.tact', 'contracts/IntroShard.tact', 'contracts/AirdropTicket.tact']
+      .map((p) => ({ file: p, addr: read(p).match(/address\("([^"]+)"\)/)?.[1] }));
+
+    for (const n of named) {
+      expect(n.addr, `${n.file} must name a fee sink address`).toBeTruthy();
+    }
+    const distinct = new Set(named.map((n) => n.addr));
+    expect(distinct.size, `all lanes must route to ONE fee accumulator, found: ${[...distinct].join(', ')}`).toBe(1);
+  });
+
   it('CONST-SOURCE-02: the protocol fee is one number — the contract charges what the spec promises', () => {
     // The owner states the economics as "0.01 GRAM per message -> 15 000 GRAM of liquidity at 1.5M messages".
     // If the contract constant and that prose ever part, the published economics stop being the shipped ones.
