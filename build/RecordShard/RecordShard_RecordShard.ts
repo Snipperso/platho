@@ -771,6 +771,77 @@ export function dictValueParserDepositProtocolFee(): DictionaryValue<DepositProt
     }
 }
 
+export type DepositCapsuleFee = {
+    $$type: 'DepositCapsuleFee';
+    amount: bigint;
+    lane: bigint;
+    init_arg0: bigint;
+    init_arg1: bigint;
+    publisher: Address;
+}
+
+export function storeDepositCapsuleFee(src: DepositCapsuleFee) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1381191750, 32);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeUint(src.lane, 8);
+        b_0.storeInt(src.init_arg0, 257);
+        b_0.storeInt(src.init_arg1, 257);
+        b_0.storeAddress(src.publisher);
+    };
+}
+
+export function loadDepositCapsuleFee(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1381191750) { throw Error('Invalid prefix'); }
+    const _amount = sc_0.loadUintBig(128);
+    const _lane = sc_0.loadUintBig(8);
+    const _init_arg0 = sc_0.loadIntBig(257);
+    const _init_arg1 = sc_0.loadIntBig(257);
+    const _publisher = sc_0.loadAddress();
+    return { $$type: 'DepositCapsuleFee' as const, amount: _amount, lane: _lane, init_arg0: _init_arg0, init_arg1: _init_arg1, publisher: _publisher };
+}
+
+export function loadTupleDepositCapsuleFee(source: TupleReader) {
+    const _amount = source.readBigNumber();
+    const _lane = source.readBigNumber();
+    const _init_arg0 = source.readBigNumber();
+    const _init_arg1 = source.readBigNumber();
+    const _publisher = source.readAddress();
+    return { $$type: 'DepositCapsuleFee' as const, amount: _amount, lane: _lane, init_arg0: _init_arg0, init_arg1: _init_arg1, publisher: _publisher };
+}
+
+export function loadGetterTupleDepositCapsuleFee(source: TupleReader) {
+    const _amount = source.readBigNumber();
+    const _lane = source.readBigNumber();
+    const _init_arg0 = source.readBigNumber();
+    const _init_arg1 = source.readBigNumber();
+    const _publisher = source.readAddress();
+    return { $$type: 'DepositCapsuleFee' as const, amount: _amount, lane: _lane, init_arg0: _init_arg0, init_arg1: _init_arg1, publisher: _publisher };
+}
+
+export function storeTupleDepositCapsuleFee(source: DepositCapsuleFee) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.amount);
+    builder.writeNumber(source.lane);
+    builder.writeNumber(source.init_arg0);
+    builder.writeNumber(source.init_arg1);
+    builder.writeAddress(source.publisher);
+    return builder.build();
+}
+
+export function dictValueParserDepositCapsuleFee(): DictionaryValue<DepositCapsuleFee> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeDepositCapsuleFee(src)).endCell());
+        },
+        parse: (src) => {
+            return loadDepositCapsuleFee(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type RecordEntry = {
     $$type: 'RecordEntry';
     frame_commit: bigint;
@@ -1077,7 +1148,7 @@ function initRecordShard_init_args(src: RecordShard_init_args) {
 }
 
 async function RecordShard_init(write_pubkey: bigint, epoch: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241020f01000415000114ff00f4a413f4bcf2c80b01020162020a04dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019ed3ffd31fd33ff404d31f55406c158e11810101d700810101d7005902d101706d21e206e3027025d74920c21f953105d31f06de21821052535031bae3023620821052535033bae302c00005c12115b00304080900de048020d7217021d749c21f9430d31f01de8210ff775609ba8e52d37f0131813559f8428d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d4c705f2f481355a01c200f2f44034c87f01ca0055405045cbff12cb1fcb3ff400cb1fc9ed54e05f0602fa5b04d33fd4d4d430d0d4d430f82382015180a90481355828a55220be9428a412bb923170e2f2f4813554f8416f24135f032bc00095820901dfa0958208cc77c0e2bef2f48135532a830bb9f2f48135555356bcf2f41048095520db3c33c882105253574401cb1f5260cb3f5230cbffc9f90081355608d026f91017f2f405060040c882105253464301cb1f03f9005003cbff01f90001cbff01f90001cbffc9f90001fc810101f82313c85902810101cf00810101cf00c9542260206e953059f45a30944133f415e204a48d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d482089eb1007f718208989680c8018210ff77560958cb1fcb7fc94343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000700da82080493e021c0019582083567e09170e2a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00443012c87f01ca0055405045cbff12cb1fcb3ff400cb1fc9ed5400e85b3333813557f82324a60282015180a88209e13380a0bcf2f46d70f842218100a270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010241023c87f01ca0055405045cbff12cb1fcb3ff400cb1fc9ed5400428e194034c87f01ca0055405045cbff12cb1fcb3ff400cb1fc9ed54e05f05f2c0820201200b0d015fbd4a976a268690000cf69ffe98fe99ffa02698faaa0360ac708c08080eb80408080eb802c816880b83690f16d9e362dc0c009e830b8209e133808208cc77c0820901dfa027a60282015180a823a082089896808d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d42b517b517b517a075523120163be200f6a268690000cf69ffe98fe99ffa02698faaa0360ac708c08080eb80408080eb802c816880b83690f12a826d9e3629c0e0064810101230259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e2206e9430707020e06f227f5928700623');
+    const __code = Cell.fromHex('b5ee9c7241021101000436000114ff00f4a413f4bcf2c80b01020162020c04dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019ed3ffd31fd33ff404d31f55406c158e11810101d700810101d7005902d101706d21e206e3027025d74920c21f953105d31f06de21821052535031bae3023620821052535033bae302c00005c12115b003040a0b00e4048020d7217021d749c21f9430d31f01de821052535046ba8e55d37fd307593031813559f8428d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d4c705f2f481355a01c200f2f44034c87f01ca0055405045cbff12cb1fcb3ff400cb1fc9ed54e05f0602fa5b04d33fd4d4d430d0d4d430f82382015180a90481355828a55220be9428a412bb923170e2f2f4813554f8416f24135f032bc0009582091121e0958208dbba00e2bef2f48135532a830bb9f2f48135555356bcf2f41048095520db3c33c882105253574401cb1f5260cb3f5230cbffc9f90081355608d026f91017f2f405060040c882105253464301cb1f03f9005003cbff01f90001cbff01f90001cbffc9f90001fe810101f82313c85902810101cf00810101cf00c9542260206e953059f45a30944133f415e204a48d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d48208adf3407f71820898968070f842546990c855408210525350465006cb1f14cb7f12cb07810101cf00810101cf00cec94343c80702d889cf16ca00cf8440ce01fa02806acf40f400c901fb0082080493e021c0019582083567e09170e2a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb004430120809000160002ec87f01ca0055405045cbff12cb1fcb3ff400cb1fc9ed5400e85b3333813557f82324a60282015180a88209e13380a0bcf2f46d70f842218100a270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010241023c87f01ca0055405045cbff12cb1fcb3ff400cb1fc9ed5400428e194034c87f01ca0055405045cbff12cb1fcb3ff400cb1fc9ed54e05f05f2c0820201200d0f015fbd4a976a268690000cf69ffe98fe99ffa02698faaa0360ac708c08080eb80408080eb802c816880b83690f16d9e362dc0e009e830b8209e133808208dbba0082091121e027a60282015180a823a082089896808d086000a11746cfbae6383973f1f5521ea751d38baa40ec227f00db91bd4ca0acadc4d42b517b517b517a075523120163be200f6a268690000cf69ffe98fe99ffa02698faaa0360ac708c08080eb80408080eb802c816880b83690f12a826d9e3629c100064810101230259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e2206e9430707020e06f227f59bd66995c');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initRecordShard_init_args({ $$type: 'RecordShard_init_args', write_pubkey, epoch })(builder);
@@ -1177,6 +1248,7 @@ const RecordShard_types: ABIType[] = [
     {"name":"CapsulePublish","header":1381191729,"fields":[{"name":"seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"sig","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"RetireShard","header":1381191731,"fields":[]},
     {"name":"DepositProtocolFee","header":4286010889,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"DepositCapsuleFee","header":1381191750,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"lane","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"init_arg0","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"init_arg1","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"publisher","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"RecordEntry","header":null,"fields":[{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"CapsuleRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"frame_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"RecordShardView","header":null,"fields":[{"name":"write_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_seq","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"deploy_min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"protocol_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retire_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"fee_sink","type":{"kind":"simple","type":"address","optional":false}}]},
@@ -1187,6 +1259,7 @@ const RecordShard_opcodes = {
     "CapsulePublish": 1381191729,
     "RetireShard": 1381191731,
     "DepositProtocolFee": 4286010889,
+    "DepositCapsuleFee": 1381191750,
 }
 
 const RecordShard_getters: ABIGetter[] = [
@@ -1214,11 +1287,11 @@ export const RS_BASE_ENDOWMENT = 3500000n;
 export const RS_PUBLISH_GAS = 2500000n;
 export const RS_PROTOCOL_FEE = 10000000n;
 export const RS_FEE_SINK = address("EQAUIujZ91zHBy5-PqpD1Oo6cXVIHYRP4BtyN6mUFZW4muQf");
-export const RS_FEE_SINK_DEPOSIT_RESERVE = 400000n;
+export const RS_FEE_SINK_DEPOSIT_RESERVE = 1400000n;
 export const RS_FEE_SINK_FWD_RESERVE = 200000n;
-export const RS_FEE_TRANSPORT = 600000n;
-export const RS_MIN_VALUE = 13400000n;
-export const RS_DEPLOY_MIN_VALUE = 16900000n;
+export const RS_FEE_TRANSPORT = 1600000n;
+export const RS_MIN_VALUE = 14400000n;
+export const RS_DEPLOY_MIN_VALUE = 17900000n;
 
 export class RecordShard implements Contract {
     

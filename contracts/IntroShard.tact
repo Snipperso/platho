@@ -105,7 +105,9 @@ const IS_FEE_SINK: Address = address("EQAUIujZ91zHBy5-PqpD1Oo6cXVIHYRP4BtyN6mUFZ
 
 // TRANSPORT, PAID BY THE PUBLISHER [OWNER 2026-07-19], so the fee reaches the pool whole.
 // Mirror of FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE (gate 15002); pinned against it in tests.
-const IS_FEE_SINK_DEPOSIT_RESERVE: Int = 400000;
+// RAISED 400_000 -> 1_400_000, same reason as RecordShard: the sink credits an airdrop ticket out of this
+// deposit and gate 15056 demands amount + 1_200_000. The 0.01 GRAM fee still reaches the pool whole.
+const IS_FEE_SINK_DEPOSIT_RESERVE: Int = 1400000;
 // Forward fee for the deposit message; measured ~75_000 and flat in shard size. Slack here returns to the
 // publisher with their change, so generosity is free and tightness is not.
 const IS_FEE_SINK_FWD_RESERVE: Int = 200000;
@@ -138,6 +140,19 @@ message(0x49535033) RetireShard {}
 message(0xFF775609) DepositProtocolFee {
     amount: Int as uint128;
 }
+
+// The airdrop-bearing deposit, mirroring FeeAccumulator's opcode. Carries the publisher (stamped by the VM from
+// sender(), never from the body) and this shard's own init arguments POSITIONALLY, so the sink can rebuild this
+// address from its bound code and prove the deposit came from a real shard. `lane` says which code that is —
+// the two lanes have different init arguments, so naming the fields would bake in one lane's shape.
+message(0x52535046) DepositCapsuleFee {
+    amount: Int as uint128;
+    lane: Int as uint8;
+    init_arg0: Int as int257;
+    init_arg1: Int as int257;
+    publisher: Address;
+}
+
 
 struct IntroEntry {
     r: Int;
@@ -249,7 +264,9 @@ contract IntroShard {
             value: IS_PROTOCOL_FEE + IS_FEE_SINK_DEPOSIT_RESERVE,
             bounce: true,
             mode: SendPayFwdFeesSeparately,
-            body: DepositProtocolFee{ amount: IS_PROTOCOL_FEE }.toCell(),
+            body: DepositCapsuleFee{ amount: IS_PROTOCOL_FEE, lane: 1,
+                                     init_arg0: self.epoch, init_arg1: self.bucket,
+                                     publisher: sender() }.toCell(),
         });
 
         // Reserve the INCREMENT on top of the balance already held (see RecordShard for the full reasoning and the
@@ -282,7 +299,7 @@ contract IntroShard {
     // the money stays in this account, mixed with the rent, which is the sole case where that happens and it is
     // an error path rather than the design. Handled explicitly so the bounce does not abort; the sender gate
     // stands because the bounced flag is an ordinary header bit any account may set. Should be unreachable.
-    bounced(msg: bounced<DepositProtocolFee>) {
+    bounced(msg: bounced<DepositCapsuleFee>) {
         throwUnless(13685, sender() == IS_FEE_SINK);
         throwUnless(13686, msg.amount > 0);
     }

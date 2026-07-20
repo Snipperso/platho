@@ -4,9 +4,9 @@ PROGRAM{
   DECLPROC __tact_context_get_sender
   DECLPROC __tact_dict_get_int_cell
   DECLPROC __tact_dict_set_int_cell
-  DECLPROC $DepositProtocolFee$_store
-  DECLPROC $DepositProtocolFee$_store_cell
-  DECLPROC $DepositProtocolFee$_load_bounced
+  DECLPROC $DepositCapsuleFee$_store
+  DECLPROC $DepositCapsuleFee$_store_cell
+  DECLPROC $DepositCapsuleFee$_load_bounced
   DECLPROC $IntroEntry$_store
   DECLPROC $IntroEntry$_store_cell
   DECLPROC $IntroEntry$_load
@@ -35,7 +35,7 @@ PROGRAM{
   DECLPROC $IntroShard$_fun_get_view
   DECLPROC $IntroEntry$_constructor_r_view_tag_body_commit_created_at
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
-  DECLPROC $DepositProtocolFee$_constructor_amount
+  DECLPROC $DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
   97744 DECLMETHOD %get_scan_page
   80118 DECLMETHOD %get_entry
@@ -75,20 +75,29 @@ PROGRAM{
       DICTISETREF
     }>
   }>
-  $DepositProtocolFee$_store PROCINLINE:<{
-    4286010889 PUSHINT
-    ROT
+  $DepositCapsuleFee$_store PROCINLINE:<{
+    1381191750 PUSHINT
+    s0 s6 XCHG2
     32 STU
+    s1 s4 XCHG
     128 STU
+    s1 s2 XCHG
+    8 STU
+    257 PUSHINT
+    STIX
+    257 PUSHINT
+    STIX
+    STSLICE
   }>
-  $DepositProtocolFee$_store_cell PROCINLINE:<{
-    SWAP
-    $DepositProtocolFee$_store INLINECALLDICT
+  $DepositCapsuleFee$_store_cell PROCINLINE:<{
+    5 -ROLL
+    $DepositCapsuleFee$_store INLINECALLDICT
     ENDC
   }>
-  $DepositProtocolFee$_load_bounced PROCINLINE:<{
+  $DepositCapsuleFee$_load_bounced PROCINLINE:<{
     128 LDU
-    SWAP
+    8 LDU
+    -ROT
   }>
   $IntroEntry$_store PROCINLINE:<{
     s3 s4 XCHG2
@@ -362,8 +371,8 @@ PROGRAM{
   $IntroShard$_fun_get_view PROCREF:<{
     604800 PUSHINT
     8000 PUSHINT
-    13110000 PUSHINT
-    15610000 PUSHINT
+    14110000 PUSHINT
+    16610000 PUSHINT
     s7 PUSH
     2 ADDCONST
     86400 PUSHINT
@@ -388,7 +397,7 @@ PROGRAM{
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
   }>
-  $DepositProtocolFee$_constructor_amount PROCINLINE:<{
+  $DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher PROCINLINE:<{
   }>
   $SendParameters$_constructor_to_value_mode_bounce PROCINLINE:<{
     s1 s3 XCHG
@@ -448,10 +457,11 @@ PROGRAM{
         32 LDU
         SWAP
       }>
-      4286010889 PUSHINT
+      1381191750 PUSHINT
       EQUAL
       IFJMP:<{
-        $DepositProtocolFee$_load_bounced INLINECALLDICT
+        $DepositCapsuleFee$_load_bounced INLINECALLDICT
+        DROP
         NIP
         13685 PUSHINT
         __tact_context_get_sender INLINECALLDICT
@@ -513,9 +523,9 @@ PROGRAM{
       s9 PUSH
       0 EQINT
       IF:<{
-        15610000 PUSHINT
+        16610000 PUSHINT
       }>ELSE<{
-        13110000 PUSHINT
+        14110000 PUSHINT
       }>
       GEQ
       THROWANYIFNOT
@@ -545,13 +555,16 @@ PROGRAM{
       SWAP
       INC
           B{b5ee9c724101010100240000438002845d1b3eeb98e0e5cfc7d5487a9d474e2ea903b089fc036e46f53282b2b713502c75c0ca} B>boc <s PUSHSLICE
-      10400000 PUSHINT
+      11400000 PUSHINT
       TRUE
       1 PUSHINT
       10000000 PUSHINT
-      $DepositProtocolFee$_constructor_amount INLINECALLDICT
+      OVER
+      __tact_context_get_sender INLINECALLDICT
+      s9 s10 s(-2) PU2XC
+      $DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher INLINECALLDICT
       NEWC
-      $DepositProtocolFee$_store_cell INLINECALLDICT
+      $DepositCapsuleFee$_store_cell INLINECALLDICT
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true

@@ -122,7 +122,10 @@ const RS_FEE_SINK: Address = address("EQAUIujZ91zHBy5-PqpD1Oo6cXVIHYRP4BtyN6mUFZ
 // recoverable through FeeAccumulator.SweepUnaccounted while a shortfall is quietly paid by the owner. If the two
 // constants ever drift apart the deposit is refused, so PT-04 in tests/shard-fee-passthrough.test.ts reads both
 // out of the sources and pins them against each other.
-const RS_FEE_SINK_DEPOSIT_RESERVE: Int = 400000;
+// RAISED 400_000 -> 1_400_000: the sink now credits an airdrop ticket out of this deposit, and its gate 15056
+// demands amount + FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE (1_200_000). The protocol fee itself is untouched
+// and still reaches the pool whole — only the transport the publisher pays grows.
+const RS_FEE_SINK_DEPOSIT_RESERVE: Int = 1400000;
 // The forward fee for the deposit message. MEASURED 2026-07-19 at ~75_000, and flat in shard size because the
 // deposit body is a fixed 160 bits. 200_000 keeps ~2.7x headroom against a config-25 repricing; unlike the
 // deposit reserve, slack here is simply returned to the publisher with their change, so it is free to be
@@ -177,6 +180,18 @@ message(0x52535033) RetireShard {}
 // project, so the sink's message type is mirrored rather than imported. The opcode is what must match.
 message(0xFF775609) DepositProtocolFee {
     amount: Int as uint128;
+}
+
+// The airdrop-bearing deposit, mirroring FeeAccumulator's opcode. Carries the publisher (stamped by the VM from
+// sender(), never from the body) and this shard's own init arguments POSITIONALLY, so the sink can rebuild this
+// address from its bound code and prove the deposit came from a real shard. `lane` says which code that is —
+// the two lanes have different init arguments, so naming the fields would bake in one lane's shape.
+message(0x52535046) DepositCapsuleFee {
+    amount: Int as uint128;
+    lane: Int as uint8;
+    init_arg0: Int as int257;
+    init_arg1: Int as int257;
+    publisher: Address;
 }
 
 struct RecordEntry {
@@ -284,7 +299,9 @@ contract RecordShard {
             value: RS_PROTOCOL_FEE + RS_FEE_SINK_DEPOSIT_RESERVE,
             bounce: true,
             mode: SendPayFwdFeesSeparately,
-            body: DepositProtocolFee{ amount: RS_PROTOCOL_FEE }.toCell(),
+            body: DepositCapsuleFee{ amount: RS_PROTOCOL_FEE, lane: 0,
+                                     init_arg0: self.write_pubkey, init_arg1: self.epoch,
+                                     publisher: sender() }.toCell(),
         });
 
         // Reserve the INCREMENT this message adds, ON TOP OF the balance the account already had
@@ -342,7 +359,7 @@ contract RecordShard {
     // transaction; the sender gate stands because the bounced flag is an ordinary header bit any account may set.
     // This should be unreachable: the deposit carries exactly what gate 15002 demands, and FeeAccumulator is
     // deployed at genesis and immutable. tests/shard-fee-passthrough.test.ts covers it anyway.
-    bounced(msg: bounced<DepositProtocolFee>) {
+    bounced(msg: bounced<DepositCapsuleFee>) {
         throwUnless(13657, sender() == RS_FEE_SINK);
         throwUnless(13658, msg.amount > 0);
     }
