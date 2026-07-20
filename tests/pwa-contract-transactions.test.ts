@@ -452,7 +452,9 @@ describe('PWA contract transaction builders', () => {
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(69_000_000n);
     expect(() => estimateAthWalletAttachedValueNanotons('WalletProductMintUsername', { notify_value: 32_000_000n })).toThrow(/Unsupported ATHWallet message type/);
     expect(() => estimateAthWalletAttachedValueNanotons('WalletProductProfileAvatar', { notify_value: 30_000_000n })).toThrow(/Unsupported ATHWallet message type/);
-    expect(ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue).toBe(30_000_000n);
+    // Raised 30M -> 45M on 2026-07-20: at 30M a refused registry purchase refunded only 24,037,796, under the 26M
+    // that gate 14212 demands on arrival, so the buyer's ATH was stranded. See ath-notify-refund-floor.test.ts.
+    expect(ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue).toBe(45_000_000n);
   });
 
   it('PWA-TX-07B: Vault ATH deposit uses the current 32m notify envelope', () => {

@@ -127,7 +127,9 @@ export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
   internalTransferAckValue: 3_000_000n,
   internalTransferSourceAckValue: 1_000_000n,
   internalTransferFwdFeeAllowance: 21_000_000n,
-  transferNotifyMinValue: 30_000_000n,
+  // Mirrors ATH_TRANSFER_NOTIFY_MIN_VALUE. Raised 30M -> 45M on 2026-07-20: at 30M a REFUSED registry purchase
+  // refunded only 24,037,796, below the 26M that gate 14212 demands on arrival, so the buyer's ATH was stranded.
+  transferNotifyMinValue: 45_000_000n,
   transferNotifyStorageEndowment: 20_000_000n,
   internalTransferExec: 2_000_000n,
   burnNotificationExec: 2_000_000n,
