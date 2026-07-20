@@ -101,13 +101,14 @@ const IS_PROTOCOL_FEE: Int = 10000000;
 // pointing at the old one — every publish's fee bounced straight back, caught by tests/shard-fee-passthrough.
 // So the constraint is real and it is this: FeeAccumulator code -> its address -> shard code -> shard addresses.
 // No cycle, but it must be walked in that order at genesis, and PT-04/PIN pins the result.
-const IS_FEE_SINK: Address = address("EQCRhugA2UH2olOQVtTh8hnpbtTEND0ZXW1yDSmY3NsWARDa");
+const IS_FEE_SINK: Address = address("EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7");
 
 // TRANSPORT, PAID BY THE PUBLISHER [OWNER 2026-07-19], so the fee reaches the pool whole.
-// Mirror of FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE (gate 15002); pinned against it in tests.
-// RAISED 400_000 -> 1_400_000, same reason as RecordShard: the sink credits an airdrop ticket out of this
-// deposit and gate 15056 demands amount + 1_200_000. The 0.01 GRAM fee still reaches the pool whole.
-const IS_FEE_SINK_DEPOSIT_RESERVE: Int = 1400000;
+// Mirror of FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE (gate 15056); pinned against it in tests.
+// 400_000 -> 1_400_000 -> 2_600_000, same reason and the same measurement as RecordShard: authenticating the
+// sender by deriving its address costs 636,134 on its own, and the airdrop credit leg costs 1,469,401 more.
+// MEASURED 2026-07-20. The 0.01 GRAM fee still reaches the pool whole; only the transport grows.
+const IS_FEE_SINK_DEPOSIT_RESERVE: Int = 2600000;
 // Forward fee for the deposit message; measured ~75_000 and flat in shard size. Slack here returns to the
 // publisher with their change, so generosity is free and tightness is not.
 const IS_FEE_SINK_FWD_RESERVE: Int = 200000;

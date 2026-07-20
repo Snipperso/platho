@@ -110,22 +110,27 @@ const RS_PROTOCOL_FEE: Int = 10000000;
 // pointing at the old one — every publish's fee bounced straight back, caught by tests/shard-fee-passthrough.
 // So the constraint is real and it is this: FeeAccumulator code -> its address -> shard code -> shard addresses.
 // No cycle, but it must be walked in that order at genesis, and PT-04/PIN pins the result.
-const RS_FEE_SINK: Address = address("EQCRhugA2UH2olOQVtTh8hnpbtTEND0ZXW1yDSmY3NsWARDa");
+const RS_FEE_SINK: Address = address("EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7");
 
 // TRANSPORT OF THE FEE, PAID BY THE PUBLISHER. [OWNER 2026-07-19, asked directly whose column this comes out of:
 // "естественно платит публикатор... Рожа у пользователей не треснет?"] So the fee arrives at the pool WHOLE —
 // 15_000 GRAM, not 14_550 — and the publish minimum carries the cost instead. It is the same ~450 GRAM either
 // way; only the payer differs.
 //
-// Mirror of FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE, which gate 15002 demands on top of the principal. Measured
-// there at 199_068 against the live mainnet gas config, then sized at 400_000 — 2x, because the surplus is
-// recoverable through FeeAccumulator.SweepUnaccounted while a shortfall is quietly paid by the owner. If the two
-// constants ever drift apart the deposit is refused, so PT-04 in tests/shard-fee-passthrough.test.ts reads both
-// out of the sources and pins them against each other.
-// RAISED 400_000 -> 1_400_000: the sink now credits an airdrop ticket out of this deposit, and its gate 15056
-// demands amount + FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE (1_200_000). The protocol fee itself is untouched
-// and still reaches the pool whole — only the transport the publisher pays grows.
-const RS_FEE_SINK_DEPOSIT_RESERVE: Int = 1400000;
+// Mirror of FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE, which gate 15056 demands on top of the principal. If the
+// two constants drift apart the deposit is refused and the fee bounces back here, so PT-04 in
+// tests/shard-fee-passthrough.test.ts reads both out of the sources and pins them against each other.
+//
+// 400_000 -> 1_400_000 -> 2_600_000. The first raise was reasoning, the second is measurement. Both earlier
+// figures descend from 199_068 — the cost of the OLD permissionless deposit, which did no sender proof at all.
+// The capsule deposit now derives the shard's address to authenticate it (9,542 gas = 636,134 on its own) and
+// then sends an airdrop credit with StateInit attached, and the two together cost the sink 2,105,535. MEASURED
+// 2026-07-20; see the comment on FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE for the full decomposition.
+//
+// The protocol fee itself is untouched and still reaches the pool whole — only the transport the publisher pays
+// grows, from 0.0134 to 0.0156 GRAM per capsule. That is the airdrop credit's real price, charged to the
+// publisher who receives the airdrop.
+const RS_FEE_SINK_DEPOSIT_RESERVE: Int = 2600000;
 // The forward fee for the deposit message. MEASURED 2026-07-19 at ~75_000, and flat in shard size because the
 // deposit body is a fixed 160 bits. 200_000 keeps ~2.7x headroom against a config-25 repricing; unlike the
 // deposit reserve, slack here is simply returned to the publisher with their change, so it is free to be

@@ -697,7 +697,7 @@ _ %get_state() method_id(86957) {
         throw_unless(15054, ($msg'amount > 0));
         throw_unless(15058, ( (($msg'lane == 0)) ? (true) : (($msg'lane == 1)) ));
         throw_unless(15055, ( (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'accrual_seq)~$FeeAccumulator$_fun_laneCodeBound($msg'lane)) ? (( equal_slices_bits(__tact_context_get_sender(), ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'accrual_seq)~$FeeAccumulator$_fun_laneShardAddress($msg'lane, $msg'init_arg0, $msg'init_arg1)) )) : (false) ));
-        throw_unless(15056, ($Context$_get_value(__tact_context_get()) >= ($msg'amount + 1200000)));
+        throw_unless(15056, ($Context$_get_value(__tact_context_get()) >= ($msg'amount + 2600000)));
         $self'accumulated_ton = $self'accumulated_ton + $msg'amount;
         if ((~ null?($self'ticket_code))) {
             cell $data = $Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint($global_beginCell(), 0, 1), $msg'publisher));

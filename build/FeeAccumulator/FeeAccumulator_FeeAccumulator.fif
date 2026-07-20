@@ -661,7 +661,7 @@ PROGRAM{
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       s13 PUSH
-      1200000 PUSHINT
+      2600000 PUSHINT
       ADD
       GEQ
       THROWANYIFNOT
