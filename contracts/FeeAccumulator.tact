@@ -74,6 +74,60 @@ message(0x594BA505) AcceptBurnReserve {
     amount: Int as uint128;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// AIRDROP ACCRUAL — this contract is the hub, because it is already the one place every published capsule
+// touches exactly once.
+//
+// The problem it solves: AirdropPool must pay 10 ATH per published capsule, but nothing could authenticate a
+// publish. AirdropPool cannot derive a shard address, because doing so would put shard code inside its own
+// code, and shard code embeds THIS contract's address — a build cycle. FeeAccumulator escapes it by BINDING
+// the shard code cell at genesis as runtime data instead of compiling it in: this contract's address is fixed
+// before the shard is built, the shard names it as a constant, and the derivation still works.
+//
+// Build order, and it is not optional:
+//   FeeAccumulator -> its address -> RecordShard.RS_FEE_SINK and AirdropTicket.AT_FEE_SINK -> their code cells
+//   -> bound back into FeeAccumulator at genesis, before the seal.
+const FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE: Int = 1200000;   // deposit exec + the ticket credit leg
+const FEEACCUMULATOR_TICKET_CREDIT_VALUE: Int = 600000;         // what a TicketCredit carries
+const FEEACCUMULATOR_ACCRUE_LEG_VALUE: Int = 60000000;          // AirdropPool gate 26114 demands exactly this
+const FEEACCUMULATOR_REDEEM_EXEC_RESERVE: Int = 2000000;
+
+// The shard's fee deposit, carrying what the pool needs and the shard alone can prove: its own identity
+// (write_pubkey, epoch — stamped from the shard's state, never from a message body) and the publisher it
+// took the value from (sender(), stamped by the VM).
+message(0x52535046) DepositCapsuleFee {
+    amount: Int as uint128;
+    write_pubkey: Int as uint256;
+    epoch: Int as uint32;
+    publisher: Address;
+}
+
+message(0x41544331) TicketCredit {}
+
+// Mirrors AirdropTicket.TicketRedeem. credits_k FIRST so a bounce (first 224 bits only) can restore it.
+message(0x41544333) TicketRedeem {
+    credits_k: Int as uint32;
+    owner: Address;
+}
+
+message(0x41544334) TicketRedeemAck {
+    credits_k: Int as uint32;
+}
+
+// Mirrors AirdropPool.AirdropAccrue — declared locally with its opcode rather than imported, the same way
+// RecordShard declares DepositProtocolFee. Importing would drag AirdropPool's code in and rebuild the cycle.
+message(0x41445210) AirdropAccrue {
+    purchase_id: Int as uint64;
+    buyer: Address;
+    credits_k: Int as uint32;
+}
+
+// Genesis binds. Authority is the treasury receiver — an immutable init parameter, the same authority
+// EnableBuybackSplit already uses (15012). Each is one-shot, so nothing here can be repointed later.
+message(0xFA110001) BindShardCode { shard_code: Cell }
+message(0xFA110002) BindTicketCode { ticket_code: Cell }
+message(0xFA110003) BindAirdropPool { airdrop_pool_address: Address }
+
 struct FeeAccumulatorStateView {
     accumulated_ton: Int;
     treasury_due_ton: Int;
@@ -92,8 +146,19 @@ contract FeeAccumulator {
     buyback_due_ton: Int as uint128;
     buyback_split_enabled: Bool;
     storage_reserve_ton: Int as coins;
+    // Airdrop accrual wiring, all bound at genesis. Nullable rather than flagged: an unbound code cell is
+    // exactly the "accrual is off" state, and the deposit path below simply skips crediting — so a genesis
+    // that never binds them yields a working fee accumulator with no airdrop, not a broken one.
+    shard_code: Cell?;
+    ticket_code: Cell?;
+    airdrop_pool_address: Address?;
+    accrual_seq: Int as uint64;
 
     init(treasury_receiver_address: Address, buyback_burn_address: Address) {
+        self.shard_code = null;
+        self.ticket_code = null;
+        self.airdrop_pool_address = null;
+        self.accrual_seq = 0;
         self.treasury_receiver_address = treasury_receiver_address;
         self.buyback_burn_address = buyback_burn_address;
         self.accumulated_ton = 0;
@@ -112,6 +177,118 @@ contract FeeAccumulator {
         throwUnless(15002, context().value >= msg.amount + FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE);
 
         self.accumulated_ton += msg.amount;
+    }
+
+    fun requireTreasury() {
+        throwUnless(15050, sender() == self.treasury_receiver_address);
+    }
+
+    receive(msg: BindShardCode) {
+        self.requireTreasury();
+        throwUnless(15051, self.shard_code == null);
+        self.shard_code = msg.shard_code;
+    }
+
+    receive(msg: BindTicketCode) {
+        self.requireTreasury();
+        throwUnless(15052, self.ticket_code == null);
+        self.ticket_code = msg.ticket_code;
+    }
+
+    receive(msg: BindAirdropPool) {
+        self.requireTreasury();
+        throwUnless(15053, self.airdrop_pool_address == null);
+        self.airdrop_pool_address = msg.airdrop_pool_address;
+    }
+
+    // The address a contract occupies IS the hash of its code and data, so rebuilding that hash and comparing
+    // it to sender() proves the sender runs exactly the bound bytecode. Only init ARGUMENTS enter the data
+    // cell, behind a one-bit lazy-init flag — pinned against the real builder output by
+    // tests/shard-address-derivation.test.ts, so a compiler change cannot silently turn this into a check that
+    // passes for everyone.
+    fun deriveFromBoundCode(code: Cell, data: Cell): Address {
+        return contractAddressExt(0, code, data);
+    }
+
+    fun shardAddress(write_pubkey: Int, epoch: Int): Address {
+        return self.deriveFromBoundCode(self.shard_code!!, beginCell()
+            .storeUint(0, 1)
+            .storeInt(write_pubkey, 257)
+            .storeInt(epoch, 257)
+            .endCell());
+    }
+
+    fun ticketAddress(owner: Address): Address {
+        return self.deriveFromBoundCode(self.ticket_code!!, beginCell()
+            .storeUint(0, 1)
+            .storeAddress(owner)
+            .endCell());
+    }
+
+    // THE ACCRUAL ENTRY POINT. Unlike DepositProtocolFee below, this one is NOT permissionless: it credits an
+    // airdrop, so an open door here would mint 10 ATH per call to anyone. 15055 is what closes it.
+    receive(msg: DepositCapsuleFee) {
+        throwUnless(15054, msg.amount > 0);
+        throwUnless(15055, self.shard_code != null && sender() == self.shardAddress(msg.write_pubkey, msg.epoch));
+        throwUnless(15056, context().value >= msg.amount + FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE);
+
+        // The fee is accounted exactly as a plain deposit — the airdrop changes who gets credited, never how
+        // much reaches the pool. The owner's arithmetic (1.5M capsules x 0.01 GRAM = 15,000 GRAM) depends on
+        // this line staying whole.
+        self.accumulated_ton += msg.amount;
+
+        if (self.ticket_code != null) {
+            // StateInit is attached on EVERY credit, not just the first. A ticket that does not exist yet
+            // would otherwise swallow its credit and silently cost the publisher their airdrop; attaching it
+            // to an already-deployed account is simply ignored by the network.
+            //
+            // MEASURED 2026-07-20 (tests/fee-accumulator-accrual.test.ts), by building this send BOTH ways:
+            //     with StateInit     1,295,132 per credit
+            //     without StateInit    949,489
+            //     => the redundant StateInit costs 345,643 = 3.46% of the 10,000,000 fee
+            // A design review had estimated ~1,000,000 (10%) and concluded onboarding must pre-deploy tickets
+            // to avoid it. The real figure is 3x smaller, and it buys the guarantee that no publisher can ever
+            // lose a credit to a ticket that did not exist yet. Removing the two lines below fails FAACC-01
+            // and FAACC-03 — the credits go nowhere.
+            let data: Cell = beginCell().storeUint(0, 1).storeAddress(msg.publisher).endCell();
+            send(SendParameters {
+                to: self.ticketAddress(msg.publisher),
+                value: FEEACCUMULATOR_TICKET_CREDIT_VALUE,
+                mode: SendPayGasSeparately,
+                bounce: false,
+                code: self.ticket_code!!,
+                data: data,
+                body: TicketCredit{}.toCell(),
+            });
+        }
+    }
+
+    // A ticket asks for its accumulated credits to be delivered. Authenticated the same structural way: the
+    // ticket's address commits to its owner, so a redeem naming someone else's owner cannot come from an
+    // address that derives to it.
+    receive(msg: TicketRedeem) {
+        throwUnless(15060, self.ticket_code != null && self.airdrop_pool_address != null);
+        throwUnless(15061, sender() == self.ticketAddress(msg.owner));
+        throwUnless(15062, msg.credits_k > 0);
+        // Fail-closed in COMPUTE so an underfunded redeem BOUNCES and the ticket restores the credits, rather
+        // than failing in ACTION where the credits would simply be gone.
+        throwUnless(15063, context().value >= FEEACCUMULATOR_ACCRUE_LEG_VALUE + FEEACCUMULATOR_REDEEM_EXEC_RESERVE);
+
+        self.accrual_seq += 1;
+        message(MessageParameters {
+            to: self.airdrop_pool_address!!,
+            value: FEEACCUMULATOR_ACCRUE_LEG_VALUE,
+            mode: SendPayGasSeparately,
+            bounce: true,
+            body: AirdropAccrue{ purchase_id: self.accrual_seq, buyer: msg.owner, credits_k: msg.credits_k }.toCell(),
+        });
+        message(MessageParameters {
+            to: sender(),
+            value: 0,
+            mode: SendRemainingValue,
+            bounce: false,
+            body: TicketRedeemAck{ credits_k: msg.credits_k }.toCell(),
+        });
     }
 
     receive(msg: SplitAccumulated) {
