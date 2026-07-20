@@ -66,7 +66,7 @@ async function attack(bc: Blockchain, victimAddress: Address, attackerOwner: Add
       amount: 1n,                      // one nanoATH — the attack costs TON, not ATH
       sender_owner: attackerOwner,
       response_destination: attackerOwner,
-      notify_value: toNano('0.03'),
+      notify_value: toNano('0.045'),
       owner_wallet: attackerOwner,
       username_len: BigInt(username.length),
       username: beginCell().storeBuffer(username).endCell().beginParse(),

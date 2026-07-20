@@ -8,8 +8,31 @@ const ATH_INTERNAL_TRANSFER_ACK_VALUE: Int = 3000000;
 const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE: Int = 1000000;
 const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE: Int = 21000000;
 const ATH_REGISTRY_PROFILE_AVATAR_FWD_FEE_ALLOWANCE: Int = 2000000;
-const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 30000000;
-const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 20000000; // ~100+ yr of mainnet config-18 rent for one processed_notifications dict entry (~67k nanoton/cell/yr; ~2-3 cells) + cushion. Funded per-transfer by the sender; the replay tombstone is self-funding for the contract's lifetime.
+// [MEASURED 2026-07-20, raised 30M -> 45M] This floor is what keeps a REFUSED registry purchase refundable.
+// When a registry throws, the notification bounces and the ATH goes home as an ATHInternalTransfer funded by
+// SendRemainingValue out of what bounced — and the payer's own wallet gates that arrival at 14212 (2M + 3M + 1M +
+// 20M = 26M). The sender-side gate on the same money, 14335, only demands 12M, so between the two there is a
+// window where the refund is SENT, arrives under-funded, throws, and the buyer's ATH is stranded on the
+// registry's official wallet. Immutable after seal, so the floor has to be measured, not modelled.
+//
+// Measured (tests/ath-notify-refund-floor.test.ts), refusal overhead deducted from notify_value before arrival:
+//     30,000,000 -> arrives 24,037,796  => BELOW 26M: refund throws 14212, ATH stranded
+//     empty registry   overhead 6,236,737
+//     200 profiles     overhead 6,336,737
+//     800 profiles     overhead 6,383,404
+// The refusing transaction's gas is paid out of the notification, and dictionary gas grows with DEPTH, so the
+// overhead rises as the product grows: ~+46,667 per doubling at the 800-profile point, i.e. ~6.9M extrapolated at
+// a million profiles. A floor calibrated on an empty registry would decay into the stranding window silently,
+// years after the seal. 45M leaves ~38M on arrival against the 26M gate (~1.47x) and tolerates the refusal
+// overhead nearly TRIPLING before anyone loses money.
+const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 45000000;
+// [COMMENT CORRECTED 2026-07-19] This used to be justified as rent for one `processed_notifications` entry — the
+// permanent replay tombstone, which was DELETED (see the state declaration below for why). What still justifies it
+// is the RECIPIENT wallet's own rent: an inbound transfer may DEPLOY that wallet (1 + code + data cells, paying
+// rent forever), and this endowment is the only thing funding it. The value is deliberately left unchanged here:
+// re-sizing it means measuring a wallet account's real storage phase, which is its own job, and it feeds gate
+// 14212 above — lowering it without that measurement would under-fund every freshly deployed wallet.
+const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 20000000;
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 7000000;

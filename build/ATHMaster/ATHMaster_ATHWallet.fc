@@ -1618,7 +1618,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14303, ($msg'amount > 0));
         throw_unless(14304, ($msg'notify_value > 0));
         throw_unless(14305, ($self'balance >= $msg'amount));
-        throw_unless(14306, ($msg'notify_value >= 30000000));
+        throw_unless(14306, ($msg'notify_value >= 45000000));
         int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
         int $required_value = ($downstream_value + 10000000);
         throw_unless(14307, ($Context$_get_value(__tact_context_get()) >= $required_value));
@@ -1650,7 +1650,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14553, ($msg'amount > 0));
         throw_unless(14554, ($msg'notify_value > 0));
         throw_unless(14555, ($self'balance >= $msg'amount));
-        throw_unless(14556, ($msg'notify_value >= 30000000));
+        throw_unless(14556, ($msg'notify_value >= 45000000));
         int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_registry_notify_transfer_value($msg'notify_value);
         int $required_value = ($downstream_value + 10000000);
         throw_unless(14557, ($Context$_get_value(__tact_context_get()) >= $required_value));
@@ -1685,7 +1685,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14653, ($msg'amount > 0));
         throw_unless(14654, ($msg'notify_value > 0));
         throw_unless(14655, ($self'balance >= $msg'amount));
-        throw_unless(14656, ($msg'notify_value >= 30000000));
+        throw_unless(14656, ($msg'notify_value >= 45000000));
         int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_registry_notify_transfer_value($msg'notify_value);
         int $required_value = ($downstream_value + 10000000);
         throw_unless(14657, ($Context$_get_value(__tact_context_get()) >= $required_value));
@@ -1712,7 +1712,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'destination, $msg'response_destination);
         throw_unless(14701, ($msg'amount > 0));
         throw_unless(14702, ($self'balance >= $msg'amount));
-        throw_unless(14703, ( (($msg'forward_ton_amount == 0)) ? (true) : (($msg'forward_ton_amount >= 30000000)) ));
+        throw_unless(14703, ( (($msg'forward_ton_amount == 0)) ? (true) : (($msg'forward_ton_amount >= 45000000)) ));
         int $required_value = (((30000000 + $msg'forward_ton_amount) + 21000000) + 2000000);
         throw_unless(14704, ($Context$_get_value(__tact_context_get()) >= $required_value));
         int $downstream_value = ($Context$_get_value(__tact_context_get()) - 2000000);
@@ -1753,7 +1753,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14711, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'from)) ));
         throw_unless(14712, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'from));
         if (($msg'forward_ton_amount > 0)) {
-            throw_unless(14713, ($msg'forward_ton_amount >= 30000000));
+            throw_unless(14713, ($msg'forward_ton_amount >= 45000000));
             throw_unless(14714, ($Context$_get_value(__tact_context_get()) >= (($msg'forward_ton_amount + 1000000) + 7000000)));
             $self'balance = $self'balance + $msg'amount;
             $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'forward_ton_amount, 1, false, $JettonTransferNotification$_store_cell($JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload($msg'query_id, $msg'amount, $msg'from, $msg'forward_payload), begin_cell())));
@@ -1786,7 +1786,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_owner);
         int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
         throw_unless(14315, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
-        throw_unless(14316, ($msg'notify_value >= 30000000));
+        throw_unless(14316, ($msg'notify_value >= 45000000));
         $self'balance = $self'balance + $msg'amount;
         $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'sender_owner, $msg'response_destination, 1000000, $msg'amount, $global_now()), begin_cell()));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'notify_destination, $msg'notify_value, 1, true, $AthTransferNotification$_store_cell($AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet($msg'query_id, $sender_key, $msg'amount, $msg'sender_owner), begin_cell())));
@@ -1815,7 +1815,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_owner);
         int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
         throw_unless(14565, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
-        throw_unless(14566, ($msg'notify_value >= 30000000));
+        throw_unless(14566, ($msg'notify_value >= 45000000));
         $self'balance = $self'balance + $msg'amount;
         $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'sender_owner, $msg'response_destination, 3000000, $msg'amount, $global_now()), begin_cell()));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'notify_value, 1, true, $AthTransferNotificationRegistryMintUsername$_store_cell($AthTransferNotificationRegistryMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username($msg'query_id, $sender_key, $msg'amount, $msg'sender_owner, $msg'owner_wallet, $msg'username_len, $msg'username), begin_cell())));
@@ -1846,7 +1846,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_owner);
         int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
         throw_unless(14665, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
-        throw_unless(14666, ($msg'notify_value >= 30000000));
+        throw_unless(14666, ($msg'notify_value >= 45000000));
         $self'balance = $self'balance + $msg'amount;
         $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'sender_owner, $msg'response_destination, 3000000, $msg'amount, $global_now()), begin_cell()));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'notify_value, 1, true, $AthTransferNotificationRegistryProfileAvatar$_store_cell($AthTransferNotificationRegistryProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format($msg'query_id, $sender_key, $msg'amount, $msg'sender_owner, $msg'owner_wallet, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format), begin_cell())));

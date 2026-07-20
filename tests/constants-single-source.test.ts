@@ -27,6 +27,8 @@ const RECORD = read('contracts/RecordShard.tact');
 const INTRO = read('contracts/IntroShard.tact');
 const RECOVERY = read('contracts/RecoveryShard.tact');
 const MSS = read('contracts/MarketStabilitySeller.tact');
+const ATH_WALLET = read('contracts/ATHWallet.tact');
+const OPEN_VALUES = read('artifacts/platho_v1_open_values_v0_6.md');
 const SPEC = read('artifacts/PLATHO_CLEAN17_SHARDED_SPEC.md');
 const ROADMAP = read('artifacts/PLATHO_CLEAN17_MASTER_ROADMAP.md');
 
@@ -68,6 +70,26 @@ describe('CONST-SOURCE — the docs may not contradict the contracts', () => {
     ] as const;
     for (const [label, value] of cases) {
       expect(quotes(SPEC, value), `the spec must quote the current ${label} endowment (${value})`).toBe(true);
+    }
+  });
+
+  it('CONST-SOURCE-01B: the ATH wallet value envelope quoted by open_values matches ATHWallet.tact', () => {
+    // This block was UNGUARDED until 2026-07-20, and it had silently drifted twice: the spec still quoted
+    // NOTIFY_EXEC_RESERVE as 2M (code: 7M) and NOTIFY_MIN_VALUE as 30M (code: 45M, raised because a refused
+    // registry purchase refunded only 24,037,796 against the 26M that gate 14212 demands). These constants decide
+    // whether a user's money comes home, so a reader believing the stale copy is a real hazard, not a typo.
+    const cases = [
+      'ATH_INTERNAL_TRANSFER_EXEC_RESERVE',
+      'ATH_BURN_NOTIFICATION_EXEC_RESERVE',
+      'ATH_TRANSFER_NOTIFY_EXEC_RESERVE',
+      'ATH_TRANSFER_NOTIFY_ACK_VALUE',
+      'ATH_TRANSFER_NOTIFY_MIN_VALUE',
+    ];
+    for (const name of cases) {
+      const value = constOf(ATH_WALLET, name);
+      const quoted = OPEN_VALUES.match(new RegExp(`^${name} = [\\d.]+ TON = ([\\d_]+) nanotons`, 'm'));
+      expect(quoted, `open_values must state ${name}`).not.toBeNull();
+      expect(Number(quoted![1].replace(/_/g, '')), `open_values must quote the CURRENT ${name}`).toBe(value);
     }
   });
 
