@@ -802,4 +802,161 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect((await ctx.officialAthWallet.getGetWalletData()).balance).toBe(0n);
     expect((await ctx.officialAthWallet.getGetPendingNotification(queryId, pendingKey)).exists).toBe(false);
   });
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════════════════
+  // AVATAR-POINTER IDEMPOTENCY (21115) — the replay guard that replaced ATHWallet's deleted tombstone.
+  //
+  // ATHWallet used to write a PERMANENT replay entry per inbound notification, which capped the whole product at
+  // ~21,845 purchases (see ath-wallet-tombstone-ceiling.test.ts). It was deleted on 2026-07-19 and replay safety
+  // moved to the SEMANTIC key at the consumer — where UsernameRegistry already kept it (19172/19173 on name_hash).
+  // These tests are that guard for the avatar lane, and — just as importantly — they pin the two things it must
+  // NOT do: block a legitimate re-upload, or burn the refused payment.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+  it('PROFREPLAY-01: a repeat of the CURRENT avatar pointer is refused (21115) and changes no state', async () => {
+    const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
+    const owner = fixtureAddress('POINTER_REPLAY_OWNER');
+    const pointer = {
+      avatar_hash: 0x5150n,
+      avatar_entry_id: 7n,
+      avatar_stream_id: 0xdeadbeefcafebabe0123456789abcdefn,
+    } satisfies Partial<AthTransferNotificationRegistryProfileAvatar>;
+
+    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
+      query_id: 3101n,
+      ...pointer,
+    }));
+    const afterFirst = await registry.getGetGlobal();
+
+    // Same pointer, DIFFERENT query_id — i.e. a genuinely new payment, not a message the wallet could dedupe.
+    // This is what an accidental double-submit looks like from the registry's side.
+    const replay = await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
+      query_id: 3102n,
+      ...pointer,
+    }));
+
+    expect(findTransaction(replay.transactions, {
+      to: registry.address,
+      op: OP_PROFILE_AVATAR_VAULT_NOTIFICATION,
+      success: false,
+      exitCode: 21115,
+    }), 'the duplicate pointer must be refused by 21115').toBeDefined();
+
+    const avatar = await registry.getGetAvatar(owner);
+    const global = await registry.getGetGlobal();
+    expect(avatar.version, 'the refused replay must not bump the version').toBe(1n);
+    expect(global.avatar_record_count).toBe(afterFirst.avatar_record_count);
+    // The dues are what a replay would inflate: they are ATH the registry promises to flush, and crediting them
+    // twice for one image would let it try to move ATH it never received.
+    expect(global.treasury_due_ath, 'a refused replay must not credit the treasury due twice').toBe(afterFirst.treasury_due_ath);
+    expect(global.burn_due_ath, 'a refused replay must not credit the burn due twice').toBe(afterFirst.burn_due_ath);
+  });
+
+  it('PROFREPLAY-02: the SAME image re-uploaded into a new stream is accepted — the guard is on the full pointer, not the hash', async () => {
+    // THE TRAP THIS TEST EXISTS FOR. Media streams expire; restoring your own avatar after retention means
+    // re-uploading the identical bytes, which produces the identical avatar_hash but a NEW stream_id/entry_id.
+    // A guard keyed on avatar_hash alone would refuse that forever and permanently strand the user's own avatar.
+    const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
+    const owner = fixtureAddress('POINTER_REUPLOAD_OWNER');
+    const sameImageHash = 0x7e57n;
+
+    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
+      query_id: 3201n,
+      avatar_hash: sameImageHash,
+      avatar_entry_id: 1n,
+      avatar_stream_id: 0x1111111111111111111111111111111n,
+    }));
+    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
+      query_id: 3202n,
+      avatar_hash: sameImageHash,          // identical bytes...
+      avatar_entry_id: 2n,                 // ...but a genuinely new upload
+      avatar_stream_id: 0x2222222222222222222222222222222n,
+    }));
+
+    const avatar = await registry.getGetAvatar(owner);
+    expect(avatar.version, 'a re-upload after retention must still be accepted').toBe(2n);
+    expect(avatar.avatar_hash).toBe(sameImageHash);
+    expect(avatar.avatar_stream_id, 'and it must be the NEW stream that is current').toBe(0x2222222222222222222222222222222n);
+  });
+
+  it('PROFREPLAY-03: A -> B -> A is legal — the guard compares against the CURRENT pointer only', async () => {
+    // The guard deliberately holds no history: a map of every pointer ever seen would be permanent per-avatar
+    // state on the account whose ~13,100-profile ceiling is already the binding limit here. Comparing only
+    // against `current` costs zero new state — and going back to an earlier avatar stays legal.
+    const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
+    const owner = fixtureAddress('POINTER_AB_A_OWNER');
+    const pointerA = { avatar_hash: 0xaaaan, avatar_entry_id: 10n, avatar_stream_id: 0xaaaa0000000000000000000000000001n };
+    const pointerB = { avatar_hash: 0xbbbbn, avatar_entry_id: 20n, avatar_stream_id: 0xbbbb0000000000000000000000000002n };
+
+    for (const [i, p] of [pointerA, pointerB, pointerA].entries()) {
+      await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
+        query_id: BigInt(3301 + i),
+        ...p,
+      }));
+    }
+
+    const avatar = await registry.getGetAvatar(owner);
+    expect(avatar.version, 'all three updates must have landed').toBe(3n);
+    expect(avatar.avatar_hash, 'returning to an earlier avatar is legal').toBe(0xaaaan);
+  });
+
+  it('PROFREPLAY-04: end to end — a duplicate purchase bounces and the ATH is REFUNDED, not kept', async () => {
+    // The refusal must cost the user nothing. If a refused notification kept the ATH, this guard would be a money
+    // burner rather than a protection — which is exactly the failure measured on the cancelled Vault, whose
+    // duplicate-deposit path acked and KEPT the payment. Here the throw bounces the notification and
+    // ATHWallet.refund_bounced_notification returns the ATH to the payer's own wallet.
+    const ctx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: 0n,
+      deployMaster: true,
+    });
+    const payer = await ctx.blockchain.treasury('profile-duplicate-payer');
+    const sourceWallet = await deployAthWallet(
+      ctx.blockchain,
+      payer.address,
+      ctx.athMasterAddress,
+      PROFILE_AVATAR_PRICE_ATH * 2n,     // funded for two purchases; only one may ever be charged
+    );
+    const buy = (queryId: bigint) => sourceWallet.send(payer.getSender(), { value: toNano('0.3') }, {
+      $$type: 'ATHTransferRequestRegistryProfileAvatar',
+      query_id: queryId,
+      amount: PROFILE_AVATAR_PRICE_ATH,
+      recipient: ctx.registry.address,
+      response_destination: payer.address,
+      notify_value: toNano('0.066'),
+      owner_wallet: payer.address,       // direct-pay: you pay for your OWN avatar (21163)
+      avatar_hash: 0x3401n,
+      avatar_entry_id: 4n,
+      avatar_stream_id: 0x34013401340134013401340134013401n,
+      avatar_part_count: 2n,
+      media_format: 1n,
+    } as ATHTransferRequestRegistryProfileAvatar);
+
+    await buy(3401n);
+    const duplicate = await buy(3402n);
+
+    expect(findTransaction(duplicate.transactions, {
+      from: ctx.officialAthWalletAddress,
+      to: ctx.registry.address,
+      op: OP_PROFILE_AVATAR_VAULT_NOTIFICATION,
+      success: false,
+      exitCode: 21115,
+    }), 'the duplicate purchase must be refused by the registry').toBeDefined();
+    expect(findTransaction(duplicate.transactions, {
+      from: ctx.officialAthWalletAddress,
+      to: sourceWallet.address,
+      op: OP_ATH_INTERNAL_TRANSFER,
+      success: true,
+    }), 'and the refused ATH must travel back to the payer wallet').toBeDefined();
+
+    const avatar = await ctx.registry.getGetAvatar(payer.address);
+    const global = await ctx.registry.getGetGlobal();
+    expect(avatar.version, 'exactly one purchase landed').toBe(1n);
+    expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+    expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+    // The money ledger: exactly one price left the payer, and nothing is stranded on the official wallet.
+    expect((await sourceWallet.getGetWalletData()).balance, 'the user was charged ONCE, not twice').toBe(PROFILE_AVATAR_PRICE_ATH);
+    expect((await ctx.officialAthWallet.getGetWalletData()).balance).toBe(PROFILE_AVATAR_PRICE_ATH);
+    expect((await ctx.officialAthWallet.getGetPendingNotification(3402n, senderKey(payer.address, 3402n))).exists,
+      'and the refused notification leaves no pending residue').toBe(false);
+  });
 });
