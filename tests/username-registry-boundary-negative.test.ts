@@ -24,7 +24,11 @@ const PENDING_MINT_STORAGE = 6_000_000n;
 const NFT_ITEM_DEPLOY_RESERVE = 829_000_000n; // clean-16 L2/#14 (owner: mint = exactly 1 TON); ~412 yr at the real 64962/cell/yr rate
 const ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
 const STATE_GROWTH_EXEC_RESERVE = 4_000_000n;
-const NAME_RECORD_STORAGE_ENDOWMENT = 100_000_000n; // clean-16 L2/#14: raised 36M→100M for a true 100-year record endowment
+// 2026-07-20: name_records was deleted, so this no longer funds a per-name entry — it is
+// USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION, the mint's contribution to the REGISTRY'S own rent (501 code cells,
+// ~32.5M/yr at 64962/cell-yr). The number is deliberately unchanged: the mint price is pinned client-side at
+// exactly 1 TON, so lowering the floor would return nothing to the buyer. Gate 19122 still sums to the same total.
+const REGISTRY_SELF_RENT_CONTRIBUTION = 100_000_000n;
 const ATH_TRANSFER_EXEC_RESERVE = 48_000_000n;
 const ATH_BURN_EXEC_RESERVE = 5_000_000n;
 const DUE_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
@@ -50,6 +54,26 @@ function nameHash(name: string): bigint {
 
 function senderForAddress(blockchain: Blockchain, address: Address) {
   return { address, getSender: () => blockchain.sender(address) };
+}
+
+// ── THE ITEM IS THE RECORD (2026-07-20) ────────────────────────────────────────────────────────────────────
+// UsernameRegistry.name_records is gone, and with it get_name_record. "Is this name minted?" is now answered by
+// the chain itself: the item's address is a pure function of (registry, name_hash), so anyone can derive it, and
+// the item's own get_state() is authoritative — its owner_wallet tracks TEP-62 transfers, which the deleted
+// record never did. See tests/username-item-is-the-record.test.ts (UNI-01..03).
+async function itemForName(blockchain: Blockchain, registryAddress: Address, name: string) {
+  const init = await UsernameNFTItem.init(registryAddress, nameHash(name));
+  const address = contractAddress(0, init);
+  return { address, item: blockchain.openContract(new UsernameNFTItem(address, init)) };
+}
+
+// The replacement for `get_name_record(h).exists`: the item account must exist AND declare itself initialized.
+// An unminted name has no account at all, so the account check has to come first — get_state() on a
+// non-existent contract is not a "false", it is an error.
+async function nameIsMinted(blockchain: Blockchain, registryAddress: Address, name: string): Promise<boolean> {
+  const { address, item } = await itemForName(blockchain, registryAddress, name);
+  if ((await blockchain.getContract(address)).accountState?.type !== 'active') return false;
+  return (await item.getGetState()).initialized;
 }
 
 async function deploySealedRegistryWithTreasuryOfficial() {
@@ -204,7 +228,7 @@ async function sendMintFromAddress(blockchain: Blockchain, registry: any, offici
 
 describe('UsernameRegistry value/storage boundary negative matrix', () => {
   it('USERNAME-REG-BND-01: paid mint notification rejects min-1 and accepts exact ACK/storage reserves', async () => {
-    const { registry, officialAthWallet, vaultAddress } = await deploySealedRegistryWithTreasuryOfficial();
+    const { blockchain, registry, officialAthWallet, vaultAddress } = await deploySealedRegistryWithTreasuryOfficial();
     const invalidOwner = fixtureAddress('INVALID_OWNER');
     const validOwner = fixtureAddress('VALID_OWNER');
     const validHash = nameHash('exact1');
@@ -218,7 +242,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE - 1n,
       vaultAddress,
     );
-    expect((await registry.getGetNameRecord(nameHash('Larisa'))).exists).toBe(false);
+    expect(await nameIsMinted(blockchain, registry.address, 'Larisa')).toBe(false);
 
     await sendMint(
       registry,
@@ -229,7 +253,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE,
       vaultAddress,
     );
-    expect((await registry.getGetNameRecord(nameHash('Larisa'))).exists).toBe(false);
+    expect(await nameIsMinted(blockchain, registry.address, 'Larisa')).toBe(false);
 
     await sendMint(
       registry,
@@ -237,10 +261,12 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       validOwner,
       'exact1',
       PRICE_6_PLUS,
-      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE + NAME_RECORD_STORAGE_ENDOWMENT - 1n,
+      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE + REGISTRY_SELF_RENT_CONTRIBUTION - 1n,
       vaultAddress,
     );
-    expect((await registry.getGetNameRecord(validHash)).exists).toBe(false);
+    // One nanoton under gate 19122 the whole receiver reverts, so the item deploy is never sent: the name's
+    // account does not exist at all. (Formerly read off name_records; the absent account is the stronger fact.)
+    expect(await nameIsMinted(blockchain, registry.address, 'exact1')).toBe(false);
     expect((await registry.getGetPendingMint(validHash)).exists).toBe(false);
 
     await sendMint(
@@ -249,10 +275,22 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       validOwner,
       'exact1',
       PRICE_6_PLUS,
-      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE + NAME_RECORD_STORAGE_ENDOWMENT,
+      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE + REGISTRY_SELF_RENT_CONTRIBUTION,
       vaultAddress,
     );
-    expect((await registry.getGetNameRecord(validHash)).exists).toBe(true);
+    // At exactly the reserve the mint completes end to end. Finalisation is now witnessed on the ITEM — it was
+    // deployed and initialized itself — rather than by a registry map entry appearing.
+    expect(await nameIsMinted(blockchain, registry.address, 'exact1')).toBe(true);
+
+    // Replaces the old NameRecord.minter_wallet assertion. owner_wallet is identical right after a mint and,
+    // unlike the record, stays correct across a later TEP-62 transfer.
+    const { item } = await itemForName(blockchain, registry.address, 'exact1');
+    expect((await item.getGetState()).owner_wallet.equals(validOwner)).toBe(true);
+    // NameRecord.registered_at had no replacement — nothing on chain holds the registration timestamp any more,
+    // so there is no assertion to migrate. It was measured in username-item-is-the-record.test.ts as unused.
+
+    // The pending mint cleared on the item's ACK, which is what finalised the mint.
+    expect((await registry.getGetPendingMint(validHash)).exists).toBe(false);
   });
 
   it('USERNAME-REG-BND-02: UsernameNFTItem resend ACK rejects min-1 and accepts exact reserve', async () => {
@@ -276,14 +314,32 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       username: usernameSlice('itemok'),
     } as InitializeUsernameItem);
 
+    // This item was initialized directly, so no pending mint exists at the registry for it. The property under
+    // test is that a resent ACK still finalises NOTHING there.
+    //
+    // The old proxy for that was "no name_record appeared". With the map deleted, `item.initialized` cannot
+    // stand in for it — the setup above made it true on purpose. So the claim is made against the state
+    // finalisation actually writes, which is the same code path the record was written from: the ACK receiver
+    // clears the pending mint and accrues the treasury/burn dues. If a spurious ACK ever finalised, the dues
+    // would move. That is the identical event, measured one field over.
     const itemAckResendReserve = ITEM_ACK_FORWARD_RESERVE + ITEM_ACK_EXEC_RESERVE;
-    await item.send(caller.getSender(), { value: itemAckResendReserve - 1n }, { $$type: 'ResendDeployedAck' });
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    const underfunded = await item.send(caller.getSender(), { value: itemAckResendReserve - 1n }, { $$type: 'ResendDeployedAck' });
+    // Below the reserve the item refuses at its own gate 18021, so no ACK is emitted at all.
+    expect((underfunded.transactions as any[]).some((t) => t.description?.computePhase?.exitCode === 18021)).toBe(true);
+    expect((await registry.getGetGlobal()).treasury_due_ath).toBe(0n);
+    expect((await registry.getGetGlobal()).burn_due_ath).toBe(0n);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
 
     const beforeItemBalance = (await blockchain.getContract(itemAddress)).balance;
-    await item.send(caller.getSender(), { value: itemAckResendReserve }, { $$type: 'ResendDeployedAck' });
+    const funded = await item.send(caller.getSender(), { value: itemAckResendReserve }, { $$type: 'ResendDeployedAck' });
     const afterItemBalance = (await blockchain.getContract(itemAddress)).balance;
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    // At exactly the reserve the ACK IS emitted — and the registry refuses it at 19130, because the sender is
+    // not an item it has an in-flight mint for.
+    const registryTx = (funded.transactions as any[]).find((t) => t.inMessage?.info?.dest?.equals?.(registry.address) && !t.inMessage?.info?.bounced);
+    expect(registryTx?.description?.computePhase?.exitCode).toBe(19130);
+    expect((await registry.getGetGlobal()).treasury_due_ath).toBe(0n);
+    expect((await registry.getGetGlobal()).burn_due_ath).toBe(0n);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
     expect(afterItemBalance).toBeGreaterThanOrEqual(beforeItemBalance);
   });
 

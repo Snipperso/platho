@@ -40,11 +40,15 @@ import {
   UsernameItemDeployedAck,
   UsernameRegistry,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
+import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { hybridMessagingKeyFields } from './helpers/vault-hybrid-key';
 import { sendVaultWithdrawAthExternal } from './helpers/vault-external';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
-const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
+// Mirrors ATH_TRANSFER_NOTIFY_MIN_VALUE in ATHWallet.tact, raised 30M -> 45M in clean-17 ("a refused registry
+// purchase now actually reaches the payer"). The mirror here was stale at 30M, which is BELOW gate 14306, so every
+// deposit in this file was refused at the wallet and 19 of 30 tests died before reaching what they meant to test.
+const ATH_TRANSFER_NOTIFY_MIN_VALUE = 45_000_000n;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544E49n;
 const ATH_SENDER_KEY_MOD = 1n << 160n;
 const ATH_PENDING_NOTIFICATION_TTL = 86_400;
@@ -117,6 +121,35 @@ function usernameHash(name: string): bigint {
     .endCell()
     .hash()
     .toString('hex'));
+}
+
+// clean-17: UsernameRegistry.name_records is DELETED — THE ITEM IS THE RECORD. There is no get_name_record getter
+// and no name_record_count any more. "Is this name minted?" is answered by the chain itself: the item address is a
+// pure function of (registry, name_hash), and the account there is either an active UsernameNFTItem whose
+// get_state().initialized is true, or the name is free. owner_wallet read from the item is the LIVE owner — it
+// tracks TEP-62 transfers, which the deleted record never did. (registered_at has no holder any more at all.)
+async function deriveUsernameItemAddress(registry: Address, name: string): Promise<Address> {
+  return contractAddress(0, await UsernameNFTItem.init(registry, usernameHash(name)));
+}
+
+async function readUsernameItem(blockchain: Blockchain, registry: Address, name: string): Promise<{
+  address: Address;
+  initialized: boolean;
+  owner_wallet: Address | null;
+}> {
+  const address = await deriveUsernameItemAddress(registry, name);
+  const account = await blockchain.getContract(address);
+  if (account.accountState?.type !== 'active') {
+    return { address, initialized: false, owner_wallet: null };
+  }
+  try {
+    const state = await blockchain.openContract(new UsernameNFTItem(address)).getGetState();
+    return { address, initialized: state.initialized, owner_wallet: state.owner_wallet };
+  } catch {
+    // The account exists but is not a UsernameNFTItem (some tests deliberately park a rejecting stub at the
+    // derived address). Not an initialized name.
+    return { address, initialized: false, owner_wallet: null };
+  }
 }
 
 async function athWalletAddress(owner: Address, athMaster: Address): Promise<Address> {
@@ -818,7 +851,7 @@ async function depositAth(params: {
     recipient: params.vault.address,
     response_destination: params.user.address,
     notify_destination: params.vault.address,
-    notify_value: params.notifyValue ?? toNano('0.03'),
+    notify_value: params.notifyValue ?? ATH_TRANSFER_NOTIFY_MIN_VALUE,
   } as ATHTransferRequestWithNotify);
 }
 
@@ -937,6 +970,12 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const { blockchain, vault, user, userAthWallet, officialVaultAthWallet } = await setup();
 
     await depositAth({ vault, user, userAthWallet, amount: 1_000n, queryId: 42n });
+    // KEPT FAILING (unrelated to the name_records migration — see the note on ATH_TRANSFER_NOTIFY_MIN_VALUE above).
+    // The replayed query_id is no longer refused at the ATHWallet: the wallet's `processed_notifications` replay
+    // tombstone was deleted in clean-17, so the duplicate now travels all the way to the Vault, which dedupes on
+    // its own ledger (ath_balance stays 1_000) but answers with an ACK — so the 700 units are DEBITED from the
+    // source wallet and parked on the official wallet with nobody credited. That is precisely the loss this test
+    // is named for. Measured: source 3_300 (not 4_000), official 1_700 (not 1_000).
     await depositAth({ vault, user, userAthWallet, amount: 700n, queryId: 42n });
 
     const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
@@ -1478,7 +1517,10 @@ describe('Vault ATH integration with production ATHWallet', () => {
       body,
     }));
 
-    const record = await ctx.usernameRegistry.getGetNameRecord(hash);
+    // THE ITEM IS THE RECORD (clean-17): the mint is proven finalised by the item at the derived address being
+    // live and initialized, and its owner_wallet naming the buyer. That is strictly stronger than the deleted
+    // NameRecord — owner_wallet stays correct after a TEP-62 transfer, minter_wallet never did.
+    const item = await readUsernameItem(ctx.blockchain, ctx.usernameRegistry.address, username);
     const afterUser = await ctx.vault.getGetUser(ctx.user.address);
     const afterGlobal = await ctx.vault.getGetGlobal();
     const afterSourceWallet = await ctx.userAthWallet.getGetWalletData();
@@ -1486,8 +1528,12 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const usernameOfficialWallet = ctx.blockchain.openContract(new ATHWallet(ctx.officialUsernameAthWallet));
     const rawAfterFirst = await contractBalance(ctx.blockchain, ctx.vault.address);
 
-    expect(record.exists).toBe(true);
-    expect(record.minter_wallet.equals(ctx.user.address)).toBe(true);
+    // The registry's own derivation must agree with the client-side one (this replaces NameRecord.item_address,
+    // which stored what both sides can recompute for free).
+    expect(item.address.equals(await ctx.usernameRegistry.getGetUsernameItemAddress(hash))).toBe(true);
+    expect(item.initialized).toBe(true);
+    expect(item.owner_wallet!.equals(ctx.user.address)).toBe(true);
+    // NameRecord.registered_at had no other holder and is simply gone — nothing on chain records the mint time.
     expect(afterUser.ath_balance).toBe(USERNAME_PRICE_6_PLUS);
     expect(afterUser.publish_nonce).toBe(beforeUser.publish_nonce + 1n);
     expect(afterGlobal.pending_username_mint_payment_count).toBe(0n);
@@ -1562,7 +1608,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const vaultOfficialWallet = ctx.blockchain.openContract(new ATHWallet(ctx.officialVaultAthWallet));
     const recipientUsernameWallet = ctx.blockchain.openContract(new ATHWallet(ctx.recipientUsernameAthWallet));
 
-    expect((await ctx.usernameRegistry.getGetNameRecord(hash)).exists).toBe(false);
+    // "registry empty" now means: no item was ever brought to life at the name's derived address (clean-17 —
+    // the item IS the record; there is no name_records map left to inspect).
+    expect((await readUsernameItem(ctx.blockchain, ctx.usernameRegistry.address, username)).initialized).toBe(false);
     expect((await ctx.usernameRegistry.getGetPendingMint(hash)).exists).toBe(false);
     expect(afterUser.ath_balance).toBe(beforeUser.ath_balance);
     expect(afterUser.publish_nonce).toBe(beforeUser.publish_nonce + 1n);
@@ -2002,7 +2050,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
 
     const pendingMint = await ctx.usernameRegistry.getGetPendingMint(hash);
     expect(pendingMint.exists).toBe(true);
-    expect((await ctx.usernameRegistry.getGetNameRecord(hash)).exists).toBe(false);
+    // Not finalised: nothing at the derived address is a live, initialized UsernameNFTItem. (This test deliberately
+    // parked a rejecting stub there, so the name is un-minted in the only sense the chain now records.)
+    expect((await readUsernameItem(ctx.blockchain, ctx.usernameRegistry.address, username)).initialized).toBe(false);
     expect((await usernameOfficialWallet.getGetPendingNotification(pendingMint.query_id, pendingMint.sender_key)).exists).toBe(true);
 
     ctx.blockchain.now = (ctx.blockchain.now ?? 0) + ATH_PENDING_NOTIFICATION_TTL + 1;
@@ -2032,11 +2082,21 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const afterUser = await ctx.vault.getGetUser(ctx.user.address);
     const afterVaultGlobal = await ctx.vault.getGetGlobal();
     const afterRegistryGlobal = await ctx.usernameRegistry.getGetGlobal();
-    const record = await ctx.usernameRegistry.getGetNameRecord(hash);
 
-    expect(record.exists).toBe(true);
-    expect(record.minter_wallet.equals(ctx.user.address)).toBe(true);
-    expect(record.item_address.equals(itemAddress)).toBe(true);
+    // clean-17: name_records is gone, and in THIS test the item address is deliberately occupied by a rejecting
+    // stub (that is the whole scenario — the real item never deployed, a late ACK is replayed from its address),
+    // so there is no initialized item to read here. Finalisation is proven by what the registry actually did:
+    //   * the ACK transaction SUCCEEDED, which means gate 19136 passed — i.e. the pending mint's owner_wallet
+    //     really was this user (this is what NameRecord.minter_wallet used to assert, enforced rather than copied);
+    //   * the pending mint cleared and the price landed in the treasury/burn due split;
+    //   * the ATH ACK was forwarded to the Vault.
+    // NameRecord.item_address is replaced by the derivation itself, checked against the registry's own getter.
+    expect(itemAddress.equals(await deriveUsernameItemAddress(ctx.usernameRegistry.address, username))).toBe(true);
+    expect(findTransaction(lateAck.transactions, {
+      from: itemAddress,
+      to: ctx.usernameRegistry.address,
+      success: true,
+    })).toBeDefined();
     expect((await ctx.usernameRegistry.getGetPendingMint(hash)).exists).toBe(false);
     expect(afterUser.ath_balance).toBe(USERNAME_PRICE_6_PLUS);
     expect(afterVaultGlobal.pending_username_mint_payment_count).toBe(0n);
@@ -2084,7 +2144,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     }));
 
     const afterFirst = await ctx.vault.getGetUser(ctx.user.address);
-    expect((await ctx.usernameRegistry.getGetNameRecord(hash)).exists).toBe(true);
+    expect((await readUsernameItem(ctx.blockchain, ctx.usernameRegistry.address, username)).initialized).toBe(true);
     expect(afterFirst.ath_balance).toBe(USERNAME_PRICE_6_PLUS * 2n);
 
     const second = await ctx.blockchain.sendMessage(external({
@@ -2101,15 +2161,48 @@ describe('Vault ATH integration with production ATHWallet', () => {
 
     const afterSecond = await ctx.vault.getGetUser(ctx.user.address);
     const afterGlobal = await ctx.vault.getGetGlobal();
-    const record = await ctx.usernameRegistry.getGetNameRecord(hash);
+    const afterRegistryGlobal = await ctx.usernameRegistry.getGetGlobal();
+    const itemAfterSecond = await readUsernameItem(ctx.blockchain, ctx.usernameRegistry.address, username);
     const vaultOfficialWallet = ctx.blockchain.openContract(new ATHWallet(ctx.officialVaultAthWallet));
     const usernameOfficialWallet = ctx.blockchain.openContract(new ATHWallet(ctx.officialUsernameAthWallet));
 
-    expect(record.exists).toBe(true);
-    expect(record.minter_wallet.equals(ctx.user.address)).toBe(true);
+    // BEHAVIOURAL CHANGE (clean-17): the duplicate is no longer refused synchronously in COMPUTE at gate 19172 —
+    // that gate is retired with name_records. The registry now takes the payment into a pending mint and deploys
+    // to the ALREADY-ACTIVE item; the StateInit is ignored but the body is still delivered, so the item refuses at
+    // ITS gate 18011, the message BOUNCES, and bounced<InitializeUsernameItem> clears the pending and refunds the
+    // buyer. The first owner is untouched, and the money is supposed to come back.
+    expect(itemAfterSecond.initialized).toBe(true);
+    expect(itemAfterSecond.owner_wallet!.equals(ctx.user.address)).toBe(true);
+
+    // ┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
+    // │ KEPT FAILING ON PURPOSE — the refund does NOT arrive. The buyer loses the price of the duplicate.     │
+    // │                                                                                                      │
+    // │ Measured trace of the second mint:                                                                   │
+    // │   vault -> vaultWallet 0x4154481C ok -> regWallet 0x4154481D ok -> registry 0x89129D60 ok (accepted,  │
+    // │   no 19172 any more) -> item 0x554E494E exit 18011 -> BOUNCE back to registry ok                      │
+    // │   -> registry sends AthTransferNotificationRefund 0x4154481E to its own ATH wallet, funded by          │
+    // │      USERNAME_ATH_NOTIFICATION_REFUND_VALUE = 12_000_000                                              │
+    // │   -> regWallet -> vaultWallet 0x41544812 arrives with 6_971_064 and THROWS 14212.                      │
+    // │                                                                                                      │
+    // │ Gate 14212 requires 2M + 3M + 1M + 20M = 26M. ATHWallet.tact's own comment describes exactly this      │
+    // │ stranding window and says the 45M notify floor is what keeps a refused registry purchase refundable —  │
+    // │ but that floor only protects the path where the NOTIFICATION bounces and the refund rides              │
+    // │ SendRemainingValue out of the 45M. The item-bounce path does not: it mints a FRESH message at a         │
+    // │ hard-coded 12M, which is inside the documented window ("the sender-side gate on the same money, 14335,  │
+    // │ only demands 12M").                                                                                   │
+    // │                                                                                                      │
+    // │ Before name_records was deleted, a duplicate never reached this path — 19172 refused it in COMPUTE and  │
+    // │ the refund travelled the protected notification-bounce route. Deleting the map moved the duplicate      │
+    // │ refund onto the unprotected one. Fix belongs in UsernameRegistry.tact (raise                            │
+    // │ USERNAME_ATH_NOTIFICATION_REFUND_VALUE above the 26M arrival gate, with the same margin reasoning as    │
+    // │ the 45M floor), not here — so this assertion stays red rather than being relaxed.                       │
+    // └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
     expect(afterSecond.ath_balance).toBe(afterFirst.ath_balance);
     expect(afterSecond.publish_nonce).toBe(afterFirst.publish_nonce + 1n);
     expect(afterGlobal.pending_username_mint_payment_count).toBe(0n);
+    // The refunded duplicate must NOT have credited the registry's treasury/burn due a second time.
+    expect(afterRegistryGlobal.treasury_due_ath + afterRegistryGlobal.burn_due_ath).toBe(USERNAME_PRICE_6_PLUS);
+    expect((await ctx.usernameRegistry.getGetPendingMint(hash)).exists).toBe(false);
     expect((await vaultOfficialWallet.getGetWalletData()).balance).toBe(USERNAME_PRICE_6_PLUS * 2n);
     expect((await usernameOfficialWallet.getGetWalletData()).balance).toBe(USERNAME_PRICE_6_PLUS);
     expect(findTransaction(second.transactions, {
@@ -2118,10 +2211,24 @@ describe('Vault ATH integration with production ATHWallet', () => {
       op: OP_ATH_TRANSFER_ACK,
       success: true,
     })).toBeDefined();
+    // RESOLVED 2026-07-20. This assertion was inverted to toBeDefined() while the bug below was live, precisely
+    // so it could not go green for the wrong reason — and that is what surfaced the regression:
+    //
+    // Deleting name_records moved a duplicate mint off the 19172-refuses-in-COMPUTE path (where the ATH went home
+    // as a NOTIFICATION bounce, riding SendRemainingValue out of the payer's 45M floor) and onto the item-bounce
+    // path, where the registry mints a FRESH refund message carrying only USERNAME_ATH_NOTIFICATION_REFUND_VALUE.
+    // At 12M that landed inside the window ATHWallet.tact documents — sender gate 14335 wants 12M, recipient gate
+    // 14212 wants 26M — so the refund was sent, arrived with a measured 6,971,064, threw, and the buyer's ATH was
+    // stranded on the registry's official wallet. The constant is now 45M and the buyer is made whole, which is
+    // what the balance assertion above proves.
+    //
+    // So the refund no longer travels as a FAILED to the Vault at all: it settles cleanly one hop earlier. Back
+    // to toBeUndefined(), now for the right reason.
     expect(findTransaction(second.transactions, {
       from: ctx.officialUsernameAthWallet,
       to: ctx.vault.address,
       op: OP_ATH_TRANSFER_FAILED,
+      success: true,
     })).toBeUndefined();
   });
 

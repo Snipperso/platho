@@ -16,6 +16,7 @@ import {
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { MockUsernameNFTItemNoAck } from '../build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck';
 import { MockVaultAthWallet } from '../build/MockVaultAthWallet/MockVaultAthWallet_MockVaultAthWallet';
+import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 
 const MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
@@ -119,9 +120,37 @@ async function installNoAckAt(blockchain: Blockchain, address: Address) {
   }));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+// THE ITEM IS THE RECORD.
+//
+// UsernameRegistry.name_records was deleted (2026-07-20) along with get_name_record and the global
+// name_record_count. The per-name UsernameNFTItem was always the authoritative record; the map was a
+// weaker copy of it. So "does this forged message create a name?" is now asked of the CHAIN:
+//   * the item address is a pure function of (registry, name_hash) — nothing needs to index it;
+//   * the name exists iff that account is a live UsernameNFTItem with get_state().initialized == true;
+//   * get_state().owner_wallet is the LIVE owner and follows TEP-62 transfers, which the record never did.
+//
+// The registered_at timestamp the record carried is held by nothing now, so no test below asserts it.
+//
+// Several tests here deliberately park a MockUsernameNFTItemNoAck at the item address to hold a mint
+// pending. That account is active but is NOT an item, so the code-hash check below reports it as "no
+// name here" — which is exactly correct: no name was ever created at that address.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+async function readUsernameItem(blockchain: Blockchain, registryAddress: Address, name: string) {
+  const init = await UsernameNFTItem.init(registryAddress, nameHash(name));
+  const address = contractAddress(0, init);
+  const account = await blockchain.getContract(address);
+  const state = account.accountState;
+  if (!state || state.type !== 'active' || !state.state.code || !state.state.code.equals(init.code)) {
+    return { address, initialized: false, owner_wallet: null as Address | null };
+  }
+  const view = await blockchain.openContract(new UsernameNFTItem(address, init)).getGetState();
+  return { address, initialized: view.initialized, owner_wallet: view.owner_wallet as Address | null };
+}
+
 describe('UsernameRegistry negative authorization matrix', () => {
   it('USERNAME-REG-AUTH-NEG-01: forged mint notification and forged item ACK cannot create a name record', async () => {
-    const { registry, attacker } = await deploySealedRegistryWithMockOfficial();
+    const { blockchain, registry, attacker } = await deploySealedRegistryWithMockOfficial();
     const ownerWallet = fixtureAddress('FORGED_MINT_OWNER');
     const hash = nameHash('forged');
 
@@ -135,7 +164,9 @@ describe('UsernameRegistry negative authorization matrix', () => {
       username_len: 6n,
       username: usernameSlice('forged'),
     } as AthTransferNotificationRegistryMintUsername);
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    // Gate 19180 rejects the forged notification, so no item was ever deployed for this name: the
+    // account at the derived address does not exist, which is the chain's answer to "is 'forged' taken".
+    expect((await readUsernameItem(blockchain, registry.address, 'forged')).initialized).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
 
     await registry.send(attacker.getSender(), { value: toNano('0.05') }, {
@@ -143,8 +174,10 @@ describe('UsernameRegistry negative authorization matrix', () => {
       name_hash: hash,
       owner_wallet: ownerWallet,
     } as UsernameItemDeployedAck);
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
-    expect((await registry.getGetGlobal()).name_record_count).toBe(0n);
+    // Was: name_record_count still 0 — i.e. the forged ACK finalised no mint. There is no global
+    // counter any more, and the stronger claim is the one the chain answers directly: the item for
+    // this name never became initialized, so the name is still unminted.
+    expect((await readUsernameItem(blockchain, registry.address, 'forged')).initialized).toBe(false);
   });
 
   it('USERNAME-REG-AUTH-NEG-02: forged item ACK cannot finalize an existing pending mint', async () => {
@@ -164,7 +197,8 @@ describe('UsernameRegistry negative authorization matrix', () => {
     } as UsernameItemDeployedAck);
 
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
-    expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
+    // And no name came into being: the derived address holds the stuck no-ACK mock, never a live item.
+    expect((await readUsernameItem(ctx.blockchain, ctx.registry.address, 'stuckx')).initialized).toBe(false);
   });
 
   it('USERNAME-REG-AUTH-03: item ACK owner must match the pending mint owner before finalization', async () => {
@@ -184,9 +218,17 @@ describe('UsernameRegistry negative authorization matrix', () => {
       owner_wallet: wrongOwner,
     } as UsernameItemDeployedAck);
 
-    let record = await ctx.registry.getGetNameRecord(hash);
-    expect(record.exists).toBe(false);
-    expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
+    // The wrong-owner ACK is refused at gate 19136 and changes nothing: no name exists, the mint is
+    // still pending, and — the claim the deleted record's minter_wallet used to carry — the owner the
+    // registry is holding for this mint is still the one the payment named, never the ACK's.
+    expect((await readUsernameItem(ctx.blockchain, ctx.registry.address, 'moveme')).initialized).toBe(false);
+    const stillPending = await ctx.registry.getGetPendingMint(hash);
+    expect(stillPending.exists).toBe(true);
+    expect(stillPending.owner_wallet.equals(mintOwner)).toBe(true);
+    expect(stillPending.owner_wallet.equals(wrongOwner)).toBe(false);
+    // The item address is a pure function of (registry, name_hash), so the record's item_address field
+    // was storing something anyone can recompute. Assert the derivation agrees instead.
+    expect((await readUsernameItem(ctx.blockchain, ctx.registry.address, 'moveme')).address.equals(itemAddress)).toBe(true);
 
     await ctx.registry.send(ctx.blockchain.sender(itemAddress), { value: toNano('0.05') }, {
       $$type: 'UsernameItemDeployedAck',
@@ -194,12 +236,20 @@ describe('UsernameRegistry negative authorization matrix', () => {
       owner_wallet: mintOwner,
     } as UsernameItemDeployedAck);
 
-    record = await ctx.registry.getGetNameRecord(hash);
-    expect(record.exists).toBe(true);
-    expect(record.item_address.equals(itemAddress)).toBe(true);
-    expect(record.minter_wallet.equals(mintOwner)).toBe(true);
-    expect(record.minter_wallet.equals(wrongOwner)).toBe(false);
+    // Was: a NameRecord appeared carrying { item_address, minter_wallet, registered_at }. Nothing
+    // records a mint inside the registry any more, so finalisation is asserted by what it still does —
+    // it clears the pending mint and books the price split. Both only happen on the accepted ACK path.
+    //
+    // The "who owns this name" half of the old assertion now belongs to the item's own owner_wallet,
+    // which tracks TEP-62 transfers; it cannot be read in THIS fixture, because holding the mint
+    // pending requires parking a no-ACK mock at the item address instead of a real item. It is
+    // measured against a real item in tests/username-item-is-the-record.test.ts (UNI-01, UNI-03).
+    // registered_at is held by nothing at all now, so it is asserted nowhere.
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
+    const afterFinalize = await ctx.registry.getGetGlobal();
+    expect(afterFinalize.treasury_due_ath).toBe(HALF_PRICE);
+    expect(afterFinalize.burn_due_ath).toBe(PRICE_6_PLUS - HALF_PRICE);
+    expect(afterFinalize.pending_mint_count).toBe(0n);
   });
 
   it('RT-USER-004: resend ACK with transferred owner cannot spoof the pending mint owner', async () => {
@@ -233,7 +283,8 @@ describe('UsernameRegistry negative authorization matrix', () => {
     expect(afterPending.exists).toBe(true);
     expect(afterPending.owner_wallet.equals(mintOwner)).toBe(true);
     expect(afterPending.owner_wallet.equals(transferredOwner)).toBe(false);
-    expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
+    // Nothing was minted either — the spoofed ACK finalised no name.
+    expect((await readUsernameItem(ctx.blockchain, ctx.registry.address, 'resendx')).initialized).toBe(false);
     expect((await ctx.registry.getGetGlobal()).pending_mint_count).toBe(1n);
   });
 
@@ -243,6 +294,12 @@ describe('UsernameRegistry negative authorization matrix', () => {
 
     await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, treasuryOwner, 'treasy', PRICE_6_PLUS, ctx.vaultAddress);
     expect((await ctx.registry.getGetGlobal()).treasury_due_ath).toBe(HALF_PRICE);
+    // This mint installs a REAL item (no no-ACK mock), so it is the one place in this file where the
+    // successful case is visible. It also keeps every `.initialized === false` assertion above honest:
+    // if readUsernameItem could never return true, they would all pass vacuously.
+    const minted = await readUsernameItem(ctx.blockchain, ctx.registry.address, 'treasy');
+    expect(minted.initialized).toBe(true);
+    expect(minted.owner_wallet!.equals(treasuryOwner)).toBe(true);
     await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.05') }, {
       $$type: 'FlushTreasuryAthDue',
       query_id: 8001n,
