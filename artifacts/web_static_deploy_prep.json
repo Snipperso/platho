@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-13T20:02:14.326Z",
-  "mode": "production",
+  "generatedAt": "2026-07-20T16:04:11.187Z",
+  "mode": "preview",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "PRODUCTION_STATIC_PACKAGE_READY",
-  "productionReady": true,
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
+  "status": "PREVIEW_STATIC_PACKAGE_READY",
+  "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 178,
-    "totalBytes": 5694592,
-    "bundleSha256": "ac6e554c92e5d1dc30ce7de01fa39025943ef0a1e87539589659bc1477edc145",
+    "fileCount": 180,
+    "totalBytes": 5694203,
+    "bundleSha256": "b376f0becd57fb7076b7b4fb38eaf423f91c3c91746a03caef87da65b1776c16",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1575823,
-        "sha256": "c5edfa4a50bd08f48d87342c1ca61739197519774c2a9cd64d874a56d196fd00"
+        "bytes": 1518841,
+        "sha256": "662269f412c8943897a9ecabf59fbf3cc10ac316c6fb64653615337f3e30b807"
       },
       {
         "path": "assets/icons/about.svg",
@@ -268,9 +268,19 @@
         "sha256": "d2bc6e1635eb3da69e1fcb838bc83363952a218853bc51c018c4dddac5030c4d"
       },
       {
+        "path": "crypto/conv-routing.mjs",
+        "bytes": 16691,
+        "sha256": "7dbaa8ffe603da447f4c18fcc219ef001d01f4edf20fc85410c69dfbd6631503"
+      },
+      {
+        "path": "crypto/intro-handshake.mjs",
+        "bytes": 12619,
+        "sha256": "9883da32adf120486c02b3de6e4bafc5c6419b66881b589ef09f5a4849452d14"
+      },
+      {
         "path": "crypto/platho-crypto.mjs",
-        "bytes": 125463,
-        "sha256": "dee114f4474000f06a3dc7dad09d14dbbf70f0a52579ad41c0547ebac0bf13cc"
+        "bytes": 164061,
+        "sha256": "541f3415499b94b1ca1d2e8961604d3073140199cb73ec735376f469d259b2db"
       },
       {
         "path": "docs/about-platho.de.md",
@@ -424,8 +434,8 @@
       },
       {
         "path": "encrypted-message-store.mjs",
-        "bytes": 16872,
-        "sha256": "e5efbc043836f34436b57beaf314697e018c1f168e00581a554a8f62a13440ed"
+        "bytes": 12926,
+        "sha256": "26d5e4b62374104af5b440c87365f7b602e158e0bcf51622c052e344a0416771"
       },
       {
         "path": "i18n-strings.mjs",
@@ -439,8 +449,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 60824,
-        "sha256": "b45735bef309c2f74115035baaa05c5dfab1c7bb5d76f5f6374e8a6ba8c264ce"
+        "bytes": 60474,
+        "sha256": "208d8d2ec8512adcaf444fb5b96ed0f3fbecc5974f446c7b878194779f4487c0"
       },
       {
         "path": "manifest.webmanifest",
@@ -454,13 +464,13 @@
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 19016,
-        "sha256": "601904747f367d9e049d5161e6e6feb7c2a55a489fd06c1c55625db4fd51f058"
+        "bytes": 18484,
+        "sha256": "9f0e0bc2f423a383868d03a3eb00e7bdcfcbf7d411a392f9b51253e6f344158c"
       },
       {
         "path": "platho-wallet.mjs",
-        "bytes": 24746,
-        "sha256": "81b1d54e75bb9a1fd6d223885c684b5943fdfc123b989a5f9fe1bd2afe23f3cc"
+        "bytes": 26611,
+        "sha256": "e2bdba361714acba89eda09fc91f8bbf31585e5b5aac67ddb15450e69b630847"
       },
       {
         "path": "profile-avatar-media-store.mjs",
@@ -469,8 +479,8 @@
       },
       {
         "path": "profile-registry-ton-rpc-provider.mjs",
-        "bytes": 8261,
-        "sha256": "e75aa8ad673542da7c3a2f50b2dce43587119403cc89522122385d1d8416e239"
+        "bytes": 8114,
+        "sha256": "9bcaa949a297a8149535dcb1c1c8794611086b50cbd4b54c9d4eee3badfd09f4"
       },
       {
         "path": "public-channel-subscriptions.mjs",
@@ -484,8 +494,8 @@
       },
       {
         "path": "pwa-contract-transactions.mjs",
-        "bytes": 93573,
-        "sha256": "64fff9d3b4b1ffe83cf96e740dd7e2d1529ae0dad80217519d72fb2b6564091b"
+        "bytes": 88512,
+        "sha256": "b2b90e0d1f87edd34bb4f5873656d45dafc684143c3e02a78d23a8fdf992c233"
       },
       {
         "path": "qr-code.mjs",
@@ -524,8 +534,8 @@
       },
       {
         "path": "username-ton-rpc-provider.mjs",
-        "bytes": 17434,
-        "sha256": "d517eae15d56c8503a146f211ff7ae03d5b027950f8da3a8a3e3ab4a25132c2c"
+        "bytes": 17285,
+        "sha256": "8bdaf28e7bb01e46ada79ffef64aff71ffca808fd90fdf84612a300501cd6362"
       },
       {
         "path": "vault-chain-provider.mjs",
@@ -534,8 +544,8 @@
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
-        "bytes": 103709,
-        "sha256": "5fa3565b79d5605157695dfc673336a9be0f5c2aa30f234400ff5424a4fb33d8"
+        "bytes": 100714,
+        "sha256": "da23b10f66f1085077a858d855f75dc2253ff6a2faf17c6bf4adad037986174d"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",
@@ -906,8 +916,26 @@
     "excludedWebFiles": [
       "CRYPTO_PROTOCOL.md",
       "NO_BACKEND_ARCHITECTURE.md",
+      "conv-discovery.mjs",
+      "intro-bucket.mjs",
+      "intro-codec.mjs",
+      "intro-cursor-store.mjs",
+      "intro-lane.mjs",
+      "intro-publish-browser.mjs",
+      "intro-receive.mjs",
+      "intro-scan-policy.mjs",
+      "intro-scan-runner.mjs",
+      "intro-scan.mjs",
+      "intro-transport.mjs",
       "preview-desktop.png",
       "preview-mobile.png",
+      "publish-builder.mjs",
+      "publish-price.mjs",
+      "shard-address.mjs",
+      "shard-code.mjs",
+      "shard-discovery.mjs",
+      "shard-reader.mjs",
+      "shard-rpc.mjs",
       "static-server.js",
       "vendor/@noble/ciphers/README.md",
       "vendor/@noble/ciphers/_arx.d.ts",
@@ -1157,9 +1185,18 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": true
+    "productionMarkersCleared": false
   },
   "blockers": [],
-  "warnings": [],
-  "productionFindings": []
+  "warnings": [
+    "STATIC_PACKAGE_IS_NON_PRODUCTION",
+    "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH"
+  ],
+  "productionFindings": [
+    {
+      "id": "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH",
+      "file": "artifacts/mainnet_genesis_verify_input.json",
+      "message": "MAINNET_GENESIS_VERIFIED=true must match current build code hashes: ath_master, ath_vesting, ath_wallet, buyback_burn, market_stability_seller, capsulehub, fee_accumulator, profile_registry, username_nft_item, username_registry, vault."
+    }
+  ]
 }
