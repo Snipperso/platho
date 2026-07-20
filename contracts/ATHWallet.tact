@@ -320,8 +320,8 @@ contract ATHWallet {
     //      closed by 14315/14565/14665, which are untouched.
     // Replay safety now lives on the SEMANTIC key at the consumer, which is both stronger and the pattern this
     // contract already uses: the TEP-74 lane below (`JettonInternalTransfer`) has never written a tombstone, and
-    // says so explicitly. UsernameRegistry rejects a repeat by name_hash (19172/19173); ProfileRegistry gained an
-    // equivalent gate on the full avatar pointer in the same change.
+    // says so explicitly. UsernameRegistry rejects a repeat by name_hash (19172/19173); ProfileRegistry rejects a
+    // repeat of the current avatar pointer at 21115, added in the same change because it had no guard at all.
     //
     // Residual, stated plainly: a resend with the same query_id now reaches the registry. It is paid for by a
     // SECOND debit, so it is a second genuine purchase, not minted value.
