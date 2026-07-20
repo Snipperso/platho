@@ -218,8 +218,12 @@ export function decodePendingAthBurnFlushStack(result) {
 
 export function decodeUsernameRegistryGlobalStack(result) {
   const stack = extractStack(result);
-  if (stack.length !== 13) {
-    throw new UsernameTonRpcProviderError(`UsernameRegistry get_global ABI mismatch: expected 13 stack items, got ${stack.length}`);
+  // 13 -> 12 on 2026-07-20: name_record_count left the getter when name_records was deleted (the registry has no
+  // per-name state to count any more). EVERY index after it shifts down by one, which is the whole reason this
+  // decoder asserts an exact length instead of reading by position and hoping — a silent off-by-one here reads
+  // treasury_due as burn_due and reports money that is not there.
+  if (stack.length !== 12) {
+    throw new UsernameTonRpcProviderError(`UsernameRegistry get_global ABI mismatch: expected 12 stack items, got ${stack.length}`);
   }
   return {
     sealed: readStackBool(stack, 0, 'UsernameRegistry sealed'),
@@ -228,13 +232,12 @@ export function decodeUsernameRegistryGlobalStack(result) {
     genesis_config_hash: readStackInt(stack, 3, 'UsernameRegistry genesis config hash'),
     official_ath_wallet_address: readStackAddress(stack, 4, 'UsernameRegistry official ATH wallet'),
     genesis_controller_address: readStackAddress(stack, 5, 'UsernameRegistry genesis controller'),
-    name_record_count: readStackInt(stack, 6, 'UsernameRegistry name record count'),
-    pending_mint_count: readStackInt(stack, 7, 'UsernameRegistry pending mint count'),
-    treasury_due_ath: readStackInt(stack, 8, 'UsernameRegistry treasury due'),
-    burn_due_ath: readStackInt(stack, 9, 'UsernameRegistry burn due'),
-    pending_treasury_flush_count: readStackInt(stack, 10, 'UsernameRegistry pending treasury flush count'),
-    pending_burn_flush_count: readStackInt(stack, 11, 'UsernameRegistry pending burn flush count'),
-    pending_mint_stale_ttl: readStackInt(stack, 12, 'UsernameRegistry pending mint stale ttl'),
+    pending_mint_count: readStackInt(stack, 6, 'UsernameRegistry pending mint count'),
+    treasury_due_ath: readStackInt(stack, 7, 'UsernameRegistry treasury due'),
+    burn_due_ath: readStackInt(stack, 8, 'UsernameRegistry burn due'),
+    pending_treasury_flush_count: readStackInt(stack, 9, 'UsernameRegistry pending treasury flush count'),
+    pending_burn_flush_count: readStackInt(stack, 10, 'UsernameRegistry pending burn flush count'),
+    pending_mint_stale_ttl: readStackInt(stack, 11, 'UsernameRegistry pending mint stale ttl'),
   };
 }
 
@@ -259,7 +262,7 @@ export async function resolveAuthoritativeUsernameItemOwnership({
   registryCallOptions = {},
   itemCallOptions = {},
 } = {}) {
-  if (!registryProvider?.getNameRecord) throw new UsernameTonRpcProviderError('UsernameRegistry provider cannot read authoritative name records');
+  if (!registryProvider?.getUsernameItemAddress) throw new UsernameTonRpcProviderError('UsernameRegistry provider cannot derive item addresses');
   if (!itemProvider?.getState) throw new UsernameTonRpcProviderError('UsernameNFTItem provider cannot read item state');
   if (!itemAddress) throw new UsernameTonRpcProviderError('UsernameNFTItem address is required');
 
@@ -284,19 +287,15 @@ export async function resolveAuthoritativeUsernameItemOwnership({
     };
   }
 
-  const record = await registryProvider.getNameRecord(itemState.name_hash, registryCallOptions);
-  if (record?.exists !== true) {
-    return {
-      authoritative: false,
-      reason: 'missing_registry_record',
-      item_state: itemState,
-      record,
-    };
-  }
-
-  const recordItemAddress = parseTonAddress(record.item_address).raw;
+  // The check this replaces asked the registry's name_records map where the name's item lives. That map is gone
+  // (2026-07-20), and it was the weaker source anyway: it named the MINTER and never followed a TEP-62 transfer.
+  // What actually establishes authority is unchanged in substance and stronger in form — the item claims a
+  // name_hash, and the collection DERIVES an address from that hash; if the derivation lands anywhere other than
+  // the account we just read, the item is an impostor. deriveItemAddress is a pure function, so no stored record
+  // is involved on either side.
+  const derivedItemAddress = await registryProvider.getUsernameItemAddress(itemState.name_hash, registryCallOptions);
   const itemOwnerWallet = parseTonAddress(itemState.owner_wallet).raw;
-  const authoritative = recordItemAddress === parsedItemAddress;
+  const authoritative = parseTonAddress(derivedItemAddress).raw === parsedItemAddress;
   return {
     authoritative,
     reason: authoritative ? 'registry_item' : 'registry_item_mismatch',
@@ -304,7 +303,7 @@ export async function resolveAuthoritativeUsernameItemOwnership({
     item_address: parsedItemAddress,
     name_hash: itemState.name_hash,
     item_state: itemState,
-    record,
+    derived_item_address: derivedItemAddress,
   };
 }
 
@@ -332,19 +331,9 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
       });
       return readStackAddress(extractStack(result), 0, 'username item address');
     },
-    async getNameRecord(nameHash, callOptions = {}) {
-      const transport = resolveTransport(options);
-      const address = resolveAddress(options.usernameRegistryAddress, callOptions, 'plathoUsernameRegistryAddress', 'UsernameRegistry');
-      return decodeUsernameNameRecordStack(await transport.runGetMethod({
-        address,
-        method: 'get_name_record',
-        stack: [stackNumber(nameHash)],
-        ...criticalCallOptions(callOptions),
-      }));
-    },
-    async getNameRecordByUsername(username, callOptions = {}) {
-      return this.getNameRecord(await computeUsernameNameHash(username), callOptions);
-    },
+    // getNameRecord / getNameRecordByUsername REMOVED 2026-07-20 with the registry's name_records map. A name's
+    // record is its ITEM: derive the address with getUsernameItemAddress(nameHash) and read the item, which is
+    // authoritative for ownership (it follows TEP-62 transfers; the deleted map named the minter forever).
     async getPendingMint(nameHash, callOptions = {}) {
       const transport = resolveTransport(options);
       const address = resolveAddress(options.usernameRegistryAddress, callOptions, 'plathoUsernameRegistryAddress', 'UsernameRegistry');

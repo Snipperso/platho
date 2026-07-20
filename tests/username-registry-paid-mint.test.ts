@@ -24,7 +24,11 @@ const PRICE_5 = 1_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 const OP_ATH_TRANSFER_NOTIFICATION_REFUND = 0x4154481E;
-const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 829_000_000n + 1_000_000n + 4_000_000n + 100_000_000n; // clean-16 L2/#14 (owner: mint=exactly 1 TON): item(829M)+record(100M), sized at the real 64962/cell/yr rate
+// clean-16 L2/#14 (owner: mint=exactly 1 TON): item(829M) + 100M, sized at the real 64962/cell/yr rate.
+// The 100M was the per-name record's rent; name_records is gone, so since 2026-07-20 it funds the REGISTRY'S
+// OWN storage instead. The number is deliberately unchanged — mint price is pinned client-side at exactly 1 TON,
+// so lowering it would return nothing to the buyer, only stop accounting for where the money goes.
+const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 829_000_000n + 1_000_000n + 4_000_000n + 100_000_000n;
 const USERNAME_ITEM_STORAGE_FLOOR = 15_900_000n;
 
 // TEP-62 transfer body after query_id (new NftTransfer binding carries it as one slice).
@@ -136,6 +140,24 @@ function vaultMintNotificationBody(ownerWallet: Address, name: string, amount: b
   })).endCell();
 }
 
+// ── THE ITEM IS THE RECORD ────────────────────────────────────────────────────────────────────────────────
+// UsernameRegistry.name_records is DELETED (2026-07-20), and with it get_name_record and get_global().name_record_count.
+// The per-name UsernameNFTItem was always the authoritative record; the map was a weaker, staler copy of it.
+//
+// "Is this name minted?" is answered by the chain, with no map: the item account at the name-derived address
+// exists AND its get_state().initialized is true. `owner` is the LIVE owner — unlike the deleted
+// NameRecord.minter_wallet, it tracks TEP-62 transfers. The deleted registered_at has no successor anywhere.
+async function readItemRecord(blockchain: Blockchain, registryAddress: Address, hash: bigint) {
+  const init = await UsernameNFTItem.init(registryAddress, hash);
+  const address = contractAddress(0, init);
+  const account = await blockchain.getContract(address);
+  if (account.accountState?.type !== 'active') {
+    return { address, minted: false, owner: null as Address | null };
+  }
+  const state = await blockchain.openContract(new UsernameNFTItem(address, init)).getGetState();
+  return { address, minted: state.initialized, owner: state.owner_wallet as Address | null };
+}
+
 function internalMessage(from: Address, to: Address, value: bigint, body: any, bounce = true) {
   return {
     info: {
@@ -164,15 +186,17 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     await sendMint(registry, officialAthWallet, ownerWallet, 'platho', PRICE_6_PLUS);
 
-    const record = await registry.getGetNameRecord(hash);
+    // The mint FINALISED: the item at the name-derived address became initialized. That is the stronger claim
+    // the deleted name_record_count counter used to stand in for.
+    const rec = await readItemRecord(blockchain, registry.address, hash);
     const pending = await registry.getGetPendingMint(hash);
     const global = await registry.getGetGlobal();
 
-    expect(record.exists).toBe(true);
-    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
-    expect(record.item_address.equals(itemAddress)).toBe(true);
+    expect(rec.minted).toBe(true);
+    expect(rec.owner!.equals(ownerWallet)).toBe(true);
+    // The registry's getter and the pure client-side derivation reach the same address — no index required.
+    expect(rec.address.equals(itemAddress)).toBe(true);
     expect(pending.exists).toBe(false);
-    expect(global.name_record_count).toBe(1n);
     expect(global.pending_mint_count).toBe(0n);
     expect(global.treasury_due_ath).toBe(50_000_000_000n);
     expect(global.burn_due_ath).toBe(50_000_000_000n);
@@ -205,11 +229,11 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     await sendMint(registry, officialAthWallet, ownerWallet, 'preokx', PRICE_6_PLUS);
 
-    const record = await registry.getGetNameRecord(hash);
+    const rec = await readItemRecord(blockchain, registry.address, hash);
     const itemState = await item.getGetState();
-    expect(record.exists).toBe(true);
-    expect(record.item_address.equals(itemAddress)).toBe(true);
-    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
+    expect(rec.minted).toBe(true);
+    expect(rec.address.equals(itemAddress)).toBe(true);
+    expect(rec.owner!.equals(ownerWallet)).toBe(true);
     expect(itemState.initialized).toBe(true);
     expect(itemState.owner_wallet.equals(ownerWallet)).toBe(true);
     expect(itemState.owner_wallet.equals(attacker.address)).toBe(false);
@@ -217,33 +241,29 @@ describe('UsernameRegistry paid mint milestone', () => {
   });
 
   it('USERNAME-REG-M10-01D: canonical usernames allow lowercase letters, digits, underscores, and hyphens only', async () => {
-    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_CANONICAL_CHARS_OWNER');
     const hash = nameHash('platho_1-x');
 
     await sendMint(registry, officialAthWallet, ownerWallet, 'platho_1-x', PRICE_6_PLUS);
 
-    const record = await registry.getGetNameRecord(hash);
-    const global = await registry.getGetGlobal();
-
-    expect(record.exists).toBe(true);
-    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
-    expect(global.name_record_count).toBe(1n);
+    // Accepted: the item exists and finalised. (The old name_record_count === 1n proved the same finalisation
+    // indirectly; the item becoming initialized is the direct claim.)
+    const rec = await readItemRecord(blockchain, registry.address, hash);
+    expect(rec.minted).toBe(true);
+    expect(rec.owner!.equals(ownerWallet)).toBe(true);
   });
 
   it('USERNAME-REG-M10-01E: v1 separator policy intentionally permits edge separator names', async () => {
-    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_SEPARATOR_POLICY_OWNER');
     const hash = nameHash('----');
 
     await sendMint(registry, officialAthWallet, ownerWallet, '----', PRICE_4);
 
-    const record = await registry.getGetNameRecord(hash);
-    const global = await registry.getGetGlobal();
-
-    expect(record.exists).toBe(true);
-    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
-    expect(global.name_record_count).toBe(1n);
+    const rec = await readItemRecord(blockchain, registry.address, hash);
+    expect(rec.minted).toBe(true);
+    expect(rec.owner!.equals(ownerWallet)).toBe(true);
   });
 
   it('USERNAME-REG-M10-01B: repeated item resend after finalization cannot mutate record or split due again', async () => {
@@ -256,21 +276,21 @@ describe('UsernameRegistry paid mint milestone', () => {
     await sendMint(registry, officialAthWallet, ownerWallet, 'repeat', PRICE_6_PLUS);
 
     const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
-    const beforeRecord = await registry.getGetNameRecord(hash);
+    const beforeRec = await readItemRecord(blockchain, registry.address, hash);
     const beforeGlobal = await registry.getGetGlobal();
 
     await item.send(caller.getSender(), { value: 4_000_000n }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
 
-    const afterRecord = await registry.getGetNameRecord(hash);
+    const afterRec = await readItemRecord(blockchain, registry.address, hash);
     const afterGlobal = await registry.getGetGlobal();
 
-    expect(beforeRecord.exists).toBe(true);
-    expect(afterRecord.exists).toBe(true);
-    expect(afterRecord.minter_wallet.equals(beforeRecord.minter_wallet)).toBe(true);
-    expect(afterRecord.item_address.equals(beforeRecord.item_address)).toBe(true);
-    expect(afterGlobal.name_record_count).toBe(beforeGlobal.name_record_count);
+    // The record that must not mutate now lives in the item, not in a registry map.
+    expect(beforeRec.minted).toBe(true);
+    expect(afterRec.minted).toBe(true);
+    expect(afterRec.owner!.equals(beforeRec.owner!)).toBe(true);
+    expect(afterRec.address.equals(beforeRec.address)).toBe(true);
     expect(afterGlobal.pending_mint_count).toBe(0n);
     expect(afterGlobal.treasury_due_ath).toBe(beforeGlobal.treasury_due_ath);
     expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
@@ -287,20 +307,19 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
     const beforeGlobal = await registry.getGetGlobal();
-    const beforeRecord = await registry.getGetNameRecord(hash);
+    const beforeRec = await readItemRecord(blockchain, registry.address, hash);
     const result = await item.send(caller.getSender(), { value: 4_000_000n }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
 
     const afterGlobal = await registry.getGetGlobal();
-    const afterRecord = await registry.getGetNameRecord(hash);
+    const afterRec = await readItemRecord(blockchain, registry.address, hash);
     const itemBalance = (await blockchain.getContract(itemAddress)).balance;
 
-    expect(beforeRecord.exists).toBe(true);
-    expect(afterRecord.exists).toBe(true);
-    expect(afterRecord.minter_wallet.equals(beforeRecord.minter_wallet)).toBe(true);
-    expect(afterRecord.item_address.equals(beforeRecord.item_address)).toBe(true);
-    expect(afterGlobal.name_record_count).toBe(beforeGlobal.name_record_count);
+    expect(beforeRec.minted).toBe(true);
+    expect(afterRec.minted).toBe(true);
+    expect(afterRec.owner!.equals(beforeRec.owner!)).toBe(true);
+    expect(afterRec.address.equals(beforeRec.address)).toBe(true);
     expect(afterGlobal.pending_mint_count).toBe(0n);
     expect(afterGlobal.treasury_due_ath).toBe(beforeGlobal.treasury_due_ath);
     expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
@@ -330,10 +349,14 @@ describe('UsernameRegistry paid mint milestone', () => {
       payload: nftTransferPayload(ownerB, ownerA, 0n),
     } as NftTransfer);
 
-    const record = await registry.getGetNameRecord(hash);
+    // The authoritative address is a pure function of the name, so a TEP-62 transfer cannot move it. What DOES
+    // move is the owner — and the item reports the new one. (The deleted NameRecord.minter_wallet never did:
+    // it would still have named ownerA here, which is why removing the map removed a wrong source, not a right one.)
+    const rec = await readItemRecord(blockchain, registry.address, hash);
     const itemState = await item.getGetState();
-    expect(record.exists).toBe(true);
-    expect(record.item_address.equals(itemAddress)).toBe(true);
+    expect(rec.minted).toBe(true);
+    expect(rec.address.equals(itemAddress)).toBe(true);
+    expect(rec.owner!.equals(ownerB)).toBe(true);
     expect(itemState.owner_wallet.equals(ownerB)).toBe(true);
   });
 
@@ -356,7 +379,8 @@ describe('UsernameRegistry paid mint milestone', () => {
     const registryMintTx = await mintIterator.next();
     expect(registryMintTx.done).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(true);
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    // The item has not been deployed yet, so the name is not minted: no account at the derived address.
+    expect((await readItemRecord(blockchain, registry.address, hash)).minted).toBe(false);
 
     const itemInitTx = await mintIterator.next();
     expect(itemInitTx.done).toBe(false);
@@ -371,16 +395,22 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     const ackTx = await mintIterator.next();
     expect(ackTx.done).toBe(false);
-    const record = await registry.getGetNameRecord(hash);
+    const rec = await readItemRecord(blockchain, registry.address, hash);
     const global = await registry.getGetGlobal();
     const itemState = await item.getGetState();
 
-    expect(record.exists).toBe(true);
-    expect(record.minter_wallet.equals(ownerA)).toBe(true);
-    expect(record.item_address.equals(itemAddress)).toBe(true);
+    // The ACK still finalises the mint: pending clears and the dues are credited, even though ownership moved
+    // out from under it. The mint is FINALISED — the item is initialized at the name-derived address.
+    //
+    // DROPPED, deliberately: the old `record.minter_wallet.equals(ownerA)`. NameRecord froze the minter at mint
+    // time and nothing replaces it — the item holds the LIVE owner, which is ownerB here by design. There is no
+    // longer any on-chain place that remembers who first bought a name, and none is needed: finalisation is
+    // proven by pending clearing and the dues below, ownership by the item.
+    expect(rec.minted).toBe(true);
+    expect(rec.address.equals(itemAddress)).toBe(true);
+    expect(rec.owner!.equals(ownerB)).toBe(true);
     expect(itemState.owner_wallet.equals(ownerB)).toBe(true);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
-    expect(global.name_record_count).toBe(1n);
     expect(global.treasury_due_ath).toBe(PRICE_6_PLUS / 2n);
     expect(global.burn_due_ath).toBe(PRICE_6_PLUS / 2n);
   });
@@ -424,16 +454,20 @@ describe('UsernameRegistry paid mint milestone', () => {
       success: false,
       exitCode: 19136,
     })).toBeDefined();
+    // Rejecting the resend must not touch the pending mint. Note the ORDERING the item-is-the-record model makes
+    // explicit: the item is already live and initialized at this point — it was deployed one iterator step ago —
+    // while the registry has NOT yet finalised. "Minted" (the item) and "finalised" (pending cleared, dues
+    // credited) are now visibly two different facts, and only the second is what this resend must not disturb.
+    // The deleted name_record_count conflated them; pending_mints, which does clear itself, is the real subject.
     expect(pending.exists).toBe(true);
     expect(pending.owner_wallet.equals(ownerA)).toBe(true);
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect((await readItemRecord(blockchain, registry.address, hash)).minted).toBe(true);
     expect(afterGlobal.pending_mint_count).toBe(beforeGlobal.pending_mint_count);
-    expect(afterGlobal.name_record_count).toBe(beforeGlobal.name_record_count);
     expect(afterGlobal.treasury_due_ath).toBe(beforeGlobal.treasury_due_ath);
     expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
 
     expect((await mintIterator.next()).done).toBe(false);
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(true);
+    expect((await readItemRecord(blockchain, registry.address, hash)).minted).toBe(true);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
   });
 
@@ -464,7 +498,7 @@ describe('UsernameRegistry paid mint milestone', () => {
   });
 
   it('USERNAME-REG-M10-08: underfunded official mint notification cannot strand state without ACK reserve', async () => {
-    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const invalidOwner = fixtureAddress('USERNAME_M10_INVALID_UNDERFUNDED_OWNER');
     const validOwner = fixtureAddress('USERNAME_M10_VALID_UNDERFUNDED_OWNER');
     const validHash = nameHash('oldmin');
@@ -472,10 +506,10 @@ describe('UsernameRegistry paid mint milestone', () => {
     await sendMint(registry, officialAthWallet, invalidOwner, 'Larisa', PRICE_6_PLUS, toNano('0.004'));
     await sendMint(registry, officialAthWallet, validOwner, 'oldmin', PRICE_6_PLUS, toNano('0.026'));
 
-    expect((await registry.getGetNameRecord(validHash)).exists).toBe(false);
+    // Nothing stranded: no item was deployed, so the mint did NOT finalise.
+    expect((await readItemRecord(blockchain, registry.address, validHash)).minted).toBe(false);
     expect((await registry.getGetPendingMint(validHash)).exists).toBe(false);
     const global = await registry.getGetGlobal();
-    expect(global.name_record_count).toBe(0n);
     expect(global.pending_mint_count).toBe(0n);
   });
 
@@ -493,7 +527,7 @@ describe('UsernameRegistry paid mint milestone', () => {
       SUCCESSFUL_MINT_REQUIRED_VALUE + 1_000_000n,
     );
 
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(true);
+    expect((await readItemRecord(blockchain, registry.address, hash)).minted).toBe(true);
     expect(findTransaction(result.transactions, {
       from: registry.address,
       to: owner.address,
@@ -501,13 +535,13 @@ describe('UsernameRegistry paid mint milestone', () => {
   });
 
   it('USERNAME-REG-M10-10: masterchain owner mint is rejected before pending or name state', async () => {
-    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_MASTERCHAIN_OWNER', -1);
     const hash = nameHash('master');
 
     await sendMint(registry, officialAthWallet, ownerWallet, 'master', PRICE_6_PLUS);
 
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect((await readItemRecord(blockchain, registry.address, hash)).minted).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
     const global = await registry.getGetGlobal();
     expect(global.pending_mint_count).toBe(0n);
@@ -536,7 +570,14 @@ describe('UsernameRegistry paid mint milestone', () => {
       SUCCESSFUL_MINT_REQUIRED_VALUE,
     );
 
-    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    // The name was NOT minted. readItemRecord cannot speak here: a foreign contract squats the item address, so
+    // there is an active account but no UsernameNFTItem to ask. The direct claim is that the account still
+    // carries the squatter's code — the deploy bounced, nothing was ever initialized at that address.
+    const squattedState = (await blockchain.getContract(itemAddress)).accountState as any;
+    const itemInit = await UsernameNFTItem.init(registry.address, hash);
+    expect(squattedState?.type).toBe('active');
+    expect(squattedState.state.code.equals(rejectInit.code)).toBe(true);
+    expect(squattedState.state.code.equals(itemInit.code)).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
     expect(findTransaction(result.transactions, {
       from: registry.address,
@@ -546,22 +587,22 @@ describe('UsernameRegistry paid mint milestone', () => {
   });
 
   it('USERNAME-REG-M10-02: invalid uppercase Vault-funded username leaves no pending/name state', async () => {
-    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_UPPERCASE_OWNER');
     const hash = nameHash('Larisa');
 
     await sendMint(registry, officialAthWallet, ownerWallet, 'Larisa', PRICE_6_PLUS);
 
-    const record = await registry.getGetNameRecord(hash);
+    // The mint did NOT finalise: no item account was ever created for the rejected name.
+    const rec = await readItemRecord(blockchain, registry.address, hash);
     const global = await registry.getGetGlobal();
 
-    expect(record.exists).toBe(false);
-    expect(global.name_record_count).toBe(0n);
+    expect(rec.minted).toBe(false);
     expect(global.pending_mint_count).toBe(0n);
   });
 
   it('USERNAME-REG-M10-03: non-official ATH sender is rejected and cannot create pending or name record', async () => {
-    const { registry, attacker } = await deploySealedRegistry();
+    const { blockchain, registry, attacker } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_SPOOF_OWNER');
 
     await registry.send(attacker.getSender(), { value: toNano('0.1') }, {
@@ -575,30 +616,56 @@ describe('UsernameRegistry paid mint milestone', () => {
       username: usernameSlice('platho'),
     } as AthTransferNotificationRegistryMintUsername);
 
+    // The spoofed mint neither finalised nor left a pending entry.
+    expect((await readItemRecord(blockchain, registry.address, nameHash('platho'))).minted).toBe(false);
     const global = await registry.getGetGlobal();
-    expect(global.name_record_count).toBe(0n);
     expect(global.pending_mint_count).toBe(0n);
   });
 
-  it('USERNAME-REG-M10-04: duplicate finalized Vault-funded username rejects without changing the existing record', async () => {
-    const { registry, officialAthWallet } = await deploySealedRegistry();
+  it('USERNAME-REG-M10-04: duplicate finalized Vault-funded username is refused BY THE ITEM and the second buyer is refunded', async () => {
+    // BEHAVIOURAL CHANGE (2026-07-20, name_records deleted). A duplicate is no longer refused synchronously in
+    // COMPUTE at the registry's gate 19172 — that gate needed the map. The registry now deploys to the existing
+    // item address; because the account is already active the StateInit is ignored but the BODY is still
+    // delivered, so the ITEM answers at ITS own gate 18011, the message bounces, and the registry's
+    // bounced<InitializeUsernameItem> handler refunds the second buyer's ATH. One extra round trip, same refusal.
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const ownerA = fixtureAddress('USERNAME_M10_DUP_OWNER_A');
     const ownerB = fixtureAddress('USERNAME_M10_DUP_OWNER_B');
     const hash = nameHash('larisa');
 
     await sendMint(registry, officialAthWallet, ownerA, 'larisa', PRICE_6_PLUS);
-    await sendMint(registry, officialAthWallet, ownerB, 'larisa', PRICE_6_PLUS);
+    const dup = await sendMint(registry, officialAthWallet, ownerB, 'larisa', PRICE_6_PLUS);
 
-    const record = await registry.getGetNameRecord(hash);
-    const global = await registry.getGetGlobal();
+    // The first owner keeps the name — the duplicate changed nothing.
+    const rec = await readItemRecord(blockchain, registry.address, hash);
+    expect(rec.minted).toBe(true);
+    expect(rec.owner!.equals(ownerA)).toBe(true);
+    expect(rec.owner!.equals(ownerB)).toBe(false);
 
-    expect(record.exists).toBe(true);
-    expect(record.minter_wallet.equals(ownerA)).toBe(true);
-    expect(global.name_record_count).toBe(1n);
+    // The item refuses re-initialisation in COMPUTE, and the refusal bounces.
+    expect(findTransaction(dup.transactions, {
+      from: registry.address,
+      to: rec.address,
+      success: false,
+      exitCode: 18011,
+    })).toBeDefined();
+    expect(findTransaction(dup.transactions, {
+      from: rec.address,
+      to: registry.address,
+      inMessageBounced: true,
+    })).toBeDefined();
+
+    // The bounce is what returns the second buyer's money.
+    expect(findTransaction(dup.transactions, {
+      from: registry.address,
+      to: officialAthWallet.address,
+      op: OP_ATH_TRANSFER_NOTIFICATION_REFUND,
+    })).toBeDefined();
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
   });
 
   it('USERNAME-REG-M10-05: price tiers are enforced as exact ATH amounts and Vault underpay leaves no registry state', async () => {
-    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const owner4 = fixtureAddress('USERNAME_M10_PRICE_4');
     const owner5 = fixtureAddress('USERNAME_M10_PRICE_5');
     const underpayOwner = fixtureAddress('USERNAME_M10_UNDERPAY');
@@ -607,10 +674,10 @@ describe('UsernameRegistry paid mint milestone', () => {
     await sendMint(registry, officialAthWallet, owner5, 'abcde', PRICE_5);
     await sendMint(registry, officialAthWallet, underpayOwner, 'abcdef', PRICE_6_PLUS - 1n);
 
-    expect((await registry.getGetNameRecord(nameHash('abcd'))).exists).toBe(true);
-    expect((await registry.getGetNameRecord(nameHash('abcde'))).exists).toBe(true);
-
-    const global = await registry.getGetGlobal();
-    expect(global.name_record_count).toBe(2n);
+    // Exact-price mints finalised; the underpaid one did not. The old name_record_count === 2n proved the
+    // underpay left no state only by arithmetic — asserting the underpaid name has no item says it directly.
+    expect((await readItemRecord(blockchain, registry.address, nameHash('abcd'))).minted).toBe(true);
+    expect((await readItemRecord(blockchain, registry.address, nameHash('abcde'))).minted).toBe(true);
+    expect((await readItemRecord(blockchain, registry.address, nameHash('abcdef'))).minted).toBe(false);
   });
 });

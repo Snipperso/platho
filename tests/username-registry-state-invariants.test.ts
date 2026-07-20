@@ -10,6 +10,7 @@ import {
   PrunePendingUsernameMint,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { MockUsernameNFTItemNoAck } from '../build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck';
+import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 
 const MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
@@ -98,6 +99,25 @@ async function deploySealedRegistry() {
   return { blockchain, registry, officialAthWallet, pruner, vaultAddress };
 }
 
+// THE ITEM IS THE RECORD (2026-07-20). UsernameRegistry.name_records is gone, so "is this name minted, and to
+// whom" is no longer a registry lookup — it is read off the chain itself:
+//   * the item's address is a pure function of (registry, name_hash), recomputed here rather than stored;
+//   * the name is minted iff that account is a LIVE UsernameNFTItem whose get_state().initialized is true;
+//   * owner_wallet is the item's live owner — the deleted record only ever held the MINTER, and never tracked
+//     a TEP-62 transfer, so this is a strictly stronger read than the one it replaces.
+// The code-hash check is load-bearing for THIS suite: the stuck-pending fixture installs MockUsernameNFTItemNoAck
+// at the very same address, so "account is active" alone would report an unminted name as minted. Comparing code
+// distinguishes the fixture without swallowing a getter failure the way a bare try/catch would.
+async function readItem(blockchain: Blockchain, registryAddress: Address, nameHashValue: bigint) {
+  const init = await UsernameNFTItem.init(registryAddress, nameHashValue);
+  const address = contractAddress(0, init);
+  const state = (await blockchain.getContract(address)).accountState;
+  if (state?.type !== 'active') return { address, initialized: false, owner: null as Address | null };
+  if (!state.state.code?.equals(init.code)) return { address, initialized: false, owner: null as Address | null };
+  const view = await blockchain.openContract(new UsernameNFTItem(address, init)).getGetState();
+  return { address, initialized: view.initialized, owner: view.owner_wallet as Address | null };
+}
+
 async function installNoAckAt(blockchain: Blockchain, address: Address) {
   const noAckInit = await MockUsernameNFTItemNoAck.init();
   await blockchain.setShardAccount(address, createShardAccount({
@@ -150,29 +170,40 @@ describe('UsernameRegistry state-machine invariants', () => {
       let queryId = BigInt(seed & 0xffff) + 1n;
       let debugContext = `seed ${seed} initial`;
 
+      // Every name the walk can possibly touch — including the two that must NEVER mint. get_global used to carry
+      // name_record_count, and that scalar was the only thing proving no name OUTSIDE the model had been recorded
+      // (an invalid or underpaid mint quietly succeeding). There is no global counter any more, so the sweep is
+      // done per name over the whole universe instead: each item must be initialized iff the model says minted.
+      // That is strictly stronger than the count it replaces — a count can be right while the wrong name holds it.
+      const universeNames = [...normalNames, ...stuckNames, 'Larisa', 'bad.name'];
+
       async function assertModel() {
-        let registeredCount = 0n;
         let pendingCount = 0n;
-        for (const [name, model] of nameModel.entries()) {
+        for (const name of universeNames) {
+          const model = nameModel.get(name);
           const hash = nameHash(name);
-          const record = await registry.getGetNameRecord(hash);
+          const item = await readItem(blockchain, registry.address, hash);
           const pending = await registry.getGetPendingMint(hash);
-          if (model.status === 'registered') {
-            registeredCount += 1n;
-            expect(record.exists, `${debugContext}: ${name} record exists`).toBe(true);
-            expect(record.minter_wallet.toString()).toBe(model.owner.toString());
+          if (model?.status === 'registered') {
+            expect(item.initialized, `${debugContext}: ${name} item initialized`).toBe(true);
+            // The item's LIVE owner, which is what the deleted record's minter_wallet approximated. Identical
+            // immediately after a mint; unlike the record it would also follow a TEP-62 transfer.
+            expect(item.owner!.toString()).toBe(model.owner.toString());
             expect(pending.exists, `${debugContext}: ${name} no pending`).toBe(false);
-          } else {
+            // registered_at is gone with the record and nothing on chain holds it — no assertion is possible.
+          } else if (model?.status === 'pending') {
             pendingCount += 1n;
-            expect(record.exists, `${debugContext}: ${name} no record`).toBe(false);
+            expect(item.initialized, `${debugContext}: ${name} item not initialized`).toBe(false);
             expect(pending.exists, `${debugContext}: ${name} pending exists`).toBe(true);
             expect(pending.owner_wallet.toString()).toBe(model.owner.toString());
             expect(pending.price_paid).toBe(model.amount);
+          } else {
+            expect(item.initialized, `${debugContext}: ${name} never minted`).toBe(false);
+            expect(pending.exists, `${debugContext}: ${name} never pending`).toBe(false);
           }
         }
 
         const global = await registry.getGetGlobal();
-        expect(global.name_record_count, `${debugContext}: record count`).toBe(registeredCount);
         expect(global.pending_mint_count, `${debugContext}: pending count`).toBe(pendingCount);
         expect(global.treasury_due_ath, `${debugContext}: treasury due`).toBe(treasuryDue);
         expect(global.burn_due_ath, `${debugContext}: burn due`).toBe(burnDue);
@@ -187,6 +218,12 @@ describe('UsernameRegistry state-machine invariants', () => {
           debugContext = `seed ${seed} step ${step} valid-mint ${name}`;
           await sendMint({ registry, officialAthWallet, owner, username: name, amount, queryId, payerWallet: vaultAddress });
           const existing = nameModel.get(name);
+          // Re-minting an ALREADY REGISTERED name is the one genuine behavioural change of the name_records
+          // deletion. It is no longer refused in COMPUTE at 19172 with zero state touched: the registry now takes
+          // the pending slot, deploys onto the existing item, the ITEM refuses at its own gate 18011, the message
+          // bounces, and bounced<InitializeUsernameItem> clears the pending slot and refunds the buyer. The model
+          // below is unchanged for that case on purpose — the walk asserts, after every step, that the round trip
+          // left NOTHING behind: no extra pending, no second accrual to treasury_due/burn_due, owner untouched.
           if (existing == null) {
             nameModel.set(name, { owner, amount, status: 'registered', createdAt: blockchain.now ?? 0 });
             treasuryDue += amount / 2n;

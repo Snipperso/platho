@@ -3,6 +3,43 @@
 // exact price tiers, raw lowercase ASCII username validation, bounce-safe treasury/burn due flushes, and stale pending mint check.
 // No admin/owner override/pause/upgrade/governance/rescue/fallback behavior is implemented.
 // No BuybackBurn route, adapter, migration, or compatibility path is implemented.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 2026-07-20 — name_records DELETED. THE ITEM IS THE RECORD.
+//
+// This contract's last unbounded map is gone. It cost a MEASURED 3.00 cells per name and was never evicted,
+// which was the whole of the ~21,500-name ceiling — a silent one, because exceeding the ~65536-cell account
+// limit fails in the ACTION phase with code 50 while COMPUTE reports exit 0. Nothing would have gone red; names
+// would simply have stopped being recorded. Everything else here is fixed-size or self-clearing, so with the map
+// gone the registry has no ceiling at all.
+//
+// It was deleted rather than sharded because it held nothing of its own. NameRecord was
+// { minter_wallet, item_address, registered_at }, and:
+//   * item_address  is deriveItemAddress(name_hash) — a pure function anyone can recompute (UNI-02).
+//   * minter_wallet is NOT the owner. The struct's own comment said so: a TEP-62 transfer moves the item's
+//     owner_wallet and leaves the record naming the minter (UNI-03). Consumers resolving ownership through the
+//     map were reading a stale answer, so removing it deletes a WRONG source, not a right one.
+//   * registered_at was the only field nothing else held, and no consumer used it.
+//
+// UNIQUENESS DID NOT LIVE HERE EITHER, which is the part that had to be measured before cutting. The item
+// refuses re-initialisation at its own gate 18011, and the mint attaches StateInit to every deploy: on an
+// already-active account the StateInit is ignored but the BODY is still delivered, so the item's gate runs and
+// the message BOUNCES — into the bounced<InitializeUsernameItem> handler that already existed, which refunds the
+// buyer's ATH. Measured in tests/username-item-is-the-record.test.ts UNI-01. Had the message been swallowed
+// instead, a duplicate mint would have taken payment and delivered nothing, and this deletion would be a hole.
+// In-flight duplicates are still refused synchronously by pending_mints (19173), which is the map that DOES
+// clear itself.
+//
+// A duplicate mint therefore costs one extra round trip and refunds, instead of being refused in COMPUTE. That
+// is the entire behavioural change, and it buys a registry that cannot fill up.
+//
+// Retired gates, kept listed so a reader meeting them in an old client does not think they were lost:
+//   19172 — mint-time "name already taken"; now the item's 18011 with a bounce+refund.
+//   19135 — the same check repeated at ACK finalisation.
+//   19304 — the same check inside PrunePendingUsernameMint, a receiver that throws 19307 unconditionally anyway.
+// Retired getter: get_name_record. A client asks the CHAIN instead — derive the item address from the name and
+// read the item, which is both authoritative for ownership and one RPC round trip cheaper than asking here first.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 import "./UsernameNFTItem.tact";
 import "./ATHWallet.tact";
@@ -12,26 +49,50 @@ const USERNAME_PRICE_5_CHARS: Int = 1000000000000;       // 1,000 ATH atomic uni
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;   // 100 ATH atomic units
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT: Int = 6000000;
 const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 4000000;
-// The name_records ownership entry (~2-4 cells) is created at finalization and NEVER evicted (a username's owner
-// record must persist for the life of the collection — owner-decided 2026-07-15: usernames are the eviction
-// EXCEPTION, guaranteed 100+ years, effectively forever when actively used). This dedicated endowment stays in the
-// registry's single balance to self-fund that entry's rent, folded into retainedValue so the FLOOR guarantees it.
-// clean-16 L2/#14/#7-fix: the old 36M was raised here on the belief that 240,631/cell/yr was canonical. THAT BELIEF
-// WAS WRONG and this comment used to assert it in the present tense, which is the most dangerous kind of stale
-// number: 240,631 is the DEAD pre-2026-04-29 schedule (500/1, bits billed). Since 2026-04-29 config-18 charges
-// 135/0 — 64,962 per cell-year with BITS FREE — so this constant is ~385 years, not ~100 (see the next line).
-// The comment also called ~67k "a WRONG rate"; it is not, it is a 3%-conservative rounding of the live 64,962, and
-// ATHWallet.tact and ProfileRegistry.tact both size their endowments on it CORRECTLY. A reader who trusted the old
-// wording would have "corrected" those two onto the dead rate — on immutable contracts. See [[ton-storage-rate-frozen]].
-// G8-provisional: finalize from measured cell.computeDataSize().
-const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT: Int = 100000000; // 0.1 TON: ~385 yr at the REAL basechain rate 64962 nanoton/cell/yr, bit=0 (~4-cell record). See [[ton-storage-rate-frozen]].
+// WAS the per-name record's rent; since 2026-07-20 it funds THIS CONTRACT'S OWN life, which is the larger bill.
+//
+// name_records is gone (see the note at the top of this file), so there is no per-name entry left to fund. The
+// value and the floor are UNCHANGED on purpose: the mint price is an owner decision pinned client-side at exactly
+// 1 TON, and lowering a floor here would not return a nanoton to the buyer — it would only stop accounting for
+// where the money goes.
+//
+// What it genuinely pays for now is measured, and it is not small: this contract carries 501 CODE CELLS (the
+// on-chain SVG art and metadata dominate it), against 149 for ProfileRegistry and 17-33 for every shard in the
+// project. At the live 64,962 nanoton/cell-year that is ~32,500,000 a year for the code alone, so each mint's
+// contribution buys roughly three years of collection life. That is a self-funding registry rather than one
+// leaning on a genesis endowment — and it is the reason a "contract per name" built from THIS code would be
+// unaffordable at 0.0326 GRAM/year per name, while deleting the map costs nothing.
+//
+// The rate itself: 64,962 per cell-year with BITS FREE since config-18 switched on 2026-04-29. The DEAD figure
+// is 240,631 (the pre-switch 500/1 schedule, bits billed); this comment once asserted it in the present tense and
+// called the live ~67k rounding "WRONG", which would have led a reader to "correct" ATHWallet and ProfileRegistry
+// onto a dead rate, on immutable contracts. See [[ton-storage-rate-frozen]].
+const USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION: Int = 100000000;
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 829000000; // clean-16 L2/#14 (owner: mint = EXACTLY 1 TON): sized so client usernameMintTonCharge = 1_000_000_000 exactly. ~412 yr at the REAL rate 64962/cell/yr for the ~31-cell item (the earlier 240,631-rate figures were the STALE pre-2026 config-18 — corrected 2026-07-15). Minter funds once; NFT lives centuries, forever when used. G8-provisional (finalize NFT cell count via computeDataSize). (A masterchain library code-cell would cut per-item rent ~7× — deferred, Фаза-5.)
 const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 48000000; // raised 30M->48M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the official ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M.
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
-const USERNAME_ATH_NOTIFICATION_REFUND_VALUE: Int = 12000000;
+// [MEASURED 2026-07-20, raised 12M -> 45M] What a refund must carry to actually ARRIVE.
+//
+// CAUGHT BY A TEST THAT WAS KEPT RED RATHER THAN RELAXED. Deleting name_records moved the duplicate-mint refund
+// onto a route it had never taken: gate 19172 used to refuse a duplicate in COMPUTE, so the ATH went home as a
+// NOTIFICATION BOUNCE, riding SendRemainingValue out of the payer's 45M notify floor. Now the registry accepts,
+// the item refuses at its own gate 18011, the bounce lands here, and this function mints a FRESH message — whose
+// value is this constant alone.
+//
+// 12M sits squarely inside a window ATHWallet.tact already documents on ATH_TRANSFER_NOTIFY_MIN_VALUE: the
+// recipient wallet gates an arriving transfer at 14212 (2M + 3M + 1M + 20M = 26M) while the sender-side gate
+// 14335 demands only 12M. So the refund was SENT, arrived under-funded, threw 14212, and the buyer's ATH was
+// stranded on the registry's official wallet — measured arrival 6,971,064 against the 26M needed.
+//
+// Sized at 45M to match ATH_TRANSFER_NOTIFY_MIN_VALUE, which was measured on the adjacent path this morning:
+// arrival must clear 26M, the measured overhead on this hop is ~5M, so the floor is ~31M and 45M keeps the same
+// margin as its sibling rather than inventing a second, thinner one. Unspent value returns as change.
+// Pinned by VAULT-ATH-08 in tests/vault-ath-integration.test.ts, which asserts the BUYER's balance is restored —
+// not merely that a refund was emitted.
+const USERNAME_ATH_NOTIFICATION_REFUND_VALUE: Int = 45000000;
 const USERNAME_PENDING_MINT_STALE_TTL: Int = 86400; // 24 hours
 const USERNAME_MAX_LENGTH: Int = 16;
 const USERNAME_SPLIT_BASE_BPS: Int = 10000;
@@ -87,14 +148,6 @@ struct PendingUsernameMint {
     created_at: Int as uint64;
 }
 
-struct NameRecord {
-    // The wallet that MINTED the name. NOT the current owner: TEP-62 transfer updates the
-    // item's owner_wallet but not this record. Resolve live ownership from the item state.
-    minter_wallet: Address;
-    item_address: Address;
-    registered_at: Int as uint64;
-}
-
 struct UsernameRegistryGlobalView {
     sealed: Bool;
     official_ath_wallet_bound: Bool;
@@ -102,7 +155,6 @@ struct UsernameRegistryGlobalView {
     genesis_config_hash: Int;
     official_ath_wallet_address: Address;
     genesis_controller_address: Address;
-    name_record_count: Int;
     pending_mint_count: Int;
     treasury_due_ath: Int;
     burn_due_ath: Int;
@@ -114,15 +166,6 @@ struct UsernameRegistryGlobalView {
 struct UsernamePriceView {
     valid_length: Bool;
     price_ath_atomic: Int;
-}
-
-struct UsernameNameRecordView {
-    exists: Bool;
-    // Minter at registration time, NOT the current owner (see NameRecord). Read live ownership
-    // from the item's get_state.owner_wallet.
-    minter_wallet: Address;
-    item_address: Address;
-    registered_at: Int;
 }
 
 struct PendingUsernameMintView {
@@ -200,11 +243,9 @@ contract UsernameRegistry {
     sealed: Bool;
     deployment_manifest_hash: Int as uint256;
     genesis_config_hash: Int as uint256;
-    name_record_count: Int as uint64;
     pending_mint_count: Int as uint64;
     treasury_due_ath: Int as uint128;
     burn_due_ath: Int as uint128;
-    name_records: map<Int, NameRecord>;
     pending_mints: map<Int, PendingUsernameMint>;
     pending_item_to_name_hash: map<Address, Int>;
     pending_treasury_flushes: map<Int, PendingAthTreasuryFlush>;
@@ -234,7 +275,6 @@ contract UsernameRegistry {
         self.genesis_controller_address = genesis_controller_address;
         self.deployment_manifest_hash = deployment_manifest_hash;
         self.genesis_config_hash = genesis_config_hash;
-        self.name_record_count = 0;
         self.pending_mint_count = 0;
         self.treasury_due_ath = 0;
         self.burn_due_ath = 0;
@@ -431,15 +471,12 @@ contract UsernameRegistry {
             throw(19171);
         }
 
-        if (self.name_records.exists(name_hash)) {
-            throw(19172);
-        }
 
         if (self.pending_mints.exists(name_hash)) {
             throw(19173);
         }
 
-        let retainedValue: Int = USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE + USERNAME_NAME_RECORD_STORAGE_ENDOWMENT;
+        let retainedValue: Int = USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE + USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION;
         throwUnless(19122, context().value >= retainedValue);
 
         let item_address: Address = self.deriveItemAddress(name_hash);
@@ -568,17 +605,10 @@ contract UsernameRegistry {
         let pending: PendingUsernameMint = pendingOpt!!;
         throwUnless(19133, self.isBasechainAddress(msg.owner_wallet));
         throwUnless(19134, pending.item_address == sender());
-        throwUnless(19135, !self.name_records.exists(msg.name_hash));
         throwUnless(19136, msg.owner_wallet == pending.owner_wallet);
 
         let pendingToFinalize: PendingUsernameMint = self.clearPendingMint(msg.name_hash);
 
-        self.name_records.set(msg.name_hash, NameRecord {
-            minter_wallet: pendingToFinalize.owner_wallet,
-            item_address: pendingToFinalize.item_address,
-            registered_at: now()
-        });
-        self.name_record_count += 1;
 
         let treasury_amount: Int = (pendingToFinalize.price_paid * USERNAME_TREASURY_SHARE_BPS) / USERNAME_SPLIT_BASE_BPS;
         let burn_amount: Int = pendingToFinalize.price_paid - treasury_amount;
@@ -722,7 +752,6 @@ contract UsernameRegistry {
         throwUnless(19302, pendingOpt != null);
         let pending: PendingUsernameMint = pendingOpt!!;
         throwUnless(19303, now() >= pending.created_at + USERNAME_PENDING_MINT_STALE_TTL);
-        throwUnless(19304, !self.name_records.exists(msg.name_hash));
         // Conservative seam policy: do not refund a Vault-funded mint until UsernameNFTItem ACK/bounce proves item deployment finality.
         throw(19307);
     }
@@ -1215,24 +1244,6 @@ contract UsernameRegistry {
         };
     }
 
-    get fun get_name_record(name_hash: Int): UsernameNameRecordView {
-        let recOpt: NameRecord? = self.name_records.get(name_hash);
-        if (recOpt == null) {
-            return UsernameNameRecordView {
-                exists: false,
-                minter_wallet: self.official_ath_wallet_address,
-                item_address: self.official_ath_wallet_address,
-                registered_at: 0
-            };
-        }
-        let rec: NameRecord = recOpt!!;
-        return UsernameNameRecordView {
-            exists: true,
-            minter_wallet: rec.minter_wallet,
-            item_address: rec.item_address,
-            registered_at: rec.registered_at
-        };
-    }
 
     get fun get_pending_mint(name_hash: Int): PendingUsernameMintView {
         let pendingOpt: PendingUsernameMint? = self.pending_mints.get(name_hash);
@@ -1311,7 +1322,6 @@ contract UsernameRegistry {
             genesis_config_hash: self.genesis_config_hash,
             official_ath_wallet_address: self.official_ath_wallet_address,
             genesis_controller_address: self.genesis_controller_address,
-            name_record_count: self.name_record_count,
             pending_mint_count: self.pending_mint_count,
             treasury_due_ath: self.treasury_due_ath,
             burn_due_ath: self.burn_due_ath,

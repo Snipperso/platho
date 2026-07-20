@@ -293,7 +293,7 @@ describe('UsernameRegistry foundation milestone', () => {
   });
 
   it('USERNAME-REG-M9-05: seal fails without official ATH wallet binding and storage top-up grants no authority', async () => {
-    const { deployer, caller, registry, placeholderAthWallet } = await deployRegistry();
+    const { blockchain, deployer, caller, registry, registryAddress, placeholderAthWallet } = await deployRegistry();
 
     await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
@@ -305,14 +305,28 @@ describe('UsernameRegistry foundation milestone', () => {
     expect(state.official_ath_wallet_bound).toBe(false);
     expect(state.official_ath_wallet_address.equals(placeholderAthWallet)).toBe(true);
 
-    await registry.send(caller.getSender(), { value: toNano('0.05') }, {
+    const topUp = await registry.send(caller.getSender(), { value: toNano('0.05') }, {
       $$type: 'UsernameRegistryTopUpStorageReserve',
     } as UsernameRegistryTopUpStorageReserve);
+
+    // clean-17: name_records is gone, and with it the global name_record_count. The per-name UsernameNFTItem IS
+    // the record now, so "an unfunded caller registered nothing" is measured where registration actually lands:
+    // no item account was deployed. Two claims, together at least as strong as the old counter —
+    //   (a) globally: the top-up produced no deploy at all (no transaction carried a StateInit), and
+    //   (b) per-name: the item address a mint would target is still an empty account, not an initialized one.
+    expect((topUp.transactions as any[]).some((t) => t.inMessage?.init != null),
+      'TopUpStorageReserve deploys nothing — no username item, no anything').toBe(false);
+    // Derived through the registry's own getter, not a local re-implementation: probing an address the registry
+    // would never mint to would make the emptiness check vacuous. M9-02 pins that getter to the local derivation.
+    const probeItemAddress = await registry.getGetUsernameItemAddress(nameHash('platho'));
+    expect(probeItemAddress.equals(contractAddress(registryAddress.workChain,
+      await UsernameNFTItem.init(registryAddress, nameHash('platho')))), 'probing the real mint target').toBe(true);
+    expect((await blockchain.getContract(probeItemAddress)).accountState?.type,
+      'the name is unminted: its item account does not exist, so it cannot be initialized').not.toBe('active');
 
     state = await registry.getGetGlobal();
     expect(state.sealed).toBe(false);
     expect(state.official_ath_wallet_bound).toBe(false);
-    expect(state.name_record_count).toBe(0n);
     expect(state.pending_mint_count).toBe(0n);
     expect(state.treasury_due_ath).toBe(0n);
     expect(state.burn_due_ath).toBe(0n);
