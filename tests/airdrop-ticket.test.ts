@@ -144,12 +144,30 @@ describe('AIRDROP TICKET — credits cannot be minted, and cannot be lost', () =
     // credits must never be BOTH gone and not in flight, which is the shape of a silent loss.
     expect(after.credits + after.in_flight, 'no credit may evaporate').toBe(64n);
 
-    if (after.in_flight > 0n) {
-      // While a delivery is unsettled a second claim must not hand out the same credits again.
-      await credit(bc, ticket, 64);
-      await ticket.send(owner.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
-      expect((await ticket.getGetTicket()).credits, 'no double delivery while one is in flight').toBe(64n);
-    }
+    expect(after.in_flight, 'a bounced delivery leaves nothing in flight').toBe(0n);
+    expect(after.credits, 'and every credit is back').toBe(64n);
+  });
+
+  it('TICKET-08: a second claim is refused while one delivery is still in flight', async () => {
+    // THE GATE MUTATION TESTING FOUND UNCOVERED. Disabling 27011 broke nothing in the first version of this
+    // file, because every claim test either settled or bounced inside the same chain — so the one state the
+    // gate exists for, an UNSETTLED delivery, was never actually reached. It is reachable here because the fee
+    // sink stub accepts the redeem and never acks, which is exactly what a slow or stuck settlement looks like.
+    //
+    // Without the gate the same credits go out twice: the pool pays 1000 credits, then pays 1000 again for a
+    // delivery that has already been dispatched.
+    const { bc, owner, ticket } = await setup();
+    await credit(bc, ticket, 1100);
+
+    await ticket.send(owner.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
+    const inFlight = await ticket.getGetTicket();
+    expect(inFlight.in_flight, 'the first delivery is genuinely unsettled').toBe(AT_MAX_CREDITS_PER_CLAIM);
+    expect(inFlight.credits).toBe(100n);
+
+    await ticket.send(owner.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
+    const after = await ticket.getGetTicket();
+    expect(after.in_flight, 'the in-flight delivery is untouched').toBe(AT_MAX_CREDITS_PER_CLAIM);
+    expect(after.credits, 'and the remaining credits were NOT dispatched a second time').toBe(100n);
   });
 
   it('TICKET-07: state is fixed-size — a publisher with many credits costs no more state than one with few', async () => {
