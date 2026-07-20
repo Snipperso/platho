@@ -3366,26 +3366,27 @@ PROGRAM{
       EQUAL
       s1 s7 XCHG
       THROWANYIFNOT
-      14352 PUSHINT
-          NOW
-      s0 s6 XCHG
-      86400 PUSHINT
-      ADD
-      s1 s6 XCHG
-      GEQ
-      s1 s5 XCHG
-      THROWANYIFNOT
-      14353 PUSHINT
       s0 s6 XCHG
       3000000 PUSHINT
-      NEQ
-      s1 s6 XCHG
+      EQUAL
+      IF:<{
+        604800 PUSHINT
+      }>ELSE<{
+        86400 PUSHINT
+      }>
+      14352 PUSHINT
+          NOW
+      s6 s2 XCHG2
+      ADD
+      GEQ
+      s1 s4 XCHG
       THROWANYIFNOT
       s0 s3 XCHG
       257 PUSHINT
           DICTIDEL
       DROP
-      s1 s0 s4 XCHG3
+      s4 s0 s3 XCHG3
+      s0 s2 XCHG
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     s6 POP

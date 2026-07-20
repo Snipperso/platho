@@ -24,7 +24,20 @@ const ATH_OUTGOING_TRANSFER_ID_DOMAIN: Int = 0x41544F47; // "ATOG"
 const ATH_NOTIFY_REFUND_QUERY_DOMAIN: Int = 0x41545246; // "ATRF"
 const ATH_QUERY_ID_MOD: Int = 18446744073709551616;
 const ATH_SENDER_KEY_MOD: Int = 1461501637330902918203684832716283019655932542976; // 2^160
-const ATH_PENDING_NOTIFICATION_TTL: Int = 86400; // 24 hours
+const ATH_PENDING_NOTIFICATION_TTL: Int = 86400; // 24 hours — plain lane
+// [OWNER DECISION 2026-07-19] The registry lanes (username mint / profile avatar) used to be UNPRUNABLE outright:
+// gate 14353 refused any prune of a pending carrying the registry marker, at any age, forever. That handed anyone a
+// permanent griefing primitive — measured, a stuck pending costs 3 cells, so ~21,845 of them fill an ordinary
+// user's ATH wallet to the account ceiling for about 1333 GRAM, after which every write to that wallet fails
+// SILENTLY (compute exit 0, ACTION code 50) and the user can never buy a name, set a paid avatar, or receive ATH
+// again. Immutable, so unfixable after seal.
+//
+// A TTL closes it without giving up what 14353 was protecting. The danger of pruning is pruning a LIVE pending: the
+// balance is credited on the inbound message, so if the entry disappears before the registry settles, the buyer has
+// paid and the mint never completes. A legitimate settlement — the registry acking, or refusing and refunding —
+// happens within seconds. A week is six orders of magnitude of headroom over that, while still making the attack
+// something the attacker must pay for again every week instead of once forever.
+const ATH_REGISTRY_PENDING_TTL: Int = 604800; // 7 days — registry lanes, deliberately far longer than the plain one
 const JETTON_EXCESSES_VALUE: Int = 1000000;
 
 message(0x41544801) ATHBurn {
@@ -1051,8 +1064,12 @@ contract ATHWallet {
         throwUnless(14350, pendingOpt != null);
         let pending: PendingAthTransferNotification = pendingOpt!!;
         throwUnless(14351, self.compute_sender_key(msg.query_id, pending.sender_owner) == msg.sender_key);
-        throwUnless(14352, now() >= pending.created_at + ATH_PENDING_NOTIFICATION_TTL);
-        throwUnless(14353, pending.response_ack_value != ATH_VAULT_RESPONSE_ACK_VALUE);
+        // The registry lanes get a LONGER age requirement, not an exemption. 14353 used to sit here and refuse them
+        // outright — see ATH_REGISTRY_PENDING_TTL for why that had to go and what the week is protecting.
+        let ttl: Int = pending.response_ack_value == ATH_VAULT_RESPONSE_ACK_VALUE
+            ? ATH_REGISTRY_PENDING_TTL
+            : ATH_PENDING_NOTIFICATION_TTL;
+        throwUnless(14352, now() >= pending.created_at + ttl);
         // Pruning now genuinely FREES the entry. It used to convert pending into a permanent tombstone, so the
         // "prune" only moved the cost from one map to another that could never be reclaimed — the stale entry was
         // cleared and the account grew anyway. With the tombstone gone this is a real reclaim.

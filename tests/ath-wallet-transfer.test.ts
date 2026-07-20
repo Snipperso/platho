@@ -808,14 +808,31 @@ describe('ATH wallet transfer profile', () => {
       sender_key: key,
     } as PruneStaleNotification);
 
+    // [REWRITTEN 2026-07-19.] This asserted 14353 — a registry-lane pending could NEVER be pruned, at any age. That
+    // permanence was a griefing primitive: measured, ~21,845 stuck entries at 3 cells each fill an ordinary user's
+    // ATH wallet for about 1333 GRAM, after which every write to it fails silently and the user can never buy a
+    // name, set a paid avatar, or receive ATH again — permanently, on an immutable contract.
+    // The lane now carries a 7-day TTL instead. A day (the plain lane's whole window) must still be refused, which
+    // is what keeps a live purchase safe: the balance is credited on the inbound message, so pruning an entry the
+    // registry is still going to settle would strand a buyer who has already paid.
     expect(findTransaction(pruneSystemPending.transactions, {
       from: pruner.address,
       to: recipientWallet.address,
       success: false,
-      exitCode: 14353,
+      exitCode: 14352,
     })).toBeDefined();
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+
+    // Past the week it sweeps, which is what makes the grief temporary rather than permanent.
+    blockchain.now = (blockchain.now ?? 0) + 604_800;
+    await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'PruneStaleNotification',
+      query_id: queryId,
+      sender_key: key,
+    } as PruneStaleNotification);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists,
+      'a stuck registry pending is reclaimable after the week').toBe(false);
   });
 
   it('ATH-XFER-05D: bounced profile-avatar notification refunds ATH to original sender wallet', async () => {

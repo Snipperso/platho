@@ -1914,8 +1914,8 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14350, (~ null?($pendingOpt)));
         var ($pending'sender_owner, $pending'response_destination, $pending'response_ack_value, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
         throw_unless(14351, (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $pending'sender_owner) == $msg'sender_key));
-        throw_unless(14352, ($global_now() >= ($pending'created_at + 86400)));
-        throw_unless(14353, ($pending'response_ack_value != 3000000));
+        int $ttl = (($pending'response_ack_value == 3000000) ? 604800 : 86400);
+        throw_unless(14352, ($global_now() >= ($pending'created_at + $ttl)));
         $self'pending_notifications~__tact_dict_delete_int(257, $pending_key);
         $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers));
         return ();
