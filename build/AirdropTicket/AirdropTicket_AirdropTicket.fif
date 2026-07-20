@@ -1,0 +1,296 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/AirdropTicket/AirdropTicket_AirdropTicket.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get
+  DECLPROC __tact_context_get_sender
+  DECLPROC $TicketRedeem$_store
+  DECLPROC $TicketRedeem$_store_cell
+  DECLPROC $TicketRedeem$_load_bounced
+  DECLPROC $AirdropTicket$_store
+  DECLPROC $AirdropTicket$_load
+  DECLPROC $Context$_get_value
+  DECLPROC $AirdropTicketView$_to_external
+  DECLPROC $AirdropTicket$init$_load
+  DECLPROC $AirdropTicket$_contract_init
+  DECLPROC $AirdropTicket$_contract_load
+  DECLPROC $AirdropTicket$_contract_store
+  DECLPROC $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value
+  DECLPROC $AirdropTicket$_fun_get_ticket
+  DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
+  DECLPROC $TicketRedeem$_constructor_credits_k_owner
+  104158 DECLMETHOD %get_ticket
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get PROCINLINE:<{
+    __tact_context GETGLOB
+    4 UNTUPLE
+  }>
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  $TicketRedeem$_store PROCINLINE:<{
+    1096041267 PUSHINT
+    s0 s3 XCHG2
+    32 STU
+    32 STU
+    STSLICE
+  }>
+  $TicketRedeem$_store_cell PROCINLINE:<{
+    -ROT
+    $TicketRedeem$_store INLINECALLDICT
+    ENDC
+  }>
+  $TicketRedeem$_load_bounced PROCINLINE:<{
+    32 LDU
+    SWAP
+  }>
+  $AirdropTicket$_store PROCINLINE:<{
+    s2 s3 XCHG2
+    STSLICE
+    32 STU
+    32 STU
+  }>
+  $AirdropTicket$_load PROCINLINE:<{
+    LDMSGADDR
+    32 LDU
+    32 LDU
+    3 -ROLL
+  }>
+  $Context$_get_value PROCINLINE:<{
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $AirdropTicketView$_to_external PROCINLINE:<{
+  }>
+  $AirdropTicket$init$_load PROCINLINE:<{
+    LDMSGADDR
+    SWAP
+  }>
+  $AirdropTicket$_contract_init PROCINLINE:<{
+    0 PUSHINT
+    DUP
+  }>
+  $AirdropTicket$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $AirdropTicket$_load INLINECALLDICT
+      1 3 BLKDROP2
+    }>ELSE<{
+      $AirdropTicket$init$_load INLINECALLDICT
+      SWAP
+      ENDS
+      $AirdropTicket$_contract_init INLINECALLDICT
+    }>
+  }>
+  $AirdropTicket$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    3 -ROLL
+    $AirdropTicket$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value PROCINLINE:<{
+  }>
+  $AirdropTicket$_fun_get_ticket PROCREF:<{
+    64 PUSHINT
+    1000 PUSHINT
+    63000000 PUSHINT
+    s5 PUSH
+    s3 s5 XCPU
+    s3 s5 XCPU
+    s0 s3 XCHG
+    $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value INLINECALLDICT
+  }>
+  $MessageParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
+    s4 s1 s3 XCHG3
+    -ROT
+  }>
+  $TicketRedeem$_constructor_credits_k_owner PROCINLINE:<{
+  }>
+  %get_ticket PROC:<{
+    $AirdropTicket$_contract_load INLINECALLDICT
+    $AirdropTicket$_fun_get_ticket INLINECALLDICT
+    3 6 BLKDROP2
+    $AirdropTicketView$_to_external INLINECALLDICT
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $AirdropTicket$_contract_load INLINECALLDICT
+    s0 s4 XCHG
+    IFJMP:<{
+      s3 POP
+      SWAP
+      32 PUSHINT
+      SDSKIPFIRST
+      0 PUSHINT
+      OVER
+      SBITS
+      31 GTINT
+      IF:<{
+        DROP
+        32 LDU
+        SWAP
+      }>
+      1096041267 PUSHINT
+      EQUAL
+      IFJMP:<{
+        $TicketRedeem$_load_bounced INLINECALLDICT
+        NIP
+        s1 s2 XCHG
+        ADD
+        0 PUSHINT
+        $AirdropTicket$_contract_store INLINECALLDICT
+      }>
+      3 BLKDROP
+    }>
+    0 PUSHINT
+    s3 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s3 PUSH
+      32 PLDU
+      s4 POP
+      s0 s3 XCHG
+    }>ELSE<{
+      s4 POP
+    }>
+    DUP
+    1096041265 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s2 POP
+      27001 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+          B{b5ee9c724101010100240000438002845d1b3eeb98e0e5cfc7d5487a9d474e2ea903b089fc036e46f53282b2b713502c75c0ca} B>boc <s PUSHSLICE
+      SDEQ
+      THROWANYIFNOT
+      27002 PUSHINT
+      s2 PUSH
+      32 PUSHPOW2DEC
+      LESS
+      THROWANYIFNOT
+      SWAP
+      INC
+      ROT
+      $AirdropTicket$_contract_store INLINECALLDICT
+    }>
+    DUP
+    1096041266 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s2 POP
+      27010 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s2 PUSH
+      SDEQ
+      THROWANYIFNOT
+      27011 PUSHINT
+      s0 s3 XCHG
+      0 EQINT
+      s1 s3 XCHG
+      THROWANYIFNOT
+      27012 PUSHINT
+      OVER
+      63 GTINT
+      THROWANYIFNOT
+      27013 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      63000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      s0 s0 PUSH2
+      1000 PUSHINT
+      GREATER
+      IF:<{
+        DROP
+        1000 PUSHINT
+      }>
+      TUCK
+      SUB
+      OVER
+          B{b5ee9c724101010100240000438002845d1b3eeb98e0e5cfc7d5487a9d474e2ea903b089fc036e46f53282b2b713502c75c0ca} B>boc <s PUSHSLICE
+      0 PUSHINT
+      64 PUSHINT
+      TRUE
+      s6 s7 XCPU
+      $TicketRedeem$_constructor_credits_k_owner INLINECALLDICT
+      NEWC
+      $TicketRedeem$_store_cell INLINECALLDICT
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      s1 s6 XCHG
+      $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      SWAP
+      $AirdropTicket$_contract_store INLINECALLDICT
+    }>
+    DUP
+    1096041268 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      2 2 BLKDROP2
+      27020 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+          B{b5ee9c724101010100240000438002845d1b3eeb98e0e5cfc7d5487a9d474e2ea903b089fc036e46f53282b2b713502c75c0ca} B>boc <s PUSHSLICE
+      SDEQ
+      THROWANYIFNOT
+      0 PUSHINT
+      $AirdropTicket$_contract_store INLINECALLDICT
+    }>
+    0 EQINT
+    s0 s3 XCHG
+    33 LESSINT
+    s1 s3 XCHG
+    AND
+    IFJMP:<{
+      s0 s2 XCHG
+      $AirdropTicket$_contract_store INLINECALLDICT
+    }>
+    s0 s2 XCHG
+    $AirdropTicket$_contract_store INLINECALLDICT
+  }>
+}END>c

@@ -1,139 +1,144 @@
 {
-  "projects": [
-    {
-      "name": "ATHWallet",
-      "path": "contracts/ATHWallet.tact",
-      "output": "build/ATHWallet"
-    },
-    {
-      "name": "ATHMaster",
-      "path": "contracts/ATHMaster.tact",
-      "output": "build/ATHMaster"
-    },
-    {
-      "name": "ATHVesting",
-      "path": "contracts/ATHVesting.tact",
-      "output": "build/ATHVesting"
-    },
-    {
-      "name": "FeeAccumulator",
-      "path": "contracts/FeeAccumulator.tact",
-      "output": "build/FeeAccumulator"
-    },
-    {
-      "name": "BuybackBurn",
-      "path": "contracts/BuybackBurn.tact",
-      "output": "build/BuybackBurn"
-    },
-    {
-      "name": "MarketStabilitySeller",
-      "path": "contracts/MarketStabilitySeller.tact",
-      "output": "build/MarketStabilitySeller"
-    },
-    {
-      "name": "M20TBuybackBurnHarness",
-      "path": "contracts/M20TBuybackBurnHarness.tact",
-      "output": "build/M20TBuybackBurnHarness"
-    },
-    {
-      "name": "M20TFeeAccumulatorHarness",
-      "path": "contracts/M20TFeeAccumulatorHarness.tact",
-      "output": "build/M20TFeeAccumulatorHarness"
-    },
-    {
-      "name": "CapsuleHub",
-      "path": "contracts/CapsuleHub.tact",
-      "output": "build/CapsuleHub"
-    },
-    {
-      "name": "ProfileRegistry",
-      "path": "contracts/ProfileRegistry.tact",
-      "output": "build/ProfileRegistry"
-    },
-    {
-      "name": "MockVaultAckSink",
-      "path": "contracts/MockVaultAckSink.tact",
-      "output": "build/MockVaultAckSink"
-    },
-    {
-      "name": "MockVaultAthWallet",
-      "path": "contracts/MockVaultAthWallet.tact",
-      "output": "build/MockVaultAthWallet"
-    },
-    {
-      "name": "Vault",
-      "path": "contracts/Vault.tact",
-      "output": "build/Vault"
-    },
-    {
-      "name": "PlathoController",
-      "path": "contracts/PlathoController.tact",
-      "output": "build/PlathoController"
-    },
-    {
-      "name": "UsernameNFTItem",
-      "path": "contracts/UsernameNFTItem.tact",
-      "output": "build/UsernameNFTItem"
-    },
-    {
-      "name": "MockUsernameRegistryAckSink",
-      "path": "contracts/MockUsernameRegistryAckSink.tact",
-      "output": "build/MockUsernameRegistryAckSink"
-    },
-    {
-      "name": "MockRegistryNotificationNoAck",
-      "path": "contracts/MockRegistryNotificationNoAck.tact",
-      "output": "build/MockRegistryNotificationNoAck"
-    },
-    {
-      "name": "MockUsernameNFTItemNoAck",
-      "path": "contracts/MockUsernameNFTItemNoAck.tact",
-      "output": "build/MockUsernameNFTItemNoAck"
-    },
-    {
-      "name": "MockAthWalletNoAck",
-      "path": "contracts/MockAthWalletNoAck.tact",
-      "output": "build/MockAthWalletNoAck"
-    },
-    {
-      "name": "MockCheckSig",
-      "path": "contracts/MockCheckSig.tact",
-      "output": "build/MockCheckSig"
-    },
-    {
-      "name": "UsernameRegistry",
-      "path": "contracts/UsernameRegistry.tact",
-      "output": "build/UsernameRegistry"
-    },
-    {
-      "name": "KeyRegistry",
-      "path": "contracts/KeyRegistry.tact",
-      "output": "build/KeyRegistry"
-    },
-    {
-      "name": "CreditIssuer",
-      "path": "contracts/CreditIssuer.tact",
-      "output": "build/CreditIssuer"
-    },
-    {
-      "name": "AirdropPool",
-      "path": "./contracts/AirdropPool.tact",
-      "output": "./build/AirdropPool"
-    },
-    {
-      "name": "RecordShard",
-      "path": "./contracts/RecordShard.tact",
-      "output": "./build/RecordShard"
-    },
-    {
-      "name": "RecoveryShard",
-      "path": "./contracts/RecoveryShard.tact",
-      "output": "./build/RecoveryShard"
-    },
-    {
-      "name": "IntroShard",
-      "path": "./contracts/IntroShard.tact",
-      "output": "./build/IntroShard"
-    }
-  ]
+    "projects": [
+        {
+            "name": "ATHWallet",
+            "path": "contracts/ATHWallet.tact",
+            "output": "build/ATHWallet"
+        },
+        {
+            "name": "ATHMaster",
+            "path": "contracts/ATHMaster.tact",
+            "output": "build/ATHMaster"
+        },
+        {
+            "name": "ATHVesting",
+            "path": "contracts/ATHVesting.tact",
+            "output": "build/ATHVesting"
+        },
+        {
+            "name": "FeeAccumulator",
+            "path": "contracts/FeeAccumulator.tact",
+            "output": "build/FeeAccumulator"
+        },
+        {
+            "name": "BuybackBurn",
+            "path": "contracts/BuybackBurn.tact",
+            "output": "build/BuybackBurn"
+        },
+        {
+            "name": "MarketStabilitySeller",
+            "path": "contracts/MarketStabilitySeller.tact",
+            "output": "build/MarketStabilitySeller"
+        },
+        {
+            "name": "M20TBuybackBurnHarness",
+            "path": "contracts/M20TBuybackBurnHarness.tact",
+            "output": "build/M20TBuybackBurnHarness"
+        },
+        {
+            "name": "M20TFeeAccumulatorHarness",
+            "path": "contracts/M20TFeeAccumulatorHarness.tact",
+            "output": "build/M20TFeeAccumulatorHarness"
+        },
+        {
+            "name": "CapsuleHub",
+            "path": "contracts/CapsuleHub.tact",
+            "output": "build/CapsuleHub"
+        },
+        {
+            "name": "ProfileRegistry",
+            "path": "contracts/ProfileRegistry.tact",
+            "output": "build/ProfileRegistry"
+        },
+        {
+            "name": "MockVaultAckSink",
+            "path": "contracts/MockVaultAckSink.tact",
+            "output": "build/MockVaultAckSink"
+        },
+        {
+            "name": "MockVaultAthWallet",
+            "path": "contracts/MockVaultAthWallet.tact",
+            "output": "build/MockVaultAthWallet"
+        },
+        {
+            "name": "Vault",
+            "path": "contracts/Vault.tact",
+            "output": "build/Vault"
+        },
+        {
+            "name": "PlathoController",
+            "path": "contracts/PlathoController.tact",
+            "output": "build/PlathoController"
+        },
+        {
+            "name": "UsernameNFTItem",
+            "path": "contracts/UsernameNFTItem.tact",
+            "output": "build/UsernameNFTItem"
+        },
+        {
+            "name": "MockUsernameRegistryAckSink",
+            "path": "contracts/MockUsernameRegistryAckSink.tact",
+            "output": "build/MockUsernameRegistryAckSink"
+        },
+        {
+            "name": "MockRegistryNotificationNoAck",
+            "path": "contracts/MockRegistryNotificationNoAck.tact",
+            "output": "build/MockRegistryNotificationNoAck"
+        },
+        {
+            "name": "MockUsernameNFTItemNoAck",
+            "path": "contracts/MockUsernameNFTItemNoAck.tact",
+            "output": "build/MockUsernameNFTItemNoAck"
+        },
+        {
+            "name": "MockAthWalletNoAck",
+            "path": "contracts/MockAthWalletNoAck.tact",
+            "output": "build/MockAthWalletNoAck"
+        },
+        {
+            "name": "MockCheckSig",
+            "path": "contracts/MockCheckSig.tact",
+            "output": "build/MockCheckSig"
+        },
+        {
+            "name": "UsernameRegistry",
+            "path": "contracts/UsernameRegistry.tact",
+            "output": "build/UsernameRegistry"
+        },
+        {
+            "name": "KeyRegistry",
+            "path": "contracts/KeyRegistry.tact",
+            "output": "build/KeyRegistry"
+        },
+        {
+            "name": "CreditIssuer",
+            "path": "contracts/CreditIssuer.tact",
+            "output": "build/CreditIssuer"
+        },
+        {
+            "name": "AirdropPool",
+            "path": "./contracts/AirdropPool.tact",
+            "output": "./build/AirdropPool"
+        },
+        {
+            "name": "RecordShard",
+            "path": "./contracts/RecordShard.tact",
+            "output": "./build/RecordShard"
+        },
+        {
+            "name": "RecoveryShard",
+            "path": "./contracts/RecoveryShard.tact",
+            "output": "./build/RecoveryShard"
+        },
+        {
+            "name": "IntroShard",
+            "path": "./contracts/IntroShard.tact",
+            "output": "./build/IntroShard"
+        },
+        {
+            "name": "AirdropTicket",
+            "path": "./contracts/AirdropTicket.tact",
+            "output": "./build/AirdropTicket"
+        }
+    ]
 }
