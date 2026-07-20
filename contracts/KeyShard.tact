@@ -1,0 +1,390 @@
+// KeyShard — clean-17 per-wallet messaging identity. THE DIRECTORY IS GONE, NOT SHARDED.
+//
+// WHAT THIS REPLACES AND WHY. KeyRegistry held every wallet's identity in two maps that never shrink
+// (`accounts`, `key_records`; the single `.del()` was rotation's own re-fill, net-zero). MEASURED 2026-07-20:
+// 17.00 cells per registered wallet, exactly linear, plus 46 cells of code and 1 base data cell. Against the
+// ~65536-cell account ceiling that is (65536 - 46 - 1) / 17 = 3852 wallets — for a contract that EVERY wallet
+// must register in. [OWNER: миллионы пользователей — порог существования.] Worse, the refusal lands in the
+// ACTION phase as code 50 while COMPUTE reports exit 0, so nothing would have gone red: the registry would have
+// simply stopped recording identities, silently, at wallet 3853.
+//
+// The cure is not a sharded directory. It is NO directory: this contract holds ONE wallet's identity, and its
+// address IS a function of that wallet. A sender resolving a recipient computes
+// contractAddress(0, KeyShard.init(recipient_wallet)) locally and reads it. Nothing indexes anything, so
+// nothing can fill up. State here is FIXED SIZE — there is not a single map in this contract, which is why the
+// ceiling is not raised but removed.
+//
+// It also makes resolution cheaper than the registry was: toncenter's accountStates batches >=700 addresses in
+// ONE request and omits accounts that never existed, so a client resolves a whole contact list in a single call
+// instead of one getter per contact (runGetMethod does not batch at all).
+//
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+// THE BRICK, AND WHY THERE IS NO SLOT IN THE ADDRESS.
+//
+// KeyRegistry took auth_pubkey straight from the message with no proof the registrant held it, allowed exactly
+// ONE registration per wallet forever (throwUnless 20111), and never deleted an account. A wallet that
+// registered an auth key it did not control was bricked PERMANENTLY: rotation needs a signature under that key
+// and there was no second chance. That is a live defect independent of the ceiling, found while measuring it.
+//
+// The project's rule for shards is that a frozen identity must have an escape, and RecoveryShard buys one with
+// a slot index in its address. A slot is WRONG here: resolution is the hot path — every contact of every user,
+// on every open — and probing S slots multiplies the read space by S for a hazard that has a cheaper answer.
+//
+// The cheaper answer is that the WALLET is the identity. [Identity is by WALLET; a name is a movable alias.]
+// So RegisterKeys is authorised by sender() == owner_wallet and may be sent AGAIN: it replaces the whole bundle
+// and bumps the generation. Losing the auth key therefore costs one wallet transaction, not the identity. The
+// external rotation path stays for the cheap case (no wallet signature, no gas from the wallet), and the two
+// authorities are ordered exactly as they should be — the wallet outranks the key it delegated to.
+//
+// This is also why one shard per wallet needs no uniqueness check at all: the address already commits to the
+// owner, so nobody can write into someone else's shard, and there is nothing to collide over.
+//
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+// WHAT IS DELIBERATELY NOT CARRIED OVER
+//
+// * `storageReserve()` — KeyRegistry declared a fail-closed rent floor over its never-shrinking state and the
+//   comment above it said so. It was NEVER CALLED: one occurrence in the source, ZERO references in the
+//   compiled .fc (Tact removed it as unreachable). It defended nothing. Here the state does not grow, so the
+//   floor it wanted is replaced by a fixed endowment that is MEASURED rather than declared.
+// * `account_count` / `key_record_count` — protocol-wide telemetry whose only consumer was that dead function.
+//   A per-wallet contract cannot maintain them and loses no invariant by not having them.
+// * The genesis seal / controller / manifest-hash lifecycle — a lazily-deployed per-wallet contract has no
+//   genesis. It is deployed by its own owner, on demand, and there is no pre-seal window to protect.
+
+const KS_CRYPTO_SUITE_HYBRID: Int = 2;
+const KS_MLKEM768_PUBKEY_LEN: Int = 1184;
+const KS_MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES: Int = 127;
+const KS_MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES: Int = 41;
+const KS_MLKEM768_PUBKEY_SNAKE_CELLS: Int = 10;
+const KS_MLKEM768_PUBKEY_SNAKE_BITS: Int = 9472;
+const KS_MLKEM768_PUBKEY_SNAKE_REFS: Int = 9;
+const KS_UINT32_MAX: Int = 4294967295;
+
+const KS_KEY_ID_DOMAIN: Int = 0x4b455949;          // "KEYI" — unchanged from KeyRegistry, the id means the same thing
+const KS_REPLACE_KEYS_SIGNING_DOMAIN: Int = 0x4b534b31;  // "KSK1" — DIFFERENT from KeyRegistry's "KRK1" on purpose:
+// a signature made for the old registry must not verify here, and vice versa.
+
+// [RE-MEASURE BEFORE SEAL] Storage is 64962 nanoton/cell/year (config-18 after the Apr-2026 switch, bits free).
+// A shard occupies its own CODE as well as its data — that is the price of not being a singleton, and it is the
+// number that decides whether this form is affordable at all. MEASURED 2026-07-20 on the built artifacts:
+// the shard form in this project costs 12-20 code cells (AirdropTicket 12, RecordShard/RecoveryShard 17,
+// IntroShard 20), against KeyRegistry's 46, ProfileRegistry's 149 and UsernameRegistry's 501.
+// KS_BASE_ENDOWMENT is finalised from the measured account size in tests/key-shard.test.ts (KS-RENT-01), which
+// reads the storage phase rather than counting a model of the account — the mistake that under-funded
+// RecoveryShard by exactly the StateInit wrapper cell.
+const KS_YEARS_FUNDED: Int = 10;
+const KS_BASE_ENDOWMENT: Int = 45000000;
+const KS_REGISTER_GAS: Int = 12000000;
+const KS_MIN_REGISTER_VALUE: Int = KS_BASE_ENDOWMENT + KS_REGISTER_GAS;
+// A replacement does not grow the account (same shape in, same shape out), so it pays gas only.
+const KS_MIN_REPLACE_VALUE: Int = KS_REGISTER_GAS;
+
+message(0x4B534731) KeyShardRegisterKeys {          // "KSG1" — internal, wallet-authorised
+    enc_pubkey: Int as uint256;
+    sign_pubkey: Int as uint256;
+    scan_pubkey: Int as uint256;
+    auth_pubkey: Int as uint256;
+    pq_kem_pubkey_hash: Int as uint256;
+    pq_kem_pubkey_len: Int as uint16;
+    pq_kem_pubkey: Cell;
+    crypto_suite_mask: Int as uint16;
+}
+
+message(0x4B534732) KeyShardReplaceKeys {           // "KSG2" — external, auth-key-authorised
+    signature: Slice as bytes64;
+    signed_payload: Cell;
+    envelope_padding: Slice as remaining;
+}
+
+message(0x4B534734) KeyShardTopUpStorageReserve {}  // "KSG4" — permissionless; anyone may fund a shard's rent
+
+struct KeyShardView {
+    exists: Bool;                 // registered at least once
+    owner_wallet: Address;
+    key_id: Int;
+    key_generation: Int;
+    rotation_nonce: Int;
+    enc_pubkey: Int;
+    sign_pubkey: Int;
+    scan_pubkey: Int;
+    pq_kem_pubkey_hash: Int;
+    pq_kem_pubkey_len: Int;
+    pq_kem_pubkey: Cell;
+    crypto_suite_mask: Int;
+    created_at: Int;
+    created_lt: Int;
+    min_register_value: Int;
+    min_replace_value: Int;
+    // auth_pubkey is NEVER returned — the privacy invariant inherited from KeyRegistry. It authorises rotation;
+    // advertising it would hand an observer the exact key to attack.
+}
+
+contract KeyShard {
+    owner_wallet: Address;          // init argument: THIS is what the address commits to
+    registered: Bool;
+    key_id: Int as uint256;
+    auth_pubkey: Int as uint256;
+    key_generation: Int as uint32;
+    rotation_nonce: Int as uint64;
+    enc_pubkey: Int as uint256;
+    sign_pubkey: Int as uint256;
+    scan_pubkey: Int as uint256;
+    pq_kem_pubkey_hash: Int as uint256;
+    pq_kem_pubkey_len: Int as uint16;
+    pq_kem_pubkey: Cell;
+    crypto_suite_mask: Int as uint16;
+    created_at: Int as uint64;
+    created_lt: Int as uint64;
+
+    init(owner_wallet: Address) {
+        self.owner_wallet = owner_wallet;
+        self.registered = false;
+        self.key_id = 0;
+        self.auth_pubkey = 0;
+        self.key_generation = 0;
+        self.rotation_nonce = 0;
+        self.enc_pubkey = 0;
+        self.sign_pubkey = 0;
+        self.scan_pubkey = 0;
+        self.pq_kem_pubkey_hash = 0;
+        self.pq_kem_pubkey_len = 0;
+        self.pq_kem_pubkey = emptyCell();
+        self.crypto_suite_mask = 0;
+        self.created_at = 0;
+        self.created_lt = 0;
+    }
+
+    // ---- ML-KEM-768 pubkey shape (ported from KeyRegistry; the snake is what makes a record 10 of its cells) ----
+
+    fun validatePqPubkeyCell(pqLen: Int, cryptoSuiteMask: Int, pqPubkey: Cell) {
+        throwUnless(22107, cryptoSuiteMask == KS_CRYPTO_SUITE_HYBRID);
+        let size: DataSize = pqPubkey.computeDataSize(KS_MLKEM768_PUBKEY_SNAKE_CELLS);
+        throwUnless(22108, size.cells == KS_MLKEM768_PUBKEY_SNAKE_CELLS);
+        throwUnless(22109, size.bits == KS_MLKEM768_PUBKEY_SNAKE_BITS);
+        throwUnless(22113, size.refs == KS_MLKEM768_PUBKEY_SNAKE_REFS);
+
+        let cursor: Cell = pqPubkey;
+        let remaining: Int = pqLen;
+        while (remaining > 0) {
+            let chunkBytes: Int = KS_MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES;
+            if (remaining == KS_MLKEM768_PUBKEY_LEN) {
+                chunkBytes = KS_MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES;
+            } else {
+                if (remaining < chunkBytes) {
+                    chunkBytes = remaining;
+                }
+            }
+            let cursorSlice: Slice = cursor.beginParse();
+            throwUnless(22114, cursorSlice.bits() == (chunkBytes * 8));
+            if (remaining > chunkBytes) {
+                throwUnless(22115, cursorSlice.refs() == 1);
+                cursor = cursorSlice.loadRef();
+            } else {
+                throwUnless(22116, cursorSlice.refs() == 0);
+            }
+            remaining -= chunkBytes;
+        }
+    }
+
+    fun isValidPqPubkeyCell(pqLen: Int, cryptoSuiteMask: Int, pqPubkey: Cell): Bool {
+        if (cryptoSuiteMask != KS_CRYPTO_SUITE_HYBRID) { return false; }
+        let size: DataSize = pqPubkey.computeDataSize(KS_MLKEM768_PUBKEY_SNAKE_CELLS);
+        if (size.cells != KS_MLKEM768_PUBKEY_SNAKE_CELLS) { return false; }
+        if (size.bits != KS_MLKEM768_PUBKEY_SNAKE_BITS) { return false; }
+        if (size.refs != KS_MLKEM768_PUBKEY_SNAKE_REFS) { return false; }
+
+        let cursor: Cell = pqPubkey;
+        let remaining: Int = pqLen;
+        while (remaining > 0) {
+            let chunkBytes: Int = KS_MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES;
+            if (remaining == KS_MLKEM768_PUBKEY_LEN) {
+                chunkBytes = KS_MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES;
+            } else {
+                if (remaining < chunkBytes) {
+                    chunkBytes = remaining;
+                }
+            }
+            let cursorSlice: Slice = cursor.beginParse();
+            if (cursorSlice.bits() != (chunkBytes * 8)) { return false; }
+            if (remaining > chunkBytes) {
+                if (cursorSlice.refs() != 1) { return false; }
+                cursor = cursorSlice.loadRef();
+            } else {
+                if (cursorSlice.refs() != 0) { return false; }
+            }
+            remaining -= chunkBytes;
+        }
+        return true;
+    }
+
+    fun validateKeyProfile(encPubkey: Int, signPubkey: Int, scanPubkey: Int, pqHash: Int, pqLen: Int, pqPubkey: Cell, cryptoSuiteMask: Int) {
+        throwUnless(22101, encPubkey != 0);
+        throwUnless(22102, signPubkey != 0);
+        throwUnless(22103, scanPubkey != 0);
+        throwUnless(22107, cryptoSuiteMask == KS_CRYPTO_SUITE_HYBRID);
+        throwUnless(22105, pqHash != 0);
+        throwUnless(22106, pqLen == KS_MLKEM768_PUBKEY_LEN);
+        self.validatePqPubkeyCell(pqLen, cryptoSuiteMask, pqPubkey);
+    }
+
+    fun isValidKeyProfile(encPubkey: Int, signPubkey: Int, scanPubkey: Int, pqHash: Int, pqLen: Int, pqPubkey: Cell, cryptoSuiteMask: Int): Bool {
+        if (encPubkey == 0) { return false; }
+        if (signPubkey == 0) { return false; }
+        if (scanPubkey == 0) { return false; }
+        if (cryptoSuiteMask != KS_CRYPTO_SUITE_HYBRID) { return false; }
+        if (pqHash == 0) { return false; }
+        if (pqLen != KS_MLKEM768_PUBKEY_LEN) { return false; }
+        return self.isValidPqPubkeyCell(pqLen, cryptoSuiteMask, pqPubkey);
+    }
+
+    // keyId binds owner+generation+enc/sign/pqHash, verbatim from KeyRegistry so an id computed by either side
+    // means the same thing. key_generation is unique per shard and increments on every write, so it alone
+    // guarantees a fresh id; scan_pubkey need not enter it (it is stored and advertised in the view).
+    fun computeKeyId(keyGeneration: Int, encPubkey: Int, signPubkey: Int, pqHash: Int, pqLen: Int, cryptoSuiteMask: Int): Int {
+        let keyFields: Cell = beginCell()
+            .storeUint(encPubkey, 256)
+            .storeUint(signPubkey, 256)
+            .storeUint(pqHash, 256)
+            .endCell();
+        return beginCell()
+            .storeUint(KS_KEY_ID_DOMAIN, 32)
+            .storeAddress(self.owner_wallet)
+            .storeUint(keyGeneration, 32)
+            .storeUint(pqLen, 16)
+            .storeUint(cryptoSuiteMask, 16)
+            .storeRef(keyFields)
+            .endCell()
+            .hash();
+    }
+
+    inline fun requireEmptyEnvelopePadding(padding: Slice) {
+        // Canonical, non-malleable external form: reject extra refs/bits appended OUTSIDE the signature. They
+        // would be charged as import fee but are not covered by the signature. Checked PRE-ACCEPT.
+        throwUnless(22900, padding.bits() == 0);
+        throwUnless(22901, padding.refs() == 0);
+    }
+
+    // ---- register / replace, authorised by the WALLET ----
+    //
+    // The address commits to owner_wallet, so this single comparison is the whole authorisation: nobody can
+    // reach another wallet's shard, and there is no directory in which to collide. Sending it AGAIN replaces the
+    // bundle — that is the escape hatch that makes a lost auth key cost one transaction instead of the identity.
+    receive(msg: KeyShardRegisterKeys) {
+        throwUnless(22050, sender() == self.owner_wallet);
+        self.validateKeyProfile(msg.enc_pubkey, msg.sign_pubkey, msg.scan_pubkey, msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.pq_kem_pubkey, msg.crypto_suite_mask);
+        throwUnless(22118, msg.auth_pubkey != 0);
+        throwUnless(22119, msg.auth_pubkey != msg.sign_pubkey);
+        // A FIRST registration funds the account's life; a replacement changes nothing about its size.
+        throwUnless(22110, context().value >= (self.registered ? KS_MIN_REPLACE_VALUE : KS_MIN_REGISTER_VALUE));
+        throwUnless(22117, self.key_generation < KS_UINT32_MAX);
+
+        let wasRegistered: Bool = self.registered;
+        let keyGeneration: Int = wasRegistered ? self.key_generation + 1 : 0;
+        self.writeBundle(keyGeneration, msg.enc_pubkey, msg.sign_pubkey, msg.scan_pubkey,
+                         msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.pq_kem_pubkey, msg.crypto_suite_mask);
+        self.auth_pubkey = msg.auth_pubkey;
+
+        // Keep the account's own rent and return the rest. ReserveAddOriginalBalance so the reserve is the
+        // INCREMENT this message adds rather than an absolute target — an absolute target turns the balance into
+        // a ceiling and strands every later top-up. A REPLACEMENT adds no state, so its increment is ZERO:
+        // reserving the base endowment again would silently swallow the caller's change on every rotation and
+        // let the shard accrete a fresh endowment per key change.
+        nativeReserve(wasRegistered ? 0 : KS_BASE_ENDOWMENT, ReserveAtMost | ReserveAddOriginalBalance);
+        message(MessageParameters { to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
+    }
+
+    fun writeBundle(keyGeneration: Int, encPubkey: Int, signPubkey: Int, scanPubkey: Int, pqHash: Int, pqLen: Int, pqPubkey: Cell, cryptoSuiteMask: Int) {
+        self.key_id = self.computeKeyId(keyGeneration, encPubkey, signPubkey, pqHash, pqLen, cryptoSuiteMask);
+        self.key_generation = keyGeneration;
+        self.enc_pubkey = encPubkey;
+        self.sign_pubkey = signPubkey;
+        self.scan_pubkey = scanPubkey;
+        self.pq_kem_pubkey_hash = pqHash;
+        self.pq_kem_pubkey_len = pqLen;
+        self.pq_kem_pubkey = pqPubkey;
+        self.crypto_suite_mask = cryptoSuiteMask;
+        self.created_at = now();
+        self.created_lt = curLt();
+        self.registered = true;
+    }
+
+    // ---- rotate, authorised by the auth key (external: no wallet signature, no gas from the wallet) ----
+
+    external(msg: KeyShardReplaceKeys) {
+        self.requireEmptyEnvelopePadding(msg.envelope_padding);
+        throwUnless(22120, self.registered);
+        throwUnless(22128, self.auth_pubkey != 0);
+        throwUnless(22130, checkSignature(msg.signed_payload.hash(), msg.signature, self.auth_pubkey));
+
+        // signed payload: domain(32) | shard address hash(256) | nonce(64) | ref = action payload.
+        // The shard's OWN address is in the signature, so a payload signed for one wallet's shard cannot be
+        // replayed against another's — the registry bound this to its single address, which no longer exists.
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        throwUnless(22136, signedPayload.bits() == 352);
+        throwUnless(22137, signedPayload.refs() == 1);
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(22131, signedDomain == KS_REPLACE_KEYS_SIGNING_DOMAIN);
+        let signedShardHash: Int = signedPayload.loadUint(256);
+        let shardSlice: Slice = myAddress().asSlice();
+        throwUnless(22133, shardSlice.loadUint(11) == 1024);
+        throwUnless(22133, signedShardHash == shardSlice.loadUint(256));
+        let signedNonce: Int = signedPayload.loadUint(64);
+        throwUnless(22135, signedNonce == self.rotation_nonce);
+
+        acceptMessage();
+        // Burn the nonce FIRST and commit, so a replay of this exact payload cannot be re-run even if the work
+        // below bails out. Everything after commit() is a silent `return` rather than a throw for the same
+        // reason: a throw would roll the nonce back.
+        self.rotation_nonce += 1;
+        commit();
+
+        // action payload: enc(256)|sign(256)|scan(256)|pqLen(16)|suite(16) = 800 bits inline,
+        // ref[0] = ML-KEM snake, ref[1] = cell{ pqHash(256) }. Spilled to stay under the 1023-bit cell limit.
+        let actionPayloadCell: Cell = signedPayload.loadRef();
+        let actionPayload: Slice = actionPayloadCell.beginParse();
+        if (!(actionPayload.bits() == 800)) { return; }
+        if (!(actionPayload.refs() == 2)) { return; }
+        let encPubkey: Int = actionPayload.loadUint(256);
+        let signPubkey: Int = actionPayload.loadUint(256);
+        let scanPubkey: Int = actionPayload.loadUint(256);
+        let pqKemPubkeyLen: Int = actionPayload.loadUint(16);
+        let cryptoSuiteMask: Int = actionPayload.loadUint(16);
+        let pqKemPubkey: Cell = actionPayload.loadRef();
+        let pqHashCell: Cell = actionPayload.loadRef();
+        let pqHashSlice: Slice = pqHashCell.beginParse();
+        if (!(pqHashSlice.bits() == 256)) { return; }
+        if (!(pqHashSlice.refs() == 0)) { return; }
+        let pqKemPubkeyHash: Int = pqHashSlice.loadUint(256);
+
+        if (!self.isValidKeyProfile(encPubkey, signPubkey, scanPubkey, pqKemPubkeyHash, pqKemPubkeyLen, pqKemPubkey, cryptoSuiteMask)) { return; }
+        if (!(signPubkey != self.auth_pubkey)) { return; }
+        if (!(self.key_generation < KS_UINT32_MAX)) { return; }
+
+        self.writeBundle(self.key_generation + 1, encPubkey, signPubkey, scanPubkey,
+                         pqKemPubkeyHash, pqKemPubkeyLen, pqKemPubkey, cryptoSuiteMask);
+    }
+
+    receive(msg: KeyShardTopUpStorageReserve) {}   // anyone may fund a shard's rent
+    receive() {}                                   // plain top-up / lazy deploy carrier
+
+    get fun get_view(): KeyShardView {
+        return KeyShardView {
+            exists: self.registered,
+            owner_wallet: self.owner_wallet,
+            key_id: self.key_id,
+            key_generation: self.key_generation,
+            rotation_nonce: self.rotation_nonce,
+            enc_pubkey: self.enc_pubkey,
+            sign_pubkey: self.sign_pubkey,
+            scan_pubkey: self.scan_pubkey,
+            pq_kem_pubkey_hash: self.pq_kem_pubkey_hash,
+            pq_kem_pubkey_len: self.pq_kem_pubkey_len,
+            pq_kem_pubkey: self.pq_kem_pubkey,
+            crypto_suite_mask: self.crypto_suite_mask,
+            created_at: self.created_at,
+            created_lt: self.created_lt,
+            min_register_value: KS_MIN_REGISTER_VALUE,
+            min_replace_value: KS_MIN_REPLACE_VALUE
+        };
+    }
+}

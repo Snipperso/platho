@@ -1,0 +1,923 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/KeyShard/KeyShard_KeyShard.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get
+  DECLPROC __tact_context_get_sender
+  DECLPROC $KeyShard$_store
+  DECLPROC $KeyShard$_load
+  DECLPROC $Context$_get_value
+  DECLPROC $KeyShardView$_to_external
+  DECLPROC $KeyShard$init$_load
+  DECLPROC $KeyShard$_contract_init
+  DECLPROC $KeyShard$_contract_load
+  DECLPROC $KeyShard$_contract_store
+  DECLPROC $KeyShard$_fun_validatePqPubkeyCell
+  DECLPROC $KeyShard$_fun_isValidPqPubkeyCell
+  DECLPROC $KeyShard$_fun_validateKeyProfile
+  DECLPROC $KeyShard$_fun_isValidKeyProfile
+  DECLPROC $KeyShard$_fun_computeKeyId
+  DECLPROC $KeyShard$_fun_requireEmptyEnvelopePadding
+  DECLPROC $KeyShard$_fun_writeBundle
+  DECLPROC $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value
+  DECLPROC $KeyShard$_fun_get_view
+  DECLPROC $MessageParameters$_constructor_to_value_mode_bounce
+  76114 DECLMETHOD %get_view
+  DECLPROC recv_internal
+  DECLPROC recv_external
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get PROCINLINE:<{
+    __tact_context GETGLOB
+    4 UNTUPLE
+  }>
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  $KeyShard$_store PROCINLINE:<{
+    s14 s15 XCHG2
+    STSLICE
+    s1 s12 XCHG
+    1 STI
+    s1 s10 XCHG
+    256 STU
+    s1 s8 XCHG
+    256 STU
+    s1 s6 XCHG
+    32 STU
+    s1 s4 XCHG
+    64 STU
+    s0 s2 XCHG
+    NEWC
+    256 STU
+    256 STU
+    s1 s2 XCHG
+    256 STU
+    s0 s2 XCHG
+    NEWC
+    256 STU
+    s1 s3 XCHG
+    16 STU
+    s1 s3 XCHG
+    STREF
+    s1 s3 XCHG
+    16 STU
+    s1 s3 XCHG
+    64 STU
+    s1 s3 XCHG
+    64 STU
+    STBREFR
+    STBREFR
+  }>
+  $KeyShard$_load PROCINLINE:<{
+    LDMSGADDR
+    1 LDI
+    256 LDU
+    256 LDU
+    32 LDU
+    64 LDU
+    LDREF
+    SWAP
+    CTOS
+    256 LDU
+    256 LDU
+    256 LDU
+    LDREF
+    DROP
+    CTOS
+    256 LDU
+    16 LDU
+    LDREF
+    16 LDU
+    64 LDU
+    64 LDU
+    DROP
+    s9 s15 XCHG
+    s9 s14 XCHG
+    s9 s13 XCHG
+    s9 s12 XCHG
+    s9 s11 XCHG
+    s9 s10 XCHG
+  }>
+  $Context$_get_value PROCINLINE:<{
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $KeyShardView$_to_external PROCINLINE:<{
+  }>
+  $KeyShard$init$_load PROCINLINE:<{
+    LDMSGADDR
+    SWAP
+  }>
+  $KeyShard$_contract_init PROCINLINE:<{
+    FALSE
+    0 PUSHINT
+    s0 s0 s0 PUSH3
+    s0 s0 s0 PUSH3
+    s0 s0 PUSH2
+        <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
+    s1 s1 s1 PUSH3
+  }>
+  $KeyShard$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $KeyShard$_load INLINECALLDICT
+      1 15 BLKDROP2
+    }>ELSE<{
+      $KeyShard$init$_load INLINECALLDICT
+      SWAP
+      ENDS
+      $KeyShard$_contract_init INLINECALLDICT
+    }>
+  }>
+  $KeyShard$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    15 -ROLL
+    $KeyShard$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $KeyShard$_fun_validatePqPubkeyCell PROCREF:<{
+    22107 PUSHINT
+    s0 s2 XCHG
+    2 EQINT
+    s1 s2 XCHG
+    THROWANYIFNOT
+    DUP
+    10 PUSHINT
+        CDATASIZE
+    22108 PUSHINT
+    s0 s3 XCHG
+    10 EQINT
+    s1 s3 XCHG
+    THROWANYIFNOT
+    22109 PUSHINT
+    SWAP
+    9472 PUSHINT
+    EQUAL
+    THROWANYIFNOT
+    22113 PUSHINT
+    SWAP
+    9 EQINT
+    THROWANYIFNOT
+    WHILE:<{
+      OVER
+      0 GTINT
+    }>DO<{
+      127 PUSHINT
+      s2 PUSH
+      1184 PUSHINT
+      EQUAL
+      IF:<{
+        DROP
+        41 PUSHINT
+      }>ELSE<{
+        s2 PUSH
+        127 LESSINT
+        IF:<{
+          DROP
+          OVER
+        }>
+      }>
+      OVER
+          CTOS
+      22114 PUSHINT
+      OVER
+          SBITS
+      s3 PUSH
+      3 LSHIFT#
+      EQUAL
+      THROWANYIFNOT
+      s3 s1 PUSH2
+      GREATER
+      IF:<{
+        s2 POP
+        22115 PUSHINT
+        s2 PUSH
+            SREFS
+        1 EQINT
+        THROWANYIFNOT
+        SWAP
+            LDREF
+        DROP
+      }>ELSE<{
+        22116 PUSHINT
+        SWAP
+            SREFS
+        0 EQINT
+        THROWANYIFNOT
+        SWAP
+      }>
+      -ROT
+      SUB
+      SWAP
+    }>
+    2DROP
+  }>
+  $KeyShard$_fun_isValidPqPubkeyCell PROCREF:<{
+    c2 SAVE
+    SAMEALTSAVE
+    SWAP
+    2 NEQINT
+    IFJMP:<{
+      2DROP
+      FALSE
+    }>
+    DUP
+    10 PUSHINT
+        CDATASIZE
+    s0 s2 XCHG
+    10 NEQINT
+    IFJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    9472 PUSHINT
+    NEQ
+    IFJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    9 NEQINT
+    IFJMP:<{
+      2DROP
+      FALSE
+    }>
+    WHILE:<{
+      OVER
+      0 GTINT
+    }>DO<{
+      127 PUSHINT
+      s2 PUSH
+      1184 PUSHINT
+      EQUAL
+      IF:<{
+        DROP
+        41 PUSHINT
+      }>ELSE<{
+        s2 PUSH
+        127 LESSINT
+        IF:<{
+          DROP
+          OVER
+        }>
+      }>
+      OVER
+          CTOS
+      DUP
+          SBITS
+      s2 PUSH
+      3 LSHIFT#
+      NEQ
+      IFJMP:<{
+        4 BLKDROP
+        FALSE
+        RETALT
+      }>
+      s3 s1 PUSH2
+      GREATER
+      IF:<{
+        s2 POP
+        OVER
+            SREFS
+        1 NEQINT
+        IFJMP:<{
+          3 BLKDROP
+          FALSE
+          RETALT
+        }>
+        SWAP
+            LDREF
+        DROP
+      }>ELSE<{
+            SREFS
+        IFJMP:<{
+          3 BLKDROP
+          FALSE
+          RETALT
+        }>
+        SWAP
+      }>
+      -ROT
+      SUB
+      SWAP
+    }>
+    2DROP
+    TRUE
+  }>
+  $KeyShard$_fun_validateKeyProfile PROCREF:<{
+    22101 PUSHINT
+    s0 s7 XCHG
+    0 NEQINT
+    s1 s7 XCHG
+    THROWANYIFNOT
+    22102 PUSHINT
+    s0 s5 XCHG
+    0 NEQINT
+    s1 s5 XCHG
+    THROWANYIFNOT
+    22103 PUSHINT
+    s0 s3 XCHG
+    0 NEQINT
+    s1 s3 XCHG
+    THROWANYIFNOT
+    22107 PUSHINT
+    s4 PUSH
+    2 EQINT
+    THROWANYIFNOT
+    22105 PUSHINT
+    SWAP
+    0 NEQINT
+    THROWANYIFNOT
+    22106 PUSHINT
+    OVER
+    1184 PUSHINT
+    EQUAL
+    THROWANYIFNOT
+    -ROT
+    $KeyShard$_fun_validatePqPubkeyCell INLINECALLDICT
+  }>
+  $KeyShard$_fun_isValidKeyProfile PROCREF:<{
+    s0 s6 XCHG
+    IFNOTJMP:<{
+      6 BLKDROP
+      FALSE
+    }>
+    s0 s4 XCHG
+    IFNOTJMP:<{
+      5 BLKDROP
+      FALSE
+    }>
+    s0 s2 XCHG
+    IFNOTJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    s3 PUSH
+    2 NEQINT
+    IFJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    IFNOTJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    DUP
+    1184 PUSHINT
+    NEQ
+    IFJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    -ROT
+    $KeyShard$_fun_isValidPqPubkeyCell INLINECALLDICT
+  }>
+  $KeyShard$_fun_computeKeyId PROCREF:<{
+        NEWC
+    s1 s5 XCHG
+    256 STU
+    s1 s3 XCHG
+    256 STU
+    256 STU
+        ENDC
+        NEWC
+    1262836041 PUSHINT
+    SWAP
+    32 STU
+    19 s() PUSH
+        STSLICER
+    s1 s4 XCHG
+    32 STU
+    16 STU
+    16 STU
+        STREF
+        ENDC
+        HASHCU
+  }>
+  $KeyShard$_fun_requireEmptyEnvelopePadding PROCINLINE:<{
+    22900 PUSHINT
+    OVER
+        SBITS
+    0 EQINT
+    THROWANYIFNOT
+    22901 PUSHINT
+    SWAP
+        SREFS
+    0 EQINT
+    THROWANYIFNOT
+  }>
+  $KeyShard$_fun_writeBundle PROCREF:<{
+    s14 22 s() XCHG
+    s13 21 s() XCHG
+    s12 20 s() XCHG
+    s11 19 s() XCHG
+    s10 18 s() XCHG
+    s9 17 s() XCHG
+    s8 16 s() XCHG
+    s7 s15 XCHG
+    s6 22 s() XCHG
+    s5 21 s() XCHG
+    s4 20 s() XCHG
+    s3 19 s() XCHG
+    s2 18 s() XCHG
+    s1 17 s() XCHG
+    s0 16 s() XCHG
+    s15 PUSH
+    23 s() PUSH
+    23 s() PUSH
+    22 s() PUSH
+    22 s() PUSH
+    21 s() PUSH
+    $KeyShard$_fun_computeKeyId INLINECALLDICT
+    s11 POP
+    9 BLKDROP
+    s3 POP
+    s3 POP
+        NOW
+        LTIME
+    s5 s13 XCHG
+    TRUE
+    s0 s13 XCHG
+    s5 s12 XCHG
+    s3 s11 XCHG
+    s7 s10 XCHG
+    s4 s9 XCHG
+    s6 s8 XCHG
+    s0 s7 XCHG
+    s5 s6 XCHG
+    s3 s5 XCHG
+    4 -ROLL
+  }>
+  $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value PROCINLINE:<{
+  }>
+  $KeyShard$_fun_get_view PROCREF:<{
+    57000000 PUSHINT
+    12000000 PUSHINT
+    s15 PUSH
+    s0 s2 XCHG
+    17 s() PUSH
+    s0 s2 XCHG
+    16 s() PUSH
+    s15 s2 s(-1) PUXC2
+    s15 PUSH
+    s15 s2 s(-1) PUXC2
+    s15 PUSH
+    s15 s2 s(-1) PUXC2
+    s15 PUSH
+    s15 s2 s(-1) PUXC2
+    s15 PUSH
+    s15 s2 s(-1) PUXC2
+    s15 PUSH
+    s15 s2 s(-1) PUXC2
+    $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value INLINECALLDICT
+  }>
+  $MessageParameters$_constructor_to_value_mode_bounce PROCINLINE:<{
+    s1 s3 XCHG
+    PUSHNULL
+    3 -ROLL
+  }>
+  %get_view PROC:<{
+    $KeyShard$_contract_load INLINECALLDICT
+    $KeyShard$_fun_get_view INLINECALLDICT
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    16 s() POP
+    15 -ROLL
+    $KeyShardView$_to_external INLINECALLDICT
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $KeyShard$_contract_load INLINECALLDICT
+    s0 16 s() XCHG
+    IFJMP:<{
+      15 BLKDROP
+      DROP
+    }>
+    0 PUSHINT
+    s15 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s15 XCHG
+      32 LDU
+      s0 16 s() XCHG
+    }>
+    OVER
+    1263748913 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s14 XCHG
+      256 LDU
+      256 LDU
+      256 LDU
+      LDREF
+      DROP
+      CTOS
+      256 LDU
+      256 LDU
+      16 LDU
+      LDREF
+      16 LDU
+      DROP
+      22050 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      22 s() PUSH
+      SDEQ
+      THROWANYIFNOT
+      s14 20 s() XCHG
+      s13 19 s() XCHG
+      s12 18 s() XCHG
+      s11 17 s() XCHG
+      s10 16 s() XCHG
+      s9 s15 XCHG
+      s8 20 s() XCHG
+      s7 19 s() XCHG
+      s6 18 s() XCHG
+      s5 17 s() XCHG
+      s4 16 s() XCHG
+      s3 s15 XCHG
+      s2 20 s() XCHG
+      s1 21 s() XCHG
+      s0 22 s() XCHG
+      19 s() PUSH
+      19 s() PUSH
+      19 s() PUSH
+      18 s() PUSH
+      24 s() PUSH
+      26 s() PUSH
+      28 s() PUSH
+      $KeyShard$_fun_validateKeyProfile INLINECALLDICT
+      22118 PUSHINT
+      17 s() PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      22119 PUSHINT
+      17 s() PUSH
+      20 s() PUSH
+      NEQ
+      THROWANYIFNOT
+      22110 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s15 PUSH
+      IF:<{
+        12000000 PUSHINT
+      }>ELSE<{
+        57000000 PUSHINT
+      }>
+      GEQ
+      THROWANYIFNOT
+      22117 PUSHINT
+      s11 PUSH
+      32 PUSHPOW2DEC
+      LESS
+      THROWANYIFNOT
+      s13 s13 PUSH2
+      IF:<{
+        s11 PUSH
+        INC
+      }>ELSE<{
+        0 PUSHINT
+      }>
+      16 s() 22 s() XCHG
+      s15 21 s() XCHG
+      s14 20 s() XCHG
+      s13 19 s() XCHG
+      s12 18 s() XCHG
+      s11 17 s() XCHG
+      s10 16 s() XCHG
+      s9 s15 XCHG
+      s8 s14 XCHG
+      s7 s13 XCHG
+      s6 s12 XCHG
+      s5 s11 XCHG
+      s4 s10 XCHG
+      s3 s9 XCHG
+      s8 s1 s7 XCHG3
+      s3 s6 XCHG
+      s5 s1 s4 XCHG3
+      s0 s1 s3 XCHG3
+      s1 23 s() XCHG
+      s0 24 s() XCHG
+      $KeyShard$_fun_writeBundle INLINECALLDICT
+      s11 POP
+      s0 s14 XCHG
+      IF:<{
+        0 PUSHINT
+      }>ELSE<{
+        45000000 PUSHINT
+      }>
+      6 PUSHINT
+          RAWRESERVE
+      __tact_context_get_sender INLINECALLDICT
+      0 PUSHINT
+      130 PUSHINT
+      FALSE
+      $MessageParameters$_constructor_to_value_mode_bounce INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s12 s14 XCHG
+      s11 s13 XCHG
+      s10 s12 XCHG
+      s10 s11 XCHG
+      2 9 BLKSWAP
+      $KeyShard$_contract_store INLINECALLDICT
+    }>
+    16 s() POP
+    DUP
+    1263748916 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s14 POP
+      s12 s14 XCHG
+      2 12 BLKSWAP
+      $KeyShard$_contract_store INLINECALLDICT
+    }>
+    0 EQINT
+    s0 s15 XCHG
+    33 LESSINT
+    s1 s15 XCHG
+    AND
+    IFJMP:<{
+      s12 s14 XCHG
+      2 12 BLKSWAP
+      $KeyShard$_contract_store INLINECALLDICT
+    }>
+    15 BLKDROP
+    130 THROW
+  }>
+  recv_external PROC:<{
+    $KeyShard$_contract_load INLINECALLDICT
+    s0 s15 XCHG
+    32 LDUQ 130 THROWIFNOT
+    SWAP
+    1263748914 PUSHINT
+    EQUAL
+    IFJMP:<{
+      9 PUSHPOW2
+      LDSLICEX
+      LDREF
+      s15 16 s() XCHG
+      s14 16 s() XCHG
+      s13 16 s() XCHG
+      s12 16 s() XCHG
+      s11 16 s() XCHG
+      s10 16 s() XCHG
+      s9 16 s() XCHG
+      s8 16 s() XCHG
+      s7 16 s() XCHG
+      s6 16 s() XCHG
+      s5 16 s() XCHG
+      s4 16 s() XCHG
+      s3 16 s() XCHG
+      s2 16 s() XCHG
+      s1 17 s() XCHG
+      $KeyShard$_fun_requireEmptyEnvelopePadding INLINECALLDICT
+      22120 PUSHINT
+      s14 PUSH
+      THROWANYIFNOT
+      22128 PUSHINT
+      s12 PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      22130 PUSHINT
+      17 s() PUSH
+          HASHCU
+      SWAP
+      s0 17 s() XCHG
+      s13 PUSH
+          CHKSIGNU
+      s1 16 s() XCHG
+      THROWANYIFNOT
+      s0 s15 XCHG
+          CTOS
+      22136 PUSHINT
+      OVER
+          SBITS
+      352 PUSHINT
+      EQUAL
+      THROWANYIFNOT
+      22137 PUSHINT
+      OVER
+          SREFS
+      1 EQINT
+      THROWANYIFNOT
+      32 LDU
+      22131 PUSHINT
+      s0 s2 XCHG
+      1263749937 PUSHINT
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      256 LDU
+          MYADDR
+      22133 PUSHINT
+      SWAP
+      11 LDU
+      SWAP
+      10 PUSHPOW2
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      22133 PUSHINT
+      SWAP
+      256 LDU
+      DROP
+      s1 s3 XCHG
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      64 LDU
+      22135 PUSHINT
+      s2 s10 XCPU
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+          ACCEPT
+      s0 s8 XCHG
+      INC
+          COMMIT
+      s0 s8 XCHG
+          LDREF
+      DROP
+          CTOS
+      DUP
+          SBITS
+      800 PUSHINT
+      EQUAL
+      IFNOTJMP:<{
+        DROP
+        2 13 BLKSWAP
+        $KeyShard$_contract_store INLINECALLDICT
+      }>
+      DUP
+          SREFS
+      2 EQINT
+      IFNOTJMP:<{
+        DROP
+        2 13 BLKSWAP
+        $KeyShard$_contract_store INLINECALLDICT
+      }>
+      256 LDU
+      256 LDU
+      256 LDU
+      16 LDU
+      16 LDU
+          LDREF
+          LDREF
+      DROP
+          CTOS
+      DUP
+          SBITS
+      8 PUSHPOW2
+      EQUAL
+      IFNOTJMP:<{
+        7 BLKDROP
+        2 13 BLKSWAP
+        $KeyShard$_contract_store INLINECALLDICT
+      }>
+      DUP
+          SREFS
+      0 EQINT
+      IFNOTJMP:<{
+        7 BLKDROP
+        2 13 BLKSWAP
+        $KeyShard$_contract_store INLINECALLDICT
+      }>
+      256 LDU
+      DROP
+      s14 19 s() XCHG
+      s13 18 s() XCHG
+      s12 17 s() XCHG
+      s11 16 s() XCHG
+      s10 s15 XCHG
+      s9 19 s() XCHG
+      s8 18 s() XCHG
+      s7 17 s() XCHG
+      s6 16 s() XCHG
+      s5 s15 XCHG
+      s4 19 s() XCHG
+      s3 18 s() XCHG
+      s2 17 s() XCHG
+      s1 21 s() XCHG
+      s0 20 s() XCHG
+      16 s() PUSH
+      16 s() PUSH
+      21 s() PUSH
+      23 s() PUSH
+      22 s() PUSH
+      26 s() PUSH
+      23 s() PUSH
+      $KeyShard$_fun_isValidKeyProfile INLINECALLDICT
+      IFNOTJMP:<{
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        7 8 BLKSWAP
+        $KeyShard$_contract_store INLINECALLDICT
+      }>
+      s15 s11 PUSH2
+      NEQ
+      IFNOTJMP:<{
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        7 8 BLKSWAP
+        $KeyShard$_contract_store INLINECALLDICT
+      }>
+      s10 PUSH
+      32 PUSHPOW2DEC
+      LESS
+      IFNOTJMP:<{
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        s15 POP
+        7 8 BLKSWAP
+        $KeyShard$_contract_store INLINECALLDICT
+      }>
+      s10 PUSH
+      INC
+      s15 22 s() XCHG
+      s14 21 s() XCHG
+      s13 20 s() XCHG
+      s12 19 s() XCHG
+      s11 18 s() XCHG
+      s10 17 s() XCHG
+      s9 16 s() XCHG
+      s8 s15 XCHG
+      s7 s14 XCHG
+      7 7 BLKSWAP
+      s3 s6 XCHG
+      s5 s1 s3 XCHG3
+      s0 s4 XCHG
+      $KeyShard$_fun_writeBundle INLINECALLDICT
+      $KeyShard$_contract_store INLINECALLDICT
+    }>
+    15 BLKDROP
+    DROP
+    130 THROW
+  }>
+}END>c
