@@ -2668,9 +2668,17 @@ describe('PWA runtime config guard', () => {
     expect(avatarLoadSource).toMatch(/getAvatarVersion\(ownerWallet, requestedPointer\.profileVersion, readOptions\)/);
     expect(avatarLoadSource).toMatch(/getAvatar\(ownerWallet, readOptions\)/);
     expect(avatarPointerSource).toMatch(/getAvatar\(ownerWallet, \{\s*profileRegistryAddress: resolved\.address,\s*\.\.\.criticalChainReadOptions\(\),\s*\}\)/);
-    expect(usernameResolveSource).toMatch(/getNameRecordByUsername\(displayLabel, \{\s*address: registryAddress,\s*\.\.\.criticalChainReadOptions\(\),\s*\}\)/);
+    // 2026-07-20: the registry's name_records map is gone, so the item address is no longer LOOKED UP — it is
+    // DERIVED from the name hash. The derivation read is still a critical (fresh + verified) read, because it is
+    // the address the ownership proof is checked against; a stale/unverified derivation would let a wrong item
+    // answer for the name.
+    expect(usernameResolveSource).toMatch(/const nameHash = await computeUsernameNameHash\(displayLabel\)/);
+    expect(usernameResolveSource).toMatch(/getUsernameItemAddress\(nameHash, \{\s*address: registryAddress,\s*\.\.\.criticalChainReadOptions\(\),\s*\}\)/);
     expect(usernameResolveSource).toMatch(/registryCallOptions: \{ address: registryAddress, \.\.\.criticalChainReadOptions\(\) \}/);
-    expect(usernameResolveSource).toMatch(/itemCallOptions: \{ address: record\.item_address, \.\.\.criticalChainReadOptions\(\) \}/);
+    expect(usernameResolveSource).toMatch(/itemCallOptions: \{ address: itemAddress, \.\.\.criticalChainReadOptions\(\) \}/);
+    // The removed surface must stay removed: no getNameRecord/getNameRecordByUsername call may come back anywhere
+    // in the app (the map named the MINTER and never followed a TEP-62 transfer — reading it is reading a lie).
+    expect(app).not.toMatch(/getNameRecord/);
     expect(usernameMintSource).toMatch(/readUsernameMintPriceForOwnVaultAction\(provider, registry, username\)/);
   });
 
@@ -2730,6 +2738,18 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function reconcileUsernameOwnership\(usernameIdentity, ownerWallet\)/);
     expect(app).toMatch(/async function revalidateThreadUsernameVariants\(thread\)/);
     expect(app).toMatch(/class UsernameNotRegisteredError extends Error/);
+    // 2026-07-20: "not registered" used to be `record.exists !== true` off the registry's name_records map. The map
+    // is gone; the same fact now comes from the item proof reporting that the per-name contract was never
+    // initialised. It must stay a DISTINCT error from a failed read — callers branch on `instanceof` to decide
+    // between refusing the dialog outright and retrying, so folding the two together would either strand a real
+    // name or invent a dialog for a nonexistent one.
+    const usernameOwnerSource = app.slice(
+      app.indexOf('async function resolvePlathoUsernameOwner'),
+      app.indexOf('async function waitForPlathoUsernameOwnership'),
+    );
+    expect(usernameOwnerSource).toMatch(/if \(proof\.reason === 'item_not_initialized'\) \{\s*throw new UsernameNotRegisteredError\(/);
+    expect(usernameOwnerSource).toMatch(/if \(proof\.authoritative !== true \|\| !proof\.owner_wallet\)/);
+    expect(usernameOwnerSource).not.toMatch(/getNameRecord|record\.exists/);
     // The new-chat handler async-resolves a username to its current owner wallet, validates existence, reconciles,
     // then opens the dialog BY WALLET. Guarded against double-submit and self-addressing.
     const newChatSource = app.slice(
@@ -7034,6 +7054,10 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function readUsernameMintAvailabilityForOwnVaultAction'),
       app.indexOf('async function resolveUsernameNftItemProvider'),
     );
+    const mintedProbe = app.slice(
+      app.indexOf('async function usernameItemIsMinted'),
+      app.indexOf('async function readUsernameMintAvailabilityForOwnVaultAction'),
+    );
     const submitSource = app.slice(
       app.indexOf('async function submitUsernameMint'),
       app.indexOf('async function submitAthDueFlush'),
@@ -7047,12 +7071,45 @@ describe('PWA runtime config guard', () => {
     expect(helper).toMatch(/provider cannot verify username availability/);
     expect(helper).toMatch(/const readOptions = \{ address: registry, \.\.\.criticalChainReadOptions\(\) \}/);
     expect(helper).toMatch(/const nameHash = await computeUsernameNameHash\(username\)/);
-    expect(helper).toMatch(/provider\.getNameRecordByUsername\(username, readOptions\)/);
+    // 2026-07-20: "is this name taken" is asked of the ITEM (derived from the name hash), not of the deleted
+    // name_records map. The guard at the top of the helper must demand the derivation method, or a provider
+    // missing it would fail deep inside the read instead of up front.
+    expect(helper).toMatch(/!provider\?\.getUsernameItemAddress \|\| !provider\?\.getPendingMint/);
+    expect(helper).toMatch(/const itemAddress = await provider\.getUsernameItemAddress\(nameHash, readOptions\)/);
+    expect(helper).toMatch(/const minted = await usernameItemIsMinted\(itemAddress\)/);
     expect(helper).toMatch(/provider\.getPendingMint\(nameHash, readOptions\)/);
-    expect(helper).toMatch(/Username is already registered/);
+    expect(helper).toMatch(/if \(minted\) \{\s*throw new Error\('Username is already registered'\)/);
     expect(helper).toMatch(/Username mint is already pending/);
+    expect(helper).not.toMatch(/getNameRecord/);
     expect(helper).not.toMatch(/allowUnverifiedCriticalRead/);
     expect(helper).not.toMatch(/callWithVerificationUnavailableReadFallback/);
+
+    // THE SHARPEST EDGE OF THE name_records DELETION. A get-method against an account that does not exist fails
+    // exactly the way a get-method fails when toncenter is having a bad minute. If usernameItemIsMinted ever
+    // collapses those two, an unreachable RPC reads as "this name is free" and the buyer signs a mint that
+    // bounces. So: a thrown get-method error is NEVER an answer.
+    expect(mintedProbe).toMatch(/itemProvider\.getState\(\{ address: itemAddress, \.\.\.criticalChainReadOptions\(\) \}\)/);
+    expect(mintedProbe).toMatch(/return state\?\.initialized === true/);
+    // The catch must not return anything on the error path itself — the only `return false` reachable after a
+    // failed get-method comes from the ACCOUNT STATE, which reports "never existed" as DATA rather than as a
+    // failure (the walletAccountIsUninitialized pattern).
+    expect(mintedProbe).toMatch(/catch \(getMethodError\) \{[\s\S]*transport\.getAccountState\(\{ address: itemAddress \}, \{ skipIfRateLimited: false \}\)/);
+    expect(mintedProbe).toMatch(/status === 'uninit' \|\| status === 'uninitialized' \|\| status === 'nonexist' \|\| status === 'non_exist'/);
+    // And when NEITHER question can be answered it refuses instead of guessing. A retry costs a second; a wrong
+    // "free" costs a failed mint.
+    expect(mintedProbe).toMatch(/throw new Error\('Could not verify whether this username is taken'\)|const error = new Error\('Could not verify whether this username is taken'\)[\s\S]*throw error/);
+    // No silent optimism anywhere on this path: the probe never answers "not minted" merely because a read failed.
+    expect(mintedProbe).not.toMatch(/catch\s*(?:\([^)]*\))?\s*\{\s*return false/);
+    expect(mintedProbe).not.toMatch(/allowUnverifiedCriticalRead|callWithVerificationUnavailableReadFallback/);
+    // DELIBERATELY FAILING (2026-07-20) — the one hole the rest of this probe was built to close.
+    // Reaching the account-state fallback means get_state THREW, so nothing is known about the item yet. Only the
+    // never-existed statuses above are evidence of "free". An account reported ACTIVE is evidence of the OPPOSITE:
+    // the per-name item contract is deployed, and since the map was deleted that deployment IS the record that the
+    // name is taken. `if (status === 'active') return false` answers "this name is free" on the strength of a read
+    // that failed — its own trailing comment says "that is a read problem", which is the description of a case that
+    // must fall through to the refusal below, not of one that may return an answer. Left red on purpose: fix
+    // web/app.js usernameItemIsMinted (drop the line, or return true) rather than relaxing this assertion.
+    expect(mintedProbe).not.toMatch(/status === 'active'\)\s*return false/);
     expect(priceIndex).toBeGreaterThanOrEqual(0);
     expect(availabilityIndex).toBeGreaterThan(priceIndex);
     expect(assertIndex).toBeGreaterThan(availabilityIndex);

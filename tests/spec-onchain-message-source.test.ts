@@ -428,12 +428,70 @@ describe('v1 on-chain message source of truth', () => {
       expect(text, path).not.toMatch(/UsernameNFTItem.*alone.*ownership/i);
     }
 
+    // 2026-07-20: the registry's `name_records` map was deleted, so the name-to-item anchor is no longer a STORED
+    // record — it is a DERIVATION. The reader reads the item state, asks the collection to derive an address from
+    // the name_hash the item claims, and grants authority only when that derivation lands on the very account it
+    // read. Substance unchanged (a bare item still cannot claim a name), form stronger: the deleted map recorded
+    // the MINTER and never followed a TEP-62 transfer, so it could disagree with the item it pointed at.
     const readerCode = read('web/username-ton-rpc-provider.mjs');
     expect(readerCode).toMatch(/resolveAuthoritativeUsernameItemOwnership/);
-    expect(readerCode).toMatch(/getNameRecord\(itemState\.name_hash/);
-    expect(readerCode).toMatch(/recordItemAddress === parsedItemAddress/);
+    expect(readerCode).toMatch(/registryProvider\.getUsernameItemAddress\(itemState\.name_hash/);
+    expect(readerCode).toMatch(/const authoritative = parseTonAddress\(derivedItemAddress\)\.raw === parsedItemAddress/);
     expect(readerCode).toMatch(/owner_wallet: authoritative \? itemOwnerWallet : null/);
-    expect(readerCode).toMatch(/missing_registry_record|registry_item_mismatch|item_registry_mismatch/);
+    expect(readerCode).toMatch(/derived_item_address: derivedItemAddress/);
+    // Each refusal reason pinned on its own line, not as one alternation: an alternation lets any single branch
+    // rot while the assertion stays green, and callers branch on these exact strings (`item_not_initialized` is
+    // what turns into UsernameNotRegisteredError, a hard "no such name" rather than a retryable read failure).
+    expect(readerCode).toMatch(/reason: 'item_not_initialized'/);
+    expect(readerCode).toMatch(/reason: 'item_registry_mismatch'/);
+    expect(readerCode).toMatch(/reason: authoritative \? 'registry_item' : 'registry_item_mismatch'/);
+    // The weaker source must not come back as a second answer to the same question.
+    expect(readerCode).not.toMatch(/decodeUsernameNameRecordStack|async getNameRecord\b|getNameRecordByUsername\s*[(:]/);
+
+    // get_global ARITY PIN. `name_record_count` left the getter with the map, so every index after it shifted
+    // down by one — 13 items became 12. This is why the decoder asserts an EXACT length instead of reading by
+    // position and hoping: against the old 13-item shape a tolerant decoder reads treasury_due as burn_due and
+    // reports money that is not there. Pin the length, the boundary indices around the hole, and the last index.
+    expect(readerCode).toMatch(/if \(stack\.length !== 12\) \{/);
+    expect(readerCode).toMatch(/expected 12 stack items/);
+    expect(readerCode).toMatch(/pending_mint_count: readStackInt\(stack, 6,/);
+    expect(readerCode).toMatch(/treasury_due_ath: readStackInt\(stack, 7,/);
+    expect(readerCode).toMatch(/burn_due_ath: readStackInt\(stack, 8,/);
+    expect(readerCode).toMatch(/pending_mint_stale_ttl: readStackInt\(stack, 11,/);
+    // A length check that ACCEPTS a longer/shorter stack is the exact drift this guard exists to catch.
+    expect(readerCode).not.toMatch(/stack\.length\s*[<>]=?\s*1[123]/);
+  });
+
+  it('SPEC-MSG-SOURCE-04D: username availability never reads an unreachable RPC as "this name is free"', () => {
+    // With `name_records` deleted, "is this name taken?" is asked of the item ACCOUNT. That makes the failure
+    // modes dangerously symmetric: a get-method against an account that does not exist fails exactly the way a
+    // get-method fails when toncenter is having a bad minute. Collapsing the two sends a buyer into a mint that
+    // bounces, so `usernameItemIsMinted` answers "free" ONLY from account-state data that says the account never
+    // existed, and refuses outright when neither question can be answered.
+    const app = read('web/app.js');
+    const start = app.indexOf('async function usernameItemIsMinted(');
+    expect(start, 'usernameItemIsMinted must exist').toBeGreaterThanOrEqual(0);
+    const probe = app.slice(start, app.indexOf('async function readUsernameMintAvailabilityForOwnVaultAction'));
+    expect(probe.length, 'usernameItemIsMinted must precede readUsernameMintAvailabilityForOwnVaultAction')
+      .toBeGreaterThan(0);
+
+    expect(probe).toMatch(/return state\?\.initialized === true/);
+    // The fallback is the ACCOUNT, which reports uninitialised as DATA rather than as a failure.
+    expect(probe).toMatch(/transport\.getAccountState\(\{ address: itemAddress \}, \{ skipIfRateLimited: false \}\)/);
+    expect(probe).toMatch(/status === 'uninit' \|\| status === 'uninitialized' \|\| status === 'nonexist' \|\| status === 'non_exist'/);
+    // And the terminal path of the catch is a refusal, never a guess.
+    expect(probe).toMatch(/const error = new Error\('Could not verify whether this username is taken'\)[\s\S]*throw error/);
+    expect(probe).not.toMatch(/catch\s*(?:\([^)]*\))?\s*\{\s*return false/);
+    expect(probe).not.toMatch(/allowUnverifiedCriticalRead|callWithVerificationUnavailableReadFallback/);
+
+    // DELIBERATELY FAILING (2026-07-20) — a real hole in web/app.js, not a stale test. After a failed get_state
+    // the probe reads the account status and, for `active`, answers `return false` = "this name is free". But
+    // `active` means the item account EXISTS; the branch's own comment says "that is a read problem", and a read
+    // problem is precisely what must not become an answer. Only "never existed" (uninit/nonexist) may answer
+    // free. This assertion is the weakest correct form on purpose: it passes if the branch throws, if it answers
+    // `true`, or if it is deleted so the refusal below catches it. It must NOT be relaxed to match the code.
+    expect(probe, 'an item account that EXISTS must never answer "this username is free"')
+      .not.toMatch(/status === 'active'[\s\S]{0,60}return false/);
   });
 
   it('SPEC-MSG-SOURCE-04B: username stale pending mint docs match non-destructive recovery', () => {

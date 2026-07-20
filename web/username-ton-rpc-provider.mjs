@@ -166,16 +166,6 @@ export function decodeUsernamePriceStack(result) {
   };
 }
 
-export function decodeUsernameNameRecordStack(result) {
-  const stack = extractStack(result);
-  return {
-    exists: readStackBool(stack, 0, 'username record exists'),
-    owner_wallet: readStackAddress(stack, 1, 'username owner wallet'),
-    item_address: readStackAddress(stack, 2, 'username item address'),
-    registered_at: readStackInt(stack, 3, 'username registered at'),
-  };
-}
-
 export function decodePendingUsernameMintStack(result) {
   const stack = extractStack(result);
   if (stack.length !== 9) {
