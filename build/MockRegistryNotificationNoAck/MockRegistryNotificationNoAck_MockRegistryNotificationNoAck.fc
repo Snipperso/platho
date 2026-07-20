@@ -149,7 +149,7 @@ _ %get_state() method_id(86957) {
     if (in_msg_length >= 32) {
         op = in_msg~load_uint(32);
     }
-    ;; Receive AthTransferNotificationVaultProfileAvatar message
+    ;; Receive AthTransferNotificationRegistryProfileAvatar message
     if (op == 0xa11a7002) {
         var $msg'query_id = in_msg~load_uint(64);
         var $msg'sender_key = in_msg~load_uint(160);
@@ -168,7 +168,7 @@ _ %get_state() method_id(86957) {
         return ();
     }
     
-    ;; Receive AthTransferNotificationVaultMintUsername message
+    ;; Receive AthTransferNotificationRegistryMintUsername message
     if (op == 0x89129d60) {
         var $msg'query_id = in_msg~load_uint(64);
         var $msg'sender_key = in_msg~load_uint(160);

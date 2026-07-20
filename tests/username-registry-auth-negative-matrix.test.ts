@@ -6,7 +6,7 @@ import {
   UsernameRegistry,
   BindOfficialAthWallet,
   SealGenesis,
-  AthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
   UsernameItemDeployedAck,
   FlushTreasuryAthDue,
   ATHTransferAck,
@@ -97,7 +97,7 @@ async function sendMintFromOfficialAddress(
 ) {
   // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M), so the mint notification must carry >= that.
   await registry.send(blockchain.sender(officialAddress), { value: toNano('1.2') }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 911n,
     amount,
     sender_key: 0n,
@@ -105,7 +105,7 @@ async function sendMintFromOfficialAddress(
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
 }
 
 async function installNoAckAt(blockchain: Blockchain, address: Address) {
@@ -126,7 +126,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
     const hash = nameHash('forged');
 
     await registry.send(attacker.getSender(), { value: toNano('0.15') }, {
-      $$type: 'AthTransferNotificationVaultMintUsername',
+      $$type: 'AthTransferNotificationRegistryMintUsername',
       query_id: 1n,
       amount: PRICE_6_PLUS,
       sender_key: 0n,
@@ -134,7 +134,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       owner_wallet: ownerWallet,
       username_len: 6n,
       username: usernameSlice('forged'),
-    } as AthTransferNotificationVaultMintUsername);
+    } as AthTransferNotificationRegistryMintUsername);
     expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
 

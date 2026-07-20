@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
-  AthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
   BindOfficialAthWallet,
   SealGenesis,
   UsernameRegistry,
@@ -168,9 +168,9 @@ async function setupRegistry(label: string) {
   return { blockchain, registry, officialAthWallet, vaultAddress };
 }
 
-function mintBody(owner: Address, name: string, amount: bigint, queryId: bigint, payerWallet: Address): AthTransferNotificationVaultMintUsername {
+function mintBody(owner: Address, name: string, amount: bigint, queryId: bigint, payerWallet: Address): AthTransferNotificationRegistryMintUsername {
   return {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: queryId,
     amount,
     sender_key: 77n,

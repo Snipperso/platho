@@ -12,7 +12,7 @@ import {
   UsernameRegistry,
   BindOfficialAthWallet,
   SealGenesis,
-  AthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
   FlushTreasuryAthDue,
   FlushBurnAthDue,
   PrunePendingUsernameMint,
@@ -370,7 +370,7 @@ async function mintValidName(blockchain: Blockchain, registry: any, officialAthW
   // endowments); the mint notification must carry >= that.
   const value = toNano('1.2');
   const res = await registry.send(blockchain.sender(officialAthWalletAddress), { value }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 17701n,
     amount: PRICE_6_PLUS,
     sender_key: 0n,
@@ -378,7 +378,7 @@ async function mintValidName(blockchain: Blockchain, registry: any, officialAthW
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
   return { value, res };
 }
 
@@ -393,7 +393,7 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
 
   const invalidValue = toNano('0.1');
   const invalidRes = await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: invalidValue }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 17702n,
     amount: PRICE_6_PLUS,
     sender_key: 0n,
@@ -401,7 +401,7 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
     owner_wallet: ownerRejected,
     username_len: 6n,
     username: usernameSlice('Larisa'),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
 
   const treasuryValue = toNano('0.2');
   const treasuryRes = await ctx.registry.send(ctx.flusher.getSender(), { value: treasuryValue }, {

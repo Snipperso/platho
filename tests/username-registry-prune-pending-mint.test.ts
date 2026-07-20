@@ -6,7 +6,7 @@ import {
   UsernameRegistry,
   BindOfficialAthWallet,
   SealGenesis,
-  AthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
   PrunePendingUsernameMint,
   UsernameItemDeployedAck,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -96,7 +96,7 @@ async function createStuckPendingMint(ctx: Awaited<ReturnType<typeof deploySeale
 
   // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M), so the mint notification must carry >= that.
   await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('1.2') }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: 13001n,
     amount: PRICE_6_PLUS,
     sender_key: 0n,
@@ -104,7 +104,7 @@ async function createStuckPendingMint(ctx: Awaited<ReturnType<typeof deploySeale
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
 
   return { hash, itemAddress, noAckItem };
 }
@@ -205,7 +205,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
     expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
 
     await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('1.2') }, {
-      $$type: 'AthTransferNotificationVaultMintUsername',
+      $$type: 'AthTransferNotificationRegistryMintUsername',
       query_id: 13002n,
       amount: PRICE_6_PLUS,
       sender_key: 0n,
@@ -213,7 +213,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
       owner_wallet: ownerWallet,
       username_len: 6n,
       username: usernameSlice('remint'),
-    } as AthTransferNotificationVaultMintUsername);
+    } as AthTransferNotificationRegistryMintUsername);
 
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
     expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);

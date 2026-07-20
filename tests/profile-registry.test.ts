@@ -8,7 +8,7 @@ import {
   ATHBurnFailed,
   ATHTransferAck,
   ATHTransferFailed,
-  AthTransferNotificationVaultProfileAvatar,
+  AthTransferNotificationRegistryProfileAvatar,
   BindProfileOfficialAthWallet,
   FlushProfileBurnAthDue,
   FlushProfileTreasuryAthDue,
@@ -19,7 +19,7 @@ import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoA
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import {
   ATHWallet,
-  ATHTransferRequestVaultProfileAvatar,
+  ATHTransferRequestRegistryProfileAvatar,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x50524f46494c45524547495354525900000000000000000000000000000001n;
@@ -223,9 +223,9 @@ async function deployProfileRegistryWithAthSystem(options: { officialWalletBalan
   };
 }
 
-function avatarNotification(owner: Address, overrides: Partial<AthTransferNotificationVaultProfileAvatar> = {}): AthTransferNotificationVaultProfileAvatar {
+function avatarNotification(owner: Address, overrides: Partial<AthTransferNotificationRegistryProfileAvatar> = {}): AthTransferNotificationRegistryProfileAvatar {
   return {
-    $$type: 'AthTransferNotificationVaultProfileAvatar',
+    $$type: 'AthTransferNotificationRegistryProfileAvatar',
     query_id: overrides.query_id ?? 1n,
     amount: overrides.amount ?? PROFILE_AVATAR_PRICE_ATH,
     sender_key: overrides.sender_key ?? 77n,
@@ -242,10 +242,10 @@ function avatarNotification(owner: Address, overrides: Partial<AthTransferNotifi
 function vaultAvatarNotification(
   payerWallet: Address,
   owner: Address,
-  overrides: Partial<AthTransferNotificationVaultProfileAvatar> = {},
-): AthTransferNotificationVaultProfileAvatar {
+  overrides: Partial<AthTransferNotificationRegistryProfileAvatar> = {},
+): AthTransferNotificationRegistryProfileAvatar {
   return {
-    $$type: 'AthTransferNotificationVaultProfileAvatar',
+    $$type: 'AthTransferNotificationRegistryProfileAvatar',
     query_id: overrides.query_id ?? 1n,
     amount: overrides.amount ?? PROFILE_AVATAR_PRICE_ATH,
     sender_key: overrides.sender_key ?? senderKey(payerWallet, overrides.query_id ?? 1n),
@@ -428,7 +428,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       { avatar_part_count: 3n },
       { media_format: 2n },
       { owner_wallet: fixtureAddress('INVALID_POINTER_MASTERCHAIN_OWNER', -1) },
-    ] satisfies Array<Partial<AthTransferNotificationVaultProfileAvatar>>) {
+    ] satisfies Array<Partial<AthTransferNotificationRegistryProfileAvatar>>) {
       await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, overrides));
     }
 
@@ -760,7 +760,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     );
 
     const result = await sourceWallet.send(wrongPayer.getSender(), { value: toNano('0.3') }, {
-      $$type: 'ATHTransferRequestVaultProfileAvatar',
+      $$type: 'ATHTransferRequestRegistryProfileAvatar',
       query_id: queryId,
       amount: PROFILE_AVATAR_PRICE_ATH,
       recipient: ctx.registry.address,
@@ -774,7 +774,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       avatar_stream_id: 0x11223344556677889900aabbccddeeffn,
       avatar_part_count: 2n,
       media_format: 1n,
-    } as ATHTransferRequestVaultProfileAvatar);
+    } as ATHTransferRequestRegistryProfileAvatar);
 
     const avatar = await ctx.registry.getGetAvatar(owner);
     const global = await ctx.registry.getGetGlobal();

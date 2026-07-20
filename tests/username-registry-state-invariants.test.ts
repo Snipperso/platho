@@ -6,7 +6,7 @@ import {
   UsernameRegistry,
   BindOfficialAthWallet,
   SealGenesis,
-  AthTransferNotificationVaultMintUsername,
+  AthTransferNotificationRegistryMintUsername,
   PrunePendingUsernameMint,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { MockUsernameNFTItemNoAck } from '../build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck';
@@ -121,7 +121,7 @@ async function sendMint(params: {
 }) {
   // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M), so the mint notification must carry >= that.
   await params.registry.send(params.officialAthWallet.getSender(), { value: params.value ?? toNano('1.2') }, {
-    $$type: 'AthTransferNotificationVaultMintUsername',
+    $$type: 'AthTransferNotificationRegistryMintUsername',
     query_id: params.queryId,
     amount: params.amount,
     sender_key: 0n,
@@ -129,7 +129,7 @@ async function sendMint(params: {
     owner_wallet: params.owner,
     username_len: BigInt(Buffer.from(params.username, 'ascii').length),
     username: usernameSlice(params.username),
-  } as AthTransferNotificationVaultMintUsername);
+  } as AthTransferNotificationRegistryMintUsername);
 }
 
 describe('UsernameRegistry state-machine invariants', () => {

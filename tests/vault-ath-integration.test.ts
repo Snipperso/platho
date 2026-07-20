@@ -720,7 +720,7 @@ async function depositTonFromAddress(blockchain: Blockchain, vault: any, owner: 
   }));
 }
 
-function signedVaultProfileAvatarBody(params: {
+function signedRegistryProfileAvatarBody(params: {
   vault: any;
   owner: Address;
   outerOwner?: Address;
@@ -1013,7 +1013,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     // payer==owner (direct-pay), and the Vault stamps payer=Vault != owner, so the registry rejects it (21163). The
     // ATH round-trips back and the user's custodial balance is made whole. Real avatar-set now runs direct-pay
     // (user's OWN ATH wallet) — covered by PROFILE-12/12B in tests/profile-registry.test.ts.
-    const body = signedVaultProfileAvatarBody({
+    const body = signedRegistryProfileAvatarBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       profileRegistry: ctx.profileRegistry,
@@ -1119,7 +1119,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
       expect(rawAfter).toBeLessThan(rawBefore);
     }
     const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
-    await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultProfileAvatarBody({
+    await expectRejectedWithoutRawSpend(ctx.user.address, signedRegistryProfileAvatarBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       profileRegistry: ctx.profileRegistry,
@@ -1131,7 +1131,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
       avatarPartCount: 1n,
     }), 16611);
 
-    await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultProfileAvatarBody({
+    await expectRejectedWithoutRawSpend(ctx.user.address, signedRegistryProfileAvatarBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       profileRegistry: ctx.profileRegistry,
@@ -1145,7 +1145,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     }), 16615);
 
     const afterBadMax = await ctx.vault.getGetUser(ctx.user.address);
-    await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultProfileAvatarBody({
+    await expectRejectedWithoutRawSpend(ctx.user.address, signedRegistryProfileAvatarBody({
       vault: ctx.vault,
       signedVault: ctx.profileRegistry.address,
       owner: ctx.user.address,
@@ -1159,7 +1159,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     }), 16619);
 
     const afterBadVault = await ctx.vault.getGetUser(ctx.user.address);
-    await expectAcceptedReturnChargesLocalReserve(ctx.user.address, signedVaultProfileAvatarBody({
+    await expectAcceptedReturnChargesLocalReserve(ctx.user.address, signedRegistryProfileAvatarBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       profileRegistry: ctx.profileRegistry,
@@ -1174,7 +1174,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const underfunded = await ctx.blockchain.treasury('vault-avatar-underfunded');
     const underfundedKeyPair = await registerAvatarRouteKeys(ctx.vault, underfunded);
     const underfundedBefore = await ctx.vault.getGetUser(underfunded.address);
-    await expectRejectedWithoutRawSpend(underfunded.address, signedVaultProfileAvatarBody({
+    await expectRejectedWithoutRawSpend(underfunded.address, signedRegistryProfileAvatarBody({
       vault: ctx.vault,
       owner: underfunded.address,
       profileRegistry: ctx.profileRegistry,
@@ -1190,7 +1190,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const rawBeforeMalformed = await contractBalance(ctx.blockchain, ctx.vault.address);
     await ctx.blockchain.sendMessage(external({
       to: ctx.vault.address,
-      body: signedVaultProfileAvatarBody({
+      body: signedRegistryProfileAvatarBody({
         vault: ctx.vault,
         owner: ctx.user.address,
         profileRegistry: ctx.profileRegistry,
@@ -1223,7 +1223,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
 
     await expect(ctx.blockchain.sendMessage(external({
       to: ctx.vault.address,
-      body: signedVaultProfileAvatarBody({
+      body: signedRegistryProfileAvatarBody({
         vault: ctx.vault,
         owner: ctx.user.address,
         outerOwner: attacker.address,
@@ -1266,7 +1266,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
 
     await expect(ctx.blockchain.sendMessage(external({
       to: otherVault.address,
-      body: signedVaultProfileAvatarBody({
+      body: signedRegistryProfileAvatarBody({
         vault: ctx.vault,
         owner: ctx.user.address,
         profileRegistry: ctx.profileRegistry,
@@ -1308,7 +1308,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const avatarHash = 0x6611ffn;
     await ctx.blockchain.sendMessage(external({
       to: ctx.vault.address,
-      body: signedVaultProfileAvatarBody({
+      body: signedRegistryProfileAvatarBody({
         vault: ctx.vault,
         owner: ctx.user.address,
         profileRegistry: ctx.profileRegistry,
@@ -1385,7 +1385,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
     await ctx.blockchain.sendMessage(external({
       to: ctx.vault.address,
-      body: signedVaultProfileAvatarBody({
+      body: signedRegistryProfileAvatarBody({
         vault: ctx.vault,
         owner: ctx.user.address,
         profileRegistry: ctx.profileRegistry,
@@ -2134,7 +2134,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
     await ctx.blockchain.sendMessage(external({
       to: ctx.vault.address,
-      body: signedVaultProfileAvatarBody({
+      body: signedRegistryProfileAvatarBody({
         vault: ctx.vault, owner: ctx.user.address, profileRegistry: ctx.profileRegistry,
         clientNonce: beforeUser.publish_nonce, secretKey: keyPair.secretKey,
         avatarHash: opts.avatarHash, avatarEntryId: opts.entryId, avatarStreamId: opts.streamId, avatarPartCount: 2n,

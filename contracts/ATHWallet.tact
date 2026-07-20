@@ -3,11 +3,11 @@
 // and owner-authorized bounce-safe ATH transfers.
 
 const ATH_TRANSFER_NOTIFY_ACK_VALUE: Int = 1000000;
-const ATH_VAULT_RESPONSE_ACK_VALUE: Int = 3000000;
+const ATH_REGISTRY_RESPONSE_ACK_VALUE: Int = 3000000;
 const ATH_INTERNAL_TRANSFER_ACK_VALUE: Int = 3000000;
 const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE: Int = 1000000;
 const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE: Int = 21000000;
-const ATH_VAULT_PROFILE_AVATAR_FWD_FEE_ALLOWANCE: Int = 2000000;
+const ATH_REGISTRY_PROFILE_AVATAR_FWD_FEE_ALLOWANCE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 30000000;
 const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 20000000; // ~100+ yr of mainnet config-18 rent for one processed_notifications dict entry (~67k nanoton/cell/yr; ~2-3 cells) + cushion. Funded per-transfer by the sender; the replay tombstone is self-funding for the contract's lifetime.
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
@@ -103,10 +103,10 @@ message(0x504E5052) PruneStaleNotification {
     sender_key: Int as uint160;
 }
 
-// Official username ATH wallet -> UsernameRegistry for Vault-funded username
-// mints. payer_wallet is the bound Vault, owner_wallet is the wallet receiving
-// the username NFT.
-message(0x89129D60) AthTransferNotificationVaultMintUsername {
+// Official username ATH wallet -> UsernameRegistry for a registry-funded username mint. payer_wallet is stamped by
+// the official ATH wallet from the real payer's derived address, owner_wallet is the wallet receiving the NFT.
+// (Named "Vault" until 2026-07-19: this lane predates the Vault's cancellation and the registries took the role.)
+message(0x89129D60) AthTransferNotificationRegistryMintUsername {
     query_id: Int as uint64;
     sender_key: Int as uint160;
     amount: Int as uint128;
@@ -116,10 +116,10 @@ message(0x89129D60) AthTransferNotificationVaultMintUsername {
     username: Slice as remaining;
 }
 
-// Official profile ATH wallet -> ProfileRegistry for Vault-funded profile
-// avatars. payer_wallet is the bound Vault, owner_wallet is the wallet whose
-// public avatar pointer is being updated.
-message(0xA11A7002) AthTransferNotificationVaultProfileAvatar {
+// Official profile ATH wallet -> ProfileRegistry for a registry-funded profile avatar. payer_wallet is stamped by
+// the official ATH wallet from the real payer's derived address, owner_wallet is the wallet whose public avatar
+// pointer is being updated.
+message(0xA11A7002) AthTransferNotificationRegistryProfileAvatar {
     query_id: Int as uint64;
     sender_key: Int as uint160;
     amount: Int as uint128;
@@ -149,7 +149,7 @@ message(0x41544814) ATHTransferRequestWithNotify {
     notify_value: Int as uint128;
 }
 
-message(0x4154481A) ATHTransferRequestVaultProfileAvatar {
+message(0x4154481A) ATHTransferRequestRegistryProfileAvatar {
     query_id: Int as uint64;
     amount: Int as uint128;
     recipient: Address;
@@ -163,7 +163,7 @@ message(0x4154481A) ATHTransferRequestVaultProfileAvatar {
     media_format: Int as uint8;
 }
 
-message(0x4154481C) ATHTransferRequestVaultMintUsername {
+message(0x4154481C) ATHTransferRequestRegistryMintUsername {
     query_id: Int as uint64;
     amount: Int as uint128;
     recipient: Address;
@@ -191,7 +191,7 @@ message(0x41544815) ATHInternalTransferWithNotify {
     notify_value: Int as uint128;
 }
 
-message(0x4154481B) ATHInternalTransferVaultProfileAvatar {
+message(0x4154481B) ATHInternalTransferRegistryProfileAvatar {
     query_id: Int as uint64;
     amount: Int as uint128;
     sender_owner: Address;
@@ -205,7 +205,7 @@ message(0x4154481B) ATHInternalTransferVaultProfileAvatar {
     media_format: Int as uint8;
 }
 
-message(0x4154481D) ATHInternalTransferVaultMintUsername {
+message(0x4154481D) ATHInternalTransferRegistryMintUsername {
     query_id: Int as uint64;
     amount: Int as uint128;
     sender_owner: Address;
@@ -389,8 +389,8 @@ contract ATHWallet {
         return notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
     }
 
-    fun vault_notify_transfer_value(notify_value: Int): Int {
-        return notify_value + ATH_VAULT_RESPONSE_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT + ATH_VAULT_PROFILE_AVATAR_FWD_FEE_ALLOWANCE;
+    fun registry_notify_transfer_value(notify_value: Int): Int {
+        return notify_value + ATH_REGISTRY_RESPONSE_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT + ATH_REGISTRY_PROFILE_AVATAR_FWD_FEE_ALLOWANCE;
     }
 
     fun store_pending_outgoing(query_id: Int, amount: Int, recipient_wallet: Address, response_destination: Address) {
@@ -476,7 +476,7 @@ contract ATHWallet {
         let refund_response_destination: Address = pending.sender_owner;
         let outgoing_failure_destination: Address = pending.sender_owner;
 
-        if (pending.response_ack_value == ATH_VAULT_RESPONSE_ACK_VALUE) {
+        if (pending.response_ack_value == ATH_REGISTRY_RESPONSE_ACK_VALUE) {
             refund_query_id = query_id;
             refund_response_destination = pending.response_destination;
             outgoing_failure_destination = myAddress();
@@ -652,7 +652,7 @@ contract ATHWallet {
         self.refund_owner_excess(msg.response_destination, context().value - required_value);
     }
 
-    receive(msg: ATHTransferRequestVaultMintUsername) {
+    receive(msg: ATHTransferRequestRegistryMintUsername) {
         throwUnless(14550, sender() == self.owner_address);
         throwUnless(14551, msg.response_destination == self.owner_address);
         self.require_basechain_owner_path(msg.recipient, msg.response_destination);
@@ -661,7 +661,7 @@ contract ATHWallet {
         throwUnless(14554, msg.notify_value > 0);
         throwUnless(14555, self.balance >= msg.amount);
         throwUnless(14556, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        let downstream_value: Int = self.vault_notify_transfer_value(msg.notify_value);
+        let downstream_value: Int = self.registry_notify_transfer_value(msg.notify_value);
         let required_value: Int = downstream_value + ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE;
         throwUnless(14557, context().value >= required_value);
 
@@ -677,7 +677,7 @@ contract ATHWallet {
             mode: SendPayFwdFeesSeparately,
             code: recipient_init.code,
             data: recipient_init.data,
-            body: ATHInternalTransferVaultMintUsername {
+            body: ATHInternalTransferRegistryMintUsername {
                 query_id: msg.query_id,
                 amount: msg.amount,
                 sender_owner: self.owner_address,
@@ -692,7 +692,7 @@ contract ATHWallet {
         self.refund_owner_excess(msg.response_destination, context().value - required_value);
     }
 
-    receive(msg: ATHTransferRequestVaultProfileAvatar) {
+    receive(msg: ATHTransferRequestRegistryProfileAvatar) {
         throwUnless(14650, sender() == self.owner_address);
         throwUnless(14651, msg.response_destination == self.owner_address);
         self.require_basechain_owner_path(msg.recipient, msg.response_destination);
@@ -701,7 +701,7 @@ contract ATHWallet {
         throwUnless(14654, msg.notify_value > 0);
         throwUnless(14655, self.balance >= msg.amount);
         throwUnless(14656, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        let downstream_value: Int = self.vault_notify_transfer_value(msg.notify_value);
+        let downstream_value: Int = self.registry_notify_transfer_value(msg.notify_value);
         let required_value: Int = downstream_value + ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE;
         throwUnless(14657, context().value >= required_value);
 
@@ -717,7 +717,7 @@ contract ATHWallet {
             mode: SendPayFwdFeesSeparately,
             code: recipient_init.code,
             data: recipient_init.data,
-            body: ATHInternalTransferVaultProfileAvatar {
+            body: ATHInternalTransferRegistryProfileAvatar {
                 query_id: msg.query_id,
                 amount: msg.amount,
                 sender_owner: self.owner_address,
@@ -904,11 +904,11 @@ contract ATHWallet {
         });
     }
 
-    receive(msg: ATHInternalTransferVaultMintUsername) {
+    receive(msg: ATHInternalTransferRegistryMintUsername) {
         throwUnless(14560, msg.amount > 0);
         throwUnless(14561, sender() == self.derive_wallet_address(msg.sender_owner));
         throwUnless(14562, msg.notify_value > 0);
-        throwUnless(14563, context().value >= msg.notify_value + ATH_VAULT_RESPONSE_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
+        throwUnless(14563, context().value >= msg.notify_value + ATH_REGISTRY_RESPONSE_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
         throwUnless(14564, self.is_basechain_address(msg.owner_wallet));
         let sender_key: Int = self.compute_sender_key(msg.query_id, msg.sender_owner);
         let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
@@ -922,7 +922,7 @@ contract ATHWallet {
         self.pending_notifications.set(pending_key, PendingAthTransferNotification {
             sender_owner: msg.sender_owner,
             response_destination: msg.response_destination,
-            response_ack_value: ATH_VAULT_RESPONSE_ACK_VALUE,
+            response_ack_value: ATH_REGISTRY_RESPONSE_ACK_VALUE,
             amount: msg.amount,
             created_at: now()
         });
@@ -932,7 +932,7 @@ contract ATHWallet {
             value: msg.notify_value,
             mode: SendPayFwdFeesSeparately,
             bounce: true,
-            body: AthTransferNotificationVaultMintUsername {
+            body: AthTransferNotificationRegistryMintUsername {
                 query_id: msg.query_id,
                 sender_key: sender_key,
                 amount: msg.amount,
@@ -955,11 +955,11 @@ contract ATHWallet {
         });
     }
 
-    receive(msg: ATHInternalTransferVaultProfileAvatar) {
+    receive(msg: ATHInternalTransferRegistryProfileAvatar) {
         throwUnless(14660, msg.amount > 0);
         throwUnless(14661, sender() == self.derive_wallet_address(msg.sender_owner));
         throwUnless(14662, msg.notify_value > 0);
-        throwUnless(14663, context().value >= msg.notify_value + ATH_VAULT_RESPONSE_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
+        throwUnless(14663, context().value >= msg.notify_value + ATH_REGISTRY_RESPONSE_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
         throwUnless(14664, self.is_basechain_address(msg.owner_wallet));
         let sender_key: Int = self.compute_sender_key(msg.query_id, msg.sender_owner);
         let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
@@ -973,7 +973,7 @@ contract ATHWallet {
         self.pending_notifications.set(pending_key, PendingAthTransferNotification {
             sender_owner: msg.sender_owner,
             response_destination: msg.response_destination,
-            response_ack_value: ATH_VAULT_RESPONSE_ACK_VALUE,
+            response_ack_value: ATH_REGISTRY_RESPONSE_ACK_VALUE,
             amount: msg.amount,
             created_at: now()
         });
@@ -983,7 +983,7 @@ contract ATHWallet {
             value: msg.notify_value,
             mode: SendPayFwdFeesSeparately,
             bounce: true,
-            body: AthTransferNotificationVaultProfileAvatar {
+            body: AthTransferNotificationRegistryProfileAvatar {
                 query_id: msg.query_id,
                 sender_key: sender_key,
                 amount: msg.amount,
@@ -1066,7 +1066,7 @@ contract ATHWallet {
         throwUnless(14351, self.compute_sender_key(msg.query_id, pending.sender_owner) == msg.sender_key);
         // The registry lanes get a LONGER age requirement, not an exemption. 14353 used to sit here and refuse them
         // outright — see ATH_REGISTRY_PENDING_TTL for why that had to go and what the week is protecting.
-        let ttl: Int = pending.response_ack_value == ATH_VAULT_RESPONSE_ACK_VALUE
+        let ttl: Int = pending.response_ack_value == ATH_REGISTRY_RESPONSE_ACK_VALUE
             ? ATH_REGISTRY_PENDING_TTL
             : ATH_PENDING_NOTIFICATION_TTL;
         throwUnless(14352, now() >= pending.created_at + ttl);
@@ -1084,11 +1084,11 @@ contract ATHWallet {
         self.restore_bounced_outgoing(msg.query_id, msg.amount);
     }
 
-    bounced(msg: bounced<ATHInternalTransferVaultMintUsername>) {
+    bounced(msg: bounced<ATHInternalTransferRegistryMintUsername>) {
         self.restore_bounced_outgoing(msg.query_id, msg.amount);
     }
 
-    bounced(msg: bounced<ATHInternalTransferVaultProfileAvatar>) {
+    bounced(msg: bounced<ATHInternalTransferRegistryProfileAvatar>) {
         self.restore_bounced_outgoing(msg.query_id, msg.amount);
     }
 
@@ -1101,12 +1101,12 @@ contract ATHWallet {
         self.refund_bounced_notification(msg.query_id, msg.sender_key);
     }
 
-    bounced(msg: bounced<AthTransferNotificationVaultMintUsername>) {
+    bounced(msg: bounced<AthTransferNotificationRegistryMintUsername>) {
         throwUnless(14570, sender() == self.owner_address);
         self.refund_bounced_notification(msg.query_id, msg.sender_key);
     }
 
-    bounced(msg: bounced<AthTransferNotificationVaultProfileAvatar>) {
+    bounced(msg: bounced<AthTransferNotificationRegistryProfileAvatar>) {
         throwUnless(14670, sender() == self.owner_address);
         self.refund_bounced_notification(msg.query_id, msg.sender_key);
     }

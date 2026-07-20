@@ -1256,7 +1256,7 @@ _ %get_pending_burn_flush(int $query_id) method_id(109631) {
         return ();
     }
     
-    ;; Receive AthTransferNotificationVaultProfileAvatar message
+    ;; Receive AthTransferNotificationRegistryProfileAvatar message
     if (op == 0xa11a7002) {
         var $msg'query_id = in_msg~load_uint(64);
         var $msg'sender_key = in_msg~load_uint(160);

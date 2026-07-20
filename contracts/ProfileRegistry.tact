@@ -357,7 +357,7 @@ contract ProfileRegistry {
     // sender_owner); we require owner_wallet == payer_wallet so a payer can set ONLY THEIR OWN avatar — no Vault,
     // controller, or third party can ever be another user's payer, so the delegated-consent hijack vector is gone.
     // Vault-independent → the registry freezes once and survives every future Vault redeploy.
-    receive(msg: AthTransferNotificationVaultProfileAvatar) {
+    receive(msg: AthTransferNotificationRegistryProfileAvatar) {
         self.requireSealed();
         throwUnless(21160, sender() == self.official_ath_wallet_address);
         throwUnless(21163, msg.owner_wallet == msg.payer_wallet);

@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
-  AthTransferNotificationVaultProfileAvatar,
+  AthTransferNotificationRegistryProfileAvatar,
   BindProfileOfficialAthWallet,
   ProfileRegistry,
   SealGenesis,
@@ -120,9 +120,9 @@ async function setupRegistry(label: string) {
 // This fixture used to set payer_wallet = ctx.vault, which the gate now rejects: the notification threw, the
 // registry retained nothing, and the case reported "retained margin is negative (-45000000)" — reading as an
 // endowment shortfall when it was really a fixture describing a world that no longer exists.
-function avatarNotification(ctx: Setup, owner: Address, queryId: bigint): AthTransferNotificationVaultProfileAvatar {
+function avatarNotification(ctx: Setup, owner: Address, queryId: bigint): AthTransferNotificationRegistryProfileAvatar {
   return {
-    $$type: 'AthTransferNotificationVaultProfileAvatar',
+    $$type: 'AthTransferNotificationRegistryProfileAvatar',
     query_id: queryId,
     amount: PROFILE_AVATAR_PRICE_ATH,
     sender_key: 77n,

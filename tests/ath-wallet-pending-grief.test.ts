@@ -4,16 +4,16 @@ import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
   ATHWallet,
-  storeATHInternalTransferVaultMintUsername,
+  storeATHInternalTransferRegistryMintUsername,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // ATHWALLET PENDING GRIEF — who can be frozen by an unprunable pending entry, and who cannot.
 //
-// The vault lanes (username mint / profile avatar) mark their pending entries with ATH_VAULT_RESPONSE_ACK_VALUE,
+// The registry lanes (username mint / profile avatar) mark their pending entries with ATH_REGISTRY_RESPONSE_ACK_VALUE,
 // and gate 14353 refuses to prune anything carrying that marker — forever, with no TTL escape. So an attacker who
-// can make a victim's ATH wallet hold vault-lane pendings can grow its state without bound until it hits the
+// can make a victim's ATH wallet hold registry-lane pendings can grow its state without bound until it hits the
 // ~65536-cell account ceiling, after which writes fail SILENTLY (compute exit 0, ACTION code 50).
 //
 // THE DECIDING QUESTION IS WHAT THE VICTIM'S OWNER DOES WITH THE NOTIFICATION. The wallet forwards it to its owner
@@ -28,7 +28,7 @@ import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544e49n;
 const ATH_SENDER_KEY_MOD = 1461501637330902918203684832716283019655932542976n;
-// The vault lane's value gate (14563): notify_value + VAULT_ACK(3M) + SOURCE_ACK(1M) + EXEC(7M) + ENDOWMENT(20M).
+// The registry lane's value gate (14563): notify_value + REGISTRY_ACK(3M) + SOURCE_ACK(1M) + EXEC(7M) + ENDOWMENT(20M).
 const ATTACK_VALUE = toNano('0.08');
 
 const senderKey = (senderOwner: Address, queryId: bigint): bigint =>
@@ -51,7 +51,7 @@ async function provisionWallet(bc: Blockchain, owner: Address, master: Address, 
   return { wallet: bc.openContract(new ATHWallet(address, zeroInit)), address };
 }
 
-/** One vault-lane mint notification aimed at `victimWallet`, sent from `attackerOwner`'s own derived ATH wallet. */
+/** One registry-lane mint notification aimed at `victimWallet`, sent from `attackerOwner`'s own derived ATH wallet. */
 async function attack(bc: Blockchain, victimAddress: Address, attackerOwner: Address, master: Address, queryId: bigint) {
   const attackerWalletAddr = contractAddress(0, await ATHWallet.init(0n, attackerOwner, master));
   const username = Buffer.from('victim', 'ascii');
@@ -60,8 +60,8 @@ async function attack(bc: Blockchain, victimAddress: Address, attackerOwner: Add
     to: victimAddress,
     value: ATTACK_VALUE,
     bounce: true,
-    body: beginCell().store(storeATHInternalTransferVaultMintUsername({
-      $$type: 'ATHInternalTransferVaultMintUsername',
+    body: beginCell().store(storeATHInternalTransferRegistryMintUsername({
+      $$type: 'ATHInternalTransferRegistryMintUsername',
       query_id: queryId,
       amount: 1n,                      // one nanoATH — the attack costs TON, not ATH
       sender_owner: attackerOwner,
@@ -74,7 +74,7 @@ async function attack(bc: Blockchain, victimAddress: Address, attackerOwner: Add
   }));
 }
 
-describe('ATHWALLET PENDING GRIEF — an unprunable vault pending, and who it can be aimed at', () => {
+describe('ATHWALLET PENDING GRIEF — a stuck registry pending, and who it can be aimed at', () => {
   it('GRIEF-01: a wallet owned by an ORDINARY wallet keeps the pending forever — this is the real exposure', async () => {
     const bc = await Blockchain.create();
     bc.now = 1_790_000_000;
@@ -112,7 +112,7 @@ describe('ATHWALLET PENDING GRIEF — an unprunable vault pending, and who it ca
     // The system wallets (MarketStabilitySeller, ATHVesting, UsernameRegistry, ProfileRegistry) all throw on an
     // unexpected message — 23999 / 24999 / 19099 / 21400 respectively — so the notification bounces and 14570's
     // refund_bounced_notification clears the pending. ATHMaster stands in here: it likewise has no receiver for a
-    // vault mint notification, so it throws in exactly the same way.
+    // registry mint notification, so it throws in exactly the same way.
     const bc = await Blockchain.create();
     bc.now = 1_790_000_000;
     const master = fixtureAddress('GRIEF_MASTER_2');
