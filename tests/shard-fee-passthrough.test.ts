@@ -4,6 +4,7 @@ import { toNano, beginCell, contractAddress, Address } from '@ton/core';
 import { readFileSync } from 'node:fs';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
+import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicket';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { buildIntroPublish, buildConvPublish } from '../web/publish-builder.mjs';
 import { epochOf } from '../web/shard-discovery.mjs';
@@ -32,21 +33,49 @@ const cell = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCell
 const CLOCK = 1_790_000_000;
 
 const PROTOCOL_FEE = 10_000_000n;
-// Fee transport rose 600_000 -> 1_600_000 (deposit reserve 400_000 -> 1_400_000) when the deposit began
-// carrying an airdrop credit: FeeAccumulator gate 15056 demands amount + 1_200_000. The 10_000_000 protocol
-// fee is unchanged and still reaches the pool whole — only the publisher's transport grew.
-const RS_MIN_VALUE = 14_400_000n;        // 300_000 + 2_500_000 + 10_000_000 + 1_600_000
-const RS_DEPLOY_MIN_VALUE = 17_900_000n; // + RS_BASE_ENDOWMENT 3_500_000, charged on the FIRST publish only
-const IS_MIN_VALUE = 14_110_000n;        //    10_000 + 2_500_000 + 10_000_000 + 1_600_000
+// Fee transport rose 600_000 -> 2_800_000 (deposit reserve 400_000 -> 2_600_000) when the deposit began carrying
+// an airdrop credit. The intermediate 1_400_000 was REASONED and wrong; 2_600_000 is measured — see PT-04c and
+// the comment on FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE. The 10_000_000 protocol fee is unchanged and still
+// reaches the pool whole; only the publisher's transport grew.
+const RS_MIN_VALUE = 15_600_000n;        // 300_000 + 2_500_000 + 10_000_000 + 2_800_000
+const RS_DEPLOY_MIN_VALUE = 19_100_000n; // + RS_BASE_ENDOWMENT 3_500_000, charged on the FIRST publish only
+const IS_MIN_VALUE = 15_310_000n;        //    10_000 + 2_500_000 + 10_000_000 + 2_800_000
 
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
 const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');
+const FA_POOL = Address.parse('UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH');
 
-async function deploySink(bc: Blockchain) {
+/** The data cell of an AirdropTicket owned by `owner` — lazy-init flag plus the single init argument. */
+const ticketData = (owner: Address) => beginCell().storeUint(0, 1).storeAddress(owner).endCell();
+
+/**
+ * The sink as GENESIS leaves it: deployed AND bound. Binding is not test scaffolding — an unbound sink refuses
+ * every capsule deposit at gate 15055, because the gate authenticates a shard by rebuilding its address from the
+ * bound code, and with nothing bound there is nothing to rebuild against. That refusal is correct behaviour and
+ * PT-11 asserts it directly; every other test here needs the sink a live network would actually have.
+ */
+async function deploySink(bc: Blockchain, opts: { bind?: boolean } = {}) {
   const sink = bc.openContract(await FeeAccumulator.fromInit(FA_TREASURY, FA_BUYBACK));
   const funder = await bc.treasury('sink-funder');
   await sink.send(funder.getSender(), { value: toNano('1') }, { $$type: 'TopUpStorageReserve' } as any);
+  if (opts.bind === false) return sink;
+
+  // The binds are treasury-only and one-shot (gates 15050 / 15051 / 15052 / 15053 / 15057), so this mirrors the
+  // ceremony exactly: four messages from the treasury wallet, once, before any publish exists.
+  const gov = bc.sender(FA_TREASURY);
+  const send = (body: any) => sink.send(gov, { value: toNano('0.1') }, body);
+  await send({ $$type: 'BindShardCode', shard_code: (await RecordShard.init(1n, 1n)).code } as any);
+  await send({ $$type: 'BindIntroShardCode', intro_shard_code: (await IntroShard.init(1n, 1n)).code } as any);
+  await send({ $$type: 'BindTicketCode', ticket_code: (await AirdropTicket.init(FA_TREASURY)).code } as any);
+  await send({ $$type: 'BindAirdropPool', airdrop_pool_address: FA_POOL } as any);
   return sink;
+}
+
+/** How many airdrop credits a publisher's ticket holds — 0 if the ticket was never deployed. */
+async function creditsOf(bc: Blockchain, owner: Address) {
+  const addr = contractAddress(0, { code: (await AirdropTicket.init(FA_TREASURY)).code, data: ticketData(owner) });
+  if ((await bc.getContract(addr)).accountState?.type !== 'active') return 0n;
+  return (await bc.openContract(AirdropTicket.fromAddress(addr)).getGetTicket()).credits;
 }
 
 /** One publish at EXACTLY the given value, with no deploy-price correction — for testing the gate itself. */
@@ -91,13 +120,15 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     const sink = await deploySink(bc);
     const before = (await sink.getGetState()).accumulated_ton;
 
-    const { shard } = await publishConv(bc, 5, 0x21);
+    const { shard, payer } = await publishConv(bc, 5, 0x21);
 
     // WHOLE, not net of transport: the publisher funds the transfer so the pool's arithmetic stays exact.
     // 1.5M capsules x 0.01 GRAM must be 15_000 GRAM, not 15_000 minus a per-message shave.
     expect((await sink.getGetState()).accumulated_ton - before, 'the pool books the fee whole')
       .toBe(5n * PROTOCOL_FEE);
     expect((await shard.getGetView()).record_count).toBe(5n);
+    // And the same deposit earned the publisher their airdrop — one credit per capsule, 10 ATH each.
+    expect(await creditsOf(bc, payer.address), 'one airdrop credit per capsule').toBe(5n);
   }, 300_000);
 
   it('PT-02: an INTRO publish does the same', async () => {
@@ -116,6 +147,10 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
       await payer.send({ to: b.to, value: b.value, body: b.body, init: b.init, bounce: true } as any);
     }
     expect((await sink.getGetState()).accumulated_ton - before).toBe(5n * PROTOCOL_FEE);
+    // The INTRO lane derives through a DIFFERENT bound code and a different pair of init arguments (epoch,
+    // bucket instead of pubkey, epoch). It was a positional mix-up here that would have authenticated the wrong
+    // addresses for the whole lane while compiling cleanly, so the credit is asserted, not assumed.
+    expect(await creditsOf(bc, payer.address), 'INTRO capsules earn the same credit').toBe(5n);
   }, 300_000);
 
   it('PT-03: the shard holds ONLY its rent — no fee sits in it', async () => {
@@ -137,14 +172,20 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     expect(view.record_count, 'and the records are all there').toBe(BigInt(n));
   }, 300_000);
 
-  it('PT-04: the deposit reserve MATCHES FeeAccumulator gate 15002 — a drift refuses every deposit', async () => {
-    // The shards mirror FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE by hand, because Tact compiles one contract per
-    // project. If the two ever drift apart, gate 15002 refuses and every publish bounces its fee. This reads
-    // both numbers out of the sources rather than trusting either.
+  it('PT-04: the shards carry what gate 15056 demands — a drift refuses every deposit', async () => {
+    // RETARGETED 2026-07-20. This used to pin the mirrors against FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE and gate
+    // 15002, which is the PERMISSIONLESS DepositProtocolFee path. The shards no longer travel that path: a capsule
+    // fee now carries an airdrop credit, so it goes through DepositCapsuleFee and is gated by 15056, which demands
+    // amount + FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE. Left pointing at the old constant this test would have
+    // gone on passing while every publish bounced — the same shape of failure it was written to catch.
+    //
+    // The relation is >= rather than ==, and deliberately so: the shard's surplus is recoverable through
+    // SweepUnaccounted (PT-09), while a shortfall is quietly paid by the owner on every one of 1.5M capsules.
     const fa = readFileSync('contracts/FeeAccumulator.tact', 'utf8');
-    const faReserve = /FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE:\s*Int\s*=\s*(\d+)/.exec(fa)?.[1];
-    expect(faReserve, 'FeeAccumulator must declare a deposit reserve').toBeDefined();
+    const capsuleReserve = /FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE:\s*Int\s*=\s*(\d+)/.exec(fa)?.[1];
+    expect(capsuleReserve, 'FeeAccumulator must declare a capsule-fee reserve').toBeDefined();
 
+    const mirrors: number[] = [];
     for (const [file, name] of [
       ['contracts/RecordShard.tact', 'RS_FEE_SINK_DEPOSIT_RESERVE'],
       ['contracts/IntroShard.tact', 'IS_FEE_SINK_DEPOSIT_RESERVE'],
@@ -152,14 +193,73 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
       const src = readFileSync(file, 'utf8');
       const mirror = new RegExp(`${name}:\\s*Int\\s*=\\s*(\\d+)`).exec(src)?.[1];
       expect(mirror, `${file} must declare ${name}`).toBeDefined();
-      expect(mirror, `${name} must equal FeeAccumulator's gate-15002 reserve`).toBe(faReserve);
+      expect(Number(mirror), `${name} must cover FeeAccumulator's gate-15056 reserve`)
+        .toBeGreaterThanOrEqual(Number(capsuleReserve));
+      mirrors.push(Number(mirror));
     }
+    // Both lanes pay the same fee into the same receiver, so a difference between them is a mistake, not a choice.
+    expect(mirrors[0], 'both lanes must carry the same deposit reserve').toBe(mirrors[1]);
 
-    // And it must be at least what a deposit really costs, or FeeAccumulator drains a little on every publish.
-    // Measured 199_068 against the live mainnet gas config.
-    expect(Number(faReserve), 'the reserve must cover the measured 199_068 cost of a deposit')
-      .toBeGreaterThanOrEqual(199_068);
+    // And the reserve must cover what the receiver really spends: the deposit's own execution plus the ticket
+    // credit it now sends. PT-04c measures that end to end; this is the cheap source-level guard beside it.
+    const creditValue = /FEEACCUMULATOR_TICKET_CREDIT_VALUE:\s*Int\s*=\s*(\d+)/.exec(fa)?.[1];
+    expect(Number(capsuleReserve), 'the reserve must cover the deposit execution plus the credit it carries')
+      .toBeGreaterThanOrEqual(199_068 + Number(creditValue));
   });
+
+  it('PT-04c: MEASURED — the sink does not lose money on a capsule, credit and all', async () => {
+    // The property the source-level pin above can only approximate. FeeAccumulator now SPENDS on every deposit:
+    // it forwards FEEACCUMULATOR_TICKET_CREDIT_VALUE to the publisher's ticket and pays that message's fees. If
+    // the arriving transport does not cover both, the sink bleeds a little on each of 1.5M capsules and the
+    // shortfall lands on the owner. Balance is measured against the BOOKED figure, because accumulated_ton is a
+    // liability: everything above it is the sink's own, everything below it is money it owes and does not have.
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    const sink = await deploySink(bc);
+    const balBefore = (await bc.getContract(sink.address)).balance;
+
+    const n = 10;
+    const { payer } = await publishConv(bc, n, 0xA1);
+    const booked = (await sink.getGetState()).accumulated_ton;
+    expect(booked, 'the principal is booked whole').toBe(BigInt(n) * PROTOCOL_FEE);
+
+    const balAfter = (await bc.getContract(sink.address)).balance;
+    const surplus = balAfter - balBefore - booked;
+
+    // eslint-disable-next-line no-console
+    console.log([
+      '[PT-04c] what a capsule fee really leaves at the sink',
+      `  balance grew      ${balAfter - balBefore} over ${n} capsules`,
+      `  of which booked   ${booked} (the owner's, whole)`,
+      `  sink's own margin ${surplus} = ${surplus / BigInt(n)} per capsule`,
+    ].join('\n'));
+
+    expect(surplus, 'the sink must not fund the airdrop credit out of the fee it owes').toBeGreaterThanOrEqual(0n);
+    expect(await creditsOf(bc, payer.address), 'and every capsule credited its publisher').toBe(BigInt(n));
+  }, 300_000);
+
+  it('PT-11: an UNBOUND sink refuses the capsule fee — the airdrop gate is not decorative', async () => {
+    // The inverse of the binding this suite now performs, kept explicit so nobody concludes the binds are
+    // scaffolding. Gate 15055 authenticates a shard by rebuilding its address from the bound code; with no code
+    // bound there is no shard it can accept, and 10 ATH per call stays shut. The fee bounces home rather than
+    // being swallowed, which is why an unbound genesis is recoverable rather than fatal.
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    const sink = await deploySink(bc, { bind: false });
+    const { shard, payer, last } = await publishConv(bc, 1, 0xB1);
+
+    const sinkTx = (last.transactions as any[])
+      .find((t) => t.inMessage?.info?.dest?.equals?.(sink.address) && !t.inMessage?.info?.bounced);
+    expect(sinkTx?.description?.computePhase?.exitCode, 'gate 15055 must refuse an unauthenticated deposit')
+      .toBe(15055);
+    expect((await sink.getGetState()).accumulated_ton, 'and nothing is booked').toBe(0n);
+    expect(await creditsOf(bc, payer.address), 'and no credit is minted').toBe(0n);
+
+    // The record still stored, and the refused fee came back to the shard rather than vanishing.
+    expect((await shard.getGetView()).record_count, 'the publish itself still succeeded').toBe(1n);
+    expect((await bc.getContract(shard.address)).balance, 'the refused fee is held, not lost')
+      .toBeGreaterThan(PROTOCOL_FEE);
+  }, 300_000);
 
   it('PT-04b: the hardcoded sink address IS the current FeeAccumulator — this exact bug already happened', async () => {
     // WRITTEN BECAUSE IT BIT. Earlier today I measured that FeeAccumulator.init carries no deployment_id and
@@ -266,15 +366,23 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
 
   it('PT-10: SweepUnaccounted cannot invent money — an under-funded sink refuses', async () => {
     // The receiver is permissionless, so it must be impossible to use it to credit money that is not there.
-    // A freshly deployed sink holds only the storage float and has no surplus at all.
+    // A sink with NO publishes behind it has nothing that is genuinely the protocol's.
+    //
+    // The first sweep is not a formality: genesis binding itself leaves change in the account (four messages from
+    // the treasury wallet), and that change is real unaccounted money the owner is entitled to. Sweeping it is
+    // correct. What must be impossible is the sweep AFTER that one — a second call finding a second surplus would
+    // mean the receiver can be pumped for money that was never deposited.
     const bc = await Blockchain.create();
     bc.now = CLOCK;
     const sink = await deploySink(bc);
     const anyone = await bc.treasury('pt10');
+    await sink.send(anyone.getSender(), { value: toNano('0.05') }, { $$type: 'SweepUnaccounted' } as any);
+    const credited = (await sink.getGetState()).accumulated_ton;
+
     const r = await sink.send(anyone.getSender(), { value: toNano('0.05') }, { $$type: 'SweepUnaccounted' } as any);
     const tx = (r.transactions as any[]).find((t) => t.inMessage?.info?.dest?.equals?.(sink.address));
     expect(tx?.description?.computePhase?.exitCode, 'no surplus above the floor -> refuse').toBe(15040);
-    expect((await sink.getGetState()).accumulated_ton, 'nothing credited').toBe(0n);
+    expect((await sink.getGetState()).accumulated_ton, 'and nothing further is credited').toBe(credited);
   }, 300_000);
 
   it('PT-07: retiring a shard moves no protocol money — the fee left long ago at publish time', async () => {
@@ -299,8 +407,10 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     expect((await bc.getContract(shard.address)).accountState?.type, 'and the account is gone').not.toBe('active');
   }, 600_000);
 
-  it('PT-08: the publish minimum is what the owner was told — 0.0134 CONV, 0.013110 INTRO', async () => {
+  it('PT-08: the publish minimum is what the owner was told — 0.0156 CONV, 0.01531 INTRO', async () => {
     // The owner priced this decision in GRAM and agreed to it. Pin the number so it cannot drift silently.
+    // MOVED 2026-07-20 from 0.0134 / 0.013110: the airdrop credit's real cost, measured, is 1.2M more per capsule
+    // than the figure it was first quoted at. The protocol fee inside it is untouched at 0.01 GRAM.
     const bc = await Blockchain.create();
     bc.now = CLOCK;
     await deploySink(bc);

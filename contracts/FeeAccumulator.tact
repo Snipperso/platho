@@ -87,7 +87,27 @@ message(0x594BA505) AcceptBurnReserve {
 // Build order, and it is not optional:
 //   FeeAccumulator -> its address -> RecordShard.RS_FEE_SINK and AirdropTicket.AT_FEE_SINK -> their code cells
 //   -> bound back into FeeAccumulator at genesis, before the seal.
-const FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE: Int = 1200000;   // deposit exec + the ticket credit leg
+// WHAT RECEIVING A CAPSULE FEE ACTUALLY COSTS. MEASURED 2026-07-20 against the live mainnet gas config, by
+// running the same publish with the ticket code bound and unbound, and reading the sink's balance delta rather
+// than summing fee fields:
+//     deposit alone (gate 15055's address derivation + booking)   9,542 gas =   636,134
+//     deposit + the ticket credit leg                            15,302 gas = 1,020,134
+//       + action fees 161,797 + forwarding 323,604 + the 600,000 the credit carries
+//     => the sink spends 2,105,535 per capsule, of which 1,469,401 is the credit
+//
+// The first figure alone already exceeded the 400,000 this was sized from before the derivation existed: proving
+// a sender IS a shard is real work, and 199,068 was the cost of the OLD permissionless deposit that did no such
+// proof. Carrying that number forward is what made the airdrop credit look nearly free.
+//
+// Sized at 2,600,000 — 23% above measurement, and deliberately generous rather than tight, because the asymmetry
+// is total: surplus returns to the owner through SweepUnaccounted (PT-09), while a shortfall is paid silently
+// out of the sink's storage float on every one of 1.5M capsules. PT-04c measures the margin end to end and fails
+// if it ever goes negative again.
+const FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE: Int = 2600000;   // deposit exec + the ticket credit leg
+// What a TicketCredit carries. The ticket's own execution measured 189,001, so this is ~3x covered — and the
+// margin is not waste: the ticket holds it and returns it with SendRemainingValue when the credits are claimed,
+// where it goes straight into funding the airdrop delivery. Under-sizing it, by contrast, would make the credit
+// fail in the ticket's COMPUTE phase, and the credit is sent bounce:false — a lost airdrop, silently.
 const FEEACCUMULATOR_TICKET_CREDIT_VALUE: Int = 600000;         // what a TicketCredit carries
 const FEEACCUMULATOR_ACCRUE_LEG_VALUE: Int = 60000000;          // AirdropPool gate 26114 demands exactly this
 const FEEACCUMULATOR_REDEEM_EXEC_RESERVE: Int = 2000000;

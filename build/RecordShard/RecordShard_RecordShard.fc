@@ -266,9 +266,9 @@ int $Cell$_fun_hash(cell $self) impure asm """
 """;
 
 ;; RecordShard_RecordShard.constants.fc
-;; EQCRhugA2UH2olOQVtTh8hnpbtTEND0ZXW1yDSmY3NsWARDa
-slice __gen_slice_address_dd528845dc01dd62f97c456efb65dfd04f7bf0caa814cf364c361cdb0c0d0c1c() asm """
-    B{b5ee9c72410101010024000043801230dd001b283ed44a720ada9c3e433d2dda988687a32badae41a5331b9b62c03037337865} B>boc <s PUSHSLICE
+;; EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7
+slice __gen_slice_address_a416a25019bede120cf0e4005ea2da10b233fc443e0680605e7995de15244f15() asm """
+    B{b5ee9c724101010100240000438018de48ff11483208e49b2e33b1e710b09561500d32b3717ac7551f4ee22e9b5f90f42d94f8} B>boc <s PUSHSLICE
 """;
 
 ;; RecordShard_RecordShard.storage.fc
@@ -487,7 +487,7 @@ builder $RecordShard$_store(builder build_0, (int, int, int, cell, int) v) inlin
 
 ((int, int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, slice)) $RecordShard$_fun_get_view((int, int, int, cell, int) $self) impure inline_ref {
     var (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count)) = $self;
-    var $fresh$ret_3 = $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_safe_cap_retention_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'write_pubkey, $self'epoch, $self'last_seq, $self'record_count, 4096, 31536000, 14400000, 17900000, ((($self'epoch + 2) * 86400) + 31536000), 10000000, __gen_slice_address_dd528845dc01dd62f97c456efb65dfd04f7bf0caa814cf364c361cdb0c0d0c1c());
+    var $fresh$ret_3 = $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_safe_cap_retention_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'write_pubkey, $self'epoch, $self'last_seq, $self'record_count, 4096, 31536000, 15600000, 19100000, ((($self'epoch + 2) * 86400) + 31536000), 10000000, __gen_slice_address_a416a25019bede120cf0e4005ea2da10b233fc443e0680605e7995de15244f15());
     return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_3);
 }
 
@@ -541,7 +541,7 @@ _ %get_view() method_id(76114) {
         ;; Bounced handler for DepositCapsuleFee message
         if (op == 0x52535046) {
             var ($msg'amount, $msg'lane) = in_msg~$DepositCapsuleFee$_load_bounced();
-            throw_unless(13657, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_dd528845dc01dd62f97c456efb65dfd04f7bf0caa814cf364c361cdb0c0d0c1c()) ));
+            throw_unless(13657, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_a416a25019bede120cf0e4005ea2da10b233fc443e0680605e7995de15244f15()) ));
             throw_unless(13658, ($msg'amount > 0));
             $RecordShard$_contract_store(($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count));
             return ();
@@ -564,7 +564,7 @@ _ %get_view() method_id(76114) {
         var $msg'sig = sc_1~load_ref();
         int $nowEpoch = ($global_now() / 86400);
         throw_unless(13656, ( (($nowEpoch >= ($self'epoch - 1))) ? (($nowEpoch <= ($self'epoch + 1))) : (false) ));
-        throw_unless(13652, ($Context$_get_value(__tact_context_get()) >= (($self'record_count == 0) ? 17900000 : 14400000)));
+        throw_unless(13652, ($Context$_get_value(__tact_context_get()) >= (($self'record_count == 0) ? 19100000 : 15600000)));
         throw_unless(13651, ($self'record_count < 4096));
         throw_unless(13653, ($msg'seq > $self'last_seq));
         int $commit = ($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count)~$RecordShard$_fun_frameCommit($msg'header_0, $msg'header_1, $msg'body);
@@ -573,7 +573,7 @@ _ %get_view() method_id(76114) {
         $self'last_seq = $msg'seq;
         $self'records~__tact_dict_set_int_cell(257, $self'record_count, $RecordEntry$_store_cell($RecordEntry$_constructor_frame_commit_created_at($commit, $global_now()), begin_cell()));
         $self'record_count = ($self'record_count + 1);
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_dd528845dc01dd62f97c456efb65dfd04f7bf0caa814cf364c361cdb0c0d0c1c(), 11400000, true, 1, $DepositCapsuleFee$_store_cell($DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(10000000, 0, $self'write_pubkey, $self'epoch, __tact_context_get_sender()), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_a416a25019bede120cf0e4005ea2da10b233fc443e0680605e7995de15244f15(), 12600000, true, 1, $DepositCapsuleFee$_store_cell($DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(10000000, 0, $self'write_pubkey, $self'epoch, __tact_context_get_sender()), begin_cell())));
         $global_nativeReserve((300000 + (($self'record_count == 1) ? 3500000 : 0)), 6);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecordShard$_contract_store(($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count));
