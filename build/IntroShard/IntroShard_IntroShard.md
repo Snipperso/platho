@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: IntroShard
-BoC Size: 1280 bytes
+BoC Size: 1306 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 18
+Total structures: 19
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -56,6 +56,10 @@ Signature: `RetireShard{}`
 ### DepositProtocolFee
 TL-B: `deposit_protocol_fee#ff775609 amount:uint128 = DepositProtocolFee`
 Signature: `DepositProtocolFee{amount:uint128}`
+
+### DepositCapsuleFee
+TL-B: `deposit_capsule_fee#52535046 amount:uint128 lane:uint8 init_arg0:int257 init_arg1:int257 publisher:address = DepositCapsuleFee`
+Signature: `DepositCapsuleFee{amount:uint128,lane:uint8,init_arg0:int257,init_arg1:int257,publisher:address}`
 
 ### IntroEntry
 TL-B: `_ r:int257 view_tag:int257 body_commit:int257 created_at:int257 = IntroEntry`
