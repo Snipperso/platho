@@ -30,7 +30,11 @@ describe('PWA on-chain self-sufficiency', () => {
     for (const method of ['get_global', 'get_avatar', 'get_avatar_version', 'get_ath_wallet_address']) {
       expect(profileRegistry, `ProfileRegistry must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
     }
-    for (const method of ['get_global', 'get_name_record', 'get_username_price', 'get_username_item_address']) {
+    // get_name_record RETIRED 2026-07-20 with the name_records map. The per-name UsernameNFTItem contract is the
+    // record, and get_username_item_address is how a client reaches it from a name — so the self-sufficiency
+    // property this pins is unchanged in substance: the PWA can still resolve a name to its owner with nothing
+    // but chain getters, and now does so against the source that actually follows a TEP-62 transfer.
+    for (const method of ['get_global', 'get_username_price', 'get_username_item_address']) {
       expect(usernameRegistry, `UsernameRegistry must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
     }
     expect(athMaster).toMatch(/get fun get_jetton_data\b/);
@@ -62,7 +66,7 @@ describe('PWA on-chain self-sufficiency', () => {
     for (const method of ['get_global', 'get_avatar', 'get_avatar_version']) {
       expect(profileProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
     }
-    for (const method of ['get_global', 'get_name_record', 'get_username_price']) {
+    for (const method of ['get_global', 'get_username_price', 'get_username_item_address']) {
       expect(usernameProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
     }
     expect(athProvider).toMatch(/method:\s*'get_jetton_data'/);
