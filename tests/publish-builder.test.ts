@@ -13,7 +13,7 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 // (conv-routing.convWritePublicKey); here any deterministic 32-byte secret stands in for it.
 // A FIRST publish into a fresh shard also funds the account's life and its retirement (RS_DEPLOY_MIN_VALUE);
 // later publishes pay the lower RS_MIN_VALUE. Clients read both from get_view.
-const RS_DEPLOY_MIN_VALUE = 16_900_000n;
+const RS_DEPLOY_MIN_VALUE = 19_100_000n;
 
 const writeKey = (fill: number) => {
   const secret = new Uint8Array(32).fill(fill);
@@ -419,7 +419,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     const is = await deploy(blockchain.openContract(new IntroShard(contractAddress(0, init), init)));
     const view = await is.getGetView();
     expect(view.protocol_fee, 'INTRO now carries the same 0.01 GRAM per-message fee as CONV').toBe(10_000_000n);
-    expect(view.min_value, 'endowment + gas + fee + transport').toBe(13_110_000n);
+    expect(view.min_value, 'endowment + gas + fee + transport').toBe(15_310_000n);
 
     const built = await buildIntroPublish({
       epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8),
@@ -439,12 +439,16 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     const ok = await buildIntroPublish({ epoch, bucket, r: 0xBEEFn, viewTag: 0x77n, header0: cellOf(7), body: cellOf(8), value: toNano('0.05') });   // comfortably above the deploy floor
     const okResult = await send(ok);
     expect(exitOf(okResult, is.address)).toBe(0);
+    // The opcode moved on 2026-07-20: the capsule fee now carries an airdrop credit, so it travels as
+    // DepositCapsuleFee (0x52535046) rather than the permissionless DepositProtocolFee (0xFF775609) it used to
+    // share with CapsuleHub. Asserting the OLD opcode here kept passing right up to the wiring change and then
+    // failed for the right reason — the lane really did change.
     const deposit = (okResult.transactions as any[]).some((t) => {
       const body = t.inMessage?.body?.beginParse?.();
       if (!body || body.remainingBits < 32) return false;
-      return body.loadUint(32) === 0xFF775609;                 // DepositProtocolFee
+      return body.loadUint(32) === 0x52535046;                 // DepositCapsuleFee
     });
-    expect(deposit, 'the publish must emit a DepositProtocolFee carrying the fee out').toBe(true);
+    expect(deposit, 'the publish must emit a DepositCapsuleFee carrying the fee out').toBe(true);
     // tests/shard-fee-passthrough.test.ts deploys the real sink and checks the far end of that wire.
   }, 120_000);
 

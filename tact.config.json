@@ -106,11 +106,6 @@
             "output": "build/UsernameRegistry"
         },
         {
-            "name": "KeyRegistry",
-            "path": "contracts/KeyRegistry.tact",
-            "output": "build/KeyRegistry"
-        },
-        {
             "name": "CreditIssuer",
             "path": "contracts/CreditIssuer.tact",
             "output": "build/CreditIssuer"
@@ -124,6 +119,11 @@
             "name": "RecordShard",
             "path": "./contracts/RecordShard.tact",
             "output": "./build/RecordShard"
+        },
+        {
+            "name": "KeyShard",
+            "path": "./contracts/KeyShard.tact",
+            "output": "./build/KeyShard"
         },
         {
             "name": "RecoveryShard",

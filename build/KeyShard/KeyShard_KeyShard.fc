@@ -1,0 +1,630 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; KeyShard_KeyShard.headers.fc
+;;
+;; Header files for KeyShard
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $KeyShard$_store
+builder $KeyShard$_store(builder build_0, (slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) v) inline;
+
+;; $KeyShard$_load
+(slice, ((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int))) $KeyShard$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $KeyShardView$_to_external
+(int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int) $KeyShardView$_to_external(((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int)) v) inline;
+
+;; $KeyShard$init$_load
+(slice, ((slice))) $KeyShard$init$_load(slice sc_0) inline;
+
+;; $KeyShard$_contract_init
+(slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $KeyShard$_contract_init(slice $owner_wallet) impure inline;
+
+;; $KeyShard$_contract_load
+(slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $KeyShard$_contract_load() impure inline;
+
+;; $KeyShard$_contract_store
+() $KeyShard$_contract_store((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) v) impure inline;
+
+;; $KeyShard$_fun_validatePqPubkeyCell
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), ()) $KeyShard$_fun_validatePqPubkeyCell((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $pqLen, int $cryptoSuiteMask, cell $pqPubkey) impure inline_ref;
+
+;; $KeyShard$_fun_isValidPqPubkeyCell
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), int) $KeyShard$_fun_isValidPqPubkeyCell((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $pqLen, int $cryptoSuiteMask, cell $pqPubkey) impure inline_ref;
+
+;; $KeyShard$_fun_validateKeyProfile
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), ()) $KeyShard$_fun_validateKeyProfile((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref;
+
+;; $KeyShard$_fun_isValidKeyProfile
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), int) $KeyShard$_fun_isValidKeyProfile((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref;
+
+;; $KeyShard$_fun_computeKeyId
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), int) $KeyShard$_fun_computeKeyId((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $keyGeneration, int $encPubkey, int $signPubkey, int $pqHash, int $pqLen, int $cryptoSuiteMask) impure inline_ref;
+
+;; $KeyShard$_fun_requireEmptyEnvelopePadding
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), ()) $KeyShard$_fun_requireEmptyEnvelopePadding((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, slice $padding) impure inline;
+
+;; $KeyShard$_fun_writeBundle
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), ()) $KeyShard$_fun_writeBundle((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $keyGeneration, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref;
+
+;; $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value
+((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int)) $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value(int $exists, slice $owner_wallet, int $key_id, int $key_generation, int $rotation_nonce, int $enc_pubkey, int $sign_pubkey, int $scan_pubkey, int $pq_kem_pubkey_hash, int $pq_kem_pubkey_len, cell $pq_kem_pubkey, int $crypto_suite_mask, int $created_at, int $created_lt, int $min_register_value, int $min_replace_value) inline;
+
+;; $KeyShard$_fun_get_view
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), (int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int)) $KeyShard$_fun_get_view((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self) impure inline_ref;
+
+;; $MessageParameters$_constructor_to_value_mode_bounce
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
+
+
+;; KeyShard_KeyShard.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+cell $global_emptyCell() impure asm """
+    <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
+""";
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_checkSignature(int $hash, slice $signature, int $publicKey) impure asm """
+    CHKSIGNU
+""";
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_acceptMessage() impure asm """
+    ACCEPT
+""";
+
+() $global_commit() impure asm """
+    COMMIT
+""";
+
+int $global_now() impure asm """
+    NOW
+""";
+
+int $global_curLt() impure asm """
+    LTIME
+""";
+
+builder $Builder$_fun_storeRef(cell $cell, builder $self) impure asm """
+    STREF
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+(slice, cell) $Slice$_fun_loadRef(slice $self) impure asm( -> 1 0) """
+    LDREF
+""";
+
+int $Slice$_fun_refs(slice $self) impure asm """
+    SREFS
+""";
+
+int $Slice$_fun_bits(slice $self) impure asm """
+    SBITS
+""";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+(int, int, int) $Cell$_fun_computeDataSize(cell $self, int $maxCells) impure asm """
+    CDATASIZE
+""";
+
+int $Cell$_fun_hash(cell $self) impure asm """
+    HASHCU
+""";
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+;; KeyShard_KeyShard.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline {
+    return ($mode, null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: KeyShardView
+;; TLB: _ exists:bool owner_wallet:address key_id:int257 key_generation:int257 rotation_nonce:int257 enc_pubkey:int257 sign_pubkey:int257 scan_pubkey:int257 pq_kem_pubkey_hash:int257 pq_kem_pubkey_len:int257 pq_kem_pubkey:^cell crypto_suite_mask:int257 created_at:int257 created_lt:int257 min_register_value:int257 min_replace_value:int257 = KeyShardView
+;;
+
+(int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int) $KeyShardView$_to_external(((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int)) v) inline {
+    var (v'exists, v'owner_wallet, v'key_id, v'key_generation, v'rotation_nonce, v'enc_pubkey, v'sign_pubkey, v'scan_pubkey, v'pq_kem_pubkey_hash, v'pq_kem_pubkey_len, v'pq_kem_pubkey, v'crypto_suite_mask, v'created_at, v'created_lt, v'min_register_value, v'min_replace_value) = v; 
+    return (v'exists, v'owner_wallet, v'key_id, v'key_generation, v'rotation_nonce, v'enc_pubkey, v'sign_pubkey, v'scan_pubkey, v'pq_kem_pubkey_hash, v'pq_kem_pubkey_len, v'pq_kem_pubkey, v'crypto_suite_mask, v'created_at, v'created_lt, v'min_register_value, v'min_replace_value);
+}
+
+((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int)) $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value(int $exists, slice $owner_wallet, int $key_id, int $key_generation, int $rotation_nonce, int $enc_pubkey, int $sign_pubkey, int $scan_pubkey, int $pq_kem_pubkey_hash, int $pq_kem_pubkey_len, cell $pq_kem_pubkey, int $crypto_suite_mask, int $created_at, int $created_lt, int $min_register_value, int $min_replace_value) inline {
+    return ($exists, $owner_wallet, $key_id, $key_generation, $rotation_nonce, $enc_pubkey, $sign_pubkey, $scan_pubkey, $pq_kem_pubkey_hash, $pq_kem_pubkey_len, $pq_kem_pubkey, $crypto_suite_mask, $created_at, $created_lt, $min_register_value, $min_replace_value);
+}
+
+;;
+;; Type: KeyShard
+;; TLB: _ owner_wallet:address registered:bool key_id:uint256 auth_pubkey:uint256 key_generation:uint32 rotation_nonce:uint64 enc_pubkey:uint256 sign_pubkey:uint256 scan_pubkey:uint256 pq_kem_pubkey_hash:uint256 pq_kem_pubkey_len:uint16 pq_kem_pubkey:^cell crypto_suite_mask:uint16 created_at:uint64 created_lt:uint64 = KeyShard
+;;
+
+builder $KeyShard$_store(builder build_0, (slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) v) inline {
+    var (v'owner_wallet, v'registered, v'key_id, v'auth_pubkey, v'key_generation, v'rotation_nonce, v'enc_pubkey, v'sign_pubkey, v'scan_pubkey, v'pq_kem_pubkey_hash, v'pq_kem_pubkey_len, v'pq_kem_pubkey, v'crypto_suite_mask, v'created_at, v'created_lt) = v;
+    build_0 = build_0.store_slice(v'owner_wallet);
+    build_0 = build_0.store_int(v'registered, 1);
+    build_0 = build_0.store_uint(v'key_id, 256);
+    build_0 = build_0.store_uint(v'auth_pubkey, 256);
+    build_0 = build_0.store_uint(v'key_generation, 32);
+    build_0 = build_0.store_uint(v'rotation_nonce, 64);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'enc_pubkey, 256);
+    build_1 = build_1.store_uint(v'sign_pubkey, 256);
+    build_1 = build_1.store_uint(v'scan_pubkey, 256);
+    var build_2 = begin_cell();
+    build_2 = build_2.store_uint(v'pq_kem_pubkey_hash, 256);
+    build_2 = build_2.store_uint(v'pq_kem_pubkey_len, 16);
+    build_2 = build_2.store_ref(v'pq_kem_pubkey);
+    build_2 = build_2.store_uint(v'crypto_suite_mask, 16);
+    build_2 = build_2.store_uint(v'created_at, 64);
+    build_2 = build_2.store_uint(v'created_lt, 64);
+    build_1 = store_builder_ref(build_1, build_2);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int))) $KeyShard$_load(slice sc_0) inline {
+    var v'owner_wallet = sc_0~load_msg_addr();
+    var v'registered = sc_0~load_int(1);
+    var v'key_id = sc_0~load_uint(256);
+    var v'auth_pubkey = sc_0~load_uint(256);
+    var v'key_generation = sc_0~load_uint(32);
+    var v'rotation_nonce = sc_0~load_uint(64);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'enc_pubkey = sc_1~load_uint(256);
+    var v'sign_pubkey = sc_1~load_uint(256);
+    var v'scan_pubkey = sc_1~load_uint(256);
+    slice sc_2 = sc_1~load_ref().begin_parse();
+    var v'pq_kem_pubkey_hash = sc_2~load_uint(256);
+    var v'pq_kem_pubkey_len = sc_2~load_uint(16);
+    var v'pq_kem_pubkey = sc_2~load_ref();
+    var v'crypto_suite_mask = sc_2~load_uint(16);
+    var v'created_at = sc_2~load_uint(64);
+    var v'created_lt = sc_2~load_uint(64);
+    return (sc_0, (v'owner_wallet, v'registered, v'key_id, v'auth_pubkey, v'key_generation, v'rotation_nonce, v'enc_pubkey, v'sign_pubkey, v'scan_pubkey, v'pq_kem_pubkey_hash, v'pq_kem_pubkey_len, v'pq_kem_pubkey, v'crypto_suite_mask, v'created_at, v'created_lt));
+}
+
+(slice, ((slice))) $KeyShard$init$_load(slice sc_0) inline {
+    var v'owner_wallet = sc_0~load_msg_addr();
+    return (sc_0, (v'owner_wallet));
+}
+
+(slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $KeyShard$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$KeyShard$_load();
+    }
+    else {
+        (slice $owner_wallet) = $sc~$KeyShard$init$_load();
+        $sc.end_parse();
+        return $KeyShard$_contract_init($owner_wallet);
+    }
+}
+
+() $KeyShard$_contract_store((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $KeyShard$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract KeyShard functions
+;;
+
+(slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $KeyShard$_contract_init(slice $owner_wallet) impure inline {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
+    $self'owner_wallet = $owner_wallet;
+    $self'registered = false;
+    $self'key_id = 0;
+    $self'auth_pubkey = 0;
+    $self'key_generation = 0;
+    $self'rotation_nonce = 0;
+    $self'enc_pubkey = 0;
+    $self'sign_pubkey = 0;
+    $self'scan_pubkey = 0;
+    $self'pq_kem_pubkey_hash = 0;
+    $self'pq_kem_pubkey_len = 0;
+    $self'pq_kem_pubkey = $global_emptyCell();
+    $self'crypto_suite_mask = 0;
+    $self'created_at = 0;
+    $self'created_lt = 0;
+    return ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt);
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), ()) $KeyShard$_fun_validatePqPubkeyCell((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $pqLen, int $cryptoSuiteMask, cell $pqPubkey) impure inline_ref {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = $self;
+    throw_unless(22107, ($cryptoSuiteMask == 2));
+    var ($size'cells, $size'bits, $size'refs) = $Cell$_fun_computeDataSize($pqPubkey, 10);
+    throw_unless(22108, ($size'cells == 10));
+    throw_unless(22109, ($size'bits == 9472));
+    throw_unless(22113, ($size'refs == 9));
+    cell $cursor = $pqPubkey;
+    int $remaining = $pqLen;
+    while (($remaining > 0)) {
+        int $chunkBytes = 127;
+        if (($remaining == 1184)) {
+            $chunkBytes = 41;
+        } elseif (($remaining < $chunkBytes)) {
+            $chunkBytes = $remaining;
+        }
+        slice $cursorSlice = $Cell$_fun_beginParse($cursor);
+        throw_unless(22114, ($Slice$_fun_bits($cursorSlice) == ($chunkBytes * 8)));
+        if (($remaining > $chunkBytes)) {
+            throw_unless(22115, ($Slice$_fun_refs($cursorSlice) == 1));
+            $cursor = $cursorSlice~$Slice$_fun_loadRef();
+        } else {
+            throw_unless(22116, ($Slice$_fun_refs($cursorSlice) == 0));
+        }
+        $remaining = $remaining - $chunkBytes;
+    }
+    return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), ());
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), int) $KeyShard$_fun_isValidPqPubkeyCell((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $pqLen, int $cryptoSuiteMask, cell $pqPubkey) impure inline_ref {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = $self;
+    if (($cryptoSuiteMask != 2)) {
+        var $fresh$ret_0 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_0);
+    }
+    var ($size'cells, $size'bits, $size'refs) = $Cell$_fun_computeDataSize($pqPubkey, 10);
+    if (($size'cells != 10)) {
+        var $fresh$ret_1 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_1);
+    }
+    if (($size'bits != 9472)) {
+        var $fresh$ret_2 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_2);
+    }
+    if (($size'refs != 9)) {
+        var $fresh$ret_3 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_3);
+    }
+    cell $cursor = $pqPubkey;
+    int $remaining = $pqLen;
+    while (($remaining > 0)) {
+        int $chunkBytes = 127;
+        if (($remaining == 1184)) {
+            $chunkBytes = 41;
+        } elseif (($remaining < $chunkBytes)) {
+            $chunkBytes = $remaining;
+        }
+        slice $cursorSlice = $Cell$_fun_beginParse($cursor);
+        if (($Slice$_fun_bits($cursorSlice) != ($chunkBytes * 8))) {
+            var $fresh$ret_4 = false;
+            return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_4);
+        }
+        if (($remaining > $chunkBytes)) {
+            if (($Slice$_fun_refs($cursorSlice) != 1)) {
+                var $fresh$ret_5 = false;
+                return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_5);
+            }
+            $cursor = $cursorSlice~$Slice$_fun_loadRef();
+        } elseif ($Slice$_fun_refs($cursorSlice)) {
+            var $fresh$ret_6 = false;
+            return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_6);
+        }
+        $remaining = $remaining - $chunkBytes;
+    }
+    var $fresh$ret_7 = true;
+    return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_7);
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), ()) $KeyShard$_fun_validateKeyProfile((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = $self;
+    throw_unless(22101, ($encPubkey != 0));
+    throw_unless(22102, ($signPubkey != 0));
+    throw_unless(22103, ($scanPubkey != 0));
+    throw_unless(22107, ($cryptoSuiteMask == 2));
+    throw_unless(22105, ($pqHash != 0));
+    throw_unless(22106, ($pqLen == 1184));
+    ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)~$KeyShard$_fun_validatePqPubkeyCell($pqLen, $cryptoSuiteMask, $pqPubkey);
+    return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), ());
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), int) $KeyShard$_fun_isValidKeyProfile((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = $self;
+    ifnot ($encPubkey) {
+        var $fresh$ret_8 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_8);
+    }
+    ifnot ($signPubkey) {
+        var $fresh$ret_9 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_9);
+    }
+    ifnot ($scanPubkey) {
+        var $fresh$ret_10 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_10);
+    }
+    if (($cryptoSuiteMask != 2)) {
+        var $fresh$ret_11 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_11);
+    }
+    ifnot ($pqHash) {
+        var $fresh$ret_12 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_12);
+    }
+    if (($pqLen != 1184)) {
+        var $fresh$ret_13 = false;
+        return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_13);
+    }
+    var $fresh$ret_14 = ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)~$KeyShard$_fun_isValidPqPubkeyCell($pqLen, $cryptoSuiteMask, $pqPubkey);
+    return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_14);
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), int) $KeyShard$_fun_computeKeyId((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $keyGeneration, int $encPubkey, int $signPubkey, int $pqHash, int $pqLen, int $cryptoSuiteMask) impure inline_ref {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = $self;
+    cell $keyFields = $Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), $encPubkey, 256), $signPubkey, 256), $pqHash, 256));
+    var $fresh$ret_15 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($keyFields, store_uint(store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 1262836041, 32), $self'owner_wallet), $keyGeneration, 32), $pqLen, 16), $cryptoSuiteMask, 16))));
+    return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_15);
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), ()) $KeyShard$_fun_requireEmptyEnvelopePadding((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, slice $padding) impure inline {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = $self;
+    throw_unless(22900, ($Slice$_fun_bits($padding) == 0));
+    throw_unless(22901, ($Slice$_fun_refs($padding) == 0));
+    return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), ());
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), ()) $KeyShard$_fun_writeBundle((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self, int $keyGeneration, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = $self;
+    $self'key_id = ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)~$KeyShard$_fun_computeKeyId($keyGeneration, $encPubkey, $signPubkey, $pqHash, $pqLen, $cryptoSuiteMask);
+    $self'key_generation = $keyGeneration;
+    $self'enc_pubkey = $encPubkey;
+    $self'sign_pubkey = $signPubkey;
+    $self'scan_pubkey = $scanPubkey;
+    $self'pq_kem_pubkey_hash = $pqHash;
+    $self'pq_kem_pubkey_len = $pqLen;
+    $self'pq_kem_pubkey = $pqPubkey;
+    $self'crypto_suite_mask = $cryptoSuiteMask;
+    $self'created_at = $global_now();
+    $self'created_lt = $global_curLt();
+    $self'registered = true;
+    return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), ());
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int), (int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int)) $KeyShard$_fun_get_view((slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int) $self) impure inline_ref {
+    var (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)) = $self;
+    var $fresh$ret_16 = $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value($self'registered, $self'owner_wallet, $self'key_id, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, 57000000, 12000000);
+    return (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt), $fresh$ret_16);
+}
+
+;;
+;; Get methods of a Contract KeyShard
+;;
+
+_ %get_view() method_id(76114) {
+    var self = $KeyShard$_contract_load();
+    var res = self~$KeyShard$_fun_get_view();
+    return $KeyShardView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract KeyShard
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt) = $KeyShard$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive KeyShardRegisterKeys message
+    if (op == 0x4b534731) {
+        var $msg'enc_pubkey = in_msg~load_uint(256);
+        var $msg'sign_pubkey = in_msg~load_uint(256);
+        var $msg'scan_pubkey = in_msg~load_uint(256);
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'auth_pubkey = sc_1~load_uint(256);
+        var $msg'pq_kem_pubkey_hash = sc_1~load_uint(256);
+        var $msg'pq_kem_pubkey_len = sc_1~load_uint(16);
+        var $msg'pq_kem_pubkey = sc_1~load_ref();
+        var $msg'crypto_suite_mask = sc_1~load_uint(16);
+        throw_unless(22050, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_wallet) ));
+        ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)~$KeyShard$_fun_validateKeyProfile($msg'enc_pubkey, $msg'sign_pubkey, $msg'scan_pubkey, $msg'pq_kem_pubkey_hash, $msg'pq_kem_pubkey_len, $msg'pq_kem_pubkey, $msg'crypto_suite_mask);
+        throw_unless(22118, ($msg'auth_pubkey != 0));
+        throw_unless(22119, ($msg'auth_pubkey != $msg'sign_pubkey));
+        throw_unless(22110, ($Context$_get_value(__tact_context_get()) >= ($self'registered ? 12000000 : 57000000)));
+        throw_unless(22117, ($self'key_generation < 4294967295));
+        int $wasRegistered = $self'registered;
+        int $keyGeneration = ($wasRegistered ? ($self'key_generation + 1) : 0);
+        ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)~$KeyShard$_fun_writeBundle($keyGeneration, $msg'enc_pubkey, $msg'sign_pubkey, $msg'scan_pubkey, $msg'pq_kem_pubkey_hash, $msg'pq_kem_pubkey_len, $msg'pq_kem_pubkey, $msg'crypto_suite_mask);
+        $self'auth_pubkey = $msg'auth_pubkey;
+        $global_nativeReserve(($wasRegistered ? 0 : 45000000), 6);
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
+        $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+        return ();
+    }
+    
+    ;; Receive KeyShardTopUpStorageReserve message
+    if (op == 0x4b534734) {
+        var $msg = empty_tuple();
+        $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_external(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_external(slice in_msg) impure {
+    ;; Load contract data
+    var ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt) = $KeyShard$_contract_load();
+    
+    var op = in_msg~load_opcode_external();
+    ;; Receive KeyShardReplaceKeys message
+    if (op == 0x4b534732) {
+        var $msg'signature = in_msg~load_bits(512);
+        var $msg'signed_payload = in_msg~load_ref();
+        var $msg'envelope_padding = in_msg;
+        ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)~$KeyShard$_fun_requireEmptyEnvelopePadding($msg'envelope_padding);
+        throw_unless(22120, $self'registered);
+        throw_unless(22128, ($self'auth_pubkey != 0));
+        throw_unless(22130, $global_checkSignature($Cell$_fun_hash($msg'signed_payload), $msg'signature, $self'auth_pubkey));
+        slice $signedPayload = $Cell$_fun_beginParse($msg'signed_payload);
+        throw_unless(22136, ($Slice$_fun_bits($signedPayload) == 352));
+        throw_unless(22137, ($Slice$_fun_refs($signedPayload) == 1));
+        int $signedDomain = $signedPayload~load_uint(32);
+        throw_unless(22131, ($signedDomain == 1263749937));
+        int $signedShardHash = $signedPayload~load_uint(256);
+        slice $shardSlice = $Address$_fun_asSlice($global_myAddress());
+        throw_unless(22133, ($shardSlice~load_uint(11) == 1024));
+        throw_unless(22133, ($signedShardHash == $shardSlice~load_uint(256)));
+        int $signedNonce = $signedPayload~load_uint(64);
+        throw_unless(22135, ($signedNonce == $self'rotation_nonce));
+        $global_acceptMessage();
+        $self'rotation_nonce = $self'rotation_nonce + 1;
+        $global_commit();
+        cell $actionPayloadCell = $signedPayload~$Slice$_fun_loadRef();
+        slice $actionPayload = $Cell$_fun_beginParse($actionPayloadCell);
+        ifnot (($Slice$_fun_bits($actionPayload) == 800)) {
+            $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+            return ();
+        }
+        ifnot (($Slice$_fun_refs($actionPayload) == 2)) {
+            $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+            return ();
+        }
+        int $encPubkey = $actionPayload~load_uint(256);
+        int $signPubkey = $actionPayload~load_uint(256);
+        int $scanPubkey = $actionPayload~load_uint(256);
+        int $pqKemPubkeyLen = $actionPayload~load_uint(16);
+        int $cryptoSuiteMask = $actionPayload~load_uint(16);
+        cell $pqKemPubkey = $actionPayload~$Slice$_fun_loadRef();
+        cell $pqHashCell = $actionPayload~$Slice$_fun_loadRef();
+        slice $pqHashSlice = $Cell$_fun_beginParse($pqHashCell);
+        ifnot (($Slice$_fun_bits($pqHashSlice) == 256)) {
+            $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+            return ();
+        }
+        ifnot (($Slice$_fun_refs($pqHashSlice) == 0)) {
+            $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+            return ();
+        }
+        int $pqKemPubkeyHash = $pqHashSlice~load_uint(256);
+        ifnot (($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)~$KeyShard$_fun_isValidKeyProfile($encPubkey, $signPubkey, $scanPubkey, $pqKemPubkeyHash, $pqKemPubkeyLen, $pqKemPubkey, $cryptoSuiteMask)) {
+            $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+            return ();
+        }
+        ifnot (($signPubkey != $self'auth_pubkey)) {
+            $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+            return ();
+        }
+        ifnot (($self'key_generation < 4294967295)) {
+            $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+            return ();
+        }
+        ($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt)~$KeyShard$_fun_writeBundle(($self'key_generation + 1), $encPubkey, $signPubkey, $scanPubkey, $pqKemPubkeyHash, $pqKemPubkeyLen, $pqKemPubkey, $cryptoSuiteMask);
+        $KeyShard$_contract_store(($self'owner_wallet, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt));
+        return ();
+    }
+    
+    ;; Throw if not handled
+    throw(130);
+}
