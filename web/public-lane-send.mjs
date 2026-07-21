@@ -55,3 +55,19 @@ export async function publishPublicLane({ wallet, transport, ...args }, options 
   const result = await sendPlathoWalletTransaction(wallet, { messages: [prepared.message] }, { ...options, transport });
   return { ...prepared, result };
 }
+
+/**
+ * Publish SEVERAL PublicPublish parts in ONE wallet transfer — the multipart case: a post split across N body cells
+ * is N separate entries in the SAME shard (grouped on read by the header's streamId), so one signed transfer carries
+ * all N. `parts` is an array of the buildPublicPublishWalletMessage args ({ kind, keyArg, header, body, value,
+ * partitionKey, epochTag }); every part shares the same StateInit-bearing shard, so the first deploys it and the
+ * rest just publish. Returns the prepared parts (for commit tracking) and the single wallet-send result.
+ */
+export async function publishPublicLaneParts({ wallet, transport }, parts, options = {}) {
+  if (!wallet) throw new Error('publishPublicLaneParts requires a wallet');
+  if (!Array.isArray(parts) || parts.length === 0) throw new Error('publishPublicLaneParts requires at least one part');
+  const prepared = [];
+  for (const part of parts) prepared.push(await buildPublicPublishWalletMessage(part));
+  const result = await sendPlathoWalletTransaction(wallet, { messages: prepared.map((p) => p.message) }, { ...options, transport });
+  return { parts: prepared, result };
+}
