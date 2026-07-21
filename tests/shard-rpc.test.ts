@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { beginCell } from '@ton/core';
-import { createShardStatesRequest, createShardMessagesReader } from '../web/shard-rpc.mjs';
+import { createShardStatesRequest, createShardMessagesReader, createShardMessagesWithSourceReader } from '../web/shard-rpc.mjs';
 import { readAccountStates } from '../web/shard-reader.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -103,6 +103,30 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
     expect(cells.length, 'one readable body out of four rows').toBe(1);
     expect(seen[0].url, 'asked for messages TO the shard').toContain('destination=');
     expect(seen[0].url, 'newest first').toContain('sort=desc');
+  });
+
+  it('RPC-07: the source-bearing messages reader pairs each parsed body with its top-level source', async () => {
+    // The PUBLIC lane recovers a post's author from the transaction source, which get_page omits. `source` is a
+    // TOP-LEVEL field of the message object (MEASURED against live toncenter v3 2026-07-21), raw 0:HEX, next to
+    // message_content.body — NOT message.in_msg.source. A body that will not parse is skipped, source and all.
+    const payload = beginCell().storeUint(0x50535031, 32).endCell();
+    const src = '0:' + 'c1'.repeat(32);
+    const readWithSource = createShardMessagesWithSourceReader({
+      endpoint: MESSAGES,
+      fetch: fakeFetch({
+        messages: [
+          { source: src, message_content: { body: payload.toBoc().toString('base64') } },
+          { source: '0:' + 'ff'.repeat(32), message_content: { body: 'not-a-cell' } },  // dropped: unparseable
+          { message_content: { body: payload.toBoc().toString('base64') } },            // parseable, source null
+        ],
+      }),
+    });
+
+    const rows = await readWithSource('0:' + '77'.repeat(32));
+    expect(rows.length, 'two parseable bodies out of three rows').toBe(2);
+    expect(rows[0].source, 'the top-level source is carried through').toBe(src);
+    expect(rows[0].bodyCell, 'and paired with the parsed body').toBeTruthy();
+    expect(rows[1].source, 'a message with no source yields null, not a throw').toBeNull();
   });
 
   it('RPC-06: with no endpoint configured it fails loudly rather than guessing one', async () => {
