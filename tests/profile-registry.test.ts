@@ -21,6 +21,8 @@ import {
   ATHWallet,
   ATHTransferRequestRegistryProfileAvatar,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { KeyShard } from '../build/KeyShard/KeyShard_KeyShard';
+import { registerKeyShard } from './helpers/key-shard-fixture';
 
 const MANIFEST_HASH = 0x50524f46494c45524547495354525900000000000000000000000000000001n;
 const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
@@ -31,6 +33,7 @@ const ATH_SENDER_KEY_MOD = 1n << 160n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 const OP_ATH_INTERNAL_TRANSFER = 0x41544812;
 const OP_PROFILE_AVATAR_VAULT_NOTIFICATION = 0xA11A7002;
+const OP_KEY_SHARD_SET_AVATAR_POINTER = 0x4B534735;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.PROFILE.${label}`).digest());
@@ -264,9 +267,41 @@ async function sendAcceptedAvatar(
   owner: Address,
   queryId = 1n,
 ) {
+  // An ACCEPTED avatar now requires the buyer to have an identity: the pointer is written into their KeyShard,
+  // and gate 22202 refuses an unregistered one. Registering here is part of what "accepted" means after
+  // 2026-07-21, not test scaffolding — a purchase without it bounces and refunds.
+  await registerKeyShard(ctx.blockchain, owner, ctx.registry.address);
   await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(owner, owner, {
     query_id: queryId,
   }));
+}
+
+/**
+ * The wallet's avatar pointer, read where it LIVES since 2026-07-21: the wallet's own KeyShard, not a map in this
+ * registry. The registry's map cost a MEASURED 5.0000 cells per profile against a ~65536-cell account — a silent
+ * ceiling at 13,076 profiles — so what used to be `registry.getGetAvatar(owner)` is now a read of a different
+ * account entirely. The shape is preserved so these tests keep asserting the same facts about the same purchase.
+ */
+async function avatarOf(blockchain: Blockchain, owner: Address, registryAddress: Address) {
+  const init = await KeyShard.init(owner, registryAddress);
+  const address = contractAddress(0, init);
+  const absent = {
+    exists: false, version: 0n, avatar_hash: 0n, avatar_entry_id: 0n,
+    avatar_stream_id: 0n, avatar_part_count: 0n, media_format: 0n,
+  };
+  if ((await blockchain.getContract(address)).accountState?.type !== 'active') return absent;
+  const view = await blockchain.openContract(new KeyShard(address, init)).getGetView();
+  if (view.avatar_version === 0n) return absent;
+  return {
+    exists: true,
+    owner_wallet: view.owner_wallet,
+    version: view.avatar_version,
+    avatar_hash: view.avatar_hash,
+    avatar_entry_id: view.avatar_entry_id,
+    avatar_stream_id: view.avatar_stream_id,
+    avatar_part_count: view.avatar_part_count,
+    media_format: view.avatar_media_format,
+  };
 }
 
 async function deployAthWallet(blockchain: Blockchain, owner: Address, athMaster: Address, tokenBalance: bigint) {
@@ -380,10 +415,14 @@ describe('ProfileRegistry wallet avatar pointers', () => {
   it('PROFILE-01: accepts paid official avatar notification, stores version, and splits ATH due', async () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('OWNER_ONE');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(blockchain, owner, registry.address);
 
     const result = await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner));
 
-    const avatar = await registry.getGetAvatar(owner);
+    const avatar = await avatarOf(blockchain, owner, registry.address);
     const global = await registry.getGetGlobal();
     expect(avatar.exists).toBe(true);
     expect(avatar.owner_wallet.equals(owner)).toBe(true);
@@ -391,7 +430,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect(avatar.avatar_hash).toBe(0xabc123n);
     expect(avatar.avatar_part_count).toBe(2n);
     expect(global.profile_count).toBe(1n);
-    expect(global.avatar_record_count).toBe(1n);
+    expect(global.pending_avatar_write_count, 'a settled purchase leaves no in-flight write behind').toBe(0n);
     expect(global.treasury_due_ath).toBe(50_000_000_000n);
     expect(global.burn_due_ath).toBe(50_000_000_000n);
     expect(findTransaction(result.transactions, {
@@ -404,12 +443,16 @@ describe('ProfileRegistry wallet avatar pointers', () => {
   it('PROFILE-02: rejects wrong ATH amount before mutating avatar state', async () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('WRONG_AMOUNT_OWNER');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(blockchain, owner, registry.address);
 
     await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
       amount: PROFILE_AVATAR_PRICE_ATH - 1n,
     }));
 
-    const avatar = await registry.getGetAvatar(owner);
+    const avatar = await avatarOf(blockchain, owner, registry.address);
     const global = await registry.getGetGlobal();
     expect(avatar.exists).toBe(false);
     expect(global.profile_count).toBe(0n);
@@ -420,6 +463,10 @@ describe('ProfileRegistry wallet avatar pointers', () => {
   it('PROFILE-02B: malformed avatar pointers reject before mutating avatar or due state', async () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('INVALID_POINTER_OWNER');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(blockchain, owner, registry.address);
 
     for (const overrides of [
       { avatar_hash: 0n },
@@ -432,11 +479,11 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, overrides));
     }
 
-    const avatar = await registry.getGetAvatar(owner);
+    const avatar = await avatarOf(blockchain, owner, registry.address);
     const global = await registry.getGetGlobal();
     expect(avatar.exists).toBe(false);
     expect(global.profile_count).toBe(0n);
-    expect(global.avatar_record_count).toBe(0n);
+    expect(global.pending_avatar_write_count, 'a refused purchase leaves no in-flight write behind').toBe(0n);
     expect(global.treasury_due_ath).toBe(0n);
     expect(global.burn_due_ath).toBe(0n);
   });
@@ -444,6 +491,10 @@ describe('ProfileRegistry wallet avatar pointers', () => {
   it('PROFILE-03: increments avatar versions without increasing profile count', async () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('VERSION_OWNER');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(blockchain, owner, registry.address);
 
     await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
       query_id: 11n,
@@ -455,21 +506,22 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       avatar_stream_id: 0x22223333444455556666777788889999n,
     }));
 
-    const current = await registry.getGetAvatar(owner);
-    const first = await registry.getGetAvatarVersion(owner, 1n);
+    const current = await avatarOf(blockchain, owner, registry.address);
     const global = await registry.getGetGlobal();
     expect(current.version).toBe(2n);
     expect(current.avatar_hash).toBe(0x22n);
-    // clean-16 L2/#13: the previous version's record is DELETED on update (only `current` is ever read). Old
-    // versions were dead, unbounded state. avatar_records is now O(profiles), net-flat on an update.
-    expect(first.exists).toBe(false);
-    expect(global.profile_count).toBe(1n);
-    expect(global.avatar_record_count).toBe(1n);
+    // There is no version history to look up any more, and there was none before either: the registry DELETED the
+    // previous record on every update (clean-16 L2/#13), so get_avatar_version already answered exists:false for
+    // anything but the current version. The shard keeps exactly one pointer and a counter, which is the same
+    // information in an account that cannot fill up.
+    expect(global.profile_count, 'a second purchase is an UPDATE, not a new profile').toBe(1n);
+    expect(global.pending_avatar_write_count, 'a settled purchase leaves no in-flight write behind').toBe(0n);
   });
 
   it('PROFILE-04: burn finalization must be for the ProfileRegistry owner address', async () => {
     const { blockchain, registry, officialAthWalletAddress, athMasterAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('BURN_OWNER_CHECK');
+    await registerKeyShard(blockchain, owner, registry.address);
     const flusher = await blockchain.treasury('profile-burn-flusher');
     const burnDue = 50_000_000_000n;
     const queryId = 91n;
@@ -718,6 +770,10 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       deployMaster: true,
     });
     const owner = fixtureAddress('VAULT_FUNDED_AVATAR_OWNER');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(ctx.blockchain, owner, ctx.registry.address);
     const attacker = fixtureAddress('VAULT_FUNDED_ATTACKER');
 
     // valid: the owner pays for their OWN avatar (payer == owner)
@@ -732,14 +788,14 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       avatar_hash: 0x1202n,
     }));
 
-    const avatar = await ctx.registry.getGetAvatar(owner);
+    const avatar = await avatarOf(ctx.blockchain, owner, ctx.registry.address);
     const global = await ctx.registry.getGetGlobal();
 
     expect(avatar.exists).toBe(true);
     expect(avatar.owner_wallet.equals(owner)).toBe(true);
     expect(avatar.avatar_hash).toBe(0x1201n); // the owner's OWN update, NOT the hijack attempt (0x1202)
     expect(global.profile_count).toBe(1n);
-    expect(global.avatar_record_count).toBe(1n);
+    expect(global.pending_avatar_write_count, 'a settled purchase leaves no in-flight write behind').toBe(0n);
     expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
     expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
   });
@@ -751,6 +807,10 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     });
     const wrongPayer = await ctx.blockchain.treasury('profile-wrong-payer-source');
     const owner = fixtureAddress('VAULT_FUNDED_WRONG_PAYER_OWNER');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(ctx.blockchain, owner, ctx.registry.address);
     const queryId = 1_203n;
     const sourceWallet = await deployAthWallet(
       ctx.blockchain,
@@ -776,7 +836,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       media_format: 1n,
     } as ATHTransferRequestRegistryProfileAvatar);
 
-    const avatar = await ctx.registry.getGetAvatar(owner);
+    const avatar = await avatarOf(ctx.blockchain, owner, ctx.registry.address);
     const global = await ctx.registry.getGetGlobal();
     const pendingKey = senderKey(wrongPayer.address, queryId);
 
@@ -795,7 +855,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     })).toBeDefined();
     expect(avatar.exists).toBe(false);
     expect(global.profile_count).toBe(0n);
-    expect(global.avatar_record_count).toBe(0n);
+    expect(global.pending_avatar_write_count, 'a refused purchase leaves no in-flight write behind').toBe(0n);
     expect(global.treasury_due_ath).toBe(0n);
     expect(global.burn_due_ath).toBe(0n);
     expect((await sourceWallet.getGetWalletData()).balance).toBe(PROFILE_AVATAR_PRICE_ATH);
@@ -804,18 +864,24 @@ describe('ProfileRegistry wallet avatar pointers', () => {
   });
 
   // ═════════════════════════════════════════════════════════════════════════════════════════════════════════
-  // AVATAR-POINTER IDEMPOTENCY (21115) — the replay guard that replaced ATHWallet's deleted tombstone.
+  // AVATAR-POINTER IDEMPOTENCY — the replay guard that replaced ATHWallet's deleted tombstone.
   //
   // ATHWallet used to write a PERMANENT replay entry per inbound notification, which capped the whole product at
   // ~21,845 purchases (see ath-wallet-tombstone-ceiling.test.ts). It was deleted on 2026-07-19 and replay safety
   // moved to the SEMANTIC key at the consumer — where UsernameRegistry already kept it (19172/19173 on name_hash).
-  // These tests are that guard for the avatar lane, and — just as importantly — they pin the two things it must
-  // NOT do: block a legitimate re-upload, or burn the refused payment.
+  //
+  // The guard MOVED AGAIN on 2026-07-21, from registry gate 21115 to shard gate 22205, because it must sit where
+  // the current pointer sits and the pointer left this contract. Its content is unchanged, and so is everything
+  // these tests assert: the refusal is one hop later and arrives as a bounce rather than a synchronous throw.
   // ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-  it('PROFREPLAY-01: a repeat of the CURRENT avatar pointer is refused (21115) and changes no state', async () => {
+  it('PROFREPLAY-01: a repeat of the CURRENT avatar pointer is refused (22205) and changes no state', async () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('POINTER_REPLAY_OWNER');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(blockchain, owner, registry.address);
     const pointer = {
       avatar_hash: 0x5150n,
       avatar_entry_id: 7n,
@@ -836,16 +902,16 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     }));
 
     expect(findTransaction(replay.transactions, {
-      to: registry.address,
-      op: OP_PROFILE_AVATAR_VAULT_NOTIFICATION,
+      from: registry.address,
+      op: OP_KEY_SHARD_SET_AVATAR_POINTER,
       success: false,
-      exitCode: 21115,
-    }), 'the duplicate pointer must be refused by 21115').toBeDefined();
+      exitCode: 22205,
+    }), 'the duplicate pointer must be refused by the shard that holds the current one').toBeDefined();
 
-    const avatar = await registry.getGetAvatar(owner);
+    const avatar = await avatarOf(blockchain, owner, registry.address);
     const global = await registry.getGetGlobal();
     expect(avatar.version, 'the refused replay must not bump the version').toBe(1n);
-    expect(global.avatar_record_count).toBe(afterFirst.avatar_record_count);
+    expect(global.pending_avatar_write_count, 'a refused replay leaves no in-flight write behind').toBe(0n);
     // The dues are what a replay would inflate: they are ATH the registry promises to flush, and crediting them
     // twice for one image would let it try to move ATH it never received.
     expect(global.treasury_due_ath, 'a refused replay must not credit the treasury due twice').toBe(afterFirst.treasury_due_ath);
@@ -858,6 +924,10 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     // A guard keyed on avatar_hash alone would refuse that forever and permanently strand the user's own avatar.
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('POINTER_REUPLOAD_OWNER');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(blockchain, owner, registry.address);
     const sameImageHash = 0x7e57n;
 
     await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
@@ -873,7 +943,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       avatar_stream_id: 0x2222222222222222222222222222222n,
     }));
 
-    const avatar = await registry.getGetAvatar(owner);
+    const avatar = await avatarOf(blockchain, owner, registry.address);
     expect(avatar.version, 'a re-upload after retention must still be accepted').toBe(2n);
     expect(avatar.avatar_hash).toBe(sameImageHash);
     expect(avatar.avatar_stream_id, 'and it must be the NEW stream that is current').toBe(0x2222222222222222222222222222222n);
@@ -885,6 +955,10 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     // against `current` costs zero new state — and going back to an earlier avatar stays legal.
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('POINTER_AB_A_OWNER');
+    // Gate 22202: an avatar can only be written into a REGISTERED KeyShard, because that is where the pointer
+    // lives now. Registering here keeps each test asserting what it names — a refusal below is the amount or
+    // the payer being wrong, not the buyer having no identity.
+    await registerKeyShard(blockchain, owner, registry.address);
     const pointerA = { avatar_hash: 0xaaaan, avatar_entry_id: 10n, avatar_stream_id: 0xaaaa0000000000000000000000000001n };
     const pointerB = { avatar_hash: 0xbbbbn, avatar_entry_id: 20n, avatar_stream_id: 0xbbbb0000000000000000000000000002n };
 
@@ -895,7 +969,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       }));
     }
 
-    const avatar = await registry.getGetAvatar(owner);
+    const avatar = await avatarOf(blockchain, owner, registry.address);
     expect(avatar.version, 'all three updates must have landed').toBe(3n);
     expect(avatar.avatar_hash, 'returning to an earlier avatar is legal').toBe(0xaaaan);
   });
@@ -931,16 +1005,16 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       media_format: 1n,
     } as ATHTransferRequestRegistryProfileAvatar);
 
+    await registerKeyShard(ctx.blockchain, payer.address, ctx.registry.address);
     await buy(3401n);
     const duplicate = await buy(3402n);
 
     expect(findTransaction(duplicate.transactions, {
-      from: ctx.officialAthWalletAddress,
-      to: ctx.registry.address,
-      op: OP_PROFILE_AVATAR_VAULT_NOTIFICATION,
+      from: ctx.registry.address,
+      op: OP_KEY_SHARD_SET_AVATAR_POINTER,
       success: false,
-      exitCode: 21115,
-    }), 'the duplicate purchase must be refused by the registry').toBeDefined();
+      exitCode: 22205,
+    }), 'the duplicate purchase must be refused by the shard that holds the current pointer').toBeDefined();
     expect(findTransaction(duplicate.transactions, {
       from: ctx.officialAthWalletAddress,
       to: sourceWallet.address,
@@ -948,7 +1022,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       success: true,
     }), 'and the refused ATH must travel back to the payer wallet').toBeDefined();
 
-    const avatar = await ctx.registry.getGetAvatar(payer.address);
+    const avatar = await avatarOf(ctx.blockchain, payer.address, ctx.registry.address);
     const global = await ctx.registry.getGetGlobal();
     expect(avatar.version, 'exactly one purchase landed').toBe(1n);
     expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);

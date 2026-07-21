@@ -191,8 +191,14 @@ describe('PWA runtime config guard', () => {
     ]) {
       expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain(method);
     }
-    expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_avatar_version');
+    // The two per-user record reads: a name resolves through its NFT item, an avatar through the wallet's
+    // KeyShard get_view. Both replaced registry getters that had to die with the maps behind them.
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_username_item_address');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_key_shard_address');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_view');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods, 'a retired getter must not stay pinned as critical')
+      .not.toContain('get_avatar');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).not.toContain('get_name_record');
     expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBe(128);
     expect(PLATHO_APP_CONFIG.vault.address).toBe('UQAFsNc952nbwLMDfHqXExkgn1lipVzNndbNQKBfHEIEe5Zy');
     expect(PLATHO_APP_CONFIG.vault.deploymentManifestHash).toBe(
@@ -774,7 +780,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/Set avatar/);
     expect(app).toMatch(/readCurrentProfileAvatarPointerFromChain/);
     expect(app).toMatch(/waitForProfileAvatarRegistryUpdate/);
-    expect(app).toMatch(/ProfileRegistry provider is required to read current avatar version/);
+    expect(app).toMatch(/KeyShard provider is required to read current avatar version/);
     expect(app).toMatch(/if \(view === 'profile' && plathoWallet\?\.address\)/);
     expect(app).toMatch(/assertVaultProfileAvatarCanStart/);
     expect(app).toMatch(/submitVaultProfileAvatarRegistration/);

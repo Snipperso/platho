@@ -50,6 +50,30 @@
 //   A per-wallet contract cannot maintain them and loses no invariant by not having them.
 // * The genesis seal / controller / manifest-hash lifecycle — a lazily-deployed per-wallet contract has no
 //   genesis. It is deployed by its own owner, on demand, and there is no pre-seal window to protect.
+//
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+// WHY THE AVATAR POINTER LIVES HERE, AND WHY THE REGISTRY ADDRESS IS AN INIT ARGUMENT
+//
+// ProfileRegistry held `current_avatar_versions` + `avatar_records`: MEASURED 2026-07-21 at exactly 5.0000 cells
+// per profile, linear over 1200 owners, against 149 cells of code — a ceiling of 13,076 profiles. The same
+// silent ACTION-phase-50 death as the key directory, on the same product.
+//
+// The username cure (delete the map in favour of the contract that already held the record) had no counterpart
+// here: NOTHING held a wallet's current avatar pointer authoritatively. The image bytes live in CapsuleHub under
+// a GLOBAL, evictable entry id, so `avatar_entry_id` is a hint, not an address. So the pointer needs a per-wallet
+// home, and this contract already is one — the client resolving a contact reads this shard anyway, which means
+// the avatar now arrives in the SAME batched accountStates read instead of a second getter against a registry.
+//
+// The write must be authorised by the registry (otherwise avatars are free and the 100 ATH price is bypassed),
+// and the registry must derive this shard's address (otherwise it writes wherever a caller points it). Baking the
+// registry address into this contract's CODE would make that a genuine build cycle: the registry embeds KeyShard's
+// code to derive addresses, so its own address would depend on a constant derived from its own address.
+//
+// Passing it as an INIT ARGUMENT breaks the cycle outright — the code no longer mentions the registry, so the
+// registry may `initOf KeyShard(owner, myAddress())` directly, with no genesis bind and no ceremony step. The
+// address stays a pure function of (wallet, registry), and a shard deployed against a FAKE registry is
+// self-defeating: it lands on a different address, and no client — which derives with the real registry — will
+// ever read it. This is the same property that makes RecordShard's init arguments trustworthy.
 
 const KS_CRYPTO_SUITE_HYBRID: Int = 2;
 const KS_MLKEM768_PUBKEY_LEN: Int = 1184;
@@ -78,6 +102,10 @@ const KS_REGISTER_GAS: Int = 12000000;
 const KS_MIN_REGISTER_VALUE: Int = KS_BASE_ENDOWMENT + KS_REGISTER_GAS;
 // A replacement does not grow the account (same shape in, same shape out), so it pays gas only.
 const KS_MIN_REPLACE_VALUE: Int = KS_REGISTER_GAS;
+// An avatar write does not grow the account either: the pointer fields are fixed-width and are already
+// serialised (at zero) from the moment the shard is registered, so their rent is inside KS_BASE_ENDOWMENT and
+// this message pays gas only. That is also why 22202 requires registration first — see the receiver.
+const KS_AVATAR_WRITE_GAS: Int = 8000000;
 
 message(0x4B534731) KeyShardRegisterKeys {          // "KSG1" — internal, wallet-authorised
     enc_pubkey: Int as uint256;
@@ -98,6 +126,26 @@ message(0x4B534732) KeyShardReplaceKeys {           // "KSG2" — external, auth
 
 message(0x4B534734) KeyShardTopUpStorageReserve {}  // "KSG4" — permissionless; anyone may fund a shard's rent
 
+// "KSG5" — ProfileRegistry-authorised paid avatar pointer write. write_id comes FIRST because a bounced message
+// preserves only the first 256 bits of the body: opcode(32) + write_id(64) = 96 bits, so the registry can always
+// find its pending entry on the refusal path. owner_wallet is carried even though this shard knows its own — it
+// is a cross-check that catches a derivation bug at the registry as a refusal instead of an avatar silently
+// written into the wrong wallet's shard.
+message(0x4B534735) KeyShardSetAvatarPointer {
+    write_id: Int as uint64;
+    owner_wallet: Address;
+    avatar_hash: Int as uint256;
+    avatar_entry_id: Int as uint64;
+    avatar_stream_id: Int as uint128;
+    avatar_part_count: Int as uint16;
+    media_format: Int as uint8;
+}
+
+message(0x4B534736) KeyShardAvatarPointerAck {     // "KSG6" — shard -> registry: the write landed, settle the payment
+    write_id: Int as uint64;
+    version: Int as uint32;
+}
+
 struct KeyShardView {
     exists: Bool;                 // registered at least once
     owner_wallet: Address;
@@ -115,12 +163,24 @@ struct KeyShardView {
     created_lt: Int;
     min_register_value: Int;
     min_replace_value: Int;
+    // The paid avatar pointer, formerly ProfileRegistry.avatar_records. avatar_version 0 means "never bought".
+    // It rides in the SAME view — and therefore the same batched read — that a client already performs to
+    // resolve a contact's keys.
+    profile_registry: Address;
+    avatar_version: Int;
+    avatar_hash: Int;
+    avatar_entry_id: Int;
+    avatar_stream_id: Int;
+    avatar_part_count: Int;
+    avatar_media_format: Int;
+    avatar_updated_at: Int;
     // auth_pubkey is NEVER returned — the privacy invariant inherited from KeyRegistry. It authorises rotation;
     // advertising it would hand an observer the exact key to attack.
 }
 
 contract KeyShard {
     owner_wallet: Address;          // init argument: THIS is what the address commits to
+    profile_registry: Address;      // init argument: the ONLY sender that may write the avatar pointer
     registered: Bool;
     key_id: Int as uint256;
     auth_pubkey: Int as uint256;
@@ -135,9 +195,17 @@ contract KeyShard {
     crypto_suite_mask: Int as uint16;
     created_at: Int as uint64;
     created_lt: Int as uint64;
+    avatar_version: Int as uint32;
+    avatar_hash: Int as uint256;
+    avatar_entry_id: Int as uint64;
+    avatar_stream_id: Int as uint128;
+    avatar_part_count: Int as uint16;
+    avatar_media_format: Int as uint8;
+    avatar_updated_at: Int as uint64;
 
-    init(owner_wallet: Address) {
+    init(owner_wallet: Address, profile_registry: Address) {
         self.owner_wallet = owner_wallet;
+        self.profile_registry = profile_registry;
         self.registered = false;
         self.key_id = 0;
         self.auth_pubkey = 0;
@@ -152,6 +220,13 @@ contract KeyShard {
         self.crypto_suite_mask = 0;
         self.created_at = 0;
         self.created_lt = 0;
+        self.avatar_version = 0;
+        self.avatar_hash = 0;
+        self.avatar_entry_id = 0;
+        self.avatar_stream_id = 0;
+        self.avatar_part_count = 0;
+        self.avatar_media_format = 0;
+        self.avatar_updated_at = 0;
     }
 
     // ---- ML-KEM-768 pubkey shape (ported from KeyRegistry; the snake is what makes a record 10 of its cells) ----
@@ -308,6 +383,61 @@ contract KeyShard {
         self.registered = true;
     }
 
+    // ---- avatar pointer, authorised by ProfileRegistry (which is where the 100 ATH was paid) ----
+    //
+    // The pointer fields are NOT re-validated here. ProfileRegistry gates them at 21120-21125 before it ever
+    // sends this message, both contracts are immutable after seal, and 22200 admits no other sender — so a second
+    // copy of the same checks would buy nothing and cost code cells, which in a per-wallet contract are a rent
+    // levy on every user. Leanness here is an economic property, not a style preference.
+    receive(msg: KeyShardSetAvatarPointer) {
+        throwUnless(22200, sender() == self.profile_registry);
+        throwUnless(22201, msg.owner_wallet == self.owner_wallet);
+        // 22202: an avatar with no identity behind it cannot be resolved by anyone — a client reaches this shard
+        // by deriving it from a wallet it is already trying to resolve. Requiring registration first also keeps
+        // this message free of a deploy path: the pointer fields are serialised from registration onward, so
+        // their rent is already inside KS_BASE_ENDOWMENT and nothing here grows the account. A purchase for an
+        // unregistered wallet bounces, and the registry refunds the ATH.
+        throwUnless(22202, self.registered);
+        throwUnless(22203, context().value >= KS_AVATAR_WRITE_GAS);
+        throwUnless(22206, self.avatar_version < KS_UINT32_MAX);
+
+        // IDEMPOTENCY (22205), inherited verbatim from ProfileRegistry gate 21115 which lived where the pointer
+        // used to. ATHWallet's permanent replay tombstone was deleted 2026-07-19 because it capped the whole
+        // product; replay safety moved to the SEMANTIC key at the consumer, and this is that key for the avatar
+        // lane. A payment that would rewrite the CURRENT pointer with the identical pointer is refused, so an
+        // accidental duplicate submit bounces and is REFUNDED instead of charging the user 100 ATH twice.
+        //
+        // Compared against the CURRENT pointer only — never a map of every pointer ever seen, which would rebuild
+        // the exact unbounded state this whole change removed. And the FULL pointer, not avatar_hash alone: the
+        // same image re-uploaded after retention is a new stream, and a hash-only gate would refuse it forever,
+        // permanently costing the user the ability to restore their own avatar. A->B->A stays legal.
+        if (self.avatar_version > 0) {
+            let samePointer: Bool = (self.avatar_hash == msg.avatar_hash)
+                && (self.avatar_stream_id == msg.avatar_stream_id)
+                && (self.avatar_entry_id == msg.avatar_entry_id)
+                && (self.avatar_media_format == msg.media_format);
+            throwUnless(22205, !samePointer);
+        }
+
+        self.avatar_version += 1;
+        self.avatar_hash = msg.avatar_hash;
+        self.avatar_entry_id = msg.avatar_entry_id;
+        self.avatar_stream_id = msg.avatar_stream_id;
+        self.avatar_part_count = msg.avatar_part_count;
+        self.avatar_media_format = msg.media_format;
+        self.avatar_updated_at = now();
+
+        // The ack is what SETTLES the payment at the registry, so it must not be able to fail for want of value:
+        // SendRemainingValue hands back exactly what this message brought, less this transaction's gas.
+        message(MessageParameters {
+            to: sender(),
+            value: 0,
+            mode: SendRemainingValue | SendIgnoreErrors,
+            bounce: false,
+            body: KeyShardAvatarPointerAck { write_id: msg.write_id, version: self.avatar_version }.toCell()
+        });
+    }
+
     // ---- rotate, authorised by the auth key (external: no wallet signature, no gas from the wallet) ----
 
     external(msg: KeyShardReplaceKeys) {
@@ -384,7 +514,15 @@ contract KeyShard {
             created_at: self.created_at,
             created_lt: self.created_lt,
             min_register_value: KS_MIN_REGISTER_VALUE,
-            min_replace_value: KS_MIN_REPLACE_VALUE
+            min_replace_value: KS_MIN_REPLACE_VALUE,
+            profile_registry: self.profile_registry,
+            avatar_version: self.avatar_version,
+            avatar_hash: self.avatar_hash,
+            avatar_entry_id: self.avatar_entry_id,
+            avatar_stream_id: self.avatar_stream_id,
+            avatar_part_count: self.avatar_part_count,
+            avatar_media_format: self.avatar_media_format,
+            avatar_updated_at: self.avatar_updated_at
         };
     }
 }

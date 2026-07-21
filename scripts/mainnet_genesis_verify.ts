@@ -173,7 +173,7 @@ export interface MainnetGenesisVerifyInput {
       ath_master_address: string;
       treasury_ath_receiver: string;
       profile_count: string;
-      avatar_record_count: string;
+      pending_avatar_write_count: string;
       treasury_due_ath: string;
       burn_due_ath: string;
       pending_treasury_flush_count: string;
@@ -911,7 +911,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         treasury_ath_receiver: 'REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS',
         profile_count: '0',
-        avatar_record_count: '0',
+        pending_avatar_write_count: '0',
         treasury_due_ath: '0',
         burn_due_ath: '0',
         pending_treasury_flush_count: '0',
@@ -1457,7 +1457,10 @@ export function verifyMainnetGenesisSnapshot(
   addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_VAULT', s.profile_registry.treasury_ath_receiver, manifest.addresses.vault, 'profile_registry.treasury_ath_receiver', 'vault');
   addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_ATH_MASTER', s.profile_registry.treasury_ath_receiver, manifest.addresses.ath_master, 'profile_registry.treasury_ath_receiver', 'ath_master');
   addDecimalZero(issues, 'PROFILE_REGISTRY_PROFILE_COUNT_NOT_ZERO_AT_GENESIS', s.profile_registry.profile_count, 'profile_registry.profile_count');
-  addDecimalZero(issues, 'PROFILE_REGISTRY_AVATAR_RECORDS_NOT_ZERO_AT_GENESIS', s.profile_registry.avatar_record_count, 'profile_registry.avatar_record_count');
+  // The per-profile record count retired 2026-07-21 with the maps behind it. What must be zero at genesis is
+  // now the count of avatar writes still IN FLIGHT to buyer KeyShards — a fresh registry has settled nothing
+  // and therefore owes nothing.
+  addDecimalZero(issues, 'PROFILE_REGISTRY_PENDING_AVATAR_WRITES_NOT_ZERO_AT_GENESIS', s.profile_registry.pending_avatar_write_count, 'profile_registry.pending_avatar_write_count');
   addDecimalZero(issues, 'PROFILE_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', s.profile_registry.treasury_due_ath, 'profile_registry.treasury_due_ath');
   addDecimalZero(issues, 'PROFILE_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS', s.profile_registry.burn_due_ath, 'profile_registry.burn_due_ath');
   addDecimalZero(issues, 'PROFILE_REGISTRY_PENDING_TREASURY_FLUSH_NOT_ZERO_AT_GENESIS', s.profile_registry.pending_treasury_flush_count, 'profile_registry.pending_treasury_flush_count');

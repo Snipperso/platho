@@ -22,8 +22,9 @@ Direct user-wallet username mint, profile avatar payment, and username refund-fl
 - It confirms final publish by CapsuleHub entry/hash visibility, not only by Vault nonce advancement.
 - It publishes public posts, public comments, and profile avatar capsule parts through Vault -> CapsuleHub.
 - It derives user ATHWallet addresses through ATHMaster and never presents official protocol ATH wallets as user deposit addresses.
-- It resolves `.ath` ownership by requiring `UsernameRegistry.get_name_record(name_hash)` to point to the deterministic item, then reading the current owner from `UsernameNFTItem.get_state()`.
-- A deployed `UsernameNFTItem` without `UsernameRegistry.name_records[name_hash]` pointing to that exact item is non-authoritative and must not be treated as username ownership. The registry record remains the name-to-item anchor; the registry record owner is historical and is not the current owner after transfer.
+- It resolves `.ath` ownership by deriving the item address with `UsernameRegistry.get_username_item_address(name_hash)`, then reading the current owner from `UsernameNFTItem.get_state()`. (`get_name_record` retired 2026-07-20 with the `name_records` map, which capped the registry at ~21,503 names.)
+- The item's address IS the name-to-item anchor: the derivation points to exactly one item address, and a `UsernameNFTItem` deployed at any other address is **non-authoritative** and must not be treated as username ownership. Nothing else has to agree, which is what allowed the registry-side map to be deleted.
+- The current owner is read from that item's `get_state()`, because the item is what a TEP-62 transfer moves. An owner read from anywhere else — a cached record, an earlier generation's registry — is historical and is not the current owner after transfer.
 
 Remaining gaps are production gates, provider/readiness configuration, and UI/status polish rather than missing core user-facing contract sends.
 
@@ -69,14 +70,13 @@ These are normal user flows. They should be implemented in the PWA, with tests, 
 | ATH wallet balance | `ATHWallet` | `get_wallet_data()` | Implemented | External ATH wallet balance/status. |
 | ATH pending notification | `ATHWallet` | `get_pending_notification(query_id, sender_key)` | Implemented | Recovery/debug for notify flows. |
 | Username price | `UsernameRegistry` | `get_username_price(name_len)` | Implemented | Quote exact ATH price before mint. |
-| Username record | `UsernameRegistry` | `get_name_record(name_hash)` | Implemented | Resolve authoritative item address for `.ath` name. |
 | Username item address | `UsernameRegistry` | `get_username_item_address(name_hash)` | Implemented | Derive item address from name hash. |
 | Username pending mint | `UsernameRegistry` | `get_pending_mint(name_hash)` | Implemented | Mint pending UI. |
 | Username pending mint | `UsernameRegistry` | `get_pending_mint(name_hash)` | Implemented | Mint pending/recovery UI; stale pending mints are non-destructive and do not create registry refund due. |
 | Username global | `UsernameRegistry` | `get_global()` | Implemented | Registry route, prices, due/status dashboard. |
 | Username NFT item | `UsernameNFTItem` | `get_state()`, `get_nft_data()`, `NftTransfer` | Implemented/optional | Current owner is the item owner, provided the registry points to that exact item. |
-| Profile avatar current | `ProfileRegistry` | `get_avatar(owner_wallet)` | Implemented | Current wallet avatar pointer. |
-| Profile avatar version | `ProfileRegistry` | `get_avatar_version(owner_wallet, version)` | Implemented | Historical avatar pointer for old posts/private headers. |
+| Wallet KeyShard address | `ProfileRegistry` | `get_key_shard_address(owner_wallet)` | Implemented | Where a wallet's identity and avatar pointer live. Client derives the same address locally for batched reads. |
+| Wallet identity + avatar | `KeyShard` | `get_view()` | Implemented | Messaging keys AND the paid avatar pointer in ONE read. Replaced `ProfileRegistry.get_avatar` / `get_avatar_version` on 2026-07-21: holding a pointer per profile cost a measured 5.0000 cells each and capped the product at 13,076 profiles, silently. There is no version history to query — an update always replaced the previous record, so the retired getters only ever answered for the current version. |
 | Profile global | `ProfileRegistry` | `get_global()` | Implemented | Registry route and fee due buckets. |
 
 ## Contract Entrypoints The Normal PWA Should Not Use Directly

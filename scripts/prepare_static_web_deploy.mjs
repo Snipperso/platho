@@ -42,6 +42,13 @@ const ROOT_RUNTIME_FILES = new Set([
   'capsulehub-ton-rpc-provider.mjs',
   'ath-ton-rpc-provider.mjs',
   'profile-registry-ton-rpc-provider.mjs',
+  // The avatar pointer moved into the per-wallet KeyShard on 2026-07-21, so the browser now DERIVES a contract
+  // address instead of calling a registry getter — which pulls the derivation and the compiled code cells it
+  // hashes into the shipped bundle for the first time. A missing file here is not a build error: the import
+  // simply 404s in production and the app fails to boot, which is why WEB-GRAPH-01 walks the graph.
+  'key-shard-ton-rpc-provider.mjs',
+  'shard-address.mjs',
+  'shard-code.mjs',
   'username-ton-rpc-provider.mjs',
   'sw.js',
   'manifest.webmanifest',

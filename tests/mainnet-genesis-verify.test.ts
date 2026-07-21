@@ -277,7 +277,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         ath_master_address: addresses.ath_master,
         treasury_ath_receiver: addresses.profile_registry_treasury_ath_receiver,
         profile_count: '0',
-        avatar_record_count: '0',
+        pending_avatar_write_count: '0',
         treasury_due_ath: '0',
         burn_due_ath: '0',
         pending_treasury_flush_count: '0',
@@ -1038,7 +1038,7 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     input.snapshot.username_registry.pending_treasury_flush_count = '1';
     input.snapshot.username_registry.pending_burn_flush_count = '1';
     input.snapshot.profile_registry.profile_count = '1';
-    input.snapshot.profile_registry.avatar_record_count = '1';
+    input.snapshot.profile_registry.pending_avatar_write_count = '1';
     input.snapshot.profile_registry.treasury_due_ath = '1';
     input.snapshot.profile_registry.burn_due_ath = '1';
     input.snapshot.profile_registry.pending_treasury_flush_count = '1';
@@ -1053,7 +1053,7 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('USERNAME_REGISTRY_NAME_RECORDS_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('USERNAME_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('USERNAME_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS');
-    expect(report.issue_codes).toContain('PROFILE_REGISTRY_AVATAR_RECORDS_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('PROFILE_REGISTRY_PENDING_AVATAR_WRITES_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('PROFILE_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('FEE_ACCUMULATOR_ACCUMULATED_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('FEE_ACCUMULATOR_TREASURY_DUE_NOT_ZERO_AT_GENESIS');

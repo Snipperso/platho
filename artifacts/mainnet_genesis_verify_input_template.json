@@ -229,7 +229,7 @@
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "treasury_ath_receiver": "REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS",
       "profile_count": "0",
-      "avatar_record_count": "0",
+      "pending_avatar_write_count": "0",
       "treasury_due_ath": "0",
       "burn_due_ath": "0",
       "pending_treasury_flush_count": "0",

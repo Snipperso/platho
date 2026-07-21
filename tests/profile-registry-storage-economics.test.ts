@@ -36,11 +36,12 @@ describe('ProfileRegistry storage economics', () => {
         .toBeGreaterThanOrEqual(BigInt(item.expected_permanent_endowment_nanotons));
       expect(BigInt(item.retained_margin_vs_permanent_endowment_nanotons), item.label)
         .toBeGreaterThanOrEqual(BigInt(report.constants.minimum_storage_margin_nanotons));
-      // NOT `>= updates`. Fix #13 (avatar_records.del) deletes the previous record on every update
-      // (ProfileRegistry.tact:323-324), so the surviving count is one per OWNER regardless of how often they
-      // changed their avatar. The old expectation encoded the pre-#13 world where records accumulated forever —
-      // it read as "the economics are broken" while what was actually broken was the expectation.
-      expect(BigInt(item.avatar_record_count), item.label).toBe(BigInt(item.owners ?? 1));
+      // THE CEILING. Per-profile state is what capped this contract at 13,076 profiles, in the ACTION phase,
+      // with COMPUTE reporting exit 0 — so nothing would have gone red. This is the assertion that now would.
+      expect(Number(item.data_cells_per_owner), `${item.label}: the registry must not grow with profiles`).toBe(0);
+      // In-flight writes settle within the same message chain; a residue here would be a permanent 3-cell leak
+      // per PAYMENT, which is a second, independent consumer of the same 65536-cell budget.
+      expect(BigInt(item.pending_avatar_write_count), item.label).toBe(0n);
     }
   }, 30000);
 

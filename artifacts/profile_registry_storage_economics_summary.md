@@ -2,16 +2,17 @@
 
 Status: **PASS**
 
-Sandbox evidence that accepted ProfileRegistry avatar updates retain enough TON after ACK/refund actions to cover the permanent avatar record and owner-version map endowments. This is not a mainnet rent oracle; it is a release gate against underfunded permanent avatar pointer growth.
+Sandbox evidence for the two properties that survived the 2026-07-21 pointer move: the registry account does NOT grow with the number of profiles (it used to grow 5.0000 cells each, capping the product at 13,076 profiles silently), and a settled purchase does not cost the registry TON. Per-profile storage endowments are gone with the state they funded; the buyer KeyShard funds its own rent, measured in tests/key-shard.test.ts KS-RENT-01. This is not a mainnet rent oracle; it is a release gate.
 
-ProfileRegistry code hash: `96b823bb85145e3311c43a871013b8b227bc265121e1941f1dc686aeff11b292`
+ProfileRegistry code hash: `2b61e18d231fdf3d646400492f7533cdfcc04d0c9538f50e0edcc53155fefa51`
 
-| Case | Updates | Retained delta | Permanent endowment | Margin |
-|---|---:|---:|---:|---:|
-| VAULT_FIRST_AVATAR | 1 | 46302399 | 45000000 | 1302399 |
-| VAULT_REPEAT_AVATAR | 1 | 37213999 | 36000000 | 1213999 |
-| VAULT_MANY_OWNERS_12 | 12 | 552562122 | 540000000 | 12562122 |
-| VAULT_MANY_UPDATES_ONE_OWNER_10 | 10 | 380561723 | 369000000 | 11561723 |
+| Case | Owners | Updates | Retained delta | Registry cells | Cells per owner |
+|---|---:|---:|---:|---:|---:|
+| DIRECT_FIRST_AVATAR | 1 | 1 | 55654729 | 3 | 0 |
+| DIRECT_REPEAT_AVATAR | 1 | 1 | 55628595 | 3 | 0 |
+| DIRECT_MANY_OWNERS_12 | 12 | 12 | 667853076 | 3 | 0 |
+| DIRECT_MANY_UPDATES_ONE_OWNER_10 | 1 | 10 | 556309024 | 3 | 0 |
 
 Minimum retained margin gate: **1000000 nanotons**.
-Worst retained margin vs permanent endowment: **1213999 nanotons**.
+Worst retained margin: **55628595 nanotons**.
+Worst cells per owner (must be 0): **0**.

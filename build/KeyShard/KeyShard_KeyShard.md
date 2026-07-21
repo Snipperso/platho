@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: KeyShard
-BoC Size: 2228 bytes
+BoC Size: 2896 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 15
+Total structures: 17
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -57,13 +57,21 @@ Signature: `KeyShardReplaceKeys{signature:fixed_bytes64,signed_payload:^cell,env
 TL-B: `key_shard_top_up_storage_reserve#4b534734  = KeyShardTopUpStorageReserve`
 Signature: `KeyShardTopUpStorageReserve{}`
 
+### KeyShardSetAvatarPointer
+TL-B: `key_shard_set_avatar_pointer#4b534735 write_id:uint64 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = KeyShardSetAvatarPointer`
+Signature: `KeyShardSetAvatarPointer{write_id:uint64,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
+
+### KeyShardAvatarPointerAck
+TL-B: `key_shard_avatar_pointer_ack#4b534736 write_id:uint64 version:uint32 = KeyShardAvatarPointerAck`
+Signature: `KeyShardAvatarPointerAck{write_id:uint64,version:uint32}`
+
 ### KeyShardView
-TL-B: `_ exists:bool owner_wallet:address key_id:int257 key_generation:int257 rotation_nonce:int257 enc_pubkey:int257 sign_pubkey:int257 scan_pubkey:int257 pq_kem_pubkey_hash:int257 pq_kem_pubkey_len:int257 pq_kem_pubkey:^cell crypto_suite_mask:int257 created_at:int257 created_lt:int257 min_register_value:int257 min_replace_value:int257 = KeyShardView`
-Signature: `KeyShardView{exists:bool,owner_wallet:address,key_id:int257,key_generation:int257,rotation_nonce:int257,enc_pubkey:int257,sign_pubkey:int257,scan_pubkey:int257,pq_kem_pubkey_hash:int257,pq_kem_pubkey_len:int257,pq_kem_pubkey:^cell,crypto_suite_mask:int257,created_at:int257,created_lt:int257,min_register_value:int257,min_replace_value:int257}`
+TL-B: `_ exists:bool owner_wallet:address key_id:int257 key_generation:int257 rotation_nonce:int257 enc_pubkey:int257 sign_pubkey:int257 scan_pubkey:int257 pq_kem_pubkey_hash:int257 pq_kem_pubkey_len:int257 pq_kem_pubkey:^cell crypto_suite_mask:int257 created_at:int257 created_lt:int257 min_register_value:int257 min_replace_value:int257 profile_registry:address avatar_version:int257 avatar_hash:int257 avatar_entry_id:int257 avatar_stream_id:int257 avatar_part_count:int257 avatar_media_format:int257 avatar_updated_at:int257 = KeyShardView`
+Signature: `KeyShardView{exists:bool,owner_wallet:address,key_id:int257,key_generation:int257,rotation_nonce:int257,enc_pubkey:int257,sign_pubkey:int257,scan_pubkey:int257,pq_kem_pubkey_hash:int257,pq_kem_pubkey_len:int257,pq_kem_pubkey:^cell,crypto_suite_mask:int257,created_at:int257,created_lt:int257,min_register_value:int257,min_replace_value:int257,profile_registry:address,avatar_version:int257,avatar_hash:int257,avatar_entry_id:int257,avatar_stream_id:int257,avatar_part_count:int257,avatar_media_format:int257,avatar_updated_at:int257}`
 
 ### KeyShard$Data
-TL-B: `_ owner_wallet:address registered:bool key_id:uint256 auth_pubkey:uint256 key_generation:uint32 rotation_nonce:uint64 enc_pubkey:uint256 sign_pubkey:uint256 scan_pubkey:uint256 pq_kem_pubkey_hash:uint256 pq_kem_pubkey_len:uint16 pq_kem_pubkey:^cell crypto_suite_mask:uint16 created_at:uint64 created_lt:uint64 = KeyShard`
-Signature: `KeyShard{owner_wallet:address,registered:bool,key_id:uint256,auth_pubkey:uint256,key_generation:uint32,rotation_nonce:uint64,enc_pubkey:uint256,sign_pubkey:uint256,scan_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,pq_kem_pubkey:^cell,crypto_suite_mask:uint16,created_at:uint64,created_lt:uint64}`
+TL-B: `_ owner_wallet:address profile_registry:address registered:bool key_id:uint256 auth_pubkey:uint256 key_generation:uint32 rotation_nonce:uint64 enc_pubkey:uint256 sign_pubkey:uint256 scan_pubkey:uint256 pq_kem_pubkey_hash:uint256 pq_kem_pubkey_len:uint16 pq_kem_pubkey:^cell crypto_suite_mask:uint16 created_at:uint64 created_lt:uint64 avatar_version:uint32 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 avatar_media_format:uint8 avatar_updated_at:uint64 = KeyShard`
+Signature: `KeyShard{owner_wallet:address,profile_registry:address,registered:bool,key_id:uint256,auth_pubkey:uint256,key_generation:uint32,rotation_nonce:uint64,enc_pubkey:uint256,sign_pubkey:uint256,scan_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,pq_kem_pubkey:^cell,crypto_suite_mask:uint16,created_at:uint64,created_lt:uint64,avatar_version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,avatar_media_format:uint8,avatar_updated_at:uint64}`
 
 ## Get methods
 Total get methods: 1

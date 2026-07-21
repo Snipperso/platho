@@ -275,7 +275,7 @@
       "ath_master_address": "EQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcANe",
       "treasury_ath_receiver": "EQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOFkC",
       "profile_count": "0",
-      "avatar_record_count": "0",
+      "pending_avatar_write_count": "0",
       "treasury_due_ath": "0",
       "burn_due_ath": "0",
       "pending_treasury_flush_count": "0",

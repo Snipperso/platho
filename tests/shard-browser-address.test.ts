@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { contractAddress, beginCell, toNano } from '@ton/core';
+import { Address, contractAddress, beginCell, toNano } from '@ton/core';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
-import { recordShardAddressBytes, introShardAddressBytes, recoveryShardAddressBytes, rawAddress } from '../web/shard-address.mjs';
+import { KeyShard } from '../build/KeyShard/KeyShard_KeyShard';
+import { recordShardAddressBytes, introShardAddressBytes, recoveryShardAddressBytes, keyShardAddressBytes, rawAddress } from '../web/shard-address.mjs';
 import { renderShardCodeModule } from '../scripts/generate_shard_code.mjs';
 // The recovery slot key is derived by THREE implementations that must agree — the browser hasher (read path), the
 // @ton/core builder (write path), and the contract itself. ADDR-06 pins the first two against each other.
@@ -35,6 +36,8 @@ const referenceRecord = async (key: bigint, epoch: number) =>
   contractAddress(0, await RecordShard.init(key, BigInt(epoch))).toRawString();
 const referenceRecovery = async (slot: bigint) =>
   contractAddress(0, await RecoveryShard.init(slot)).toRawString();
+const referenceKeyShard = async (owner: Address, registry: Address) =>
+  contractAddress(0, await KeyShard.init(owner, registry)).toRawString();
 
 describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
   it('ADDR-01: INTRO shard addresses match the reference for a wide spread of arguments', async () => {
@@ -115,10 +118,45 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
     }
   }, 180_000);
 
+  it('ADDR-07: KEY shard addresses match — the first shard whose init arguments are ADDRESSES', async () => {
+    // Every other shard takes integers, so this is the first time the browser has to lay out Tact's 267-bit
+    // address form (tag 10, anycast 0, workchain int8, hash 256) inside an init data cell. Getting it wrong yields
+    // a well-formed address that no contract occupies: identity reads would return "no such user" and the paid
+    // avatar pointer would be written where nobody reads. Both are silent.
+    //
+    // The registry argument is varied deliberately. It is what makes a shard deployed against a fake registry
+    // unreachable, so it MUST enter the address — a derivation that ignored it would still pass a fixed-registry
+    // test while quietly collapsing every user onto one address per wallet.
+    const owners = [
+      Address.parse('EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7'),
+      Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH'),
+      new Address(0, Buffer.alloc(32, 0)),
+      new Address(0, Buffer.alloc(32, 0xff)),
+    ];
+    const registries = [
+      Address.parse('UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH'),
+      new Address(0, Buffer.alloc(32, 0x5a)),
+    ];
+    const seen = new Set<string>();
+    for (const owner of owners) {
+      for (const registry of registries) {
+        const reference = await referenceKeyShard(owner, registry);
+        const browser = rawAddress(await keyShardAddressBytes(owner.toRawString(), registry.toRawString()));
+        expect(browser, `KEY(${owner.toRawString()}, ${registry.toRawString()})`).toBe(reference);
+        seen.add(browser);
+      }
+    }
+    expect(seen.size, 'every (wallet, registry) pair must be its OWN address').toBe(owners.length * registries.length);
+  }, 120_000);
+
   it('ADDR-04: the browser refuses arguments it cannot encode instead of producing a wrong address', async () => {
     // Silently truncating an out-of-range value would produce a plausible address that nobody can ever read from.
     await expect(introShardAddressBytes(-1, 0)).rejects.toThrow();
     await expect(recoveryShardAddressBytes(1n << 256n)).rejects.toThrow();
+    // An address argument that is not a raw workchain:hex pair must be refused, not coerced.
+    await expect(keyShardAddressBytes('EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7', '0:' + '11'.repeat(32)))
+      .rejects.toThrow();
+    await expect(keyShardAddressBytes('0:' + '11'.repeat(32), undefined as any)).rejects.toThrow();
   }, 60_000);
 
   it('ADDR-05: the checked-in code constants are exactly what build/ produces', () => {
