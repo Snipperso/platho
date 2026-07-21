@@ -19,10 +19,14 @@ export const REQUIRED_TON_RPC_CRITICAL_METHODS = Object.freeze([
   'get_private_page',
   'get_public_entry',
   'get_public_page',
-  'get_name_record',
+  // get_name_record (retired 2026-07-20 with UsernameRegistry.name_records) and get_avatar / get_avatar_version
+  // (retired 2026-07-21 with ProfileRegistry's per-profile maps) are deliberately ABSENT. Both registries now
+  // answer WHERE the per-user contract is, and the record itself is read from that contract — get_view on the
+  // wallet's KeyShard for the avatar, the NFT item for a name. Leaving a retired method here would silently
+  // demand verification of a call nothing makes.
   'get_username_item_address',
-  'get_avatar',
-  'get_avatar_version',
+  'get_key_shard_address',
+  'get_view',
   'get_username_price',
   'get_ath_wallet_address',
   'dnsresolve',

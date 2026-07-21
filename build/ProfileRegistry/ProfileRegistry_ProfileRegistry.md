@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: ProfileRegistry
-BoC Size: 11378 bytes
+BoC Size: 14437 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 56
+Total structures: 64
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -173,6 +173,34 @@ Signature: `PendingAthOutgoingTransfer{recipient_wallet:address,response_destina
 TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint64}> pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint64}> = ATHWallet`
 Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint64}>,pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint64}>}`
 
+### KeyShardRegisterKeys
+TL-B: `key_shard_register_keys#4b534731 enc_pubkey:uint256 sign_pubkey:uint256 scan_pubkey:uint256 auth_pubkey:uint256 pq_kem_pubkey_hash:uint256 pq_kem_pubkey_len:uint16 pq_kem_pubkey:^cell crypto_suite_mask:uint16 = KeyShardRegisterKeys`
+Signature: `KeyShardRegisterKeys{enc_pubkey:uint256,sign_pubkey:uint256,scan_pubkey:uint256,auth_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,pq_kem_pubkey:^cell,crypto_suite_mask:uint16}`
+
+### KeyShardReplaceKeys
+TL-B: `key_shard_replace_keys#4b534732 signature:fixed_bytes64 signed_payload:^cell envelope_padding:remainder<slice> = KeyShardReplaceKeys`
+Signature: `KeyShardReplaceKeys{signature:fixed_bytes64,signed_payload:^cell,envelope_padding:remainder<slice>}`
+
+### KeyShardTopUpStorageReserve
+TL-B: `key_shard_top_up_storage_reserve#4b534734  = KeyShardTopUpStorageReserve`
+Signature: `KeyShardTopUpStorageReserve{}`
+
+### KeyShardSetAvatarPointer
+TL-B: `key_shard_set_avatar_pointer#4b534735 write_id:uint64 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = KeyShardSetAvatarPointer`
+Signature: `KeyShardSetAvatarPointer{write_id:uint64,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
+
+### KeyShardAvatarPointerAck
+TL-B: `key_shard_avatar_pointer_ack#4b534736 write_id:uint64 version:uint32 = KeyShardAvatarPointerAck`
+Signature: `KeyShardAvatarPointerAck{write_id:uint64,version:uint32}`
+
+### KeyShardView
+TL-B: `_ exists:bool owner_wallet:address key_id:int257 key_generation:int257 rotation_nonce:int257 enc_pubkey:int257 sign_pubkey:int257 scan_pubkey:int257 pq_kem_pubkey_hash:int257 pq_kem_pubkey_len:int257 pq_kem_pubkey:^cell crypto_suite_mask:int257 created_at:int257 created_lt:int257 min_register_value:int257 min_replace_value:int257 profile_registry:address avatar_version:int257 avatar_hash:int257 avatar_entry_id:int257 avatar_stream_id:int257 avatar_part_count:int257 avatar_media_format:int257 avatar_updated_at:int257 = KeyShardView`
+Signature: `KeyShardView{exists:bool,owner_wallet:address,key_id:int257,key_generation:int257,rotation_nonce:int257,enc_pubkey:int257,sign_pubkey:int257,scan_pubkey:int257,pq_kem_pubkey_hash:int257,pq_kem_pubkey_len:int257,pq_kem_pubkey:^cell,crypto_suite_mask:int257,created_at:int257,created_lt:int257,min_register_value:int257,min_replace_value:int257,profile_registry:address,avatar_version:int257,avatar_hash:int257,avatar_entry_id:int257,avatar_stream_id:int257,avatar_part_count:int257,avatar_media_format:int257,avatar_updated_at:int257}`
+
+### KeyShard$Data
+TL-B: `_ owner_wallet:address profile_registry:address registered:bool key_id:uint256 auth_pubkey:uint256 key_generation:uint32 rotation_nonce:uint64 enc_pubkey:uint256 sign_pubkey:uint256 scan_pubkey:uint256 pq_kem_pubkey_hash:uint256 pq_kem_pubkey_len:uint16 pq_kem_pubkey:^cell crypto_suite_mask:uint16 created_at:uint64 created_lt:uint64 avatar_version:uint32 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 avatar_media_format:uint8 avatar_updated_at:uint64 = KeyShard`
+Signature: `KeyShard{owner_wallet:address,profile_registry:address,registered:bool,key_id:uint256,auth_pubkey:uint256,key_generation:uint32,rotation_nonce:uint64,enc_pubkey:uint256,sign_pubkey:uint256,scan_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,pq_kem_pubkey:^cell,crypto_suite_mask:uint16,created_at:uint64,created_lt:uint64,avatar_version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,avatar_media_format:uint8,avatar_updated_at:uint64}`
+
 ### BindProfileOfficialAthWallet
 TL-B: `bind_profile_official_ath_wallet#50a61101 deployment_manifest_hash:uint256 official_ath_wallet_address:address = BindProfileOfficialAthWallet`
 Signature: `BindProfileOfficialAthWallet{deployment_manifest_hash:uint256,official_ath_wallet_address:address}`
@@ -197,13 +225,17 @@ Signature: `ProfileRegistryTopUpStorageReserve{}`
 TL-B: `profile_avatar_ton_excess_refund#50a61121 query_id:uint64 owner_wallet:address amount:uint128 = ProfileAvatarTonExcessRefund`
 Signature: `ProfileAvatarTonExcessRefund{query_id:uint64,owner_wallet:address,amount:uint128}`
 
-### ProfileAvatarRecord
-TL-B: `_ owner_wallet:address version:uint32 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 updated_at:uint64 = ProfileAvatarRecord`
-Signature: `ProfileAvatarRecord{owner_wallet:address,version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8,updated_at:uint64}`
+### PruneStaleAvatarWrite
+TL-B: `prune_stale_avatar_write#50a61123 write_id:uint64 = PruneStaleAvatarWrite`
+Signature: `PruneStaleAvatarWrite{write_id:uint64}`
 
-### ProfileAvatarView
-TL-B: `_ exists:bool owner_wallet:address version:int257 avatar_hash:int257 avatar_entry_id:int257 avatar_stream_id:int257 avatar_part_count:int257 media_format:int257 updated_at:int257 = ProfileAvatarView`
-Signature: `ProfileAvatarView{exists:bool,owner_wallet:address,version:int257,avatar_hash:int257,avatar_entry_id:int257,avatar_stream_id:int257,avatar_part_count:int257,media_format:int257,updated_at:int257}`
+### PendingProfileAvatarWrite
+TL-B: `_ query_id:uint64 sender_key:uint160 amount:uint128 owner_wallet:address created_at:uint64 = PendingProfileAvatarWrite`
+Signature: `PendingProfileAvatarWrite{query_id:uint64,sender_key:uint160,amount:uint128,owner_wallet:address,created_at:uint64}`
+
+### PendingProfileAvatarWriteView
+TL-B: `_ exists:bool query_id:int257 sender_key:int257 amount:int257 owner_wallet:address created_at:int257 = PendingProfileAvatarWriteView`
+Signature: `PendingProfileAvatarWriteView{exists:bool,query_id:int257,sender_key:int257,amount:int257,owner_wallet:address,created_at:int257}`
 
 ### PendingProfileTreasuryFlush
 TL-B: `_ amount:uint128 recipient_ath_wallet:address created_at:uint64 = PendingProfileTreasuryFlush`
@@ -222,12 +254,12 @@ TL-B: `_ exists:bool amount:int257 created_at:int257 = PendingProfileBurnFlushVi
 Signature: `PendingProfileBurnFlushView{exists:bool,amount:int257,created_at:int257}`
 
 ### ProfileRegistryGlobalView
-TL-B: `_ sealed:bool official_ath_wallet_bound:bool deployment_manifest_hash:int257 genesis_config_hash:int257 official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address genesis_controller_address:address profile_count:int257 avatar_record_count:int257 treasury_due_ath:int257 burn_due_ath:int257 pending_treasury_flush_count:int257 pending_burn_flush_count:int257 = ProfileRegistryGlobalView`
-Signature: `ProfileRegistryGlobalView{sealed:bool,official_ath_wallet_bound:bool,deployment_manifest_hash:int257,genesis_config_hash:int257,official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,genesis_controller_address:address,profile_count:int257,avatar_record_count:int257,treasury_due_ath:int257,burn_due_ath:int257,pending_treasury_flush_count:int257,pending_burn_flush_count:int257}`
+TL-B: `_ sealed:bool official_ath_wallet_bound:bool deployment_manifest_hash:int257 genesis_config_hash:int257 official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address genesis_controller_address:address profile_count:int257 pending_avatar_write_count:int257 next_avatar_write_id:int257 treasury_due_ath:int257 burn_due_ath:int257 pending_treasury_flush_count:int257 pending_burn_flush_count:int257 = ProfileRegistryGlobalView`
+Signature: `ProfileRegistryGlobalView{sealed:bool,official_ath_wallet_bound:bool,deployment_manifest_hash:int257,genesis_config_hash:int257,official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,genesis_controller_address:address,profile_count:int257,pending_avatar_write_count:int257,next_avatar_write_id:int257,treasury_due_ath:int257,burn_due_ath:int257,pending_treasury_flush_count:int257,pending_burn_flush_count:int257}`
 
 ### ProfileRegistry$Data
-TL-B: `_ official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 genesis_controller_address:address profile_count:uint64 avatar_record_count:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 current_avatar_versions:dict<address, int> avatar_records:dict<int, ^ProfileAvatarRecord{owner_wallet:address,version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8,updated_at:uint64}> pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}> pending_burn_flush_count:uint64 = ProfileRegistry`
-Signature: `ProfileRegistry{official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,genesis_controller_address:address,profile_count:uint64,avatar_record_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,current_avatar_versions:dict<address, int>,avatar_records:dict<int, ^ProfileAvatarRecord{owner_wallet:address,version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8,updated_at:uint64}>,pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}>,pending_burn_flush_count:uint64}`
+TL-B: `_ official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 genesis_controller_address:address profile_count:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 pending_avatar_writes:dict<int, ^PendingProfileAvatarWrite{query_id:uint64,sender_key:uint160,amount:uint128,owner_wallet:address,created_at:uint64}> pending_avatar_write_count:uint64 next_avatar_write_id:uint64 pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}> pending_burn_flush_count:uint64 = ProfileRegistry`
+Signature: `ProfileRegistry{official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,genesis_controller_address:address,profile_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,pending_avatar_writes:dict<int, ^PendingProfileAvatarWrite{query_id:uint64,sender_key:uint160,amount:uint128,owner_wallet:address,created_at:uint64}>,pending_avatar_write_count:uint64,next_avatar_write_id:uint64,pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}>,pending_burn_flush_count:uint64}`
 
 ## Get methods
 Total get methods: 6
@@ -235,12 +267,11 @@ Total get methods: 6
 ## get_global
 No arguments
 
-## get_avatar
+## get_key_shard_address
 Argument: owner_wallet
 
-## get_avatar_version
-Argument: owner_wallet
-Argument: version
+## get_pending_avatar_write
+Argument: write_id
 
 ## get_ath_wallet_address
 Argument: owner_wallet
@@ -303,4 +334,5 @@ ProfileRegistry --> BaseTrait
 graph TD
 ProfileRegistry
 ProfileRegistry --> ATHWallet
+ProfileRegistry --> KeyShard
 ```

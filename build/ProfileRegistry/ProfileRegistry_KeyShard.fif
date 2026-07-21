@@ -1,4 +1,4 @@
-// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/KeyShard/KeyShard_KeyShard.fc` 
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/ProfileRegistry/ProfileRegistry_KeyShard.fc` 
 PROGRAM{
   DECLPROC __tact_context_get
   DECLPROC __tact_context_get_sender
@@ -12,6 +12,7 @@ PROGRAM{
   DECLPROC $KeyShard$_contract_init
   DECLPROC $KeyShard$_contract_load
   DECLPROC $KeyShard$_contract_store
+  DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $KeyShard$_fun_validatePqPubkeyCell
   DECLPROC $KeyShard$_fun_isValidPqPubkeyCell
   DECLPROC $KeyShard$_fun_validateKeyProfile
@@ -22,7 +23,6 @@ PROGRAM{
   DECLPROC $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at
   DECLPROC $KeyShard$_fun_get_view
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce
-  DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $KeyShardAvatarPointerAck$_constructor_write_id_version
   76114 DECLMETHOD %get_view
   DECLPROC recv_internal
@@ -208,6 +208,10 @@ PROGRAM{
     $KeyShard$_store INLINECALLDICT
     ENDC
     c4 POP
+  }>
+  $MessageParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
+    s4 s1 s3 XCHG3
+    -ROT
   }>
   $KeyShard$_fun_validatePqPubkeyCell PROCREF:<{
     22107 PUSHINT
@@ -582,10 +586,6 @@ PROGRAM{
     s1 s3 XCHG
     PUSHNULL
     3 -ROLL
-  }>
-  $MessageParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
-    s4 s1 s3 XCHG3
-    -ROT
   }>
   $KeyShardAvatarPointerAck$_constructor_write_id_version PROCINLINE:<{
   }>

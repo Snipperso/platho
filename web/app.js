@@ -45,6 +45,7 @@ import {
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
   TON_RPC_REQUEST_TIMEOUT_MS,
+  decodeTonAddressSliceBoc,
 } from './vault-ton-rpc-provider.mjs?v=62';
 import {
   DEFAULT_PUBLIC_CHANNELS,
@@ -162,7 +163,8 @@ import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
 } from './capsulehub-ton-rpc-provider.mjs?v=59';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=44';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=45';
+import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=1';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=40';
 import {
   computeUsernameNameHash,
@@ -8973,8 +8975,26 @@ async function resolveProfileRegistryProvider() {
   if (!address) return null;
   const provider = globalThis.plathoProfileRegistryProvider
     ?? createProfileRegistryTonRpcProvider({ profileRegistryAddress: address });
+  if (!provider?.getGlobal || !provider?.getAthWalletAddress) {
+    throw new Error('ProfileRegistry provider cannot read the registry');
+  }
+  return { provider, address };
+}
+
+// The avatar pointer moved out of ProfileRegistry into the buyer's own KeyShard on 2026-07-21 (the registry's map
+// cost 5.0000 cells per profile and capped the product at 13,076 profiles, silently). The registry is still what
+// PRICES and settles a purchase, so it keeps its own provider above; reads of the pointer come from here.
+//
+// The KeyShard address is derived from (wallet, registry), so this provider is handed the SAME registry address
+// the registry provider uses. A mismatch would not error — it would derive a live, empty address and report every
+// user as having no avatar.
+async function resolveProfileAvatarProvider() {
+  const address = configuredProfileRegistryAddress();
+  if (!address) return null;
+  const provider = globalThis.plathoKeyShardProvider
+    ?? createKeyShardTonRpcProvider({ profileRegistryAddress: address, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
   if (!provider?.getAvatar || !provider?.getAvatarVersion) {
-    throw new Error('ProfileRegistry provider cannot read avatars');
+    throw new Error('KeyShard provider cannot read avatars');
   }
   return { provider, address };
 }
@@ -9496,7 +9516,7 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
   const key = `${ownerWallet}:${requestedPointer?.profileVersion ?? 'current'}:${requestedPointer?.avatarHash ?? 'current'}`;
   if (profileAvatarLoadPromises.has(key)) return profileAvatarLoadPromises.get(key);
   const promise = enqueueAvatarChainRead(async () => {
-    const resolved = await resolveProfileRegistryProvider();
+    const resolved = await resolveProfileAvatarProvider();
     if (!resolved) return null;
     const readOptions = { profileRegistryAddress: resolved.address, ...criticalChainReadOptions() };
     const record = requestedPointer
@@ -12485,9 +12505,9 @@ async function refreshOwnProfileAvatarRun() {
 
 async function readCurrentProfileAvatarPointerResultFromChain(ownerWallet, options = {}) {
   try {
-    const resolved = await resolveProfileRegistryProvider();
+    const resolved = await resolveProfileAvatarProvider();
     if (!resolved) {
-      const error = new Error('ProfileRegistry provider is required to read current avatar version');
+      const error = new Error('KeyShard provider is required to read current avatar version');
       if (options.required === false) return { ok: false, pointer: null, error };
       throw error;
     }

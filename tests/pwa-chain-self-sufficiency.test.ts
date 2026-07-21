@@ -27,9 +27,15 @@ describe('PWA on-chain self-sufficiency', () => {
     for (const method of ['get_state', 'get_private_entry', 'get_public_entry', 'get_private_page', 'get_public_page']) {
       expect(capsuleHub, `CapsuleHub must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
     }
-    for (const method of ['get_global', 'get_avatar', 'get_avatar_version', 'get_ath_wallet_address']) {
+    // get_avatar / get_avatar_version RETIRED 2026-07-21 with the maps behind them: holding a pointer per profile
+    // cost a MEASURED 5.0000 cells each against a ~65536-cell account and capped the product at 13,076 profiles,
+    // silently. The pointer lives in the buyer's own KeyShard, and get_key_shard_address is how a client reaches
+    // it from a wallet — so the self-sufficiency property is unchanged in substance: the PWA still resolves a
+    // wallet to its avatar with nothing but chain getters, and now does so against an account that cannot fill up.
+    for (const method of ['get_global', 'get_key_shard_address', 'get_ath_wallet_address']) {
       expect(profileRegistry, `ProfileRegistry must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
     }
+    expect(read('contracts/KeyShard.tact'), 'KeyShard must expose get_view').toMatch(/get fun get_view\b/);
     // get_name_record RETIRED 2026-07-20 with the name_records map. The per-name UsernameNFTItem contract is the
     // record, and get_username_item_address is how a client reaches it from a name — so the self-sufficiency
     // property this pins is unchanged in substance: the PWA can still resolve a name to its owner with nothing
@@ -63,9 +69,10 @@ describe('PWA on-chain self-sufficiency', () => {
     for (const method of ['get_state', 'get_private_entry', 'get_public_entry', 'get_private_page', 'get_public_page']) {
       expect(capsuleProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
     }
-    for (const method of ['get_global', 'get_avatar', 'get_avatar_version']) {
+    for (const method of ['get_global', 'get_key_shard_address']) {
       expect(profileProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
     }
+    expect(read('web/key-shard-ton-rpc-provider.mjs')).toMatch(/method:\s*'get_view'/);
     for (const method of ['get_global', 'get_username_price', 'get_username_item_address']) {
       expect(usernameProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
     }

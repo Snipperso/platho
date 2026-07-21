@@ -2835,6 +2835,726 @@ export function dictValueParserATHWallet$Data(): DictionaryValue<ATHWallet$Data>
     }
 }
 
+export type KeyShardRegisterKeys = {
+    $$type: 'KeyShardRegisterKeys';
+    enc_pubkey: bigint;
+    sign_pubkey: bigint;
+    scan_pubkey: bigint;
+    auth_pubkey: bigint;
+    pq_kem_pubkey_hash: bigint;
+    pq_kem_pubkey_len: bigint;
+    pq_kem_pubkey: Cell;
+    crypto_suite_mask: bigint;
+}
+
+export function storeKeyShardRegisterKeys(src: KeyShardRegisterKeys) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1263748913, 32);
+        b_0.storeUint(src.enc_pubkey, 256);
+        b_0.storeUint(src.sign_pubkey, 256);
+        b_0.storeUint(src.scan_pubkey, 256);
+        const b_1 = new Builder();
+        b_1.storeUint(src.auth_pubkey, 256);
+        b_1.storeUint(src.pq_kem_pubkey_hash, 256);
+        b_1.storeUint(src.pq_kem_pubkey_len, 16);
+        b_1.storeRef(src.pq_kem_pubkey);
+        b_1.storeUint(src.crypto_suite_mask, 16);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadKeyShardRegisterKeys(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1263748913) { throw Error('Invalid prefix'); }
+    const _enc_pubkey = sc_0.loadUintBig(256);
+    const _sign_pubkey = sc_0.loadUintBig(256);
+    const _scan_pubkey = sc_0.loadUintBig(256);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _auth_pubkey = sc_1.loadUintBig(256);
+    const _pq_kem_pubkey_hash = sc_1.loadUintBig(256);
+    const _pq_kem_pubkey_len = sc_1.loadUintBig(16);
+    const _pq_kem_pubkey = sc_1.loadRef();
+    const _crypto_suite_mask = sc_1.loadUintBig(16);
+    return { $$type: 'KeyShardRegisterKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, auth_pubkey: _auth_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+}
+
+export function loadTupleKeyShardRegisterKeys(source: TupleReader) {
+    const _enc_pubkey = source.readBigNumber();
+    const _sign_pubkey = source.readBigNumber();
+    const _scan_pubkey = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
+    const _pq_kem_pubkey_hash = source.readBigNumber();
+    const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
+    const _crypto_suite_mask = source.readBigNumber();
+    return { $$type: 'KeyShardRegisterKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, auth_pubkey: _auth_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+}
+
+export function loadGetterTupleKeyShardRegisterKeys(source: TupleReader) {
+    const _enc_pubkey = source.readBigNumber();
+    const _sign_pubkey = source.readBigNumber();
+    const _scan_pubkey = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
+    const _pq_kem_pubkey_hash = source.readBigNumber();
+    const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
+    const _crypto_suite_mask = source.readBigNumber();
+    return { $$type: 'KeyShardRegisterKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, auth_pubkey: _auth_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+}
+
+export function storeTupleKeyShardRegisterKeys(source: KeyShardRegisterKeys) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.enc_pubkey);
+    builder.writeNumber(source.sign_pubkey);
+    builder.writeNumber(source.scan_pubkey);
+    builder.writeNumber(source.auth_pubkey);
+    builder.writeNumber(source.pq_kem_pubkey_hash);
+    builder.writeNumber(source.pq_kem_pubkey_len);
+    builder.writeCell(source.pq_kem_pubkey);
+    builder.writeNumber(source.crypto_suite_mask);
+    return builder.build();
+}
+
+export function dictValueParserKeyShardRegisterKeys(): DictionaryValue<KeyShardRegisterKeys> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShardRegisterKeys(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShardRegisterKeys(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type KeyShardReplaceKeys = {
+    $$type: 'KeyShardReplaceKeys';
+    signature: Buffer;
+    signed_payload: Cell;
+    envelope_padding: Slice;
+}
+
+export function storeKeyShardReplaceKeys(src: KeyShardReplaceKeys) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1263748914, 32);
+        b_0.storeBuffer(src.signature);
+        b_0.storeRef(src.signed_payload);
+        b_0.storeBuilder(src.envelope_padding.asBuilder());
+    };
+}
+
+export function loadKeyShardReplaceKeys(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1263748914) { throw Error('Invalid prefix'); }
+    const _signature = sc_0.loadBuffer(64);
+    const _signed_payload = sc_0.loadRef();
+    const _envelope_padding = sc_0;
+    return { $$type: 'KeyShardReplaceKeys' as const, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
+}
+
+export function loadTupleKeyShardReplaceKeys(source: TupleReader) {
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'KeyShardReplaceKeys' as const, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
+}
+
+export function loadGetterTupleKeyShardReplaceKeys(source: TupleReader) {
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'KeyShardReplaceKeys' as const, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
+}
+
+export function storeTupleKeyShardReplaceKeys(source: KeyShardReplaceKeys) {
+    const builder = new TupleBuilder();
+    builder.writeBuffer(source.signature);
+    builder.writeCell(source.signed_payload);
+    builder.writeSlice(source.envelope_padding.asCell());
+    return builder.build();
+}
+
+export function dictValueParserKeyShardReplaceKeys(): DictionaryValue<KeyShardReplaceKeys> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShardReplaceKeys(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShardReplaceKeys(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type KeyShardTopUpStorageReserve = {
+    $$type: 'KeyShardTopUpStorageReserve';
+}
+
+export function storeKeyShardTopUpStorageReserve(src: KeyShardTopUpStorageReserve) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1263748916, 32);
+    };
+}
+
+export function loadKeyShardTopUpStorageReserve(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1263748916) { throw Error('Invalid prefix'); }
+    return { $$type: 'KeyShardTopUpStorageReserve' as const };
+}
+
+export function loadTupleKeyShardTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'KeyShardTopUpStorageReserve' as const };
+}
+
+export function loadGetterTupleKeyShardTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'KeyShardTopUpStorageReserve' as const };
+}
+
+export function storeTupleKeyShardTopUpStorageReserve(source: KeyShardTopUpStorageReserve) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserKeyShardTopUpStorageReserve(): DictionaryValue<KeyShardTopUpStorageReserve> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShardTopUpStorageReserve(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShardTopUpStorageReserve(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type KeyShardSetAvatarPointer = {
+    $$type: 'KeyShardSetAvatarPointer';
+    write_id: bigint;
+    owner_wallet: Address;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    media_format: bigint;
+}
+
+export function storeKeyShardSetAvatarPointer(src: KeyShardSetAvatarPointer) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1263748917, 32);
+        b_0.storeUint(src.write_id, 64);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.avatar_hash, 256);
+        b_0.storeUint(src.avatar_entry_id, 64);
+        b_0.storeUint(src.avatar_stream_id, 128);
+        b_0.storeUint(src.avatar_part_count, 16);
+        b_0.storeUint(src.media_format, 8);
+    };
+}
+
+export function loadKeyShardSetAvatarPointer(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1263748917) { throw Error('Invalid prefix'); }
+    const _write_id = sc_0.loadUintBig(64);
+    const _owner_wallet = sc_0.loadAddress();
+    const _avatar_hash = sc_0.loadUintBig(256);
+    const _avatar_entry_id = sc_0.loadUintBig(64);
+    const _avatar_stream_id = sc_0.loadUintBig(128);
+    const _avatar_part_count = sc_0.loadUintBig(16);
+    const _media_format = sc_0.loadUintBig(8);
+    return { $$type: 'KeyShardSetAvatarPointer' as const, write_id: _write_id, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadTupleKeyShardSetAvatarPointer(source: TupleReader) {
+    const _write_id = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'KeyShardSetAvatarPointer' as const, write_id: _write_id, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadGetterTupleKeyShardSetAvatarPointer(source: TupleReader) {
+    const _write_id = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'KeyShardSetAvatarPointer' as const, write_id: _write_id, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function storeTupleKeyShardSetAvatarPointer(source: KeyShardSetAvatarPointer) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.write_id);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.media_format);
+    return builder.build();
+}
+
+export function dictValueParserKeyShardSetAvatarPointer(): DictionaryValue<KeyShardSetAvatarPointer> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShardSetAvatarPointer(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShardSetAvatarPointer(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type KeyShardAvatarPointerAck = {
+    $$type: 'KeyShardAvatarPointerAck';
+    write_id: bigint;
+    version: bigint;
+}
+
+export function storeKeyShardAvatarPointerAck(src: KeyShardAvatarPointerAck) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1263748918, 32);
+        b_0.storeUint(src.write_id, 64);
+        b_0.storeUint(src.version, 32);
+    };
+}
+
+export function loadKeyShardAvatarPointerAck(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1263748918) { throw Error('Invalid prefix'); }
+    const _write_id = sc_0.loadUintBig(64);
+    const _version = sc_0.loadUintBig(32);
+    return { $$type: 'KeyShardAvatarPointerAck' as const, write_id: _write_id, version: _version };
+}
+
+export function loadTupleKeyShardAvatarPointerAck(source: TupleReader) {
+    const _write_id = source.readBigNumber();
+    const _version = source.readBigNumber();
+    return { $$type: 'KeyShardAvatarPointerAck' as const, write_id: _write_id, version: _version };
+}
+
+export function loadGetterTupleKeyShardAvatarPointerAck(source: TupleReader) {
+    const _write_id = source.readBigNumber();
+    const _version = source.readBigNumber();
+    return { $$type: 'KeyShardAvatarPointerAck' as const, write_id: _write_id, version: _version };
+}
+
+export function storeTupleKeyShardAvatarPointerAck(source: KeyShardAvatarPointerAck) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.write_id);
+    builder.writeNumber(source.version);
+    return builder.build();
+}
+
+export function dictValueParserKeyShardAvatarPointerAck(): DictionaryValue<KeyShardAvatarPointerAck> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShardAvatarPointerAck(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShardAvatarPointerAck(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type KeyShardView = {
+    $$type: 'KeyShardView';
+    exists: boolean;
+    owner_wallet: Address;
+    key_id: bigint;
+    key_generation: bigint;
+    rotation_nonce: bigint;
+    enc_pubkey: bigint;
+    sign_pubkey: bigint;
+    scan_pubkey: bigint;
+    pq_kem_pubkey_hash: bigint;
+    pq_kem_pubkey_len: bigint;
+    pq_kem_pubkey: Cell;
+    crypto_suite_mask: bigint;
+    created_at: bigint;
+    created_lt: bigint;
+    min_register_value: bigint;
+    min_replace_value: bigint;
+    profile_registry: Address;
+    avatar_version: bigint;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    avatar_media_format: bigint;
+    avatar_updated_at: bigint;
+}
+
+export function storeKeyShardView(src: KeyShardView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.exists);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeInt(src.key_id, 257);
+        b_0.storeInt(src.key_generation, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.rotation_nonce, 257);
+        b_1.storeInt(src.enc_pubkey, 257);
+        b_1.storeInt(src.sign_pubkey, 257);
+        const b_2 = new Builder();
+        b_2.storeInt(src.scan_pubkey, 257);
+        b_2.storeInt(src.pq_kem_pubkey_hash, 257);
+        b_2.storeInt(src.pq_kem_pubkey_len, 257);
+        b_2.storeRef(src.pq_kem_pubkey);
+        const b_3 = new Builder();
+        b_3.storeInt(src.crypto_suite_mask, 257);
+        b_3.storeInt(src.created_at, 257);
+        b_3.storeInt(src.created_lt, 257);
+        const b_4 = new Builder();
+        b_4.storeInt(src.min_register_value, 257);
+        b_4.storeInt(src.min_replace_value, 257);
+        b_4.storeAddress(src.profile_registry);
+        const b_5 = new Builder();
+        b_5.storeInt(src.avatar_version, 257);
+        b_5.storeInt(src.avatar_hash, 257);
+        b_5.storeInt(src.avatar_entry_id, 257);
+        const b_6 = new Builder();
+        b_6.storeInt(src.avatar_stream_id, 257);
+        b_6.storeInt(src.avatar_part_count, 257);
+        b_6.storeInt(src.avatar_media_format, 257);
+        const b_7 = new Builder();
+        b_7.storeInt(src.avatar_updated_at, 257);
+        b_6.storeRef(b_7.endCell());
+        b_5.storeRef(b_6.endCell());
+        b_4.storeRef(b_5.endCell());
+        b_3.storeRef(b_4.endCell());
+        b_2.storeRef(b_3.endCell());
+        b_1.storeRef(b_2.endCell());
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadKeyShardView(slice: Slice) {
+    const sc_0 = slice;
+    const _exists = sc_0.loadBit();
+    const _owner_wallet = sc_0.loadAddress();
+    const _key_id = sc_0.loadIntBig(257);
+    const _key_generation = sc_0.loadIntBig(257);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _rotation_nonce = sc_1.loadIntBig(257);
+    const _enc_pubkey = sc_1.loadIntBig(257);
+    const _sign_pubkey = sc_1.loadIntBig(257);
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _scan_pubkey = sc_2.loadIntBig(257);
+    const _pq_kem_pubkey_hash = sc_2.loadIntBig(257);
+    const _pq_kem_pubkey_len = sc_2.loadIntBig(257);
+    const _pq_kem_pubkey = sc_2.loadRef();
+    const sc_3 = sc_2.loadRef().beginParse();
+    const _crypto_suite_mask = sc_3.loadIntBig(257);
+    const _created_at = sc_3.loadIntBig(257);
+    const _created_lt = sc_3.loadIntBig(257);
+    const sc_4 = sc_3.loadRef().beginParse();
+    const _min_register_value = sc_4.loadIntBig(257);
+    const _min_replace_value = sc_4.loadIntBig(257);
+    const _profile_registry = sc_4.loadAddress();
+    const sc_5 = sc_4.loadRef().beginParse();
+    const _avatar_version = sc_5.loadIntBig(257);
+    const _avatar_hash = sc_5.loadIntBig(257);
+    const _avatar_entry_id = sc_5.loadIntBig(257);
+    const sc_6 = sc_5.loadRef().beginParse();
+    const _avatar_stream_id = sc_6.loadIntBig(257);
+    const _avatar_part_count = sc_6.loadIntBig(257);
+    const _avatar_media_format = sc_6.loadIntBig(257);
+    const sc_7 = sc_6.loadRef().beginParse();
+    const _avatar_updated_at = sc_7.loadIntBig(257);
+    return { $$type: 'KeyShardView' as const, exists: _exists, owner_wallet: _owner_wallet, key_id: _key_id, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, min_register_value: _min_register_value, min_replace_value: _min_replace_value, profile_registry: _profile_registry, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function loadTupleKeyShardView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _owner_wallet = source.readAddress();
+    const _key_id = source.readBigNumber();
+    const _key_generation = source.readBigNumber();
+    const _rotation_nonce = source.readBigNumber();
+    const _enc_pubkey = source.readBigNumber();
+    const _sign_pubkey = source.readBigNumber();
+    const _scan_pubkey = source.readBigNumber();
+    const _pq_kem_pubkey_hash = source.readBigNumber();
+    const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
+    const _crypto_suite_mask = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    const _created_lt = source.readBigNumber();
+    source = source.readTuple();
+    const _min_register_value = source.readBigNumber();
+    const _min_replace_value = source.readBigNumber();
+    const _profile_registry = source.readAddress();
+    const _avatar_version = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _avatar_media_format = source.readBigNumber();
+    const _avatar_updated_at = source.readBigNumber();
+    return { $$type: 'KeyShardView' as const, exists: _exists, owner_wallet: _owner_wallet, key_id: _key_id, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, min_register_value: _min_register_value, min_replace_value: _min_replace_value, profile_registry: _profile_registry, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function loadGetterTupleKeyShardView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _owner_wallet = source.readAddress();
+    const _key_id = source.readBigNumber();
+    const _key_generation = source.readBigNumber();
+    const _rotation_nonce = source.readBigNumber();
+    const _enc_pubkey = source.readBigNumber();
+    const _sign_pubkey = source.readBigNumber();
+    const _scan_pubkey = source.readBigNumber();
+    const _pq_kem_pubkey_hash = source.readBigNumber();
+    const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
+    const _crypto_suite_mask = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    const _created_lt = source.readBigNumber();
+    const _min_register_value = source.readBigNumber();
+    const _min_replace_value = source.readBigNumber();
+    const _profile_registry = source.readAddress();
+    const _avatar_version = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _avatar_media_format = source.readBigNumber();
+    const _avatar_updated_at = source.readBigNumber();
+    return { $$type: 'KeyShardView' as const, exists: _exists, owner_wallet: _owner_wallet, key_id: _key_id, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, min_register_value: _min_register_value, min_replace_value: _min_replace_value, profile_registry: _profile_registry, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function storeTupleKeyShardView(source: KeyShardView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.exists);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.key_id);
+    builder.writeNumber(source.key_generation);
+    builder.writeNumber(source.rotation_nonce);
+    builder.writeNumber(source.enc_pubkey);
+    builder.writeNumber(source.sign_pubkey);
+    builder.writeNumber(source.scan_pubkey);
+    builder.writeNumber(source.pq_kem_pubkey_hash);
+    builder.writeNumber(source.pq_kem_pubkey_len);
+    builder.writeCell(source.pq_kem_pubkey);
+    builder.writeNumber(source.crypto_suite_mask);
+    builder.writeNumber(source.created_at);
+    builder.writeNumber(source.created_lt);
+    builder.writeNumber(source.min_register_value);
+    builder.writeNumber(source.min_replace_value);
+    builder.writeAddress(source.profile_registry);
+    builder.writeNumber(source.avatar_version);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.avatar_media_format);
+    builder.writeNumber(source.avatar_updated_at);
+    return builder.build();
+}
+
+export function dictValueParserKeyShardView(): DictionaryValue<KeyShardView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShardView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShardView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type KeyShard$Data = {
+    $$type: 'KeyShard$Data';
+    owner_wallet: Address;
+    profile_registry: Address;
+    registered: boolean;
+    key_id: bigint;
+    auth_pubkey: bigint;
+    key_generation: bigint;
+    rotation_nonce: bigint;
+    enc_pubkey: bigint;
+    sign_pubkey: bigint;
+    scan_pubkey: bigint;
+    pq_kem_pubkey_hash: bigint;
+    pq_kem_pubkey_len: bigint;
+    pq_kem_pubkey: Cell;
+    crypto_suite_mask: bigint;
+    created_at: bigint;
+    created_lt: bigint;
+    avatar_version: bigint;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    avatar_media_format: bigint;
+    avatar_updated_at: bigint;
+}
+
+export function storeKeyShard$Data(src: KeyShard$Data) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeAddress(src.profile_registry);
+        b_0.storeBit(src.registered);
+        b_0.storeUint(src.key_id, 256);
+        const b_1 = new Builder();
+        b_1.storeUint(src.auth_pubkey, 256);
+        b_1.storeUint(src.key_generation, 32);
+        b_1.storeUint(src.rotation_nonce, 64);
+        b_1.storeUint(src.enc_pubkey, 256);
+        b_1.storeUint(src.sign_pubkey, 256);
+        const b_2 = new Builder();
+        b_2.storeUint(src.scan_pubkey, 256);
+        b_2.storeUint(src.pq_kem_pubkey_hash, 256);
+        b_2.storeUint(src.pq_kem_pubkey_len, 16);
+        b_2.storeRef(src.pq_kem_pubkey);
+        b_2.storeUint(src.crypto_suite_mask, 16);
+        b_2.storeUint(src.created_at, 64);
+        b_2.storeUint(src.created_lt, 64);
+        b_2.storeUint(src.avatar_version, 32);
+        b_2.storeUint(src.avatar_hash, 256);
+        const b_3 = new Builder();
+        b_3.storeUint(src.avatar_entry_id, 64);
+        b_3.storeUint(src.avatar_stream_id, 128);
+        b_3.storeUint(src.avatar_part_count, 16);
+        b_3.storeUint(src.avatar_media_format, 8);
+        b_3.storeUint(src.avatar_updated_at, 64);
+        b_2.storeRef(b_3.endCell());
+        b_1.storeRef(b_2.endCell());
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadKeyShard$Data(slice: Slice) {
+    const sc_0 = slice;
+    const _owner_wallet = sc_0.loadAddress();
+    const _profile_registry = sc_0.loadAddress();
+    const _registered = sc_0.loadBit();
+    const _key_id = sc_0.loadUintBig(256);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _auth_pubkey = sc_1.loadUintBig(256);
+    const _key_generation = sc_1.loadUintBig(32);
+    const _rotation_nonce = sc_1.loadUintBig(64);
+    const _enc_pubkey = sc_1.loadUintBig(256);
+    const _sign_pubkey = sc_1.loadUintBig(256);
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _scan_pubkey = sc_2.loadUintBig(256);
+    const _pq_kem_pubkey_hash = sc_2.loadUintBig(256);
+    const _pq_kem_pubkey_len = sc_2.loadUintBig(16);
+    const _pq_kem_pubkey = sc_2.loadRef();
+    const _crypto_suite_mask = sc_2.loadUintBig(16);
+    const _created_at = sc_2.loadUintBig(64);
+    const _created_lt = sc_2.loadUintBig(64);
+    const _avatar_version = sc_2.loadUintBig(32);
+    const _avatar_hash = sc_2.loadUintBig(256);
+    const sc_3 = sc_2.loadRef().beginParse();
+    const _avatar_entry_id = sc_3.loadUintBig(64);
+    const _avatar_stream_id = sc_3.loadUintBig(128);
+    const _avatar_part_count = sc_3.loadUintBig(16);
+    const _avatar_media_format = sc_3.loadUintBig(8);
+    const _avatar_updated_at = sc_3.loadUintBig(64);
+    return { $$type: 'KeyShard$Data' as const, owner_wallet: _owner_wallet, profile_registry: _profile_registry, registered: _registered, key_id: _key_id, auth_pubkey: _auth_pubkey, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function loadTupleKeyShard$Data(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _profile_registry = source.readAddress();
+    const _registered = source.readBoolean();
+    const _key_id = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
+    const _key_generation = source.readBigNumber();
+    const _rotation_nonce = source.readBigNumber();
+    const _enc_pubkey = source.readBigNumber();
+    const _sign_pubkey = source.readBigNumber();
+    const _scan_pubkey = source.readBigNumber();
+    const _pq_kem_pubkey_hash = source.readBigNumber();
+    const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
+    const _crypto_suite_mask = source.readBigNumber();
+    source = source.readTuple();
+    const _created_at = source.readBigNumber();
+    const _created_lt = source.readBigNumber();
+    const _avatar_version = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _avatar_media_format = source.readBigNumber();
+    const _avatar_updated_at = source.readBigNumber();
+    return { $$type: 'KeyShard$Data' as const, owner_wallet: _owner_wallet, profile_registry: _profile_registry, registered: _registered, key_id: _key_id, auth_pubkey: _auth_pubkey, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function loadGetterTupleKeyShard$Data(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _profile_registry = source.readAddress();
+    const _registered = source.readBoolean();
+    const _key_id = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
+    const _key_generation = source.readBigNumber();
+    const _rotation_nonce = source.readBigNumber();
+    const _enc_pubkey = source.readBigNumber();
+    const _sign_pubkey = source.readBigNumber();
+    const _scan_pubkey = source.readBigNumber();
+    const _pq_kem_pubkey_hash = source.readBigNumber();
+    const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
+    const _crypto_suite_mask = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    const _created_lt = source.readBigNumber();
+    const _avatar_version = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _avatar_media_format = source.readBigNumber();
+    const _avatar_updated_at = source.readBigNumber();
+    return { $$type: 'KeyShard$Data' as const, owner_wallet: _owner_wallet, profile_registry: _profile_registry, registered: _registered, key_id: _key_id, auth_pubkey: _auth_pubkey, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function storeTupleKeyShard$Data(source: KeyShard$Data) {
+    const builder = new TupleBuilder();
+    builder.writeAddress(source.owner_wallet);
+    builder.writeAddress(source.profile_registry);
+    builder.writeBoolean(source.registered);
+    builder.writeNumber(source.key_id);
+    builder.writeNumber(source.auth_pubkey);
+    builder.writeNumber(source.key_generation);
+    builder.writeNumber(source.rotation_nonce);
+    builder.writeNumber(source.enc_pubkey);
+    builder.writeNumber(source.sign_pubkey);
+    builder.writeNumber(source.scan_pubkey);
+    builder.writeNumber(source.pq_kem_pubkey_hash);
+    builder.writeNumber(source.pq_kem_pubkey_len);
+    builder.writeCell(source.pq_kem_pubkey);
+    builder.writeNumber(source.crypto_suite_mask);
+    builder.writeNumber(source.created_at);
+    builder.writeNumber(source.created_lt);
+    builder.writeNumber(source.avatar_version);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.avatar_media_format);
+    builder.writeNumber(source.avatar_updated_at);
+    return builder.build();
+}
+
+export function dictValueParserKeyShard$Data(): DictionaryValue<KeyShard$Data> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShard$Data(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShard$Data(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type BindProfileOfficialAthWallet = {
     $$type: 'BindProfileOfficialAthWallet';
     deployment_manifest_hash: bigint;
@@ -3129,188 +3849,196 @@ export function dictValueParserProfileAvatarTonExcessRefund(): DictionaryValue<P
     }
 }
 
-export type ProfileAvatarRecord = {
-    $$type: 'ProfileAvatarRecord';
-    owner_wallet: Address;
-    version: bigint;
-    avatar_hash: bigint;
-    avatar_entry_id: bigint;
-    avatar_stream_id: bigint;
-    avatar_part_count: bigint;
-    media_format: bigint;
-    updated_at: bigint;
+export type PruneStaleAvatarWrite = {
+    $$type: 'PruneStaleAvatarWrite';
+    write_id: bigint;
 }
 
-export function storeProfileAvatarRecord(src: ProfileAvatarRecord) {
+export function storePruneStaleAvatarWrite(src: PruneStaleAvatarWrite) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeAddress(src.owner_wallet);
-        b_0.storeUint(src.version, 32);
-        b_0.storeUint(src.avatar_hash, 256);
-        b_0.storeUint(src.avatar_entry_id, 64);
-        b_0.storeUint(src.avatar_stream_id, 128);
-        b_0.storeUint(src.avatar_part_count, 16);
-        b_0.storeUint(src.media_format, 8);
-        b_0.storeUint(src.updated_at, 64);
+        b_0.storeUint(1353060643, 32);
+        b_0.storeUint(src.write_id, 64);
     };
 }
 
-export function loadProfileAvatarRecord(slice: Slice) {
+export function loadPruneStaleAvatarWrite(slice: Slice) {
     const sc_0 = slice;
-    const _owner_wallet = sc_0.loadAddress();
-    const _version = sc_0.loadUintBig(32);
-    const _avatar_hash = sc_0.loadUintBig(256);
-    const _avatar_entry_id = sc_0.loadUintBig(64);
-    const _avatar_stream_id = sc_0.loadUintBig(128);
-    const _avatar_part_count = sc_0.loadUintBig(16);
-    const _media_format = sc_0.loadUintBig(8);
-    const _updated_at = sc_0.loadUintBig(64);
-    return { $$type: 'ProfileAvatarRecord' as const, owner_wallet: _owner_wallet, version: _version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format, updated_at: _updated_at };
+    if (sc_0.loadUint(32) !== 1353060643) { throw Error('Invalid prefix'); }
+    const _write_id = sc_0.loadUintBig(64);
+    return { $$type: 'PruneStaleAvatarWrite' as const, write_id: _write_id };
 }
 
-export function loadTupleProfileAvatarRecord(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
-    const _version = source.readBigNumber();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    const _updated_at = source.readBigNumber();
-    return { $$type: 'ProfileAvatarRecord' as const, owner_wallet: _owner_wallet, version: _version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format, updated_at: _updated_at };
+export function loadTuplePruneStaleAvatarWrite(source: TupleReader) {
+    const _write_id = source.readBigNumber();
+    return { $$type: 'PruneStaleAvatarWrite' as const, write_id: _write_id };
 }
 
-export function loadGetterTupleProfileAvatarRecord(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
-    const _version = source.readBigNumber();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    const _updated_at = source.readBigNumber();
-    return { $$type: 'ProfileAvatarRecord' as const, owner_wallet: _owner_wallet, version: _version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format, updated_at: _updated_at };
+export function loadGetterTuplePruneStaleAvatarWrite(source: TupleReader) {
+    const _write_id = source.readBigNumber();
+    return { $$type: 'PruneStaleAvatarWrite' as const, write_id: _write_id };
 }
 
-export function storeTupleProfileAvatarRecord(source: ProfileAvatarRecord) {
+export function storeTuplePruneStaleAvatarWrite(source: PruneStaleAvatarWrite) {
     const builder = new TupleBuilder();
-    builder.writeAddress(source.owner_wallet);
-    builder.writeNumber(source.version);
-    builder.writeNumber(source.avatar_hash);
-    builder.writeNumber(source.avatar_entry_id);
-    builder.writeNumber(source.avatar_stream_id);
-    builder.writeNumber(source.avatar_part_count);
-    builder.writeNumber(source.media_format);
-    builder.writeNumber(source.updated_at);
+    builder.writeNumber(source.write_id);
     return builder.build();
 }
 
-export function dictValueParserProfileAvatarRecord(): DictionaryValue<ProfileAvatarRecord> {
+export function dictValueParserPruneStaleAvatarWrite(): DictionaryValue<PruneStaleAvatarWrite> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeProfileAvatarRecord(src)).endCell());
+            builder.storeRef(beginCell().store(storePruneStaleAvatarWrite(src)).endCell());
         },
         parse: (src) => {
-            return loadProfileAvatarRecord(src.loadRef().beginParse());
+            return loadPruneStaleAvatarWrite(src.loadRef().beginParse());
         }
     }
 }
 
-export type ProfileAvatarView = {
-    $$type: 'ProfileAvatarView';
-    exists: boolean;
+export type PendingProfileAvatarWrite = {
+    $$type: 'PendingProfileAvatarWrite';
+    query_id: bigint;
+    sender_key: bigint;
+    amount: bigint;
     owner_wallet: Address;
-    version: bigint;
-    avatar_hash: bigint;
-    avatar_entry_id: bigint;
-    avatar_stream_id: bigint;
-    avatar_part_count: bigint;
-    media_format: bigint;
-    updated_at: bigint;
+    created_at: bigint;
 }
 
-export function storeProfileAvatarView(src: ProfileAvatarView) {
+export function storePendingProfileAvatarWrite(src: PendingProfileAvatarWrite) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 160);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.created_at, 64);
+    };
+}
+
+export function loadPendingProfileAvatarWrite(slice: Slice) {
+    const sc_0 = slice;
+    const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(160);
+    const _amount = sc_0.loadUintBig(128);
+    const _owner_wallet = sc_0.loadAddress();
+    const _created_at = sc_0.loadUintBig(64);
+    return { $$type: 'PendingProfileAvatarWrite' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, created_at: _created_at };
+}
+
+export function loadTuplePendingProfileAvatarWrite(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingProfileAvatarWrite' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, created_at: _created_at };
+}
+
+export function loadGetterTuplePendingProfileAvatarWrite(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingProfileAvatarWrite' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, created_at: _created_at };
+}
+
+export function storeTuplePendingProfileAvatarWrite(source: PendingProfileAvatarWrite) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.sender_key);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.created_at);
+    return builder.build();
+}
+
+export function dictValueParserPendingProfileAvatarWrite(): DictionaryValue<PendingProfileAvatarWrite> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storePendingProfileAvatarWrite(src)).endCell());
+        },
+        parse: (src) => {
+            return loadPendingProfileAvatarWrite(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type PendingProfileAvatarWriteView = {
+    $$type: 'PendingProfileAvatarWriteView';
+    exists: boolean;
+    query_id: bigint;
+    sender_key: bigint;
+    amount: bigint;
+    owner_wallet: Address;
+    created_at: bigint;
+}
+
+export function storePendingProfileAvatarWriteView(src: PendingProfileAvatarWriteView) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeBit(src.exists);
-        b_0.storeAddress(src.owner_wallet);
-        b_0.storeInt(src.version, 257);
-        b_0.storeInt(src.avatar_hash, 257);
+        b_0.storeInt(src.query_id, 257);
+        b_0.storeInt(src.sender_key, 257);
+        b_0.storeInt(src.amount, 257);
         const b_1 = new Builder();
-        b_1.storeInt(src.avatar_entry_id, 257);
-        b_1.storeInt(src.avatar_stream_id, 257);
-        b_1.storeInt(src.avatar_part_count, 257);
-        const b_2 = new Builder();
-        b_2.storeInt(src.media_format, 257);
-        b_2.storeInt(src.updated_at, 257);
-        b_1.storeRef(b_2.endCell());
+        b_1.storeAddress(src.owner_wallet);
+        b_1.storeInt(src.created_at, 257);
         b_0.storeRef(b_1.endCell());
     };
 }
 
-export function loadProfileAvatarView(slice: Slice) {
+export function loadPendingProfileAvatarWriteView(slice: Slice) {
     const sc_0 = slice;
     const _exists = sc_0.loadBit();
-    const _owner_wallet = sc_0.loadAddress();
-    const _version = sc_0.loadIntBig(257);
-    const _avatar_hash = sc_0.loadIntBig(257);
+    const _query_id = sc_0.loadIntBig(257);
+    const _sender_key = sc_0.loadIntBig(257);
+    const _amount = sc_0.loadIntBig(257);
     const sc_1 = sc_0.loadRef().beginParse();
-    const _avatar_entry_id = sc_1.loadIntBig(257);
-    const _avatar_stream_id = sc_1.loadIntBig(257);
-    const _avatar_part_count = sc_1.loadIntBig(257);
-    const sc_2 = sc_1.loadRef().beginParse();
-    const _media_format = sc_2.loadIntBig(257);
-    const _updated_at = sc_2.loadIntBig(257);
-    return { $$type: 'ProfileAvatarView' as const, exists: _exists, owner_wallet: _owner_wallet, version: _version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format, updated_at: _updated_at };
+    const _owner_wallet = sc_1.loadAddress();
+    const _created_at = sc_1.loadIntBig(257);
+    return { $$type: 'PendingProfileAvatarWriteView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, created_at: _created_at };
 }
 
-export function loadTupleProfileAvatarView(source: TupleReader) {
+export function loadTuplePendingProfileAvatarWriteView(source: TupleReader) {
     const _exists = source.readBoolean();
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _owner_wallet = source.readAddress();
-    const _version = source.readBigNumber();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    const _updated_at = source.readBigNumber();
-    return { $$type: 'ProfileAvatarView' as const, exists: _exists, owner_wallet: _owner_wallet, version: _version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format, updated_at: _updated_at };
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingProfileAvatarWriteView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, created_at: _created_at };
 }
 
-export function loadGetterTupleProfileAvatarView(source: TupleReader) {
+export function loadGetterTuplePendingProfileAvatarWriteView(source: TupleReader) {
     const _exists = source.readBoolean();
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _owner_wallet = source.readAddress();
-    const _version = source.readBigNumber();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    const _updated_at = source.readBigNumber();
-    return { $$type: 'ProfileAvatarView' as const, exists: _exists, owner_wallet: _owner_wallet, version: _version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format, updated_at: _updated_at };
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingProfileAvatarWriteView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, created_at: _created_at };
 }
 
-export function storeTupleProfileAvatarView(source: ProfileAvatarView) {
+export function storeTuplePendingProfileAvatarWriteView(source: PendingProfileAvatarWriteView) {
     const builder = new TupleBuilder();
     builder.writeBoolean(source.exists);
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.sender_key);
+    builder.writeNumber(source.amount);
     builder.writeAddress(source.owner_wallet);
-    builder.writeNumber(source.version);
-    builder.writeNumber(source.avatar_hash);
-    builder.writeNumber(source.avatar_entry_id);
-    builder.writeNumber(source.avatar_stream_id);
-    builder.writeNumber(source.avatar_part_count);
-    builder.writeNumber(source.media_format);
-    builder.writeNumber(source.updated_at);
+    builder.writeNumber(source.created_at);
     return builder.build();
 }
 
-export function dictValueParserProfileAvatarView(): DictionaryValue<ProfileAvatarView> {
+export function dictValueParserPendingProfileAvatarWriteView(): DictionaryValue<PendingProfileAvatarWriteView> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeProfileAvatarView(src)).endCell());
+            builder.storeRef(beginCell().store(storePendingProfileAvatarWriteView(src)).endCell());
         },
         parse: (src) => {
-            return loadProfileAvatarView(src.loadRef().beginParse());
+            return loadPendingProfileAvatarWriteView(src.loadRef().beginParse());
         }
     }
 }
@@ -3554,7 +4282,8 @@ export type ProfileRegistryGlobalView = {
     treasury_ath_receiver_address: Address;
     genesis_controller_address: Address;
     profile_count: bigint;
-    avatar_record_count: bigint;
+    pending_avatar_write_count: bigint;
+    next_avatar_write_id: bigint;
     treasury_due_ath: bigint;
     burn_due_ath: bigint;
     pending_treasury_flush_count: bigint;
@@ -3575,12 +4304,15 @@ export function storeProfileRegistryGlobalView(src: ProfileRegistryGlobalView) {
         b_1.storeAddress(src.genesis_controller_address);
         const b_2 = new Builder();
         b_2.storeInt(src.profile_count, 257);
-        b_2.storeInt(src.avatar_record_count, 257);
-        b_2.storeInt(src.treasury_due_ath, 257);
+        b_2.storeInt(src.pending_avatar_write_count, 257);
+        b_2.storeInt(src.next_avatar_write_id, 257);
         const b_3 = new Builder();
+        b_3.storeInt(src.treasury_due_ath, 257);
         b_3.storeInt(src.burn_due_ath, 257);
         b_3.storeInt(src.pending_treasury_flush_count, 257);
-        b_3.storeInt(src.pending_burn_flush_count, 257);
+        const b_4 = new Builder();
+        b_4.storeInt(src.pending_burn_flush_count, 257);
+        b_3.storeRef(b_4.endCell());
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
@@ -3600,13 +4332,15 @@ export function loadProfileRegistryGlobalView(slice: Slice) {
     const _genesis_controller_address = sc_1.loadAddress();
     const sc_2 = sc_1.loadRef().beginParse();
     const _profile_count = sc_2.loadIntBig(257);
-    const _avatar_record_count = sc_2.loadIntBig(257);
-    const _treasury_due_ath = sc_2.loadIntBig(257);
+    const _pending_avatar_write_count = sc_2.loadIntBig(257);
+    const _next_avatar_write_id = sc_2.loadIntBig(257);
     const sc_3 = sc_2.loadRef().beginParse();
+    const _treasury_due_ath = sc_3.loadIntBig(257);
     const _burn_due_ath = sc_3.loadIntBig(257);
     const _pending_treasury_flush_count = sc_3.loadIntBig(257);
-    const _pending_burn_flush_count = sc_3.loadIntBig(257);
-    return { $$type: 'ProfileRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, avatar_record_count: _avatar_record_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count };
+    const sc_4 = sc_3.loadRef().beginParse();
+    const _pending_burn_flush_count = sc_4.loadIntBig(257);
+    return { $$type: 'ProfileRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, pending_avatar_write_count: _pending_avatar_write_count, next_avatar_write_id: _next_avatar_write_id, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count };
 }
 
 export function loadTupleProfileRegistryGlobalView(source: TupleReader) {
@@ -3619,12 +4353,13 @@ export function loadTupleProfileRegistryGlobalView(source: TupleReader) {
     const _treasury_ath_receiver_address = source.readAddress();
     const _genesis_controller_address = source.readAddress();
     const _profile_count = source.readBigNumber();
-    const _avatar_record_count = source.readBigNumber();
+    const _pending_avatar_write_count = source.readBigNumber();
+    const _next_avatar_write_id = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flush_count = source.readBigNumber();
-    return { $$type: 'ProfileRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, avatar_record_count: _avatar_record_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count };
+    return { $$type: 'ProfileRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, pending_avatar_write_count: _pending_avatar_write_count, next_avatar_write_id: _next_avatar_write_id, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count };
 }
 
 export function loadGetterTupleProfileRegistryGlobalView(source: TupleReader) {
@@ -3637,12 +4372,13 @@ export function loadGetterTupleProfileRegistryGlobalView(source: TupleReader) {
     const _treasury_ath_receiver_address = source.readAddress();
     const _genesis_controller_address = source.readAddress();
     const _profile_count = source.readBigNumber();
-    const _avatar_record_count = source.readBigNumber();
+    const _pending_avatar_write_count = source.readBigNumber();
+    const _next_avatar_write_id = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flush_count = source.readBigNumber();
-    return { $$type: 'ProfileRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, avatar_record_count: _avatar_record_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count };
+    return { $$type: 'ProfileRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, pending_avatar_write_count: _pending_avatar_write_count, next_avatar_write_id: _next_avatar_write_id, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count };
 }
 
 export function storeTupleProfileRegistryGlobalView(source: ProfileRegistryGlobalView) {
@@ -3656,7 +4392,8 @@ export function storeTupleProfileRegistryGlobalView(source: ProfileRegistryGloba
     builder.writeAddress(source.treasury_ath_receiver_address);
     builder.writeAddress(source.genesis_controller_address);
     builder.writeNumber(source.profile_count);
-    builder.writeNumber(source.avatar_record_count);
+    builder.writeNumber(source.pending_avatar_write_count);
+    builder.writeNumber(source.next_avatar_write_id);
     builder.writeNumber(source.treasury_due_ath);
     builder.writeNumber(source.burn_due_ath);
     builder.writeNumber(source.pending_treasury_flush_count);
@@ -3686,11 +4423,11 @@ export type ProfileRegistry$Data = {
     genesis_config_hash: bigint;
     genesis_controller_address: Address;
     profile_count: bigint;
-    avatar_record_count: bigint;
     treasury_due_ath: bigint;
     burn_due_ath: bigint;
-    current_avatar_versions: Dictionary<Address, bigint>;
-    avatar_records: Dictionary<bigint, ProfileAvatarRecord>;
+    pending_avatar_writes: Dictionary<bigint, PendingProfileAvatarWrite>;
+    pending_avatar_write_count: bigint;
+    next_avatar_write_id: bigint;
     pending_treasury_flushes: Dictionary<bigint, PendingProfileTreasuryFlush>;
     pending_treasury_flush_count: bigint;
     pending_burn_flushes: Dictionary<bigint, PendingProfileBurnFlush>;
@@ -3710,12 +4447,12 @@ export function storeProfileRegistry$Data(src: ProfileRegistry$Data) {
         b_1.storeUint(src.genesis_config_hash, 256);
         b_1.storeAddress(src.genesis_controller_address);
         b_1.storeUint(src.profile_count, 64);
-        b_1.storeUint(src.avatar_record_count, 64);
+        b_1.storeUint(src.treasury_due_ath, 128);
         const b_2 = new Builder();
-        b_2.storeUint(src.treasury_due_ath, 128);
         b_2.storeUint(src.burn_due_ath, 128);
-        b_2.storeDict(src.current_avatar_versions, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
-        b_2.storeDict(src.avatar_records, Dictionary.Keys.BigInt(257), dictValueParserProfileAvatarRecord());
+        b_2.storeDict(src.pending_avatar_writes, Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarWrite());
+        b_2.storeUint(src.pending_avatar_write_count, 64);
+        b_2.storeUint(src.next_avatar_write_id, 64);
         b_2.storeDict(src.pending_treasury_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingProfileTreasuryFlush());
         b_2.storeUint(src.pending_treasury_flush_count, 64);
         b_2.storeDict(src.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingProfileBurnFlush());
@@ -3737,17 +4474,17 @@ export function loadProfileRegistry$Data(slice: Slice) {
     const _genesis_config_hash = sc_1.loadUintBig(256);
     const _genesis_controller_address = sc_1.loadAddress();
     const _profile_count = sc_1.loadUintBig(64);
-    const _avatar_record_count = sc_1.loadUintBig(64);
+    const _treasury_due_ath = sc_1.loadUintBig(128);
     const sc_2 = sc_1.loadRef().beginParse();
-    const _treasury_due_ath = sc_2.loadUintBig(128);
     const _burn_due_ath = sc_2.loadUintBig(128);
-    const _current_avatar_versions = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_2);
-    const _avatar_records = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserProfileAvatarRecord(), sc_2);
+    const _pending_avatar_writes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarWrite(), sc_2);
+    const _pending_avatar_write_count = sc_2.loadUintBig(64);
+    const _next_avatar_write_id = sc_2.loadUintBig(64);
     const _pending_treasury_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileTreasuryFlush(), sc_2);
     const _pending_treasury_flush_count = sc_2.loadUintBig(64);
     const _pending_burn_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileBurnFlush(), sc_2);
     const _pending_burn_flush_count = sc_2.loadUintBig(64);
-    return { $$type: 'ProfileRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, avatar_record_count: _avatar_record_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, current_avatar_versions: _current_avatar_versions, avatar_records: _avatar_records, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count };
+    return { $$type: 'ProfileRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_avatar_writes: _pending_avatar_writes, pending_avatar_write_count: _pending_avatar_write_count, next_avatar_write_id: _next_avatar_write_id, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count };
 }
 
 export function loadTupleProfileRegistry$Data(source: TupleReader) {
@@ -3760,17 +4497,17 @@ export function loadTupleProfileRegistry$Data(source: TupleReader) {
     const _genesis_config_hash = source.readBigNumber();
     const _genesis_controller_address = source.readAddress();
     const _profile_count = source.readBigNumber();
-    const _avatar_record_count = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
-    const _current_avatar_versions = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _avatar_records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserProfileAvatarRecord(), source.readCellOpt());
+    const _pending_avatar_writes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarWrite(), source.readCellOpt());
+    const _pending_avatar_write_count = source.readBigNumber();
+    const _next_avatar_write_id = source.readBigNumber();
     source = source.readTuple();
     const _pending_treasury_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileTreasuryFlush(), source.readCellOpt());
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileBurnFlush(), source.readCellOpt());
     const _pending_burn_flush_count = source.readBigNumber();
-    return { $$type: 'ProfileRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, avatar_record_count: _avatar_record_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, current_avatar_versions: _current_avatar_versions, avatar_records: _avatar_records, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count };
+    return { $$type: 'ProfileRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_avatar_writes: _pending_avatar_writes, pending_avatar_write_count: _pending_avatar_write_count, next_avatar_write_id: _next_avatar_write_id, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count };
 }
 
 export function loadGetterTupleProfileRegistry$Data(source: TupleReader) {
@@ -3783,16 +4520,16 @@ export function loadGetterTupleProfileRegistry$Data(source: TupleReader) {
     const _genesis_config_hash = source.readBigNumber();
     const _genesis_controller_address = source.readAddress();
     const _profile_count = source.readBigNumber();
-    const _avatar_record_count = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
-    const _current_avatar_versions = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _avatar_records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserProfileAvatarRecord(), source.readCellOpt());
+    const _pending_avatar_writes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarWrite(), source.readCellOpt());
+    const _pending_avatar_write_count = source.readBigNumber();
+    const _next_avatar_write_id = source.readBigNumber();
     const _pending_treasury_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileTreasuryFlush(), source.readCellOpt());
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileBurnFlush(), source.readCellOpt());
     const _pending_burn_flush_count = source.readBigNumber();
-    return { $$type: 'ProfileRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, avatar_record_count: _avatar_record_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, current_avatar_versions: _current_avatar_versions, avatar_records: _avatar_records, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count };
+    return { $$type: 'ProfileRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, genesis_controller_address: _genesis_controller_address, profile_count: _profile_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_avatar_writes: _pending_avatar_writes, pending_avatar_write_count: _pending_avatar_write_count, next_avatar_write_id: _next_avatar_write_id, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count };
 }
 
 export function storeTupleProfileRegistry$Data(source: ProfileRegistry$Data) {
@@ -3806,11 +4543,11 @@ export function storeTupleProfileRegistry$Data(source: ProfileRegistry$Data) {
     builder.writeNumber(source.genesis_config_hash);
     builder.writeAddress(source.genesis_controller_address);
     builder.writeNumber(source.profile_count);
-    builder.writeNumber(source.avatar_record_count);
     builder.writeNumber(source.treasury_due_ath);
     builder.writeNumber(source.burn_due_ath);
-    builder.writeCell(source.current_avatar_versions.size > 0 ? beginCell().storeDictDirect(source.current_avatar_versions, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257)).endCell() : null);
-    builder.writeCell(source.avatar_records.size > 0 ? beginCell().storeDictDirect(source.avatar_records, Dictionary.Keys.BigInt(257), dictValueParserProfileAvatarRecord()).endCell() : null);
+    builder.writeCell(source.pending_avatar_writes.size > 0 ? beginCell().storeDictDirect(source.pending_avatar_writes, Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarWrite()).endCell() : null);
+    builder.writeNumber(source.pending_avatar_write_count);
+    builder.writeNumber(source.next_avatar_write_id);
     builder.writeCell(source.pending_treasury_flushes.size > 0 ? beginCell().storeDictDirect(source.pending_treasury_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingProfileTreasuryFlush()).endCell() : null);
     builder.writeNumber(source.pending_treasury_flush_count);
     builder.writeCell(source.pending_burn_flushes.size > 0 ? beginCell().storeDictDirect(source.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingProfileBurnFlush()).endCell() : null);
@@ -3975,20 +4712,28 @@ const ATHWallet_types: ABIType[] = [
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
+    {"name":"KeyShardRegisterKeys","header":1263748913,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"scan_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
+    {"name":"KeyShardReplaceKeys","header":1263748914,"fields":[{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}},{"name":"envelope_padding","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"KeyShardTopUpStorageReserve","header":1263748916,"fields":[]},
+    {"name":"KeyShardSetAvatarPointer","header":1263748917,"fields":[{"name":"write_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"KeyShardAvatarPointerAck","header":1263748918,"fields":[{"name":"write_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"version","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"KeyShardView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"key_generation","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"rotation_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"enc_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sign_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"scan_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_register_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_replace_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"profile_registry","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_version","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_part_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_media_format","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_updated_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"KeyShard$Data","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_registry","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered","type":{"kind":"simple","type":"bool","optional":false}},{"name":"key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"rotation_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"scan_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_version","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"avatar_media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"avatar_updated_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"BindProfileOfficialAthWallet","header":1353060609,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"FlushProfileTreasuryAthDue","header":1353060624,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"FlushProfileBurnAthDue","header":1353060625,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ProfileRegistryTopUpStorageReserve","header":1353060640,"fields":[]},
     {"name":"ProfileAvatarTonExcessRefund","header":1353060641,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"ProfileAvatarRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"version","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"updated_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"ProfileAvatarView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"version","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_part_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"media_format","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"updated_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"PruneStaleAvatarWrite","header":1353060643,"fields":[{"name":"write_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"PendingProfileAvatarWrite","header":null,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"PendingProfileAvatarWriteView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sender_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingProfileTreasuryFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"PendingProfileBurnFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"PendingProfileTreasuryFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingProfileBurnFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"ProfileRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"ProfileRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"current_avatar_versions","type":{"kind":"dict","key":"address","value":"int"}},{"name":"avatar_records","type":{"kind":"dict","key":"int","value":"ProfileAvatarRecord","valueFormat":"ref"}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingProfileTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingProfileBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"ProfileRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_avatar_write_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"next_avatar_write_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"ProfileRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"pending_avatar_writes","type":{"kind":"dict","key":"int","value":"PendingProfileAvatarWrite","valueFormat":"ref"}},{"name":"pending_avatar_write_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"next_avatar_write_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingProfileTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingProfileBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
 ]
 
 const ATHWallet_opcodes = {
@@ -4019,12 +4764,18 @@ const ATHWallet_opcodes = {
     "JettonTransferNotification": 1935855772,
     "JettonExcesses": 3576854235,
     "ATHWalletTopUpStorageReserve": 1096042503,
+    "KeyShardRegisterKeys": 1263748913,
+    "KeyShardReplaceKeys": 1263748914,
+    "KeyShardTopUpStorageReserve": 1263748916,
+    "KeyShardSetAvatarPointer": 1263748917,
+    "KeyShardAvatarPointerAck": 1263748918,
     "BindProfileOfficialAthWallet": 1353060609,
     "SealGenesis": 974311853,
     "FlushProfileTreasuryAthDue": 1353060624,
     "FlushProfileBurnAthDue": 1353060625,
     "ProfileRegistryTopUpStorageReserve": 1353060640,
     "ProfileAvatarTonExcessRefund": 1353060641,
+    "PruneStaleAvatarWrite": 1353060643,
 }
 
 const ATHWallet_getters: ABIGetter[] = [
@@ -4083,10 +4834,28 @@ export const ATH_SENDER_KEY_MOD = 1461501637330902918203684832716283019655932542
 export const ATH_PENDING_NOTIFICATION_TTL = 86400n;
 export const ATH_REGISTRY_PENDING_TTL = 604800n;
 export const JETTON_EXCESSES_VALUE = 1000000n;
+export const KS_CRYPTO_SUITE_HYBRID = 2n;
+export const KS_MLKEM768_PUBKEY_LEN = 1184n;
+export const KS_MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES = 127n;
+export const KS_MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES = 41n;
+export const KS_MLKEM768_PUBKEY_SNAKE_CELLS = 10n;
+export const KS_MLKEM768_PUBKEY_SNAKE_BITS = 9472n;
+export const KS_MLKEM768_PUBKEY_SNAKE_REFS = 9n;
+export const KS_UINT32_MAX = 4294967295n;
+export const KS_KEY_ID_DOMAIN = 1262836041n;
+export const KS_REPLACE_KEYS_SIGNING_DOMAIN = 1263749937n;
+export const KS_YEARS_FUNDED = 10n;
+export const KS_BASE_ENDOWMENT = 45000000n;
+export const KS_REGISTER_GAS = 12000000n;
+export const KS_MIN_REGISTER_VALUE = 57000000n;
+export const KS_MIN_REPLACE_VALUE = 12000000n;
+export const KS_AVATAR_WRITE_GAS = 8000000n;
 export const PROFILE_AVATAR_PRICE_ATH = 100000000000n;
-export const PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT = 36000000n;
-export const PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT = 9000000n;
 export const PROFILE_STATE_GROWTH_EXEC_RESERVE = 3000000n;
+export const PROFILE_KEY_SHARD_WRITE_VALUE = 50000000n;
+export const PROFILE_ATH_NOTIFICATION_REFUND_VALUE = 45000000n;
+export const PROFILE_AVATAR_SETTLE_EXEC_RESERVE = 5000000n;
+export const PROFILE_AVATAR_WRITE_STALE_TTL = 604800n;
 export const PROFILE_ATH_NOTIFICATION_ACK_VALUE = 1000000n;
 export const PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE = 100000n;
 export const PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE = 2000000n;
@@ -4098,7 +4867,6 @@ export const PROFILE_SPLIT_BASE_BPS = 10000n;
 export const PROFILE_TREASURY_SHARE_BPS = 5000n;
 export const PROFILE_AVATAR_MAX_PARTS = 2n;
 export const PROFILE_AVATAR_MEDIA_FORMAT_WEBP = 1n;
-export const PROFILE_AVATAR_RECORD_ID_DOMAIN = 1347567958n;
 
 export class ATHWallet implements Contract {
     

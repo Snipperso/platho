@@ -21,7 +21,7 @@
 // evidence worth having, given the failure mode above.
 
 import { beginCell, parseBocBase64, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=1';
-import { RECORDSHARD_CODE_BOC, INTROSHARD_CODE_BOC, RECOVERYSHARD_CODE_BOC } from './shard-code.mjs?v=1';
+import { RECORDSHARD_CODE_BOC, INTROSHARD_CODE_BOC, RECOVERYSHARD_CODE_BOC, KEYSHARD_CODE_BOC } from './shard-code.mjs?v=2';
 
 const CODE_CACHE = new Map();
 
@@ -42,10 +42,31 @@ function storeInt257(builder, value, name) {
   return builder;
 }
 
+/** Tact stores an Address init argument as a standard address slice: addr_std tag 10, anycast 0, workchain int8,
+ *  hash 256. KeyShard is the first shard whose init arguments are addresses rather than integers, and getting the
+ *  267-bit layout wrong here would produce a plausible-looking address that no contract occupies — the failure the
+ *  header of this file is about. Pinned against @ton/core in tests/shard-browser-address.test.ts. */
+function storeAddressArg(builder, value, name) {
+  const raw = String(value ?? '');
+  const match = /^(-?\d+):([0-9a-fA-F]{64})$/.exec(raw.trim());
+  if (!match) throw new RangeError(`${name} must be a raw "workchain:hex" address, got ${JSON.stringify(value)}`);
+  const workchain = Number(match[1]);
+  if (!Number.isInteger(workchain) || workchain < -128 || workchain > 127) {
+    throw new RangeError(`${name} workchain ${workchain} does not fit int8`);
+  }
+  builder.uint(0b100, 3, `${name} addr_std tag + anycast`);
+  builder.uint(BigInt(workchain & 0xff), 8, `${name} workchain`);
+  builder.uint(BigInt(`0x${match[2]}`), 256, `${name} hash`);
+  return builder;
+}
+
 function initDataCell(args) {
   const builder = beginCell();
   builder.uint(0, 1, 'tact init prefix');
-  for (const [name, value] of args) storeInt257(builder, value, name);
+  for (const [name, value, kind] of args) {
+    if (kind === 'address') storeAddressArg(builder, value, name);
+    else storeInt257(builder, value, name);
+  }
   return builder.endCell();
 }
 
@@ -95,6 +116,23 @@ export const introShardAddressBytes = (epoch, bucket) =>
 /** RECOVERY: the user's own slot, epoch-independent. */
 export const recoveryShardAddressBytes = (selfBucketKey) =>
   addressFor(RECOVERYSHARD_CODE_BOC, [['self_bucket_key', selfBucketKey]]);
+
+/**
+ * KEY: a wallet's identity — public keys, and since 2026-07-21 the paid avatar pointer that ProfileRegistry used
+ * to hold in a map with a 13,076-profile ceiling.
+ *
+ * The registry address is the SECOND init argument, not a constant in the shard's code, which is what let the
+ * registry embed KeyShard's code and derive these addresses itself with no build cycle and no genesis bind. It
+ * must therefore be the SAME registry the client reads from: derive against a different one and you get a live,
+ * well-formed address that simply holds nothing — the exact silent failure this module exists to prevent.
+ *
+ * Both arguments are raw `workchain:hex` addresses, the form rawAddress() produces.
+ */
+export const keyShardAddressBytes = (ownerWallet, profileRegistry) =>
+  addressFor(KEYSHARD_CODE_BOC, [['owner_wallet', ownerWallet, 'address'], ['profile_registry', profileRegistry, 'address']]);
+
+export const keyShardStateInit = (ownerWallet, profileRegistry) =>
+  shardStateInitCell(KEYSHARD_CODE_BOC, [['owner_wallet', ownerWallet, 'address'], ['profile_registry', profileRegistry, 'address']]);
 
 /** Raw `workchain:hex` form — what toncenter accepts, and what a test can compare without an Address class. */
 export function rawAddress({ workchain, hash }) {

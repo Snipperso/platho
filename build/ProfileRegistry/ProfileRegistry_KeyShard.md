@@ -1,6 +1,6 @@
 # Tact compilation report
-Contract: ATHWallet
-BoC Size: 6202 bytes
+Contract: KeyShard
+BoC Size: 2896 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 64
@@ -262,14 +262,10 @@ TL-B: `_ official_ath_wallet_address:address ath_master_address:address treasury
 Signature: `ProfileRegistry{official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,genesis_controller_address:address,profile_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,pending_avatar_writes:dict<int, ^PendingProfileAvatarWrite{query_id:uint64,sender_key:uint160,amount:uint128,owner_wallet:address,created_at:uint64}>,pending_avatar_write_count:uint64,next_avatar_write_id:uint64,pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint64}>,pending_burn_flush_count:uint64}`
 
 ## Get methods
-Total get methods: 2
+Total get methods: 1
 
-## get_wallet_data
+## get_view
 No arguments
-
-## get_pending_notification
-Argument: query_id
-Argument: sender_key
 
 ## Exit codes
 * 2: Stack underflow
@@ -313,13 +309,13 @@ Argument: sender_key
 
 ```mermaid
 graph TD
-ATHWallet
-ATHWallet --> BaseTrait
+KeyShard
+KeyShard --> BaseTrait
 ```
 
 ## Contract dependency diagram
 
 ```mermaid
 graph TD
-ATHWallet
+KeyShard
 ```

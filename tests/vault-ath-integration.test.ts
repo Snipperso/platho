@@ -1074,7 +1074,11 @@ describe('Vault ATH integration with production ATHWallet', () => {
     });
     await ctx.blockchain.sendMessage(external({ to: ctx.vault.address, body }));
 
-    expect((await ctx.profileRegistry.getGetAvatar(ctx.user.address)).exists).toBe(false); // rejected -> no avatar
+    // The pointer left ProfileRegistry for the buyer's own KeyShard on 2026-07-21, so "no avatar was set" is now
+    // read as "the shard was never even written": a rejected payer never reaches the write, so the account does
+    // not exist at all. profile_count is the registry-side proof of the same fact.
+    expect((await ctx.profileRegistry.getGetGlobal()).profile_count).toBe(0n); // rejected -> no avatar
+    expect((await ctx.profileRegistry.getGetGlobal()).pending_avatar_write_count).toBe(0n);
     expect((await ctx.vault.getGetUser(ctx.user.address)).ath_balance).toBe(PROFILE_AVATAR_PRICE_ATH * 2n); // refunded in full
     expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n); // pending settled via reject/bounce
   });

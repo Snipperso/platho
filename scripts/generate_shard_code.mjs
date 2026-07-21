@@ -7,7 +7,10 @@
 // shard-browser-address.test.ts runs this and fails if the checked-in file differs.
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const SHARDS = ['RecordShard', 'IntroShard', 'RecoveryShard'];
+// KeyShard is here for the same reason as the other three even though it is not epoch-keyed: its address is
+// hash(code, data) over a code cell the browser cannot import, and both the identity read and the avatar read
+// now resolve through it.
+const SHARDS = ['RecordShard', 'IntroShard', 'RecoveryShard', 'KeyShard'];
 
 export function renderShardCodeModule() {
   const lines = [

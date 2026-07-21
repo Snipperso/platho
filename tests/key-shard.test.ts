@@ -28,6 +28,12 @@ const MIN_REGISTER_VALUE = 57_000_000n;   // BASE_ENDOWMENT + KS_REGISTER_GAS
 const MIN_REPLACE_VALUE = 12_000_000n;
 const SIGN_DOMAIN = 0x4b534b31;
 
+// KeyShard's second init argument: the ProfileRegistry allowed to write its avatar pointer (see
+// tests/profile-avatar-two-phase.test.ts for the lane itself). It enters the ADDRESS, which is what makes a
+// shard deployed against a fake registry unreachable — nobody derives it. Any address works for the key tests
+// here; what matters is that it is the same one throughout, exactly as a live client would use.
+const REGISTRY = Address.parse('EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7');
+
 /** A well-formed ML-KEM-768 pubkey: 1184 bytes as a 41 + 127*9 snake, which is what gate 22108 demands. */
 const mlkemSnake = (fill: number): Cell => {
   const buf = Buffer.alloc(1184, fill);
@@ -79,7 +85,7 @@ async function setup() {
 }
 
 /** The shard of a wallet, at the address a CLIENT computes with nothing but that wallet's address. */
-const shardOf = async (owner: Address) => contractAddress(0, await KeyShard.init(owner));
+const shardOf = async (owner: Address) => contractAddress(0, await KeyShard.init(owner, REGISTRY));
 
 describe('KEY-SHARD — one wallet, one contract, no directory to fill up', () => {
   it('KS-01: the address is a pure function of the wallet — the client needs no directory at all', async () => {
@@ -102,7 +108,7 @@ describe('KEY-SHARD — one wallet, one contract, no directory to fill up', () =
     const bc = await setup();
     const alice = await bc.treasury('ks-alice');
     const mallory = await bc.treasury('ks-mallory');
-    const shard = bc.openContract(await KeyShard.fromInit(alice.address));
+    const shard = bc.openContract(await KeyShard.fromInit(alice.address, REGISTRY));
     const auth = authKey(0x11);
 
     // The stranger attaches plenty of value and a perfectly valid bundle. The address commits to Alice, so
@@ -129,7 +135,7 @@ describe('KEY-SHARD — one wallet, one contract, no directory to fill up', () =
 
     for (let i = 0; i < 8; i += 1) {
       const w = await bc.treasury(`ks-user-${i}`);
-      const shard = bc.openContract(await KeyShard.fromInit(w.address));
+      const shard = bc.openContract(await KeyShard.fromInit(w.address, REGISTRY));
       // Distinct ML-KEM blob and clock per user so identical cells cannot be deduplicated into a flat count —
       // the trap that once measured Vault at 17 cells when the truth was 76.
       bc.now = CLOCK + i * 97;
@@ -142,7 +148,7 @@ describe('KEY-SHARD — one wallet, one contract, no directory to fill up', () =
 
     // And rotation must be net-zero, or a chatty user eats their own account instead of the registry's.
     const w = await bc.treasury('ks-rotator');
-    const shard = bc.openContract(await KeyShard.fromInit(w.address));
+    const shard = bc.openContract(await KeyShard.fromInit(w.address, REGISTRY));
     await shard.send(w.getSender(), { value: toNano('0.1') }, bundle(1, auth.pub) as any);
     const before = await dataCells(bc, shard.address);
     for (let i = 0; i < 6; i += 1) {
@@ -161,7 +167,7 @@ describe('KEY-SHARD — one wallet, one contract, no directory to fill up', () =
     // actually charges: advance the clock a year and take the storage phase's own figure.
     const bc = await setup();
     const w = await bc.treasury('ks-rent');
-    const shard = bc.openContract(await KeyShard.fromInit(w.address));
+    const shard = bc.openContract(await KeyShard.fromInit(w.address, REGISTRY));
     await shard.send(w.getSender(), { value: toNano('0.1') }, bundle(7, authKey(0x31).pub) as any);
 
     const held = (await bc.getContract(shard.address)).balance;
@@ -186,7 +192,7 @@ describe('KEY-SHARD — one wallet, one contract, no directory to fill up', () =
   it('KS-03: the register floor is real, and change comes back', async () => {
     const bc = await setup();
     const w = await bc.treasury('ks-floor');
-    const shard = bc.openContract(await KeyShard.fromInit(w.address));
+    const shard = bc.openContract(await KeyShard.fromInit(w.address, REGISTRY));
     const auth = authKey(0x41);
 
     const low = await shard.send(w.getSender(), { value: MIN_REGISTER_VALUE - 1n }, bundle(2, auth.pub) as any);
@@ -215,7 +221,7 @@ describe('KEY-SHARD — one wallet, one contract, no directory to fill up', () =
     // Here the WALLET outranks the key it delegated to, so recovery costs one transaction.
     const bc = await setup();
     const w = await bc.treasury('ks-brick');
-    const shard = bc.openContract(await KeyShard.fromInit(w.address));
+    const shard = bc.openContract(await KeyShard.fromInit(w.address, REGISTRY));
 
     const lost = authKey(0x51);       // an auth key whose secret the user does not actually have
     await shard.send(w.getSender(), { value: toNano('0.1') }, bundle(5, lost.pub) as any);
@@ -261,8 +267,8 @@ describe('KEY-SHARD — one wallet, one contract, no directory to fill up', () =
     const a = await bc.treasury('ks-rot-a');
     const b = await bc.treasury('ks-rot-b');
     const auth = authKey(0x61);
-    const shardA = bc.openContract(await KeyShard.fromInit(a.address));
-    const shardB = bc.openContract(await KeyShard.fromInit(b.address));
+    const shardA = bc.openContract(await KeyShard.fromInit(a.address, REGISTRY));
+    const shardB = bc.openContract(await KeyShard.fromInit(b.address, REGISTRY));
     await shardA.send(a.getSender(), { value: toNano('0.1') }, bundle(11, auth.pub) as any);
     await shardB.send(b.getSender(), { value: toNano('0.1') }, bundle(12, auth.pub) as any);
 
