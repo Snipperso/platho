@@ -8,8 +8,8 @@ import { buildPublicPublishWalletMessage } from '../web/public-lane-send.mjs';
 import { createPublicPostPayloadV2, readPublicPostPayloadV2, serializeBoc } from '../web/pwa-contract-transactions.mjs';
 import { publicPublishValueForKind } from '../web/publish-price.mjs';
 import {
-  publicChannelPartitionKey, publicThreadPartitionKey, publicPostUid,
-  publicWalletHash, publicEpochTag, publicEraOf, addrKey,
+  publicChannelPartitionKey, publicThreadPartitionKey, publicBeaconPartitionKey, publicPostUid,
+  publicWalletHash, publicEpochTag, publicEraOf, PUBLIC_BEACON_READ_SPACE, addrKey,
 } from '../web/shard-discovery.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -190,5 +190,35 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
 
     expect(comments.length, 'the prior-era comment is still found via the era window').toBe(1);
     expect(readPublicPostPayloadV2({ header: comments[0].header, body: comments[0].body }).text).toBe('written last era');
+  }, 300_000);
+
+  it('PLE2E-04: a channel that announces to its beacon bucket is found by sweepChannelCatalog', async () => {
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    await deployFeeSink(bc, { funderSeed: 'ple2e-beacon-sink' });
+    const channel = await bc.treasury('ple2e-beacon-channel');
+
+    // The announce: a BEACON PublicPublish into the deterministic bucket = walletHash % PUBLIC_BEACON_READ_SPACE.
+    const walletHash = publicWalletHash(channel.address.toString());
+    const bucket = Number(walletHash % BigInt(PUBLIC_BEACON_READ_SPACE));
+    const beaconPk = await publicBeaconPartitionKey(bucket);
+    const beaconEpochTag = publicEpochTag(2, publicEraOf(2, CLOCK));
+    const card = await createPublicPostPayloadV2({ type: 'document', bytes: new Uint8Array(64).fill(0x7a), streamId: '05'.repeat(16), createdAtSec: CLOCK });
+    const built = await buildPublicPublishWalletMessage({
+      kind: 2, keyArg: BigInt(bucket), header: card.headerCell, body: card.bodyCell,
+      value: publicPublishValueForKind(2), partitionKey: beaconPk, epochTag: beaconEpochTag,
+    });
+    const dest = await sendBuilt(channel, built);
+    const beaconShard = bc.openContract(PublicShard.fromAddress(dest));
+    expect((await beaconShard.getGetView()).entry_count, 'the announcement is stored in the beacon bucket').toBe(1n);
+
+    const lane = laneOverShards(bc, new Map([[addrKey(dest.toString()), { shard: beaconShard, messages: [{ body: built.body, source: channel.address.toString() }] }]]));
+    const catalog = await lane.sweepChannelCatalog({ eraWindow: 1, topBuckets: 32 });
+
+    const found = catalog.find((c: any) => addrKey(c.channelWallet) === addrKey(channel.address.toString()));
+    expect(found, 'the announcing channel appears in the catalogue, attributed to its own wallet').toBeTruthy();
+    // the card is the beacon body — the app decodes it into a profile; here we assert it round-trips as the doc body
+    const decoded = readPublicPostPayloadV2({ header: card.headerCell, body: found.card });
+    expect(decoded.type).toBe('document');
   }, 300_000);
 });

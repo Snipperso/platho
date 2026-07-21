@@ -175,10 +175,12 @@ import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
   publicAvatarPartitionKey,
+  publicBeaconPartitionKey,
   publicPostUid,
   publicWalletHash,
   publicEpochTag,
   publicEraOf,
+  PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
 } from './shard-discovery.mjs?v=3';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=40';
@@ -10463,10 +10465,49 @@ async function discoverChannelsViaProfileChain(provider, address, readOptions, o
   return results;
 }
 
+// clean-17 Discover: sweep the BEACON directory (public-lane ranks live buckets by entry_count, NOT lt) and adapt
+// each announcement to the 4-field shape renderPublicDiscovery consumes. The beacon card body is the raw profile
+// document (a single-part 'document' body), so it decodes header-free via readProfileDocument.
+async function discoverChannelsFromBeacon() {
+  const lane = directPublicLaneReader();
+  if (!lane) return publicDiscoveryCache?.results ?? [];
+  let catalog;
+  try { catalog = await lane.sweepChannelCatalog({ topBuckets: 32 }); }
+  catch (error) { console.warn('[public] beacon sweep failed', error); return publicDiscoveryCache?.results ?? []; }
+  const ownWallet = rawWalletAddress(plathoWallet?.address);
+  const subscribedAuthors = new Set(
+    subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
+      .map((channel) => rawWalletAddress(channel.authorWallet))
+      .filter(Boolean),
+  );
+  const results = [];
+  const seen = new Set();
+  for (const item of catalog) {
+    const wallet = rawWalletAddress(item.channelWallet);
+    if (!wallet || seen.has(wallet)) continue;
+    if (ownWallet && sameWalletAddress(wallet, ownWallet)) continue;   // discovery is for finding NEW channels
+    if (subscribedAuthors.has(wallet)) continue;
+    let profileDoc = null;
+    try { profileDoc = readProfileDocument(tonCell.readSnakeCellBytes(item.card, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES })); }
+    catch { continue; }                                               // a card that is not a profile document is skipped
+    if (!profileDoc?.profileBlock) continue;
+    const description = String(profileDoc.profileBlock.description ?? '').trim();
+    const tags = (profileDoc.profileBlock.tags ?? []).filter(Boolean);
+    if (!description && tags.length === 0) continue;                  // discovery suggests DESCRIBED channels
+    seen.add(wallet);
+    // Warm the profile cache (also queues .ath verification) so render-time publicAuthorLabel resolves the name.
+    setChannelProfileFromWalk(wallet, profileDoc.profileBlock, null, Number(item.announcedAt ?? 0n));
+    results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
+  }
+  publicDiscoveryCache = { at: Date.now(), results };
+  return results;
+}
+
 async function discoverChannels(options = {}) {
   if (options.force !== true && publicDiscoveryCache && (Date.now() - publicDiscoveryCache.at) < PUBLIC_DISCOVERY_CACHE_TTL_MS) {
     return publicDiscoveryCache.results;
   }
+  if (publicLaneDirectPayEnabled()) return discoverChannelsFromBeacon();
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return publicDiscoveryCache?.results ?? [];
   const { provider, address } = resolved;
@@ -29837,7 +29878,39 @@ async function submitPublicPostThroughVault(draft = null) {
 // author's on-chain public_author_index, and is read back by resolveChannelProfile walking that author's chain.
 // Latest profile post per author wins — no on-chain mutation of a prior profile, each save is a fresh post. Unlike a
 // composer post, NO optimistic feed record is created: a profile is channel metadata, diverted from the visible feed.
+// clean-17 channel profile: publish the profile document into BOTH the author's CHANNEL shard (already-subscribed
+// readers pick it up via the profile divert) AND the BEACON directory (Discover finds NEW channels). Both parts ride
+// ONE wallet transfer. The beacon bucket is deterministic (walletHash % PUBLIC_BEACON_READ_SPACE) so re-saving a
+// profile idempotently updates the same beacon shard; the contract stamps publisher=sender(), so a beacon entry can
+// only advertise the announcer's own wallet — which is exactly what makes it findable and self-attributing.
+async function publishChannelProfileDirect(description, tags) {
+  if (!plathoWallet?.address) throw new Error('Connect a wallet to publish a channel profile');
+  const desc = String(description ?? '').trim();
+  const normalizedTags = normalizeProfileTags(tags);
+  const linkedLabel = readLinkedPlathoUsername(plathoWallet?.address)?.label ?? '';
+  const ownerUsername = linkedLabel ? canonicalUsernameDisplay(linkedLabel) : '';
+  const createdAtSec = Math.floor(Date.now() / 1000);
+  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername }]);
+  const [profilePayload] = await createPublicLanePayloadPartsV2({ type: 'post', documentBytes, commentsAllowed: false });
+  if (!profilePayload) throw new Error('Channel profile produced no payload');
+
+  const walletHash = publicWalletHash(plathoWallet.address);
+  const bucket = Number(walletHash % BigInt(PUBLIC_BEACON_READ_SPACE));
+  const channelPart = {
+    kind: 0, keyArg: 0n, header: profilePayload.headerCell, body: profilePayload.bodyCell,
+    value: publicPublishValueForKind(0), partitionKey: await publicChannelPartitionKey(walletHash, 0), epochTag: publicEpochTag(0, publicEraOf(0, createdAtSec)),
+  };
+  const beaconPart = {
+    kind: 2, keyArg: BigInt(bucket), header: profilePayload.headerCell, body: profilePayload.bodyCell,
+    value: publicPublishValueForKind(2), partitionKey: await publicBeaconPartitionKey(bucket), epochTag: publicEpochTag(2, publicEraOf(2, createdAtSec)),
+  };
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  const result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, [channelPart, beaconPart]);
+  return { result, description: desc, tags: normalizedTags, ownerUsername, createdAtSec };
+}
+
 async function publishChannelProfile(description, tags) {
+  if (publicLaneDirectPayEnabled()) return publishChannelProfileDirect(description, tags);
   const desc = String(description ?? '').trim();
   const normalizedTags = normalizeProfileTags(tags);
   // Carry the wallet's OWN linked .ath (bare name) as the channel's self-declared owner username — consistent with
