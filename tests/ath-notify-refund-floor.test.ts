@@ -135,8 +135,31 @@ async function refusedPurchaseAt(notifyValue: bigint, prefillProfiles = 0) {
     media_format: 1n,
   } as ATHTransferRequestRegistryProfileAvatar);
 
-  const first = await buy(9001n);                // lands (if funded), becoming the CURRENT pointer
-  const result = await buy(9002n);               // identical pointer -> refused -> must be refunded
+  // [REPOINTED 2026-07-21] This used to provoke the refusal with a DUPLICATE pointer, refused by the registry at
+  // gate 21115. The avatar pointer has since moved into the buyer's KeyShard, so a duplicate is now refused one
+  // hop later by the SHARD (22205) and refunded by an explicit AthTransferNotificationRefund carrying a fixed
+  // 45,000,000 — a different mechanism that does NOT come out of notify_value and therefore does not measure
+  // what ATH_TRANSFER_NOTIFY_MIN_VALUE funds.
+  //
+  // What that constant funds is still live and still reachable: a refusal the REGISTRY performs itself, in
+  // COMPUTE, which bounces the notification so ATHWallet.refund_bounced_notification pays the refund out of what
+  // bounced. A malformed pointer (avatar_part_count 3 > PROFILE_AVATAR_MAX_PARTS, gate 21124) is exactly such a
+  // refusal, and unlike the duplicate it needs no landed first purchase to set up.
+  const first = await buy(9001n);                // lands (if funded)
+  const result = await sourceWallet.send(payer.getSender(), { value: toNano('1') }, {
+    $$type: 'ATHTransferRequestRegistryProfileAvatar',
+    query_id: 9002n,
+    amount: PROFILE_AVATAR_PRICE_ATH,
+    recipient: registryAddress,
+    response_destination: payer.address,
+    notify_value: notifyValue,
+    owner_wallet: payer.address,
+    avatar_hash: 0x9002n,
+    avatar_entry_id: 10n,
+    avatar_stream_id: 0x90029002900290029002900290029002n,
+    avatar_part_count: 3n,                       // > PROFILE_AVATAR_MAX_PARTS -> refused in COMPUTE at 21124
+    media_format: 1n,
+  } as ATHTransferRequestRegistryProfileAvatar);
 
   // Refusal by ANY code, not just the duplicate gate: below ~49M the registry cannot even fund a FIRST avatar
   // record and refuses at 21112, so the purchase that must be refunded is the first one, not the second.
@@ -222,19 +245,34 @@ describe('ATH refund floor — a refused registry purchase must reach the payer'
       .toBe(ATH_TRANSFER_NOTIFY_MIN_VALUE);
   }, 600_000);
 
-  it('REFUND-FLOOR-03: the refusal overhead grows with registry DEPTH, so the floor must be sized at scale', async () => {
-    // The refusing transaction's gas comes out of the notification's value, and dictionary gas grows with depth.
-    // A floor calibrated on an empty registry therefore decays into the stranding window as the product grows —
-    // silently, and after the seal there is no fixing it. This measures the slope instead of assuming it.
+  it('REFUND-FLOOR-03: the refusal overhead is now FLAT in the number of profiles', async () => {
+    // [PREMISE INVERTED BY MEASUREMENT 2026-07-21 — read this before trusting the name it used to carry.]
+    //
+    // This test was written to measure a SLOPE. The refusing transaction's gas comes out of the notification's
+    // value and dictionary gas grows with depth, so a floor calibrated on an empty registry would decay into the
+    // stranding window as the product grew — silently, and unfixable after the seal. Measured then:
+    //     0 profiles 6,236,737 | 200 profiles 6,336,737 | 800 profiles 6,383,404   (~+46,667 per doubling)
+    //
+    // The slope is GONE, because the dictionary is gone: ProfileRegistry's per-profile maps were removed on
+    // 2026-07-21 when the avatar pointer moved into the buyer's KeyShard (they cost 5.0000 cells each and capped
+    // the product at 13,076 profiles). There is nothing left for the refusal to walk, so the overhead is a
+    // constant. Measured now: identical to the nanoton at 0, 200 and 800 profiles.
+    //
+    // That is worth more than the margin it buys. The floor no longer has to be sized against a future the seal
+    // cannot revisit — it is sized against a number that cannot move. The assertion below therefore checks
+    // FLATNESS, which is the property that must never silently regress: if per-profile state ever returns here,
+    // the slope returns with it and this goes red.
     const NOTIFY = 66_000_000n;
     const rows: string[] = [];
     let worstOverhead = 0n;
+    const overheads: bigint[] = [];
 
     for (const profiles of [0, 200, 800]) {
       const r = await refusedPurchaseAt(NOTIFY, profiles);
       expect(r.arrivedValue, `a refund must be attempted with ${profiles} profiles`).not.toBeNull();
       const overhead = NOTIFY - (r.arrivedValue ?? 0n);
       if (overhead > worstOverhead) worstOverhead = overhead;
+      overheads.push(overhead);
       rows.push(`  profiles=${String(profiles).padStart(5)}  refused_by=${String(r.refusalExit).padStart(5)}  arrived=${(r.arrivedValue ?? 0n).toString().padStart(11)}  overhead=${overhead.toString().padStart(9)}`);
     }
 
@@ -247,6 +285,11 @@ describe('ATH refund floor — a refused registry purchase must reach the payer'
       `  declared ATH_TRANSFER_NOTIFY_MIN_VALUE: ${ATH_TRANSFER_NOTIFY_MIN_VALUE}`,
     ].join('\n'));
 
+    // THE PROPERTY. Not "the slope is small" — that is a number that drifts — but "there is no slope at all",
+    // which is only true while the registry holds no per-profile state.
+    expect(new Set(overheads.map(String)).size,
+      'the refusal overhead must be IDENTICAL at every profile count; a spread means per-profile state is back')
+      .toBe(1);
     expect(ATH_TRANSFER_NOTIFY_MIN_VALUE - worstOverhead,
       'the declared floor must still leave 14212 its 26M after the DEEPEST measured refusal').toBeGreaterThanOrEqual(REFUND_ARRIVAL_FLOOR);
   }, 900_000);
