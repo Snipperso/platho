@@ -1,0 +1,62 @@
+import { describe, expect, it } from 'vitest';
+import { createMemoryConvKeyStore, conversationId, adoptKRoot } from '../web/conv-key-store.mjs';
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// CONV-KEY-STORE — the two invariants that keep a private conversation from silently forking or dropping a message.
+// Both are the kind of bug that never throws and only shows as "the other side stopped getting my messages".
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+const kid = (b: number) => new Uint8Array(32).fill(b);
+const kroot = (b: number) => new Uint8Array(32).fill(b);
+const nonce = (b: number) => new Uint8Array(16).fill(b);
+const A = kid(0x11);
+const B = kid(0x22);
+
+describe('CONV-KEY-STORE', () => {
+  it('CKS-01: conversationId is the SAME join key from both sides (order-independent)', () => {
+    expect(conversationId(A, B), 'initiator and responder must land on one record').toBe(conversationId(B, A));
+  });
+
+  it('CKS-02: re-INTRO adoption is last-writer-WINS by createdAt, not by arrival order', async () => {
+    const store = createMemoryConvKeyStore();
+    // Adopt root #1 (createdAt 100).
+    expect(await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1), peerEncPublicKey: kid(0x33) })).toBe('created');
+    // A LATER-ARRIVING but OLDER re-INTRO (createdAt 50) must NOT clobber the live root — this is the fork-prevention.
+    expect(await store.upsertConversationKRoot(A, B, { kRoot: kroot(2), createdAt: 50, introNonce: nonce(2) })).toBe('retained');
+    let rec = store.getConversation(A, B)!;
+    expect([...rec.kRootCurrent], 'the newer root stays current').toEqual([...kroot(1)]);
+    expect(rec.kRootsForRead.length, 'the older root is kept for decrypting its history').toBe(1);
+    // A genuinely NEWER re-INTRO (createdAt 150) IS adopted; the previous current retires to read-only.
+    expect(await store.upsertConversationKRoot(A, B, { kRoot: kroot(3), createdAt: 150, introNonce: nonce(3) })).toBe('adopted');
+    rec = store.getConversation(A, B)!;
+    expect([...rec.kRootCurrent], 'the newest root now drives derivation').toEqual([...kroot(3)]);
+    expect(rec.kRootsForRead.length, 'both older roots remain readable').toBe(2);
+  });
+
+  it('CKS-03: adoption ties on createdAt break by introNonce (deterministic on both sides)', () => {
+    const base = adoptKRoot(undefined, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(5), peerKeyId: B }).record;
+    // higher nonce at the same createdAt wins; lower nonce is retained
+    expect(adoptKRoot(base, { kRoot: kroot(2), createdAt: 100, introNonce: nonce(9), peerKeyId: B }).outcome).toBe('adopted');
+    expect(adoptKRoot(base, { kRoot: kroot(2), createdAt: 100, introNonce: nonce(2), peerKeyId: B }).outcome).toBe('retained');
+  });
+
+  it('CKS-04: re-adopting the identical intro is idempotent (no duplicate read-roots)', async () => {
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) });
+    expect(await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) })).toBe('duplicate');
+    expect(store.getConversation(A, B)!.kRootsForRead.length, 'no phantom read-root from a replayed intro').toBe(0);
+  });
+
+  it('CKS-05: outgoing seq is locally monotonic — two fast messages never collide, coldFloor only seeds', async () => {
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) });
+    // cold start: the chain says last_seq = 7, so the first outgoing is 8...
+    const first = await store.nextOutgoingSeq(A, B, 19000, 7);
+    // ...and a SECOND message sent before the chain read refreshes must be 9, not 8 again (the lost-2nd-message bug).
+    const second = await store.nextOutgoingSeq(A, B, 19000, 7);
+    expect(first).toBe(8);
+    expect(second, 'a stale coldFloor must not reset the local counter').toBe(9);
+    // a different epoch has its own counter, seeded by its own floor
+    expect(await store.nextOutgoingSeq(A, B, 19001, 0)).toBe(1);
+  });
+});
