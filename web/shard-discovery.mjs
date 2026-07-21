@@ -37,8 +37,9 @@ import {
   recordShardAddressBytes,
   introShardAddressBytes,
   recoveryShardAddressBytes,
+  publicShardAddressBytes,
   rawAddress,
-} from './shard-address.mjs?v=1';
+} from './shard-address.mjs?v=3';
 
 export const EPOCH_SECONDS = 86400;
 
@@ -179,6 +180,150 @@ export async function introScanAddresses(fromEpoch, toEpoch, bucketCount = INTRO
     for (let b = 0; b < bucketCount; b += 1) {
       out.push(await introShardAddress(e, b));
     }
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// PUBLIC LANE — channel posts, comment threads, the beacon directory, and avatar image bytes (PublicShard).
+//
+// A PublicShard address is publicShardAddress(partition_key, epoch_tag), where epoch_tag = (kind<<32)|era and
+// partition_key is a domain-separated hash the CONTRACT recomputes and checks against its own partition_key
+// (contracts/PublicShard.tact). These derivations MUST match the contract's preimages byte for byte — a wrong
+// one is a live, well-formed address nobody reads, the silent-loss failure the whole shard-address module guards.
+// Pinned against the contract in tests/public-lane-discovery.test.ts.
+
+// MUST equal the constants in contracts/PublicShard.tact.
+const PS_KIND = Object.freeze({ CHANNEL: 0, THREAD: 1, BEACON: 2, AVATAR: 3 });
+const PS_ERA_SHORT = 2592000;   // 30 days — CHANNEL, THREAD
+const PS_ERA_LONG = 31536000;   // 1 year  — BEACON, AVATAR
+const PS_CHANNEL_DOMAIN = 0x50534348n;   // "PSCH"
+const PS_THREAD_DOMAIN = 0x50535448n;    // "PSTH"
+const PS_BEACON_DOMAIN = 0x50534243n;    // "PSBC"
+const PS_AVATAR_DOMAIN = 0x50534156n;    // "PSAV"
+const PS_POST_UID_DOMAIN = 0x50535544n;  // "PSUD"
+
+/**
+ * The BEACON directory width — how many buckets a client sweeps to discover channels. A CLIENT constant, in NO
+ * contract gate, so it is widen-only with no redeploy, exactly like INTRO_READ_SPACE. [OWNER 2026-07-21: 1024.]
+ * 1024 url-safe friendly addresses fit ONE 64 KiB accountStates request (measured 2026-07-18), so a full-directory
+ * sweep of one era is a single request. NEVER narrow it — an announcer on the old width would land where nobody
+ * looks. Widen by shipping the reader first, letting it propagate, then letting announcers use the new range.
+ */
+export const PUBLIC_BEACON_READ_SPACE = 1024;
+
+/** How many overflow shards a reader probes per (channel/thread, era) before giving up. Client-side, widen-only. */
+export const PUBLIC_SEQ_PROBE = 4;
+
+export const publicEraOf = (kind, unixSeconds) =>
+  Math.floor(unixSeconds / (kind < PS_KIND.BEACON ? PS_ERA_SHORT : PS_ERA_LONG));
+
+export const publicEpochTag = (kind, era) => (BigInt(kind) << 32n) | BigInt(era);
+
+const bigToBucket = (n) => BigInt(n) & 0xFFFFFFFFn;
+
+/** H over a builder, as a uint256 — the browser's async sha256 cell hasher (no sync sha256 in the platform API). */
+async function hashCell(cell) {
+  const { hash } = await computeCellHashAndDepth(cell);
+  return bytesToBig(hash);
+}
+
+/**
+ * partition_key for each kind, reproducing contracts/PublicShard.tact.claimedPartitionKey EXACTLY.
+ *   CHANNEL: H(PS_CHANNEL_DOMAIN ‖ ownerHash:256 ‖ shard_seq:32)   ownerHash = the channel wallet's account hash
+ *   THREAD:  H(PS_THREAD_DOMAIN  ‖ post_uid:256  ‖ shard_seq:32)
+ *   BEACON:  H(PS_BEACON_DOMAIN  ‖ bucket:32)
+ *   AVATAR:  H(PS_AVATAR_DOMAIN  ‖ ownerHash:256)
+ */
+export async function publicChannelPartitionKey(ownerWalletHash, shardSeq = 0) {
+  return hashCell(beginCell()
+    .uint(PS_CHANNEL_DOMAIN, 32, 'PS_CHANNEL_DOMAIN')
+    .uint(BigInt(ownerWalletHash), 256, 'owner_hash')
+    .uint(BigInt(shardSeq), 32, 'shard_seq')
+    .endCell());
+}
+export async function publicThreadPartitionKey(postUid, shardSeq = 0) {
+  return hashCell(beginCell()
+    .uint(PS_THREAD_DOMAIN, 32, 'PS_THREAD_DOMAIN')
+    .uint(BigInt(postUid), 256, 'post_uid')
+    .uint(BigInt(shardSeq), 32, 'shard_seq')
+    .endCell());
+}
+export async function publicBeaconPartitionKey(bucket) {
+  return hashCell(beginCell()
+    .uint(PS_BEACON_DOMAIN, 32, 'PS_BEACON_DOMAIN')
+    .uint(bigToBucket(bucket), 32, 'bucket')
+    .endCell());
+}
+export async function publicAvatarPartitionKey(ownerWalletHash) {
+  return hashCell(beginCell()
+    .uint(PS_AVATAR_DOMAIN, 32, 'PS_AVATAR_DOMAIN')
+    .uint(BigInt(ownerWalletHash), 256, 'owner_hash')
+    .endCell());
+}
+
+/**
+ * post_uid = H(PS_POST_UID_DOMAIN ‖ channel_partition_key ‖ epoch_tag ‖ entry_id). A reader that rendered a post
+ * holds all three, so a comment thread's address is O(1) derivable and never needs an index. Mirrors
+ * contracts/PublicShard.tact's PS_POST_UID_DOMAIN preimage.
+ */
+export async function publicPostUid(channelPartitionKey, epochTag, entryId) {
+  return hashCell(beginCell()
+    .uint(PS_POST_UID_DOMAIN, 32, 'PS_POST_UID_DOMAIN')
+    .uint(BigInt(channelPartitionKey), 256, 'channel_partition_key')
+    .uint(BigInt(epochTag), 64, 'epoch_tag')
+    .uint(BigInt(entryId), 64, 'entry_id')
+    .endCell());
+}
+
+/** The 256-bit account hash of a basechain address, the value the contract folds via senderHash(). */
+export function publicWalletHash(address) {
+  const { hash } = parseTonAddress(String(address));
+  return bytesToBig(hash);
+}
+
+/** friendly address of a PublicShard partition, for the toncenter query. */
+async function publicShardFriendly(partitionKey, epochTag) {
+  return friendly(publicShardAddressBytes(partitionKey, epochTag));
+}
+
+/**
+ * The BEACON sweep set: every directory bucket across a window of eras, newest era first. A fresh client reads
+ * these with ONE batched accountStates call per era (1024 < the 1149-address URL budget) and ranks live buckets
+ * by entry_count — NOT last_transaction_lt, which an attacker moves for a forward fee. Pure local computation.
+ */
+export async function publicBeaconScanAddresses(nowUnix, eraWindow = 3, bucketCount = PUBLIC_BEACON_READ_SPACE) {
+  const era = publicEraOf(PS_KIND.BEACON, nowUnix);
+  const out = [];
+  for (let e = era; e > era - eraWindow && e >= 0; e -= 1) {
+    const tag = publicEpochTag(PS_KIND.BEACON, e);
+    for (let b = 0; b < bucketCount; b += 1) {
+      out.push(await publicShardFriendly(await publicBeaconPartitionKey(b), tag));
+    }
+  }
+  return out;
+}
+
+/** A channel's post shards for an era window, probing overflow seqs — the addresses a subscriber reads. */
+export async function publicChannelScanAddresses(ownerWalletHash, nowUnix, eraWindow = 3, seqProbe = PUBLIC_SEQ_PROBE) {
+  const era = publicEraOf(PS_KIND.CHANNEL, nowUnix);
+  const out = [];
+  for (let e = era; e > era - eraWindow && e >= 0; e -= 1) {
+    const tag = publicEpochTag(PS_KIND.CHANNEL, e);
+    for (let seq = 0; seq < seqProbe; seq += 1) {
+      out.push(await publicShardFriendly(await publicChannelPartitionKey(ownerWalletHash, seq), tag));
+    }
+  }
+  return out;
+}
+
+/** A wallet's avatar shard for the current era and the two before it; the stream lives in whichever is live. */
+export async function publicAvatarScanAddresses(ownerWalletHash, nowUnix, eraWindow = 3) {
+  const era = publicEraOf(PS_KIND.AVATAR, nowUnix);
+  const pk = await publicAvatarPartitionKey(ownerWalletHash);
+  const out = [];
+  for (let e = era; e > era - eraWindow && e >= 0; e -= 1) {
+    out.push(await publicShardFriendly(pk, publicEpochTag(PS_KIND.AVATAR, e)));
   }
   return out;
 }

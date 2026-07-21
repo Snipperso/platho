@@ -21,7 +21,7 @@
 // evidence worth having, given the failure mode above.
 
 import { beginCell, parseBocBase64, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=1';
-import { RECORDSHARD_CODE_BOC, INTROSHARD_CODE_BOC, RECOVERYSHARD_CODE_BOC, KEYSHARD_CODE_BOC } from './shard-code.mjs?v=2';
+import { RECORDSHARD_CODE_BOC, INTROSHARD_CODE_BOC, RECOVERYSHARD_CODE_BOC, KEYSHARD_CODE_BOC, PUBLICSHARD_CODE_BOC } from './shard-code.mjs?v=3';
 
 const CODE_CACHE = new Map();
 
@@ -133,6 +133,22 @@ export const keyShardAddressBytes = (ownerWallet, profileRegistry) =>
 
 export const keyShardStateInit = (ownerWallet, profileRegistry) =>
   shardStateInitCell(KEYSHARD_CODE_BOC, [['owner_wallet', ownerWallet, 'address'], ['profile_registry', profileRegistry, 'address']]);
+
+/**
+ * PUBLIC: one partition of the public/avatar lane. init(partition_key: Int, epoch_tag: Int) — two int257, the
+ * simple integer case like RecordShard. partition_key is a 256-bit domain-separated hash (of the channel wallet,
+ * a post_uid, or a beacon bucket — computed in the discovery layer); epoch_tag = (kind << 32) | era_index.
+ *
+ * The kind lives in epoch_tag, NOT in a separate argument, so this same two-int derivation serves all four kinds
+ * (channel/thread/beacon/avatar). A wrong epoch_tag is the silent-loss failure this whole module guards against:
+ * it is a live, well-formed address nobody reads, so it is pinned BOTH ways against @ton/core in
+ * tests/shard-browser-address.test.ts.
+ */
+export const publicShardAddressBytes = (partitionKey, epochTag) =>
+  addressFor(PUBLICSHARD_CODE_BOC, [['partition_key', partitionKey], ['epoch_tag', epochTag]]);
+
+export const publicShardStateInit = (partitionKey, epochTag) =>
+  shardStateInitCell(PUBLICSHARD_CODE_BOC, [['partition_key', partitionKey], ['epoch_tag', epochTag]]);
 
 /** Raw `workchain:hex` form — what toncenter accepts, and what a test can compare without an Address class. */
 export function rawAddress({ workchain, hash }) {

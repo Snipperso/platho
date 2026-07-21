@@ -5,7 +5,8 @@ import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
 import { KeyShard } from '../build/KeyShard/KeyShard_KeyShard';
-import { recordShardAddressBytes, introShardAddressBytes, recoveryShardAddressBytes, keyShardAddressBytes, rawAddress } from '../web/shard-address.mjs';
+import { PublicShard } from '../build/PublicShard/PublicShard_PublicShard';
+import { recordShardAddressBytes, introShardAddressBytes, recoveryShardAddressBytes, keyShardAddressBytes, publicShardAddressBytes, rawAddress } from '../web/shard-address.mjs';
 import { renderShardCodeModule } from '../scripts/generate_shard_code.mjs';
 // The recovery slot key is derived by THREE implementations that must agree — the browser hasher (read path), the
 // @ton/core builder (write path), and the contract itself. ADDR-06 pins the first two against each other.
@@ -38,6 +39,8 @@ const referenceRecovery = async (slot: bigint) =>
   contractAddress(0, await RecoveryShard.init(slot)).toRawString();
 const referenceKeyShard = async (owner: Address, registry: Address) =>
   contractAddress(0, await KeyShard.init(owner, registry)).toRawString();
+const referencePublic = async (partitionKey: bigint, epochTag: bigint) =>
+  contractAddress(0, await PublicShard.init(partitionKey, epochTag)).toRawString();
 
 describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
   it('ADDR-01: INTRO shard addresses match the reference for a wide spread of arguments', async () => {
@@ -147,6 +150,39 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
       }
     }
     expect(seen.size, 'every (wallet, registry) pair must be its OWN address').toBe(owners.length * registries.length);
+  }, 120_000);
+
+  it('ADDR-08: PUBLIC shard addresses match, across all four kinds and full-width partition keys', async () => {
+    // PublicShard takes two int257 integers (partition_key, epoch_tag), so this is the RecordShard integer case,
+    // not the KeyShard address case. epoch_tag = (kind << 32) | era folds the kind into the address; a client that
+    // mis-shifted it would write to a live, well-formed address nobody reads. Every (kind, era) is exercised, and
+    // partition_key runs to full 256-bit width where a 64-bit or hex-string derivation would break.
+    const partitionKeys = [
+      0n,
+      1n,
+      0xdeadbeefn,
+      (1n << 255n),
+      (1n << 256n) - 1n,
+      BigInt('0x' + 'c3'.repeat(32)),
+    ];
+    const eras = [0, 1, 20718, 2 ** 31 - 1];
+    const seen = new Set<string>();
+    for (const kind of [0, 1, 2, 3]) {
+      for (const era of eras) {
+        const epochTag = (BigInt(kind) << 32n) | BigInt(era);
+        const pk = partitionKeys[(kind + era) % partitionKeys.length];
+        const reference = await referencePublic(pk, epochTag);
+        const browser = rawAddress(await publicShardAddressBytes(pk, epochTag));
+        expect(browser, `PUBLIC(kind=${kind}, era=${era}, pk=${pk.toString(16)})`).toBe(reference);
+        seen.add(browser);
+      }
+    }
+    // A different kind at the same era+pk must be a DIFFERENT address — proof the kind really is in epoch_tag.
+    const era = 20718;
+    const pk = 0xabcn;
+    const addrs = await Promise.all([0, 1, 2, 3].map((k) =>
+      referencePublic(pk, (BigInt(k) << 32n) | BigInt(era))));
+    expect(new Set(addrs).size, 'each kind must occupy its own address at the same era and partition key').toBe(4);
   }, 120_000);
 
   it('ADDR-04: the browser refuses arguments it cannot encode instead of producing a wrong address', async () => {
