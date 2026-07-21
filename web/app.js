@@ -125,6 +125,7 @@ import {
   createProfileRegistryMessage,
   createAthWalletMessage,
   createPublicPostPayload,
+  createPublicPostPayloadV2,
   createUsernameRegistryMessage,
   createWalletTransaction,
   buildVaultProfileAvatarExternalBoc,
@@ -165,6 +166,21 @@ import {
 } from './capsulehub-ton-rpc-provider.mjs?v=59';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=45';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=1';
+// clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
+import { createPublicLane } from './public-lane.mjs?v=1';
+import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=1';
+import { publishPublicLane, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
+import { publicPublishValueForKind } from './publish-price.mjs?v=1';
+import {
+  publicChannelPartitionKey,
+  publicThreadPartitionKey,
+  publicAvatarPartitionKey,
+  publicPostUid,
+  publicWalletHash,
+  publicEpochTag,
+  publicEraOf,
+  addrKey as publicAddrKey,
+} from './shard-discovery.mjs?v=3';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=40';
 import {
   computeUsernameNameHash,
