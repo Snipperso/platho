@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Blockchain } from '@ton/sandbox';
+import { deployFeeSink } from './helpers/fee-sink-fixture';
 import { toNano, beginCell, contractAddress, Address } from '@ton/core';
 import { x25519 } from '@noble/curves/ed25519.js';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
@@ -27,7 +28,7 @@ const cellOf = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCe
 const CLOCK = 1_790_000_000;
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
 const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');
-const INTRO_DEPLOY = 15_610_000n;
+const INTRO_DEPLOY = 17_810_000n;   // IS_DEPLOY_MIN_VALUE — read from the live getter, not remembered
 
 /**
  * Stand in for toncenter on the two endpoints the lane reads: /accountStates for what exists, /messages for the
@@ -83,8 +84,7 @@ describe('INTRO-LANE — a first contact travels from the chain to onIntro', () 
   it('LANE-01: an intro addressed to this scan key is delivered, with its body verified', async () => {
     const bc = await Blockchain.create();
     bc.now = CLOCK;
-    const sink = bc.openContract(await FeeAccumulator.fromInit(FA_TREASURY, FA_BUYBACK));
-    await sink.send((await bc.treasury('lane-fund')).getSender(), { value: toNano('1') }, { $$type: 'TopUpStorageReserve' } as any);
+    const sink = await deployFeeSink(bc, { funderSeed: 'lane-fund' });
 
     const epoch = epochOf(bc.now!);
     const bucket = 0n;                                  // the write rule packs densely from the bottom
@@ -107,10 +107,10 @@ describe('INTRO-LANE — a first contact travels from the chain to onIntro', () 
       if (i === 2) mine = { r, tag };
       const built = await buildIntroPublish({
         epoch, bucket, r, viewTag: BigInt(tag), header0, body,
-        value: i === 0 ? INTRO_DEPLOY : 13_110_000n,
+        value: i === 0 ? INTRO_DEPLOY : 15_310_000n,
       });
       const res = await payer.send({
-        to: built.to, value: i === 0 ? INTRO_DEPLOY : 13_110_000n,
+        to: built.to, value: i === 0 ? INTRO_DEPLOY : 15_310_000n,
         body: built.body, init: built.init, bounce: true,
       } as any);
       for (const t of res.transactions as any[]) {
@@ -172,8 +172,7 @@ describe('INTRO-LANE — a first contact travels from the chain to onIntro', () 
     // its cursor alone so the next pass retries it. Showing a duplicate is showing rubbish.
     const bc = await Blockchain.create();
     bc.now = CLOCK;
-    const sink = bc.openContract(await FeeAccumulator.fromInit(FA_TREASURY, FA_BUYBACK));
-    await sink.send((await bc.treasury('l3-fund')).getSender(), { value: toNano('1') }, { $$type: 'TopUpStorageReserve' } as any);
+    const sink = await deployFeeSink(bc, { funderSeed: 'l3-fund' });
 
     const epoch = epochOf(bc.now!);
     const payer = await bc.treasury('l3-payer');

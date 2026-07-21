@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Blockchain } from '@ton/sandbox';
+import { deployFeeSink } from './helpers/fee-sink-fixture';
 import { toNano, beginCell, contractAddress, Address, internal, SendMode } from '@ton/core';
 import { WalletContractV5R1 } from '@ton/ton';
 import { mnemonicToPrivateKey } from '@ton/crypto';
@@ -28,18 +29,16 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 const cell = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCell();
 const CLOCK = 1_790_000_000;               // after the Apr-2026 config-18 storage switch
 
-const RS_DEPLOY_MIN_VALUE = 16_900_000n;
-const IS_DEPLOY_MIN_VALUE = 15_610_000n;
+const RS_DEPLOY_MIN_VALUE = 19_100_000n;
+const IS_DEPLOY_MIN_VALUE = 17_810_000n;
 
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
 const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');
 
-async function deploySink(bc: Blockchain) {
-  const sink = bc.openContract(await FeeAccumulator.fromInit(FA_TREASURY, FA_BUYBACK));
-  const funder = await bc.treasury('retire-sink-funder');
-  await sink.send(funder.getSender(), { value: toNano('1') }, { $$type: 'TopUpStorageReserve' } as any);
-  return sink;
-}
+// The sink must be BOUND, not merely deployed: gate 15055 refuses a capsule fee from a shard it cannot
+// re-derive, a publish whose fee is refused stores no record, and a shard with no records cannot pay its
+// retirer. That is how a missing bind shows up here — as a NEGATIVE payout, four steps from its cause.
+const deploySink = (bc: Blockchain) => deployFeeSink(bc, { funderSeed: 'retire-sink-funder' });
 
 /**
  * A REAL wallet, warmed. Two details matter and both were learned the hard way:
