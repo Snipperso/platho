@@ -10427,7 +10427,99 @@ async function discoverChannels(options = {}) {
   return results;
 }
 
+// clean-17 read lane: a public-lane reader over the app's shared RPC pump. endpoint/apiKey are OMITTED on purpose —
+// web/shard-rpc.resolveEndpoint derives the /accountStates and /messages leaves from globalThis.plathoTonRpcEndpoint
+// (+ plathoToncenterApiKey), exactly as intro-transport does in production; passing a final URL here is what once
+// made the messages reader query /accountStates and silently return null bodies. Built per sync (cheap) so it always
+// picks up the current transport after a wallet/endpoint switch.
+function directPublicLaneReader() {
+  const transport = globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return null;
+  return createPublicLane({
+    runGetMethod: (call) => transport.runGetMethod(call),
+    now: () => Math.floor(Date.now() / 1000),
+  });
+}
+
+// 0x + 64-hex representation hash of a body cell — the shard model's stand-in for CapsuleHub's stored body_hash, so a
+// shard post satisfies publicFeedPostHasChainAnchor (which the feed cache/merge/render all gate on). Unique per body.
+async function publicShardBodyHashHex(cell) {
+  const { hash } = await tonCell.computeCellHashAndDepth(cell);
+  return `0x${tonCell.bytesToHex(hash)}`;
+}
+
+// clean-17 feed sync (gated): for each feed-source channel, read its posts from the author's CHANNEL PublicShard and
+// merge into publicChannelFeedCache through the SAME assemble/upsert/local-pending seam the CapsuleHub sync uses.
+// Comments are NOT walked here — they load on demand (loadPublicPostComments), same as the CapsuleHub path since the
+// scalability fix. A channel whose read fails keeps its cached posts (append-merge, never wipe to placeholder).
+async function syncPublicChannelFromShards() {
+  const lane = directPublicLaneReader();
+  if (!lane) return false;
+  const feedChannels = feedSourcePublicChannels();
+  const updatedAt = new Date().toISOString();
+  const nextFeedCache = { ...publicChannelFeedCache };
+  const touched = [];
+  for (const channel of feedChannels) {
+    if (!channel.authorWallet) continue;
+    let shardPosts;
+    try {
+      shardPosts = await lane.readChannelPosts(channel.authorWallet);
+    } catch (error) {
+      console.warn('[public] shard channel read failed', channel.id, error);
+      continue;
+    }
+    const postParts = [];
+    for (const sp of shardPosts) {
+      let payload;
+      try { payload = readPublicPostPayloadV2({ header: sp.header, body: sp.body }); } catch { continue; }
+      const authorWallet = channel.authorWallet;
+      const createdAtSec = Number(sp.created_at ?? 0n);
+      // Channel PROFILE divert: a single-part document carrying only a profile block is channel metadata, not a
+      // visible post — capture it and drop it, exactly like the CapsuleHub walk.
+      if (payload.type === 'document' && Number(payload.partCount ?? 1) <= 1) {
+        const profileDoc = readProfileDocument(payload.documentBytes ?? payload.document_bytes);
+        if (profileDoc?.isProfileOnly) {
+          setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, sp.entry_id, createdAtSec);
+          continue;
+        }
+      }
+      const bodyHashHex = await publicShardBodyHashHex(sp.body);
+      postParts.push({
+        id: `pshard-${channel.id}-${sp.entry_id.toString()}`,
+        entryId: sp.entry_id.toString(),
+        channelId: channel.id,
+        type: payload.type,
+        text: payload.text ?? '',
+        imageBytes: payload.imageBytes ?? payload.image_bytes,
+        documentBytes: payload.documentBytes ?? payload.document_bytes,
+        createdAt: createdAtSec > 0 ? new Date(createdAtSec * 1000).toISOString() : new Date().toISOString(),
+        author: publicAuthorLabel(authorWallet),
+        authorWallet,
+        bodyHash: bodyHashHex,
+        entryUid: bodyHashHex.slice(2),   // synthesized: unique per body, satisfies the chain anchor
+        streamId: payload.stream_id,
+        partIndex: payload.partIndex ?? 0,
+        partCount: payload.partCount ?? 1,
+        commentsAllowed: payload.commentsAllowed !== false,
+        chainVerified: true,
+      });
+    }
+    const posts = assemblePublicParts(postParts);
+    posts.reverse();
+    const cachedFeed = publicChannelFeedCache?.[channel.id]?.feed ?? publicChannelFeedCache?.[channel.id];
+    const existing = (cachedFeed?.posts ?? []).filter(publicFeedPostHasChainAnchor);
+    const merged = upsertPublicChainPosts(existing, posts);
+    const withPending = mergeLocalPendingPublicFeed(channel.id, merged);
+    nextFeedCache[channel.id] = { feed: { version: 1, channelId: channel.id, updatedAt, posts: withPending }, syncedAt: updatedAt };
+    touched.push(channel.id);
+  }
+  publicChannelFeedCache = nextFeedCache;
+  globalThis.plathoLastPublicSync = { mode: 'shard', channels: touched, at: updatedAt };
+  return true;
+}
+
 async function syncPublicChannelFromChain() {
+  if (publicLaneDirectPayEnabled()) return syncPublicChannelFromShards();
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return false;
   const { provider, address } = resolved;
