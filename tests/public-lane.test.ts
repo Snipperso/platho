@@ -122,6 +122,18 @@ describe('PUBLIC-LANE — the read assembly', () => {
     const a = catalog.find((c: any) => addrKey(c.channelWallet) === addrKey(chanA.address.toString()));
     expect(a.announcedAt, 'and it is chanA\'s NEWER announcement that survived').toBe(BigInt(CLOCK + 4 * 1000));
   }, 300_000);
+
+  it('PL-03: readThreadComments returns [] for a post whose thread shard was never deployed (no comments)', async () => {
+    // The ordinary case: a post nobody has commented on has no THREAD shard, so a bare get_page would hit an
+    // uninitialised account and throw exit -13. The liveness guard must turn that into a clean empty list. With the
+    // guard removed, this throws "no fixture shard" (get_page on the absent thread) — that is the mutation check.
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    const lane = makeLane(bc, { pages: new Map(), messages: new Map(), liveShards: [] });
+    const chTag = publicEpochTag(KIND.CHANNEL, publicEraOf(KIND.CHANNEL, CLOCK));
+    const comments = await lane.readThreadComments('EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-', chTag, 0n, { channelShardSeq: 0 });
+    expect(comments, 'an uncommented post yields no comments, not a throw').toEqual([]);
+  }, 60_000);
 });
 
 /**
