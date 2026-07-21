@@ -17,7 +17,10 @@ import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicke
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 // Must equal AT_FEE_SINK in contracts/AirdropTicket.tact — the same address RecordShard names as RS_FEE_SINK.
-const FEE_SINK = Address.parse('EQAUIujZ91zHBy5-PqpD1Oo6cXVIHYRP4BtyN6mUFZW4muQf');
+// [CORRECTED 2026-07-21] This mirror was left at the PRE-REBAKE address when the three contract-side
+// constants were rebaked on 2026-07-20. Rebaking a constant in the contracts and not in the tests that
+// mirror it turns the whole suite red for a reason that looks like a protocol defect and is not one.
+const FEE_SINK = Address.parse('EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7');
 const AT_MIN_CLAIM_CREDITS = 64n;
 const AT_MAX_CREDITS_PER_CLAIM = 1000n;
 const AT_CLAIM_MIN_VALUE = 63_000_000n;

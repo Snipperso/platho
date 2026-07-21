@@ -81,10 +81,16 @@ message(0x43524439) CreditBindAirdropPool {    // "CRD9" — genesis bind of the
 // Mirror of AirdropPool's accrual message (op + layout MUST match). Emitted ONLY from the FundAnonPoolAck handler:
 // the ack proves the funding LANDED in the Hub, so a bounced FundAnonPool can never mint ATH. Accruing at purchase
 // time instead would be a free-ATH loop (buy with a bad epoch -> collect ATH -> bounce refunds the TON in full).
+// [WIDTH ALIGNED 2026-07-21] credits_k narrowed uint64 -> uint32 so all THREE declarations of opcode 0x41445210
+// (here, AirdropPool, FeeAccumulator) are byte-identical. FeeAccumulator's clean-17 mirror was written at uint32
+// and, credits_k being the last field, every accrual it sent died at the pool with exit 9 — measured in
+// tests/airdrop-accrue-wire.test.ts. Narrowing the other two is the cheap direction: FeeAccumulator's address is
+// baked into RecordShard, IntroShard and AirdropTicket as the fee sink, so touching ITS code moves every shard
+// address in the product. uint32 is ample against the 1000-credit per-accrual cap (gate 26112).
 message(0x41445210) AirdropAccrue {
     purchase_id: Int as uint64;
     buyer: Address;
-    credits_k: Int as uint64;
+    credits_k: Int as uint32;
 }
 
 message(0x43524438) CreditPurchaseRefund {     // "CRD8" — sent to the buyer when their pool funding bounced (full refund)

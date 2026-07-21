@@ -523,7 +523,7 @@ _ %get_global() method_id(126899) {
         in_msg~skip_bits(32);
         var $msg'purchase_id = in_msg~load_uint(64);
         var $msg'buyer = in_msg~load_msg_addr();
-        var $msg'credits_k = in_msg~load_uint(64);
+        var $msg'credits_k = in_msg~load_uint(32);
         ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireSealed();
         throw_unless(26110, ( equal_slices_bits(__tact_context_get_sender(), $self'credit_issuer_address) ));
         throw_unless(26111, ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_isBasechainAddress($msg'buyer));
