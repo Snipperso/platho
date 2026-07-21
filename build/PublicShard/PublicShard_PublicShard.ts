@@ -912,6 +912,69 @@ export function dictValueParserPublicEntryView(): DictionaryValue<PublicEntryVie
     }
 }
 
+export type PublicPage = {
+    $$type: 'PublicPage';
+    from_id: bigint;
+    count: bigint;
+    entry_count: bigint;
+    rows: Cell;
+}
+
+export function storePublicPage(src: PublicPage) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeInt(src.from_id, 257);
+        b_0.storeInt(src.count, 257);
+        b_0.storeInt(src.entry_count, 257);
+        b_0.storeRef(src.rows);
+    };
+}
+
+export function loadPublicPage(slice: Slice) {
+    const sc_0 = slice;
+    const _from_id = sc_0.loadIntBig(257);
+    const _count = sc_0.loadIntBig(257);
+    const _entry_count = sc_0.loadIntBig(257);
+    const _rows = sc_0.loadRef();
+    return { $$type: 'PublicPage' as const, from_id: _from_id, count: _count, entry_count: _entry_count, rows: _rows };
+}
+
+export function loadTuplePublicPage(source: TupleReader) {
+    const _from_id = source.readBigNumber();
+    const _count = source.readBigNumber();
+    const _entry_count = source.readBigNumber();
+    const _rows = source.readCell();
+    return { $$type: 'PublicPage' as const, from_id: _from_id, count: _count, entry_count: _entry_count, rows: _rows };
+}
+
+export function loadGetterTuplePublicPage(source: TupleReader) {
+    const _from_id = source.readBigNumber();
+    const _count = source.readBigNumber();
+    const _entry_count = source.readBigNumber();
+    const _rows = source.readCell();
+    return { $$type: 'PublicPage' as const, from_id: _from_id, count: _count, entry_count: _entry_count, rows: _rows };
+}
+
+export function storeTuplePublicPage(source: PublicPage) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.from_id);
+    builder.writeNumber(source.count);
+    builder.writeNumber(source.entry_count);
+    builder.writeCell(source.rows);
+    return builder.build();
+}
+
+export function dictValueParserPublicPage(): DictionaryValue<PublicPage> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storePublicPage(src)).endCell());
+        },
+        parse: (src) => {
+            return loadPublicPage(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type PublicShardView = {
     $$type: 'PublicShardView';
     partition_key: bigint;
@@ -1119,7 +1182,7 @@ function initPublicShard_init_args(src: PublicShard_init_args) {
 }
 
 async function PublicShard_init(partition_key: bigint, epoch_tag: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241021e0100059b000114ff00f4a413f4bcf2c80b01020162020e04d6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cd3ffd33ff404d31f55306c148e10810101d700810101d7005902d1016d70e205e3027024d74920c21f953104d31f05de21821050535031bae3023520821050535033bae302c00004c12114b003040c0d00de038020d7217021d749c21f9430d31f01de821052535046ba8e52d37fd30759303181358df8428d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e8284c705f2f481358e01c200f2f44003c87f01ca0055305034cbffcb3ff400cb1fc9ed54e05f05046c5b03d307d3ffd31fd4d430465781358509db3c5260ba1af2f45522102881358607db3c24ba15f2f4f82304db3c15a9045520813587051b05190702da228e9c6c21c882105053434801cb1f5531db3c5005cbff15cb1fc9f9004430e122c0018e1232c882105053544801cb1fcbffcb1fc9f900e03001c0028e14c882105053424301cb1f01841fb001cb1fc9f900e030c882105053415601cb1f5530db3c5005cbffc9f9001034413006060024f84281358b01d30a018309ba12f2f4d3ff300342db3ca55250be8e85db3ca415bb923470e215f2f4813588f8416f24135f0324c00018180804fe8e845054db3c8e845054db3ce215be15f2f481358923830bb9f2f481358c23841fb9f2f42381010124f84210374698db3c32f8234770c855205023ce810101cf00810101cf00c910344460206e953059f45a30944133f415e202a48d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e82841213090a0032c882105053464401cb1f02f90058cbff01f90001cbffc9f90003fc8208c042c07f71820898968072f8425468b0c855408210525350465006cb1f14cb7f12cb07810101cf00810101cf00cec94343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004330db3c21c0018e845530db3c93553070e215a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa02806914150b006ecf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005502c87f01ca0055305034cbffcb3ff400cb1fc9ed5401da303381358af8235045db3c6c2182015180a014bc12f2f46d70f842218100a270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb001023c87f01ca0055305034cbffcb3ff400cb1fc9ed5417003c8e164003c87f01ca0055305034cbffcb3ff400cb1fc9ed54e05f04f2c0820202710f1c0159b254bb51343480006734fff4cffd0134c7d54c1b05238420404075c020404075c01640b4405b5c38b6cf1b136010042a5d5531db3c5530db3c5414045043830b06db3c55301b1819110424db3c5530db3c5530db3c44348208989680041a1312160218db3c5530db3c15a01034413013150128db3c82082625a0a08208989680a082082ab980a0140136db3c20c00396308208249f00e0c002958208186a00e0820807a1201b0136db3c20c00396308208a7d8c0e0c0029582086acfc0e082083567e01b0188db3c8d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e82840c11100c10bf10ae09111009108f107d106e05111005104f103d102e10de170326db3ca6025530db3c15a804db3c15a01034413018191a000822841fb00122db3cc102958208278d00958209e13380e21b0138db3c20c0039730821005a39a80e0c002958209e13380e08209e133801b000622ab1f015db23dbb51343480006734fff4cffd0134c7d54c1b05238420404075c020404075c01640b4405b5c389540f6cf1b11201d0070810101230259f40d6fa192306ddf206e92306d8e13d0fa40810101d700810101d70055206c136f03e2206e963070f8287020e06f237f552055e6503d');
+    const __code = Cell.fromHex('b5ee9c724102230100067f000114ff00f4a413f4bcf2c80b01020162020e04d6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cd3ffd33ff404d31f55306c148e10810101d700810101d7005902d1016d70e205e3027024d74920c21f953104d31f05de21821050535031bae3023520821050535033bae302c00004c12114b003040c0d00de038020d7217021d749c21f9430d31f01de821052535046ba8e52d37fd30759303181358df8428d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e8284c705f2f481358e01c200f2f44003c87f01ca0055305034cbffcb3ff400cb1fc9ed54e05f05046c5b03d307d3ffd31fd4d430465781358509db3c5260ba1af2f45522102881358607db3c24ba15f2f4f82304db3c15a9045520813587051c051a0702da228e9c6c21c882105053434801cb1f5531db3c5005cbff15cb1fc9f9004430e122c0018e1232c882105053544801cb1fcbffcb1fc9f900e03001c0028e14c882105053424301cb1f01841fb001cb1fc9f900e030c882105053415601cb1f5530db3c5005cbffc9f9001034413006060024f84281358b01d30a018309ba12f2f4d3ff300342db3ca55250be8e85db3ca415bb923470e215f2f4813588f8416f24135f0324c00019190804fe8e845054db3c8e845054db3ce215be15f2f481358923830bb9f2f481358c23841fb9f2f42381010124f84210374698db3c32f8234770c855205023ce810101cf00810101cf00c910344460206e953059f45a30944133f415e202a48d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e82841314090a0032c882105053464401cb1f02f90058cbff01f90001cbffc9f90003fc8208c042c07f71820898968072f8425468b0c855408210525350465006cb1f14cb7f12cb07810101cf00810101cf00cec94343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004330db3c21c0018e845530db3c93553070e215a076fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa02806915160b006ecf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005502c87f01ca0055305034cbffcb3ff400cb1fc9ed5401da303381358af8235045db3c6c2182015180a014bc12f2f46d70f842218100a270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb001023c87f01ca0055305034cbffcb3ff400cb1fc9ed5418003c8e164003c87f01ca0055305034cbffcb3ff400cb1fc9ed54e05f04f2c0820201200f1f020166101d0159b254bb51343480006734fff4cffd0134c7d54c1b05238420404075c020404075c01640b4405b5c38b6cf1b136011042a5d5531db3c5530db3c5414045043830b06db3c55301c191a120424db3c5530db3c5530db3c44348208989680041b1413170218db3c5530db3c15a01034413014160128db3c82082625a0a08208989680a082082ab980a0150136db3c20c00396308208249f00e0c002958208186a00e0820807a1201c0136db3c20c00396308208a7d8c0e0c0029582086acfc0e082083567e01c0188db3c8d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e82840c11100c10bf10ae09111009108f107d106e05111005104f103d102e10de180326db3ca6025530db3c15a804db3c15a010344130191a1b000822841fb00122db3cc102958208278d00958209e13380e21c0138db3c20c0039730821005a39a80e0c002958209e13380e08209e133801c000622ab1f015db23dbb51343480006734fff4cffd0134c7d54c1b05238420404075c020404075c01640b4405b5c389540f6cf1b11201e0070810101230259f40d6fa192306ddf206e92306d8e13d0fa40810101d700810101d70055206c136f03e2206e963070f8287020e06f237f5520015dbf9bdf6a268690000ce69ffe99ffa02698faa98360a4708408080eb80408080eb802c816880b6b8712a89ed9e362242001520170b6095320bc935320a19170e270038060b60801b60812b60922103645465354db3c1036457010472101f4c8c97f9322c2008e6f2273b6085343a021a1c870935303b98e4c8101015331a02b5959f40d6fa192306ddf206e92306d8e13d0fa40810101d700810101d70055206c136f03e2206e917095206f233031e25003cbff226e92327095026f236c21e258cb3f01a4e8303122946c22c9709413ccc901e25aa159e8132200045f03c23c3f6d');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initPublicShard_init_args({ $$type: 'PublicShard_init_args', partition_key, epoch_tag })(builder);
@@ -1221,6 +1284,7 @@ const PublicShard_types: ABIType[] = [
     {"name":"DepositCapsuleFee","header":1381191750,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"lane","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"init_arg0","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"init_arg1","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"publisher","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"PublicEntry","header":null,"fields":[{"name":"publisher","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PublicEntryView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"publisher","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_commit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"PublicPage","header":null,"fields":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"entry_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"rows","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"PublicShardView","header":null,"fields":[{"name":"partition_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"epoch_tag","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"kind","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"era_index","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"entry_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"safe_cap","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"era_seconds","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"deploy_min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"protocol_fee","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retire_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"fee_sink","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"PublicShard$Data","header":null,"fields":[{"name":"partition_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"epoch_tag","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entries","type":{"kind":"dict","key":"int","value":"PublicEntry","valueFormat":"ref"}},{"name":"entry_count","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
@@ -1232,11 +1296,13 @@ const PublicShard_opcodes = {
 }
 
 const PublicShard_getters: ABIGetter[] = [
+    {"name":"get_page","methodId":127867,"arguments":[{"name":"from_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_count","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"PublicPage","optional":false}},
     {"name":"get_entry","methodId":80118,"arguments":[{"name":"entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}],"returnType":{"kind":"simple","type":"PublicEntryView","optional":false}},
     {"name":"get_view","methodId":76114,"arguments":[],"returnType":{"kind":"simple","type":"PublicShardView","optional":false}},
 ]
 
 export const PublicShard_getterMapping: { [key: string]: string } = {
+    'get_page': 'getGetPage',
     'get_entry': 'getGetEntry',
     'get_view': 'getGetView',
 }
@@ -1277,6 +1343,8 @@ export const PS_FEE_SINK_FWD_RESERVE = 200000n;
 export const PS_FEE_TRANSPORT = 2800000n;
 export const PS_RETIRE_SLACK = 86400n;
 export const PS_UINT32_MAX = 4294967295n;
+export const PS_PAIRS_PER_CELL = 3n;
+export const PS_PAGE_CAP = 96n;
 
 export class PublicShard implements Contract {
     
@@ -1328,6 +1396,15 @@ export class PublicShard implements Contract {
         
         await provider.internal(via, { ...args, body: body });
         
+    }
+    
+    async getGetPage(provider: ContractProvider, from_id: bigint, max_count: bigint) {
+        const builder = new TupleBuilder();
+        builder.writeNumber(from_id);
+        builder.writeNumber(max_count);
+        const source = (await provider.get('get_page', builder.build())).stack;
+        const result = loadGetterTuplePublicPage(source);
+        return result;
     }
     
     async getGetEntry(provider: ContractProvider, entry_id: bigint) {

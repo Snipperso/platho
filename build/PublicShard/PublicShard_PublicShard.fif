@@ -15,8 +15,11 @@ PROGRAM{
   DECLPROC $PublicShard$_store
   DECLPROC $PublicShard$_load
   DECLPROC $Context$_get_value
+  DECLPROC $PublicEntry$_get_body_commit
+  DECLPROC $PublicEntry$_get_created_at
   DECLPROC $PublicEntry$_not_null
   DECLPROC $PublicEntryView$_to_external
+  DECLPROC $PublicPage$_to_external
   DECLPROC $PublicShardView$_to_external
   DECLPROC $PublicShard$init$_load
   DECLPROC $PublicShard$_contract_init
@@ -34,6 +37,9 @@ PROGRAM{
   DECLPROC $PublicShard$_fun_senderHash
   DECLPROC $PublicShard$_fun_bodyCommit
   DECLPROC $PublicShard$_fun_claimedPartitionKey
+  DECLPROC $PublicShard$_fun_packRows
+  DECLPROC $PublicPage$_constructor_from_id_count_entry_count_rows
+  DECLPROC $PublicShard$_fun_get_page
   DECLPROC $PublicEntryView$_constructor_exists_publisher_body_commit_created_at
   DECLPROC $PublicShard$_fun_get_entry
   DECLPROC $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink
@@ -42,6 +48,7 @@ PROGRAM{
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
   DECLPROC $DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce
+  127867 DECLMETHOD %get_page
   80118 DECLMETHOD %get_entry
   76114 DECLMETHOD %get_view
   DECLPROC recv_internal
@@ -158,10 +165,19 @@ PROGRAM{
     s1 s3 XCHG
     3 BLKDROP
   }>
+  $PublicEntry$_get_body_commit PROCINLINE:<{
+    DROP
+    NIP
+  }>
+  $PublicEntry$_get_created_at PROCINLINE:<{
+    2 1 BLKDROP2
+  }>
   $PublicEntry$_not_null PROCINLINE:<{
         3 UNTUPLE
   }>
   $PublicEntryView$_to_external PROCINLINE:<{
+  }>
+  $PublicPage$_to_external PROCINLINE:<{
   }>
   $PublicShardView$_to_external PROCINLINE:<{
   }>
@@ -384,6 +400,112 @@ PROGRAM{
     s3 s4 XCHG
     s1 s3 s0 XCHG3
   }>
+  $PublicShard$_fun_packRows PROCREF:<{
+        NEWC
+        ENDC
+    TRUE
+    WHILE:<{
+      s2 PUSH
+      0 GTINT
+    }>DO<{
+      s2 PUSH
+      3 PUSHINT
+          MIN
+      s4 s3 PUSH2
+      ADD
+      OVER
+      SUB
+          NEWC
+      0 PUSHINT
+      WHILE:<{
+        s0 s3 PUSH2
+        LESS
+      }>DO<{
+        257 PUSHINT
+        s3 s1 PUSH2
+        ADD
+        s11 PUSH
+        -ROT
+        __tact_dict_get_int_cell INLINECALLDICT
+        $PublicEntry$_load_opt INLINECALLDICT
+        DUP
+        ISNULL
+        IF:<{
+          0 PUSHINT
+        }>ELSE<{
+          DUP
+          $PublicEntry$_not_null INLINECALLDICT
+          $PublicEntry$_get_body_commit INLINECALLDICT
+        }>
+        s0 s3 XCHG2
+        256 STU
+        s2 PUSH
+        ISNULL
+        IF:<{
+          s2 POP
+          0 PUSHINT
+        }>ELSE<{
+          s0 s2 XCHG
+          $PublicEntry$_not_null INLINECALLDICT
+          $PublicEntry$_get_created_at INLINECALLDICT
+        }>
+        ROT
+        64 STU
+        SWAP
+        INC
+      }>
+      DROP
+      NIP
+      s2 PUSH
+      IF:<{
+        2 2 BLKDROP2
+            ENDC
+        FALSE
+      }>ELSE<{
+        s1 s3 XCHG
+            STREF
+            ENDC
+        SWAP
+      }>
+      2SWAP
+      SUB
+      -ROT
+    }>
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $PublicPage$_constructor_from_id_count_entry_count_rows PROCINLINE:<{
+  }>
+  $PublicShard$_fun_get_page PROCREF:<{
+    SWAP
+    0 PUSHINT
+        MAX
+    s2 s0 PUSH2
+    GREATER
+    IF:<{
+      s2 s0 PUSH2
+      SUB
+    }>ELSE<{
+      0 PUSHINT
+    }>
+    0 PUSHINT
+    s0 s3 XCHG
+    96 PUSHINT
+        MIN
+    SWAP
+        MIN
+    s1 s2 XCHG
+        MAX
+    s2 PUSH
+    s3 s6 XCHG
+    s5 s4 s6 XCHG3
+    s5 s4 PUSH2
+    $PublicShard$_fun_packRows INLINECALLDICT
+    s3 s6 XCHG
+    s5 s7 s0 XCHG3
+    $PublicPage$_constructor_from_id_count_entry_count_rows INLINECALLDICT
+    s4 s7 XCHG
+  }>
   $PublicEntryView$_constructor_exists_publisher_body_commit_created_at PROCINLINE:<{
   }>
   $PublicShard$_fun_get_entry PROCREF:<{
@@ -459,6 +581,13 @@ PROGRAM{
     s4 s3 XCHG2
     PUSHNULL
     s0 s3 XCHG
+  }>
+  %get_page PROC:<{
+    $PublicShard$_contract_load INLINECALLDICT
+    2 4 BLKSWAP
+    $PublicShard$_fun_get_page INLINECALLDICT
+    4 4 BLKDROP2
+    $PublicPage$_to_external INLINECALLDICT
   }>
   %get_entry PROC:<{
     $PublicShard$_contract_load INLINECALLDICT

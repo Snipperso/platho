@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: PublicShard
-BoC Size: 1447 bytes
+BoC Size: 1675 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 17
+Total structures: 18
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -65,6 +65,10 @@ Signature: `PublicEntry{publisher:address,body_commit:int257,created_at:int257}`
 TL-B: `_ exists:bool publisher:address body_commit:int257 created_at:int257 = PublicEntryView`
 Signature: `PublicEntryView{exists:bool,publisher:address,body_commit:int257,created_at:int257}`
 
+### PublicPage
+TL-B: `_ from_id:int257 count:int257 entry_count:int257 rows:^cell = PublicPage`
+Signature: `PublicPage{from_id:int257,count:int257,entry_count:int257,rows:^cell}`
+
 ### PublicShardView
 TL-B: `_ partition_key:int257 epoch_tag:int257 kind:int257 era_index:int257 entry_count:int257 safe_cap:int257 era_seconds:int257 retention:int257 min_value:int257 deploy_min_value:int257 protocol_fee:int257 retire_at:int257 fee_sink:address = PublicShardView`
 Signature: `PublicShardView{partition_key:int257,epoch_tag:int257,kind:int257,era_index:int257,entry_count:int257,safe_cap:int257,era_seconds:int257,retention:int257,min_value:int257,deploy_min_value:int257,protocol_fee:int257,retire_at:int257,fee_sink:address}`
@@ -74,7 +78,11 @@ TL-B: `_ partition_key:uint256 epoch_tag:uint64 entries:dict<int, ^PublicEntry{p
 Signature: `PublicShard{partition_key:uint256,epoch_tag:uint64,entries:dict<int, ^PublicEntry{publisher:address,body_commit:int257,created_at:int257}>,entry_count:uint32}`
 
 ## Get methods
-Total get methods: 2
+Total get methods: 3
+
+## get_page
+Argument: from_id
+Argument: max_count
 
 ## get_entry
 Argument: entry_id

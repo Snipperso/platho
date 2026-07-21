@@ -53,11 +53,20 @@ builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline;
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
+;; $PublicEntry$_get_body_commit
+_ $PublicEntry$_get_body_commit((slice, int, int) v) inline;
+
+;; $PublicEntry$_get_created_at
+_ $PublicEntry$_get_created_at((slice, int, int) v) inline;
+
 ;; $PublicEntry$_not_null
 ((slice, int, int)) $PublicEntry$_not_null(tuple v) inline;
 
 ;; $PublicEntryView$_to_external
 (int, slice, int, int) $PublicEntryView$_to_external(((int, slice, int, int)) v) inline;
+
+;; $PublicPage$_to_external
+(int, int, int, cell) $PublicPage$_to_external(((int, int, int, cell)) v) inline;
 
 ;; $PublicShardView$_to_external
 (int, int, int, int, int, int, int, int, int, int, int, int, slice) $PublicShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int, slice)) v) inline;
@@ -109,6 +118,15 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $PublicShard$_fun_claimedPartitionKey
 ((int, int, cell, int), int) $PublicShard$_fun_claimedPartitionKey((int, int, cell, int) $self, int $kind, int $keyArg, int $shardSeq) impure inline_ref;
+
+;; $PublicShard$_fun_packRows
+((int, int, cell, int), cell) $PublicShard$_fun_packRows((int, int, cell, int) $self, int $start, int $n) impure inline_ref;
+
+;; $PublicPage$_constructor_from_id_count_entry_count_rows
+((int, int, int, cell)) $PublicPage$_constructor_from_id_count_entry_count_rows(int $from_id, int $count, int $entry_count, cell $rows) inline;
+
+;; $PublicShard$_fun_get_page
+((int, int, cell, int), (int, int, int, cell)) $PublicShard$_fun_get_page((int, int, cell, int) $self, int $from_id, int $max_count) impure inline_ref;
 
 ;; $PublicEntryView$_constructor_exists_publisher_body_commit_created_at
 ((int, slice, int, int)) $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(int $exists, slice $publisher, int $body_commit, int $created_at) inline;
@@ -177,6 +195,14 @@ cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
 
 builder $global_beginCell() impure asm """
     NEWC
+""";
+
+int $global_min(int $x, int $y) impure asm """
+    MIN
+""";
+
+int $global_max(int $x, int $y) impure asm """
+    MAX
 """;
 
 slice $global_myAddress() impure asm """
@@ -284,6 +310,10 @@ slice $global_myAddress() impure asm """
 
 int $global_now() impure asm """
     NOW
+""";
+
+builder $Builder$_fun_storeRef(cell $cell, builder $self) impure asm """
+    STREF
 """;
 
 cell $Builder$_fun_endCell(builder $self) impure asm """
@@ -399,6 +429,16 @@ tuple $PublicEntry$_load_opt(cell cl) inline {
     return $PublicEntry$_as_optional(sc~$PublicEntry$_load());
 }
 
+_ $PublicEntry$_get_body_commit((slice, int, int) v) inline {
+    var (v'publisher, v'body_commit, v'created_at) = v;
+    return v'body_commit;
+}
+
+_ $PublicEntry$_get_created_at((slice, int, int) v) inline {
+    var (v'publisher, v'body_commit, v'created_at) = v;
+    return v'created_at;
+}
+
 ((slice, int, int)) $PublicEntry$_not_null(tuple v) inline {
     var (slice vvv'publisher, int vvv'body_commit, int vvv'created_at) = __tact_tuple_destroy_3(v);
     return (vvv'publisher, vvv'body_commit, vvv'created_at);
@@ -420,6 +460,20 @@ tuple $PublicEntry$_load_opt(cell cl) inline {
 
 ((int, slice, int, int)) $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(int $exists, slice $publisher, int $body_commit, int $created_at) inline {
     return ($exists, $publisher, $body_commit, $created_at);
+}
+
+;;
+;; Type: PublicPage
+;; TLB: _ from_id:int257 count:int257 entry_count:int257 rows:^cell = PublicPage
+;;
+
+(int, int, int, cell) $PublicPage$_to_external(((int, int, int, cell)) v) inline {
+    var (v'from_id, v'count, v'entry_count, v'rows) = v; 
+    return (v'from_id, v'count, v'entry_count, v'rows);
+}
+
+((int, int, int, cell)) $PublicPage$_constructor_from_id_count_entry_count_rows(int $from_id, int $count, int $entry_count, cell $rows) inline {
+    return ($from_id, $count, $entry_count, $rows);
 }
 
 ;;
@@ -610,27 +664,71 @@ builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline {
     return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_20);
 }
 
+((int, int, cell, int), cell) $PublicShard$_fun_packRows((int, int, cell, int) $self, int $start, int $n) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    cell $cell = $Builder$_fun_endCell($global_beginCell());
+    int $isTail = true;
+    int $remaining = $n;
+    while (($remaining > 0)) {
+        int $chunk = $global_min($remaining, 3);
+        int $first = (($start + $remaining) - $chunk);
+        builder $b = $global_beginCell();
+        int $i = 0;
+        while (($i < $chunk)) {
+            tuple $e = $PublicEntry$_load_opt(__tact_dict_get_int_cell($self'entries, 257, ($first + $i)));
+            $b = store_uint(store_uint($b, (null?($e) ? 0 : $PublicEntry$_get_body_commit($PublicEntry$_not_null($e))), 256), (null?($e) ? 0 : $PublicEntry$_get_created_at($PublicEntry$_not_null($e))), 64);
+            $i = ($i + 1);
+        }
+        if ($isTail) {
+            $cell = $Builder$_fun_endCell($b);
+            $isTail = false;
+        } else {
+            $cell = $Builder$_fun_endCell($Builder$_fun_storeRef($cell, $b));
+        }
+        $remaining = ($remaining - $chunk);
+    }
+    var $fresh$ret_21 = $cell;
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_21);
+}
+
+((int, int, cell, int), (int, int, int, cell)) $PublicShard$_fun_get_page((int, int, cell, int) $self, int $from_id, int $max_count) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    int $start = $global_max($from_id, 0);
+    int $available = (($self'entry_count > $start) ? ($self'entry_count - $start) : 0);
+    int $n = $global_max(0, $global_min($global_min($max_count, 96), $available));
+    var $fresh$ret_22 = $PublicPage$_constructor_from_id_count_entry_count_rows($start, $n, $self'entry_count, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_packRows($start, $n));
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_22);
+}
+
 ((int, int, cell, int), (int, slice, int, int)) $PublicShard$_fun_get_entry((int, int, cell, int) $self, int $entry_id) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
     tuple $e = $PublicEntry$_load_opt(__tact_dict_get_int_cell($self'entries, 257, $entry_id));
     if (null?($e)) {
-        var $fresh$ret_21 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(false, $global_myAddress(), 0, 0);
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_21);
+        var $fresh$ret_23 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(false, $global_myAddress(), 0, 0);
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_23);
     }
     var ($v'publisher, $v'body_commit, $v'created_at) = $PublicEntry$_not_null($e);
-    var $fresh$ret_22 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(true, $v'publisher, $v'body_commit, $v'created_at);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_22);
+    var $fresh$ret_24 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(true, $v'publisher, $v'body_commit, $v'created_at);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_24);
 }
 
 ((int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int, int, slice)) $PublicShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_23 = $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink($self'partition_key, $self'epoch_tag, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex(), $self'entry_count, 4096, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_deployMinValue(), 10000000, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt(), __gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57());
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_23);
+    var $fresh$ret_25 = $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink($self'partition_key, $self'epoch_tag, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex(), $self'entry_count, 4096, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_deployMinValue(), 10000000, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt(), __gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57());
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_25);
 }
 
 ;;
 ;; Get methods of a Contract PublicShard
 ;;
+
+_ %get_page(int $from_id, int $max_count) method_id(127867) {
+    int $from_id = $from_id;
+    int $max_count = $max_count;
+    var self = $PublicShard$_contract_load();
+    var res = self~$PublicShard$_fun_get_page($from_id, $max_count);
+    return $PublicPage$_to_external(res);
+}
 
 _ %get_entry(int $entry_id) method_id(80118) {
     int $entry_id = $entry_id;
