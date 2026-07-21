@@ -29,8 +29,8 @@ import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider
 import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=3';
 import {
   publicBeaconScanAddresses,
-  publicChannelScanAddresses,
   publicAvatarScanAddresses,
+  PUBLIC_SEQ_PROBE,
   publicWalletHash,
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -40,6 +40,7 @@ import {
   addrKey,
 } from './shard-discovery.mjs?v=3';
 
+const PS_KIND_CHANNEL = 0;
 const PS_KIND_THREAD = 1;
 
 /**
@@ -113,15 +114,28 @@ export function createPublicLane({
      * A channel's posts over the era window, authenticated and newest-first. `channelWallet` is the channel's
      * identity — a channel IS a wallet in clean-17. Returns { entry counts unused here } a flat post list.
      */
-    async readChannelPosts(channelWallet, { eraWindow = 3, seqProbe } = {}) {
+    async readChannelPosts(channelWallet, { eraWindow = 3, seqProbe = PUBLIC_SEQ_PROBE } = {}) {
       const nowUnix = now();
       const hash = publicWalletHash(channelWallet);
-      const addresses = await publicChannelScanAddresses(hash, nowUnix, eraWindow, seqProbe);
-      const live = await readStates(addresses);
+      const era = publicEraOf(PS_KIND_CHANNEL, nowUnix);
+      // Build (address, epochTag, seq) coordinates rather than a bare address list, so every post can be tagged with
+      // the epoch_tag of the shard it lives in. A comment's thread shard is f(post_uid) and post_uid folds the
+      // channel epoch_tag, so without this the reader could not derive where to read (or write) a post's comments.
+      const coords = [];
+      for (let e = era; e > era - eraWindow && e >= 0; e -= 1) {
+        const epochTag = publicEpochTag(PS_KIND_CHANNEL, e);
+        for (let seq = 0; seq < seqProbe; seq += 1) {
+          const address = rawAddress(await publicShardAddressBytes(await publicChannelPartitionKey(hash, seq), epochTag));
+          coords.push({ address, epochTag, seq });
+        }
+      }
+      const live = await readStates(coords.map((c) => c.address));
       const posts = [];
-      for (const [, state] of live) {
+      for (const coord of coords) {
+        const state = live.get(addrKey(coord.address));
+        if (!state) continue;
         const { posts: shardPosts } = await readShardPosts(state.address);
-        for (const p of shardPosts) posts.push({ ...p, channelWallet });
+        for (const p of shardPosts) posts.push({ ...p, channelWallet, channelEpochTag: coord.epochTag, channelShardSeq: coord.seq });
       }
       posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
       return posts;
@@ -129,16 +143,23 @@ export function createPublicLane({
 
     /**
      * The comment thread of one post. The caller holds the post's coordinates from having rendered it:
-     * (channelWallet, channelEpochTag, entryId). post_uid is derived from them, then the THREAD shard for the
-     * current era. Comments are open to anyone who saw the post (gate 13702 folds post_uid, not a wallet).
+     * (channelWallet, channelEpochTag, entryId) plus the parent's channel overflow seq. post_uid folds the parent's
+     * channel_pk (which uses channelShardSeq — NOT 0, or an overflow-shard post's thread would never be found),
+     * then the THREAD shard for the current era. Comments are open to anyone who saw the post (gate 13702 folds
+     * post_uid, not a wallet).
+     *
+     * LIVENESS FIRST: a post with no comments never deployed its thread shard, so a bare get_page would hit an
+     * uninitialised account and throw exit -13. Check accountStates and return [] for the ordinary no-comments case.
      */
-    async readThreadComments(channelWallet, channelEpochTag, entryId, { shardSeq = 0 } = {}) {
+    async readThreadComments(channelWallet, channelEpochTag, entryId, { channelShardSeq = 0, threadShardSeq = 0 } = {}) {
       const nowUnix = now();
-      const channelPk = await publicChannelPartitionKey(publicWalletHash(channelWallet), 0);
+      const channelPk = await publicChannelPartitionKey(publicWalletHash(channelWallet), channelShardSeq);
       const postUid = await publicPostUid(channelPk, channelEpochTag, entryId);
-      const threadPk = await publicThreadPartitionKey(postUid, shardSeq);
+      const threadPk = await publicThreadPartitionKey(postUid, threadShardSeq);
       const threadTag = publicEpochTag(PS_KIND_THREAD, publicEraOf(PS_KIND_THREAD, nowUnix));
       const address = rawAddress(await publicShardAddressBytes(threadPk, threadTag));
+      const live = await readStates([address]);
+      if (live.size === 0) return [];   // no thread shard = the post has no comments (the ordinary case)
       const { posts } = await readShardPosts(address);
       return posts;
     },

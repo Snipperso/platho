@@ -8490,7 +8490,62 @@ function buildDiscoveryCtaCard() {
 // re-download); otherwise the walk STOPS at the snapshot boundary and only the new entries' bodies are fetched
 // (comment entries are immutable on-chain). A multipart group straddling the boundary (half-landed at snapshot
 // time) extends the walk until the group completes.
+// clean-17 comment read (gated): a post's comments live in its THREAD shard (address = f(post_uid), and post_uid
+// folds the parent's channel_pk + channel epoch_tag + entry_id). The opened post carries channelEpochTag/authorWallet
+// from the shard feed, so the thread is O(1) derivable — no parent index, no chain walk.
+// NOTE (era window): readThreadComments reads the CURRENT thread era only; comments written in a later era land in a
+// different thread shard. Within a 30-day thread era this is complete; a cross-era window is a public-lane refinement.
+async function loadPublicPostCommentsFromShards(item) {
+  const lane = directPublicLaneReader();
+  if (!lane) return { comments: [], degraded: true };
+  if (item?.channelEpochTag == null || item?.entryId == null || !item?.authorWallet) {
+    return { comments: [], degraded: false, parentExists: false, latestLink: '0' };
+  }
+  let threadPosts;
+  try {
+    threadPosts = await lane.readThreadComments(item.authorWallet, BigInt(item.channelEpochTag), BigInt(item.entryId), { channelShardSeq: item.channelShardSeq ?? 0 });
+  } catch (error) {
+    console.warn('[public] thread comments read failed', item.entryId, error);
+    return { comments: [], degraded: true };
+  }
+  const commentParts = [];
+  for (const tp of threadPosts) {
+    let payload;
+    try { payload = readPublicPostPayloadV2({ header: tp.header, body: tp.body }); } catch { continue; }
+    if (payload.type !== 'comment' && payload.type !== 'image_comment' && payload.type !== 'document_comment') continue;
+    const authorWallet = tp.publisher ? (rawWalletAddress(publicAddrKey(tp.publisher)) ?? publicAddrKey(tp.publisher)) : item.authorWallet;
+    const createdAtSec = Number(tp.created_at ?? 0n);
+    const bodyHashHex = await publicShardBodyHashHex(tp.body);
+    commentParts.push({
+      id: `pshard-c-${tp.entry_id.toString()}`,
+      entryId: tp.entry_id.toString(),
+      channelId: item.channelId ?? publicChannelIdForAuthorWallet(authorWallet),
+      type: payload.type,
+      text: payload.text ?? '',
+      imageBytes: payload.imageBytes ?? payload.image_bytes,
+      documentBytes: payload.documentBytes ?? payload.document_bytes,
+      createdAt: createdAtSec > 0 ? new Date(createdAtSec * 1000).toISOString() : new Date().toISOString(),
+      author: publicAuthorLabel(authorWallet),
+      authorWallet,
+      bodyHash: bodyHashHex,
+      entryUid: bodyHashHex.slice(2),
+      streamId: payload.stream_id,
+      partIndex: payload.partIndex ?? 0,
+      partCount: payload.partCount ?? 1,
+      chainVerified: true,
+      // All comments in the thread share the parent; carry the post's id/hash so assemble/attach group them under it.
+      parentEntryId: String(item.entryId),
+      parentHash: item.bodyHash,
+    });
+  }
+  const comments = assemblePublicParts(commentParts);
+  comments.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  globalThis.plathoLastPublicCommentLoad = { mode: 'shard', entryId: String(item.entryId), comments: comments.length, degraded: false };
+  return { comments, degraded: false, parentExists: comments.length > 0, latestLink: String(comments.length) };
+}
+
 async function loadPublicPostComments(item, options = {}) {
+  if (publicLaneDirectPayEnabled()) return loadPublicPostCommentsFromShards(item);
   const snapshot = options.snapshot && Array.isArray(options.snapshot.comments) ? options.snapshot : null;
   const snapshotBoundary = (() => {
     try { return BigInt(snapshot?.latestLink ?? 0n); } catch { return 0n; }
@@ -10502,6 +10557,10 @@ async function syncPublicChannelFromShards() {
         partCount: payload.partCount ?? 1,
         commentsAllowed: payload.commentsAllowed !== false,
         chainVerified: true,
+        // The shard's channel epoch_tag + overflow seq — the comment reader/writer folds these into post_uid to
+        // find the THREAD shard for this post's comments.
+        channelEpochTag: sp.channelEpochTag != null ? String(sp.channelEpochTag) : undefined,
+        channelShardSeq: sp.channelShardSeq ?? 0,
       });
     }
     const posts = assemblePublicParts(postParts);
@@ -29755,7 +29814,57 @@ async function publishChannelProfile(description, tags) {
   return { result, description: desc, tags: normalizedTags, ownerUsername, createdAtSec };
 }
 
+// Publish a comment DIRECT-PAY into the parent post's THREAD shard. The thread partition is f(post_uid), post_uid
+// folds the parent's channel_pk + channel epoch_tag + entry_id — all carried on the opened post. keyArg = post_uid,
+// which is exactly what the contract folds to verify a THREAD publish.
+async function submitPublicCommentDirect(parent, bodyText = null, draftAttachments = publicImageAttachments, draftFileAttachments = publicFileAttachments) {
+  if (!plathoWallet?.address) throw new Error('Connect a wallet to comment on the public lane');
+  if (parent?.entryId === undefined || parent?.entryId === null) throw new Error('Public comment parent is not synced from a shard');
+  if (parent?.channelEpochTag == null || !parent?.authorWallet) throw new Error('Public comment parent is missing its channel coordinates');
+  if (parent.commentsAllowed === false) throw new Error('Comments are closed for this post');
+  const text = bodyText?.trim() ?? publicMessageInput?.value?.trim() ?? '';
+  const attachments = normalizePublicImageAttachments(draftAttachments);
+  const fileAttachments = normalizePrivateFileAttachments(draftFileAttachments);
+  const documentBlocks = publicDocumentBlocksFromDraft(text, attachments, fileAttachments);
+  if (documentBlocks.length === 0) return null;
+  setPublicStatus('comment signing');
+  const blocks = displayBlocksFromDocumentBlocks(documentBlocks);
+  const payloads = await createPublicLanePayloadPartsV2({ type: 'comment', text, attachments, fileAttachments });
+  if (payloads.length === 0) return null;
+  setPublicCommentReplyTo(null);
+  setPublicShareDraft(null);
+  const ref = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
+    blocks,
+    publishStatus: 'sending',
+    publishState: null,
+  });
+
+  // Derive the THREAD shard from the parent's coordinates.
+  const channelPk = await publicChannelPartitionKey(publicWalletHash(parent.authorWallet), parent.channelShardSeq ?? 0);
+  const postUid = await publicPostUid(channelPk, BigInt(parent.channelEpochTag), BigInt(parent.entryId));
+  const threadPk = await publicThreadPartitionKey(postUid, 0);
+  const threadEpochTag = publicEpochTag(1, publicEraOf(1, Math.floor(Date.now() / 1000)));
+  const value = publicPublishValueForKind(1);
+  const parts = payloads.map((payload) => ({
+    kind: 1, keyArg: postUid, header: payload.headerCell, body: payload.bodyCell, value, partitionKey: threadPk, epochTag: threadEpochTag,
+  }));
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+
+  let result;
+  try {
+    result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, parts);
+  } catch (error) {
+    if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'comment failed' });
+    setPublicStatus('comment failed');
+    throw error;
+  }
+  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: null });
+  setPublicStatus('comment published');
+  return result;
+}
+
 async function submitPublicCommentThroughVault(parent, bodyText = null, draftAttachments = publicImageAttachments, draftFileAttachments = publicFileAttachments) {
+  if (publicLaneDirectPayEnabled()) return submitPublicCommentDirect(parent, bodyText, draftAttachments, draftFileAttachments);
   if (parent?.entryId === undefined || parent?.entryId === null) throw new Error('Public comment parent is not synced from chain');
   if (!/^0x[0-9a-fA-F]{64}$/.test(String(parent.bodyHash ?? ''))) throw new Error('Public comment parent hash is missing');
   if (parent.commentsAllowed === false) throw new Error('Comments are closed for this post');
