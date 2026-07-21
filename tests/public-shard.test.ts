@@ -252,6 +252,47 @@ describe('PUBLIC-SHARD — four domains, one self-verifying address', () => {
     expect(v.safe_cap, 'the cap is a COMPUTE gate (13705), so a full shard bounces rather than dying as ACTION code 50').toBe(4096n);
   }, 300_000);
 
+  it('PS-PAGE-01: get_page returns the same authenticated commits as row-by-row get_entry, in one call', async () => {
+    // The feed-read primitive: a page is ONE runGetMethod, not one per entry. This pins that the packed rows
+    // (3 per cell, ref-chained) decode to exactly the per-entry body_commit values, so the client's page decoder
+    // and the point getter cannot disagree.
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    await deployFeeSink(bc, { funderSeed: 'ps-page-sink' });
+    const owner = await bc.treasury('ps-page-owner');
+    const era = Math.floor(CLOCK / ERA_SHORT);
+    const pk = partitionKey(KIND.CHANNEL, { senderHash: addrHash(owner.address) });
+    const shard = await liveShard(bc, KIND.CHANNEL, era, pk);
+
+    const N = 7;   // spans three packed cells (3 + 3 + 1)
+    for (let i = 0; i < N; i++) {
+      bc.now = CLOCK + i * 97;
+      const v = await shard.getGetView();
+      const due = v.entry_count === 0n ? v.deploy_min_value : v.min_value;
+      await shard.send(owner.getSender(), { value: due + toNano('0.02') }, publish(KIND.CHANNEL, { h: 20 + i }));
+    }
+
+    const page = await shard.getGetPage(0n, 96n);
+    expect(page.count, 'the page covers every entry').toBe(BigInt(N));
+    expect(page.entry_count, 'and reports the append cursor so a client knows there is no more').toBe(BigInt(N));
+
+    // Walk the ref-chained rows and match each to the point getter.
+    let slice = page.rows.beginParse();
+    for (let i = 0; i < N; i++) {
+      if (slice.remainingBits < 320 && slice.remainingRefs > 0) slice = slice.loadRef().beginParse();
+      const commit = slice.loadUintBig(256);
+      const createdAt = slice.loadUintBig(64);
+      const entry = await shard.getGetEntry(BigInt(i));
+      expect(commit, `row ${i} commit matches get_entry`).toBe(entry.body_commit);
+      expect(createdAt, `row ${i} created_at matches get_entry`).toBe(entry.created_at);
+    }
+
+    // A page from the middle is clamped to the live range and reports the same cursor.
+    const tail = await shard.getGetPage(5n, 96n);
+    expect(tail.from_id).toBe(5n);
+    expect(tail.count).toBe(BigInt(N - 5));
+  }, 300_000);
+
   it('PS-RETIRE-01: a retire is refused before the death instant and destroys the account after it', async () => {
     const bc = await Blockchain.create();
     bc.now = CLOCK;

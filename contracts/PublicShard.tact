@@ -152,6 +152,21 @@ struct PublicEntryView {
     created_at: Int;
 }
 
+// One getter call returns a whole page of authenticated rows, mirroring IntroShard.get_scan_page — so a feed
+// page is ONE runGetMethod per shard, not one per entry. Rows are (body_commit, created_at); the PUBLISHER is
+// NOT packed, because it is recovered from the `source` of the /messages entry whose body hashes to body_commit,
+// and forging a body to a stored commit is a sha256 preimage. ids are IMPLICIT: row i is entry (from_id + i),
+// sound because nothing removes an entry, so [0, entry_count) is contiguous.
+const PS_PAIRS_PER_CELL: Int = 3;      // (uint256 commit, uint64 created_at) = 320 bits; 3 x 320 = 960 <= 1023
+const PS_PAGE_CAP: Int = 96;           // keep the get-method well under its gas ceiling
+
+struct PublicPage {
+    from_id: Int;
+    count: Int;
+    entry_count: Int;    // the shard's append cursor, so a client knows whether more pages remain
+    rows: Cell;          // `count` x (uint256 body_commit, uint64 created_at), 3 per cell, chained by ref
+}
+
 struct PublicShardView {
     partition_key: Int;
     epoch_tag: Int;
@@ -327,6 +342,38 @@ contract PublicShard {
     }
 
     receive() {}   // plain top-up / lazy deploy carrier
+
+    // Pack the (body_commit, created_at) rows of [start, start+n) into a ref-chained cell, built from the END
+    // backwards so each cell can reference the one after it — verbatim shape from IntroShard.packPairs.
+    fun packRows(start: Int, n: Int): Cell {
+        let cell: Cell = beginCell().endCell();
+        let isTail: Bool = true;
+        let remaining: Int = n;
+        while (remaining > 0) {
+            let chunk: Int = min(remaining, PS_PAIRS_PER_CELL);
+            let first: Int = start + remaining - chunk;
+            let b: Builder = beginCell();
+            let i: Int = 0;
+            while (i < chunk) {
+                let e: PublicEntry? = self.entries.get(first + i);
+                b = b.storeUint(e == null ? 0 : e!!.body_commit, 256).storeUint(e == null ? 0 : e!!.created_at, 64);
+                i = i + 1;
+            }
+            if (isTail) { cell = b.endCell(); isTail = false; }
+            else { cell = b.storeRef(cell).endCell(); }
+            remaining = remaining - chunk;
+        }
+        return cell;
+    }
+
+    // THE FEED-READ PRIMITIVE. Clamped to the live range so a caller cannot be handed ids past the end, and capped
+    // so the page cannot run the get-method out of gas. Row i is entry (from_id + i).
+    get fun get_page(from_id: Int, max_count: Int): PublicPage {
+        let start: Int = max(from_id, 0);
+        let available: Int = self.entry_count > start ? self.entry_count - start : 0;
+        let n: Int = max(0, min(min(max_count, PS_PAGE_CAP), available));
+        return PublicPage{ from_id: start, count: n, entry_count: self.entry_count, rows: self.packRows(start, n) };
+    }
 
     get fun get_entry(entry_id: Int): PublicEntryView {
         let e: PublicEntry? = self.entries.get(entry_id);
