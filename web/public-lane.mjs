@@ -155,12 +155,30 @@ export function createPublicLane({
       const nowUnix = now();
       const channelPk = await publicChannelPartitionKey(publicWalletHash(channelWallet), channelShardSeq);
       const postUid = await publicPostUid(channelPk, channelEpochTag, entryId);
-      const threadPk = await publicThreadPartitionKey(postUid, threadShardSeq);
-      const threadTag = publicEpochTag(PS_KIND_THREAD, publicEraOf(PS_KIND_THREAD, nowUnix));
-      const address = rawAddress(await publicShardAddressBytes(threadPk, threadTag));
-      const live = await readStates([address]);
-      if (live.size === 0) return [];   // no thread shard = the post has no comments (the ordinary case)
-      const { posts } = await readShardPosts(address);
+      const threadPk = await publicThreadPartitionKey(postUid, threadShardSeq);   // era-independent; only epoch_tag moves the address
+      // Comments land in the thread shard of their WRITE-time era, so over a post's ~1-year life they accumulate
+      // ACROSS thread eras — reading only the current era silently dropped every earlier comment. Scan every thread
+      // era from the post's era (extracted from its channel epoch_tag; channel and thread share the 30-day granularity)
+      // up to now, in ONE accountStates batch, then get_page only the LIVE ones. Bounded against a hostile epoch_tag.
+      const nowThreadEra = publicEraOf(PS_KIND_THREAD, nowUnix);
+      const postEra = Number(BigInt(channelEpochTag) & 0xFFFFFFFFn);
+      const startEra = Math.max(0, Math.min(postEra, nowThreadEra));
+      const MAX_THREAD_ERAS = 14;   // ~1 year of 30-day eras + slack
+      const coords = [];
+      for (let e = nowThreadEra; e >= startEra && coords.length < MAX_THREAD_ERAS; e -= 1) {
+        coords.push(rawAddress(await publicShardAddressBytes(threadPk, publicEpochTag(PS_KIND_THREAD, e))));
+      }
+      const live = await readStates(coords);
+      const posts = [];
+      for (const address of coords) {
+        const state = live.get(addrKey(address));
+        // ACTIVE, not merely present: readAccountStates reports touched-but-uninit accounts too (525 B, status
+        // 'uninit'), and get_page on an uninit account throws exit -13 — a publicly-derivable touched address would
+        // otherwise defeat a bare size check and break the read.
+        if (!state || state.status !== 'active') continue;
+        const { posts: shardPosts } = await readShardPosts(address);
+        posts.push(...shardPosts);
+      }
       return posts;
     },
 
@@ -172,13 +190,24 @@ export function createPublicLane({
     async readAvatarParts(ownerWallet, { eraWindow = 3 } = {}) {
       const nowUnix = now();
       const hash = publicWalletHash(ownerWallet);
-      const addresses = await publicAvatarScanAddresses(hash, nowUnix, eraWindow);
+      const addresses = await publicAvatarScanAddresses(hash, nowUnix, eraWindow);   // newest AVATAR era first
       const live = await readStates(addresses);
-      for (const [, state] of live) {
+      // AGGREGATE across live avatar shards in newest-first order, not "first in RPC Map order": a wallet that
+      // (re)published its avatar in a different era than the newest keeps its current avatar in an OLDER shard, and
+      // returning whichever shard the RPC listed first would lose it. The caller's sha256 == pointer.avatarHash match
+      // then picks the authoritative set. ACTIVE-only for the same uninit/-13 reason as the thread read.
+      const collected = [];
+      let shard = null;
+      for (const address of addresses) {
+        const state = live.get(addrKey(address));
+        if (!state || state.status !== 'active') continue;
         const messages = await readMessagesWithSource(state.address);
-        if (messages.length > 0) return { shard: state.address, messages };
+        if (messages.length > 0) {
+          if (!shard) shard = state.address;
+          collected.push(...messages);
+        }
       }
-      return { shard: null, messages: [] };
+      return { shard, messages: collected };
     },
   };
 }
