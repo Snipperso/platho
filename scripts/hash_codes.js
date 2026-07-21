@@ -29,6 +29,10 @@ RECOVERY_SHARD_CODE_HASH:'build/RecoveryShard/RecoveryShard_RecoveryShard.code.b
 KEY_SHARD_CODE_HASH:'build/KeyShard/KeyShard_KeyShard.code.boc',
 AIRDROP_TICKET_CODE_HASH:'build/AirdropTicket/AirdropTicket_AirdropTicket.code.boc',
 AIRDROP_POOL_CODE_HASH:'build/AirdropPool/AirdropPool_AirdropPool.code.boc',
+// PublicShard — the clean-17 public/avatar lane (added 2026-07-21). Address-critical like the other shards: a
+// channel/thread/beacon/avatar address is derived from this code hash, and FeeAccumulator authenticates a lane-2
+// fee by rebuilding it.
+PUBLIC_SHARD_CODE_HASH:'build/PublicShard/PublicShard_PublicShard.code.boc',
 };
 const productionKeys = [
   'ATH_WALLET_CODE_HASH',
@@ -48,6 +52,7 @@ const productionKeys = [
   'KEY_SHARD_CODE_HASH',
   'AIRDROP_TICKET_CODE_HASH',
   'AIRDROP_POOL_CODE_HASH',
+  'PUBLIC_SHARD_CODE_HASH',
 ];
 const hashes = {};
 let out='';

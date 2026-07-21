@@ -157,6 +157,7 @@ message(0xFA110001) BindShardCode { shard_code: Cell }
 message(0xFA110002) BindTicketCode { ticket_code: Cell }
 message(0xFA110004) BindIntroShardCode { intro_shard_code: Cell }
 message(0xFA110003) BindAirdropPool { airdrop_pool_address: Address }
+message(0xFA110005) BindPublicShardCode { public_shard_code: Cell }   // lane 2, added 2026-07-21 with PublicShard
 
 struct FeeAccumulatorStateView {
     accumulated_ton: Int;
@@ -183,6 +184,9 @@ contract FeeAccumulator {
     intro_shard_code: Cell?;
     ticket_code: Cell?;
     airdrop_pool_address: Address?;
+    // lane 2, the PUBLIC lane. Same nullable-is-off treatment as the CONV/INTRO codes above; a genesis that never
+    // binds it yields a fee accumulator that simply refuses public deposits at gate 15055, not a broken one.
+    public_shard_code: Cell?;
     accrual_seq: Int as uint64;
 
     init(treasury_receiver_address: Address, buyback_burn_address: Address) {
@@ -190,6 +194,7 @@ contract FeeAccumulator {
         self.intro_shard_code = null;
         self.ticket_code = null;
         self.airdrop_pool_address = null;
+        self.public_shard_code = null;
         self.accrual_seq = 0;
         self.treasury_receiver_address = treasury_receiver_address;
         self.buyback_burn_address = buyback_burn_address;
@@ -239,6 +244,12 @@ contract FeeAccumulator {
         self.airdrop_pool_address = msg.airdrop_pool_address;
     }
 
+    receive(msg: BindPublicShardCode) {
+        self.requireTreasury();
+        throwUnless(15059, self.public_shard_code == null);
+        self.public_shard_code = msg.public_shard_code;
+    }
+
     // The address a contract occupies IS the hash of its code and data, so rebuilding that hash and comparing
     // it to sender() proves the sender runs exactly the bound bytecode. Only init ARGUMENTS enter the data
     // cell, behind a one-bit lazy-init flag — pinned against the real builder output by
@@ -248,10 +259,12 @@ contract FeeAccumulator {
         return contractAddressExt(0, code, data);
     }
 
-    // One derivation for BOTH lanes, because both shards take exactly two Int init args — the difference is
+    // One derivation for ALL THREE lanes, because every shard takes exactly two Int init args — the difference is
     // only WHICH code cell they belong to, never the layout. Positional on purpose: see DepositCapsuleFee.
+    // PublicShard's init is deliberately (partition_key: Int, epoch_tag: Int) — two int257 — so this same builder
+    // reproduces its address (contracts/PublicShard.tact, the note on its state fields explains why).
     fun laneShardAddress(lane: Int, arg0: Int, arg1: Int): Address {
-        let code: Cell = lane == 0 ? self.shard_code!! : self.intro_shard_code!!;
+        let code: Cell = lane == 0 ? self.shard_code!! : (lane == 1 ? self.intro_shard_code!! : self.public_shard_code!!);
         return self.deriveFromBoundCode(code, beginCell()
             .storeUint(0, 1)
             .storeInt(arg0, 257)
@@ -260,7 +273,7 @@ contract FeeAccumulator {
     }
 
     fun laneCodeBound(lane: Int): Bool {
-        return lane == 0 ? self.shard_code != null : self.intro_shard_code != null;
+        return lane == 0 ? self.shard_code != null : (lane == 1 ? self.intro_shard_code != null : self.public_shard_code != null);
     }
 
     fun ticketAddress(owner: Address): Address {
@@ -274,7 +287,7 @@ contract FeeAccumulator {
     // airdrop, so an open door here would mint 10 ATH per call to anyone. 15055 is what closes it.
     receive(msg: DepositCapsuleFee) {
         throwUnless(15054, msg.amount > 0);
-        throwUnless(15058, msg.lane == 0 || msg.lane == 1);
+        throwUnless(15058, msg.lane >= 0 && msg.lane <= 2);
         throwUnless(15055, self.laneCodeBound(msg.lane)
             && sender() == self.laneShardAddress(msg.lane, msg.init_arg0, msg.init_arg1));
         throwUnless(15056, context().value >= msg.amount + FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE);
