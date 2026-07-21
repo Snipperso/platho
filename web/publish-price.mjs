@@ -51,3 +51,29 @@ export function publishValueFor(lane) {
   if (lane === 'intro') return INTRO_PUBLISH_VALUE;
   throw new Error(`publishValueFor: unknown lane "${lane}" (expected "conv" or "intro")`);
 }
+
+// PublicShard deploy figures per KIND (0 CHANNEL, 1 THREAD, 2 BEACON, 3 AVATAR) — PS_DEPLOY_MIN_VALUE. Same
+// "always attach the deploy figure" rule as CONV/INTRO: the shard keeps only what it needs and mode-128 returns the
+// surplus, so a client that always pays this is never refused and never overspends. CHANNEL and THREAD share the
+// post endowment (30-day era, 1-year retention); BEACON funds a 1-year era, AVATAR a 3-year retention.
+// MEASURED 2026-07-21 against get_view.deploy_min_value; pinned in tests/public-lane-price.test.ts against the live
+// getter so a contract drift is a red test, not a refused publish. [RE-MEASURE BEFORE SEAL — PublicShard
+// endowments are still derivations, see PLATHO_CLEAN17_MASTER_ROADMAP "ЗАМЕРИТЬ ДО SEAL".]
+export const PUBLIC_CHANNEL_PUBLISH_VALUE = 19_300_000n;
+export const PUBLIC_THREAD_PUBLISH_VALUE = 19_300_000n;
+export const PUBLIC_BEACON_PUBLISH_VALUE = 23_900_000n;
+export const PUBLIC_AVATAR_PUBLISH_VALUE = 28_700_000n;
+
+const PUBLIC_PUBLISH_VALUE_BY_KIND = Object.freeze({
+  0: PUBLIC_CHANNEL_PUBLISH_VALUE,
+  1: PUBLIC_THREAD_PUBLISH_VALUE,
+  2: PUBLIC_BEACON_PUBLISH_VALUE,
+  3: PUBLIC_AVATAR_PUBLISH_VALUE,
+});
+
+/** The deploy figure to attach to a PublicShard publish of the given KIND (0..3). */
+export function publicPublishValueForKind(kind) {
+  const value = PUBLIC_PUBLISH_VALUE_BY_KIND[Number(kind)];
+  if (value === undefined) throw new Error(`publicPublishValueForKind: unknown PublicShard kind ${kind} (expected 0..3)`);
+  return value;
+}
