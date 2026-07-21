@@ -112,3 +112,45 @@ export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, 
     return cells;
   };
 }
+
+/**
+ * `readMessagesWithSource(address) -> [{ bodyCell, source }]`, newest first — the reader the PUBLIC lane needs.
+ *
+ * WHY A SECOND READER RATHER THAN A FLAG ON THE FIRST. The CONV/INTRO/RECOVERY lanes never need the sender: a
+ * private capsule authenticates by a signature carried IN the body, so who sent the transaction is irrelevant
+ * (and deliberately unlinkable). The PUBLIC lane is the opposite — a post's AUTHOR is the whole point, and it is
+ * recovered from the transaction's source, because get_page omits the publisher to stay narrow. Keeping the
+ * source-free reader source-free preserves that separation.
+ *
+ * `source` is a TOP-LEVEL field of each message object, raw `0:HEX`, alongside message_content.body — MEASURED
+ * against live toncenter v3 2026-07-21 (not message.in_msg.source, which does not exist on this shape). A message
+ * whose body will not parse is skipped, exactly like the source-free reader; absence is [], not an error.
+ */
+export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 64 } = {}) {
+  const doFetch = fetchImpl ?? globalThis.fetch;
+  if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
+  return async (address) => {
+    const base = resolveEndpoint('messages', endpoint);
+    const key = resolveApiKey(apiKey);
+    const url = new URL(base);
+    url.searchParams.set('destination', String(address));
+    url.searchParams.set('limit', String(limit));
+    url.searchParams.set('sort', 'desc');
+    const headers = { Accept: 'application/json' };
+    if (key) headers['X-API-Key'] = key;
+    const response = await scheduleToncenterHttpRequest(
+      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), SCAN_REQUEST_OPTIONS);
+    if (!response) return [];
+    if (!response.ok) throw new Error(`messages failed with HTTP ${response.status}`);
+    const body = await response.json();
+    const out = [];
+    for (const message of body?.messages ?? []) {
+      const raw = message?.message_content?.body;
+      if (!raw) continue;
+      let bodyCell;
+      try { bodyCell = parseBocBase64(raw); } catch { continue; }
+      out.push({ bodyCell, source: message?.source ?? null });
+    }
+    return out;
+  };
+}
