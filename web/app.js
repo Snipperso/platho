@@ -168,7 +168,7 @@ import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=1';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
 import { createPublicLane } from './public-lane.mjs?v=1';
-import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=1';
+import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=1';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
 import { publicPublishValueForKind } from './publish-price.mjs?v=1';
 import {
@@ -9251,6 +9251,44 @@ function publicAvatarPartMatches(payload, ownerWallet, pointer) {
   return true;
 }
 
+// clean-17 avatar-part match: PPH2 dropped the per-part avatar_hash/profile_version from the header (they were the
+// free avatar-from-header bypass, mandatory fix #4), so a shard avatar part is matched by streamId + partCount +
+// owner, and the AUTHORITATIVE check is the whole-image sha256 against the PAID KeyShard pointer.avatarHash, done in
+// cacheAssembledAvatarParts. The pointer's avatar_stream_id/avatar_part_count come from the paid KeyShard pointer.
+function publicAvatarPartMatchesShard(payload, ownerWallet, pointer) {
+  if (payload?.type !== 'avatar') return false;
+  const pointerStreamId = pointer.avatarStreamId ?? pointer.avatar_stream_id ?? null;
+  if (pointerStreamId && String(payload.stream_id ?? '').toLowerCase() !== String(pointerStreamId).toLowerCase()) return false;
+  if (pointer.avatarPartCount && Number(payload.partCount ?? payload.part_count ?? 0) !== Number(pointer.avatarPartCount)) return false;
+  if (ownerWallet && payload.authorWallet && !sameWalletAddress(payload.authorWallet, ownerWallet)) return false;
+  return true;
+}
+
+// Read the avatar image bytes from the owner's AVATAR PublicShard (kind 3) and verify them against the paid pointer.
+// The pointer (from KeyShard) is authoritative; the shard only stores bytes, authenticated by sha256 == avatarHash.
+async function readAvatarPartsFromShard(ownerWallet, pointer) {
+  const cached = await readProfileAvatarMediaCache(pointer?.avatarHash);
+  if (cached) return cached;
+  if (!pointer) return null;
+  const lane = directPublicLaneReader();
+  if (!lane) return null;
+  let messages;
+  try { ({ messages } = await lane.readAvatarParts(ownerWallet)); }
+  catch (error) { console.warn('[public] avatar shard read failed', error); return null; }
+  const parts = [];
+  for (const message of messages ?? []) {
+    const parsed = parsePublicPublish(message.bodyCell);
+    if (!parsed) continue;
+    let payload;
+    try { payload = readPublicPostPayloadV2({ header: parsed.header, body: parsed.body }); } catch { continue; }
+    payload.authorWallet = message.source ? (rawWalletAddress(publicAddrKey(message.source)) ?? publicAddrKey(message.source)) : ownerWallet;
+    if (!publicAvatarPartMatchesShard(payload, ownerWallet, pointer)) continue;
+    parts.push({ ...payload, imageBytes: payload.imageBytes ?? payload.image_bytes });
+  }
+  const assembled = await assembledAvatarPartGroup(parts, pointer);
+  return assembled?.imageUrl ?? null;
+}
+
 function avatarPartStreamId(part) {
   return String(part?.stream_id ?? part?.streamId ?? '').toLowerCase();
 }
@@ -9596,7 +9634,9 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
     const recordPointer = profileAvatarPointerFromRecord(record);
     if (!recordPointer) return null;
     if (requestedPointer && recordPointer.avatarHash.toLowerCase() !== requestedPointer.avatarHash.toLowerCase()) return null;
-    return readAvatarPartsFromCapsuleHub(ownerWallet, recordPointer);
+    return publicLaneDirectPayEnabled()
+      ? readAvatarPartsFromShard(ownerWallet, recordPointer)
+      : readAvatarPartsFromCapsuleHub(ownerWallet, recordPointer);
   }).catch((error) => {
     if (!noteTonRpcRateLimit(error)) console.error(error);
     return null;
