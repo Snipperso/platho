@@ -8503,7 +8503,8 @@ async function loadPublicPostCommentsFromShards(item) {
   }
   let threadPosts;
   try {
-    threadPosts = await lane.readThreadComments(item.authorWallet, BigInt(item.channelEpochTag), BigInt(item.entryId), { channelShardSeq: item.channelShardSeq ?? 0 });
+    // shardEntryId is the RAW per-shard entry_id post_uid folds; item.entryId is the collision-safe composite.
+    threadPosts = await lane.readThreadComments(item.authorWallet, BigInt(item.channelEpochTag), BigInt(item.shardEntryId ?? item.entryId), { channelShardSeq: item.channelShardSeq ?? 0 });
   } catch (error) {
     console.warn('[public] thread comments read failed', item.entryId, error);
     return { comments: [], degraded: true };
@@ -8516,9 +8517,12 @@ async function loadPublicPostCommentsFromShards(item) {
     const authorWallet = tp.publisher ? (rawWalletAddress(publicAddrKey(tp.publisher)) ?? publicAddrKey(tp.publisher)) : item.authorWallet;
     const createdAtSec = Number(tp.created_at ?? 0n);
     const bodyHashHex = await publicShardBodyHashHex(tp.body);
+    // A thread's comments now come from MULTIPLE era shards (the era-window fix), whose entry_ids collide (0-based
+    // per shard). A comment is a leaf (nothing derives from its id), so its feed identity is its unique body hash —
+    // which also dedups the same comment on re-read. Multipart comments still group by streamId, not this id.
     commentParts.push({
-      id: `pshard-c-${tp.entry_id.toString()}`,
-      entryId: tp.entry_id.toString(),
+      id: `pshard-c-${bodyHashHex.slice(2, 18)}`,
+      entryId: `c-${bodyHashHex.slice(2)}`,
       channelId: item.channelId ?? publicChannelIdForAuthorWallet(authorWallet),
       type: payload.type,
       text: payload.text ?? '',
@@ -10579,9 +10583,17 @@ async function syncPublicChannelFromShards() {
         }
       }
       const bodyHashHex = await publicShardBodyHashHex(sp.body);
+      // entry_id is 0-based PER shard account, so a channel's posts across its era/overflow shards COLLIDE on it
+      // (both shards have entry 0, 1, …). assemblePublicParts groups single-part posts by `single:channelId:entryId`
+      // and upsertPublicChainPosts dedups by entryId — a raw entry_id would merge two distinct posts into one
+      // corrupted record. So the FEED identity (entryId) is made globally unique with the shard's coordinates, while
+      // the RAW per-shard entry_id is kept as shardEntryId for the comment thread derivation (post_uid needs it).
+      const shardEntryId = sp.entry_id.toString();
+      const globalEntryId = `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}`;
       postParts.push({
-        id: `pshard-${channel.id}-${sp.entry_id.toString()}`,
-        entryId: sp.entry_id.toString(),
+        id: `pshard-${channel.id}-${globalEntryId}`,
+        entryId: globalEntryId,
+        shardEntryId,
         channelId: channel.id,
         type: payload.type,
         text: payload.text ?? '',
@@ -29879,9 +29891,10 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
     publishState: null,
   });
 
-  // Derive the THREAD shard from the parent's coordinates.
+  // Derive the THREAD shard from the parent's coordinates. shardEntryId is the RAW per-shard entry_id post_uid
+  // folds (parent.entryId is the collision-safe composite the feed cache uses).
   const channelPk = await publicChannelPartitionKey(publicWalletHash(parent.authorWallet), parent.channelShardSeq ?? 0);
-  const postUid = await publicPostUid(channelPk, BigInt(parent.channelEpochTag), BigInt(parent.entryId));
+  const postUid = await publicPostUid(channelPk, BigInt(parent.channelEpochTag), BigInt(parent.shardEntryId ?? parent.entryId));
   const threadPk = await publicThreadPartitionKey(postUid, 0);
   const threadEpochTag = publicEpochTag(1, publicEraOf(1, Math.floor(Date.now() / 1000)));
   const value = publicPublishValueForKind(1);

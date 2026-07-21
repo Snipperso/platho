@@ -24,6 +24,7 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 const CLOCK = 1_790_000_000;
+const THREAD_ERA_SECONDS = 2_592_000;   // 30 days (PS_ERA_SHORT) — measured from get_view.era_seconds
 const num = (v: bigint) => ({ type: 'num', value: '0x' + BigInt(v).toString(16) });
 const toCoreCell = (c: any) => Cell.fromBase64(Buffer.from(serializeBoc(c)).toString('base64'));
 const bocBase64 = (c: any) => Buffer.from(serializeBoc(c)).toString('base64');
@@ -44,7 +45,7 @@ async function sendBuilt(payer: any, built: any) {
 /** A read lane whose get_view/get_page come live from the given shards and whose accountStates/messages are served
  *  from the published bodies — the real read stack, not a re-decode. `entries` maps a shard's raw key to its opened
  *  contract and the { body, source } messages published to it. */
-function laneOverShards(bc: Blockchain, entries: Map<string, { shard: any; messages: Array<{ body: any; source: string }> }>) {
+function laneOverShards(bc: Blockchain, entries: Map<string, { shard: any; messages: Array<{ body: any; source: string }> }>, nowUnix = CLOCK) {
   const runGetMethod = async (call: any) => {
     const entry = entries.get(addrKey(call.address));
     if (!entry) throw new Error(`no shard for ${call.address}`);
@@ -77,7 +78,7 @@ function laneOverShards(bc: Blockchain, entries: Map<string, { shard: any; messa
     }
     throw new Error(`unexpected fetch ${urlStr}`);
   };
-  return createPublicLane({ runGetMethod, now: () => CLOCK, endpoint: 'https://x/api/v3/accountStates', fetch: fetchImpl });
+  return createPublicLane({ runGetMethod, now: () => nowUnix, endpoint: 'https://x/api/v3/accountStates', fetch: fetchImpl });
 }
 
 describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
@@ -151,5 +152,43 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     const decoded = readPublicPostPayloadV2({ header: comments[0].header, body: comments[0].body });
     expect(decoded.type).toBe('comment');
     expect(decoded.text, 'the comment text survived the full loop').toBe(commentText);
+  }, 300_000);
+
+  it('PLE2E-03: a comment written in an earlier thread era is STILL read a era later (the era-window fix)', async () => {
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    await deployFeeSink(bc, { funderSeed: 'ple2e-era-sink' });
+    const channel = await bc.treasury('ple2e-era-channel');
+    const commenter = await bc.treasury('ple2e-era-commenter');
+
+    const channelPk = await publicChannelPartitionKey(publicWalletHash(channel.address.toString()), 0);
+    const channelEpochTag = publicEpochTag(0, publicEraOf(0, CLOCK));
+    const post = await createPublicPostPayloadV2({ type: 'post', text: 'an old post', streamId: '03'.repeat(16), createdAtSec: CLOCK });
+    await sendBuilt(channel, await buildPublicPublishWalletMessage({
+      kind: 0, keyArg: 0n, header: post.headerCell, body: post.bodyCell,
+      value: publicPublishValueForKind(0), partitionKey: channelPk, epochTag: channelEpochTag,
+    }));
+
+    // Comment published NOW, into THIS thread era.
+    const postUid = await publicPostUid(channelPk, channelEpochTag, 0n);
+    const threadPk = await publicThreadPartitionKey(postUid, 0);
+    const threadEpochTag = publicEpochTag(1, publicEraOf(1, CLOCK));
+    const comment = await createPublicPostPayloadV2({ type: 'comment', text: 'written last era', streamId: '04'.repeat(16), createdAtSec: CLOCK });
+    const builtComment = await buildPublicPublishWalletMessage({
+      kind: 1, keyArg: postUid, header: comment.headerCell, body: comment.bodyCell,
+      value: publicPublishValueForKind(1), partitionKey: threadPk, epochTag: threadEpochTag,
+    });
+    const threadDest = await sendBuilt(commenter, builtComment);
+    const threadShard = bc.openContract(PublicShard.fromAddress(threadDest));
+
+    // Read ONE THREAD ERA LATER: a current-era-only reader would derive the next era's (empty) thread shard and see
+    // nothing; the era-window scan must still reach this shard. Mutation: revert readThreadComments to current-era
+    // only and this returns 0.
+    const laterClock = CLOCK + THREAD_ERA_SECONDS;
+    const lane = laneOverShards(bc, new Map([[addrKey(threadDest.toString()), { shard: threadShard, messages: [{ body: builtComment.body, source: commenter.address.toString() }] }]]), laterClock);
+    const comments = await lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 });
+
+    expect(comments.length, 'the prior-era comment is still found via the era window').toBe(1);
+    expect(readPublicPostPayloadV2({ header: comments[0].header, body: comments[0].body }).text).toBe('written last era');
   }, 300_000);
 });

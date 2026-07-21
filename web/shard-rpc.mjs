@@ -126,7 +126,11 @@ export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, 
  * against live toncenter v3 2026-07-21 (not message.in_msg.source, which does not exist on this shape). A message
  * whose body will not parse is skipped, exactly like the source-free reader; absence is [], not an error.
  */
-export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 64 } = {}) {
+// limit 128 (not 64): readPosts matches /messages bodies against get_page commits, and get_page returns up to 96 per
+// page (PS_PAGE_CAP). At 64 a shard holding 65-96 live entries would leave the oldest in-page posts with no body to
+// match, silently dropping them. 128 covers the page cap plus top-up/bounce noise; a shard busier than that needs
+// message pagination (a later refinement — logged, not silent).
+export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128 } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
   return async (address) => {
