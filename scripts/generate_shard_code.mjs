@@ -9,8 +9,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 // KeyShard is here for the same reason as the other three even though it is not epoch-keyed: its address is
 // hash(code, data) over a code cell the browser cannot import, and both the identity read and the avatar read
-// now resolve through it.
-const SHARDS = ['RecordShard', 'IntroShard', 'RecoveryShard', 'KeyShard'];
+// now resolve through it. PublicShard (added 2026-07-21) is the public/avatar lane; the client derives channel,
+// thread, beacon and avatar shard addresses from its code hash to sweep the directory and render the feed.
+const SHARDS = ['RecordShard', 'IntroShard', 'RecoveryShard', 'KeyShard', 'PublicShard'];
 
 export function renderShardCodeModule() {
   const lines = [
