@@ -1420,6 +1420,53 @@ export function dictValueParserBindAirdropPool(): DictionaryValue<BindAirdropPoo
     }
 }
 
+export type BindPublicShardCode = {
+    $$type: 'BindPublicShardCode';
+    public_shard_code: Cell;
+}
+
+export function storeBindPublicShardCode(src: BindPublicShardCode) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(4195418117, 32);
+        b_0.storeRef(src.public_shard_code);
+    };
+}
+
+export function loadBindPublicShardCode(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 4195418117) { throw Error('Invalid prefix'); }
+    const _public_shard_code = sc_0.loadRef();
+    return { $$type: 'BindPublicShardCode' as const, public_shard_code: _public_shard_code };
+}
+
+export function loadTupleBindPublicShardCode(source: TupleReader) {
+    const _public_shard_code = source.readCell();
+    return { $$type: 'BindPublicShardCode' as const, public_shard_code: _public_shard_code };
+}
+
+export function loadGetterTupleBindPublicShardCode(source: TupleReader) {
+    const _public_shard_code = source.readCell();
+    return { $$type: 'BindPublicShardCode' as const, public_shard_code: _public_shard_code };
+}
+
+export function storeTupleBindPublicShardCode(source: BindPublicShardCode) {
+    const builder = new TupleBuilder();
+    builder.writeCell(source.public_shard_code);
+    return builder.build();
+}
+
+export function dictValueParserBindPublicShardCode(): DictionaryValue<BindPublicShardCode> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeBindPublicShardCode(src)).endCell());
+        },
+        parse: (src) => {
+            return loadBindPublicShardCode(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type FeeAccumulatorStateView = {
     $$type: 'FeeAccumulatorStateView';
     accumulated_ton: bigint;
@@ -1517,6 +1564,7 @@ export type FeeAccumulator$Data = {
     intro_shard_code: Cell | null;
     ticket_code: Cell | null;
     airdrop_pool_address: Address | null;
+    public_shard_code: Cell | null;
     accrual_seq: bigint;
 }
 
@@ -1535,6 +1583,7 @@ export function storeFeeAccumulator$Data(src: FeeAccumulator$Data) {
         if (src.intro_shard_code !== null && src.intro_shard_code !== undefined) { b_1.storeBit(true).storeRef(src.intro_shard_code); } else { b_1.storeBit(false); }
         if (src.ticket_code !== null && src.ticket_code !== undefined) { b_1.storeBit(true).storeRef(src.ticket_code); } else { b_1.storeBit(false); }
         b_1.storeAddress(src.airdrop_pool_address);
+        if (src.public_shard_code !== null && src.public_shard_code !== undefined) { b_1.storeBit(true).storeRef(src.public_shard_code); } else { b_1.storeBit(false); }
         b_1.storeUint(src.accrual_seq, 64);
         b_0.storeRef(b_1.endCell());
     };
@@ -1554,8 +1603,9 @@ export function loadFeeAccumulator$Data(slice: Slice) {
     const _intro_shard_code = sc_1.loadBit() ? sc_1.loadRef() : null;
     const _ticket_code = sc_1.loadBit() ? sc_1.loadRef() : null;
     const _airdrop_pool_address = sc_1.loadMaybeAddress();
+    const _public_shard_code = sc_1.loadBit() ? sc_1.loadRef() : null;
     const _accrual_seq = sc_1.loadUintBig(64);
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton, shard_code: _shard_code, intro_shard_code: _intro_shard_code, ticket_code: _ticket_code, airdrop_pool_address: _airdrop_pool_address, accrual_seq: _accrual_seq };
+    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton, shard_code: _shard_code, intro_shard_code: _intro_shard_code, ticket_code: _ticket_code, airdrop_pool_address: _airdrop_pool_address, public_shard_code: _public_shard_code, accrual_seq: _accrual_seq };
 }
 
 export function loadTupleFeeAccumulator$Data(source: TupleReader) {
@@ -1570,8 +1620,9 @@ export function loadTupleFeeAccumulator$Data(source: TupleReader) {
     const _intro_shard_code = source.readCellOpt();
     const _ticket_code = source.readCellOpt();
     const _airdrop_pool_address = source.readAddressOpt();
+    const _public_shard_code = source.readCellOpt();
     const _accrual_seq = source.readBigNumber();
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton, shard_code: _shard_code, intro_shard_code: _intro_shard_code, ticket_code: _ticket_code, airdrop_pool_address: _airdrop_pool_address, accrual_seq: _accrual_seq };
+    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton, shard_code: _shard_code, intro_shard_code: _intro_shard_code, ticket_code: _ticket_code, airdrop_pool_address: _airdrop_pool_address, public_shard_code: _public_shard_code, accrual_seq: _accrual_seq };
 }
 
 export function loadGetterTupleFeeAccumulator$Data(source: TupleReader) {
@@ -1586,8 +1637,9 @@ export function loadGetterTupleFeeAccumulator$Data(source: TupleReader) {
     const _intro_shard_code = source.readCellOpt();
     const _ticket_code = source.readCellOpt();
     const _airdrop_pool_address = source.readAddressOpt();
+    const _public_shard_code = source.readCellOpt();
     const _accrual_seq = source.readBigNumber();
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton, shard_code: _shard_code, intro_shard_code: _intro_shard_code, ticket_code: _ticket_code, airdrop_pool_address: _airdrop_pool_address, accrual_seq: _accrual_seq };
+    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, storage_reserve_ton: _storage_reserve_ton, shard_code: _shard_code, intro_shard_code: _intro_shard_code, ticket_code: _ticket_code, airdrop_pool_address: _airdrop_pool_address, public_shard_code: _public_shard_code, accrual_seq: _accrual_seq };
 }
 
 export function storeTupleFeeAccumulator$Data(source: FeeAccumulator$Data) {
@@ -1603,6 +1655,7 @@ export function storeTupleFeeAccumulator$Data(source: FeeAccumulator$Data) {
     builder.writeCell(source.intro_shard_code);
     builder.writeCell(source.ticket_code);
     builder.writeAddress(source.airdrop_pool_address);
+    builder.writeCell(source.public_shard_code);
     builder.writeNumber(source.accrual_seq);
     return builder.build();
 }
@@ -1633,7 +1686,7 @@ function initFeeAccumulator_init_args(src: FeeAccumulator_init_args) {
 }
 
 async function FeeAccumulator_init(treasury_receiver_address: Address, buyback_burn_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241021f01000a38000114ff00f4a413f4bcf2c80b01020162021d02f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e33fa40fa40d37fd37fd37fd200d401d0fa00f404f404f404d72c01916d93fa4001e201d33f30106c106b106a1069106810676c1c8e14fa40fa405902d1016d6d6d6d7054700070215544e20de302702cd74920c21f95310cd31f0dde21030400f80b8020d7217021d749c21f9430d31f01de8210594ba505ba8e5fd37f0131813ab8f8422bc705f2f4813ab921c200f2f416a0109b108a107910680710461035443012c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed54e05f0d02fe8210ff775609ba8e6a5b0bd37f30813a9921c200f2f4813a9af8416f24135f03228208061a80a0bef2f418a0109b108a091068105710461035443012c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed54e0218210fa110001bae30221050601ce5b0bd43010ab109a108910781067105610451034413cdb3c813acb056e15f2f410ab109a108910781067105610455502c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed540903fa8210fa110004ba8ee85b0bd43010ab109a108910781067105610451034413cdb3c813ad1046e14f2f410ab109a10891078106710561045103458c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed54e0218210fa110002bae3022109070801d25b0bd43010ab109a108910781067105610451034413cdb3c813acc036e13f2f410ab109a1089107810671056104510344300c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed540903fe8210fa110003ba8eea5b0bfa403010ab109a108910781067105610451034413cdb3c813acd026e12f2f410ab109a1089107810671056104510344130c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed54e021821052535046bae30221090a0f0014813acaf8422dc705f2f403fa5b0bd37fd307810101d700810101d700fa4030813ace25c200f2f4813ad224c000917f9324c001e2f2f410ae109d108c107b106e105d104c103b4edf813acf11112cdb3c8ea3f84210ce10bd10ac109b108a10791068105710461035443012011110010fdb3c1dc705943c6c2d70e21ff2f4813ad0f8416f24135f032d0b0c0d0016c00093246eb393236eb3e2013802c00091269125e2c87001cb0012810101cf0012810101cf00c9db3c1201aa820827ac40a0bef2f4507ba02a6eb3913be30d107b106a10691048553313c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed540e01fcc87001cb002ccf16c9109c108b1a10691058104710361025431d02db3c82080927c071706f00c8013082104154433101cb1fc9104510344130270211120110464515504403c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb000b080a50974564500311044a821041544333bae3022182107b24ea03bae3022182108d8f2c18bae302218210ddab4641ba1014161702fc5b0bd31ffa4030813ad4236eb3932d6eb39170e2f2f4813ad5f84210bd5e39108c107d106c105d104c103d4cef2cdb3c01111001c7051ef2f4813ad62cc200f2f4813ad7f8416f24135f03820bb20b80bef2f40da4820b93870071227f51efc855208210414452105004cb1f12cb3fcecb1fc92f0450ee441359c8cf85801113011ac87001cb0001cf16c95230db3c12005a705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d00196ca00cf8440ce01fa02806acf40f400c901fb00f842708040700ec80182104154433458cb1fcb1fc9103441301e441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00553743301b01fc5b3b813aa228c200f2f4813aa3f8416f24135f0382081e8480bef2f4248e4a067008a0109b108a1079081057104610354403c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed54e127811388a8812710a9045188a1077009a05067a015008e109b108a107910680710461035443012c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed5400f05b3b813aa4f8422bc705f2f4813aa505b315f2f4813aa6f8416f24135f0382081e8480bef2f426c200965056a0705056de108a10791068105710467f0610354403c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed5404fe8ee05b0bd37f30813aac21c200f2f4813aad5318bbf2f4813aaf2182084c4b40be917f935318bae2f2f4813aaef8416f24135f0382084c4b40bef2f45177a170544b99716d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00109b5518e0218210b3d2c52dbae3023d20821087a2d2c7bae3022082105357554e1b18191a01e25b0bd37f30813ab621c200f2f4813aba2182180be2d12e80baf2f4813ab75317bbf2f4813abbf8416f24135f0382086acfc0bef2f45166a12682081e8480a07f7109c8018210594ba50558cb1fcb7fc92c0450aa4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00109b55181b00a2303bf8416f24135f0314a0109b108a1079106810571046443512c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed5402feba8ef5303bf8276f10f8416f24135f03a15387a027a025a0813ac02182080f4240a05230bcf2f45210a182080f4240a119a00872fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00109b5518e0c0000cc1211c1b1c006ec87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed540092b08e40813afbf2f0109b5518c87f01ca0055b050bcce19ce17cb7f15cb7f13cb7fca00c858fa0212f40012f40012f40058206e9430cf84809201cee212cb3fcdc9ed54e05f0cf2c08201b1a0a75bda89a1a400031c67f481f481a6ffa6ffa6ffa401a803a1f401e809e809e809ae580322db27f48003c403a67e6020d820d620d420d220d020ced8391c29f481f480b205a202dadadadae0a8e000e042aa89c5b678d98f1e000e5479875479ed2bd6d29c8f');
+    const __code = Cell.fromHex('b5ee9c7241022301000b41000114ff00f4a413f4bcf2c80b01020162022103f4d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e35fa40fa40d37fd37fd37fd200d401d0fa00f404f404f404d72c01916d93fa4001e201f404d33f30107d107c107b107a107910786c1d8e15fa40fa405902d1016d6d6d6d6d7054700070215554e20ee302702dd74920c21fe3002103050601fe0c8020d7217021d749c21f9430d31f01de8210594ba505ba8e64d37f0131813ab8f8422cc705f2f4813ab921c200f2f417a010ac109b108a1079081057104610354430c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed54e00400045f0e000a310dd31f0e01f48210ff775609ba8e6f5b0cd37f30813a9921c200f2f4813a9af8416f24135f03228208061a80a0bef2f419a010ac109b0a107910681057104610354430c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed54e0210702fe8210fa110001ba8eed5b0cd43010bc10ab109a108910781067105610451034413ddb3c813acb066e16f2f410bc10ab109a10891078106710565503c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed54e0218210fa110004ba0c0803fa8eef5b0cd43010bc10ab109a108910781067105610451034413ddb3c813ad1056e15f2f410bc10ab109a108910781067105610455502c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed54e0218210fa110002bae302210c090a01e05b0cd43010bc10ab109a108910781067105610451034413ddb3c813acc046e14f2f410bc10ab109a10891078106710561045103458c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed540c02fa8210fa110003ba8ef25b0cfa403010bc10ab109a108910781067105610451034413ddb3c813acd036e13f2f410bc10ab109a1089107810671056104510344300c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed54e0210c0b02f88210fa110005ba8ef15b0cd43010bc10ab109a108910781067105610451034413ddb3c813ad3026e12f2f410bc10ab109a1089107810671056104510344130c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed54e0210c0d0014813acaf8422ec705f2f4044a821052535046bae30221821041544333bae3022182107b24ea03bae3022182108d8f2c18ba0e14181a03fa5b0cd37fd307810101d700810101d700fa4030813ace25c200f2f4813ad224c103f2f410bf10ae109d108c107f106e105d104c103f102e11101d813acf11125610db3c8ea6f84210df10ce10bd10ac109b108a10791068105710461035443002111102111001db3c1ec7059a3e3e3e5e2a109b551870e201111001f2f40f1011002a20c0009430256eb39bc00193246eb393216eb3e2e2014822c0009232279802c00191269123e2e2c87001cb0012810101cf0012810101cf00c9db3c1601ce813ad0f8416f24135f032e820827ac40a0bef2f4508ca0276eb3913ce30d108c107b107a1059104855334300c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed541202fcc87001cb002dcf16c910ad109c1b107a10691058104710361025441e02db3c82080927c071706f00c8013082104154433101cb1fc9104510344130280211130110464515504403c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb000c090b50a8467515130004404302fe5b0cd31ffa4030813ad4246eb393236eb39170e2f2f4813ad5f84210ce5e3a109d108e107d106e105d104e103d102e1110541f0edb3c01111101c7051ff2f4813ad62cc200f2f4813ad7f8416f24135f03820bb20b80bef2f40ea4820b93870071227f11102fc855208210414452105004cb1f12cb3fcecb1fc956110411101517011ac87001cb0001cf16c95240db3c16005a705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d001ae01441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f842708040700ec80182104154433458cb1fcb1fc9103441301e441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00108c107b106a55351f01fe5b3c813aa229c200f2f4813aa3f8416f24135f0382081e8480bef2f4258e51077009a010ac109b108a091068105710461035440302c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed54e128811388a8812710a9045199a1081900a4700aa05078a010ac109b108a1079081057104610354430c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed5404fee302218210ddab4641ba8ee05b0cd37f30813aac21c200f2f4813aad5319bbf2f4813aaf2182084c4b40be917f935319bae2f2f4813aaef8416f24135f0382084c4b40bef2f45188a170544caa716d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010ac5519e0218210b3d2c52dbae3023e20821087a2d2c71b1f1c1d00fe5b3c813aa4f8422cc705f2f4813aa506b316f2f4813aa6f8416f24135f0382081e8480bef2f427c200965067a0705067de109b108a1079106810577f0710461035440302c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed5401e25b0cd37f30813ab621c200f2f4813aba2182180be2d12e80baf2f4813ab75318bbf2f4813abbf8416f24135f0382086acfc0bef2f45177a12782081e8480a07f710ac8018210594ba50558cb1fcb7fc92d0450bb4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010ac55191f02e6ba8e57303cf8416f24135f0315a010ac109b108a1079106810570610354430c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed54e02082105357554ebae302c0000dc1211db0e3025f0df2c0821e2001ea303cf8276f10f8416f24135f03a15398a028a026a0813ac02182080f4240a05230bcf2f45210a182080f4240a11aa00972fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010ac55191f0076c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed540088813afbf2f010ac5519c87f01ca0055c050cdce1ace18cb7f16cb7f14cb7f12ca00c858fa0212f40012f40012f40058206e9430cf84809201cee212f40012cb3fcdc9ed5401b7a0a75bda89a1a400031c6bf481f481a6ffa6ffa6ffa401a803a1f401e809e809e809ae580322db27f48003c403e809a67e6020fa20f820f620f420f220f0d83b1c2bf481f480b205a202dadadadadae0a8e000e042aaa9c5b678d9af22000e547a98547afe2cb21a4bee');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initFeeAccumulator_init_args({ $$type: 'FeeAccumulator_init_args', treasury_receiver_address, buyback_burn_address })(builder);
@@ -1747,8 +1800,9 @@ const FeeAccumulator_types: ABIType[] = [
     {"name":"BindTicketCode","header":4195418114,"fields":[{"name":"ticket_code","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"BindIntroShardCode","header":4195418116,"fields":[{"name":"intro_shard_code","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"BindAirdropPool","header":4195418115,"fields":[{"name":"airdrop_pool_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"BindPublicShardCode","header":4195418117,"fields":[{"name":"public_shard_code","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"FeeAccumulatorStateView","header":null,"fields":[{"name":"accumulated_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_split_enabled","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"storage_reserve_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"FeeAccumulator$Data","header":null,"fields":[{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"accumulated_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_split_enabled","type":{"kind":"simple","type":"bool","optional":false}},{"name":"storage_reserve_ton","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"shard_code","type":{"kind":"simple","type":"cell","optional":true}},{"name":"intro_shard_code","type":{"kind":"simple","type":"cell","optional":true}},{"name":"ticket_code","type":{"kind":"simple","type":"cell","optional":true}},{"name":"airdrop_pool_address","type":{"kind":"simple","type":"address","optional":true}},{"name":"accrual_seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"FeeAccumulator$Data","header":null,"fields":[{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"accumulated_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_split_enabled","type":{"kind":"simple","type":"bool","optional":false}},{"name":"storage_reserve_ton","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"shard_code","type":{"kind":"simple","type":"cell","optional":true}},{"name":"intro_shard_code","type":{"kind":"simple","type":"cell","optional":true}},{"name":"ticket_code","type":{"kind":"simple","type":"cell","optional":true}},{"name":"airdrop_pool_address","type":{"kind":"simple","type":"address","optional":true}},{"name":"public_shard_code","type":{"kind":"simple","type":"cell","optional":true}},{"name":"accrual_seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
 ]
 
 const FeeAccumulator_opcodes = {
@@ -1769,6 +1823,7 @@ const FeeAccumulator_opcodes = {
     "BindTicketCode": 4195418114,
     "BindIntroShardCode": 4195418116,
     "BindAirdropPool": 4195418115,
+    "BindPublicShardCode": 4195418117,
 }
 
 const FeeAccumulator_getters: ABIGetter[] = [
@@ -1785,6 +1840,7 @@ const FeeAccumulator_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"BindIntroShardCode"}},
     {"receiver":"internal","message":{"kind":"typed","type":"BindTicketCode"}},
     {"receiver":"internal","message":{"kind":"typed","type":"BindAirdropPool"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"BindPublicShardCode"}},
     {"receiver":"internal","message":{"kind":"typed","type":"DepositCapsuleFee"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TicketRedeem"}},
     {"receiver":"internal","message":{"kind":"typed","type":"SplitAccumulated"}},
@@ -1844,7 +1900,7 @@ export class FeeAccumulator implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: DepositProtocolFee | BindShardCode | BindIntroShardCode | BindTicketCode | BindAirdropPool | DepositCapsuleFee | TicketRedeem | SplitAccumulated | EnableBuybackSplit | FlushTreasuryDue | FlushBuybackDue | TopUpStorageReserve | SweepUnaccounted | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: DepositProtocolFee | BindShardCode | BindIntroShardCode | BindTicketCode | BindAirdropPool | BindPublicShardCode | DepositCapsuleFee | TicketRedeem | SplitAccumulated | EnableBuybackSplit | FlushTreasuryDue | FlushBuybackDue | TopUpStorageReserve | SweepUnaccounted | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'DepositProtocolFee') {
@@ -1861,6 +1917,9 @@ export class FeeAccumulator implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'BindAirdropPool') {
             body = beginCell().store(storeBindAirdropPool(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'BindPublicShardCode') {
+            body = beginCell().store(storeBindPublicShardCode(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'DepositCapsuleFee') {
             body = beginCell().store(storeDepositCapsuleFee(message)).endCell();

@@ -153,6 +153,29 @@ describe('AIRDROP-ACCRUE-WIRE — FeeAccumulator and AirdropPool must agree on o
     expect([...shapes], 'one opcode, one wire format — a mismatch on the LAST field is a silent cell underflow')
       .toHaveLength(1);
   });
+
+  it('ACCRUE-WIRE-03: EVERY declaration of opcode 0x52535046 (DepositCapsuleFee) is byte-identical', async () => {
+    // The same guard for the fee-carrying message. RecordShard, IntroShard, PublicShard and FeeAccumulator each
+    // declare DepositCapsuleFee LOCALLY (a shard cannot import the sink without rebuilding the address cycle), and
+    // a drift here does not underflow — it moves the fee to a body FeeAccumulator's gate 15055 rejects, so every
+    // publish's fee bounces. PublicShard added a fourth copy on 2026-07-21; sweeping the directory catches a fifth.
+    const { readFileSync, readdirSync } = await import('node:fs');
+    const declarations = new Map<string, string>();
+    for (const file of readdirSync('contracts').filter((f) => f.endsWith('.tact'))) {
+      const source = readFileSync(`contracts/${file}`, 'utf8');
+      const match = /message\(0x52535046\)\s+DepositCapsuleFee\s*\{([^}]*)\}/.exec(source);
+      if (!match) continue;
+      declarations.set(file, match[1].split(/\r?\n/).map((l) => l.split('//')[0].trim()).filter(Boolean).join(' '));
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(['[ACCRUE-WIRE-03] every declaration of opcode 0x52535046',
+      ...[...declarations].map(([f, d]) => `  ${f.padEnd(22)} ${d}`)].join('\n'));
+
+    expect(declarations.size, 'DepositCapsuleFee must be declared in more than one place, or this is vacuous').toBeGreaterThan(2);
+    expect([...new Set(declarations.values())], 'one fee message, one wire format — a drift bounces every fee')
+      .toHaveLength(1);
+  });
 });
 
 /** A distinct bound shard address per credit, so gate 15055 accepts each deposit as a different shard. */

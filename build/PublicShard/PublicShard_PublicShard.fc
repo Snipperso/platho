@@ -1,0 +1,735 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; PublicShard_PublicShard.headers.fc
+;;
+;; Header files for PublicShard
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_dict_get_int_cell
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
+
+;; __tact_dict_set_int_cell
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline;
+
+;; $DepositCapsuleFee$_store
+builder $DepositCapsuleFee$_store(builder build_0, (int, int, int, int, slice) v) inline;
+
+;; $DepositCapsuleFee$_store_cell
+cell $DepositCapsuleFee$_store_cell((int, int, int, int, slice) v, builder b) inline;
+
+;; $DepositCapsuleFee$_load_bounced
+(slice, ((int, int))) $DepositCapsuleFee$_load_bounced(slice sc_0) inline;
+
+;; $PublicEntry$_store
+builder $PublicEntry$_store(builder build_0, (slice, int, int) v) inline;
+
+;; $PublicEntry$_store_cell
+cell $PublicEntry$_store_cell((slice, int, int) v, builder b) inline;
+
+;; $PublicEntry$_load
+(slice, ((slice, int, int))) $PublicEntry$_load(slice sc_0) inline;
+
+;; $PublicEntry$_as_optional
+tuple $PublicEntry$_as_optional((slice, int, int) v) inline;
+
+;; $PublicEntry$_load_opt
+tuple $PublicEntry$_load_opt(cell cl) inline;
+
+;; $PublicShard$_store
+builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline;
+
+;; $PublicShard$_load
+(slice, ((int, int, cell, int))) $PublicShard$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $PublicEntry$_not_null
+((slice, int, int)) $PublicEntry$_not_null(tuple v) inline;
+
+;; $PublicEntryView$_to_external
+(int, slice, int, int) $PublicEntryView$_to_external(((int, slice, int, int)) v) inline;
+
+;; $PublicShardView$_to_external
+(int, int, int, int, int, int, int, int, int, int, int, int, slice) $PublicShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int, slice)) v) inline;
+
+;; $PublicShard$init$_load
+(slice, ((int, int))) $PublicShard$init$_load(slice sc_0) inline;
+
+;; $PublicShard$_contract_init
+(int, int, cell, int) $PublicShard$_contract_init(int $partition_key, int $epoch_tag) impure inline;
+
+;; $PublicShard$_contract_load
+(int, int, cell, int) $PublicShard$_contract_load() impure inline;
+
+;; $PublicShard$_contract_store
+() $PublicShard$_contract_store((int, int, cell, int) v) impure inline;
+
+;; $PublicShard$_fun_kindOf
+((int, int, cell, int), int) $PublicShard$_fun_kindOf((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_eraIndex
+((int, int, cell, int), int) $PublicShard$_fun_eraIndex((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_eraSeconds
+((int, int, cell, int), int) $PublicShard$_fun_eraSeconds((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_retention
+((int, int, cell, int), int) $PublicShard$_fun_retention((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_entryEndowment
+((int, int, cell, int), int) $PublicShard$_fun_entryEndowment((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_baseEndowment
+((int, int, cell, int), int) $PublicShard$_fun_baseEndowment((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_minValue
+((int, int, cell, int), int) $PublicShard$_fun_minValue((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_deployMinValue
+((int, int, cell, int), int) $PublicShard$_fun_deployMinValue((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_retireAt
+((int, int, cell, int), int) $PublicShard$_fun_retireAt((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_senderHash
+((int, int, cell, int), int) $PublicShard$_fun_senderHash((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicShard$_fun_bodyCommit
+((int, int, cell, int), int) $PublicShard$_fun_bodyCommit((int, int, cell, int) $self, cell $header, cell $body) impure inline_ref;
+
+;; $PublicShard$_fun_claimedPartitionKey
+((int, int, cell, int), int) $PublicShard$_fun_claimedPartitionKey((int, int, cell, int) $self, int $kind, int $keyArg, int $shardSeq) impure inline_ref;
+
+;; $PublicEntryView$_constructor_exists_publisher_body_commit_created_at
+((int, slice, int, int)) $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(int $exists, slice $publisher, int $body_commit, int $created_at) inline;
+
+;; $PublicShard$_fun_get_entry
+((int, int, cell, int), (int, slice, int, int)) $PublicShard$_fun_get_entry((int, int, cell, int) $self, int $entry_id) impure inline_ref;
+
+;; $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink
+((int, int, int, int, int, int, int, int, int, int, int, int, slice)) $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink(int $partition_key, int $epoch_tag, int $kind, int $era_index, int $entry_count, int $safe_cap, int $era_seconds, int $retention, int $min_value, int $deploy_min_value, int $protocol_fee, int $retire_at, slice $fee_sink) inline;
+
+;; $PublicShard$_fun_get_view
+((int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int, int, slice)) $PublicShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref;
+
+;; $PublicEntry$_constructor_publisher_body_commit_created_at
+((slice, int, int)) $PublicEntry$_constructor_publisher_body_commit_created_at(slice $publisher, int $body_commit, int $created_at) inline;
+
+;; $MessageParameters$_constructor_to_value_bounce_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
+
+;; $DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher
+((int, int, int, int, slice)) $DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(int $amount, int $lane, int $init_arg0, int $init_arg1, slice $publisher) inline;
+
+;; $SendParameters$_constructor_to_value_mode_bounce
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
+
+
+;; PublicShard_PublicShard.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+forall X0, X1, X2 -> tuple __tact_tuple_create_3((X0, X1, X2) v) asm """
+    3 TUPLE
+""";
+
+forall X0, X1, X2 -> (X0, X1, X2) __tact_tuple_destroy_3(tuple v) asm """
+    3 UNTUPLE
+""";
+
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get_ref?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set_ref(d, kl, k, v), ());
+    }
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+int $global_now() impure asm """
+    NOW
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+int $Cell$_fun_hash(cell $self) impure asm """
+    HASHCU
+""";
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+;; PublicShard_PublicShard.constants.fc
+;; EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-
+slice __gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57() asm """
+    B{b5ee9c7241010101002400004380152cc7265d0c7d36bdf6dc6c0ffa8f87c7e5acae1ee28cc9d6f4f4ddf9d8ba0a109591c174} B>boc <s PUSHSLICE
+""";
+
+;; PublicShard_PublicShard.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline {
+    return ($mode, null(), null(), null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: DepositCapsuleFee
+;; Header: 0x52535046
+;; TLB: deposit_capsule_fee#52535046 amount:uint128 lane:uint8 init_arg0:int257 init_arg1:int257 publisher:address = DepositCapsuleFee
+;;
+
+builder $DepositCapsuleFee$_store(builder build_0, (int, int, int, int, slice) v) inline {
+    var (v'amount, v'lane, v'init_arg0, v'init_arg1, v'publisher) = v;
+    build_0 = store_uint(build_0, 1381191750, 32);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_uint(v'lane, 8);
+    build_0 = build_0.store_int(v'init_arg0, 257);
+    build_0 = build_0.store_int(v'init_arg1, 257);
+    build_0 = build_0.store_slice(v'publisher);
+    return build_0;
+}
+
+cell $DepositCapsuleFee$_store_cell((int, int, int, int, slice) v, builder b) inline {
+    return $DepositCapsuleFee$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $DepositCapsuleFee$_load_bounced(slice sc_0) inline {
+    var v'amount = sc_0~load_uint(128);
+    var v'lane = sc_0~load_uint(8);
+    return (sc_0, (v'amount, v'lane));
+}
+
+((int, int, int, int, slice)) $DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(int $amount, int $lane, int $init_arg0, int $init_arg1, slice $publisher) inline {
+    return ($amount, $lane, $init_arg0, $init_arg1, $publisher);
+}
+
+;;
+;; Type: PublicEntry
+;; TLB: _ publisher:address body_commit:int257 created_at:int257 = PublicEntry
+;;
+
+builder $PublicEntry$_store(builder build_0, (slice, int, int) v) inline {
+    var (v'publisher, v'body_commit, v'created_at) = v;
+    build_0 = build_0.store_slice(v'publisher);
+    build_0 = build_0.store_int(v'body_commit, 257);
+    build_0 = build_0.store_int(v'created_at, 257);
+    return build_0;
+}
+
+cell $PublicEntry$_store_cell((slice, int, int) v, builder b) inline {
+    return $PublicEntry$_store(b, v).end_cell();
+}
+
+(slice, ((slice, int, int))) $PublicEntry$_load(slice sc_0) inline {
+    var v'publisher = sc_0~load_msg_addr();
+    var v'body_commit = sc_0~load_int(257);
+    var v'created_at = sc_0~load_int(257);
+    return (sc_0, (v'publisher, v'body_commit, v'created_at));
+}
+
+tuple $PublicEntry$_as_optional((slice, int, int) v) inline {
+    var (v'publisher, v'body_commit, v'created_at) = v;
+    return __tact_tuple_create_3(v'publisher, v'body_commit, v'created_at);
+}
+
+tuple $PublicEntry$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $PublicEntry$_as_optional(sc~$PublicEntry$_load());
+}
+
+((slice, int, int)) $PublicEntry$_not_null(tuple v) inline {
+    var (slice vvv'publisher, int vvv'body_commit, int vvv'created_at) = __tact_tuple_destroy_3(v);
+    return (vvv'publisher, vvv'body_commit, vvv'created_at);
+}
+
+((slice, int, int)) $PublicEntry$_constructor_publisher_body_commit_created_at(slice $publisher, int $body_commit, int $created_at) inline {
+    return ($publisher, $body_commit, $created_at);
+}
+
+;;
+;; Type: PublicEntryView
+;; TLB: _ exists:bool publisher:address body_commit:int257 created_at:int257 = PublicEntryView
+;;
+
+(int, slice, int, int) $PublicEntryView$_to_external(((int, slice, int, int)) v) inline {
+    var (v'exists, v'publisher, v'body_commit, v'created_at) = v; 
+    return (v'exists, v'publisher, v'body_commit, v'created_at);
+}
+
+((int, slice, int, int)) $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(int $exists, slice $publisher, int $body_commit, int $created_at) inline {
+    return ($exists, $publisher, $body_commit, $created_at);
+}
+
+;;
+;; Type: PublicShardView
+;; TLB: _ partition_key:int257 epoch_tag:int257 kind:int257 era_index:int257 entry_count:int257 safe_cap:int257 era_seconds:int257 retention:int257 min_value:int257 deploy_min_value:int257 protocol_fee:int257 retire_at:int257 fee_sink:address = PublicShardView
+;;
+
+(int, int, int, int, int, int, int, int, int, int, int, int, slice) $PublicShardView$_to_external(((int, int, int, int, int, int, int, int, int, int, int, int, slice)) v) inline {
+    var (v'partition_key, v'epoch_tag, v'kind, v'era_index, v'entry_count, v'safe_cap, v'era_seconds, v'retention, v'min_value, v'deploy_min_value, v'protocol_fee, v'retire_at, v'fee_sink) = v; 
+    return (v'partition_key, v'epoch_tag, v'kind, v'era_index, v'entry_count, v'safe_cap, v'era_seconds, v'retention, v'min_value, v'deploy_min_value, v'protocol_fee, v'retire_at, v'fee_sink);
+}
+
+((int, int, int, int, int, int, int, int, int, int, int, int, slice)) $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink(int $partition_key, int $epoch_tag, int $kind, int $era_index, int $entry_count, int $safe_cap, int $era_seconds, int $retention, int $min_value, int $deploy_min_value, int $protocol_fee, int $retire_at, slice $fee_sink) inline {
+    return ($partition_key, $epoch_tag, $kind, $era_index, $entry_count, $safe_cap, $era_seconds, $retention, $min_value, $deploy_min_value, $protocol_fee, $retire_at, $fee_sink);
+}
+
+;;
+;; Type: PublicShard
+;; TLB: _ partition_key:uint256 epoch_tag:uint64 entries:dict<int, ^PublicEntry{publisher:address,body_commit:int257,created_at:int257}> entry_count:uint32 = PublicShard
+;;
+
+builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline {
+    var (v'partition_key, v'epoch_tag, v'entries, v'entry_count) = v;
+    build_0 = build_0.store_uint(v'partition_key, 256);
+    build_0 = build_0.store_uint(v'epoch_tag, 64);
+    build_0 = build_0.store_dict(v'entries);
+    build_0 = build_0.store_uint(v'entry_count, 32);
+    return build_0;
+}
+
+(slice, ((int, int, cell, int))) $PublicShard$_load(slice sc_0) inline {
+    var v'partition_key = sc_0~load_uint(256);
+    var v'epoch_tag = sc_0~load_uint(64);
+    var v'entries = sc_0~load_dict();
+    var v'entry_count = sc_0~load_uint(32);
+    return (sc_0, (v'partition_key, v'epoch_tag, v'entries, v'entry_count));
+}
+
+(slice, ((int, int))) $PublicShard$init$_load(slice sc_0) inline {
+    var v'partition_key = sc_0~load_int(257);
+    var v'epoch_tag = sc_0~load_int(257);
+    return (sc_0, (v'partition_key, v'epoch_tag));
+}
+
+(int, int, cell, int) $PublicShard$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$PublicShard$_load();
+    }
+    else {
+        (int $partition_key, int $epoch_tag) = $sc~$PublicShard$init$_load();
+        $sc.end_parse();
+        return $PublicShard$_contract_init($partition_key, $epoch_tag);
+    }
+}
+
+() $PublicShard$_contract_store((int, int, cell, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $PublicShard$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract PublicShard functions
+;;
+
+(int, int, cell, int) $PublicShard$_contract_init(int $partition_key, int $epoch_tag) impure inline {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = (null(), null(), null(), null());
+    $self'partition_key = $partition_key;
+    $self'epoch_tag = $epoch_tag;
+    $self'entries = null();
+    $self'entry_count = 0;
+    return ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_kindOf((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    var $fresh$ret_0 = ($self'epoch_tag >> 32);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_0);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_eraIndex((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    var $fresh$ret_1 = ($self'epoch_tag & 4294967295);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_eraSeconds((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    var $fresh$ret_2 = ((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf() < 2) ? 2592000 : 31536000);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_2);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_retention((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    int $k = ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf();
+    if (($k == 3)) {
+        var $fresh$ret_3 = 94608000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_3);
+    }
+    if (($k == 2)) {
+        var $fresh$ret_4 = 31536000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_4);
+    }
+    var $fresh$ret_5 = 31536000;
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_5);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_entryEndowment((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    int $k = ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf();
+    if (($k == 3)) {
+        var $fresh$ret_6 = 2400000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_6);
+    }
+    if (($k == 2)) {
+        var $fresh$ret_7 = 1600000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_7);
+    }
+    var $fresh$ret_8 = 500000;
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_8);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_baseEndowment((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    int $k = ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf();
+    if (($k == 3)) {
+        var $fresh$ret_9 = 11000000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_9);
+    }
+    if (($k == 2)) {
+        var $fresh$ret_10 = 7000000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_10);
+    }
+    var $fresh$ret_11 = 3500000;
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_11);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_minValue((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    var $fresh$ret_12 = (((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_entryEndowment() + 2500000) + 10000000) + 2800000);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_12);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_deployMinValue((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    var $fresh$ret_13 = (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue() + ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_baseEndowment());
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_13);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_retireAt((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    var $fresh$ret_14 = (((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex() + 2) * ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds()) + ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention());
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_14);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_senderHash((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    slice $s = $Address$_fun_asSlice(__tact_context_get_sender());
+    throw_unless(13707, ($s~load_uint(11) == 1024));
+    var $fresh$ret_15 = $s~load_uint(256);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_15);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_bodyCommit((int, int, cell, int) $self, cell $header, cell $body) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    var $fresh$ret_16 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347634756, 32), $Cell$_fun_hash($header), 256), $Cell$_fun_hash($body), 256)));
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_16);
+}
+
+((int, int, cell, int), int) $PublicShard$_fun_claimedPartitionKey((int, int, cell, int) $self, int $kind, int $keyArg, int $shardSeq) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    ifnot ($kind) {
+        var $fresh$ret_17 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347633992, 32), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_senderHash(), 256), $shardSeq, 32)));
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_17);
+    }
+    if (($kind == 1)) {
+        var $fresh$ret_18 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347638344, 32), $keyArg, 256), $shardSeq, 32)));
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_18);
+    }
+    if (($kind == 2)) {
+        var $fresh$ret_19 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1347633731, 32), ($keyArg & 4294967295), 32)));
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_19);
+    }
+    var $fresh$ret_20 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1347633494, 32), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_senderHash(), 256)));
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_20);
+}
+
+((int, int, cell, int), (int, slice, int, int)) $PublicShard$_fun_get_entry((int, int, cell, int) $self, int $entry_id) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    tuple $e = $PublicEntry$_load_opt(__tact_dict_get_int_cell($self'entries, 257, $entry_id));
+    if (null?($e)) {
+        var $fresh$ret_21 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(false, $global_myAddress(), 0, 0);
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_21);
+    }
+    var ($v'publisher, $v'body_commit, $v'created_at) = $PublicEntry$_not_null($e);
+    var $fresh$ret_22 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(true, $v'publisher, $v'body_commit, $v'created_at);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_22);
+}
+
+((int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int, int, slice)) $PublicShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
+    var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
+    var $fresh$ret_23 = $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink($self'partition_key, $self'epoch_tag, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex(), $self'entry_count, 4096, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_deployMinValue(), 10000000, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt(), __gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57());
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_23);
+}
+
+;;
+;; Get methods of a Contract PublicShard
+;;
+
+_ %get_entry(int $entry_id) method_id(80118) {
+    int $entry_id = $entry_id;
+    var self = $PublicShard$_contract_load();
+    var res = self~$PublicShard$_fun_get_entry($entry_id);
+    return $PublicEntryView$_to_external(res);
+}
+
+_ %get_view() method_id(76114) {
+    var self = $PublicShard$_contract_load();
+    var res = self~$PublicShard$_fun_get_view();
+    return $PublicShardView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract PublicShard
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count) = $PublicShard$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        ;; Skip 0xFFFFFFFF prefix of a bounced message
+        in_msg~skip_bits(32);
+        int op = 0;
+        if (slice_bits(in_msg) >= 32) {
+            op = in_msg~load_uint(32);
+        }
+        ;; Bounced handler for DepositCapsuleFee message
+        if (op == 0x52535046) {
+            var ($msg'amount, $msg'lane) = in_msg~$DepositCapsuleFee$_load_bounced();
+            throw_unless(13709, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57()) ));
+            throw_unless(13710, ($msg'amount > 0));
+            $PublicShard$_contract_store(($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count));
+            return ();
+        }
+        
+        return ();
+    }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive PublicPublish message
+    if (op == 0x50535031) {
+        var $msg'kind = in_msg~load_uint(8);
+        var $msg'key_arg = in_msg~load_uint(256);
+        var $msg'shard_seq = in_msg~load_uint(32);
+        var $msg'header = in_msg~load_ref();
+        var $msg'body = in_msg~load_ref();
+        throw_unless(13701, ($msg'kind == ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf()));
+        throw_unless(13702, (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_claimedPartitionKey($msg'kind, $msg'key_arg, $msg'shard_seq) == $self'partition_key));
+        int $nowEra = ($global_now() / ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds());
+        throw_unless(13703, ( (($nowEra >= (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex() - 1))) ? (($nowEra <= (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex() + 1))) : (false) ));
+        throw_unless(13704, ($Context$_get_value(__tact_context_get()) >= (($self'entry_count == 0) ? ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_deployMinValue() : ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue())));
+        throw_unless(13705, ($self'entry_count < 4096));
+        throw_unless(13708, ($self'entry_count < 4294967295));
+        $self'entries~__tact_dict_set_int_cell(257, $self'entry_count, $PublicEntry$_store_cell($PublicEntry$_constructor_publisher_body_commit_created_at(__tact_context_get_sender(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_bodyCommit($msg'header, $msg'body), $global_now()), begin_cell()));
+        $self'entry_count = ($self'entry_count + 1);
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57(), 12600000, true, 1, $DepositCapsuleFee$_store_cell($DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(10000000, 2, $self'partition_key, $self'epoch_tag, __tact_context_get_sender()), begin_cell())));
+        $global_nativeReserve((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_entryEndowment() + (($self'entry_count == 1) ? ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_baseEndowment() : 0)), 6);
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
+        $PublicShard$_contract_store(($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count));
+        return ();
+    }
+    
+    ;; Receive RetirePublicShard message
+    if (op == 0x50535033) {
+        var $msg = empty_tuple();
+        throw_unless(13706, ($global_now() > (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt() + 86400)));
+        $self'entries = null();
+        $self'entry_count = 0;
+        $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 162, false));
+        $PublicShard$_contract_store(($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $PublicShard$_contract_store(($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

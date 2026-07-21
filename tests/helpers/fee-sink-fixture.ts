@@ -4,6 +4,7 @@ import { FeeAccumulator } from '../../build/FeeAccumulator/FeeAccumulator_FeeAcc
 import { RecordShard } from '../../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../../build/IntroShard/IntroShard_IntroShard';
 import { AirdropTicket } from '../../build/AirdropTicket/AirdropTicket_AirdropTicket';
+import { PublicShard } from '../../build/PublicShard/PublicShard_PublicShard';
 
 // THE FEE SINK AS GENESIS LEAVES IT — one copy, deliberately.
 //
@@ -37,6 +38,7 @@ export async function deployFeeSink(bc: Blockchain, opts: { bind?: boolean; fund
   const send = (body: any) => sink.send(gov, { value: toNano('0.1') }, body);
   await send({ $$type: 'BindShardCode', shard_code: (await RecordShard.init(1n, 1n)).code } as any);
   await send({ $$type: 'BindIntroShardCode', intro_shard_code: (await IntroShard.init(1n, 1n)).code } as any);
+  await send({ $$type: 'BindPublicShardCode', public_shard_code: (await PublicShard.init(1n, 1n)).code } as any);
   await send({ $$type: 'BindTicketCode', ticket_code: (await AirdropTicket.init(FA_TREASURY)).code } as any);
   await send({ $$type: 'BindAirdropPool', airdrop_pool_address: FA_POOL } as any);
   return sink;

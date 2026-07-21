@@ -101,7 +101,7 @@ const IS_PROTOCOL_FEE: Int = 10000000;
 // pointing at the old one — every publish's fee bounced straight back, caught by tests/shard-fee-passthrough.
 // So the constraint is real and it is this: FeeAccumulator code -> its address -> shard code -> shard addresses.
 // No cycle, but it must be walked in that order at genesis, and PT-04/PIN pins the result.
-const IS_FEE_SINK: Address = address("EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7");
+const IS_FEE_SINK: Address = address("EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-");
 
 // TRANSPORT, PAID BY THE PUBLISHER [OWNER 2026-07-19], so the fee reaches the pool whole.
 // Mirror of FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE (gate 15056); pinned against it in tests.
