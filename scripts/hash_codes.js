@@ -21,6 +21,14 @@ MOCK_USERNAME_NFT_ITEM_NO_ACK_CODE_HASH:'build/MockUsernameNFTItemNoAck/MockUser
 RECORD_SHARD_CODE_HASH:'build/RecordShard/RecordShard_RecordShard.code.boc',
 INTRO_SHARD_CODE_HASH:'build/IntroShard/IntroShard_IntroShard.code.boc',
 RECOVERY_SHARD_CODE_HASH:'build/RecoveryShard/RecoveryShard_RecoveryShard.code.boc',
+// The rest of the clean-17 set, added 2026-07-21 for the same reason the shards were added above — the Stop Rule
+// cannot compare a hash it never computes. Each of these is address-critical in its own way:
+//   KeyShard      — every wallet's identity AND avatar pointer address is derived from this code hash.
+//   AirdropTicket — its address IS the publisher, and FeeAccumulator authenticates a claim by rebuilding it.
+//   AirdropPool   — bound by address at genesis, and it is where the 15,000,000 ATH lives.
+KEY_SHARD_CODE_HASH:'build/KeyShard/KeyShard_KeyShard.code.boc',
+AIRDROP_TICKET_CODE_HASH:'build/AirdropTicket/AirdropTicket_AirdropTicket.code.boc',
+AIRDROP_POOL_CODE_HASH:'build/AirdropPool/AirdropPool_AirdropPool.code.boc',
 };
 const productionKeys = [
   'ATH_WALLET_CODE_HASH',
@@ -37,6 +45,9 @@ const productionKeys = [
   'RECORD_SHARD_CODE_HASH',
   'INTRO_SHARD_CODE_HASH',
   'RECOVERY_SHARD_CODE_HASH',
+  'KEY_SHARD_CODE_HASH',
+  'AIRDROP_TICKET_CODE_HASH',
+  'AIRDROP_POOL_CODE_HASH',
 ];
 const hashes = {};
 let out='';
