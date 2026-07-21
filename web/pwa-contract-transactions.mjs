@@ -2028,6 +2028,196 @@ export function readPublicPostPayload(payload, options = {}) {
   return readPublicBodyBytes(headerBytes, bodyBytes);
 }
 
+// ══ PPH2 — the clean-17 PublicShard header ══════════════════════════════════════════════════════════════════
+// A header is CLIENT-DEFINED opaque data: PublicShard stores it as a ref and never parses it (it commits only to
+// H(PS_BODY_DOMAIN ‖ header.hash ‖ body.hash)). So this is a client convention, not an immutable ABI — but the
+// reader re-derives that commit from the exact header bytes, so publicHeaderBytesV2 and readPublicBodyBytesV2
+// below MUST stay each other's inverse or a post authenticates against nothing.
+//
+// PPH2 drops three PPH1 fields the shard model made redundant or unsafe, leaving ONE uniform 32-byte header:
+//   - the profile pointer (profile_version + avatar_hash): advertised an avatar straight from the post header,
+//     bypassing the PAID KeyShard pointer (mandatory fix #4). The authoritative avatar is KeyShard's.
+//   - parent_entry_id: there is no global monotonic entry id; a comment's parent is the THREAD shard it lives in
+//     (address = f(post_uid)), so routing already binds it.
+//   - parent_hash: the reader derives the thread shard from the post's coordinates, so it already holds the parent.
+// Layout (all kinds): magic(4)="PPH2" | ver(1)=2 | kind(1) | flags(1) | media(1) | streamId(16) | partIdx(2) |
+// partCnt(2) | createdAt(4) = 32B. streamId/partIdx/partCnt stay at PPH1 offsets so readPublicPartHeaderInfo walks
+// both. createdAt is the CLIENT's declared post time (stable across a multipart post's per-part contract stamps).
+export const PUBLIC_HEADER_MAGIC_V2 = 'PPH2';
+export const PUBLIC_HEADER_VERSION_V2 = 2;
+export const PUBLIC_HEADER_BYTES_V2 = 32;
+
+const PUBLIC_V2_POST_KINDS = new Set([PUBLIC_BODY_KIND.POST, PUBLIC_BODY_KIND.IMAGE_POST, PUBLIC_BODY_KIND.DOCUMENT_POST]);
+const PUBLIC_V2_MEDIA_KINDS = new Set([PUBLIC_BODY_KIND.IMAGE_POST, PUBLIC_BODY_KIND.IMAGE_COMMENT, PUBLIC_BODY_KIND.AVATAR]);
+const PUBLIC_V2_KIND_TYPE = Object.freeze({
+  [PUBLIC_BODY_KIND.POST]: 'post',
+  [PUBLIC_BODY_KIND.COMMENT]: 'comment',
+  [PUBLIC_BODY_KIND.IMAGE_POST]: 'image',
+  [PUBLIC_BODY_KIND.IMAGE_COMMENT]: 'image_comment',
+  [PUBLIC_BODY_KIND.AVATAR]: 'avatar',
+  [PUBLIC_BODY_KIND.DOCUMENT_POST]: 'document',
+  [PUBLIC_BODY_KIND.DOCUMENT_COMMENT]: 'document_comment',
+});
+
+export function publicHeaderBytesV2(input) {
+  const kind = publicPayloadKind(input);
+  const streamId = publicStreamIdBytes(input);
+  const partIndex = publicPartNumber(input?.partIndex ?? input?.part_index ?? 0, 'public part index');
+  const partCount = publicPartNumber(input?.partCount ?? input?.part_count ?? 1, 'public part count');
+  if (partCount <= 0 || partIndex >= partCount) throw new RangeError('public part index mismatch');
+  const createdAtSec = publicCreatedAtSeconds(input);
+  const mediaFormat = PUBLIC_V2_MEDIA_KINDS.has(kind)
+    ? (kind === PUBLIC_BODY_KIND.AVATAR
+        ? PUBLIC_BODY_MEDIA_FORMATS.WEBP
+        : Number(input?.mediaFormat ?? input?.media_format ?? input?.format ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP))
+    : PUBLIC_BODY_MEDIA_FORMATS.NONE;
+  const flags = PUBLIC_V2_POST_KINDS.has(kind) && !publicCommentsAllowed(input) ? PUBLIC_BODY_FLAGS.COMMENTS_DISABLED : 0;
+  return concatBytes(
+    new TextEncoder().encode(PUBLIC_HEADER_MAGIC_V2),
+    new Uint8Array([PUBLIC_HEADER_VERSION_V2, kind, flags, mediaFormat]),
+    streamId,
+    bigintToBytes(BigInt(partIndex), 2, 'part_index'),
+    bigintToBytes(BigInt(partCount), 2, 'part_count'),
+    bigintToBytes(BigInt(createdAtSec), 4, 'created_at_sec'),
+  );
+}
+
+export function readPublicBodyBytesV2(headerBytes, bodyBytes) {
+  const header = toUint8Array(headerBytes, 'public header bytes');
+  const data = toUint8Array(bodyBytes, 'public body bytes');
+  if (header.length !== PUBLIC_HEADER_BYTES_V2) throw new Error('Public header length mismatch');
+  if (new TextDecoder().decode(header.slice(0, 4)) !== PUBLIC_HEADER_MAGIC_V2) throw new Error('Unsupported public header magic');
+  if (header[4] !== PUBLIC_HEADER_VERSION_V2) throw new Error('Unsupported public header version');
+  const kind = header[5];
+  const flags = header[6];
+  const mediaFormat = header[7];
+  const type = PUBLIC_V2_KIND_TYPE[kind];
+  if (!type) throw new Error('Unsupported public body kind');
+
+  // The bytes come from untrusted transaction history: reject an incoherent media/flags combination, don't render it.
+  if (PUBLIC_V2_MEDIA_KINDS.has(kind)) {
+    if (mediaFormat !== PUBLIC_BODY_MEDIA_FORMATS.WEBP) throw new Error('Unsupported public media format');
+  } else if (mediaFormat !== PUBLIC_BODY_MEDIA_FORMATS.NONE) {
+    throw new Error('Unsupported public media format');
+  }
+  if (PUBLIC_V2_POST_KINDS.has(kind)) {
+    if ((flags & ~PUBLIC_BODY_FLAGS.COMMENTS_DISABLED) !== 0) throw new Error('Unsupported public post body flags');
+  } else if (flags !== 0) {
+    throw new Error('Unsupported public body flags');
+  }
+
+  const streamId = header.slice(8, 24);
+  const partIndex = Number(readBigUintBytes(header, 24, 2, 'part_index'));
+  const partCount = Number(readBigUintBytes(header, 26, 2, 'part_count'));
+  if (partCount <= 0 || partIndex >= partCount) throw new Error('Public part index mismatch');
+  const createdAtSec = Number(readBigUintBytes(header, 28, 4, 'created_at_sec'));
+
+  const isText = kind === PUBLIC_BODY_KIND.POST || kind === PUBLIC_BODY_KIND.COMMENT;
+  const isDocument = kind === PUBLIC_BODY_KIND.DOCUMENT_POST || kind === PUBLIC_BODY_KIND.DOCUMENT_COMMENT;
+  const out = {
+    layout: PUBLIC_BODY_LAYOUT,
+    kind,
+    type,
+    headerBytes: header.length,
+    bodyBytes: data.length,
+    bytes: data.length,
+    header,
+    data,
+    flags,
+    streamId,
+    stream_id: `0x${bytesToHex(streamId)}`,
+    partIndex,
+    part_index: partIndex,
+    partCount,
+    part_count: partCount,
+    createdAtSec,
+    created_at_sec: createdAtSec,
+  };
+  if (PUBLIC_V2_POST_KINDS.has(kind)) {
+    out.commentsAllowed = (flags & PUBLIC_BODY_FLAGS.COMMENTS_DISABLED) === 0;
+    out.comments_allowed = out.commentsAllowed;
+  }
+  if (isText) {
+    out.textBytes = data;
+    out.text = new TextDecoder().decode(data);
+  } else if (isDocument) {
+    out.documentBytes = data;
+    out.document_bytes = data;
+  } else {
+    out.mediaFormat = mediaFormat;
+    out.media_format = mediaFormat;
+    out.imageBytes = data;
+    out.image_bytes = data;
+  }
+  return out;
+}
+
+/** Build the PPH2 header + body cells for a public capsule. Returns the client cells directly (headerCell/bodyCell)
+ *  so the send path hands them straight to buildPublicPublishBrowser without a BoC round-trip. */
+export async function createPublicPostPayloadV2(input, options = {}) {
+  const headerBytes = publicHeaderBytesV2(input);
+  const bodyBytes = publicBodyBytes(input);
+  const sizeClass = normalizePublicSizeClass(
+    options.sizeClass ?? options.size_class ?? publicSizeClassForBodyBytes(bodyBytes.length),
+    'public payload size_class',
+  );
+  const maxBytes = options.maxBytes ?? publicUsefulBytesForSizeClass(sizeClass);
+  if (bodyBytes.length > maxBytes) throw new RangeError(`public body exceeds ${maxBytes} bytes`);
+  const headerCell = snakeCellFromBytes(headerBytes, 'public header chunk');
+  const bodyCell = snakeCellFromBytes(bodyBytes, 'public body chunk');
+  const { hash: headerHashBytes } = await computeCellHashAndDepth(headerCell);
+  const { hash: bodyHashBytes } = await computeCellHashAndDepth(bodyCell);
+  const headerHash = `0x${bytesToHex(headerHashBytes)}`;
+  const bodyHash = `0x${bytesToHex(bodyHashBytes)}`;
+  const headerBoc = bytesToBase64(serializeBoc(headerCell));
+  const bodyBoc = bytesToBase64(serializeBoc(bodyCell));
+  const parsed = readPublicBodyBytesV2(headerBytes, bodyBytes);
+  return {
+    layout: PUBLIC_BODY_LAYOUT,
+    version: PUBLIC_HEADER_VERSION_V2,
+    kind: parsed.kind,
+    type: parsed.type,
+    streamId: parsed.stream_id,
+    stream_id: parsed.stream_id,
+    partIndex: parsed.partIndex,
+    part_index: parsed.part_index,
+    partCount: parsed.partCount,
+    part_count: parsed.part_count,
+    createdAtSec: parsed.createdAtSec,
+    created_at_sec: parsed.created_at_sec,
+    commentsAllowed: parsed.commentsAllowed,
+    comments_allowed: parsed.comments_allowed,
+    headerBytes: headerBytes.length,
+    bodyBytes: bodyBytes.length,
+    bytes: bodyBytes.length,
+    sizeClass,
+    size_class: sizeClass,
+    usefulBytes: publicUsefulBytesForSizeClass(sizeClass),
+    headerHash,
+    header_hash: headerHash,
+    bodyHash,
+    body_hash: bodyHash,
+    headerBoc,
+    header_boc: headerBoc,
+    bodyBoc,
+    body_boc: bodyBoc,
+    headerCell,
+    bodyCell,
+    header_cell: { hash: headerHash, boc: headerBoc, bytes: headerBytes.length },
+    body_cell: { hash: bodyHash, boc: bodyBoc, bytes: bodyBytes.length },
+  };
+}
+
+export function readPublicPostPayloadV2(payload, options = {}) {
+  const maxBytes = options.maxBytes ?? PUBLIC_POST_BODY_MAX_BYTES;
+  const headerPayload = payload?.header_boc ?? payload?.headerBoc ?? payload?.header_cell ?? payload?.headerCell ?? payload?.header;
+  const bodyPayload = payload?.body_boc ?? payload?.bodyBoc ?? payload?.body_cell ?? payload?.bodyCell ?? payload?.body;
+  if (!headerPayload || !bodyPayload) throw new TypeError('public payload must include header and body cells');
+  const headerBytes = readSnakeCellBytes(headerPayload, { maxBytes: PUBLIC_HEADER_BYTES_V2, name: 'public header snake cell' });
+  const bodyBytes = readSnakeCellBytes(bodyPayload, { maxBytes, name: 'public body snake cell' });
+  return readPublicBodyBytesV2(headerBytes, bodyBytes);
+}
+
 // HEADER-ONLY multipart info (v650): every PPH1 kind carries the multipart fields at the same fixed offsets
 // (streamId @8..24, part_index @24..26, part_count @26..28), so a chain walker can group entries into multipart
 // streams WITHOUT the ~32KB body reads — used by the feed sync's boundary-straddle extension to keep walking
@@ -2038,8 +2228,12 @@ export function readPublicPartHeaderInfo(headerPayload) {
     if (!headerPayload) return null;
     const header = readSnakeCellBytes(headerPayload, { maxBytes: PUBLIC_COMMENT_HEADER_BYTES, name: 'public header snake cell' });
     if (header.length < 28) return null;
-    if (new TextDecoder().decode(header.slice(0, 4)) !== PUBLIC_HEADER_MAGIC) return null;
-    if (header[4] !== PUBLIC_BODY_VERSION) return null;
+    const magic = new TextDecoder().decode(header.slice(0, 4));
+    const version = header[4];
+    // PPH1 and PPH2 share streamId@8..24, part_index@24..26, part_count@26..28, so one walker groups both.
+    const isV1 = magic === PUBLIC_HEADER_MAGIC && version === PUBLIC_BODY_VERSION;
+    const isV2 = magic === PUBLIC_HEADER_MAGIC_V2 && version === PUBLIC_HEADER_VERSION_V2;
+    if (!isV1 && !isV2) return null;
     const partIndex = Number(readBigUintBytes(header, 24, 2, 'part_index'));
     const partCount = Number(readBigUintBytes(header, 26, 2, 'part_count'));
     if (!Number.isFinite(partIndex) || !Number.isFinite(partCount) || partCount <= 0 || partIndex >= partCount) return null;
