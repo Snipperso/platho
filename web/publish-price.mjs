@@ -18,23 +18,29 @@
 // shard that already exists costs nothing — the reserve keeps only what it needs and mode-128 returns the rest.
 //     first publish  at 16_900_000: accepted, 293_473 of the payer's own gas on top
 //     later publish  at 16_900_000: accepted, 3_137_794 CAME BACK
+// (Those two lines are the ORIGINAL measurement at the then-current price; the figures below have since risen
+//  twice as RS_FEE_TRANSPORT grew to carry the airdrop credit. The PROPERTY they established — that attaching
+//  the deploy figure to an existing shard costs nothing, because mode-128 returns the surplus — is unchanged.)
 // So the client always attaches the deploy figure. There is nothing to read, nothing to infer, and nothing an
 // attacker can forge into a wrong decision. The user needs the headroom in their wallet for one block; they do
 // not spend it.
 //
 // These mirror contract constants BY HAND, because the modules that need them must load in a browser and cannot
-// import the compiled wrappers. tests/publish-price.test.ts pins every one of them against the .tact sources and
+// import the compiled wrappers. [STALE FOR A DAY, 2026-07-20..21] RS_FEE_TRANSPORT rose twice to carry the
+// airdrop credit and these four figures were not moved with it, so the client attached 13_400_000 against a
+// gate demanding 15_600_000 — every publish refused. PP-01 caught it exactly as the next sentence promises;
+// what failed was propagation, not detection. tests/publish-price.test.ts pins every one of them against the .tact sources and
 // against the live getters, so a drift is loud rather than a refused publish in production.
 
 /** RS_MIN_VALUE — what a publish into an EXISTING RecordShard must bring. Steady state. */
-export const CONV_MIN_VALUE = 13_400_000n;
+export const CONV_MIN_VALUE = 15_600_000n;
 /** RS_DEPLOY_MIN_VALUE — what the FIRST publish must bring; also what a client should always attach. */
-export const CONV_PUBLISH_VALUE = 16_900_000n;
+export const CONV_PUBLISH_VALUE = 19_100_000n;
 
 /** IS_MIN_VALUE — what an intro into an EXISTING IntroShard must bring. */
-export const INTRO_MIN_VALUE = 13_110_000n;
+export const INTRO_MIN_VALUE = 15_310_000n;
 /** IS_DEPLOY_MIN_VALUE — what the first intro must bring; also what a client should always attach. */
-export const INTRO_PUBLISH_VALUE = 15_610_000n;
+export const INTRO_PUBLISH_VALUE = 17_810_000n;
 
 /**
  * What to attach to a publish on the given lane. Takes no state and asks nothing of the chain, on purpose —
