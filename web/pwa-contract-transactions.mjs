@@ -17,6 +17,7 @@ export const ATH_WALLET_OPS = Object.freeze({
   ATHBurn: 1096042497,
   ATHTransferRequest: 1096042512,
   ATHTransferRequestWithNotify: 1096042516,
+  ATHTransferRequestRegistryProfileAvatar: 1096042522,   // 0x4154481A
 });
 
 export const USERNAME_REGISTRY_OPS = Object.freeze({
@@ -1360,6 +1361,26 @@ export function buildAthWalletMessageBody(type, params = {}) {
         .uint(params.query_id, 64, 'query_id')
         .uint(params.amount, 128, 'amount')
         .address(params.response_destination, 'response_destination')
+        .toBocBase64();
+    // clean-17 direct-pay avatar: the buyer's own ATH wallet is asked to send 100 ATH to ProfileRegistry's ATH
+    // wallet, carrying the avatar pointer fields. Layout mirrors ATHMaster's storeATHTransferRequestRegistryProfileAvatar
+    // EXACTLY — root: op|query_id|amount|recipient|response_destination|notify_value, then a REF with
+    // owner_wallet|avatar_hash(256)|avatar_entry_id(64)|avatar_stream_id(128)|avatar_part_count(16)|media_format(8).
+    case 'ATHTransferRequestRegistryProfileAvatar':
+      return beginAthWalletBody(ATH_WALLET_OPS.ATHTransferRequestRegistryProfileAvatar)
+        .uint(params.query_id, 64, 'query_id')
+        .uint(params.amount, 128, 'amount')
+        .address(params.recipient, 'recipient')
+        .address(params.response_destination, 'response_destination')
+        .uint(params.notify_value, 128, 'notify_value')
+        .ref(beginCell()
+          .address(params.owner_wallet, 'owner_wallet')
+          .uint(params.avatar_hash, 256, 'avatar_hash')
+          .uint(params.avatar_entry_id, 64, 'avatar_entry_id')
+          .uint(params.avatar_stream_id, 128, 'avatar_stream_id')
+          .uint(params.avatar_part_count, 16, 'avatar_part_count')
+          .uint(params.media_format, 8, 'media_format')
+          .endCell(), 'avatar_ref')
         .toBocBase64();
     default:
       throw new Error(`Unsupported ATHWallet message type ${type}`);

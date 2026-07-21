@@ -25159,7 +25159,77 @@ async function submitAthDueFlush() {
   return result;
 }
 
+// Direct-pay avatar funding (clean-17). notify_value 66M is above the ~49M a FIRST avatar record needs to land at
+// the registry (below it the registry refuses at 21112 and refunds); the request VALUE 200M covers the ATH wallet's
+// downstream requirement (notify_value + the notify/ack/storage constants + the owner-request reserve, ~128M
+// measured) with headroom. Both are validated end-to-end in tests/ath-avatar-request AAR-02.
+const PROFILE_AVATAR_DIRECT_NOTIFY_VALUE = 66_000_000n;
+const PROFILE_AVATAR_DIRECT_REQUEST_VALUE = 200_000_000n;
+
+// clean-17 direct-pay avatar: publish the image bytes to the owner's AVATAR PublicShard (kind 3, PPH2 — NO
+// profileVersion/avatarHash in the header, those live only in the paid pointer) AND pay 100 ATH to ProfileRegistry,
+// which authorises the KeyShard pointer write. Both ride ONE wallet transfer. The pointer's avatar_stream_id is the
+// 16-byte streamId as a uint128, avatar_part_count the part count — exactly what readAvatarPartsFromShard matches on.
+async function submitProfileAvatarDirect(avatar) {
+  if (!plathoWallet?.address) throw new Error('Connect a wallet to set an avatar');
+  if (!avatar?.bytes?.length) return null;
+  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const avatarHash = await sha256Hex(avatar.bytes);
+  setProfileAvatarPending(true);
+  setProfileAvatarStatus(t('avatar.checkingCurrent'));
+  const currentPointer = await readCurrentProfileAvatarPointerFromChain(owner, { required: false }).catch(() => null);
+  if (currentPointer?.avatarHash?.toLowerCase?.() === normalizeAvatarHashHex(avatarHash).toLowerCase()) {
+    await writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
+    setProfileAvatarStatus('avatar active', '');
+    return { status: 'active', registryPointer: currentPointer };
+  }
+  const parts = imagePartsForSend(avatar, 'profile avatar');
+  if (parts.length <= 0) throw new Error('Avatar image is empty');
+  if (parts.length > 16) throw new Error('Avatar must fit 16 public capsules');
+  const streamId = randomBytes(16);
+  const createdAtSec = Math.floor(Date.now() / 1000);
+  const payloads = [];
+  for (let index = 0; index < parts.length; index += 1) {
+    payloads.push(await createPublicPostPayloadV2({
+      type: 'avatar', bytes: parts[index].bytes, mediaFormat: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
+      streamId, partIndex: index, partCount: parts.length, createdAtSec,
+    }, { sizeClass: parts[index].sizeClass }));
+  }
+
+  const walletHash = publicWalletHash(owner);
+  const avatarPartitionKey = await publicAvatarPartitionKey(walletHash);
+  const avatarEpochTag = publicEpochTag(3, publicEraOf(3, createdAtSec));
+  const avatarValue = publicPublishValueForKind(3);
+  const shardParts = payloads.map((payload) => ({
+    kind: 3, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell, value: avatarValue, partitionKey: avatarPartitionKey, epochTag: avatarEpochTag,
+  }));
+
+  const athWalletAddress = await loadConnectedAthWalletAddress();
+  const athRequest = createAthWalletMessage('ATHTransferRequestRegistryProfileAvatar', {
+    query_id: nextQueryId(),
+    amount: PROFILE_AVATAR_PRICE_ATH,
+    recipient: requireProfileRegistryAddress(),
+    response_destination: owner,
+    notify_value: PROFILE_AVATAR_DIRECT_NOTIFY_VALUE,
+    owner_wallet: owner,
+    avatar_hash: uint256HexToBigInt(avatarHash, 'avatar_hash'),
+    avatar_entry_id: 0n,   // unused in the shard model (reader matches by streamId + sha256)
+    avatar_stream_id: tonCell.bytesToBigInt(streamId),
+    avatar_part_count: BigInt(parts.length),
+    media_format: BigInt(PUBLIC_BODY_MEDIA_FORMATS.WEBP),
+  }, { athWalletAddress, valueNanotons: PROFILE_AVATAR_DIRECT_REQUEST_VALUE });
+
+  setProfileAvatarStatus(t('avatar.publishing'));
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  const result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, shardParts, { extraMessages: [athRequest] });
+  await writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
+  setProfileAvatarStatus('avatar submitted', '');
+  globalThis.plathoLastProfileAvatarDirect = { avatarHash, streamId: bytesToHex(streamId), partCount: parts.length, result };
+  return { status: 'submitted', result, avatarHash };
+}
+
 async function submitProfileAvatarUpdate(avatar) {
+  if (publicLaneDirectPayEnabled()) return submitProfileAvatarDirect(avatar);
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   if (!avatar?.bytes?.length) return null;
   const avatarHash = await sha256Hex(avatar.bytes);

@@ -68,6 +68,10 @@ export async function publishPublicLaneParts({ wallet, transport }, parts, optio
   if (!Array.isArray(parts) || parts.length === 0) throw new Error('publishPublicLaneParts requires at least one part');
   const prepared = [];
   for (const part of parts) prepared.push(await buildPublicPublishWalletMessage(part));
-  const result = await sendPlathoWalletTransaction(wallet, { messages: prepared.map((p) => p.message) }, { ...options, transport });
+  // extraMessages lets a caller ride a NON-PublicPublish message in the same v5 transfer — the avatar path attaches
+  // the 100-ATH payment request ({address, amount, payload}) alongside the AVATAR shard bytes so both land atomically.
+  const extra = Array.isArray(options.extraMessages) ? options.extraMessages : [];
+  const { extraMessages, ...sendOptions } = options;
+  const result = await sendPlathoWalletTransaction(wallet, { messages: [...prepared.map((p) => p.message), ...extra] }, { ...sendOptions, transport });
   return { parts: prepared, result };
 }
