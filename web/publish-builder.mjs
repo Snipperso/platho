@@ -27,6 +27,7 @@ import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 import { storeCapsulePublish, RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { storeIntroPublish, IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { storeRecoveryStore, RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
+import { storePublicPublish, PublicShard } from '../build/PublicShard/PublicShard_PublicShard';
 import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs';
 
 const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
@@ -61,6 +62,11 @@ async function introShardState(epoch, bucket) {
 
 async function recoveryShardState(selfBucketKey) {
   const init = await RecoveryShard.init(BigInt(selfBucketKey));
+  return { init, address: contractAddress(0, init) };
+}
+
+async function publicShardState(partitionKey, epochTag) {
+  const init = await PublicShard.init(BigInt(partitionKey), BigInt(epochTag));
   return { init, address: contractAddress(0, init) };
 }
 
@@ -195,4 +201,44 @@ export async function buildRecoveryPublish({ seed, slotIndex, seq, h0, h1, body,
     slotIndex,
     ownerPublicKey: ownerPub,
   };
+}
+
+/**
+ * PUBLIC publish: a post, comment, beacon announcement or avatar part into a PublicShard partition. Unlike CONV
+ * there is NO signature — authorization is the preimage gate (13702): for CHANNEL/AVATAR the contract folds
+ * sender() and only the owner wallet matches, so the message carries no proof of its own. The caller supplies the
+ * already-derived `partitionKey` and `epochTag` (web/shard-discovery computes and pins them); this builder's job
+ * is the message and the address, kept narrow so the two derivations cannot drift.
+ *
+ * StateInit is ALWAYS attached — a shard is deployed lazily, so without it the first publish lands on an uninit
+ * account, runs with its compute phase skipped, and is lost while the wallet reports success.
+ *
+ * `value` must be >= the shard's deploy_min_value on the first publish (entry_count == 0), else min_value; the
+ * caller reads those from get_view. `keyArg` is post_uid for THREAD, the bucket for BEACON, and unused (0) for
+ * CHANNEL/AVATAR — the same positional contract as the PublicPublish message.
+ */
+export async function buildPublicPublish({ kind, keyArg = 0n, shardSeq = 0, header, body, value, partitionKey, epochTag }) {
+  if (!(BigInt(kind) >= 0n && BigInt(kind) <= 3n)) throw new Error(`buildPublicPublish: kind ${kind} out of range 0..3`);
+  const target = await publicShardState(partitionKey, epochTag);
+  return {
+    to: target.address,
+    init: target.init,   // lazy deploy: the first publish into a partition creates the account
+    value,
+    body: beginCell().store(storePublicPublish({
+      $$type: 'PublicPublish',
+      kind: BigInt(kind), key_arg: BigInt(keyArg), shard_seq: BigInt(shardSeq), header, body,
+    })).endCell(),
+    commit: publicBodyCommit(header, body),
+  };
+}
+
+// H(PS_BODY_DOMAIN ‖ header.hash ‖ body.hash), mirroring PublicShard.bodyCommit — the reader re-derives this to
+// match a body recovered from transaction history against the commit the contract stored.
+const PS_BODY_DOMAIN = 0x50534644n;   // "PSFD"
+function publicBodyCommit(header, body) {
+  return BigInt('0x' + beginCell()
+    .storeUint(PS_BODY_DOMAIN, 32)
+    .storeUint(cellBig(header), 256)
+    .storeUint(cellBig(body), 256)
+    .endCell().hash().toString('hex'));
 }

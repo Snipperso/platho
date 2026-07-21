@@ -5,8 +5,12 @@ import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { RecordShard, loadCapsulePublish } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard, loadIntroPublish } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecoveryShard, loadRecoveryStore } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
-import { buildConvPublish, buildIntroPublish, buildRecoveryPublish, frameCommit, introBodyCommit } from '../web/publish-builder.mjs';
-import { addrKey, epochOf } from '../web/shard-discovery.mjs';
+import { PublicShard } from '../build/PublicShard/PublicShard_PublicShard';
+import { buildConvPublish, buildIntroPublish, buildRecoveryPublish, buildPublicPublish, frameCommit, introBodyCommit } from '../web/publish-builder.mjs';
+import {
+  addrKey, epochOf,
+  publicChannelPartitionKey, publicBeaconPartitionKey, publicWalletHash, publicEpochTag, publicEraOf,
+} from '../web/shard-discovery.mjs';
 import { ed25519 } from '@noble/curves/ed25519.js';
 
 // A conversation-direction's write key. In the client this is derived from the shared K_root
@@ -528,4 +532,50 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // the STORAGE+GAS part is still materially cheaper than the old two-hop floor (7_710_000) — the hop is gone
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS')).toBeLessThan(7_710_000n);
   });
+
+  it('PB-15: a PUBLIC channel post built by buildPublicPublish is accepted (13702) and its body arrives', async () => {
+    // The public write side, end to end: derive the partition key client-side, build the message, send it, and
+    // prove the contract ACCEPTED it (the preimage gate agrees with the client derivation) and stored a commit
+    // the client can reproduce. No signature — CHANNEL folds sender(), so ONLY the payer's own shard matches.
+    const era = publicEraOf(0, blockchain.now!);
+    const pk = await publicChannelPartitionKey(publicWalletHash(payer.address), 0);
+    const tag = publicEpochTag(0, era);
+    const init = await PublicShard.init(pk, tag);
+    const ps = await deploy(blockchain.openContract(new PublicShard(contractAddress(0, init), init)));
+
+    const header = cellOf(0x66), body = cellOf(0x77, 256);
+    const dm = (await ps.getGetView()).deploy_min_value;
+    const built = await buildPublicPublish({
+      kind: 0, header, body, value: dm + toNano('0.02'), partitionKey: pk, epochTag: tag,
+    });
+    expect(addrKey(built.to), 'the builder targets the derived shard').toBe(addrKey(ps.address));
+
+    const res = await send(built);
+    expect(exitOf(res, ps.address), 'the preimage gate 13702 agrees with the client-derived partition key').toBe(0);
+
+    const entry = await ps.getGetEntry(0n);
+    expect(entry.exists).toBe(true);
+    expect(entry.body_commit, 'contract commitment == client-derived publicBodyCommit').toBe(built.commit);
+    expect(addrKey(entry.publisher), 'the VM stamped the payer as publisher').toBe(addrKey(payer.address));
+  }, 120_000);
+
+  it('PB-16: a PUBLIC beacon from a DIFFERENT wallet is accepted — the lane is open, unlike CHANNEL', async () => {
+    // BEACON folds only the bucket, not sender(), so anyone may announce. Proven by publishing from a wallet that
+    // is NOT the shard's derivation input.
+    const era = publicEraOf(2, blockchain.now!);
+    const bucket = 42n;
+    const pk = await publicBeaconPartitionKey(bucket);
+    const tag = publicEpochTag(2, era);
+    const init = await PublicShard.init(pk, tag);
+    const ps = await deploy(blockchain.openContract(new PublicShard(contractAddress(0, init), init)));
+
+    const dm = (await ps.getGetView()).deploy_min_value;
+    const built = await buildPublicPublish({
+      kind: 2, keyArg: bucket, header: cellOf(0x88), body: cellOf(0x99), value: dm + toNano('0.02'),
+      partitionKey: pk, epochTag: tag,
+    });
+    const res = await send(built);
+    expect(exitOf(res, ps.address), 'an open beacon accepts any announcer').toBe(0);
+    expect((await ps.getGetView()).entry_count).toBe(1n);
+  }, 120_000);
 });
