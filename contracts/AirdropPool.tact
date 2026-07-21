@@ -77,11 +77,28 @@ message(0x41445204) AirdropSealGenesis {
     deployment_manifest_hash: Int as uint256;
 }
 
-// Sent by CreditIssuer when — and ONLY when — a purchase's pool funding has been acked by the Hub.
+// Sent by the bound distributor when a claim is redeemed. In clean-17 that is FeeAccumulator (TicketRedeem ->
+// AirdropAccrue); it was CreditIssuer under the deleted anonymous-payment layer.
+//
+// [WIDTH FIXED 2026-07-21, MEASURED] credits_k was uint64 here and uint32 in FeeAccumulator's local mirror of
+// this same opcode. Since credits_k is the LAST field, the sender wrote 32 bits and this receiver tried to load
+// 64: every accrual died in COMPUTE with exit 9 (cell underflow), MEASURED in
+// tests/airdrop-accrue-wire.test.ts. The loss is silent — AirdropTicket debits the credits and FeeAccumulator
+// acks the redeem BEFORE this contract ever runs, so the publisher's credits are consumed, the ticket reports
+// success, and the ATH never moves. That is the whole 15,000,000 ATH airdrop, on every claim.
+//
+// FIXED HERE RATHER THAN IN FeeAccumulator ON PURPOSE. FeeAccumulator's address is baked into the code of
+// RecordShard (RS_FEE_SINK), IntroShard (IS_FEE_SINK) and AirdropTicket (AT_FEE_SINK), so moving its code moves
+// its address and invalidates all three. This contract's address is BOUND at genesis (BindAirdropPool) and
+// derived by nobody, so narrowing it here costs nothing. uint32 is ample: gate 26112 caps a single accrual at
+// AIRDROP_MAX_CREDITS_PER_ACCRUAL (1000).
+//
+// Nothing enforced the mirror before; ACCRUE-WIRE-02 now does, and ACCRUE-WIRE-01 puts a real FeeAccumulator and
+// a real AirdropPool in one sandbox — every prior test of this path stubbed one side with a treasury.
 message(0x41445210) AirdropAccrue {
     purchase_id: Int as uint64;
     buyer: Address;
-    credits_k: Int as uint64;
+    credits_k: Int as uint32;
 }
 
 message(0x41445211) AirdropTopUpStorageReserve {}       // permissionless self-financing top-up
@@ -267,7 +284,11 @@ contract AirdropPool {
     // callers have filled that role, and this pool is agnostic to which:
     //   * clean-16 caller = CreditIssuer, which emits this only from its FundAnonPoolAck handler — i.e. only after
     //     the Hub confirmed the pool funding landed (a bounced FundAnonPool yields no ack, hence no accrual).
-    //   * clean-17 caller = CreditSale, which accrues ATOMICALLY on a settled buy (no pool, no ack, no bounce path).
+    //   * clean-17 caller = FeeAccumulator, which emits this from TicketRedeem — i.e. only after a shard's capsule
+    //     fee has actually been deposited and credited to that publisher's AirdropTicket (gate 15055 proves the
+    //     depositor IS a shard). [CORRECTED 2026-07-21: this line named CreditSale, a contract deleted with the
+    //     anonymous-payment layer. The stale name mattered — it described an accrual "atomic on a settled buy",
+    //     which is not how the live path works and would have misled anyone sizing the value legs.]
     // Either way the accrual is gated on confirmed value, never on a mere request.
     receive(msg: AirdropAccrue) {
         self.requireSealed();

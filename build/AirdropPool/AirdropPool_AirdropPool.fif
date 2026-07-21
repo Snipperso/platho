@@ -636,7 +636,7 @@ PROGRAM{
       64 LDU
       NIP
       LDMSGADDR
-      64 LDU
+      32 LDU
       DROP
       s1 17 s() XCHG
       s0 18 s() XCHG

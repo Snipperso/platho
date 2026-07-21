@@ -105,7 +105,7 @@ PROGRAM{
     s1 s2 XCHG
     64 STU
     STSLICE
-    64 STU
+    32 STU
   }>
   $AirdropAccrue$_store_cell PROCINLINE:<{
     3 -ROLL

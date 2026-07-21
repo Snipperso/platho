@@ -82,8 +82,8 @@ TL-B: `credit_bind_airdrop_pool#43524439 airdrop_pool_address:address = CreditBi
 Signature: `CreditBindAirdropPool{airdrop_pool_address:address}`
 
 ### AirdropAccrue
-TL-B: `airdrop_accrue#41445210 purchase_id:uint64 buyer:address credits_k:uint64 = AirdropAccrue`
-Signature: `AirdropAccrue{purchase_id:uint64,buyer:address,credits_k:uint64}`
+TL-B: `airdrop_accrue#41445210 purchase_id:uint64 buyer:address credits_k:uint32 = AirdropAccrue`
+Signature: `AirdropAccrue{purchase_id:uint64,buyer:address,credits_k:uint32}`
 
 ### CreditPurchaseRefund
 TL-B: `credit_purchase_refund#43524438 purchase_id:uint64 credits_k:uint64 = CreditPurchaseRefund`

@@ -426,4 +426,29 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
     const intro = bc.openContract(IntroShard.fromAddress(contractAddress(0, await IntroShard.init(BigInt(epoch), 8n))));
     expect((await intro.getGetView()).min_value, 'INTRO minimum publish').toBe(IS_MIN_VALUE);
   }, 300_000);
+
+  it('PT-12: every baked FEE SINK constant equals the address the CURRENT build actually produces', async () => {
+    // A shard proves the fee sink by NAME: RecordShard, IntroShard and AirdropTicket each carry FeeAccumulator's
+    // address as a compile-time constant, because a shard has nothing to bind and nobody to ask. That makes the
+    // three constants a hand-maintained copy of a derived value — and a copy that goes stale does not fail loudly:
+    // deposits land on an address nobody occupies, or authentication refuses a genuine shard.
+    //
+    // It has already gone stale twice. The three contract constants were rebaked on 2026-07-20 when the sink's
+    // code moved; the MIRRORS of the same address inside tests/airdrop-ticket.test.ts and
+    // tests/fee-accumulator-accrual.test.ts were not, and eleven tests stayed red for a day looking like a
+    // protocol defect. This pins the invariant at its source instead of at any one copy of it.
+    const { readFileSync } = await import('node:fs');
+    const live = contractAddress(0, await FeeAccumulator.init(FA_TREASURY, FA_BUYBACK)).toString();
+    const baked: Array<[string, string]> = [
+      ['contracts/RecordShard.tact', 'RS_FEE_SINK'],
+      ['contracts/IntroShard.tact', 'IS_FEE_SINK'],
+      ['contracts/AirdropTicket.tact', 'AT_FEE_SINK'],
+    ];
+    for (const [file, name] of baked) {
+      const match = new RegExp(`const ${name}: Address = address\\("([^"]+)"\\)`).exec(readFileSync(file, 'utf8'));
+      expect(match, `${name} must be a baked address constant in ${file}`).toBeTruthy();
+      expect(Address.parse(match![1]).toString(),
+        `${name} is stale — rebake it to the address the current FeeAccumulator build produces`).toBe(live);
+    }
+  }, 300_000);
 });

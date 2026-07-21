@@ -66,8 +66,8 @@ TL-B: `airdrop_seal_genesis#41445204 deployment_manifest_hash:uint256 = AirdropS
 Signature: `AirdropSealGenesis{deployment_manifest_hash:uint256}`
 
 ### AirdropAccrue
-TL-B: `airdrop_accrue#41445210 purchase_id:uint64 buyer:address credits_k:uint64 = AirdropAccrue`
-Signature: `AirdropAccrue{purchase_id:uint64,buyer:address,credits_k:uint64}`
+TL-B: `airdrop_accrue#41445210 purchase_id:uint64 buyer:address credits_k:uint32 = AirdropAccrue`
+Signature: `AirdropAccrue{purchase_id:uint64,buyer:address,credits_k:uint32}`
 
 ### AirdropTopUpStorageReserve
 TL-B: `airdrop_top_up_storage_reserve#41445211  = AirdropTopUpStorageReserve`
