@@ -146,6 +146,14 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     // and discovery/resolve use the on-chain global profile chain (get_public_profile_head / get_public_profile_index).
     profilePointer: true,
   },
+  // clean-17 public/avatar lane cutover. false = live clean-15 path (public posts batch through the Vault into
+  // CapsuleHub, feed reads the CapsuleHub author chains). Flip to true ONLY once the clean-17 PublicShard genesis is
+  // live: posts publish DIRECT-PAY from the wallet into the author's CHANNEL shard (PPH2), and the feed reads those
+  // shards via public-lane. On-chain correctness is validated by a live run — the sandbox proves the message and the
+  // deploy figures, not the app's wallet/broadcast/feed round-trip against a real toncenter.
+  publicLane: {
+    directPay: false,
+  },
   feeAccumulator: {
     address: 'UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr',
   },
