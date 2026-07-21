@@ -169,7 +169,7 @@ import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
 import { createPublicLane } from './public-lane.mjs?v=1';
 import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=1';
-import { publishPublicLane, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
 import { publicPublishValueForKind } from './publish-price.mjs?v=1';
 import {
   publicChannelPartitionKey,
@@ -29457,7 +29457,100 @@ async function createPublicPayloadParts({ type, text, attachments = publicImageA
   return payloads;
 }
 
+// ── clean-17 DIRECT-PAY public lane (gated) ─────────────────────────────────────────────────────────────────
+// When appConfig.publicLane.directPay is true, public POSTS are published straight from the user's wallet to the
+// author's CHANNEL PublicShard (PPH2, StateInit-lazy-deploy), NOT batched into a Vault external for CapsuleHub.
+// DEFAULT OFF: clean-15 is the live genesis and PublicShard is not deployed yet, so the flag flips at clean-17
+// genesis. On-chain correctness (the wallet transfer actually lands N entries) is validated by a live run — the
+// sandbox proves the message (tests/public-publish-browser PUB-02) but not the app's wallet/broadcast path.
+function publicLaneDirectPayEnabled() {
+  return appConfig.publicLane?.directPay === true;
+}
+
+// PPH2 payload parts for a composed public post — mirrors createPublicPayloadParts' multipart plan, but calls the
+// V2 builder (uniform 32-byte header, no profile pointer / parent id / is_profile — all removed in the shard model)
+// and returns the client header/body cells the wallet builder consumes directly.
+async function createPublicLanePayloadPartsV2({ type, text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments, commentsAllowed = true, documentBytes = null }) {
+  const documentParts = documentBytes ? publicSendPlanFromDocumentBytes(documentBytes) : publicComposerSendPlan(text, attachments, fileAttachments);
+  const totalParts = documentParts.length;
+  if (totalParts <= 0) return [];
+  assertPublicComposerPartLimit(totalParts);
+  const streamId = randomBytes(16);
+  const createdAtSec = Math.floor(Date.now() / 1000);
+  const payloads = [];
+  for (let index = 0; index < documentParts.length; index += 1) {
+    const part = documentParts[index];
+    payloads.push(await createPublicPostPayloadV2({
+      type: type === 'comment' ? 'document_comment' : 'document',
+      bytes: part.bytes,
+      commentsAllowed,
+      streamId,
+      partIndex: index,
+      partCount: totalParts,
+      createdAtSec,
+    }, { sizeClass: part.sizeClass }));
+  }
+  return payloads;
+}
+
+// Publish a composed post DIRECT-PAY into the author's own CHANNEL shard. All N multipart parts ride ONE wallet
+// transfer to the same shard (N entries grouped on read by streamId); the first carries the deploy, the rest publish.
+async function submitPublicPostDirect(draft = null) {
+  if (!plathoWallet?.address) throw new Error('Connect a wallet to publish to the public lane');
+  const resolvedDraft = draft ?? {
+    text: publicMessageInput?.value?.trim() ?? '',
+    attachments: publicImageAttachments,
+    fileAttachments: publicFileAttachments,
+    commentsAllowed: publicComposerCommentsCheckbox?.checked !== false,
+  };
+  const attachments = normalizePublicImageAttachments(resolvedDraft.attachments ?? resolvedDraft.attachment);
+  const fileAttachments = normalizePrivateFileAttachments(resolvedDraft.fileAttachments);
+  const documentBlocks = publicDocumentBlocksFromDraft(resolvedDraft.text, attachments, fileAttachments);
+  if (documentBlocks.length === 0) return null;
+  setPublicStatus('public publish signing');
+  const blocks = displayBlocksFromDocumentBlocks(documentBlocks);
+  const payloads = await createPublicLanePayloadPartsV2({
+    type: 'post',
+    text: resolvedDraft.text,
+    attachments,
+    fileAttachments,
+    commentsAllowed: resolvedDraft.commentsAllowed,
+  });
+  if (payloads.length === 0) return null;
+  setPublicShareDraft(null);
+  const ref = rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
+    blocks,
+    publishStatus: 'sending',
+    publishState: null,
+  });
+
+  // Derive the author's CHANNEL shard for the current era. keyArg is unused (0) for CHANNEL — the contract stamps
+  // the real sender, so the partition_key over senderHash is what binds the shard to this wallet.
+  const walletHash = publicWalletHash(plathoWallet.address);
+  const partitionKey = await publicChannelPartitionKey(walletHash, 0);
+  const epochTag = publicEpochTag(0, publicEraOf(0, Math.floor(Date.now() / 1000)));
+  const value = publicPublishValueForKind(0);
+  const parts = payloads.map((payload) => ({
+    kind: 0, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell, value, partitionKey, epochTag,
+  }));
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+
+  let result;
+  try {
+    result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, parts);
+  } catch (error) {
+    if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'public publish failed' });
+    setPublicStatus('public publish failed');
+    throw error;
+  }
+  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: null });
+  setPublicStatus('public published');
+  globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, blocks, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result, direct: true };
+  return result;
+}
+
 async function submitPublicPostThroughVault(draft = null) {
+  if (publicLaneDirectPayEnabled()) return submitPublicPostDirect(draft);
   const resolvedDraft = draft ?? {
     text: publicMessageInput?.value?.trim() ?? '',
     attachments: publicImageAttachments,
