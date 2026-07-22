@@ -25457,7 +25457,18 @@ async function submitUsernameMintDirect(username) {
     username: new TextEncoder().encode(username),
   }, { athWalletAddress, valueNanotons: USERNAME_MINT_DIRECT_REQUEST_VALUE });
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
-  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), { messages: [athRequest] }, { transport });
+  let result;
+  try {
+    result = await sendPlathoWalletTransaction(requirePlathoWallet(), { messages: [athRequest] }, { transport });
+  } catch (error) {
+    // AMBIGUOUS broadcast (platho-wallet attaches error.builtBoc when the external may have landed): set the pending
+    // marker so a retry is BLOCKED (assertNoPendingUsernameMintRetry) until it expires or the mint confirms — otherwise
+    // the retry would sign a FRESH external + a SECOND real ATH payment (the contract refunds it, but it burns TON and
+    // confuses the user). A CLEAR pre-broadcast failure (no builtBoc) leaves no marker, so a clean retry is allowed.
+    // [mint review: ambiguous-broadcast double-payment — the button flow has no message-object to re-broadcast from]
+    if (error?.builtBoc) rememberPendingUsernameMint(username, owner, { clientNonce: error?.builtSeqno ?? null });
+    throw error;
+  }
   rememberPendingUsernameMint(username, owner, result);
   setUsernameMintStatus(result?.confirmationPending === true ? t('username.mintSubmittedFinalizing') : t('username.mintFinalizing'));
   autoLinkMintedUsername(username, owner, {
