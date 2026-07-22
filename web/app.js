@@ -1,6 +1,7 @@
 import {
   CRYPTO_SUITES,
   createEncryptedConvCapsule,
+  createEncryptedIntroCapsule,
   createEncryptedPrivateCapsuleFromPublicBundle,
   createVaultMessagingKeyDraft,
   encodeCompactPayload,
@@ -171,7 +172,7 @@ import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v
 import { createPublicLane } from './public-lane.mjs?v=1';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=1';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
-import { publicPublishValueForKind, CONV_PUBLISH_VALUE } from './publish-price.mjs?v=1';
+import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE } from './publish-price.mjs?v=1';
 import { createIntroLane } from './intro-lane.mjs?v=1';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=1';
 import { createMemoryConvKeyStore } from './conv-key-store.mjs?v=1';
@@ -183,6 +184,10 @@ import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-r
 import { createConvReadLane } from './conv-lane.mjs?v=1';
 import { createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
+// clean-17 first-contact (INTRO) send.
+import { publishIntroLane } from './intro-lane-send.mjs?v=1';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=1';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -29120,18 +29125,102 @@ function cancelPrivateMessageFromUi(thread, message) {
 // message; the ONLY swap vs the Vault path is the seal (createEncryptedConvCapsule / bucketKey) and the transport
 // (publishConvLaneParts / RecordShard) instead of Vault→CapsuleHub. Gated behind privateLane.directPay.
 //
-// SCOPE OF THIS FIRST CUT (gated OFF, functionally unverifiable until genesis): only the RESPONDER path — a thread
-// whose K_root was adopted from a received INTRO. The INITIATOR path (mint a K_root via INTRO send, then CONV) is not
-// wired yet, so a thread without an adopted conversation FAILS CLOSED with a clear message, never a silent no-op.
+// clean-17 first contact (INTRO) direct-pay. A conversation has no K_root until an INTRO mints one, so the FIRST message
+// to a not-yet-introduced peer is sent as an INTRO that carries the message AND establishes the pairwise K_root. Resolve
+// the recipient's KeyShard bundle (INTRO needs the scan key for the stealth view_tag), seal the INTRO with the composed
+// document as its first message, publish into a bucket the recipient scans, read back the CONTRACT created_at (never
+// Date.now — a local clock forks a later re-INTRO [[reintro-kroot-adoption-invariant]]), adopt the minted K_root, and
+// stamp convPeerKeyId so every subsequent message goes over the CONV lane. Gated behind privateLane.directPay.
+// FIRST-CUT BOUNDS: INTRO is a SINGLE capsule, so an oversized first message throws in the seal (fail-closed, never
+// truncated) — multipart first contact is a follow-up; a proper post-send created_at confirm driver is a follow-up too.
+async function attemptIntroFirstContactDirect(context) {
+  const { thread, message } = context;
+  const selfKeyId = localRecipientKeyPair?.keyId;
+  if (!selfKeyId || !localIdentity) throw new Error('Messaging identity is not ready');
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) throw new Error('INTRO direct-pay: RPC transport unavailable');
+  if (!convKeyStore) convKeyStore = createMemoryConvKeyStore();
+
+  // Resolve the recipient's FULL bundle from their KeyShard (by the wallet the thread targets — the initiator chose it,
+  // and a KeyShard is address-bound to its wallet, so the keys are authentic and the resolved keyId defines the peer).
+  const peerWallet = requireBasechainAddress(await resolveRecipientWalletForThread(thread), 'Recipient wallet');
+  const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
+  const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
+  const bundle = await resolveRecipientBundleByWallet({ provider, wallet: peerWallet, callOptions: criticalChainReadOptions() });
+  const peerKeyId = bundle.keyId;
+
+  // The composed document becomes the INTRO's first message (INTRO carries it, so first contact is one transaction).
+  const firstMessageBytes = messageDocumentBytesFromDraft(
+    context.text, context.attachments,
+    context.payment ?? context.paymentDraft ?? null, {},
+    context.replyDraft === undefined ? privateReplyDraft : context.replyDraft,
+    context.fileAttachments === undefined ? privateFileAttachments : context.fileAttachments,
+    context.shareDraft === undefined ? privateShareDraft : context.shareDraft);
+  if (!firstMessageBytes) throw new Error('INTRO direct-pay: nothing to send');
+
+  const capsule = await createEncryptedIntroCapsule(bundle, localIdentity, {
+    firstMessageBytes, now: Date.now(), ...currentProfilePointerFields(),
+  });
+
+  // Pick a bucket the recipient scans (densely from the bottom) and publish.
+  const readScanPage = createScanPageReader((call) => transport.runGetMethod(call));
+  const readEntry = createEntryReader((call) => transport.runGetMethod(call));
+  const introEpochNow = Math.floor(Date.now() / 86400000);
+  const slot = await pickIntroSendSlot({ readScanPage, epoch: introEpochNow });
+  const result = await publishIntroLane({
+    wallet: plathoWallet, transport, epoch: slot.epoch, bucket: slot.bucket, capsule, value: INTRO_PUBLISH_VALUE,
+  });
+
+  // Read back the CONTRACT created_at (fork-safety — the recipient stores THIS same value). Bounded retries cover the
+  // indexer lag right after broadcast; if still not visible, adopt a provisional time and log (re-INTRO ordering, an
+  // edge case, is the only thing at risk — a proper confirm driver is the follow-up).
+  let createdAtSec = null;
+  for (let attempt = 0; attempt < 3 && createdAtSec === null; attempt += 1) {
+    if (attempt > 0) await delay(1500);
+    try {
+      const confirmed = await confirmIntroCreatedAt({
+        readEntry, epoch: slot.epoch, bucket: slot.bucket, fromEntryId: slot.expectedEntryId, r: result.r, viewTag: result.viewTag,
+      });
+      if (confirmed) createdAtSec = confirmed.createdAt;
+    } catch (error) { if (!noteTonRpcRateLimit(error)) console.warn('[intro] created_at confirm read failed', error); }
+  }
+  if (createdAtSec === null) {
+    createdAtSec = Math.floor(Date.now() / 1000);
+    console.warn('[intro] contract created_at not yet visible — adopting a provisional time (re-INTRO ordering may drift for this conversation)');
+  }
+
+  // Adopt the minted K_root under (self, peer) so CONV send/receive work; stamp the thread so the next message is CONV.
+  await convKeyStore.upsertConversationKRoot(selfKeyId, peerKeyId, {
+    kRoot: capsule.kRoot, createdAt: createdAtSec, introNonce: capsule.introNonce, peerKeyId, peerEncPublicKey: null, peerWallet,
+  });
+  thread.convPeerKeyId = peerKeyId;
+
+  clearPrivateSendRetry(message);
+  clearPrivateMessageManualRecovery(message);
+  message.meta = 'published';
+  message.privateManualRetryAvailable = false;
+  message.privateCancelAvailable = false;
+  thread.state = 'sealed';
+  refreshThreadAfterMessageChange(thread);
+  await updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+  globalThis.plathoLastIntroDirectSend = { peerKeyId, epoch: slot.epoch, bucket: slot.bucket, createdAtSec, to: result.to };
+  refreshMessagingControls();
+  return result;
+}
+
+// FIRST CONTACT vs ESTABLISHED. A thread with no adopted conversation (no convPeerKeyId) is a not-yet-introduced peer:
+// the FIRST message routes to attemptIntroFirstContactDirect, which mints the pairwise K_root via an INTRO (carrying
+// that first message) and stamps convPeerKeyId — so every message after it lands here on the CONV lane.
 // Send retry/confirm hardening (no-double-publish on an ambiguous broadcast) mirrors the public confirm driver and is
 // a follow-up; the send path gets an adversarial review before the flag is ever flipped. [clean17-private-lane-plan]
 async function attemptConvMessagePublishDirect(context) {
   const { thread, message } = context;
   const selfKeyId = localRecipientKeyPair?.keyId;
   if (!selfKeyId || !localIdentity) throw new Error('Messaging identity is not ready');
-  // The peer's messaging keyId, stashed on the thread by handleIntroFirstContact. Absent ⇒ not-yet-introduced peer.
+  // The peer's messaging keyId, stashed on the thread by handleIntroFirstContact / the INTRO send. Absent ⇒ first
+  // contact: send an INTRO (which mints the K_root and carries this message) instead of a CONV publish.
   const peerKeyId = thread?.convPeerKeyId ?? null;
-  if (!peerKeyId) throw new Error('CONV direct-pay: establish first contact via INTRO before sending a CONV message');
+  if (!peerKeyId) return attemptIntroFirstContactDirect(context);
   const rec = convKeyStore?.getConversation(selfKeyId, peerKeyId) ?? null;
   if (!rec?.kRootCurrent) throw new Error('CONV direct-pay: no K_root for this conversation — receive/adopt the INTRO first');
   if (!rec.peerWallet) throw new Error('CONV direct-pay: conversation has no peer wallet to resolve the reply bundle');
