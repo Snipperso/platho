@@ -171,6 +171,9 @@ import { createPublicLane } from './public-lane.mjs?v=1';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=1';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
 import { publicPublishValueForKind } from './publish-price.mjs?v=1';
+import { createIntroLane } from './intro-lane.mjs?v=1';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=1';
+import { createMemoryConvKeyStore } from './conv-key-store.mjs?v=1';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -873,6 +876,11 @@ let localVaultAuthKeyPair = null;
 let localRecipientKeyPair = null;
 let localSignedPublicBundle = null;
 let localVaultDraft = null;
+// clean-17 private INTRO-receive lane state (gated behind privateLane.directPay). convKeyStore holds the pairwise
+// K_root per conversation; introReplayGuard dedups intro nonces; introReceiveLane is the running scan (start/stop).
+let convKeyStore = null;
+let introReplayGuard = null;
+let introReceiveLane = null;
 const knownVaultKeyOwnerBySignPubkey = new Map();
 const knownVaultKeyRecordByWallet = new Map();
 const verifiedPlathoUsernameOwnerCache = new Map();
@@ -3631,6 +3639,10 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   localRecipientKeyPair = null;
   localSignedPublicBundle = null;
   localVaultDraft = null;
+  // Stop the INTRO scan and drop its per-wallet K_root state — a different wallet must never inherit these (bleed).
+  stopIntroReceiveLane();
+  convKeyStore = null;
+  introReplayGuard = null;
   localReplayStore = createMemoryReplayStore();
   encryptedMessageStore = null;
   knownVaultKeyOwnerBySignPubkey.clear();
@@ -4123,6 +4135,9 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   localSignedPublicBundle = null;
   localVaultDraft = null;
   localProfileAvatarPointer = null;
+  stopIntroReceiveLane();
+  convKeyStore = null;
+  introReplayGuard = null;
   delete globalThis.plathoVaultBinding;
   resetVaultPocketState();
   renderWalletIdentity();
@@ -10579,6 +10594,86 @@ function directPublicLaneReader() {
     runGetMethod: (call) => transport.runGetMethod(call),
     now: () => Math.floor(Date.now() / 1000),
   });
+}
+
+// ── clean-17 INTRO receive lane (gated behind privateLane.directPay) ──────────────────────────────────────────
+// Scans IntroShard for stealth first contacts addressed to this wallet, opens each through the reviewed handshake
+// crypto (keyId binding + K_root confirm — NO chain resolver), and adopts the pairwise K_root into the conv key store.
+// Lifecycle mirrors the app's other polling: armed on unlock + tab-visible, stopped on lock/teardown + tab-hidden
+// (the scan-runner's own timer must not tick in a backgrounded tab — RUN-08).
+// FIRST-PASS LIMITATION: the conv key store is IN-MEMORY, so a device reload loses K_roots (re-derived on the next
+// INTRO from that peer). An encrypted persistent store is the fast-follow. [clean17-private-lane-plan]
+
+// A messaging keyId as its canonical base64url string. openIntroHandshake surfaces senderKeyId as RAW 32 bytes;
+// the conv key store and thread ids key on the base64url form, so convert once here.
+function introKeyIdString(keyId) {
+  if (typeof keyId === 'string') return keyId;
+  return bytesToBase64(keyId).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+// Decode the intro's first message (a composer document payload) into display blocks, tolerating unknown block kinds
+// and never throwing — a first contact must still establish the conversation even if its first message will not parse.
+function introFirstMessageBlocks(bytes) {
+  try {
+    const blocks = displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(bytes, { tolerateUnknownBlocks: true }));
+    return Array.isArray(blocks) && blocks.length > 0 ? blocks : null;
+  } catch {
+    return null;
+  }
+}
+
+// onFirstContact: the K_root is already adopted by the handler; here we surface the conversation. A first contact is
+// ANONYMOUS by design — INTRO carries no sender wallet, only the sender keyId + profile — so the thread is keyed on
+// the sender keyId and labelled as such until a later CONV message (which does carry a wallet) can name it.
+function handleIntroFirstContact(opened) {
+  const senderKeyId = introKeyIdString(opened.senderKeyId);
+  const created = createInboundPeerThread({ senderKeyId, keyId: senderKeyId, label: null });
+  let thread = threads.find((item) => item.id === created.id);
+  if (!thread) { thread = created; threads.push(thread); }
+  const bytes = opened.firstMessageBytes;
+  if (bytes && bytes.length > 0) {
+    const blocks = introFirstMessageBlocks(bytes);
+    const message = { type: 'in', text: blocks ? messagePreviewFromBlocks(blocks) : '', meta: 'received', blocks: blocks ?? undefined };
+    insertThreadMessage(thread, message);
+    refreshThreadAfterMessageChange(thread);
+    markIncomingThreadMessage(thread);
+  }
+  renderThreads();
+}
+
+// Build + start the scan (idempotent). Safe to call on unlock and on every return-to-visible.
+async function armIntroReceiveLane() {
+  if (!privateLaneDirectPayEnabled()) return;
+  if (introReceiveLane || !localIdentity || !localRecipientKeyPair) return;
+  const transport = globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return;
+  if (!convKeyStore) convKeyStore = createMemoryConvKeyStore();
+  if (!introReplayGuard) introReplayGuard = createMemoryReplayStore();
+  const onIntro = createIntroReceiveHandler({
+    recipientKeyPair: localRecipientKeyPair,
+    convKeyStore,
+    introReplayGuard,
+    onFirstContact: handleIntroFirstContact,
+  });
+  try {
+    introReceiveLane = await createIntroLane({
+      scanSecretKey: localIdentity.scanSecretKey,
+      runGetMethod: (call) => transport.runGetMethod(call),
+      onIntro,
+      onError: (error) => { if (!noteTonRpcRateLimit(error)) console.warn('[intro] scan error', error); },
+    });
+    introReceiveLane.start();
+  } catch (error) {
+    introReceiveLane = null;
+    console.warn('[intro] lane arm failed', error);
+  }
+}
+
+// Stop the scan (idempotent). Called on lock/teardown and on tab-hidden.
+function stopIntroReceiveLane() {
+  if (!introReceiveLane) return;
+  try { introReceiveLane.stop(); } catch { /* stop is best-effort/idempotent */ }
+  introReceiveLane = null;
 }
 
 // 0x + 64-hex representation hash of a body cell — the shard model's stand-in for CapsuleHub's stored body_hash, so a
@@ -30570,6 +30665,7 @@ async function bootCrypto() {
     // instantly (IndexedDB) so this rarely blocks; an uncached avatar pays one serial read, never a freeze.
     await refreshOwnProfileAvatar().catch((error) => console.error(error));
     scheduleMessageAutoSync();
+    armIntroReceiveLane().catch((error) => console.warn('[intro] arm on unlock failed', error));
     if (isVaultViewActive()) {
       await refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
         if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
@@ -30632,11 +30728,13 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     clearMessageAutoSyncTimer();
     clearVaultAutoRefreshTimer();
+    stopIntroReceiveLane();
     lockPlathoWalletForBackground();
   } else {
     clearTelegramBackgroundLockTimer();
     scheduleWalletUnlockPrompt();
     scheduleMessageAutoSync(2_000);
+    armIntroReceiveLane().catch((error) => console.warn('[intro] arm on visible failed', error));
     // Return-from-wallet-app: refresh a quick-start balance step so topped-up funds show right away.
     quickStartRefreshCurrentBalanceStep();
     if (isVaultViewActive()) {
