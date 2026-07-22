@@ -60,6 +60,17 @@ describe('INTRO capsule build/open round-trip (clean-16 hybrid first contact)', 
     await expect(openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, stranger.encryptionKeyPair, { enforceExpiry: false })).rejects.toThrow();
   });
 
+  it('INTRO-CAP-04: the object-open path works with DEFAULT options (no enforceExpiry footgun)', async () => {
+    // The canonical header1 sits in 1970, so a naive default enforceExpiry would throw 'expired'. INTRO opens must
+    // self-default enforceExpiry:false (INTRO expiry is not a client security boundary). [private-review #2]
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, { firstMessageBytes: utf8('без флага') });
+    const opened = await openEncryptedIntroCapsule(built, recipient.encryptionKeyPair);   // NO { enforceExpiry:false }
+    expect(hex(opened.kRoot)).toBe(hex(built.kRoot));
+    expect(fromUtf8(opened.firstMessageBytes)).toBe('без флага');
+  });
+
   it('INTRO-CAP-02: works with no first message (pure handshake)', async () => {
     const sender: any = await createMessagingIdentity();
     const recipient: any = await createMessagingIdentity();

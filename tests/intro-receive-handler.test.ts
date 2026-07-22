@@ -14,13 +14,21 @@ const hex = (b: Uint8Array): string => Buffer.from(b).toString('hex');
 const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s);
 const fromUtf8 = (b: Uint8Array): string => new TextDecoder().decode(b);
 
-/** Shape a built INTRO as what fetchIntroCapsule delivers: the two published cells (parsed from their BoC). */
-const asScanCapsule = (built: any, createdAt: number) => ({
+/** Shape a built INTRO as what fetchIntroCapsule delivers: the two published cells (parsed from their BoC) + the
+ *  CONTRACT-stamped created_at (the field name fetchIntroCapsule actually surfaces — the adoption ordering key). */
+const asScanCapsule = (built: any, created_at: number) => ({
   header0: parseBocBase64(built.chainCells.header0.boc),
   body: parseBocBase64(built.chainCells.body.boc),
   r: 0n,
   viewTag: built.header0.viewTag,
-  createdAt,
+  created_at,
+});
+
+/** The mandatory first-contact impersonation guard: resolves the sender's keyId to their LIVE registered key bundle. */
+const resolverFor = (sender: any) => async () => ({
+  signingPublicKey: sender.signingPublicKey,
+  x25519PublicKey: sender.encryptionKeyPair.x25519PublicKey,
+  mlKem768PublicKey: sender.encryptionKeyPair.mlKem768PublicKey,
 });
 
 describe('INTRO-RECEIVE-HANDLER', () => {
@@ -34,6 +42,7 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     const onIntro = createIntroReceiveHandler({
       recipientKeyPair: recipient.encryptionKeyPair,
       convKeyStore: store,
+      resolveVaultKeyRecord: resolverFor(sender),
       onFirstContact: (r: any) => { firstContact = r; },
     });
 
@@ -50,7 +59,7 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     const sender: any = await createMessagingIdentity();
     const recipient: any = await createMessagingIdentity();
     const store = createMemoryConvKeyStore();
-    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store });
+    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store, resolveVaultKeyRecord: resolverFor(sender) });
 
     // Two DISTINCT first contacts (each mints its own K_root). The later-created one must win regardless of order.
     const introA = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, {});
@@ -64,5 +73,22 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     const rec = store.getConversation(recipient.encryptionKeyPair.keyId, a.senderKeyId);
     expect(hex(rec.kRootCurrent), 'the newer-created intro root stays current').toBe(hex(introA.kRoot));
     expect(rec.kRootsForRead.length, 'the older root is kept only for decrypting its history').toBe(1);
+  });
+
+  it('IRH-03: the impersonation guard is MANDATORY — no resolver fails construction, a wrong record is rejected', async () => {
+    const recipient: any = await createMessagingIdentity();
+    const store = createMemoryConvKeyStore();
+    // (a) fail-closed: constructing the handler without the guard throws.
+    expect(() => createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store }))
+      .toThrow(/impersonation guard/i);
+
+    // (b) a forged first contact whose claimed sender does NOT match the live registered record is rejected, and
+    // nothing is stored — a stranger cannot impersonate someone into the recipient's conversation list.
+    const sender: any = await createMessagingIdentity();
+    const impostor: any = await createMessagingIdentity();
+    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, {});
+    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store, resolveVaultKeyRecord: resolverFor(impostor) });
+    await expect(onIntro(asScanCapsule(built, 100)), 'the handshake key must match the live record').rejects.toThrow();
+    expect(store.getConversation(recipient.encryptionKeyPair.keyId, sender.encryptionKeyPair.keyId), 'nothing stored for a rejected forgery').toBeNull();
   });
 });
