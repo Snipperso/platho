@@ -50,6 +50,14 @@ export const INTRO_PUBLISH_VALUE = 17_810_000n;
 export const RECOVERY_PUBLISH_VALUE = 37_000_000n;
 
 /**
+ * KS_MIN_REGISTER_VALUE — what a FIRST KeyShard register must bring (gate 22110): KS_BASE_ENDOWMENT (45_000_000, the
+ * account's rent float, reserved and held) + KS_REGISTER_GAS (12_000_000) = 57_000_000. The shard reserves the base and
+ * mode-SendRemainingBalance returns the surplus, so a small margin over the floor (import fee headroom) is free — an
+ * overpay is refunded and a replace (min = KS_REGISTER_GAS) is amply covered by the same figure. Pinned by publish-price.test.ts.
+ */
+export const KEYSHARD_REGISTER_VALUE = 60_000_000n;
+
+/**
  * What to attach to a publish on the given lane. Takes no state and asks nothing of the chain, on purpose —
  * see the note above for why every state-derived rule is either an extra round trip or forgeable.
  */
@@ -57,7 +65,8 @@ export function publishValueFor(lane) {
   if (lane === 'conv') return CONV_PUBLISH_VALUE;
   if (lane === 'intro') return INTRO_PUBLISH_VALUE;
   if (lane === 'recovery') return RECOVERY_PUBLISH_VALUE;
-  throw new Error(`publishValueFor: unknown lane "${lane}" (expected "conv", "intro" or "recovery")`);
+  if (lane === 'keyshard-register') return KEYSHARD_REGISTER_VALUE;
+  throw new Error(`publishValueFor: unknown lane "${lane}" (expected "conv", "intro", "recovery" or "keyshard-register")`);
 }
 
 // PublicShard deploy figures per KIND (0 CHANNEL, 1 THREAD, 2 BEACON, 3 AVATAR) — PS_DEPLOY_MIN_VALUE. Same
