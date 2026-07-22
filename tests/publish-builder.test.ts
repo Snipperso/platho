@@ -218,8 +218,11 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect(at0.slotKey, 'index 0 and index 7 are different slots').not.toBe(built.slotKey);
     expect(addrKey(at0.to)).not.toBe(addrKey(built.to));
 
-    // the builder refuses an index the recovery scan would never probe, before any money moves
-    await expect(buildRecoveryPublish({ seed, slotIndex: 256, seq: 1, h0: 0x1n, h1: 0x2n, body: blob, value: toNano('0.05') }))
+    // a NAMED slot (256, the first above the scan range) IS accepted now (gate 13576 widened for read-by-address slots)
+    const named = await buildRecoveryPublish({ seed, slotIndex: 256, seq: 1, h0: 0x1n, h1: 0x2n, body: blob, value: toNano('0.05') });
+    expect(named.to, 'the named prefs slot 256 builds').toBeTruthy();
+    // but an index at/above the top of the named block (272) is refused before any money moves
+    await expect(buildRecoveryPublish({ seed, slotIndex: 272, seq: 1, h0: 0x1n, h1: 0x2n, body: blob, value: toNano('0.05') }))
       .rejects.toThrow(/slotIndex/);
     await expect(buildRecoveryPublish({ seed, seq: 1, h0: 0x1n, h1: 0x2n, body: blob, value: toNano('0.05') } as any))
       .rejects.toThrow(/slotIndex/);
