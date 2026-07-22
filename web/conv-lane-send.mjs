@@ -9,8 +9,17 @@
 //
 // DIRECT-PAY, no Vault, no CapsuleHub. clean-15 sent an EXTERNAL message to the user's Vault, which relayed it; clean-17
 // sends an INTERNAL message from the user's own wallet straight to the RecordShard, StateInit attached so the shard
-// deploys lazily on the first publish of the epoch. The write key (not the sender wallet) is the shard's identity, so
-// the wallet is only the payer — the conversation stays unlinkable to the payer on-chain.
+// deploys lazily on the first publish of the epoch. The write key (not the sender wallet) is the shard's identity —
+// the wallet is only the payer.
+//
+// WHAT STAYS PRIVATE, PRECISELY (do NOT overstate — RecordShard.tact says it plainly: "ADDRESS PRIVACY IS NOT
+// AUTHORIZATION", and a chain observer reads the spend tx's src). The payer wallet is NOT hidden from its OWN outgoing
+// conversation-direction: the publish tx src is the wallet, and RecordShard forwards a DepositCapsuleFee to the global
+// fee sink carrying publisher=sender() alongside init_arg0=write_pubkey in cleartext — so wallet↔own-direction (write
+// key + epoch) is public and network-harvestable. What the design DOES protect is the who-talks-to-whom GRAPH: the two
+// directions of a conversation (P_ab, P_ba) are independent HKDF(K_epoch) outputs, unlinkable without the shared K_root,
+// so an observer sees a wallet publishing into some direction but never its counterparty. Graph unlinkability is the
+// property the lane relies on; payer-direction unlinkability is NOT claimed. [conv-privacy-core]
 //
 // TWO THINGS ARE LOAD-BEARING, both silent if wrong (identical to public/intro):
 //   * StateInit MUST be attached (a RecordShard is new every epoch and deployed lazily).
