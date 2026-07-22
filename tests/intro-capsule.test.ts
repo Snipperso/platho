@@ -4,6 +4,7 @@ import {
   exportPublicKeyBundle,
   createEncryptedIntroCapsule,
   openEncryptedIntroCapsule,
+  openIntroCapsuleFromChainCells,
   introCapsuleHeader0Bytes,
   CAPSULE_PUBLISH_KIND,
 } from '../web/crypto/platho-crypto.mjs';
@@ -31,6 +32,32 @@ describe('INTRO capsule build/open round-trip (clean-16 hybrid first contact)', 
     expect(hex(opened.senderSigningPublicKey)).toBe(hex(sender.signingPublicKey));
     expect(Buffer.from(opened.senderKeyId).toString('base64url')).toBe(sender.encryptionKeyPair.keyId);
     expect(fromUtf8(opened.firstMessageBytes)).toBe('первое сообщение');
+  });
+
+  it('INTRO-CAP-CHAIN: opened from the 2-CELL on-chain form (canonical header1) derives the SAME K_root', async () => {
+    // This is the fix that makes INTRO RECEIVE possible. IntroPublish stores only ^header_0 ^body — header1 is NOT
+    // published, to keep the stealth first-contact entry minimal. The recipient reconstructs the CANONICAL header1
+    // (introCanonicalHeader1) and opens from just those two cells; if header1 were per-message it could never be
+    // recovered and receive would be dead. [OWNER 2026-07-22: the "do it right" fix, canonicalise not publish.]
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, { firstMessageBytes: utf8('через цепь') });
+
+    // exactly what fetchIntroCapsule surfaces from the shard: the two published cells' bytes, nothing else. The snake
+    // payload stores its bytes as base64url chunks (concatenated = the on-chain cell content).
+    const bytesOf = (p: any): Uint8Array => Buffer.concat(p.chunks.map((c: string) => Buffer.from(c, 'base64url')));
+    const header0Bytes = bytesOf(built.chainCells.header0);
+    const bodyBytes = bytesOf(built.chainCells.body);
+
+    const opened = await openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, recipient.encryptionKeyPair, { enforceExpiry: false });
+    expect(hex(opened.kRoot), 'recipient derives the SAME pairwise K_root from 2 cells').toBe(hex(built.kRoot));
+    expect(hex(opened.senderEncPublicKey)).toBe(hex(sender.encryptionKeyPair.x25519PublicKey));
+    expect(Buffer.from(opened.senderKeyId).toString('base64url')).toBe(sender.encryptionKeyPair.keyId);
+    expect(fromUtf8(opened.firstMessageBytes)).toBe('через цепь');
+
+    // a stranger cannot open the chain form either (decrypt fails on the wrong recipient key)
+    const stranger: any = await createMessagingIdentity();
+    await expect(openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, stranger.encryptionKeyPair, { enforceExpiry: false })).rejects.toThrow();
   });
 
   it('INTRO-CAP-02: works with no first message (pure handshake)', async () => {
