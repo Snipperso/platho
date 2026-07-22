@@ -45,9 +45,13 @@ describe('CONV-REPLY-BUNDLE (Y: resolve + verify the peer bundle from their KeyS
     const view = keyShardViewFor(peer);
     const bundle = await resolvePeerBundleFromKeyShardView(view, peer.encryptionKeyPair.keyId);
     expect(bundle.keyId, 'the resolved bundle reproduces the pairwise keyId').toBe(peer.encryptionKeyPair.keyId);
-    // and it carries the full hybrid material a CONV seal needs (enc + ML-KEM), decoded from the snake cell.
+    // and it carries the full hybrid material (enc + ML-KEM, decoded from the snake cell) AND the stealth scan pubkey —
+    // scan is not needed for a CONV reply (bucketKey routing) but IS required if the initiator reuses this to seal an
+    // INTRO (view_tag). A complete bundle carries it. [conv-reply-bundle review]
     expect(bundle.x25519PublicKey, 'enc key present').toBeTruthy();
     expect(bundle.mlKem768PublicKey, 'ML-KEM key present (snake decoded)').toBeTruthy();
+    expect(bundle.scanPublicKey, 'stealth scan key present (needed for an INTRO seal)').toBe(
+      Buffer.from(peer.scanPublicKey).toString('base64url'));
   });
 
   it('CRB-02: a view for a DIFFERENT identity is REFUSED (keyId mismatch — wrong/hostile source)', async () => {
