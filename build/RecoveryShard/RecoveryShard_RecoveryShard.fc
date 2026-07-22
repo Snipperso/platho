@@ -394,7 +394,7 @@ _ %get_body() method_id(104539) {
         int $wasUnbound = (~ $self'bound);
         ifnot ($self'bound) {
             throw_unless(13573, ($msg'seq > $self'seq));
-            throw_unless(13576, ( (($msg'slot_index >= 0)) ? (($msg'slot_index < 256)) : (false) ));
+            throw_unless(13576, ( (($msg'slot_index >= 0)) ? (($msg'slot_index < 272)) : (false) ));
             throw_unless(13575, ($self'self_bucket_key == ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)~$RecoveryShard$_fun_slotKeyForOwner($msg'owner_pubkey, $msg'slot_index)));
             $self'bound = true;
             $self'owner_pubkey = $msg'owner_pubkey;

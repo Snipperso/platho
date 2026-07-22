@@ -292,7 +292,7 @@ PROGRAM{
         THROWANYIFNOT
         13576 PUSHINT
         s8 PUSH
-        8 PUSHPOW2
+        272 PUSHINT
         LESS
         THROWANYIFNOT
         13575 PUSHINT

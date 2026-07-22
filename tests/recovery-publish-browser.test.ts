@@ -122,4 +122,29 @@ describe('RECOVERY-PUBLISH-BROWSER — the same owner-signed recovery record, bu
     // and a wrong seed cannot open the on-chain blob.
     await expect(openRecoveryBlob(new Uint8Array(32).fill(0x01), parseBocBase64(storedBody.toBoc().toString('base64')))).rejects.toThrow();
   }, 240_000);
+
+  it('REC-04: a NAMED slot (index 256, the prefs slot) is ACCEPTED by the real RecoveryShard (gate 13576 widened)', async () => {
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    await deployFeeSink(bc, { funderSeed: 'rec-04-sink' });
+    const payer = await bc.treasury('rec-04-payer');
+
+    // slot 256 is the first NAMED slot — above the [0,256) conversation scan range. A restoring client reads it by its
+    // fixed derivation, so it is reachable, and the contract now accepts it (13576 allows [0, RS_MAX_SLOTS+RS_NAMED_SLOTS)).
+    const body = cellOf(0x5c, 200);
+    const built = await buildRecoveryPublishBrowser({ seed: SEED, slotIndex: 256, seq: 1, h0: H0, h1: H1, body, value: toNano('0.05') });
+    const dest = Address.parseRaw(built.to);
+    const initCore = toCoreCell(built.init);
+    const res = await payer.send({
+      to: dest, value: built.value, body: toCoreCell(built.body),
+      init: { code: initCore.refs[0], data: initCore.refs[1] }, bounce: true,
+    } as any);
+    const tx: any = res.transactions.find((t: any) => t.inMessage?.info?.dest?.toString() === dest.toString());
+    expect(Number(tx?.description?.computePhase?.exitCode), 'the named prefs slot binds (was gate 13576 out-of-range before)').toBe(0);
+
+    const shard = bc.openContract(RecoveryShard.fromAddress(dest));
+    const view = await shard.getGetView();
+    expect(view.bound, 'the named slot is bound').toBe(true);
+    expect(view.self_bucket_key, 'the shard is at the derived named-slot key').toBe(built.slotKey);
+  }, 240_000);
 });

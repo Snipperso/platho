@@ -24,6 +24,13 @@ const RECOVERY_BLOB_SALT = 'PLATHO.RECOVERY.BLOB.SALT.V1';
 const RECOVERY_BLOB_INFO = 'PLATHO.RECOVERY.BLOB.KEY.V1';
 const RECOVERY_BLOB_H0_DOMAIN = 'PLATHO.RECOVERY.BLOB.V1';
 const RECOVERY_BLOB_SEAL_DOMAIN = 'PLATHO.RECOVERY.BLOB.SEAL.V1';
+// Prefs live in a NAMED RecoveryShard slot (a separate blob at a separate address from any conversation slot). The
+// SAME salt anchors the HKDF, but a DISTINCT info string domain-separates the prefs blob key from the conversation
+// recovery key — a wrong seed still fails, and the two blobs can never be cross-decrypted even under the same seed.
+const PREFS_BLOB_INFO = 'PLATHO.PREFS.BLOB.KEY.V1';
+const PREFS_BLOB_H0_DOMAIN = 'PLATHO.PREFS.BLOB.V1';
+const PREFS_BLOB_SEAL_DOMAIN = 'PLATHO.PREFS.BLOB.SEAL.V1';
+const PREFS_SEAL_VERSION = 1;
 const AES_GCM_NONCE_BYTES = 12;
 const SEAL_VERSION = 2;   // v2 = compact record form (v1 was the full conv record)
 
@@ -125,4 +132,52 @@ export async function openRecoveryBlob(seed, body) {
   const payload = JSON.parse(fromUtf8(new Uint8Array(plaintext)));
   if (payload?.version !== SEAL_VERSION) return new Map();
   return deserializeRecoveryMap(payload.map);
+}
+
+// ── prefs blob (the named-slot self-data: raw prefs snapshot bytes, sealed under the seed) ─────────────────────────
+const prefsSealAad = () => utf8(JSON.stringify({ domain: PREFS_BLOB_SEAL_DOMAIN, version: PREFS_SEAL_VERSION }));
+
+/** The AES-GCM prefs blob key from the seed — domain-separated from recoveryBlobKey via a distinct HKDF info string. */
+async function prefsBlobKey(seed) {
+  const ikm = seed instanceof Uint8Array ? seed : Uint8Array.from(seed);
+  const material = await cryptoApi().subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  const bits = await cryptoApi().subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: utf8(RECOVERY_BLOB_SALT), info: utf8(PREFS_BLOB_INFO) }, material, 256);
+  return cryptoApi().subtle.importKey('raw', bits, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+/**
+ * Seal the prefs snapshot BYTES (opaque to this layer — the caller's serializePrefsSnapshotBytes) into the named-slot
+ * recovery body. Returns { body (snake cell), h0, h1 } exactly like sealRecoveryBlob, so buildRecoveryPublishBrowser
+ * publishes it identically — only the slot index (the prefs named slot) and the blob key differ.
+ */
+export async function sealPrefsBlob(seed, prefsBytes) {
+  const key = await prefsBlobKey(seed);
+  const nonce = cryptoApi().getRandomValues(new Uint8Array(AES_GCM_NONCE_BYTES));
+  const plain = prefsBytes instanceof Uint8Array ? prefsBytes : Uint8Array.from(prefsBytes ?? []);
+  const ciphertext = await cryptoApi().subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce, additionalData: prefsSealAad(), tagLength: 128 }, key, plain);
+  const record = { version: PREFS_SEAL_VERSION, alg: 'AES-256-GCM', nonce: b64(nonce), ciphertext: b64(new Uint8Array(ciphertext)) };
+  const bytes = utf8(JSON.stringify(record));
+  return {
+    body: tonCell.snakeCellFromBytes(bytes, 'prefs blob'),
+    h0: await sha256Big(utf8(PREFS_BLOB_H0_DOMAIN)),   // fixed prefs version-domain marker (non-zero, ≠ recovery h0)
+    h1: await sha256Big(bytes),                        // blob content hash (non-zero)
+  };
+}
+
+/** Open a prefs body (snake cell from the named slot) to the raw prefs snapshot bytes, using the seed. Returns null for
+ *  a wrong seed / missing / foreign / unsupported record (the caller then keeps its local prefs untouched). */
+export async function openPrefsBlob(seed, body) {
+  try {
+    const bytes = tonCell.readSnakeCellBytes(body, { name: 'prefs blob' });
+    const record = JSON.parse(fromUtf8(bytes));
+    if (record?.version !== PREFS_SEAL_VERSION || record.alg !== 'AES-256-GCM' || !record.ciphertext) return null;
+    const key = await prefsBlobKey(seed);
+    const plaintext = await cryptoApi().subtle.decrypt(
+      { name: 'AES-GCM', iv: unb64(record.nonce), additionalData: prefsSealAad(), tagLength: 128 }, key, unb64(record.ciphertext));
+    return new Uint8Array(plaintext);
+  } catch {
+    return null;   // wrong seed (GCM tag fail) or a malformed body — never throw into the restore path
+  }
 }
