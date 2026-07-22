@@ -37,6 +37,11 @@ export async function resolvePeerBundleFromKeyShardView(view, peerKeyId) {
     revoked_lt: 0n,
     enc_pubkey: view.enc_pubkey,
     sign_pubkey: view.sign_pubkey,
+    // Carry scan_pubkey so the bundle is COMPLETE. A CONV reply seal (createEncryptedConvCapsule) routes by bucketKey
+    // and does NOT need it — but the INITIATOR reuses this resolver, and an INTRO seal (createEncryptedIntroCapsule)
+    // DOES require the recipient's scan key for the stealth view_tag. Omitting it left a bundle that silently could not
+    // seal an INTRO. scan_pubkey is public and sits right in the view (stack idx 7). [conv-reply-bundle review]
+    scan_pubkey: view.scan_pubkey,
     crypto_suite_mask: view.crypto_suite_mask,
     pq_kem_pubkey_len: view.pq_kem_pubkey_len,
     pq_kem_pubkey_hash: view.pq_kem_pubkey_hash,
