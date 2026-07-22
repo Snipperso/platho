@@ -182,6 +182,7 @@ import { outgoingRecordShard } from './conv-discovery.mjs?v=1';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
 import { createConvReadLane } from './conv-lane.mjs?v=1';
+import { createRecordShardLastSeqReader } from './conv-lane-read.mjs?v=1';
 import { createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
 // clean-17 first-contact (INTRO) send.
@@ -29384,6 +29385,17 @@ async function attemptConvMessagePublishDirect(context) {
   const createdAtSec = Math.floor(Date.now() / 1000);
   const route = await outgoingRecordShard({ kRoot: rec.kRootCurrent, selfKeyId, peerKeyId, createdAtSec });
 
+  // COLD-START SEQ FLOOR. If the local monotonic counter has no value for this (conversation, epoch) — the first send
+  // of the day, or a reinstall that restored the K_root but not the per-epoch seq — seed it from the shard's on-chain
+  // last_seq, or the send would reuse a seq already committed and bounce gate 13653. Only one read, only on that first
+  // send; a fresh shard reads 0. [recovery-wiring review #0]
+  let coldFloor = 0;
+  if (rec.outgoingSeq?.[route.epoch] === undefined) {
+    try {
+      coldFloor = await createRecordShardLastSeqReader((call) => transport.runGetMethod(call))(route.address);
+    } catch (error) { if (!noteTonRpcRateLimit(error)) console.warn('[conv] last_seq cold-floor read failed, using 0', error); }
+  }
+
   // Seal each part as a CONV capsule and assign a strictly-increasing outgoing seq (local monotonic counter — the
   // chain last_seq is only a cold-start floor, so two fast messages cannot collide on the same seq).
   const streamId = randomBytes(16);
@@ -29399,7 +29411,7 @@ async function attemptConvMessagePublishDirect(context) {
       payloadBytes, sizeClass: part.sizeClass, senderRecovery: true, now: createdAtSec * 1000,
       ...currentProfilePointerFields(),
     });
-    const seq = await convKeyStore.nextOutgoingSeq(selfKeyId, peerKeyId, route.epoch, 0);
+    const seq = await convKeyStore.nextOutgoingSeq(selfKeyId, peerKeyId, route.epoch, coldFloor);
     parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE });
   }
 

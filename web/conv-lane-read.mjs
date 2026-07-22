@@ -16,6 +16,7 @@
 // (derived from the shared K_root), so this authenticates the transport, not the message content.
 
 import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=33';
+import { toWireAddress } from './shard-reader.mjs?v=1';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 // MUST equal conv-publish-browser + RecordShard.tact — mirrored (not imported) so a drift is caught by the round-trip
@@ -137,6 +138,32 @@ async function convFrameCommit(header0, header1, body) {
     .uint(await cellHashBig(body), 256, 'body hash')
     .endCell();
   return cellHashBig(cell);
+}
+
+/** Decode a RecordShardView getter stack to its last_seq (index 2: [write_pubkey, epoch, last_seq, record_count, …]).
+ *  An arity check guards the same silent field-shift drift the other lanes learned the hard way. */
+export function decodeRecordShardLastSeq(stack) {
+  if (!Array.isArray(stack) || stack.length < 3) {
+    throw new Error(`RecordShard get_view returned ${stack?.length ?? 0} stack items, expected >= 3`);
+  }
+  return Number(BigInt(stack[2]?.value ?? 0));
+}
+
+/**
+ * Read a RecordShard's on-chain last_seq (the publish anti-rollback floor, gate 13653) via get_view. Used as the CONV
+ * outgoing-seq COLD-START floor when the local monotonic counter has no value for a (conversation, epoch) — e.g. after
+ * a reinstall that restored the K_root but not the per-epoch seq: without it the first sends of the day would reuse
+ * seqs already committed on chain and bounce. An absent/uninitialised shard means nothing was published → floor 0.
+ * [recovery-wiring review #0]
+ */
+export function createRecordShardLastSeqReader(runGetMethod) {
+  if (typeof runGetMethod !== 'function') throw new Error('createRecordShardLastSeqReader requires runGetMethod');
+  return async (address) => {
+    const raw = await runGetMethod({ address: toWireAddress(address), method: 'get_view', stack: [] });
+    if (!raw || raw.exit_code === -256) return 0;                        // shard not deployed → nothing published
+    if (raw.exit_code !== 0) throw new Error(`RecordShard get_view failed with exit_code ${raw.exit_code}`);
+    return decodeRecordShardLastSeq(raw.stack);
+  };
 }
 
 /**
