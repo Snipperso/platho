@@ -38,10 +38,14 @@ const RECOVERY_SLOT_DOMAIN = 0x52534C4Bn;
 
 // MUST equal RS_MAX_SLOTS in RecoveryShard.tact; mirrored here for the same independence reason as the domain.
 const RECOVERY_MAX_SLOTS = 256;
+// MUST equal RS_NAMED_SLOTS in RecoveryShard.tact — the named durable slots above the scan range (prefs at 256). This
+// reference builder cross-checks the browser derivation over the WHOLE range the contract accepts (gate 13576), so its
+// bound must track the contract's, not the old scan-only ceiling.
+const RECOVERY_NAMED_SLOTS = 16;
 
 const recoveryOwnerSlotKey = (ownerPublicKey, slotIndex) => {
-  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= RECOVERY_MAX_SLOTS) {
-    throw new Error(`buildRecoveryPublish: slotIndex must be an integer in [0, ${RECOVERY_MAX_SLOTS}), got ${slotIndex}`);
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= RECOVERY_MAX_SLOTS + RECOVERY_NAMED_SLOTS) {
+    throw new Error(`buildRecoveryPublish: slotIndex must be an integer in [0, ${RECOVERY_MAX_SLOTS + RECOVERY_NAMED_SLOTS}), got ${slotIndex}`);
   }
   return BigInt('0x' + beginCell()
     .storeUint(RECOVERY_SLOT_DOMAIN, 32)

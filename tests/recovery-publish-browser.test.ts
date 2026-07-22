@@ -37,7 +37,7 @@ const toCoreCell = (c: any) => Cell.fromBase64(Buffer.from(serializeBoc(c)).toSt
 
 describe('RECOVERY-PUBLISH-BROWSER — the same owner-signed recovery record, built without @ton/core', () => {
   it('REC-01: address, body, StateInit and slotKey are identical to the reference builder', async () => {
-    for (const slotIndex of [0, 3, 255]) {
+    for (const slotIndex of [0, 3, 255, 256]) {   // 256 = the first NAMED slot (prefs) — cross-pin the widened range too
       const body = cellOf(0x40 + slotIndex, 200);
       const reference = await buildRecoveryPublish({ seed: SEED, slotIndex, seq: 1, h0: H0, h1: H1, body: asCore(body), value: toNano('0.05') });
       const browser = await buildRecoveryPublishBrowser({ seed: SEED, slotIndex, seq: 1, h0: H0, h1: H1, body, value: toNano('0.05') });
