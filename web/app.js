@@ -29175,8 +29175,8 @@ async function attemptIntroFirstContactDirect(context) {
   // indexer lag right after broadcast; if still not visible, adopt a provisional time and log (re-INTRO ordering, an
   // edge case, is the only thing at risk — a proper confirm driver is the follow-up).
   let createdAtSec = null;
-  for (let attempt = 0; attempt < 3 && createdAtSec === null; attempt += 1) {
-    if (attempt > 0) await delay(1500);
+  for (let attempt = 0; attempt < 6 && createdAtSec === null; attempt += 1) {
+    if (attempt > 0) await delay(Math.min(1000 * attempt, 4000));
     try {
       const confirmed = await confirmIntroCreatedAt({
         readEntry, epoch: slot.epoch, bucket: slot.bucket, fromEntryId: slot.expectedEntryId, r: result.r, viewTag: result.viewTag,
@@ -29185,8 +29185,14 @@ async function attemptIntroFirstContactDirect(context) {
     } catch (error) { if (!noteTonRpcRateLimit(error)) console.warn('[intro] created_at confirm read failed', error); }
   }
   if (createdAtSec === null) {
-    createdAtSec = Math.floor(Date.now() / 1000);
-    console.warn('[intro] contract created_at not yet visible — adopting a provisional time (re-INTRO ordering may drift for this conversation)');
+    // FAIL CLOSED — never a local clock. adoptKRoot orders re-INTRO by createdAt, and the recipient stores the CONTRACT
+    // created_at; if the sender kept Date.now() and the two later disagreed on which re-INTRO is newest, the conversation
+    // would SILENTLY, PERMANENTLY fork. The INTRO is already on chain (the recipient receives it regardless), so we do
+    // NOT establish the conversation here — a resend confirms the contract time. (No-re-mint idempotent resend is the
+    // send-retry-hardening follow-up mandated before the flag flips.) [intro-send review; reintro-kroot-adoption-invariant]
+    const error = new Error('INTRO published, but its on-chain time is not yet visible — resend to establish the conversation');
+    error.code = 'INTRO_CREATED_AT_UNCONFIRMED';
+    throw error;
   }
 
   // Adopt the minted K_root under (self, peer) so CONV send/receive work; stamp the thread so the next message is CONV.
