@@ -29335,13 +29335,64 @@ const DIRECT_SEND_REBROADCAST_WINDOW_MS = 330_000;
 function markDirectSendPublished(thread, message) {
   clearPrivateSendRetry(message);
   clearPrivateMessageManualRecovery(message);
-  message.meta = 'published';        // terminal-delivered (green). A shard-read confirm driver is a follow-up.
+  message.meta = 'published';        // optimistically green; a background shard-read (below) confirms it or fails it.
   message.privateManualRetryAvailable = false;
   message.privateCancelAvailable = false;
   thread.state = 'sealed';
   refreshThreadAfterMessageChange(thread);
   updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
   refreshMessagingControls();
+}
+
+// CONV DELIVERY CONFIRM. markDirectSendPublished marks a send green on toncenter ACCEPTANCE, which is not the same as
+// on-chain landing: a stale-seqno bounce or a seqno raced away by a concurrent send would leave a false-green. This
+// reads the target RecordShard's last_seq to VERIFY the publish landed. If it has not yet, and the signed external is
+// still valid, it re-broadcasts (idempotent — a no-op if it actually landed). Past the re-broadcast window it stops:
+// the external is dead, so a still-missing publish genuinely failed → fail visibly (the user resends, which rebuilds a
+// fresh external + a new seq — safe, the old one can no longer run). INTRO needs none of this — its created_at read-back
+// already blocks establishment until the entry is confirmed on chain. [send-hardening review — confirm-driver residual]
+const CONV_CONFIRM_DELAYS_MS = [20_000, 60_000, 340_000];   // last is PAST DIRECT_SEND_REBROADCAST_WINDOW_MS (330s)
+function scheduleConvDeliveryConfirm(thread, message, attempt = 0) {
+  const delay = CONV_CONFIRM_DELAYS_MS[attempt];
+  if (delay === undefined || !message?.convDirectSend?.address) return;
+  setTimeout(() => {
+    confirmConvDeliveryOnce(thread, message, attempt).catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[conv] delivery confirm failed', error); });
+  }, delay);
+}
+async function confirmConvDeliveryOnce(thread, message, attempt) {
+  const sent = message?.convDirectSend;
+  if (!sent?.address || sent.seq == null || !thread?.messages?.includes(message)) return;   // resolved / cancelled — stop
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) { scheduleConvDeliveryConfirm(thread, message, attempt); return; }   // no transport — retry this step
+  let lastSeq = null;
+  try {
+    lastSeq = await createRecordShardLastSeqReader((call) => transport.runGetMethod(call))(sent.address);
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[conv] delivery confirm read failed', error);
+    scheduleConvDeliveryConfirm(thread, message, attempt);   // transient read failure — retry the SAME step, do not advance
+    return;
+  }
+  if (lastSeq !== null && lastSeq >= Number(sent.seq)) { message.convDirectSend = null; return; }   // CONFIRMED on chain
+  // Not landed yet. Within the external's validity, RE-BROADCAST (idempotent — a no-op if it actually landed): heals a
+  // transient non-landing whose external is still alive, without any double-publish risk.
+  if ((Date.now() - sent.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS && sent.boc && transport?.sendBoc && plathoWallet?.address) {
+    try { await transport.sendBoc({ boc: sent.boc, walletAddress: plathoWallet.address }); } catch { /* best-effort re-broadcast */ }
+  }
+  if (attempt + 1 < CONV_CONFIRM_DELAYS_MS.length) { scheduleConvDeliveryConfirm(thread, message, attempt + 1); return; }
+  // Exhausted, past the window, still not on chain → the external is dead (seqno consumed elsewhere, or expired). The
+  // optimistic green was wrong: fail visibly so the user resends.
+  message.convDirectSend = null;
+  markConvDeliveryFailed(thread, message);
+}
+function markConvDeliveryFailed(thread, message) {
+  if (!thread?.messages?.includes(message)) return;
+  message.meta = 'not sent';
+  message.convDirectDeliveryFailed = true;
+  thread.state = 'blocked';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
 }
 
 // FIRST CONTACT vs ESTABLISHED. A thread with no adopted conversation (no convPeerKeyId) is a not-yet-introduced peer:
@@ -29428,20 +29479,25 @@ async function attemptConvMessagePublishDirect(context) {
     parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE });
   }
 
+  // address + top seq let a background read CONFIRM the publish actually landed (the shard's last_seq >= our seq): all
+  // parts ride one shard (the route) with consecutive seqs, so the highest confirms them all. [conv delivery confirm]
+  const confirmAddress = route.address;
+  const confirmSeq = parts[parts.length - 1]?.seq ?? 0;
   let result;
   try {
     result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
-    message.convDirectSend = { boc: result?.result?.boc ?? null, at: Date.now() };
+    message.convDirectSend = { boc: result?.result?.boc ?? null, at: Date.now(), address: confirmAddress, seq: confirmSeq };
   } catch (error) {
     // Capture the signed external even on an AMBIGUOUS broadcast throw, so the retry re-broadcasts it (never rebuilds/
     // re-seals/re-bumps the seq). Without this a transient sendBoc failure whose external actually landed would
     // double-publish on the next attempt.
-    if (!message.convDirectSend?.boc && error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, at: Date.now() };
+    if (!message.convDirectSend?.boc && error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, at: Date.now(), address: confirmAddress, seq: confirmSeq };
     throw error;
   }
 
   globalThis.plathoLastConvDirectSend = { peerKeyId, epoch: route.epoch, parts: parts.length, to: result?.parts?.[0]?.to ?? null };
   markDirectSendPublished(thread, message);
+  scheduleConvDeliveryConfirm(thread, message);   // verify on chain that the publish landed; heal / fail-visibly if not
   return result;
 }
 
