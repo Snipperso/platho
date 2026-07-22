@@ -179,6 +179,9 @@ import { createMemoryConvKeyStore } from './conv-key-store.mjs?v=1';
 import { outgoingRecordShard } from './conv-discovery.mjs?v=1';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
+import { createConvReadLane } from './conv-lane.mjs?v=1';
+import { createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
+import { epochFromCreatedAtSeconds } from './crypto/conv-routing.mjs?v=1';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -13533,7 +13536,107 @@ function privateSyncStatusText(result) {
   return result.imported > 0 ? t('sync.newMessages') : t('sync.upToDate');
 }
 
+// The thread a decrypted CONV message belongs to, keyed on the peer's messaging keyId (the same convPeerKeyId
+// handleIntroFirstContact stamped on the INTRO-receive thread). Created if a message somehow arrives before the INTRO
+// thread does (defensive — the K_root is adopted from that INTRO, so normally the thread already exists).
+function resolveConvReceiveThread(peerKeyIdB64) {
+  let thread = threads.find((item) => item.convPeerKeyId === peerKeyIdB64);
+  if (thread) return thread;
+  const created = createInboundPeerThread({ senderKeyId: peerKeyIdB64, keyId: peerKeyIdB64, label: null });
+  thread = threads.find((item) => item.id === created.id) ?? created;
+  if (!threads.includes(thread)) threads.push(thread);
+  thread.convPeerKeyId = peerKeyIdB64;
+  return thread;
+}
+
+// Merge a conversation's freshly-decrypted capsules into a thread. Groups by streamId so a multipart message is
+// reassembled (appendOpenedPrivatePartsMessage); a single-part message is its own group. Both appends dedup by
+// capsule id, so re-reading the acceptance window on the next tick adds nothing. An incomplete multipart (some parts
+// not yet on chain / not yet in the window) is held for a later tick rather than rendered as fragments.
+async function appendConvOpenedCapsules(collected, targetThread) {
+  if (collected.length === 0) return 0;
+  const groups = new Map();
+  for (const item of collected) {
+    const payload = item.opened?.payload;
+    const key = String(payload?.streamId ?? payload?.stream_id ?? item.opened?.capsule?.id ?? '');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  let appended = 0;
+  for (const parts of groups.values()) {
+    const partCount = Number(parts[0]?.opened?.payload?.partCount ?? 1);
+    try {
+      if (partCount > 1) {
+        if (parts.length < partCount) continue; // incomplete — wait for the remaining parts on a later tick
+        if (await appendOpenedPrivatePartsMessage(parts, targetThread, 'received')) appended += 1;
+      } else if (await appendOpenedCapsuleMessage(parts[0].opened, targetThread, 'received', parts[0].entry)) {
+        appended += 1;
+      }
+    } catch (error) {
+      console.warn('[conv] append failed', error);
+    }
+  }
+  return appended;
+}
+
+// clean-17 CONV receive (gated). For every conversation whose K_root is in the store, read its incoming RecordShards
+// (K_root → bucketKey → addresses, zero index), decrypt each published capsule to the recipient's keys, and merge into
+// the SAME thread seam the CapsuleHub sync uses. Replaces getPrivateRecipientIndex/SenderIndex (a clean-15 concept)
+// with the bucketKey batch read. Idempotent: appendConvOpenedCapsules dedups by capsule id.
+async function syncConvCapsulesFromShards() {
+  if (!localRecipientKeyPair || !convKeyStore) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
+  const transport = globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
+  const selfKeyId = localRecipientKeyPair.keyId;
+  const lane = createConvReadLane({ readMessagesWithSource: createShardMessagesWithSourceReader() });
+  const epochNow = epochFromCreatedAtSeconds(Math.floor(Date.now() / 1000));
+  let imported = 0;
+  let skipped = 0;
+  let conversations = 0;
+  let rateLimited = false;
+  for (const record of convKeyStore.snapshot().values()) {
+    if (!record?.kRootCurrent || !record?.peerKeyId) continue;
+    conversations += 1;
+    const peerKeyId = record.peerKeyId;
+    const targetThread = resolveConvReceiveThread(introKeyIdString(peerKeyId));
+    // The current root plus any retired roots (a re-INTRO minted a new K_root; old messages still in the window
+    // decrypt under the retired one). kRootsForRead holds { kRoot, adoptedAt }.
+    const roots = [record.kRootCurrent, ...(record.kRootsForRead ?? []).map((entry) => entry.kRoot)];
+    const collected = [];
+    for (const kRoot of roots) {
+      let entries;
+      try {
+        entries = await lane.readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow });
+      } catch (error) {
+        if (noteTonRpcRateLimit(error)) rateLimited = true;
+        else console.warn('[conv] incoming shard read failed', error);
+        continue;
+      }
+      for (const found of entries) {
+        let opened;
+        try {
+          opened = await openPrivateCapsuleChainEntry(found.entry, localRecipientKeyPair, { enforceExpiry: false });
+        } catch (error) {
+          if (isPrivateUnreadableCapsuleError(error)) { skipped += 1; continue; }
+          if (noteTonRpcRateLimit(error)) rateLimited = true;
+          else console.warn('[conv] capsule open failed', error);
+          continue;
+        }
+        collected.push({ opened, entry: { entry_id: found.seq } });
+      }
+    }
+    imported += await appendConvOpenedCapsules(collected, targetThread);
+  }
+  if (imported > 0) { renderThreads(); renderConversation(); }
+  globalThis.plathoLastConvSync = { at: new Date().toISOString(), conversations, imported, skipped, epochNow, rateLimited };
+  return privateSyncResult({ ok: true, imported, skipped, scanComplete: true, rateLimited });
+}
+
 async function syncPrivateCapsulesFromChain(options = {}) {
+  // clean-17 direct-pay: the CapsuleHub recipient/sender index walk below is a clean-15 concept. Private receive now
+  // reads the conversation's RecordShards by bucketKey (K_root → addresses, no index) and decrypts into the same
+  // thread seam. Mirrors syncPublicChannelFromChain's top branch.
+  if (privateLaneDirectPayEnabled()) return syncConvCapsulesFromShards(options);
   if (!localRecipientKeyPair) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
