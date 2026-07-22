@@ -12,6 +12,7 @@ import {
   storeATHBurn,
   storeATHTransferRequest,
   storeATHTransferRequestWithNotify,
+  storeATHTransferRequestRegistryMintUsername,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import {
   storeFlushProfileBurnAthDue,
@@ -399,6 +400,30 @@ describe('PWA contract transaction builders', () => {
       avatar_part_count: 8n,
       media_format: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
     })).toThrow(/Unsupported ATHWallet message type/);
+  });
+
+  it('PWA-TX-06C: ATHTransferRequestRegistryMintUsername body matches the compiled Tact store (direct-pay mint)', () => {
+    const usernameBytes = new TextEncoder().encode('alice-01');
+    const payload = buildAthWalletMessageBody('ATHTransferRequestRegistryMintUsername', {
+      query_id: 21n,
+      amount: 100_000_000_000n,
+      recipient: USERNAME_REGISTRY,
+      response_destination: OWNER,
+      notify_value: 32_000_000n,
+      owner_wallet: OWNER,
+      username: usernameBytes,
+    });
+    expect(payload).toBe(generatedBody(storeATHTransferRequestRegistryMintUsername({
+      $$type: 'ATHTransferRequestRegistryMintUsername',
+      query_id: 21n,
+      amount: 100_000_000_000n,
+      recipient: Address.parseRaw(USERNAME_REGISTRY),
+      response_destination: Address.parseRaw(OWNER),
+      notify_value: 32_000_000n,
+      owner_wallet: Address.parseRaw(OWNER),
+      username_len: BigInt(usernameBytes.length),
+      username: beginCell().storeBuffer(Buffer.from(usernameBytes)).endCell().beginParse(),
+    })));
   });
 
   it('PWA-TX-06D: builds permissionless registry ATH burn flush messages', () => {

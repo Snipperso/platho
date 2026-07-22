@@ -18,6 +18,7 @@ export const ATH_WALLET_OPS = Object.freeze({
   ATHTransferRequest: 1096042512,
   ATHTransferRequestWithNotify: 1096042516,
   ATHTransferRequestRegistryProfileAvatar: 1096042522,   // 0x4154481A
+  ATHTransferRequestRegistryMintUsername: 1096042524,    // 0x4154481C
 });
 
 export const USERNAME_REGISTRY_OPS = Object.freeze({
@@ -1382,6 +1383,25 @@ export function buildAthWalletMessageBody(type, params = {}) {
           .uint(params.media_format, 8, 'media_format')
           .endCell(), 'avatar_ref')
         .toBocBase64();
+    // clean-17 DIRECT-PAY username mint: the user's OWN ATH wallet pays the UsernameRegistry directly (Vault-independent
+    // by design — UsernameRegistry.tact:588). Layout mirrors the compiled storeATHTransferRequestRegistryMintUsername
+    // EXACTLY — root: op|query_id|amount|recipient|response_destination|notify_value, then a REF with
+    // owner_wallet|username_len(8)|username(remaining ASCII bytes). `username` is the raw lowercase-ASCII byte array.
+    case 'ATHTransferRequestRegistryMintUsername': {
+      const usernameBytes = params.username instanceof Uint8Array ? params.username : new Uint8Array(params.username ?? []);
+      return beginAthWalletBody(ATH_WALLET_OPS.ATHTransferRequestRegistryMintUsername)
+        .uint(params.query_id, 64, 'query_id')
+        .uint(params.amount, 128, 'amount')
+        .address(params.recipient, 'recipient')
+        .address(params.response_destination, 'response_destination')
+        .uint(params.notify_value, 128, 'notify_value')
+        .ref(beginCell()
+          .address(params.owner_wallet, 'owner_wallet')
+          .uint(BigInt(usernameBytes.length), 8, 'username_len')
+          .bytesValue(usernameBytes, usernameBytes.length, 'username')
+          .endCell(), 'mint_ref')
+        .toBocBase64();
+    }
     default:
       throw new Error(`Unsupported ATHWallet message type ${type}`);
   }

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
+import { buildAthWalletMessageBody } from '../web/pwa-contract-transactions.mjs';
 import {
   UsernameRegistry,
   AthTransferNotificationRegistryMintUsername,
@@ -222,5 +223,34 @@ describe('UsernameRegistry integration with Vault-owned ATHWallet', () => {
     expect(global.pending_mint_count).toBe(0n);
     expect(global.treasury_due_ath).toBe(0n);
     expect(global.burn_due_ath).toBe(0n);
+  });
+
+  it('USERNAME-ATH-DIRECT-01: clean-17 direct-pay — the user\'s OWN ATH wallet mints via the BROWSER-built request (no Vault)', async () => {
+    const { blockchain, registry, user } = await setup();
+    const athMaster = fixtureAddress('USERNAME_VAULT_PATH_ATH_MASTER');   // same master setup() used
+    const username = 'directname';
+    const hash = nameHash(username);
+    // The user's OWN ATH jetton wallet (owner = the user), funded with ATH — this is who pays under direct-pay.
+    const userAthWallet = await deployAthWallet(blockchain, user.address, athMaster, PRICE_6_PLUS * 2n);
+
+    // Build the mint request with the SAME browser builder the client ships (byte-exact, pinned by PWA-TX-06C), at the
+    // clean-17 direct-pay values, and send it as a RAW body from the user to their own ATH wallet.
+    const payload = buildAthWalletMessageBody('ATHTransferRequestRegistryMintUsername', {
+      query_id: 77n,
+      amount: PRICE_6_PLUS,
+      recipient: registry.address.toRawString(),
+      response_destination: user.address.toRawString(),
+      notify_value: 1_000_000_000n,          // USERNAME_MINT_DIRECT_NOTIFY_VALUE
+      owner_wallet: user.address.toRawString(),
+      username: new TextEncoder().encode(username),
+    });
+    await user.send({ to: userAthWallet.address, value: 1_100_000_000n, body: Cell.fromBase64(payload) }); // USERNAME_MINT_DIRECT_REQUEST_VALUE
+
+    // The full direct-pay chain ran: user ATH wallet → registry's official ATH wallet → registry → UsernameNFTItem deploy.
+    const item = await readUsernameItem(blockchain, registry.address, hash);
+    expect(item.minted, 'the name minted from the user\'s own ATH wallet at the direct-pay values — no bounce, no Vault').toBe(true);
+    expect(item.state!.owner_wallet.equals(user.address), 'the user owns the minted name').toBe(true);
+    // The ATH left the user's wallet (price debited), proving the payment flowed from the user, not a relay.
+    expect((await userAthWallet.getGetWalletData()).balance).toBe(PRICE_6_PLUS);
   });
 });
