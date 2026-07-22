@@ -3,10 +3,10 @@
 // message) + recovery-transport (get_view seq / get_body) + conv-discovery (the slot addresses). app.js supplies the
 // wallet send and the get-method transport; this stays a testable seam against stub readers, like the other lanes.
 
-import { selfRecoveryShardSpace } from './conv-discovery.mjs?v=1';
-import { sealRecoveryBlob, openRecoveryBlob } from './recovery-blob.mjs?v=1';
+import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=1';
+import { sealRecoveryBlob, openRecoveryBlob, sealPrefsBlob, openPrefsBlob } from './recovery-blob.mjs?v=1';
 import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=1';
-import { RECOVERY_MAX_SLOTS } from './shard-discovery.mjs?v=1';
+import { RECOVERY_MAX_SLOTS, PREFS_NAMED_SLOT_INDEX } from './shard-discovery.mjs?v=1';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS — the immutable on-chain cap on the blob's cell tree (gate 13560).
 // Mirrored (not imported) so an over-cap backup is refused CLIENT-SIDE before it bounces on chain and is mis-recorded.
@@ -110,4 +110,47 @@ export async function prepareRecoveryBackup({ seed, slotIndex, map, readView, va
   }
   const built = await buildRecoveryPublishBrowser({ seed, slotIndex, seq: nextSeq, h0, h1, body, value });
   return { ...built, seq: nextSeq, cells };
+}
+
+/**
+ * Prepare the next PREFS backup: seal the prefs snapshot bytes and build the owner-signed publish for the NAMED prefs
+ * slot (PREFS_NAMED_SLOT_INDEX — a separate blob at a separate address from every conversation slot). Same anti-rollback
+ * seq+1 discipline and same overflow guard as prepareRecoveryBackup; the prefs blob is a single small snapshot, so the
+ * cap is never the constraint, but the guard stays a fail-loud floor. A read that THROWS propagates (never a silent seq 0).
+ */
+export async function preparePrefsBackup({ seed, prefsBytes, readView, value }) {
+  if (typeof readView !== 'function') throw new Error('preparePrefsBackup requires readView');
+  const slot = await selfRecoveryShard(seed, PREFS_NAMED_SLOT_INDEX);
+  const view = await readView(slot.address);
+  const currentSeq = view?.bound ? BigInt(view.seq) : 0n;
+  const nextSeq = Number(currentSeq) + 1;
+  const { body, h0, h1 } = await sealPrefsBlob(seed, prefsBytes);
+  const cells = countCells(body);
+  if (cells > RS_MAX_BLOB_CELLS) {
+    const error = new Error(`prefs blob is ${cells} cells, over the on-chain cap of ${RS_MAX_BLOB_CELLS}`);
+    error.code = 'RECOVERY_BLOB_OVERFLOW';
+    throw error;
+  }
+  const built = await buildRecoveryPublishBrowser({ seed, slotIndex: PREFS_NAMED_SLOT_INDEX, seq: nextSeq, h0, h1, body, value });
+  return { ...built, seq: nextSeq, cells };
+}
+
+/**
+ * Restore the prefs snapshot bytes on a fresh device from the seed: read the NAMED prefs slot by its fixed address (no
+ * scan), open it under the seed. Returns { prefsBytes, clean } — prefsBytes is null for an unbound slot (nothing saved),
+ * a foreign/wrong-seed blob, or a read that could not complete; clean=false ONLY when a read THREW (the caller must not
+ * treat an unclean result as "no prefs" and must retry). A clean unbound slot is clean=true, prefsBytes=null.
+ */
+export async function restorePrefsSnapshot({ seed, readView, readBody }) {
+  if (typeof readView !== 'function' || typeof readBody !== 'function') {
+    throw new Error('restorePrefsSnapshot requires readView/readBody');
+  }
+  const slot = await selfRecoveryShard(seed, PREFS_NAMED_SLOT_INDEX);
+  let view;
+  try { view = await readView(slot.address); } catch { return { prefsBytes: null, clean: false }; }
+  if (!view?.bound) return { prefsBytes: null, clean: true };     // never written — no prefs to restore, cleanly
+  let body;
+  try { body = await readBody(slot.address); } catch { return { prefsBytes: null, clean: false }; }
+  if (!body) return { prefsBytes: null, clean: false };           // bound but no body = incomplete read, not empty
+  return { prefsBytes: await openPrefsBlob(seed, body), clean: true };   // null if foreign/wrong-seed (not our loss)
 }

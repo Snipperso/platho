@@ -38,6 +38,16 @@ const RS_SLOT_DOMAIN: Int = 0x52534C4B;           // "RSLK" — self_bucket_key 
 // needs it. Refusing out-of-range here turns that silent loss into a loud refusal at publish time.
 // 256 x ~155 = ~40k conversations, and 256 addresses still fit one batched read.
 const RS_MAX_SLOTS: Int = 256;
+// [OWNER DECISION 2026-07-23] NAMED durable slots for KNOWN-address self-data that is NOT the conversation partition —
+// prefs (public-channel subscriptions) first, and future single-blob settings (block lists, notification prefs, contact
+// aliases). The [0, RS_MAX_SLOTS) range above is SCANNED, because a restoring client cannot know how many conversations
+// exist. A named slot is the OPPOSITE: there is exactly one, at a FIXED index the client derives deterministically and
+// reads DIRECTLY — so the scan-reachability the [RANGE] gate protects is satisfied by known-address-reachability instead,
+// and the blob is never orphaned. Reserving a small block addressed immediately above the scan range lets ONE durable
+// store serve both concerns without a namespace field (index [RS_MAX_SLOTS, RS_MAX_SLOTS + RS_NAMED_SLOTS) = named). The
+// slot key derivation is UNCHANGED (still H(domain ‖ owner_pubkey ‖ index)); only the accepted index range widens. 16
+// leaves headroom for several future named data types without a re-seal. Anything at/above the top is still refused.
+const RS_NAMED_SLOTS: Int = 16;
 const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15); permissionless evict after updated_at + this
 // The endowment must cover the WHOLE ACCOUNT for the whole retention, not just the payload. Unlike its two siblings
 // this lane has no separate base endowment (compare RS_BASE_ENDOWMENT in RecordShard and IS_BASE_ENDOWMENT in
@@ -186,12 +196,14 @@ contract RecoveryShard {
             // a squatter re-binding an evicted (or fresh) slot would need a hash preimage of the victim's
             // self_bucket_key — infeasible. Anti-hijack no longer rests on "first writer wins": ONLY the owner key
             // that names the slot can bind it, even after a 3-year eviction frees it.
-            // [RANGE] Refuse a slot the recovery scan would never look at. A restoring client probes [0, RS_MAX_SLOTS)
-            // and nothing on chain enumerates a user's slots, so an out-of-range bind writes a blob that is never read
-            // again — money spent, write reported successful, loss discovered years later. Checked ONLY on the bind,
-            // where slot_index actually decides something: on an overwrite the slot identity is already fixed and a
-            // stale index in the message must not be able to block the anti-rollback update path.
-            throwUnless(13576, (msg.slot_index >= 0) && (msg.slot_index < RS_MAX_SLOTS));
+            // [RANGE] Refuse a slot NO client would ever read back. Two ranges are reachable and everything else is
+            // orphan-territory: [0, RS_MAX_SLOTS) is found by the restore SCAN, and [RS_MAX_SLOTS, RS_MAX_SLOTS +
+            // RS_NAMED_SLOTS) are NAMED slots the client reads by their fixed deterministic address (see RS_NAMED_SLOTS).
+            // Both are reachable; a slot at/above the top is not — nothing on chain enumerates a user's slots, so an
+            // out-of-range bind writes a blob that is never read again (money spent, write reported successful, loss
+            // found years later). Checked ONLY on the bind, where slot_index decides the identity; on an overwrite the
+            // identity is already fixed and a stale index must not block the anti-rollback update path.
+            throwUnless(13576, (msg.slot_index >= 0) && (msg.slot_index < RS_MAX_SLOTS + RS_NAMED_SLOTS));
             throwUnless(13575, self.self_bucket_key == self.slotKeyForOwner(msg.owner_pubkey, msg.slot_index));
             self.bound = true;
             self.owner_pubkey = msg.owner_pubkey;

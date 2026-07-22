@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createMemoryConvKeyStore } from '../web/conv-key-store.mjs';
-import { sealRecoveryBlob, openRecoveryBlob, recoveryBlobKey } from '../web/recovery-blob.mjs';
+import { sealRecoveryBlob, openRecoveryBlob, recoveryBlobKey, sealPrefsBlob, openPrefsBlob } from '../web/recovery-blob.mjs';
 import { tonCell } from '../web/pwa-contract-transactions.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -78,5 +78,19 @@ describe('RECOVERY-BLOB', () => {
     const restored = await openRecoveryBlob(SEED, body);
     expect(restored.get(convId)).toBeTruthy();
     expect(k1).toBeTruthy(); expect(k2).toBeTruthy();
+  });
+
+  it('RB-06: the PREFS blob seals + opens under the seed (round-trip), a wrong seed opens to null, key ≠ recovery key', async () => {
+    const prefs = new TextEncoder().encode(JSON.stringify({ channels: ['0:aa', '0:bb'], at: 1790000000 }));
+    const { body, h0, h1 } = await sealPrefsBlob(SEED, prefs);
+    expect(h0, 'prefs h0 non-zero').not.toBe(0n);
+    expect(h1, 'prefs h1 non-zero').not.toBe(0n);
+
+    const opened = await openPrefsBlob(SEED, body);
+    expect(opened, 'the prefs bytes survive seal → open under the same seed').toEqual(prefs);
+    // a wrong seed cannot open it (GCM tag fails) → null, never a throw into the restore path.
+    expect(await openPrefsBlob(new Uint8Array(32).fill(0x99), body)).toBeNull();
+    // domain separation: the prefs blob is NOT a recovery-map blob — opening it as one yields an empty map, not the prefs.
+    expect((await openRecoveryBlob(SEED, body)).size, 'a prefs blob is not a conversation-map blob').toBe(0);
   });
 });

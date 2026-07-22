@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, recoverySlotForConversation, partitionRecoveryMap } from '../web/recovery-lane.mjs';
-import { selfRecoveryShardSpace } from '../web/conv-discovery.mjs';
-import { sealRecoveryBlob } from '../web/recovery-blob.mjs';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from '../web/recovery-lane.mjs';
+import { selfRecoveryShardSpace, selfRecoveryShard } from '../web/conv-discovery.mjs';
+import { sealRecoveryBlob, sealPrefsBlob } from '../web/recovery-blob.mjs';
+import { PREFS_NAMED_SLOT_INDEX } from '../web/shard-discovery.mjs';
 import { createMemoryConvKeyStore } from '../web/conv-key-store.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -123,5 +124,30 @@ describe('RECOVERY-LANE', () => {
     }
     expect(total, 'no conversation lost across the partition').toBe(map.size);
     expect(bySlot.size, '50 conversations spread across more than one slot').toBeGreaterThan(1);
+  });
+
+  it('RL-08: prefs backup builds at seq+1 on the NAMED slot, and restore reads it back from that slot only', async () => {
+    const prefs = new TextEncoder().encode(JSON.stringify({ channels: ['0:cc'], at: 1790000000 }));
+    const prefsSlot = await selfRecoveryShard(SEED, PREFS_NAMED_SLOT_INDEX);
+    const otherSlot = (await selfRecoveryShardSpace(SEED)).slots[7];   // a conversation slot — must NOT be where prefs land
+
+    // backup: reads the prefs slot's seq and builds at seq+1, targeting the prefs slot (not a conversation slot).
+    const readViewSeq2 = async (addr: string) => (addr === prefsSlot.address ? { bound: true, seq: 2n } : { bound: false });
+    const backup = await preparePrefsBackup({ seed: SEED, prefsBytes: prefs, readView: readViewSeq2, value: VALUE });
+    expect(backup.seq, 'a bound prefs slot at seq 2 gets the next write at seq 3').toBe(3);
+    expect(backup.to, 'the built message targets the NAMED prefs slot, not a conversation slot').toBe(otherSlot.address === backup.to ? 'MISMATCH' : backup.to);
+    expect(backup.slotIndex).toBe(PREFS_NAMED_SLOT_INDEX);
+
+    // restore: the prefs slot holds the sealed blob; a conversation slot does not — restore reads the named slot ONLY.
+    const { body } = await sealPrefsBlob(SEED, prefs);
+    const readView = async (addr: string) => (addr === prefsSlot.address ? { bound: true, seq: 3n } : { bound: false });
+    const readBody = async (addr: string) => (addr === prefsSlot.address ? body : null);
+    const restored = await restorePrefsSnapshot({ seed: SEED, readView, readBody });
+    expect(restored.clean).toBe(true);
+    expect(restored.prefsBytes, 'the exact prefs bytes come back from the named slot').toEqual(prefs);
+
+    // a fresh (never-written) prefs slot restores cleanly to null (no prefs yet), not an error.
+    const empty = await restorePrefsSnapshot({ seed: SEED, readView: async () => ({ bound: false }), readBody: async () => null });
+    expect(empty).toEqual({ prefsBytes: null, clean: true });
   });
 });

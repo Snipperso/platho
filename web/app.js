@@ -191,7 +191,7 @@ import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.m
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, recoverySlotForConversation, partitionRecoveryMap } from './recovery-lane.mjs?v=1';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=1';
 import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=1';
 import {
   publicChannelPartitionKey,
@@ -14946,6 +14946,7 @@ async function bootConvKeyStore() {
     if (!convKeyStore) convKeyStore = createMemoryConvKeyStore();
   }
   await restoreConvKeysFromRecoveryIfEmpty();
+  await restorePrefsFromRecoveryIfFresh();
 }
 
 // A fresh device / reinstall has an EMPTY conv key store — the IndexedDB is gone but the seed re-derives the recovery
@@ -14979,6 +14980,27 @@ async function restoreConvKeysFromRecoveryIfEmpty() {
     if (imported > 0) renderThreads();
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[recovery] restore failed', error);   // no latch — retry later
+  }
+}
+
+// clean-17: restore the seed-durable prefs (subscriptions) from the NAMED recovery slot on a fresh device. Reads the slot
+// by its fixed address (no scan), opens it under the seed, and hands the snapshot to the SAME fresh-device drain the
+// clean-15 CapsuleHub path uses (drainRestoredPrefsSnapshots auto-applies ONLY on a truly fresh device, never clobbering
+// in-session local follows). A wrong-seed/foreign/absent slot yields nothing and touches no local state.
+async function restorePrefsFromRecoveryIfFresh() {
+  if (!privateLaneDirectPayEnabled() || !plathoWallet?.seed) return;
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return;   // no transport yet — retry on the next unlock/visible
+  try {
+    const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+    const readBody = createRecoveryBodyReader((call) => transport.runGetMethod(call));
+    const { prefsBytes } = await restorePrefsSnapshot({ seed: plathoWallet.seed, readView, readBody });
+    if (prefsBytes) {
+      collectRestoredPrefsSnapshot(prefsBytes);
+      if (drainRestoredPrefsSnapshots()) { rebuildPublicChannelRegistry(); renderThreads(); }
+    }
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[prefs] recovery restore failed', error);
   }
 }
 
@@ -30496,13 +30518,48 @@ async function confirmPrefsPublishInBackground(publishState, snapshot, savedEdit
 
 // Explicit "Save subscriptions" action: publish a full snapshot as a private capsule to self via the proven publish
 // path. Only clears dirty on a CONFIRMED publish (a non-confirmed/failed one stays dirty so the user can retry).
+// clean-17 DIRECT-PAY prefs snapshot: publish the seed-sealed prefs (subscriptions) blob to the NAMED recovery slot
+// (PREFS_NAMED_SLOT_INDEX — its own address, separate from every conversation slot). A landed recovery publish IS the
+// durable save (the slot's anti-rollback seq protects it, and the send-hardening re-broadcast covers an ambiguous
+// broadcast), so there is no CapsuleHub-style background confirm. A reinstall restores it via restorePrefsFromRecoveryIfFresh.
+async function submitPrefsSnapshotDirect() {
+  if (prefsSyncInFlight) return;
+  const seed = plathoWallet?.seed;
+  if (!plathoWallet || !seed || !hasActivePlathoAccount()) { setText(savePrefsStatus, t('sync.activateFirst')); return; }
+  if (tonRpcLimited()) { setText(savePrefsStatus, t('sync.rpcBusy')); return; }
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) { setText(savePrefsStatus, t('sync.rpcBusy')); return; }
+  prefsSyncInFlight = true;
+  refreshPrefsSyncUi();
+  refreshGlobalSyncIndicator();
+  setText(savePrefsStatus, t('sync.saving'));
+  let settled = false;
+  try {
+    const snapshot = buildPrefsSnapshot();
+    const savedEditEpoch = prefsEditEpoch;   // edits after this point are not in `snapshot` — guards the dirty-clear
+    const prefsBytes = serializePrefsSnapshotBytes(snapshot);
+    const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+    const built = await preparePrefsBackup({ seed, prefsBytes, readView, value: RECOVERY_PUBLISH_VALUE });
+    await sendPlathoWalletTransaction(plathoWallet, {
+      messages: [{ address: built.to, amount: built.value, payload: tonCell.bytesToBase64(tonCell.serializeBoc(built.body)), stateInit: built.init, bounce: true }],
+    }, { transport });
+    setPrefsLastSyncedAt(snapshot.writtenAt);
+    if (prefsEditEpoch === savedEditEpoch) writePrefsDirty(false);   // a follow/unfollow mid-send stays dirty (→ "unsaved")
+    settled = true;
+  } catch (error) {
+    const rateLimited = noteTonRpcRateLimit(error);
+    setText(savePrefsStatus, rateLimited ? t('sync.rpcBusy') : t('sync.saveFailed'));
+    if (!rateLimited) console.error(error);
+  } finally {
+    prefsSyncInFlight = false;
+    if (settled) refreshPrefsSyncUi(); else refreshPrefsSyncButton();
+    refreshGlobalSyncIndicator();
+  }
+}
+
 async function publishPrefsSnapshot() {
   if (prefsSyncInFlight) return;
-  // clean-17 INTERIM: prefs-to-self still reads Vault (resolveSelfPeerEntry) and publishes via CapsuleHub. Under direct-pay
-  // both are gone, so this would loudly fail at cutover. No-op until the prefs capsule has a direct-pay shard publish; the
-  // sync button is also disabled under direct-pay (refreshPrefsSyncButton). Subscriptions still work IN-SESSION; only the
-  // cross-device on-chain snapshot is deferred. [activation review: prefs hits dead Vault]
-  if (privateLaneDirectPayEnabled()) return;
+  if (privateLaneDirectPayEnabled()) return submitPrefsSnapshotDirect();   // clean-17: seed-sealed prefs → named recovery slot
   if (!plathoWallet || !localIdentity || !localRecipientKeyPair || !hasActivePlathoAccount()) {
     setText(savePrefsStatus, t('sync.activateFirst'));
     return;
@@ -30561,9 +30618,9 @@ function prefsSyncedDateLabel(sec) {
 
 function refreshPrefsSyncButton() {
   if (!savePrefsButton) return;
-  // clean-17 INTERIM: the cross-device prefs snapshot is Vault/CapsuleHub-bound, deferred under direct-pay — disable the
-  // button so it is not offered until the prefs capsule has a direct-pay shard publish. [activation review]
-  savePrefsButton.disabled = privateLaneDirectPayEnabled() || !(Boolean(plathoWallet && hasActivePlathoAccount()) && prefsDirty && !prefsSyncInFlight);
+  // clean-17: prefs sync works on BOTH paths now — direct-pay publishes the seed-sealed blob to the named recovery slot
+  // (submitPrefsSnapshotDirect), clean-15 via CapsuleHub. Enabled whenever there are unsaved changes.
+  savePrefsButton.disabled = !(Boolean(plathoWallet && hasActivePlathoAccount()) && prefsDirty && !prefsSyncInFlight);
 }
 
 // Resting status for the Save-subscriptions row. A publish in flight owns the status text (saving/saved/failed);

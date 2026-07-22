@@ -61,18 +61,29 @@ const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | Bi
 export const RECOVERY_MAX_SLOTS = 256;
 
 /**
+ * RECOVERY_NAMED_SLOTS — MUST equal RS_NAMED_SLOTS in RecoveryShard.tact. The block [RECOVERY_MAX_SLOTS,
+ * RECOVERY_MAX_SLOTS + RECOVERY_NAMED_SLOTS) is NOT scanned: each named slot holds a single KNOWN self-data blob (prefs
+ * first) that the client reads by its FIXED deterministic address, so it is reachable without enumeration and never
+ * orphaned. Conversations still hash into [0, RECOVERY_MAX_SLOTS) only; named slots are addressed by their constant.
+ */
+export const RECOVERY_NAMED_SLOTS = 16;
+/** The named slot that carries the seed-durable prefs (public-channel subscriptions) blob. */
+export const PREFS_NAMED_SLOT_INDEX = RECOVERY_MAX_SLOTS;
+
+/**
  * The RecoveryShard self_bucket_key for one of an owner's slots: H(RS_SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index) as a
  * uint256, mirroring RecoveryShard.slotKeyForOwner. Binding the slot to the key is what closes the post-eviction
  * squat (gate 13575) — only the seed-holder who derived owner_pubkey can name any of these addresses.
  *
  * `slotIndex` is REQUIRED and deliberately has no default. It decides which address this is, and a caller who
  * silently got 0 when they meant 3 would overwrite the blob in slot 0 — a valid signature and a higher seq, so the
- * contract accepts it and the real slot-0 conversations are gone. An explicit argument makes that unmissable.
+ * contract accepts it and the real slot-0 conversations are gone. An explicit argument makes that unmissable. Valid
+ * range is the union of the scanned conversation partition and the named block, exactly the contract's gate 13576.
  */
 // Async because the browser cell hasher is: there is no synchronous sha256 in the platform's crypto API.
 export async function recoveryOwnerSlotKey(ownerPublicKey, slotIndex) {
-  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= RECOVERY_MAX_SLOTS) {
-    throw new Error(`recoveryOwnerSlotKey: slotIndex must be an integer in [0, ${RECOVERY_MAX_SLOTS}), got ${slotIndex}`);
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= RECOVERY_MAX_SLOTS + RECOVERY_NAMED_SLOTS) {
+    throw new Error(`recoveryOwnerSlotKey: slotIndex must be an integer in [0, ${RECOVERY_MAX_SLOTS + RECOVERY_NAMED_SLOTS}), got ${slotIndex}`);
   }
   const pub = typeof ownerPublicKey === 'bigint' ? ownerPublicKey : bytesToBig(ownerPublicKey);
   const cell = beginCell()

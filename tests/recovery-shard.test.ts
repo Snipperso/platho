@@ -16,6 +16,7 @@ import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShar
 const RECOVERY_DOMAIN = 0x42525331n; // "BRS1"
 const SLOT_DOMAIN = 0x52534C4Bn;     // "RSLK" — self_bucket_key = H(SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index)
 const MAX_SLOTS = 256;               // MUST equal RS_MAX_SLOTS
+const NAMED_SLOTS = 16;              // MUST equal RS_NAMED_SLOTS — the named durable slots above the scan range
 const RETENTION = 94608000;          // 3 years
 const bufToInt = (b: Buffer): bigint => BigInt('0x' + b.toString('hex'));
 const cellOf = (b: Buffer) => beginCell().storeBuffer(b).endCell();
@@ -262,26 +263,36 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
   }, 120_000);
 
   it('RECOVERY-11: an out-of-range slot index is refused (13576) — no write the scan would never find', async () => {
-    // A restoring client probes [0, RS_MAX_SLOTS) and nothing on chain enumerates slots, so a blob written above the
-    // cap is paid for and then never read again. The failure surfaces years later, at restore, which is the one
-    // moment it cannot be fixed. Refusing at publish time converts a silent loss into a loud one.
+    // Two ranges are reachable: [0, RS_MAX_SLOTS) is found by the restore scan, [RS_MAX_SLOTS, RS_MAX_SLOTS +
+    // RS_NAMED_SLOTS) are named slots read by fixed address. A blob at/above the top is enumerated by nobody, paid for,
+    // and never read again — the loss surfaces years later at restore. Refusing at publish converts silent loss into loud.
     const owner = keyPairFromSeed(Buffer.alloc(32, 0x32));
-    const overCap = selfOf(owner, MAX_SLOTS);                    // index 256 — one past the last legal slot
+    const overCap = selfOf(owner, MAX_SLOTS + NAMED_SLOTS);      // index 272 — one past the last legal (named) slot
     const rs = await shard(overCap);
 
     const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true },
-      store(owner, rs.address, overCap, 1n, 0, undefined, BigInt(MAX_SLOTS)) as any);
-    expect(exitOf(res, rs.address), 'slot 256 -> 13576').toBe(13576);
+      store(owner, rs.address, overCap, 1n, 0, undefined, BigInt(MAX_SLOTS + NAMED_SLOTS)) as any);
+    expect(exitOf(res, rs.address), 'slot 272 -> 13576').toBe(13576);
     expect((await rs.getGetView()).bound, 'nothing was stored').toBe(false);
 
-    // MUTATION CHECK on the gate's boundary: 255 is the LAST legal index and must still bind. Without this the test
-    // above would also pass against a gate written `< MAX_SLOTS - 1`, or one that refused everything.
-    const last = selfOf(owner, MAX_SLOTS - 1);
+    // MUTATION CHECK on the gate's UPPER boundary: 271 is the LAST legal index and must still bind. Without this the
+    // test above would also pass against a gate written `< top - 1`, or one that refused everything.
+    const last = selfOf(owner, MAX_SLOTS + NAMED_SLOTS - 1);
     const rsLast = await shard(last);
     expect(exitOf(await rsLast.send(relay.getSender(), { value: toNano('0.1') },
-      store(owner, rsLast.address, last, 1n, 0, undefined, BigInt(MAX_SLOTS - 1)) as any), rsLast.address),
-      'index 255 is legal').toBe(0);
+      store(owner, rsLast.address, last, 1n, 0, undefined, BigInt(MAX_SLOTS + NAMED_SLOTS - 1)) as any), rsLast.address),
+      'index 271 is legal').toBe(0);
     expect((await rsLast.getGetView()).bound).toBe(true);
+
+    // MUTATION CHECK on the NAMED range: the first named slot (256, prefs) — the whole point of the widening — must bind.
+    // Without this, a gate that never got widened (still `< RS_MAX_SLOTS`) would pass the two checks above only if 271
+    // were also refused, but 256 pins that the named block is genuinely open, not that the ceiling merely moved.
+    const named = selfOf(owner, MAX_SLOTS);
+    const rsNamed = await shard(named);
+    expect(exitOf(await rsNamed.send(relay.getSender(), { value: toNano('0.1') },
+      store(owner, rsNamed.address, named, 1n, 0, undefined, BigInt(MAX_SLOTS)) as any), rsNamed.address),
+      'the first named slot 256 is legal').toBe(0);
+    expect((await rsNamed.getGetView()).bound).toBe(true);
   }, 120_000);
 
   it('RECOVERY-12: [SQUAT-CLOSE] the index is part of the slot identity — a right-key/wrong-index bind is refused', async () => {
