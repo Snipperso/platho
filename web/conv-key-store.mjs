@@ -84,8 +84,11 @@ export function adoptKRoot(existing, candidate) {
   const createdAt = Number(candidate.createdAt ?? 0);
   const peerKeyId = toBytes(candidate.peerKeyId, 32, 'peerKeyId');
   const peerEncPublicKey = candidate.peerEncPublicKey == null ? null : toBytes(candidate.peerEncPublicKey, 32, 'peerEncPublicKey');
+  // peerWallet: the INTRO publish tx src (raw '0:HEX'), a HINT for resolving the peer's full bundle (KeyShard) on reply.
+  // Stored as-is; verified against peerKeyId at reply time, never trusted alone. [Y reply-bundle resolution]
+  const peerWallet = candidate.peerWallet == null ? null : String(candidate.peerWallet);
   if (!existing) {
-    return { outcome: 'created', record: { kRootCurrent: kRoot, kRootsForRead: [], peerKeyId, peerEncPublicKey, adoptedCreatedAt: createdAt, adoptedIntroNonce: introNonce, outgoingSeq: {} } };
+    return { outcome: 'created', record: { kRootCurrent: kRoot, kRootsForRead: [], peerKeyId, peerEncPublicKey, peerWallet, adoptedCreatedAt: createdAt, adoptedIntroNonce: introNonce, outgoingSeq: {} } };
   }
   const cmp = compareAdoption({ createdAt, introNonce }, existing);
   if (cmp === 0) return { outcome: 'duplicate', record: existing };
@@ -98,6 +101,7 @@ export function adoptKRoot(existing, candidate) {
         kRootsForRead: appendReadRoot(existing.kRootsForRead, existing.kRootCurrent, existing.adoptedCreatedAt),
         peerKeyId,
         peerEncPublicKey: peerEncPublicKey ?? existing.peerEncPublicKey,
+        peerWallet: peerWallet ?? existing.peerWallet ?? null,
         adoptedCreatedAt: createdAt,
         adoptedIntroNonce: introNonce,
       },

@@ -129,14 +129,20 @@ export async function fetchIntroCapsule({ address, entryId, readEntry, readMessa
   if (!entry?.exists) return null;
   const wanted = BigInt(entry.body_commit);
 
-  for (const message of await readMessages(address)) {
+  for (const item of await readMessages(address)) {
+    // readMessages may yield plain body Cells (source-free reader) or { bodyCell, source } (with-source reader). The
+    // source is the INTRO publish transaction's src = the SENDER's wallet (direct-pay), which the responder needs to
+    // read the sender's KeyShard and resolve their full bundle for a reply. It is a HINT: verified downstream against
+    // the sender keyId, never trusted on its own. [clean17-private-lane-plan: Y reply-bundle resolution]
+    const message = item?.bodyCell ?? item;
+    const source = item?.source ?? null;
     let parsed;
     try { parsed = parseIntroPublish(message); } catch { continue; }            // not an IntroPublish; skip
     if ((await introBodyCommitBrowser(parsed.header0, parsed.body)) !== wanted) continue;
     // created_at is the CONTRACT-STAMPED time from the entry (IntroShard stamps now(); get_entry returns it). It MUST
     // be surfaced: re-INTRO K_root adoption orders on it, and it is the only recency value BOTH sides read identically
     // — a local clock would let the two sides disagree on which re-INTRO is newest and silently fork the conversation.
-    return { header0: parsed.header0, body: parsed.body, r: parsed.r, viewTag: parsed.viewTag, bodyCommit: wanted, created_at: entry.created_at };
+    return { header0: parsed.header0, body: parsed.body, r: parsed.r, viewTag: parsed.viewTag, bodyCommit: wanted, created_at: entry.created_at, source };
   }
   return null;   // the entry exists but its transaction is beyond what this endpoint retains
 }

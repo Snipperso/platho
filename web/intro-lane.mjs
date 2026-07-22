@@ -16,7 +16,7 @@
 import { createIntroScanRunner } from './intro-scan-runner.mjs?v=1';
 import { createIntroCursorStore } from './intro-cursor-store.mjs?v=1';
 import { createScanPageReader, createEntryReader, fetchIntroCapsule } from './intro-transport.mjs?v=1';
-import { createShardStatesRequest, createShardMessagesReader } from './shard-rpc.mjs?v=1';
+import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
 import { readAccountStates } from './shard-reader.mjs?v=1';
 import { introShardAddress } from './shard-discovery.mjs?v=1';
 
@@ -58,7 +58,10 @@ export async function createIntroLane({
 
   const rpc = { endpoint, apiKey, fetch: fetchImpl ?? undefined };
   const statesRequest = createShardStatesRequest(rpc);
-  const readMessages = createShardMessagesReader(rpc);
+  // With-source reader (not the source-free one): the INTRO publish transaction's src is the sender's wallet, which the
+  // responder needs to resolve the sender's full bundle (KeyShard) for a reply. fetchIntroCapsule surfaces it, verified
+  // downstream against the sender keyId. [clean17-private-lane-plan: Y reply-bundle resolution]
+  const readMessages = createShardMessagesWithSourceReader(rpc);
   const readScanPage = createScanPageReader(runGetMethod);
   const readEntry = createEntryReader(runGetMethod);
 

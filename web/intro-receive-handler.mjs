@@ -58,6 +58,9 @@ export function createIntroReceiveHandler({
       createdAt,
       introNonce: opened.introNonce,
       peerEncPublicKey: opened.senderEncPublicKey,
+      // The INTRO publish tx src = the sender's wallet (direct-pay), captured so a reply can resolve the sender's full
+      // bundle from their KeyShard (verified against senderKeyId). A HINT — never trusted on its own. [Y resolution]
+      peerWallet: capsule.source ?? null,
     });
 
     const result = { ...opened, adoption };
