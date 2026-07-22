@@ -91,4 +91,26 @@ describe('CONV-KEY-STORE', () => {
     // unknown conversation is a no-op (never throws).
     await store.advanceConvScanCursor(A, kroot(9), 5);
   });
+
+  it('CKS-08: importConversations rehydrates records (restore), and a NEWER live root is not rolled back by an older backup', async () => {
+    const hx = (b: Uint8Array) => Buffer.from(b).toString('hex');
+    // a backup map (what the RECOVERY blob would restore)
+    const backup = createMemoryConvKeyStore();
+    await backup.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1), peerWallet: 'w-A' });
+    await backup.advanceConvScanCursor(A, B, 19005);
+    const backupMap = backup.snapshot();
+
+    // import into a FRESH device store — the conversation (K_root + cursor + wallet) comes back.
+    const fresh = createMemoryConvKeyStore();
+    expect(await fresh.importConversations(backupMap), 'one record imported').toBe(1);
+    expect(hx(fresh.getConversation(A, B)!.kRootCurrent)).toBe(hx(kroot(1)));
+    expect(fresh.getConversation(A, B)!.lastScannedEpoch).toBe(19005);
+    expect(fresh.getConversation(A, B)!.peerWallet).toBe('w-A');
+
+    // NEWER-WINS: a device already holding a newer root (createdAt 300) ignores the older backup (createdAt 100).
+    const live = createMemoryConvKeyStore();
+    await live.upsertConversationKRoot(A, B, { kRoot: kroot(9), createdAt: 300, introNonce: nonce(9) });
+    expect(await live.importConversations(backupMap), 'older backup does not overwrite a newer live root').toBe(0);
+    expect(hx(live.getConversation(A, B)!.kRootCurrent), 'the live (rotated) root stays current').toBe(hx(kroot(9)));
+  });
 });

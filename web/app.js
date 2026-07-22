@@ -172,7 +172,7 @@ import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v
 import { createPublicLane } from './public-lane.mjs?v=1';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=1';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
-import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE } from './publish-price.mjs?v=1';
+import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE } from './publish-price.mjs?v=1';
 import { createIntroLane } from './intro-lane.mjs?v=1';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=1';
 import { createMemoryConvKeyStore } from './conv-key-store.mjs?v=1';
@@ -188,6 +188,9 @@ import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-rou
 import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=1';
+// clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup } from './recovery-lane.mjs?v=1';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=1';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -3663,6 +3666,8 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   stopIntroReceiveLane();
   convKeyStore = null;
   introReplayGuard = null;
+  convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
+  if (recoveryBackupTimer) { clearTimeout(recoveryBackupTimer); recoveryBackupTimer = null; }
   localReplayStore = createMemoryReplayStore();
   encryptedMessageStore = null;
   knownVaultKeyOwnerBySignPubkey.clear();
@@ -4158,6 +4163,8 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   stopIntroReceiveLane();
   convKeyStore = null;
   introReplayGuard = null;
+  convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
+  if (recoveryBackupTimer) { clearTimeout(recoveryBackupTimer); recoveryBackupTimer = null; }
   delete globalThis.plathoVaultBinding;
   resetVaultPocketState();
   renderWalletIdentity();
@@ -10654,6 +10661,7 @@ function handleIntroFirstContact(opened) {
   // CONV reply can look up this conversation's adopted K_root in convKeyStore by (selfKeyId, peerKeyId). The thread id
   // is a normalised/anonymised peer id (a lossy round-trip), so the raw keyId is kept here explicitly. [CONV-send]
   thread.convPeerKeyId = senderKeyId;
+  scheduleRecoveryBackup();   // a first contact adopted a new K_root — back the conversation map up on chain (debounced)
   const bytes = opened.firstMessageBytes;
   if (bytes && bytes.length > 0) {
     const blocks = introFirstMessageBlocks(bytes);
@@ -14918,6 +14926,58 @@ async function bootConvKeyStore() {
     console.warn('[conv] persistent key store unavailable, using memory (K_roots will not survive reload)', error);
     if (!convKeyStore) convKeyStore = createMemoryConvKeyStore();
   }
+  await restoreConvKeysFromRecoveryIfEmpty();
+}
+
+// A fresh device / reinstall has an EMPTY conv key store — the IndexedDB is gone but the seed re-derives the recovery
+// owner key. Read every recovery slot on chain, decrypt the blob with the seed, and import the K_roots so conversations
+// survive a reinstall. Runs at most once per session (the 256-slot probe is not free) and only while the store is empty
+// — a device that already holds conversations has nothing to restore. [RECOVERY restore; recovery-lane]
+let convRecoveryRestoreAttempted = false;
+async function restoreConvKeysFromRecoveryIfEmpty() {
+  if (convRecoveryRestoreAttempted || !convKeyStore || !plathoWallet?.seed) return;
+  if (convKeyStore.snapshot().size > 0) return;
+  convRecoveryRestoreAttempted = true;
+  const transport = globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return;
+  try {
+    const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+    const readBody = createRecoveryBodyReader((call) => transport.runGetMethod(call));
+    const { map, found } = await restoreConvKeysFromRecovery({ seed: plathoWallet.seed, readView, readBody });
+    const imported = map.size > 0 ? await convKeyStore.importConversations(map) : 0;
+    globalThis.plathoLastConvRecoveryRestore = { imported, slots: found.length, at: new Date().toISOString() };
+    if (imported > 0) renderThreads();
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[recovery] restore failed', error);
+  }
+}
+
+// Back up the conversation K_root map on chain so a future reinstall can restore it. Debounced + triggered only when a
+// K_root actually changes (a new conversation established via INTRO) — NOT on every CONV message, so the backup cost
+// (RECOVERY_PUBLISH_VALUE per write) tracks new conversations, not traffic. First cut writes the whole map into slot 0
+// (holds ~155 conversations); multi-slot sharding for scale is a follow-up.
+const RECOVERY_BACKUP_DEBOUNCE_MS = 45_000;
+let recoveryBackupTimer = null;
+function scheduleRecoveryBackup(delayMs = RECOVERY_BACKUP_DEBOUNCE_MS) {
+  if (!privateLaneDirectPayEnabled() || !convKeyStore || !plathoWallet?.seed) return;
+  if (recoveryBackupTimer) clearTimeout(recoveryBackupTimer);
+  recoveryBackupTimer = setTimeout(() => {
+    recoveryBackupTimer = null;
+    runRecoveryBackup().catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[recovery] backup failed', error); });
+  }, delayMs);
+}
+async function runRecoveryBackup() {
+  if (!convKeyStore || !plathoWallet?.seed) return;
+  const map = convKeyStore.snapshot();
+  if (map.size === 0) return;
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod || !transport?.sendBoc) return;
+  const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+  const built = await prepareRecoveryBackup({ seed: plathoWallet.seed, slotIndex: 0, map, readView, value: RECOVERY_PUBLISH_VALUE });
+  await sendPlathoWalletTransaction(plathoWallet, {
+    messages: [{ address: built.to, amount: built.value, payload: tonCell.bytesToBase64(tonCell.serializeBoc(built.body)), stateInit: built.init, bounce: true }],
+  }, { transport });
+  globalThis.plathoLastConvRecoveryBackup = { slotIndex: 0, seq: built.seq, conversations: map.size, at: new Date().toISOString() };
 }
 
 async function bootWalletScopedLocalStores() {
@@ -29218,6 +29278,7 @@ async function attemptIntroFirstContactDirect(context) {
     kRoot: sendState.kRoot, createdAt: createdAtSec, introNonce: sendState.introNonce, peerKeyId: sendState.peerKeyId, peerEncPublicKey: null, peerWallet: sendState.peerWallet,
   });
   thread.convPeerKeyId = sendState.peerKeyId;
+  scheduleRecoveryBackup();   // a new K_root was minted — back the conversation map up on chain (debounced)
 
   globalThis.plathoLastIntroDirectSend = { peerKeyId: sendState.peerKeyId, epoch: sendState.epoch, bucket: sendState.bucket, createdAtSec };
   markDirectSendPublished(thread, message);
