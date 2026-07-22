@@ -55,20 +55,23 @@ export function createScanPageReader(runGetMethod, { parseStack } = {}) {
       throw error;
     }
     if (!raw) throw new Error('runGetMethod returned no response');
-    // TVM -256 is "account is not initialised", which is genuine absence. Every other non-zero exit means the
-    // account EXISTS and the call failed, which must not be mistaken for an empty bucket.
-    if (raw.exit_code === -256) return null;
+    // A code-less account aborts the get-method with -13 (production) or -256 (sandbox) = genuine absence. Every other
+    // non-zero exit means the account EXISTS and the call failed, which must not be mistaken for an empty bucket.
+    if (raw.exit_code === -256 || raw.exit_code === -13) return null;
     if (raw.exit_code !== 0) throw new Error(`get_scan_page failed with exit_code ${raw.exit_code}`);
     return (parseStack ?? parseScanPageStack)(raw.stack);
   };
 }
 
-/** Absence must come from a structured field, never from a substring of an endpoint-controlled message. */
+/** Absence must come from the non-spoofable TVM abort code for a code-less account, never a transport status an
+ *  intermediary controls. Through this transport that code is -13 in production (TON_GET_METHOD_UNINITIALIZED_EXIT_CODE,
+ *  as matched by isAthWalletNotDeployedError) and -256 under the @ton/sandbox emulator, so BOTH count. A bare HTTP 404 is
+ *  NOT absence: toncenter returns an uninitialised account as HTTP 200 + that exit code, so a 404 only ever means an
+ *  endpoint/proxy/gateway failure — reading it as "empty bucket" is exactly the silent-loss this function's callers warn
+ *  against. Rethrow it as transient so the scanner retries. [confirm review: uninit code -13, 404 false-absence] */
 function isStructurallyAbsent(error) {
-  const code = error?.exit_code ?? error?.exitCode ?? error?.body?.exit_code;
-  if (code === -256) return true;
-  const status = error?.status ?? error?.response?.status;
-  return status === 404;
+  const code = Number(error?.exit_code ?? error?.exitCode ?? error?.body?.exit_code);
+  return code === -13 || code === -256;
 }
 
 /**

@@ -5,7 +5,7 @@ import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShar
 import { buildRecoveryPublishBrowser } from '../web/recovery-publish-browser.mjs';
 import { sealRecoveryBlob, openRecoveryBlob } from '../web/recovery-blob.mjs';
 import { createMemoryConvKeyStore } from '../web/conv-key-store.mjs';
-import { decodeRecoveryViewStack, decodeRecoveryBodyStack } from '../web/recovery-transport.mjs';
+import { decodeRecoveryViewStack, decodeRecoveryBodyStack, createRecoveryViewReader } from '../web/recovery-transport.mjs';
 import { serializeBoc, computeCellHashAndDepth } from '../web/pwa-contract-transactions.mjs';
 import { deployFeeSink } from './helpers/fee-sink-fixture';
 
@@ -78,4 +78,17 @@ describe('RECOVERY-TRANSPORT', () => {
     const restored = await openRecoveryBlob(SEED, decodedBody);
     expect(hex(restored.get(convId)!.kRootCurrent), 'the restored K_root is the one that was backed up').toBe(hex(kRootAB));
   }, 240_000);
+
+  it('RT-02: an UNBOUND slot (get-method aborts -13 / -256) reads as null, but a transient read PROPAGATES', async () => {
+    // Production: the transport THROWS the code-less abort (exitCode -13). It is a fresh/unbound slot, not a read
+    // failure — the reader must return null so restore stays CLEAN (else every unbound slot blocks all backups).
+    for (const code of [-13, -256]) {
+      const reader = createRecoveryViewReader(async () => { const e: any = new Error(`exit code ${code}`); e.exitCode = code; throw e; });
+      expect(await reader('EQC_unbound_slot_address_000000000000000000000000000'), `exit ${code} = unbound → null`).toBeNull();
+    }
+    // A rate limit is NOT absence: it must propagate so the restore marks itself unclean and retries, never treats the
+    // slot as unbound and silently drops the conversations it holds.
+    const busy = createRecoveryViewReader(async () => { const e: any = new Error('rate limited'); e.status = 429; throw e; });
+    await expect(busy('EQC_busy_slot_address_00000000000000000000000000000000')).rejects.toThrow(/rate limited|429/i);
+  }, 60_000);
 });
