@@ -2465,6 +2465,19 @@ export function introCapsuleHeader0ObjectFromBytes(bytesLike) {
   };
 }
 
+// INTRO uses a CANONICAL header1, never a per-message one. INTRO publishes only header0+body (2 cells) to keep the
+// stealth first-contact entry minimal — the shard stamps created_at (IntroShard.bodyCommit commits to h0+body only),
+// retention is contract-fixed at one week, and replay is guarded by the handshake introNonce, so header1 carries
+// nothing the recipient needs. But the shared capsule machinery binds the body AEAD to header1Hash, so a per-message
+// header1 (sender-chosen timestamps + a random clientNonce) could never be recovered from the 2-cell on-chain form —
+// which is why chain-receive was impossible. Fixed canonical values keep the AEAD binding intact AND let the recipient
+// reproduce header1Hash exactly, with NO extra on-chain footprint. [OWNER 2026-07-22: the "do it right" fix —
+// canonicalise header1; do NOT publish it (that would bloat the deliberately-minimal stealth entry + need an
+// IntroShard change). Only INTRO is canonical; CONV/legacy 'private' keep their real per-message header1.]
+export function introCanonicalHeader1() {
+  return { version: PROTOCOL_VERSION, flags: 0, createdAt: 0, expiresAt: MAX_CAPSULE_TTL_MS, clientNonce: base64urlEncode(new Uint8Array(16)) };
+}
+
 function privateCapsuleHeader1ObjectFromBytes(bytesLike) {
   const bytes = toUint8Array(bytesLike);
   if (bytes.length !== PLATHO_BINARY_HEADER1_BYTES) throw new Error('Private capsule header1 binary size drift');
@@ -2919,8 +2932,11 @@ export async function createEncryptedIntroCapsule(recipientPublicBundle, senderI
     ephemeralR: base64urlEncode(ephemeralPublicKey),
     viewTag,
   };
-  const header1 = { version: PROTOCOL_VERSION, flags: 0, createdAt, expiresAt, clientNonce };
-  assertCapsuleTimestampPolicy(header1, { ...options, now });
+  // INTRO header1 is CANONICAL (see introCanonicalHeader1): it is NOT published, so it must be reproducible by the
+  // recipient. The per-message createdAt/expiresAt/clientNonce computed above are unused for INTRO — the shard stamps
+  // the authoritative created_at. enforceExpiry:false because the fixed canonical timestamps sit in the past.
+  const header1 = introCanonicalHeader1();
+  assertCapsuleTimestampPolicy(header1, { ...options, now, enforceExpiry: false });
 
   const identityBytes = privateCapsuleIdentityBytes({
     signingPublicKey: senderIdentity.signingPublicKey,
@@ -3201,6 +3217,72 @@ export async function openEncryptedIntroCapsule(capsule, recipientKeyPair, optio
     profileVersion: opened.profileVersion,
     avatarHash: opened.avatarHash,
     capsule: opened.capsule,
+  };
+}
+
+/**
+ * Open an INTRO capsule SOURCED FROM CHAIN — the 2-cell (header0, body) stealth form the recipient's scan fetches.
+ * Unlike openEncryptedIntroCapsule (which opens the in-memory capsule OBJECT and verifies its senderSignature), a
+ * chain INTRO carries NO capsule signature and NO header1 on-chain: the sender is authenticated by the HANDSHAKE
+ * TRANSCRIPT, and header1 is the CANONICAL one the recipient reproduces (introCanonicalHeader1). `header0Bytes`/
+ * `bodyBytes` are the raw snake bytes of the two published cells. Returns the same shape as openEncryptedIntroCapsule.
+ */
+export async function openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, recipientKeyPair, options = {}) {
+  const header0 = introCapsuleHeader0ObjectFromBytes(header0Bytes);
+  const header1 = introCanonicalHeader1();
+  assertPrivateBodyMatchesHeader(header0, bodyBytes);
+  const chainCells = await computePrivateCapsuleChainCells(
+    header0, header1, { version: PROTOCOL_VERSION, kind: 'private', ...compactBodyObjectFromBytes(bodyBytes) },
+  );
+  const hashes = privateCapsuleHashesFromChainCells(chainCells);
+  // Recipient-open: senderKeyId absent (INTRO header0 carries no sender label; the AAD binds header0Hash+header1Hash).
+  const decrypted = await decryptCompactBodyBytes(bodyBytes, recipientKeyPair, {
+    header0Hash: hashes.header0Hash, header1Hash: hashes.header1Hash, senderKeyId: undefined,
+  }, { identitySectionBytes: PLATHO_COMPACT_IDENTITY_BYTES });
+  if (!decrypted.identity) throw new Error('INTRO capsule is missing its in-body sender identity section');
+  const introPayloadBytes = decrypted.payload?.bytes;
+  if (!introPayloadBytes || decrypted.payload.type !== 'document') throw new Error('INTRO capsule is missing its handshake payload');
+  const senderSigningPublicKey = assertBytes('capsule.identity.senderSigningPublicKey', toUint8Array(decrypted.identity.signingPublicKey), ED25519_PUBLIC_KEY_BYTES);
+  const bodyKemCiphertext = inspectCompactBodyBytes(bodyBytes).mlKem768Ciphertext;
+  const ephemeralR = base64urlDecode(header0.ephemeralR ?? header0.ephemeral_r);
+  const viewTag = header0.viewTag ?? header0.view_tag ?? 0;
+  const hs = await openIntroHandshake({
+    introPayloadBytes,
+    recipientIdentity: { encryptionKeyPair: recipientKeyPair },
+    senderSigningPublicKey,
+    ephemeralR,
+    bodyKemCiphertext,
+    viewTag,
+  });
+  // Vault-binding gate (impersonation guard) — identical to openEncryptedIntroCapsule; fail-closed on first contact.
+  if (options.resolveVaultKeyRecord) {
+    const asKey = (v, len, name) => assertBytes(name, typeof v === 'string' ? base64urlDecode(v) : toUint8Array(v), len);
+    const keyIdA = base64urlEncode(hs.senderKeyId);
+    const record = await options.resolveVaultKeyRecord(keyIdA);
+    if (!record) throw new Error('INTRO sender keyId is not registered in the Vault (unbindable)');
+    const regSign = asKey(record.signingPublicKey ?? record.signPublicKey, ED25519_PUBLIC_KEY_BYTES, 'vault.signingPublicKey');
+    const regEnc = asKey(record.x25519PublicKey ?? record.encPublicKey, X25519_PUBLIC_KEY_BYTES, 'vault.x25519PublicKey');
+    if (!bytesEqual(regSign, senderSigningPublicKey)) throw new Error('INTRO sender signing key does not match the Vault KeyRecord (impersonation)');
+    if (!bytesEqual(regEnc, hs.senderEncPublicKey)) throw new Error('INTRO sender enc key does not match the Vault KeyRecord (impersonation)');
+    if (record.mlKem768PublicKey) {
+      const expectedKeyId = await computeHybridKeyId(regEnc, asKey(record.mlKem768PublicKey, MLKEM768_PUBLIC_KEY_BYTES, 'vault.mlKem768PublicKey'));
+      if (expectedKeyId !== keyIdA) throw new Error('INTRO sender keyId does not bind to the registered Vault key bundle');
+    }
+  }
+  if (options.introReplayGuard) {
+    const nonceKey = base64urlEncode(hs.introNonce);
+    if (await options.introReplayGuard.has(nonceKey)) throw new Error('INTRO replay detected (introNonce already seen)');
+    await options.introReplayGuard.add(nonceKey);
+  }
+  return {
+    kRoot: hs.kRoot,
+    senderKeyId: hs.senderKeyId,
+    senderEncPublicKey: hs.senderEncPublicKey,
+    senderSigningPublicKey,
+    introNonce: hs.introNonce,
+    firstMessageBytes: hs.firstMessageBytes,
+    profileVersion: decrypted.identity.profileVersion,
+    avatarHash: decrypted.identity.avatarHash,
   };
 }
 
