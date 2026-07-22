@@ -22,13 +22,15 @@ import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=33';
 const MLKEM768_PUBLIC_KEY_BYTES = 1184;
 
 /**
- * Build + VERIFY a peer bundle from a KeyShard view (the object createKeyShardTonRpcProvider.getView returns).
- * `peerKeyId` is the base64url keyId the conversation was established under (conv-key-store key). Throws — fail
- * closed — if the shard is unregistered or its bundle does not hash to peerKeyId.
+ * Build a full messaging bundle from a KeyShard view (the object createKeyShardTonRpcProvider.getView returns), WITHOUT
+ * an identity gate. The keyId is an OUTPUT here, computed from the keys. This is the INITIATOR's resolve: they pick a
+ * recipient by wallet, and the KeyShard is ADDRESS-BOUND to that wallet (deriveKeyShardRawAddress — only that wallet's
+ * own send can register it), so the keys are authentic by construction and the resolved keyId DEFINES the conversation.
+ * The RESPONDER, who resolves by an UNTRUSTED INTRO src, must NOT use this directly — it must go through the gated
+ * wrapper below, which refuses a shard whose keyId differs from the one the conversation was already established under.
  */
-export async function resolvePeerBundleFromKeyShardView(view, peerKeyId) {
-  if (!view?.exists) throw new Error('peer KeyShard is not registered — cannot resolve a reply bundle');
-  if (typeof peerKeyId !== 'string' || peerKeyId.length === 0) throw new Error('resolvePeerBundleFromKeyShardView requires the conversation peerKeyId');
+export async function resolveBundleFromKeyShardView(view) {
+  if (!view?.exists) throw new Error('peer KeyShard is not registered — cannot resolve a bundle');
   // Decode the ML-KEM snake cell to raw bytes BEFORE handing the record to the bundle builder (format trap above).
   const mlKemBytes = readSnakeCellBytes(view.pq_kem_pubkey, { maxBytes: MLKEM768_PUBLIC_KEY_BYTES, name: 'peer pq_kem_pubkey' });
   if (mlKemBytes.length !== MLKEM768_PUBLIC_KEY_BYTES) throw new Error('peer ML-KEM pubkey is not 1184 bytes');
@@ -37,19 +39,28 @@ export async function resolvePeerBundleFromKeyShardView(view, peerKeyId) {
     revoked_lt: 0n,
     enc_pubkey: view.enc_pubkey,
     sign_pubkey: view.sign_pubkey,
-    // Carry scan_pubkey so the bundle is COMPLETE. A CONV reply seal (createEncryptedConvCapsule) routes by bucketKey
-    // and does NOT need it — but the INITIATOR reuses this resolver, and an INTRO seal (createEncryptedIntroCapsule)
-    // DOES require the recipient's scan key for the stealth view_tag. Omitting it left a bundle that silently could not
-    // seal an INTRO. scan_pubkey is public and sits right in the view (stack idx 7). [conv-reply-bundle review]
+    // Carry scan_pubkey so the bundle is COMPLETE. A CONV seal (createEncryptedConvCapsule) routes by bucketKey and
+    // does NOT need it — but an INTRO seal (createEncryptedIntroCapsule) DOES require the recipient's scan key for the
+    // stealth view_tag. Omitting it left a bundle that silently could not seal an INTRO. scan_pubkey is public and
+    // sits right in the view (stack idx 7). [conv-reply-bundle review]
     scan_pubkey: view.scan_pubkey,
     crypto_suite_mask: view.crypto_suite_mask,
     pq_kem_pubkey_len: view.pq_kem_pubkey_len,
     pq_kem_pubkey_hash: view.pq_kem_pubkey_hash,
     pq_kem_pubkey: mlKemBytes,
   };
-  const bundle = await publicKeyBundleFromVaultKeyRecord(keyRecord, { suite: CRYPTO_SUITES.HYBRID_V1 });
-  // THE VERIFICATION: the shard's bundle must reproduce the pairwise keyId. keyId = H(enc, sha256(mlkem)) binds both
-  // keys, so this single equality confirms the src pointed at the RIGHT shard and its keys were not swapped.
+  return publicKeyBundleFromVaultKeyRecord(keyRecord, { suite: CRYPTO_SUITES.HYBRID_V1 });
+}
+
+/**
+ * Build + VERIFY a peer bundle from a KeyShard view. `peerKeyId` is the base64url keyId the conversation was already
+ * established under (conv-key-store key). Throws — fail closed — if the shard is unregistered or its bundle does not
+ * hash to peerKeyId. keyId = H(enc, sha256(mlkem)) binds BOTH keys, so this single equality confirms the (untrusted)
+ * src pointed at the RIGHT shard and its keys were not swapped.
+ */
+export async function resolvePeerBundleFromKeyShardView(view, peerKeyId) {
+  if (typeof peerKeyId !== 'string' || peerKeyId.length === 0) throw new Error('resolvePeerBundleFromKeyShardView requires the conversation peerKeyId');
+  const bundle = await resolveBundleFromKeyShardView(view);
   if (bundle.keyId !== peerKeyId) {
     throw new Error('peer KeyShard bundle does not match the conversation keyId (wrong/hostile source — reply refused)');
   }
@@ -57,9 +68,21 @@ export async function resolvePeerBundleFromKeyShardView(view, peerKeyId) {
 }
 
 /**
- * Read the peer's KeyShard (by wallet) via the injected provider and resolve their verified reply bundle.
- * `provider` is createKeyShardTonRpcProvider(...). Thin I/O wrapper over the pure resolver above so tests can drive
- * the format/verification logic without a chain.
+ * INITIATOR path: read the recipient's KeyShard (by a wallet the initiator chose — from the thread / username) via the
+ * injected provider and build their bundle. No gate: the wallet was chosen, the shard is address-bound to it, and the
+ * resolved bundle.keyId becomes the conversation's peerKeyId. `provider` is createKeyShardTonRpcProvider(...).
+ */
+export async function resolveRecipientBundleByWallet({ provider, wallet, callOptions = {} }) {
+  if (typeof provider?.getView !== 'function') throw new Error('resolveRecipientBundleByWallet requires a KeyShard provider');
+  if (!wallet) throw new Error('resolveRecipientBundleByWallet requires the recipient wallet');
+  const view = await provider.getView(wallet, callOptions);
+  return resolveBundleFromKeyShardView(view);
+}
+
+/**
+ * RESPONDER path: read the peer's KeyShard (by the INTRO publish src wallet) via the injected provider and resolve
+ * their VERIFIED reply bundle. `provider` is createKeyShardTonRpcProvider(...). Thin I/O wrapper over the gated resolver
+ * above so tests can drive the format/verification logic without a chain.
  */
 export async function resolvePeerReplyBundle({ provider, peerWallet, peerKeyId, callOptions = {} }) {
   if (typeof provider?.getView !== 'function') throw new Error('resolvePeerReplyBundle requires a KeyShard provider');
