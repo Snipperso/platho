@@ -4,7 +4,9 @@ import { Address, beginCell, toNano, Cell } from '@ton/core';
 import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
 import { buildRecoveryPublish } from '../web/publish-builder.mjs';
 import { buildRecoveryPublishBrowser } from '../web/recovery-publish-browser.mjs';
-import { computeCellHashAndDepth, serializeBoc, beginCell as clientCell } from '../web/pwa-contract-transactions.mjs';
+import { computeCellHashAndDepth, serializeBoc, beginCell as clientCell, parseBocBase64 } from '../web/pwa-contract-transactions.mjs';
+import { sealRecoveryBlob, openRecoveryBlob } from '../web/recovery-blob.mjs';
+import { createMemoryConvKeyStore } from '../web/conv-key-store.mjs';
 import { deployFeeSink } from './helpers/fee-sink-fixture';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -74,5 +76,50 @@ describe('RECOVERY-PUBLISH-BROWSER — the same owner-signed recovery record, bu
     expect(view.seq, 'seq advanced to the published seq').toBe(1n);
     expect(view.self_bucket_key, 'the shard is at the derived slot key').toBe(built.slotKey);
     expect(view.bh, 'the stored body hash matches the blob').toBe(bh);
+  }, 240_000);
+
+  it('REC-03: a REAL sealed K_root blob publishes, reads back via get_view + get_body, and opens to the same map (reinstall)', async () => {
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    await deployFeeSink(bc, { funderSeed: 'rec-03-sink' });
+    const payer = await bc.treasury('rec-03-payer');
+
+    // A real conversation key map, sealed under the wallet seed (the reinstall-recovery payload).
+    const A = new Uint8Array(32).fill(0x11);
+    const B = new Uint8Array(32).fill(0x22);
+    const kRootAB = new Uint8Array(32).fill(0x5a);
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kRootAB, createdAt: 100, introNonce: new Uint8Array(16).fill(1), peerWallet: 'w-A' });
+    await store.advanceConvScanCursor(A, B, 19005);
+    const map = store.snapshot();
+    const convId = [...map.keys()][0];
+
+    const { body, h0, h1 } = await sealRecoveryBlob(SEED, map);
+    const built = await buildRecoveryPublishBrowser({ seed: SEED, slotIndex: 3, seq: 1, h0, h1, body, value: toNano('0.05') });
+
+    const dest = Address.parseRaw(built.to);
+    const initCore = toCoreCell(built.init);
+    const res = await payer.send({
+      to: dest, value: built.value, body: toCoreCell(built.body),
+      init: { code: initCore.refs[0], data: initCore.refs[1] }, bounce: true,
+    } as any);
+    const tx: any = res.transactions.find((t: any) => t.inMessage?.info?.dest?.toString() === dest.toString());
+    expect(Number(tx?.description?.computePhase?.exitCode), 'the shard accepted the sealed blob').toBe(0);
+
+    const shard = bc.openContract(RecoveryShard.fromAddress(dest));
+    const view = await shard.getGetView();
+    expect(view.h0, 'the digest hashes are stored').toBe(h0);
+    expect(view.h1).toBe(h1);
+
+    // THE REINSTALL PATH: read the blob back off chain (get_body) and open it from the SEED alone.
+    const storedBody = await shard.getGetBody();
+    const restored = await openRecoveryBlob(SEED, parseBocBase64(storedBody.toBoc().toString('base64')));
+    const rec = restored.get(convId)!;
+    expect(rec, 'the conversation is recovered on a fresh device from the seed + chain').toBeTruthy();
+    expect(Buffer.from(rec.kRootCurrent).toString('hex'), 'the SAME K_root the device once held').toBe(Buffer.from(kRootAB).toString('hex'));
+    expect(rec.lastScannedEpoch, 'the scan cursor is recovered too').toBe(19005);
+
+    // and a wrong seed cannot open the on-chain blob.
+    await expect(openRecoveryBlob(new Uint8Array(32).fill(0x01), parseBocBase64(storedBody.toBoc().toString('base64')))).rejects.toThrow();
   }, 240_000);
 });
