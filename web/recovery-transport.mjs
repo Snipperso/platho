@@ -43,6 +43,11 @@ export function decodeRecoveryBodyStack(stack) {
   return typeof value === 'string' ? parseBocBase64(value) : value;
 }
 
+// A code-less account aborts a get-method run with -13 (production, via this transport — TON_GET_METHOD_UNINITIALIZED_
+// EXIT_CODE, as isAthWalletNotDeployedError matches) or -256 (the @ton/sandbox emulator). BOTH mean "fresh/unbound slot".
+function isRecoveryUninitExit(code) { return Number(code) === -13 || Number(code) === -256; }
+function isRecoveryUninitError(error) { return isRecoveryUninitExit(error?.exit_code ?? error?.exitCode ?? error?.body?.exit_code); }
+
 /**
  * Bind get_view to a get-method runner. `runGetMethod({ address, method, stack })` resolves toncenter's response;
  * an uninitialised slot (never bound) returns null rather than raising — the normal case under lazy deploy.
@@ -50,9 +55,18 @@ export function decodeRecoveryBodyStack(stack) {
 export function createRecoveryViewReader(runGetMethod) {
   if (typeof runGetMethod !== 'function') throw new Error('createRecoveryViewReader requires runGetMethod');
   return async (address) => {
-    const raw = await runGetMethod({ address: toWireAddress(address), method: 'get_view', stack: [] });
+    let raw;
+    try {
+      raw = await runGetMethod({ address: toWireAddress(address), method: 'get_view', stack: [] });
+    } catch (error) {
+      // An unbound slot ABORTS the get-method, and this transport THROWS that (exitCode -13). It is a fresh/unbound
+      // slot, NOT a read failure: return null so the restore keeps probing and stays CLEAN. Mis-catching it as a
+      // transient (clean=false) would block EVERY backup, since almost all 256 slots are unbound. [confirm review: -13]
+      if (isRecoveryUninitError(error)) return null;
+      throw error;
+    }
     if (!raw) return null;
-    if (raw.exit_code === -256) return null;                       // account not initialised = fresh/unbound slot
+    if (isRecoveryUninitExit(raw.exit_code)) return null;          // account not initialised = fresh/unbound slot
     if (raw.exit_code !== 0) throw new Error(`get_view failed with exit_code ${raw.exit_code}`);
     return decodeRecoveryViewStack(raw.stack);
   };

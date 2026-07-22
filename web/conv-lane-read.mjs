@@ -149,6 +149,137 @@ export function decodeRecordShardLastSeq(stack) {
   return Number(BigInt(stack[2]?.value ?? 0));
 }
 
+/** Decode a RecordShardView getter stack to { lastSeq, recordCount } — record_count is index 3, the number of records
+ *  stored (each publish appends exactly one). Arity check guards the same silent field-shift drift. */
+export function decodeRecordShardView(stack) {
+  if (!Array.isArray(stack) || stack.length < 4) {
+    throw new Error(`RecordShard get_view returned ${stack?.length ?? 0} stack items, expected >= 4`);
+  }
+  return { lastSeq: Number(BigInt(stack[2]?.value ?? 0)), recordCount: Number(BigInt(stack[3]?.value ?? 0)) };
+}
+
+/** Decode a CapsuleRecordView getter stack — get_record returns { exists: Bool, frame_commit: Int, created_at: Int }.
+ *  The Bool comes back as an int (0/1) on the stack; frame_commit is the per-record commitment the confirm matches. */
+export function decodeCapsuleRecordView(stack) {
+  if (!Array.isArray(stack) || stack.length < 3) {
+    throw new Error(`RecordShard get_record returned ${stack?.length ?? 0} stack items, expected >= 3`);
+  }
+  return {
+    exists: BigInt(stack[0]?.value ?? 0) !== 0n,
+    frameCommit: BigInt(stack[1]?.value ?? 0),
+    createdAt: Number(BigInt(stack[2]?.value ?? 0)),
+  };
+}
+
+// Absence must come from the NON-SPOOFABLE TVM abort code a get-method run yields against a code-less account, which
+// toncenter returns IN THE BODY (HTTP 200) and the transport rethrows as error.exitCode. THROUGH THIS TRANSPORT that
+// code is -13 in production (TON_GET_METHOD_UNINITIALIZED_EXIT_CODE — the same code isAthWalletNotDeployedError matches;
+// a first assumption of -256 was wrong and re-opened a silent green, so it is verified against the transport here); the
+// @ton/sandbox emulator surfaces it as -256, so BOTH count. A bare HTTP 404 does NOT: the transport 404s on any
+// endpoint/proxy/gateway/misroute failure, and mis-reading a transient 404 as "not landed" would false-red a landed
+// payment and, past the re-broadcast window, drive a double-publish. [confirm review: uninit code -13, 404 false-absence]
+const RS_UNINIT_EXIT_CODES = new Set([-13, -256]);
+function isUninitExit(code) { return RS_UNINIT_EXIT_CODES.has(Number(code)); }
+function isStructurallyAbsent(error) {
+  return isUninitExit(error?.exit_code ?? error?.exitCode ?? error?.body?.exit_code);
+}
+
+/**
+ * Read a RecordShard's get_view as { exists, lastSeq, recordCount }. A structurally-absent account (never deployed) is
+ * reported exists:false / recordCount:0 — NOT an error. Any OTHER failure (429, non-(-256) exit, network) throws, so the
+ * caller never mistakes "I could not read it" for "the shard has no records". Used by the CONV delivery confirm.
+ */
+export function createRecordShardViewReader(runGetMethod) {
+  if (typeof runGetMethod !== 'function') throw new Error('createRecordShardViewReader requires runGetMethod');
+  return async (address) => {
+    let raw;
+    try {
+      raw = await runGetMethod({ address: toWireAddress(address), method: 'get_view', stack: [] });
+    } catch (error) {
+      if (isStructurallyAbsent(error)) return { exists: false, lastSeq: 0, recordCount: 0 };
+      throw error;
+    }
+    if (!raw) throw new Error('RecordShard get_view returned no response');
+    if (isUninitExit(raw.exit_code)) return { exists: false, lastSeq: 0, recordCount: 0 };
+    if (raw.exit_code !== 0) throw new Error(`RecordShard get_view failed with exit_code ${raw.exit_code}`);
+    return { exists: true, ...decodeRecordShardView(raw.stack) };
+  };
+}
+
+/**
+ * Read one RecordShard record by entry_id via get_record → { exists, frameCommit, createdAt }. Structural absence (the
+ * whole shard is not deployed) reports exists:false; other failures throw (transient — the confirm retries, it does NOT
+ * conclude "not stored" from a read it could not complete).
+ */
+export function createRecordShardRecordReader(runGetMethod) {
+  if (typeof runGetMethod !== 'function') throw new Error('createRecordShardRecordReader requires runGetMethod');
+  return async (address, entryId) => {
+    let raw;
+    try {
+      raw = await runGetMethod({ address: toWireAddress(address), method: 'get_record', stack: [{ type: 'num', value: String(entryId) }] });
+    } catch (error) {
+      if (isStructurallyAbsent(error)) return { exists: false, frameCommit: 0n, createdAt: 0 };
+      throw error;
+    }
+    if (!raw) throw new Error('RecordShard get_record returned no response');
+    if (isUninitExit(raw.exit_code)) return { exists: false, frameCommit: 0n, createdAt: 0 };
+    if (raw.exit_code !== 0) throw new Error(`RecordShard get_record failed with exit_code ${raw.exit_code}`);
+    return decodeCapsuleRecordView(raw.stack);
+  };
+}
+
+/**
+ * Confirm a CONV message LANDED by matching MY frame_commit(s) against the records the shard actually stored — NOT the
+ * global last_seq high-water (the flaw that sank the first confirm driver: a LATER message reaching that seq while mine
+ * bounced false-confirmed the bounced one → silent loss). frame_commit is per-record and unique to my capsule, so a
+ * different write can never satisfy it. My outgoing conversation-direction shard is written ONLY by me (the write key is
+ * mine), so my parts are the MOST RECENT records — the scan walks down from record_count and normally hits them at once.
+ *
+ * `commits` is the array of my parts' frame_commits (all must be present — a middle part can bounce while a later one
+ * lands, gate 13653 being strictly-increasing not contiguous). `minSeq` is my highest part's seq (a cheap authoritative
+ * floor, below). Returns { landed, complete, seqShort, recordCount, lastSeq, scanned }:
+ *   - landed=true   → every commit is stored (verified delivery).
+ *   - seqShort=true → the shard has NOT accepted a publish up to my seq (last_seq < minSeq). Since my direction is
+ *     mine-only and strictly-increasing, NONE of my parts is stored and (SAFE_CAP reached / seq collision / underfunding
+ *     — the dominant bounce causes) none can be now. No record scan is done; the caller decides FINALITY from age.
+ *   - complete=true → the record scan is AUTHORITATIVE: it found them all, or reached record 0 (nothing left to find).
+ *     maxScan DEFAULTS to the full record_count, so a bounced commit's ABSENCE is always provable — a fixed 512 window
+ *     left every bounce in a >512-record shard PERMANENTLY not-complete → never reddened → false green. [confirm review]
+ *   - landed=false & complete=false & !seqShort → an explicit maxScan window was exhausted with records still below —
+ *     INCONCLUSIVE, not a failure. (Does not arise with the default full scan.)
+ * THROWS on a transient read (propagated from the readers) — the caller treats a throw as "retry", never "not landed".
+ */
+export async function confirmConvRecordsLanded({ readView, readRecord, address, commits, minSeq = null, maxScan = null }) {
+  if (typeof readView !== 'function' || typeof readRecord !== 'function') {
+    throw new Error('confirmConvRecordsLanded requires readView/readRecord');
+  }
+  const want = new Set((commits ?? []).map((c) => BigInt(c)));
+  if (want.size === 0) return { landed: true, complete: true, seqShort: false, recordCount: 0, lastSeq: 0, scanned: 0 };
+  const view = await readView(address);
+  // Absent shard: my publish (which carries StateInit) would have DEPLOYED it, so absence is authoritative non-landing.
+  if (!view?.exists) return { landed: false, complete: true, seqShort: false, recordCount: 0, lastSeq: 0, scanned: 0 };
+  const recordCount = Number(view.recordCount);
+  const lastSeq = Number(view.lastSeq);
+  // CHEAP SEQ FLOOR — no record reads. If the shard has not reached my seq, none of my parts is stored. Handles the
+  // >512-record shard bounce at zero scan cost (at SAFE_CAP the bounce leaves last_seq below my seq).
+  if (minSeq != null && lastSeq < Number(minSeq)) {
+    return { landed: false, complete: false, seqShort: true, recordCount, lastSeq, scanned: 0 };
+  }
+  // The shard has passed my seq (or no floor given): my parts have had their FINAL accept/bounce. Scan for my commits;
+  // the default limit is the WHOLE shard so absence is provable. The common landed case short-circuits at the top.
+  const limit = maxScan == null ? recordCount : Math.min(Number(maxScan), recordCount);
+  const found = new Set();
+  let scanned = 0;
+  for (let id = recordCount - 1; id >= 0 && scanned < limit && found.size < want.size; id -= 1) {
+    const rec = await readRecord(address, id);
+    scanned += 1;
+    if (rec?.exists && want.has(BigInt(rec.frameCommit))) found.add(BigInt(rec.frameCommit));
+  }
+  const landed = found.size === want.size;
+  const complete = landed || scanned >= recordCount;   // found them all, or walked to the bottom with nothing left
+  return { landed, complete, seqShort: false, recordCount, lastSeq, scanned, foundCount: found.size };
+}
+
 /**
  * Read a RecordShard's on-chain last_seq (the publish anti-rollback floor, gate 13653) via get_view. Used as the CONV
  * outgoing-seq COLD-START floor when the local monotonic counter has no value for a (conversation, epoch) — e.g. after
@@ -160,7 +291,7 @@ export function createRecordShardLastSeqReader(runGetMethod) {
   if (typeof runGetMethod !== 'function') throw new Error('createRecordShardLastSeqReader requires runGetMethod');
   return async (address) => {
     const raw = await runGetMethod({ address: toWireAddress(address), method: 'get_view', stack: [] });
-    if (!raw || raw.exit_code === -256) return 0;                        // shard not deployed → nothing published
+    if (!raw || isUninitExit(raw.exit_code)) return 0;                   // shard not deployed → nothing published (-13 prod / -256 sandbox)
     if (raw.exit_code !== 0) throw new Error(`RecordShard get_view failed with exit_code ${raw.exit_code}`);
     return decodeRecordShardLastSeq(raw.stack);
   };

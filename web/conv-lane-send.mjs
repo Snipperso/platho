@@ -97,7 +97,16 @@ export async function publishConvLaneParts({ wallet, transport }, parts, options
   if (!Array.isArray(parts) || parts.length === 0) throw new Error('publishConvLaneParts requires at least one part');
   const prepared = [];
   for (const part of parts) prepared.push(await buildConvPublishWalletMessage(part));
-  const result = await sendPlathoWalletTransaction(wallet, { messages: prepared.map((p) => p.message) }, { ...options, transport });
+  let result;
+  try {
+    result = await sendPlathoWalletTransaction(wallet, { messages: prepared.map((p) => p.message) }, { ...options, transport });
+  } catch (error) {
+    // Attach the prepared parts (each carries its frame_commit) so the caller can arm the delivery confirm on the SAME
+    // commits even when the broadcast throws ambiguously — symmetric with platho-wallet attaching error.builtBoc. Without
+    // this, an ambiguous send that actually landed could never be verified. [conv delivery confirm]
+    if (error && !error.preparedParts) error.preparedParts = prepared;
+    throw error;
+  }
   return { parts: prepared, result };
 }
 

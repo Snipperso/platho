@@ -182,7 +182,7 @@ import { outgoingRecordShard } from './conv-discovery.mjs?v=1';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
 import { createConvReadLane } from './conv-lane.mjs?v=1';
-import { createRecordShardLastSeqReader } from './conv-lane-read.mjs?v=1';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded } from './conv-lane-read.mjs?v=1';
 import { createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
 // clean-17 first-contact (INTRO) send.
@@ -3665,6 +3665,7 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   localVaultDraft = null;
   // Stop the INTRO scan and drop its per-wallet K_root state — a different wallet must never inherit these (bleed).
   stopIntroReceiveLane();
+  cancelAllConvDeliveryConfirms();   // drop pending delivery-confirm timers so none fires against a torn-down transport
   convKeyStore = null;
   introReplayGuard = null;
   convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
@@ -4165,6 +4166,7 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   localVaultDraft = null;
   localProfileAvatarPointer = null;
   stopIntroReceiveLane();
+  cancelAllConvDeliveryConfirms();   // drop pending delivery-confirm timers so none fires against a torn-down transport
   convKeyStore = null;
   introReplayGuard = null;
   convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
@@ -14617,6 +14619,12 @@ function serializeMessageForHistory(message) {
     privatePublishConfirmAttempt: Number(message.privatePublishConfirmAttempt ?? 0) || 0,
     privatePublishConfirmStopped: message.privatePublishConfirmStopped === true,
     privatePublishConfirmStoppedAt: message.privatePublishConfirmStoppedAt ?? null,
+    // clean-17 CONV delivery confirm: the driver's setTimeout chain dies on reload, but these DO survive it, so
+    // rearmConvDeliveryConfirms can resume verifying an optimistic-green send (and the persisted boc revives the
+    // idempotent re-broadcast). Without persistence a bounced green reloaded before the 8-min terminal froze green
+    // forever = silent loss. convDirectSend is JSON-safe (commits are hex strings). [confirm review: persistence]
+    convDirectSend: safeJsonClone(message.convDirectSend) ?? null,
+    convDelivery: message.convDelivery ?? null,
     attachment: message.attachment ?? null,
     profileVersion: message.profileVersion ?? 0,
     avatarHash: message.avatarHash ?? zeroAvatarHashHex(),
@@ -14891,6 +14899,9 @@ async function restoreEncryptedMessageHistory() {
   resumePendingPublicPublishConfirmations();
       resumePendingPrivateSendRetries();
     }
+    // Re-arm CONV delivery confirms for sends still unresolved when the page reloaded — the setTimeout chain does not
+    // survive a reload, but the persisted convDirectSend (commits + shard address) does. Bounded by the max age inside.
+    rearmConvDeliveryConfirms();
   } catch (error) {
     setText(localStateLabel, t('sync.historyBlocked'));
     console.error(error);
@@ -29335,13 +29346,154 @@ const DIRECT_SEND_REBROADCAST_WINDOW_MS = 330_000;
 function markDirectSendPublished(thread, message) {
   clearPrivateSendRetry(message);
   clearPrivateMessageManualRecovery(message);
-  message.meta = 'published';        // terminal-delivered (green). A shard-read confirm driver is a follow-up.
+  message.meta = 'published';        // OPTIMISTIC green — the background confirm driver below verifies (or corrects) it.
   message.privateManualRetryAvailable = false;
   message.privateCancelAvailable = false;
   thread.state = 'sealed';
   refreshThreadAfterMessageChange(thread);
   updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
   refreshMessagingControls();
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// CONV DELIVERY CONFIRM DRIVER. The send path marks a message green OPTIMISTICALLY the moment the wallet external is
+// broadcast — but a broadcast is not a landing: the publish can bounce (gate 13653, insufficient value) and the record
+// never store, which is exactly the "money spent, nothing arrives" silent success the whole lane is built to avoid.
+// This driver reads the shard back and either UPGRADES the message to verified or CORRECTS a false green to red.
+//
+// WHY THIS ONE IS CORRECT WHERE THE FIRST WAS NOT (reverted 2defbdc5). The first driver compared the shard's GLOBAL
+// last_seq high-water: a LATER message reaching that seq while THIS one bounced false-confirmed the bounced message →
+// silent loss. This driver matches THIS message's own frame_commit(s) — per-record, unique to its capsule — via
+// confirmConvRecordsLanded, so a different write can never satisfy it. Three disciplines make it safe:
+//   1. ABSENCE ≠ FAILURE. A read that could not complete (429/network) is transient — NEVER concluded as not-landed.
+//      Only a CLEAN, COMPLETE scan (confirmConvRecordsLanded.complete) that reached the bottom counts.
+//   2. LAG ≠ LOSS. A clean "not found" early on is indexer lag, not loss. Failure is declared ONLY past
+//      CONV_CONFIRM_MAX_AGE_MS — well beyond both the ~300s external validity and any realistic indexer lag — so by
+//      then a landed record WOULD be visible, and a subsequent resend safely REBUILDS (the external is provably dead).
+//   3. CANCELLABLE + RE-ARMABLE. Every armed timer is tracked so teardown cancels it; unresolved sends re-arm on reload.
+const CONV_CONFIRM_SCHEDULE_MS = [12_000, 20_000, 30_000, 45_000, 60_000, 90_000, 120_000];
+const CONV_CONFIRM_MAX_AGE_MS = 8 * 60 * 1000;   // TERMINAL: past ~8 min the external is long dead (>330s) and a landed record is indexed — decide now
+const CONV_CONFIRM_BOUNDED_SCAN = 256;           // non-terminal ticks scan only the recent top (a landed message is there); the FULL record_count walk that proves ABSENCE runs once, at the terminal tick
+const CONV_CONFIRM_REARM_MAX_AGE_MS = 24 * 60 * 60 * 1000;   // re-arm unresolved sends up to 24h after reload: well under RS_RETENTION (1y), so an absent shard is still "never deployed" (red correct), not "retired"
+const convDeliveryConfirmTimers = new Map();     // message -> setTimeout handle, so teardown/re-arm can cancel it
+let convDeliveryConfirmGeneration = 0;           // bumped on teardown so a tick begun before it becomes a no-op (no re-arm)
+
+function cancelConvDeliveryConfirm(message) {
+  const timer = convDeliveryConfirmTimers.get(message);
+  if (timer !== undefined) { clearTimeout(timer); convDeliveryConfirmTimers.delete(message); }
+}
+
+/** Cancel every in-flight confirm — called on identity teardown so no timer fires against a torn-down transport. Bumps
+ *  the generation so a tick ALREADY past its own timer (suspended on the shard read) cannot re-arm after this runs. */
+function cancelAllConvDeliveryConfirms() {
+  convDeliveryConfirmGeneration += 1;
+  for (const timer of convDeliveryConfirmTimers.values()) clearTimeout(timer);
+  convDeliveryConfirmTimers.clear();
+}
+
+/** Record what the confirm needs — commits + shard address + my highest part seq — onto message.convDirectSend
+ *  (persisted with the message). maxSeq is the cheap authoritative floor: if the shard never reaches it, nothing landed. */
+function captureConvDeliveryConfirmTarget(message, { address, epoch, commits, maxSeq }) {
+  if (!message || !address || !Array.isArray(commits) || commits.length === 0) return;
+  const send = message.convDirectSend ?? (message.convDirectSend = { boc: null, at: Date.now() });
+  send.address = address;
+  send.epoch = epoch;
+  send.commits = commits.map((c) => BigInt(c).toString(16));   // bigint → hex string (survives JSON/history persistence)
+  if (Number.isFinite(maxSeq)) send.maxSeq = Number(maxSeq);
+}
+
+function armConvDeliveryConfirm(thread, message, attempt = 0) {
+  const send = message?.convDirectSend;
+  if (!send?.address || !Array.isArray(send.commits) || send.commits.length === 0) return;   // nothing to confirm
+  if (message.convDelivery === 'verified' || message.convDelivery === 'unlanded') return;    // already resolved
+  cancelConvDeliveryConfirm(message);                                                         // never double-arm
+  const generation = convDeliveryConfirmGeneration;
+  const delayMs = CONV_CONFIRM_SCHEDULE_MS[Math.min(attempt, CONV_CONFIRM_SCHEDULE_MS.length - 1)];
+  const timer = setTimeout(() => {
+    runConvDeliveryConfirm(thread, message, attempt, generation).catch((error) => console.warn('[conv] delivery confirm tick failed', error));
+  }, delayMs);
+  convDeliveryConfirmTimers.set(message, timer);
+}
+
+async function runConvDeliveryConfirm(thread, message, attempt, generation) {
+  convDeliveryConfirmTimers.delete(message);
+  if (generation !== convDeliveryConfirmGeneration) return;               // a teardown ran after this tick was scheduled — abandon
+  if (!thread?.messages?.includes(message)) return;                       // message/thread gone — drop the confirm
+  const send = message.convDirectSend;
+  if (!send?.address || !Array.isArray(send.commits) || send.commits.length === 0) return;
+  if (message.convDelivery === 'verified' || message.convDelivery === 'unlanded') return;
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  const ageMs = Date.now() - Number(send.at ?? Date.now());
+  const reArm = () => { if (generation === convDeliveryConfirmGeneration && ageMs < CONV_CONFIRM_MAX_AGE_MS) armConvDeliveryConfirm(thread, message, attempt + 1); };
+  if (!transport?.runGetMethod) { reArm(); return; }
+  const readView = createRecordShardViewReader((call) => transport.runGetMethod(call));
+  const readRecord = createRecordShardRecordReader((call) => transport.runGetMethod(call));
+  const commits = send.commits.map((h) => BigInt('0x' + h));
+  // Only the TERMINAL tick needs the authoritative full-shard walk (to prove ABSENCE via complete). Earlier ticks scan
+  // just the recent top — a LANDED message is there and short-circuits to verified; a not-found stays inconclusive and
+  // re-arms — so the up-to-record_count walk runs at most once, not on every tick. [confirm review: per-tick re-walk cost]
+  const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS;
+  let res;
+  try {
+    res = await confirmConvRecordsLanded({ readView, readRecord, address: send.address, commits, minSeq: send.maxSeq ?? null, maxScan: terminal ? null : CONV_CONFIRM_BOUNDED_SCAN });
+  } catch (error) {
+    // TRANSIENT — a read I could not complete is NEVER "not landed". Retry within the age budget; past it, leave the
+    // message optimistically green (the pre-driver residual) rather than falsely reddening it on an endpoint outage.
+    if (!noteTonRpcRateLimit(error)) console.warn('[conv] delivery confirm read failed', error);
+    reArm();
+    return;
+  }
+  // Re-check the generation AFTER the await: a teardown during the shard read must not let this tick write state or
+  // re-arm against a swapped-out wallet/transport. [confirm review: fire-after-teardown re-arm escape]
+  if (generation !== convDeliveryConfirmGeneration || !thread?.messages?.includes(message)) return;
+  if (res.landed) {
+    message.convDelivery = 'verified';                                    // upgrade: proven on chain
+    cancelConvDeliveryConfirm(message);
+    updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+    return;
+  }
+  // Definitive non-delivery needs BOTH: the external is provably dead (past max age — it can never land now) AND the read
+  // was authoritative — the scan reached the bottom (res.complete) OR the shard never accepted my seq (res.seqShort:
+  // mine-only + strictly-increasing ⇒ it never will now). Before max age it is indexer lag, not loss — keep polling.
+  if (ageMs >= CONV_CONFIRM_MAX_AGE_MS) {
+    if (res.complete || res.seqShort) markConvDeliveryUnlanded(thread, message);
+    return;   // inconclusive at the deadline (couldn't reach bottom, shard past my seq) — leave optimistic green, never false-red
+  }
+  reArm();
+}
+
+/** A false green corrected: the shard never stored this message. Red terminal status (no Retry button — the owner's
+ *  chosen model, [[failed-send-ui-red-status-enough]]); the external is long dead so a fresh compose sends cleanly. */
+function markConvDeliveryUnlanded(thread, message) {
+  cancelConvDeliveryConfirm(message);
+  if (!thread?.messages?.includes(message)) return;
+  message.convDelivery = 'unlanded';
+  message.meta = 'not delivered: the shard did not store it — resend';
+  message.privateManualRetryAvailable = false;
+  message.privateCancelAvailable = false;
+  thread.state = 'blocked';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+  refreshMessagingControls();
+}
+
+/** Re-arm confirms for messages still unresolved after a reload (the timers do not survive a page load, the persisted
+ *  convDirectSend does). Bounded by CONV_CONFIRM_REARM_MAX_AGE_MS (24h, not the 8-min terminal): a send reloaded AFTER
+ *  the confirm window is exactly the one that must still be resolved — its first re-armed tick runs at age>=terminal and
+ *  reddens a genuine bounce (or verifies a late-indexed land). Without covering past-8-min, a bounced green reloaded late
+ *  stayed green forever = silent loss. [confirm review: persistence incomplete] */
+function rearmConvDeliveryConfirms() {
+  for (const thread of Array.isArray(threads) ? threads : []) {
+    for (const message of thread?.messages ?? []) {
+      const send = message?.convDirectSend;
+      if (!send?.address || !Array.isArray(send.commits) || send.commits.length === 0) continue;
+      if (message.convDelivery === 'verified' || message.convDelivery === 'unlanded') continue;
+      if ((Date.now() - Number(send.at ?? 0)) >= CONV_CONFIRM_REARM_MAX_AGE_MS) continue;
+      armConvDeliveryConfirm(thread, message, 0);
+    }
+  }
 }
 
 // FIRST CONTACT vs ESTABLISHED. A thread with no adopted conversation (no convPeerKeyId) is a not-yet-introduced peer:
@@ -29366,6 +29518,7 @@ async function attemptConvMessagePublishDirect(context) {
   if (captured?.boc && (Date.now() - captured.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
     if (transport?.sendBoc) await transport.sendBoc({ boc: captured.boc, walletAddress: plathoWallet.address });
     markDirectSendPublished(thread, message);
+    armConvDeliveryConfirm(thread, message);   // re-broadcast re-arms on the SAME captured commits (idempotent)
     return { rebroadcast: true };
   }
 
@@ -29432,16 +29585,22 @@ async function attemptConvMessagePublishDirect(context) {
   try {
     result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
     message.convDirectSend = { boc: result?.result?.boc ?? null, at: Date.now() };
+    // Record the parts' frame_commits + shard address + my highest seq for the delivery confirm (below). commits come
+    // from the built parts, so a message that later reddens does so on the SAME per-record identity the shard stores.
+    captureConvDeliveryConfirmTarget(message, { address: route.address, epoch: route.epoch, commits: result.parts.map((p) => p.commit), maxSeq: Math.max(...parts.map((p) => p.seq)) });
   } catch (error) {
     // Capture the signed external even on an AMBIGUOUS broadcast throw, so the retry re-broadcasts it (never rebuilds/
     // re-seals/re-bumps the seq). Without this a transient sendBoc failure whose external actually landed would
-    // double-publish on the next attempt.
+    // double-publish on the next attempt. Capture the commits too (from error.preparedParts) so a later re-broadcast
+    // success can arm the confirm on them.
     if (!message.convDirectSend?.boc && error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, at: Date.now() };
+    if (Array.isArray(error?.preparedParts)) captureConvDeliveryConfirmTarget(message, { address: route.address, epoch: route.epoch, commits: error.preparedParts.map((p) => p.commit), maxSeq: Math.max(...parts.map((p) => p.seq)) });
     throw error;
   }
 
   globalThis.plathoLastConvDirectSend = { peerKeyId, epoch: route.epoch, parts: parts.length, to: result?.parts?.[0]?.to ?? null };
   markDirectSendPublished(thread, message);
+  armConvDeliveryConfirm(thread, message);   // verify the optimistic green (or correct it to red) in the background
   return result;
 }
 
