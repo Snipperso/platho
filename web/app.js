@@ -22257,7 +22257,10 @@ async function requestUsernameMintName() {
         ];
         // Show the live ATH balance + an affordability flag — but only when the Vault user (hence the balance)
         // is actually loaded, so we never claim "not enough" against an unknown balance.
-        if (currentVaultUserSource()) {
+        // Under direct-pay the ATH lives in the wallet jetton, not the (synthesized) Vault user — the Vault-user ATH
+        // reads 0 here and would falsely say "not enough". Skip this preview; submitUsernameMintDirect checks the real
+        // wallet ATH balance authoritatively. [deletion scout: mint ATH gate live-wrong under direct-pay]
+        if (currentVaultUserSource() && !privateLaneDirectPayEnabled()) {
           let priceAtomic = null;
           try { priceAtomic = localUsernameMintPriceAtomic(normalizeUsernameInput(raw)); } catch { priceAtomic = null; }
           const athBalance = currentAthBalanceAtomic();
@@ -22276,8 +22279,10 @@ async function requestUsernameMintName() {
       // Up-front ATH affordability gate: don't let the user proceed to review/mint a name they can't pay for
       // (price is by length: 6+ chars = 100 ATH, 5 = 1000, 4 = 10000; <4 already rejected above). Only enforced
       // when the Vault user/balance is loaded; otherwise defer to the authoritative mint-time check.
+      // Up-front gate only on the Vault path — the synthesized direct-pay user carries no ATH balance (it reads 0), so
+      // this pre-check is skipped under direct-pay and submitUsernameMintDirect's wallet-ATH check is authoritative.
       const priceAtomic = localUsernameMintPriceAtomic(username);
-      if (priceAtomic !== null && currentVaultUserSource()) {
+      if (priceAtomic !== null && currentVaultUserSource() && !privateLaneDirectPayEnabled()) {
         const athBalance = currentAthBalanceAtomic();
         if (athBalance < priceAtomic) {
           throw new Error(`Insufficient ATH: ${username} costs ${formatAthAtomic(priceAtomic)} ATH, you have ${formatAthAtomic(athBalance)} — top up ATH in Vault`);
@@ -24187,6 +24192,10 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
     resetVaultPocketState();
     return null;
   }
+  // clean-17: no Vault CUSTODY under direct-pay (funds live in the wallet, not the Vault). This background refresh reads
+  // the real Vault get_user, which for a clean-17 user returns exists:false and would OVERWRITE the synthesized KeyShard
+  // activation binding → silently disable messaging. Skip it. [deletion scout: Vault-refresh clobbers KeyShard binding]
+  if (privateLaneDirectPayEnabled()) return null;
   if (navVaultBalanceRefreshPromise) return navVaultBalanceRefreshPromise;
   // iOS WebKit/JSC HARD-FREEZES the run loop on 2+ CONCURRENT app-level chain-read CALLS (the documented
   // v509/v515/v516 class — force-reload required). A full vault refresh (refreshVaultNow -> refreshVaultDashboard)
@@ -24419,6 +24428,9 @@ function refreshVaultMoveWidget() {
 }
 
 async function refreshVaultDashboard() {
+  // clean-17: the Vault custodial dashboard (deposit/withdraw + protocol stats) is meaningless under direct-pay and its
+  // get_user read would clobber the synthesized KeyShard activation binding. Skip it. [deletion scout: clobber]
+  if (privateLaneDirectPayEnabled()) return null;
   if (!plathoWallet?.address) {
     vaultProtocolState = {
       airdrop_remaining_ath: null,
@@ -24714,6 +24726,7 @@ function clearVaultAutoRefreshTimer() {
 
 function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
   clearVaultAutoRefreshTimer();
+  if (privateLaneDirectPayEnabled()) return;   // clean-17: no Vault custody refresh under direct-pay [deletion scout: clobber]
   if (document.hidden || !plathoWallet?.address) return;
   const effectiveDelayMs = delayMs === VAULT_AUTO_REFRESH_MS && !isVaultViewActive()
     ? VAULT_NAV_BACKGROUND_REFRESH_MS
