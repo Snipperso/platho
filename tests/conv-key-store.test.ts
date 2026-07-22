@@ -73,4 +73,22 @@ describe('CONV-KEY-STORE', () => {
     await store.upsertConversationKRoot(A, B, { kRoot: kroot(3), createdAt: 300, introNonce: nonce(3), peerWallet: walletA2 });
     expect(store.getConversation(A, B)!.peerWallet, 'a newer INTRO updates the wallet').toBe(walletA2);
   });
+
+  it('CKS-07: the receive scan cursor is null on create, advances MONOTONICALLY, and survives a re-INTRO', async () => {
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) });
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'never scanned yet').toBeNull();
+    await store.advanceConvScanCursor(A, B, 19000);
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'cursor set').toBe(19000);
+    // a LATER pass that scanned a NARROWER window must not rewind the cursor and re-open the offline gap.
+    await store.advanceConvScanCursor(A, B, 18990);
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'monotonic — never rewinds').toBe(19000);
+    await store.advanceConvScanCursor(A, B, 19005);
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'advances forward').toBe(19005);
+    // a re-INTRO (adopt) keeps the cursor — a new K_root does not reset how far we have scanned.
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(2), createdAt: 200, introNonce: nonce(2) });
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'cursor survives a re-INTRO').toBe(19005);
+    // unknown conversation is a no-op (never throws).
+    await store.advanceConvScanCursor(A, kroot(9), 5);
+  });
 });

@@ -181,7 +181,7 @@ import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
 import { createConvReadLane } from './conv-lane.mjs?v=1';
 import { createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
-import { epochFromCreatedAtSeconds } from './crypto/conv-routing.mjs?v=1';
+import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -13583,6 +13583,11 @@ async function appendConvOpenedCapsules(collected, targetThread) {
 // (K_root → bucketKey → addresses, zero index), decrypt each published capsule to the recipient's keys, and merge into
 // the SAME thread seam the CapsuleHub sync uses. Replaces getPrivateRecipientIndex/SenderIndex (a clean-15 concept)
 // with the bucketKey batch read. Idempotent: appendConvOpenedCapsules dedups by capsule id.
+// The furthest back the receive lane will ever catch up in one pass, in epochs. RecordShard retention is ~1 year
+// (RS_RETENTION), after which a record is retired on-chain, so scanning older buys nothing. This bounds a cold-start /
+// long-offline catch-up to a finite read fan while still covering the whole live retention window. [conv-receive review]
+const CONV_SCAN_CATCHUP_CAP_EPOCHS = 366;
+
 async function syncConvCapsulesFromShards() {
   if (!localRecipientKeyPair || !convKeyStore) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
   const transport = globalThis.plathoTonRpcTransport;
@@ -13594,20 +13599,32 @@ async function syncConvCapsulesFromShards() {
   let skipped = 0;
   let conversations = 0;
   let rateLimited = false;
+  let allClean = true;
   for (const record of convKeyStore.snapshot().values()) {
     if (!record?.kRootCurrent || !record?.peerKeyId) continue;
     conversations += 1;
     const peerKeyId = record.peerKeyId;
     const targetThread = resolveConvReceiveThread(introKeyIdString(peerKeyId));
+    // OFFLINE CATCH-UP. Always scan at least the last CONV_RECV_WINDOW_W epochs (the ±1 publish-slack window), and
+    // extend BACK to this conversation's scan cursor if it is older — so a message whose epoch scrolled past the
+    // steady window while the client was offline is still read. Capped at CONV_SCAN_CATCHUP_CAP_EPOCHS (retention).
+    // NOTE: the cursor lives on the in-memory conv key store today, so full cross-reload offline resilience also needs
+    // the persistent K_root store (a message is only lost if BOTH the store and the cursor are dropped on reload).
+    const steadyFrom = epochNow - CONV_RECV_WINDOW_W;
+    const cursorFrom = record.lastScannedEpoch == null ? steadyFrom : Math.min(steadyFrom, Number(record.lastScannedEpoch));
+    const scanFrom = Math.max(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, cursorFrom);
+    const windowW = Math.max(CONV_RECV_WINDOW_W, epochNow - scanFrom);
     // The current root plus any retired roots (a re-INTRO minted a new K_root; old messages still in the window
     // decrypt under the retired one). kRootsForRead holds { kRoot, adoptedAt }.
     const roots = [record.kRootCurrent, ...(record.kRootsForRead ?? []).map((entry) => entry.kRoot)];
     const collected = [];
+    let convClean = true; // every shard read for this conversation succeeded — only then may the cursor advance
     for (const kRoot of roots) {
       let entries;
       try {
-        entries = await lane.readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow });
+        entries = await lane.readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW });
       } catch (error) {
+        convClean = false; allClean = false;
         if (noteTonRpcRateLimit(error)) rateLimited = true;
         else console.warn('[conv] incoming shard read failed', error);
         continue;
@@ -13618,6 +13635,7 @@ async function syncConvCapsulesFromShards() {
           opened = await openPrivateCapsuleChainEntry(found.entry, localRecipientKeyPair, { enforceExpiry: false });
         } catch (error) {
           if (isPrivateUnreadableCapsuleError(error)) { skipped += 1; continue; }
+          convClean = false; allClean = false;
           if (noteTonRpcRateLimit(error)) rateLimited = true;
           else console.warn('[conv] capsule open failed', error);
           continue;
@@ -13626,10 +13644,14 @@ async function syncConvCapsulesFromShards() {
       }
     }
     imported += await appendConvOpenedCapsules(collected, targetThread);
+    // Advance the cursor ONLY on a fully clean scan — a failed read must leave the cursor so those epochs are retried,
+    // never silently skipped past.
+    if (convClean) await convKeyStore.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
   }
   if (imported > 0) { renderThreads(); renderConversation(); }
   globalThis.plathoLastConvSync = { at: new Date().toISOString(), conversations, imported, skipped, epochNow, rateLimited };
-  return privateSyncResult({ ok: true, imported, skipped, scanComplete: true, rateLimited });
+  // scanComplete reflects the truth: false if any read failed (so the UI does not claim 'up to date' over a gap).
+  return privateSyncResult({ ok: true, imported, skipped, scanComplete: allClean, rateLimited });
 }
 
 async function syncPrivateCapsulesFromChain(options = {}) {

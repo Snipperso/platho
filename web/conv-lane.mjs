@@ -17,6 +17,11 @@
 import { incomingRecordShards } from './conv-discovery.mjs?v=1';
 import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=1';
 
+// Mirrors createShardMessagesWithSourceReader's default `limit`. When a single shard returns exactly this many bodies,
+// it MAY hold older ones the newest-page read did not return (the reader does not paginate yet). We cannot silently
+// assume completeness — logging keeps the truncation visible until message pagination lands. [conv-receive review]
+const CONV_SHARD_MESSAGE_PAGE_LIMIT = 128;
+
 /**
  * Build the CONV read lane.
  *
@@ -39,6 +44,11 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
       for (const bucket of buckets) {
         let messages;
         try { messages = await readMessagesWithSource(bucket.address); } catch { continue; }
+        if ((messages?.length ?? 0) >= CONV_SHARD_MESSAGE_PAGE_LIMIT) {
+          // Not silent: a shard at the page cap may hide older bodies (no pagination yet). Ordinary text stays well
+          // under this; a burst / large multipart in one direction-epoch can hit it. Pagination is the fix.
+          console.warn('[conv] incoming shard at message page cap — older bodies may be unread', bucket.address, messages.length);
+        }
         for (const { bodyCell } of messages ?? []) {
           const parsed = parseCapsulePublishBody(bodyCell);
           if (!parsed) continue;
