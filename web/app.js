@@ -30974,6 +30974,54 @@ async function refreshVaultActivationStatus(options = {}) {
     refreshComposerPublishPolicy();
     return null;
   }
+  // clean-17 DIRECT-PAY activation: the "am I registered" signal comes from the user's OWN KeyShard (address-bound to
+  // this wallet — it can only hold keys this wallet registered), NOT a Vault get_user. Synthesize the plathoVaultBinding
+  // .user shape the ~15 activation consumers read ({ exists, current_key_id, auth_pubkey } — existence gates, never the
+  // Vault key-id formula, which lives only in the Vault paths below). auth_pubkey is the LOCAL auth key: KeyShard omits
+  // it by privacy invariant, and for one's OWN identity the local key IS it. Gated so the Vault path below is untouched.
+  if (privateLaneDirectPayEnabled()) {
+    try {
+      const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
+      const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
+      const view = await provider.getView(plathoWallet.address, { verify: true, priority: 'critical', cacheTtlMs: 0 }).catch(() => null);
+      const localAuthPubkey = localVaultAuthKeyPair?.publicKey ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey) : 0n;
+      // Registered AND the stored keys are the CURRENT local ones (a local key rotation without re-register shows as
+      // "activate", prompting the re-publish that updates the shard) — the address-binding already guarantees it is mine.
+      const registeredMine = view?.exists === true
+        && BigInt(view.enc_pubkey ?? 0n) === BigInt(localVaultDraft.message.enc_pubkey ?? 0n)
+        && BigInt(view.sign_pubkey ?? 0n) === BigInt(localVaultDraft.message.sign_pubkey ?? 0n);
+      if (!registeredMine) {
+        globalThis.plathoVaultBinding = { walletAddress: plathoWallet.address, user: { exists: view?.exists === true, current_key_id: 0n }, keyRecord: null };
+        setText(vaultRecordStatus, t('vault.activationRequired'));
+        refreshMessageActionStatuses();
+        refreshMessagingControls();
+        refreshComposerPublishPolicy();
+        return null;
+      }
+      const user = {
+        exists: true,
+        current_key_id: BigInt(view.key_id),
+        auth_pubkey: localAuthPubkey,
+        key_generation: BigInt(view.key_generation ?? 0n),
+        enc_pubkey: BigInt(view.enc_pubkey),
+        sign_pubkey: BigInt(view.sign_pubkey),
+        scan_pubkey: BigInt(view.scan_pubkey ?? 0n),
+      };
+      globalThis.plathoVaultBinding = { walletAddress: plathoWallet.address, user, keyRecord: null };
+      setText(vaultRecordStatus, t('vault.activated'));
+      refreshMessageActionStatuses();
+      refreshMessagingControls();
+      refreshComposerPublishPolicy();
+      return globalThis.plathoVaultBinding;
+    } catch (error) {
+      // A transient read must NOT flip a registered user to "activate" — leave the binding untouched and show pending.
+      if (!noteTonRpcRateLimit(error)) console.warn('[keyshard] activation status read failed', error);
+      setText(vaultRecordStatus, t('vault.keysPending'));
+      refreshMessageActionStatuses();
+      refreshComposerPublishPolicy();
+      return globalThis.plathoVaultBinding ?? null;
+    }
+  }
   try {
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
