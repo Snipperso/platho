@@ -102,7 +102,7 @@ const cellFromBase64 = (value) => parseBocBase64(value);
  * whole delivery check run in a browser. tests/intro-codec.test.ts pins the pieces it is built from.
  */
 const IS_BODY_DOMAIN = 0x49534243;
-async function introBodyCommitBrowser(header0, body) {
+export async function introBodyCommitBrowser(header0, body) {
   const h0 = (await computeCellHashAndDepth(header0)).hash;
   const bodyHash = (await computeCellHashAndDepth(body)).hash;
   const preimage = beginCell();
@@ -133,7 +133,10 @@ export async function fetchIntroCapsule({ address, entryId, readEntry, readMessa
     let parsed;
     try { parsed = parseIntroPublish(message); } catch { continue; }            // not an IntroPublish; skip
     if ((await introBodyCommitBrowser(parsed.header0, parsed.body)) !== wanted) continue;
-    return { header0: parsed.header0, body: parsed.body, r: parsed.r, viewTag: parsed.viewTag, bodyCommit: wanted };
+    // created_at is the CONTRACT-STAMPED time from the entry (IntroShard stamps now(); get_entry returns it). It MUST
+    // be surfaced: re-INTRO K_root adoption orders on it, and it is the only recency value BOTH sides read identically
+    // — a local clock would let the two sides disagree on which re-INTRO is newest and silently fork the conversation.
+    return { header0: parsed.header0, body: parsed.body, r: parsed.r, viewTag: parsed.viewTag, bodyCommit: wanted, created_at: entry.created_at };
   }
   return null;   // the entry exists but its transaction is beyond what this endpoint retains
 }

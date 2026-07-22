@@ -59,6 +59,20 @@ export function compareAdoption(candidate, record) {
   return compareBytes(toBytes(candidate.introNonce, 16, 'introNonce'), toBytes(record.adoptedIntroNonce, 16, 'adoptedIntroNonce'));
 }
 
+// How many retired roots to keep for decrypting in-window history. Bounded so a long-lived conversation with repeated
+// re-INTROs cannot grow the sealed-at-rest record without limit; the 1-week retention window means old roots stop
+// being needed long before this cap. [private-review #4]
+const CONV_KEY_MAX_READ_ROOTS = 16;
+
+/** Append a retired root to kRootsForRead, DEDUPED by bytes (re-adopting/re-retiring the same root must not pile up)
+ *  and CAPPED to the most-recent CONV_KEY_MAX_READ_ROOTS. */
+function appendReadRoot(list, kRoot, adoptedAt) {
+  const bytes = toBytes(kRoot, 32, 'kRoot');
+  if (list.some((r) => compareBytes(toBytes(r.kRoot, 32, 'kRoot'), bytes) === 0)) return list;
+  const next = [...list, { kRoot: bytes, adoptedAt }];
+  return next.length > CONV_KEY_MAX_READ_ROOTS ? next.slice(next.length - CONV_KEY_MAX_READ_ROOTS) : next;
+}
+
 /**
  * Pure last-writer-wins adoption. Returns { record, outcome } — outcome is 'created' | 'adopted' | 'retained' |
  * 'duplicate'. NEVER mutates `existing`. The retired/older root always lands in kRootsForRead so old history stays
@@ -81,7 +95,7 @@ export function adoptKRoot(existing, candidate) {
       record: {
         ...existing,
         kRootCurrent: kRoot,
-        kRootsForRead: [...existing.kRootsForRead, { kRoot: existing.kRootCurrent, adoptedAt: existing.adoptedCreatedAt }],
+        kRootsForRead: appendReadRoot(existing.kRootsForRead, existing.kRootCurrent, existing.adoptedCreatedAt),
         peerKeyId,
         peerEncPublicKey: peerEncPublicKey ?? existing.peerEncPublicKey,
         adoptedCreatedAt: createdAt,
@@ -89,7 +103,7 @@ export function adoptKRoot(existing, candidate) {
       },
     };
   }
-  return { outcome: 'retained', record: { ...existing, kRootsForRead: [...existing.kRootsForRead, { kRoot, adoptedAt: createdAt }] } };
+  return { outcome: 'retained', record: { ...existing, kRootsForRead: appendReadRoot(existing.kRootsForRead, kRoot, createdAt) } };
 }
 
 /**

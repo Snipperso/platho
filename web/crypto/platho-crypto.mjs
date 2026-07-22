@@ -3155,7 +3155,11 @@ export async function privateCapsuleFromChainEntry(entry, options = {}) {
 // handshake transcript AFTER decrypt and establish the pairwise CONV K_root. The caller MUST still bind the returned
 // {senderKeyId, senderEncPublicKey, senderSigningPublicKey} to the sender's LIVE Vault KeyRecord (authenticity anchor).
 export async function openEncryptedIntroCapsule(capsule, recipientKeyPair, options = {}) {
-  const opened = await openEncryptedPrivateCapsule(capsule, recipientKeyPair, options);
+  // INTRO expiry is NOT a client security boundary (retention is contract-fixed, replay guarded by introNonce), and the
+  // canonical header1 sits in the past, so INTRO opens default enforceExpiry:false — otherwise every caller must remember
+  // the flag or hit a spurious 'expired' (the same reason the build path and openIntroCapsuleFromChainCells skip it).
+  // A caller may still force expiry by passing enforceExpiry:true explicitly. [private-review #2]
+  const opened = await openEncryptedPrivateCapsule(capsule, recipientKeyPair, { enforceExpiry: false, ...options });
   if (opened.capsule.header0.kind !== 'intro') throw new Error('Not an INTRO capsule');
   const payload = opened.payload;
   const introPayloadBytes = payload?.bytes;

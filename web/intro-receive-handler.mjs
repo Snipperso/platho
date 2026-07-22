@@ -30,26 +30,34 @@ const asBytes = (value, name) => (value instanceof Uint8Array ? value : readSnak
 export function createIntroReceiveHandler({
   recipientKeyPair,
   convKeyStore,
-  resolveVaultKeyRecord = null,
+  resolveVaultKeyRecord,
   introReplayGuard = null,
   onFirstContact = null,
 } = {}) {
   if (!recipientKeyPair?.keyId) throw new Error('createIntroReceiveHandler requires recipientKeyPair with a keyId');
   if (typeof convKeyStore?.upsertConversationKRoot !== 'function') throw new Error('createIntroReceiveHandler requires a conv key store');
+  // MANDATORY impersonation guard. Without it a stranger forges a first contact claiming ANY senderKeyId: the handshake
+  // transcript is signed with a key the stranger themselves put inside the AEAD-sealed identity section (sealed only to
+  // the recipient's PUBLIC bundle), so it is self-consistent for anyone. Only binding that key to the sender's LIVE
+  // registered KeyShard record proves authenticity — first contact is fail-CLOSED, never fail-open. [private-review #1]
+  if (typeof resolveVaultKeyRecord !== 'function') {
+    throw new Error('createIntroReceiveHandler requires resolveVaultKeyRecord — the first-contact impersonation guard is mandatory');
+  }
 
   return async function onIntro(capsule) {
     const header0Bytes = asBytes(capsule.header0, 'intro header0');
     const bodyBytes = asBytes(capsule.body, 'intro body');
     const opened = await openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, recipientKeyPair, {
-      resolveVaultKeyRecord: resolveVaultKeyRecord ?? undefined,
+      resolveVaultKeyRecord,
       introReplayGuard: introReplayGuard ?? undefined,
       enforceExpiry: false,
     });
 
-    // Adoption ordering: prefer the CONTRACT-STAMPED created_at (both sides see the same on-chain value, so their
-    // adoption stays consistent); introNonce is the deterministic tie-break. Falls back to 0 when the scan did not
-    // surface created_at — then the (unique) introNonce alone orders re-INTROs.
-    const createdAt = Number(capsule.createdAt ?? capsule.created_at ?? 0) || 0;
+    // Adoption ordering MUST be the CONTRACT-STAMPED created_at surfaced by fetchIntroCapsule (IntroShard stamps now()):
+    // it is the ONLY recency value both sides read identically. A local clock here would let the two parties disagree on
+    // which re-INTRO is newest and silently fork the conversation, so NEVER seed this from Date.now(). introNonce is the
+    // deterministic tie-break for same-instant re-INTROs. [private-review #3]
+    const createdAt = Number(capsule.created_at ?? capsule.createdAt ?? 0) || 0;
     const adoption = await convKeyStore.upsertConversationKRoot(recipientKeyPair.keyId, opened.senderKeyId, {
       kRoot: opened.kRoot,
       createdAt,
