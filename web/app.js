@@ -16455,6 +16455,12 @@ function composerNetCostFromHoldNanotons(hold, parts = 1, profiles = null) {
 }
 
 function composerKnownVaultTonShortfall(profile, parts = 1) {
+  // clean-17 direct-pay has NO Vault hold — a CONV/public send is funded from the wallet and the affordability check
+  // runs at send time (attemptConvMessagePublishDirect / the public direct path do their own wallet-GRAM check). The
+  // synthesized KeyShard activation user carries no ton_balance, so reading it here would be a permanent false shortfall
+  // that disables every registered user's send button at cutover. Skip the Vault-balance gate; keep the part-cap gate
+  // (checked in the wrappers before this call). [keyshard activation review: ton_balance false-shortfall]
+  if (privateLaneDirectPayEnabled()) return false;
   const user = currentVaultUserSource();
   if (user?.exists !== true) return false;
   return vaultTonBalanceNanotons(user) < composerEstimatedMaxChargeNanotons(profile, parts);
@@ -16705,7 +16711,8 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
   const surcharge = currentNetworkFeeSurchargeNanotons() * BigInt(surchargeParts);
   const surchargeText = surcharge > 0n ? t('composer.networkSurchargeSuffix', { amount: formatTonNanotons(surcharge) }) : '';
   const user = currentVaultUserSource();
-  if (user?.exists === true && vaultTonBalanceNanotons(user) < hold) {
+  // No Vault hold under direct-pay (see composerKnownVaultTonShortfall) — do not show the "need hold … vault 0" warning.
+  if (!privateLaneDirectPayEnabled() && user?.exists === true && vaultTonBalanceNanotons(user) < hold) {
     return {
       text: t('composer.needHoldStatus', { hold: formatTonNanotons(hold), vault: formatTonNanotons(vaultTonBalanceNanotons(user)) }),
       state: 'short',
@@ -25416,6 +25423,10 @@ async function submitVaultWithdrawAthAmount(amount) {
 }
 
 async function submitUsernameMint() {
+  // clean-17 INTERIM: username minting still pays ATH through the Vault and reads the Vault ath_balance (which the
+  // synthesized direct-pay activation user does not carry → a false "insufficient ATH"). Refuse under direct-pay until
+  // minting has its own direct-pay path (ATH jetton → UsernameRegistry). [activation review: ath_balance false-block]
+  if (privateLaneDirectPayEnabled()) throw new Error('Username minting is not yet available on direct-pay');
   const username = await requestUsernameMintName();
   if (!username) return null;
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
@@ -25954,6 +25965,14 @@ async function runProfileAvatarSubmitPhase(owner, avatar, avatarHash) {
   return finality?.result ?? finality;
 }
 
+// A never-deployed KeyShard aborts a get-method with the code-less TVM exit (-13 in production, -256 under the sandbox);
+// the transport rethrows it as error.exitCode. That is DEFINITIVE "not registered". Any other read failure (429/network)
+// is TRANSIENT and must not be mistaken for it — mirrors [[ton-uninit-exit-code-minus13]].
+function isKeyShardUninitError(error) {
+  const code = Number(error?.exit_code ?? error?.exitCode ?? error?.body?.exit_code ?? NaN);
+  return code === -13 || code === -256;
+}
+
 // clean-17 DIRECT-PAY register: publish the messaging keys straight to the user's KeyShard from their own wallet, no
 // Vault external. sender() == owner_wallet is the shard's whole authorisation. Gated behind privateLane.directPay so the
 // clean-15 Vault path below is untouched until cutover; the byte-exact KSG1 builder is pinned in tests/key-shard-register.
@@ -25964,10 +25983,16 @@ async function submitKeyShardRegisterDirect() {
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) throw new Error('KeyShard register: RPC transport unavailable');
   // Already registered? Read the OWN KeyShard. exists ⇒ keys already published; re-registering would only bump
-  // key_generation (a rotation), which the activation button must not do silently. A read failure is treated as
-  // not-registered — the register is idempotent enough (a duplicate would replace with the SAME bundle at gen+1).
+  // key_generation (a rotation), which the activation button must not do silently. A TRANSIENT read must NOT be read as
+  // "not registered" (it would drive an unnecessary re-register that changes key_id) — only a definitive uninit does.
   const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
-  const view = await provider.getView(ownerWallet, criticalChainReadOptions()).catch(() => null);
+  let view = null;
+  try {
+    view = await provider.getView(ownerWallet, criticalChainReadOptions());
+  } catch (error) {
+    if (!isKeyShardUninitError(error)) throw error;   // transient — abort rather than re-register on a bad read
+    view = { exists: false };
+  }
   if (view?.exists) { vaultDraftStatus.textContent = t('vault.active'); return null; }
   const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
   if (!(await confirmPlathoAccountActivation(view ?? { exists: false }, { needsKeyBackup }))) return null;
@@ -26055,6 +26080,9 @@ async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = 
 
 async function submitVaultReplaceMessagingKeys() {
   if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
+  // clean-17 INTERIM: key ROTATION is not yet wired to the KeyShard replace (KSG1 at KS_MIN_REPLACE_VALUE). Refuse under
+  // direct-pay so this never issues a live external + funds to the DEPRECATED Vault at cutover. [activation review: rotation misroutes to dead Vault]
+  if (privateLaneDirectPayEnabled()) throw new Error('Key rotation is not yet available on direct-pay (KeyShard replace path pending)');
   const provider = await resolveVaultChainProvider();
   const user = await loadConnectedVaultUser({
     provider,
@@ -30414,6 +30442,11 @@ async function confirmPrefsPublishInBackground(publishState, snapshot, savedEdit
 // path. Only clears dirty on a CONFIRMED publish (a non-confirmed/failed one stays dirty so the user can retry).
 async function publishPrefsSnapshot() {
   if (prefsSyncInFlight) return;
+  // clean-17 INTERIM: prefs-to-self still reads Vault (resolveSelfPeerEntry) and publishes via CapsuleHub. Under direct-pay
+  // both are gone, so this would loudly fail at cutover. No-op until the prefs capsule has a direct-pay shard publish; the
+  // sync button is also disabled under direct-pay (refreshPrefsSyncButton). Subscriptions still work IN-SESSION; only the
+  // cross-device on-chain snapshot is deferred. [activation review: prefs hits dead Vault]
+  if (privateLaneDirectPayEnabled()) return;
   if (!plathoWallet || !localIdentity || !localRecipientKeyPair || !hasActivePlathoAccount()) {
     setText(savePrefsStatus, t('sync.activateFirst'));
     return;
@@ -30472,7 +30505,9 @@ function prefsSyncedDateLabel(sec) {
 
 function refreshPrefsSyncButton() {
   if (!savePrefsButton) return;
-  savePrefsButton.disabled = !(Boolean(plathoWallet && hasActivePlathoAccount()) && prefsDirty && !prefsSyncInFlight);
+  // clean-17 INTERIM: the cross-device prefs snapshot is Vault/CapsuleHub-bound, deferred under direct-pay — disable the
+  // button so it is not offered until the prefs capsule has a direct-pay shard publish. [activation review]
+  savePrefsButton.disabled = privateLaneDirectPayEnabled() || !(Boolean(plathoWallet && hasActivePlathoAccount()) && prefsDirty && !prefsSyncInFlight);
 }
 
 // Resting status for the Save-subscriptions row. A publish in flight owns the status text (saving/saved/failed);
@@ -30983,7 +31018,16 @@ async function refreshVaultActivationStatus(options = {}) {
     try {
       const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
       const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
-      const view = await provider.getView(plathoWallet.address, { verify: true, priority: 'critical', cacheTtlMs: 0 }).catch(() => null);
+      // A never-deployed shard (uninit) is a DEFINITIVE "not registered" → {exists:false}. Any OTHER read failure is
+      // TRANSIENT and must NOT flip a registered user to "activate" (KeyShard registration is monotonic): rethrow to the
+      // outer catch, which PRESERVES the existing binding. [activation review: transient read flips activated→activate]
+      let view;
+      try {
+        view = await provider.getView(plathoWallet.address, { verify: true, priority: 'critical', cacheTtlMs: 0 });
+      } catch (readError) {
+        if (!isKeyShardUninitError(readError)) throw readError;
+        view = { exists: false };
+      }
       const localAuthPubkey = localVaultAuthKeyPair?.publicKey ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey) : 0n;
       // Registered AND the stored keys are the CURRENT local ones (a local key rotation without re-register shows as
       // "activate", prompting the re-publish that updates the shard) — the address-binding already guarantees it is mine.
