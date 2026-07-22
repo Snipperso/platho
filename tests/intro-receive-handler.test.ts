@@ -24,13 +24,6 @@ const asScanCapsule = (built: any, created_at: number) => ({
   created_at,
 });
 
-/** The mandatory first-contact impersonation guard: resolves the sender's keyId to their LIVE registered key bundle. */
-const resolverFor = (sender: any) => async () => ({
-  signingPublicKey: sender.signingPublicKey,
-  x25519PublicKey: sender.encryptionKeyPair.x25519PublicKey,
-  mlKem768PublicKey: sender.encryptionKeyPair.mlKem768PublicKey,
-});
-
 describe('INTRO-RECEIVE-HANDLER', () => {
   it('IRH-01: a scanned INTRO establishes the pairwise K_root in the conv key store + surfaces the first message', async () => {
     const sender: any = await createMessagingIdentity();
@@ -42,7 +35,6 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     const onIntro = createIntroReceiveHandler({
       recipientKeyPair: recipient.encryptionKeyPair,
       convKeyStore: store,
-      resolveVaultKeyRecord: resolverFor(sender),
       onFirstContact: (r: any) => { firstContact = r; },
     });
 
@@ -59,7 +51,7 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     const sender: any = await createMessagingIdentity();
     const recipient: any = await createMessagingIdentity();
     const store = createMemoryConvKeyStore();
-    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store, resolveVaultKeyRecord: resolverFor(sender) });
+    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store });
 
     // Two DISTINCT first contacts (each mints its own K_root). The later-created one must win regardless of order.
     const introA = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, {});
@@ -75,20 +67,27 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     expect(rec.kRootsForRead.length, 'the older root is kept only for decrypting its history').toBe(1);
   });
 
-  it('IRH-03: the impersonation guard is MANDATORY — no resolver fails construction, a wrong record is rejected', async () => {
+  it('IRH-03: no resolver is required (auth moved into the handshake), and a corrupted first contact stores nothing', async () => {
     const recipient: any = await createMessagingIdentity();
     const store = createMemoryConvKeyStore();
-    // (a) fail-closed: constructing the handler without the guard throws.
-    expect(() => createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store }))
-      .toThrow(/impersonation guard/i);
+    // (a) construction WITHOUT a resolveVaultKeyRecord now SUCCEEDS — first-contact authenticity moved into the handshake
+    // crypto (keyId binding + K_root confirm), so the handler no longer demands a chain resolver. [auth-crypto-binding]
+    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store });
 
-    // (b) a forged first contact whose claimed sender does NOT match the live registered record is rejected, and
-    // nothing is stored — a stranger cannot impersonate someone into the recipient's conversation list.
+    // (b) fail-closed on a broken first contact: header0 from one capsule + body from another cannot open (the body AEAD
+    // binds the header hashes), so onIntro rejects and NOTHING lands in the store — a garbage/forged scan is inert.
     const sender: any = await createMessagingIdentity();
-    const impostor: any = await createMessagingIdentity();
-    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, {});
-    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store, resolveVaultKeyRecord: resolverFor(impostor) });
-    await expect(onIntro(asScanCapsule(built, 100)), 'the handshake key must match the live record').rejects.toThrow();
+    const bundle = exportPublicKeyBundle(recipient.encryptionKeyPair);
+    const builtA = await createEncryptedIntroCapsule(bundle, sender, { firstMessageBytes: utf8('a') });
+    const builtB = await createEncryptedIntroCapsule(bundle, sender, { firstMessageBytes: utf8('b') });
+    const frankenstein = {
+      header0: parseBocBase64(builtA.chainCells.header0.boc),
+      body: parseBocBase64(builtB.chainCells.body.boc),
+      r: 0n,
+      viewTag: builtA.header0.viewTag,
+      created_at: 100,
+    };
+    await expect(onIntro(frankenstein), 'a mismatched header/body cannot open').rejects.toThrow();
     expect(store.getConversation(recipient.encryptionKeyPair.keyId, sender.encryptionKeyPair.keyId), 'nothing stored for a rejected forgery').toBeNull();
   });
 });

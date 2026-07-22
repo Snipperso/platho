@@ -3178,29 +3178,10 @@ export async function openEncryptedIntroCapsule(capsule, recipientKeyPair, optio
     bodyKemCiphertext,
     viewTag,
   });
-  // Vault-binding gate — closes the first-contact impersonation risk (red-team major). The handshake only proves the
-  // sender possesses the in-body signing key it supplied; a stranger could sign a self-consistent INTRO claiming
-  // keyId_A = victim. When the caller supplies resolveVaultKeyRecord(keyIdA) → { signingPublicKey, x25519PublicKey,
-  // mlKem768PublicKey? } (raw bytes or base64url), we require the handshake's sign/enc keys to MATCH the LIVE Vault
-  // record and keyId_A to be the hash of the registered enc+mlkem bundle. First-contact open SHOULD pass it (fail-closed).
-  if (options.resolveVaultKeyRecord) {
-    const asKey = (v, len, name) => assertBytes(name, typeof v === 'string' ? base64urlDecode(v) : toUint8Array(v), len);
-    const keyIdA = base64urlEncode(hs.senderKeyId);
-    const record = await options.resolveVaultKeyRecord(keyIdA);
-    if (!record) throw new Error('INTRO sender keyId is not registered in the Vault (unbindable)');
-    const regSign = asKey(record.signingPublicKey ?? record.signPublicKey, ED25519_PUBLIC_KEY_BYTES, 'vault.signingPublicKey');
-    const regEnc = asKey(record.x25519PublicKey ?? record.encPublicKey, X25519_PUBLIC_KEY_BYTES, 'vault.x25519PublicKey');
-    if (!bytesEqual(regSign, opened.senderSigningPublicKey)) {
-      throw new Error('INTRO sender signing key does not match the Vault KeyRecord (impersonation)');
-    }
-    if (!bytesEqual(regEnc, hs.senderEncPublicKey)) {
-      throw new Error('INTRO sender enc key does not match the Vault KeyRecord (impersonation)');
-    }
-    if (record.mlKem768PublicKey) {
-      const expectedKeyId = await computeHybridKeyId(regEnc, asKey(record.mlKem768PublicKey, MLKEM768_PUBLIC_KEY_BYTES, 'vault.mlKem768PublicKey'));
-      if (expectedKeyId !== keyIdA) throw new Error('INTRO sender keyId does not bind to the registered Vault key bundle');
-    }
-  }
+  // First-contact impersonation is closed INSIDE openIntroHandshake now (clean-17): it binds keyId_A == H(senderEnc,
+  // senderMlKemHash) and verifies a K_root confirm tag, so a stranger cannot claim a victim's keyId. The old
+  // resolveVaultKeyRecord gate is gone — clean-17 deleted the Vault's keyId→keys index it depended on, and the
+  // cryptographic binding needs no on-chain read. [intro-first-contact-auth-crypto-binding]
   // anti-replay: introNonce is the dedup key. Enforce it when the caller supplies a seen-set guard (STRONGLY recommended
   // for first contact — the signature+transcript are valid on a byte-identical replay, which would otherwise re-surface
   // the first message). The guard owns the seen-set: { has(key): boolean, add(key) }.
@@ -3258,21 +3239,8 @@ export async function openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, re
     bodyKemCiphertext,
     viewTag,
   });
-  // Vault-binding gate (impersonation guard) — identical to openEncryptedIntroCapsule; fail-closed on first contact.
-  if (options.resolveVaultKeyRecord) {
-    const asKey = (v, len, name) => assertBytes(name, typeof v === 'string' ? base64urlDecode(v) : toUint8Array(v), len);
-    const keyIdA = base64urlEncode(hs.senderKeyId);
-    const record = await options.resolveVaultKeyRecord(keyIdA);
-    if (!record) throw new Error('INTRO sender keyId is not registered in the Vault (unbindable)');
-    const regSign = asKey(record.signingPublicKey ?? record.signPublicKey, ED25519_PUBLIC_KEY_BYTES, 'vault.signingPublicKey');
-    const regEnc = asKey(record.x25519PublicKey ?? record.encPublicKey, X25519_PUBLIC_KEY_BYTES, 'vault.x25519PublicKey');
-    if (!bytesEqual(regSign, senderSigningPublicKey)) throw new Error('INTRO sender signing key does not match the Vault KeyRecord (impersonation)');
-    if (!bytesEqual(regEnc, hs.senderEncPublicKey)) throw new Error('INTRO sender enc key does not match the Vault KeyRecord (impersonation)');
-    if (record.mlKem768PublicKey) {
-      const expectedKeyId = await computeHybridKeyId(regEnc, asKey(record.mlKem768PublicKey, MLKEM768_PUBLIC_KEY_BYTES, 'vault.mlKem768PublicKey'));
-      if (expectedKeyId !== keyIdA) throw new Error('INTRO sender keyId does not bind to the registered Vault key bundle');
-    }
-  }
+  // First-contact impersonation is closed inside openIntroHandshake (keyId_A binding + K_root confirm tag); the old
+  // Vault keyId→keys gate is gone with the Vault. [intro-first-contact-auth-crypto-binding]
   if (options.introReplayGuard) {
     const nonceKey = base64urlEncode(hs.introNonce);
     if (await options.introReplayGuard.has(nonceKey)) throw new Error('INTRO replay detected (introNonce already seen)');

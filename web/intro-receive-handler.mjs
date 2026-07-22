@@ -22,33 +22,28 @@ const asBytes = (value, name) => (value instanceof Uint8Array ? value : readSnak
  * Build the onIntro handler.
  *
  * `recipientKeyPair` is the user's OWN encryption key pair ({ keyId, x25519SecretKey, mlKem768SecretKey }) — the one
- * the stealth scan already uses. `convKeyStore` is web/conv-key-store. `resolveVaultKeyRecord` (recommended) binds the
- * sender's handshake keys to their LIVE registered bundle (first-contact impersonation guard); `introReplayGuard`
- * dedupes byte-identical replays by introNonce. `onFirstContact(opened, capsule)` creates the thread / shows the first
- * message — the app's decision, kept out of here.
+ * the stealth scan already uses. `convKeyStore` is web/conv-key-store. `introReplayGuard` dedupes byte-identical
+ * replays by introNonce. `onFirstContact(opened, capsule)` creates the thread / shows the first message — the app's
+ * decision, kept out of here.
+ *
+ * FIRST-CONTACT IMPERSONATION IS CLOSED IN THE HANDSHAKE (clean-17), not by a chain lookup here: openIntroHandshake
+ * binds keyId_A == H(senderEnc, senderMlKemHash) and verifies a K_root confirm tag, so a stranger cannot claim a
+ * victim's keyId. The old mandatory resolveVaultKeyRecord guard is gone — clean-17 deleted the Vault keyId→keys index
+ * it needed, and the cryptographic binding needs no on-chain read. [intro-first-contact-auth-crypto-binding]
  */
 export function createIntroReceiveHandler({
   recipientKeyPair,
   convKeyStore,
-  resolveVaultKeyRecord,
   introReplayGuard = null,
   onFirstContact = null,
 } = {}) {
   if (!recipientKeyPair?.keyId) throw new Error('createIntroReceiveHandler requires recipientKeyPair with a keyId');
   if (typeof convKeyStore?.upsertConversationKRoot !== 'function') throw new Error('createIntroReceiveHandler requires a conv key store');
-  // MANDATORY impersonation guard. Without it a stranger forges a first contact claiming ANY senderKeyId: the handshake
-  // transcript is signed with a key the stranger themselves put inside the AEAD-sealed identity section (sealed only to
-  // the recipient's PUBLIC bundle), so it is self-consistent for anyone. Only binding that key to the sender's LIVE
-  // registered KeyShard record proves authenticity — first contact is fail-CLOSED, never fail-open. [private-review #1]
-  if (typeof resolveVaultKeyRecord !== 'function') {
-    throw new Error('createIntroReceiveHandler requires resolveVaultKeyRecord — the first-contact impersonation guard is mandatory');
-  }
 
   return async function onIntro(capsule) {
     const header0Bytes = asBytes(capsule.header0, 'intro header0');
     const bodyBytes = asBytes(capsule.body, 'intro body');
     const opened = await openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, recipientKeyPair, {
-      resolveVaultKeyRecord,
       introReplayGuard: introReplayGuard ?? undefined,
       enforceExpiry: false,
     });

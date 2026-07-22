@@ -12,31 +12,52 @@
 //
 // verify-after-decrypt: openIntroHandshake runs on the ALREADY-DECRYPTED intro payload (the caller decrypts the body
 // first) and verifies A's ed25519 signature over the reconstructed transcript BEFORE trusting any field. The transcript
-// commits to both keyIds, A's STATIC enc pubkey (the classical X25519 half of K_root), both KEM ciphertexts
-// (body_KEM_ct and ct_root), R, view_tag and the intro nonce — so an active attacker cannot graft A's signature onto
-// different key material (UKS/misbinding).
-// SCOPE — the CALLER must enforce, this module does NOT: (1) bind keyId_A and the returned sender enc/sign keys to A's
-// LIVE Vault KeyRecord — the signature only proves possession of the in-body signing key A supplied, so without the
-// Vault cross-check a stranger can publish a self-consistent INTRO claiming keyId_A = victim; (2) dedup by introNonce
-// (a per-sender seen-set) — the nonce is the replay-detection KEY, it does not by itself PREVENT a byte-identical replay.
+// commits to both keyIds, A's STATIC enc pubkey (the classical X25519 half of K_root), A's ML-KEM pubkey HASH, both KEM
+// ciphertexts (body_KEM_ct and ct_root), R, view_tag and the intro nonce — so an active attacker cannot graft A's
+// signature onto different key material (UKS/misbinding).
+//
+// FIRST-CONTACT AUTHENTICITY IS CRYPTOGRAPHIC, NOT A CHAIN LOOKUP (clean-17, format V2). Earlier this module told the
+// CALLER to bind keyId_A to A's LIVE *Vault* KeyRecord — but clean-17 deleted the Vault's keyId→keys index (KeyShard is
+// wallet-keyed, with no proof-of-possession), so that anchor no longer exists and a stranger could publish a
+// self-consistent INTRO claiming keyId_A = victim, reading the victim's would-be replies. openIntroHandshake now closes
+// this in the handshake itself, with TWO bindings that need no on-chain read:
+//   (1) keyId_A == H(senderEncPublicKey, senderMlKemPublicKeyHash) — the frozen hybrid keyId formula. To claim a
+//       victim's keyId a forger must use the victim's enc key.
+//   (2) a K_root CONFIRM TAG (HMAC over the transcript under a key derived from K_root) proves the sender DERIVED the
+//       same K_root — which requires the enc SECRET behind senderEncPublicKey. Forced by (1) to use the victim's enc
+//       key, the forger cannot derive K_root, the tag mismatches, and the open is REJECTED. Present even for a
+//       first-message-less pure handshake, so the pure case is covered too.
+// SCOPE the caller STILL owns: dedup by introNonce (a per-sender seen-set) — the nonce is the replay-detection KEY, it
+// does not by itself PREVENT a byte-identical replay.
 
 import { ed25519, x25519 } from '../vendor/@noble/curves/ed25519.js';
 import {
   establishConvKRootInitiator,
   establishConvKRootResponder,
   MLKEM768_CIPHERTEXT_BYTES,
+  MLKEM768_PUBLIC_KEY_BYTES,
   KEY_ID_BYTES,
   X25519_PUBLIC_KEY_BYTES,
 } from './conv-routing.mjs';
 
-// ---- FROZEN pins (audit-critical) ----
-export const INTRO_TRANSCRIPT_DOMAIN = 'PLATHO.INTRO.TRANSCRIPT.V1';
-export const INTRO_PAYLOAD_MAGIC = new Uint8Array([0x50, 0x49, 0x48, 0x31]); // 'PIH1'
+// ---- FROZEN pins (audit-critical, clean-17 genesis) ----
+// V2/PIH2 vs the clean-16 V1/PIH1: the payload + transcript gained senderMlKemPublicKeyHash and the payload gained the
+// K_root confirm tag (see the header). The version bump is deliberate — a client on the old layout fails CLOSED on the
+// magic rather than silently interoperating with a mismatched field order. No clean-16 INTRO is deployed to be broken.
+export const INTRO_TRANSCRIPT_DOMAIN = 'PLATHO.INTRO.TRANSCRIPT.V2';
+export const INTRO_PAYLOAD_MAGIC = new Uint8Array([0x50, 0x49, 0x48, 0x32]); // 'PIH2'
 export const INTRO_NONCE_BYTES = 16;
 export const ED25519_SIGNATURE_BYTES = 64;
 export const ED25519_PUBLIC_KEY_BYTES = 32;
 export const ED25519_SECRET_KEY_BYTES = 32;
 export const INTRO_FIRST_MESSAGE_MAX_BYTES = 0xffff;
+// The frozen hybrid keyId formula, replicated here (importing platho-crypto would be circular): the recipient recomputes
+// keyId_A from the sender's enc pubkey + ML-KEM pubkey HASH and requires it to equal the claimed keyId_A.
+export const KEY_ID_HYBRID_DOMAIN = 'PLATHO.KEYID.HYBRID.V1';
+export const MLKEM768_PUBKEY_HASH_BYTES = 32;
+export const INTRO_CONFIRM_TAG_BYTES = 32;
+export const INTRO_CONFIRM_SALT_DOMAIN = 'PLATHO.INTRO.CONFIRM.SALT.V1';
+export const INTRO_CONFIRM_INFO_DOMAIN = 'PLATHO.INTRO.CONFIRM.V1';
 
 const encoder = new TextEncoder();
 
@@ -121,17 +142,53 @@ function bytesEqual(a, b) {
   return diff === 0;
 }
 
+// ---- K_root confirm-tag + keyId binding helpers (clean-17 first-contact authenticity) ----
+
+async function hkdf256(ikm, salt, info, byteLen) {
+  const key = await getSubtle().importKey('raw', toBytes(ikm), 'HKDF', false, ['deriveBits']);
+  const bits = await getSubtle().deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: toBytes(salt), info: toBytes(info) }, key, byteLen * 8);
+  return new Uint8Array(bits);
+}
+
+async function hmacSha256(key, data) {
+  const k = await getSubtle().importKey('raw', toBytes(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return new Uint8Array(await getSubtle().sign('HMAC', k, toBytes(data)));
+}
+
+// Recompute keyId_A the frozen way — H(DOMAIN || encPub(32) || sha256(mlKemPub)(32) || "1184") — from the enc pubkey and
+// the ML-KEM pubkey HASH the payload carries. Returns the RAW 32-byte digest (== normalizeKeyId of the base64url keyId).
+async function deriveHybridKeyIdRaw(encPublicKey, mlKemPublicKeyHash) {
+  return sha256(concatBytes(
+    utf8(KEY_ID_HYBRID_DOMAIN),
+    assertBytes('senderEncPublicKey', encPublicKey, X25519_PUBLIC_KEY_BYTES),
+    assertBytes('senderMlKemPublicKeyHash', mlKemPublicKeyHash, MLKEM768_PUBKEY_HASH_BYTES),
+    utf8(String(MLKEM768_PUBLIC_KEY_BYTES)),
+  ));
+}
+
+// The K_root possession proof: HMAC(HKDF(K_root), transcript). Both sides build the same transcript and derive the same
+// K_root for a genuine handshake, so the tags match; a forger who could not derive K_root (forced by the keyId binding
+// to use the victim's enc key, whose secret they lack) produces a mismatching tag and is rejected.
+async function deriveIntroConfirmTag(kRoot, transcriptBytes) {
+  const confirmKey = await hkdf256(
+    assertBytes('kRoot', kRoot, 32), utf8(INTRO_CONFIRM_SALT_DOMAIN), utf8(INTRO_CONFIRM_INFO_DOMAIN), 32);
+  return assertBytes('introConfirmTag', await hmacSha256(confirmKey, transcriptBytes), INTRO_CONFIRM_TAG_BYTES);
+}
+
 // ---- transcript ----
-// FROZEN order: DOMAIN || keyId_A(32) || keyId_B(32) || senderEncPublicKey(32) || R(32) || sha256(body_KEM_ct)(32)
-//               || sha256(ct_root)(32) || u16be(view_tag) || introNonce(16).
+// FROZEN order (V2): DOMAIN || keyId_A(32) || keyId_B(32) || senderEncPublicKey(32) || senderMlKemPublicKeyHash(32)
+//               || R(32) || sha256(body_KEM_ct)(32) || sha256(ct_root)(32) || u16be(view_tag) || introNonce(16).
 // senderEncPublicKey (A's static X25519 messaging key) is committed because it is the classical half of K_root
-// (dhShared = X25519(a, B)); without it the signature would not bind that key material.
-export async function buildIntroTranscript({ keyIdA, keyIdB, senderEncPublicKey, ephemeralR, bodyKemCiphertext, ctRoot, viewTag, introNonce }) {
+// (dhShared = X25519(a, B)); without it the signature would not bind that key material. senderMlKemPublicKeyHash is
+// committed so the keyId_A == H(enc, mlKemHash) binding cannot be bypassed by swapping the hash under a valid signature.
+export async function buildIntroTranscript({ keyIdA, keyIdB, senderEncPublicKey, senderMlKemPublicKeyHash, ephemeralR, bodyKemCiphertext, ctRoot, viewTag, introNonce }) {
   return concatBytes(
     utf8(INTRO_TRANSCRIPT_DOMAIN),
     normalizeKeyId(keyIdA),
     normalizeKeyId(keyIdB),
     assertBytes('senderEncPublicKey', senderEncPublicKey, X25519_PUBLIC_KEY_BYTES),
+    assertBytes('senderMlKemPublicKeyHash', senderMlKemPublicKeyHash, MLKEM768_PUBKEY_HASH_BYTES),
     assertBytes('ephemeralR', ephemeralR, X25519_PUBLIC_KEY_BYTES),
     await sha256(assertBytes('bodyKemCiphertext', bodyKemCiphertext, MLKEM768_CIPHERTEXT_BYTES)),
     await sha256(assertBytes('ctRoot', ctRoot, MLKEM768_CIPHERTEXT_BYTES)),
@@ -158,17 +215,20 @@ export function verifyIntroTranscript(transcriptBytes, signature, signingPublicK
 }
 
 // ---- intro payload struct (the plaintext content sealed inside the INTRO capsule body, after the 68B identity section) ----
-// FROZEN: MAGIC(4) || keyId_A(32) || senderEncPublicKey(32) || ct_root(1088) || introNonce(16) || sig(64) || u16be(msgLen) || msg
-export function serializeIntroPayload({ keyIdA, senderEncPublicKey, ctRoot, introNonce, transcriptSignature, firstMessageBytes }) {
+// FROZEN (V2): MAGIC(4) || keyId_A(32) || senderEncPublicKey(32) || senderMlKemPublicKeyHash(32) || ct_root(1088)
+//              || introNonce(16) || sig(64) || introConfirmTag(32) || u16be(msgLen) || msg
+export function serializeIntroPayload({ keyIdA, senderEncPublicKey, senderMlKemPublicKeyHash, ctRoot, introNonce, transcriptSignature, introConfirmTag, firstMessageBytes }) {
   const msg = firstMessageBytes ? toBytes(firstMessageBytes) : new Uint8Array(0);
   if (msg.length > INTRO_FIRST_MESSAGE_MAX_BYTES) throw new Error('INTRO first message too large');
   return concatBytes(
     INTRO_PAYLOAD_MAGIC,
     normalizeKeyId(keyIdA),
     assertBytes('senderEncPublicKey', senderEncPublicKey, X25519_PUBLIC_KEY_BYTES),
+    assertBytes('senderMlKemPublicKeyHash', senderMlKemPublicKeyHash, MLKEM768_PUBKEY_HASH_BYTES),
     assertBytes('ctRoot', ctRoot, MLKEM768_CIPHERTEXT_BYTES),
     assertBytes('introNonce', introNonce, INTRO_NONCE_BYTES),
     assertBytes('transcriptSignature', transcriptSignature, ED25519_SIGNATURE_BYTES),
+    assertBytes('introConfirmTag', introConfirmTag, INTRO_CONFIRM_TAG_BYTES),
     u16be(msg.length),
     msg,
   );
@@ -176,19 +236,22 @@ export function serializeIntroPayload({ keyIdA, senderEncPublicKey, ctRoot, intr
 
 export function parseIntroPayload(bytesLike) {
   const bytes = toBytes(bytesLike);
-  const fixed = 4 + KEY_ID_BYTES + X25519_PUBLIC_KEY_BYTES + MLKEM768_CIPHERTEXT_BYTES + INTRO_NONCE_BYTES + ED25519_SIGNATURE_BYTES + 2;
+  const fixed = 4 + KEY_ID_BYTES + X25519_PUBLIC_KEY_BYTES + MLKEM768_PUBKEY_HASH_BYTES + MLKEM768_CIPHERTEXT_BYTES
+    + INTRO_NONCE_BYTES + ED25519_SIGNATURE_BYTES + INTRO_CONFIRM_TAG_BYTES + 2;
   if (bytes.length < fixed) throw new Error('INTRO payload is truncated');
   if (!bytesEqual(bytes.subarray(0, 4), INTRO_PAYLOAD_MAGIC)) throw new Error('INTRO payload magic mismatch');
   let o = 4;
   const keyIdA = bytes.slice(o, o + KEY_ID_BYTES); o += KEY_ID_BYTES;
   const senderEncPublicKey = bytes.slice(o, o + X25519_PUBLIC_KEY_BYTES); o += X25519_PUBLIC_KEY_BYTES;
+  const senderMlKemPublicKeyHash = bytes.slice(o, o + MLKEM768_PUBKEY_HASH_BYTES); o += MLKEM768_PUBKEY_HASH_BYTES;
   const ctRoot = bytes.slice(o, o + MLKEM768_CIPHERTEXT_BYTES); o += MLKEM768_CIPHERTEXT_BYTES;
   const introNonce = bytes.slice(o, o + INTRO_NONCE_BYTES); o += INTRO_NONCE_BYTES;
   const transcriptSignature = bytes.slice(o, o + ED25519_SIGNATURE_BYTES); o += ED25519_SIGNATURE_BYTES;
+  const introConfirmTag = bytes.slice(o, o + INTRO_CONFIRM_TAG_BYTES); o += INTRO_CONFIRM_TAG_BYTES;
   const msgLen = readU16be(bytes, o); o += 2;
   if (bytes.length !== fixed + msgLen) throw new Error('INTRO payload length mismatch');
   const firstMessageBytes = bytes.slice(o, o + msgLen);
-  return { keyIdA, senderEncPublicKey, ctRoot, introNonce, transcriptSignature, firstMessageBytes };
+  return { keyIdA, senderEncPublicKey, senderMlKemPublicKeyHash, ctRoot, introNonce, transcriptSignature, introConfirmTag, firstMessageBytes };
 }
 
 // ---- high-level: initiator (A) ----
@@ -207,6 +270,10 @@ export async function buildIntroHandshake({
 }) {
   const a = senderIdentity.encryptionKeyPair;
   const ephemeralR = x25519.getPublicKey(assertBytes('ephemeralSecretKey', ephemeralSecretKey, 32));
+  // The keyId binding needs A's ML-KEM pubkey HASH; the hash (not the 1184-byte key) is what keyId_A commits to, so
+  // carrying it costs 32 bytes and lets the recipient recompute keyId_A == H(enc, mlKemHash) without the full key.
+  const senderMlKemPublicKeyHash = await sha256(
+    assertBytes('senderMlKem768PublicKey', a.mlKem768PublicKey, MLKEM768_PUBLIC_KEY_BYTES));
   const { kRoot, ctRoot } = await establishConvKRootInitiator({
     selfEncSecretKey: a.x25519SecretKey,
     peerEncPublicKey: recipientBundle.x25519PublicKey,
@@ -219,6 +286,7 @@ export async function buildIntroHandshake({
     keyIdA: a.keyId,
     keyIdB: recipientBundle.keyId,
     senderEncPublicKey: a.x25519PublicKey,
+    senderMlKemPublicKeyHash,
     ephemeralR,
     bodyKemCiphertext,
     ctRoot,
@@ -226,12 +294,17 @@ export async function buildIntroHandshake({
     introNonce: nonce,
   });
   const transcriptSignature = signIntroTranscript(transcript, senderIdentity.signingSecretKey);
+  // K_root possession proof — bound to the same transcript the signature covers, so it authenticates the sender as the
+  // holder of the enc secret behind senderEncPublicKey (and thus of keyId_A) even for a first-message-less handshake.
+  const introConfirmTag = await deriveIntroConfirmTag(kRoot, transcript);
   const introPayloadBytes = serializeIntroPayload({
     keyIdA: a.keyId,
     senderEncPublicKey: a.x25519PublicKey,
+    senderMlKemPublicKeyHash,
     ctRoot,
     introNonce: nonce,
     transcriptSignature,
+    introConfirmTag,
     firstMessageBytes,
   });
   return { introPayloadBytes, kRoot, ctRoot, ephemeralR, introNonce: nonce };
@@ -257,6 +330,7 @@ export async function openIntroHandshake({
     keyIdA: parsed.keyIdA,
     keyIdB: b.keyId,
     senderEncPublicKey: parsed.senderEncPublicKey,
+    senderMlKemPublicKeyHash: parsed.senderMlKemPublicKeyHash,
     ephemeralR,
     bodyKemCiphertext,
     ctRoot: parsed.ctRoot,
@@ -266,6 +340,13 @@ export async function openIntroHandshake({
   if (!verifyIntroTranscript(transcript, parsed.transcriptSignature, senderSigningPublicKey)) {
     throw new Error('INTRO transcript signature verification failed (UKS/tamper/replay guard)');
   }
+  // BINDING 1 — keyId_A must be the frozen hybrid keyId of the enc pubkey + ML-KEM pubkey hash the sender signed. This is
+  // what stops a stranger from pairing a VICTIM's keyId with their OWN enc key: to claim the victim's keyId they must
+  // present the victim's enc key here, which they do not hold the secret for (see binding 2). [intro-first-contact-auth]
+  const expectedKeyId = await deriveHybridKeyIdRaw(parsed.senderEncPublicKey, parsed.senderMlKemPublicKeyHash);
+  if (!bytesEqual(expectedKeyId, normalizeKeyId(parsed.keyIdA))) {
+    throw new Error('INTRO keyId_A does not bind to the sender enc + ML-KEM keys (impersonation)');
+  }
   const { kRoot } = await establishConvKRootResponder({
     selfEncSecretKey: b.x25519SecretKey,
     selfMlKem768SecretKey: b.mlKem768SecretKey,
@@ -274,6 +355,13 @@ export async function openIntroHandshake({
     selfKeyId: b.keyId,
     peerKeyId: parsed.keyIdA,
   });
+  // BINDING 2 — the K_root confirm tag proves the sender derived the SAME K_root, i.e. holds the enc secret behind
+  // senderEncPublicKey. Forced by binding 1 to use the victim's enc key, a forger cannot reach this K_root and the tag
+  // mismatches. Constant-time compare; failure is an authenticity failure, not a decrypt error.
+  const expectedConfirmTag = await deriveIntroConfirmTag(kRoot, transcript);
+  if (!bytesEqual(expectedConfirmTag, parsed.introConfirmTag)) {
+    throw new Error('INTRO K_root confirmation failed (sender does not hold the enc secret behind keyId_A — impersonation)');
+  }
   return {
     kRoot,
     senderKeyId: parsed.keyIdA,

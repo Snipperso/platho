@@ -88,33 +88,11 @@ describe('INTRO capsule build/open round-trip (clean-16 hybrid first contact)', 
     await expect(openEncryptedIntroCapsule(built, stranger.encryptionKeyPair, { enforceExpiry: false })).rejects.toThrow();
   });
 
-  it('INTRO-CAP-06: resolveVaultKeyRecord binds the sender to the LIVE Vault record (honest sender opens)', async () => {
-    const sender: any = await createMessagingIdentity();
-    const recipient: any = await createMessagingIdentity();
-    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, {});
-    const resolveVaultKeyRecord = async (_keyId: string) => ({
-      signingPublicKey: sender.signingPublicKey,
-      x25519PublicKey: sender.encryptionKeyPair.x25519PublicKey,
-      mlKem768PublicKey: sender.encryptionKeyPair.mlKem768PublicKey,
-    });
-    const opened = await openEncryptedIntroCapsule(built, recipient.encryptionKeyPair, { enforceExpiry: false, resolveVaultKeyRecord });
-    expect(hex(opened.kRoot)).toBe(hex(built.kRoot));
-  });
-
-  it('INTRO-CAP-07: resolveVaultKeyRecord REJECTS a sender whose in-body key ≠ the registered Vault key (impersonation)', async () => {
-    const sender: any = await createMessagingIdentity();
-    const impostorKeys: any = await createMessagingIdentity();
-    const recipient: any = await createMessagingIdentity();
-    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, {});
-    // the Vault record for this keyId carries a DIFFERENT signing key than the one signed into the body
-    const resolveVaultKeyRecord = async (_keyId: string) => ({
-      signingPublicKey: impostorKeys.signingPublicKey,
-      x25519PublicKey: sender.encryptionKeyPair.x25519PublicKey,
-      mlKem768PublicKey: sender.encryptionKeyPair.mlKem768PublicKey,
-    });
-    await expect(openEncryptedIntroCapsule(built, recipient.encryptionKeyPair, { enforceExpiry: false, resolveVaultKeyRecord }))
-      .rejects.toThrow(/does not match the Vault|impersonation/i);
-  });
+  // INTRO-CAP-06/07 (the resolveVaultKeyRecord gate) were REMOVED with the gate itself: clean-17 deleted the Vault
+  // keyId→keys index that gate depended on, and first-contact impersonation is now closed cryptographically inside the
+  // handshake (keyId_A == H(senderEnc, senderMlKemHash) + a K_root confirm tag). That defense is tested directly at the
+  // handshake level — tests/intro-handshake.test.ts INTRO-HS-11 (keyId binding) and INTRO-HS-12 (K_root possession).
+  // [intro-first-contact-auth-crypto-binding]
 
   it('INTRO-CAP-05: introReplayGuard makes a byte-identical replay fail-closed', async () => {
     const sender: any = await createMessagingIdentity();
