@@ -71,4 +71,35 @@ describe('RECOVERY-LANE', () => {
     const backupFresh = await prepareRecoveryBackup({ seed: SEED, slotIndex: 0, map, readView: async () => ({ bound: false }), value: VALUE });
     expect(backupFresh.seq, 'a fresh slot binds at seq 1').toBe(1);
   });
+
+  it('RL-04: a transient read failure marks the restore UNCLEAN (caller must not treat it as authoritative)', async () => {
+    const { map } = await sampleMap();
+    const { slots } = await selfRecoveryShardSpace(SEED);
+    const { body: mine } = await sealRecoveryBlob(SEED, map);
+    // slot 4 holds MY backup, but its view read THROWS (a 429) — restore must report clean=false and NOT return it.
+    const readView = async (addr: string) => { if (addr === slots[4].address) throw new Error('429'); return { bound: false }; };
+    const readBody = async (addr: string) => (addr === slots[4].address ? mine : null);
+    const { clean, found } = await restoreConvKeysFromRecovery({ seed: SEED, readView, readBody });
+    expect(clean, 'a thrown read makes the whole scan unclean').toBe(false);
+    expect(found.some((f) => f.slotIndex === 4), 'the failed slot yielded nothing').toBe(false);
+  });
+
+  it('RL-05: prepareRecoveryBackup REFUSES a blob that would overflow the on-chain cap (loud, not a silent bounce)', async () => {
+    // Build a conversation set large enough to exceed RS_MAX_BLOB_CELLS=79 once sealed (each fat record is several cells).
+    const big = createMemoryConvKeyStore();
+    for (let i = 0; i < 40; i += 1) {
+      // peer fills 100..139 never collide with A (0x11) — conversationOrder throws on self==peer.
+      await big.upsertConversationKRoot(A, new Uint8Array(32).fill(i + 100), { kRoot: kroot(i + 100), createdAt: 100 + i, introNonce: new Uint8Array(16).fill((i % 40) + 1), peerWallet: '0:' + (i.toString(16).padStart(2, '0')).repeat(32) });
+    }
+    await expect(
+      prepareRecoveryBackup({ seed: SEED, slotIndex: 0, map: big.snapshot(), readView: async () => ({ bound: false }), value: VALUE }),
+    ).rejects.toThrow(/over the on-chain cap|RECOVERY_BLOB_OVERFLOW|does not fit/i);
+  });
+
+  it('RL-06: prepareRecoveryBackup PROPAGATES a readView failure (never guesses seq 0 and bounces the anti-rollback)', async () => {
+    const { map } = await sampleMap();
+    await expect(
+      prepareRecoveryBackup({ seed: SEED, slotIndex: 0, map, readView: async () => { throw new Error('429'); }, value: VALUE }),
+    ).rejects.toThrow(/429/);
+  });
 });
