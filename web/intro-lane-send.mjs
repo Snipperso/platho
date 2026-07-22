@@ -52,6 +52,15 @@ function introPublishFieldsFromCapsule(capsule) {
   };
 }
 
+/** The stealth fields the SENDER needs to read back its own published intro (r = the uint256 ephemeral, view_tag),
+ *  computed straight from the capsule — so they are available whether or not the broadcast succeeded (an ambiguous
+ *  broadcast still needs them to confirm the on-chain created_at on retry). [direct-pay send hardening] */
+export function introCapsuleStealthFields(capsule) {
+  const ephemeralR = capsule?.header0?.ephemeralR ?? capsule?.header0?.ephemeral_r;
+  if (!ephemeralR) throw new Error('INTRO capsule header0 is missing the ephemeral R');
+  return { r: bytesToBig(b64urlToBytes(ephemeralR)), viewTag: BigInt(capsule?.header0?.viewTag ?? capsule?.header0?.view_tag ?? 0) };
+}
+
 /**
  * Shape an INTRO publish as the wallet-message form sendPlathoWalletTransaction consumes:
  *   { address, amount, payload (base64 BoC of the body), stateInit (cell), bounce }.

@@ -627,6 +627,12 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
         detail: error?.responseBody ?? String(error?.message ?? error),
         seqno,
       });
+      // Attach the SIGNED external so an AMBIGUOUS broadcast (the send may or may not have landed) can be re-broadcast
+      // idempotently on retry instead of re-signing a fresh seqno — a fresh sign would double-execute if the first
+      // copy actually landed. The external is bound to `seqno`, so the chain runs it at most once. [direct-pay send hardening]
+      if (error && typeof error === 'object' && built?.boc && error.builtBoc === undefined) {
+        try { error.builtBoc = built.boc; error.builtSeqno = seqno; } catch { /* frozen error — best effort */ }
+      }
       throw error;
     }
     batches.push({ ...built, result, messageCount: chunk.length });
