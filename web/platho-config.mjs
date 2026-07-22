@@ -154,6 +154,15 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   publicLane: {
     directPay: false,
   },
+  // clean-17 private lane cutover (CONV messages / INTRO first contact / RECOVERY durability). false = live clean-15
+  // path (private capsules batch through the Vault; INTRO/CONV read the Vault recipient/sender indexes). Flip to true
+  // ONLY once the clean-17 RecordShard/IntroShard/RecoveryShard genesis is live: messages publish DIRECT-PAY from the
+  // wallet straight into the shards, first contact is scanned stealthily off IntroShard, and the pairwise K_root is
+  // adopted into the local conv key store. On-chain correctness is validated by a live run — the sandbox proves the
+  // messages + adoption logic (tests/conv-*, tests/intro-*, tests/recovery-*), not the app's wallet/scan round-trip.
+  privateLane: {
+    directPay: false,
+  },
   feeAccumulator: {
     address: 'UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr',
   },

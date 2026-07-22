@@ -34,9 +34,9 @@ async function pair() {
 }
 
 describe('intro-handshake (INTRO lane first-contact — clean-16 hybrid)', () => {
-  it('INTRO-HS-00: FROZEN pins', () => {
-    expect(INTRO_TRANSCRIPT_DOMAIN).toBe('PLATHO.INTRO.TRANSCRIPT.V1');
-    expect(hex(INTRO_PAYLOAD_MAGIC)).toBe('50494831'); // 'PIH1'
+  it('INTRO-HS-00: FROZEN pins (clean-17 V2)', () => {
+    expect(INTRO_TRANSCRIPT_DOMAIN).toBe('PLATHO.INTRO.TRANSCRIPT.V2');
+    expect(hex(INTRO_PAYLOAD_MAGIC)).toBe('50494832'); // 'PIH2'
     expect(INTRO_NONCE_BYTES).toBe(16);
     expect(ED25519_SIGNATURE_BYTES).toBe(64);
   });
@@ -83,7 +83,7 @@ describe('intro-handshake (INTRO lane first-contact — clean-16 hybrid)', () =>
     const { A, B, r, viewTag, bodyKemCiphertext, recipientBundle } = await pair();
     const built = await buildIntroHandshake({ senderIdentity: A, recipientBundle, ephemeralSecretKey: r, viewTag, bodyKemCiphertext });
     const tampered = new Uint8Array(built.introPayloadBytes);
-    const ctRootOffset = 4 + 32 + 32; // magic + keyIdA + senderEncPub
+    const ctRootOffset = 4 + 32 + 32 + 32; // magic + keyIdA + senderEncPub + senderMlKemPubHash
     tampered[ctRootOffset] ^= 0xff;
     await expect(openIntroHandshake({
       introPayloadBytes: tampered, recipientIdentity: B,
@@ -125,25 +125,30 @@ describe('intro-handshake (INTRO lane first-contact — clean-16 hybrid)', () =>
   it('INTRO-HS-08: serialize/parse round-trips (with and without a first message)', () => {
     const keyIdA = randomBytes(32);
     const senderEncPublicKey = randomBytes(32);
+    const senderMlKemPublicKeyHash = randomBytes(32);
     const ctRoot = randomBytes(1088);
     const introNonce = randomBytes(16);
     const transcriptSignature = randomBytes(64);
+    const introConfirmTag = randomBytes(32);
     for (const msg of [new Uint8Array(0), utf8('first message body')]) {
-      const bytes = serializeIntroPayload({ keyIdA, senderEncPublicKey, ctRoot, introNonce, transcriptSignature, firstMessageBytes: msg });
+      const bytes = serializeIntroPayload({ keyIdA, senderEncPublicKey, senderMlKemPublicKeyHash, ctRoot, introNonce, transcriptSignature, introConfirmTag, firstMessageBytes: msg });
       const parsed = parseIntroPayload(bytes);
       expect(hex(parsed.keyIdA)).toBe(hex(keyIdA));
       expect(hex(parsed.senderEncPublicKey)).toBe(hex(senderEncPublicKey));
+      expect(hex(parsed.senderMlKemPublicKeyHash)).toBe(hex(senderMlKemPublicKeyHash));
       expect(hex(parsed.ctRoot)).toBe(hex(ctRoot));
       expect(hex(parsed.introNonce)).toBe(hex(introNonce));
       expect(hex(parsed.transcriptSignature)).toBe(hex(transcriptSignature));
+      expect(hex(parsed.introConfirmTag)).toBe(hex(introConfirmTag));
       expect(hex(parsed.firstMessageBytes)).toBe(hex(msg));
     }
   });
 
   it('INTRO-HS-09: parse rejects wrong magic and truncation', () => {
     const good = serializeIntroPayload({
-      keyIdA: randomBytes(32), senderEncPublicKey: randomBytes(32), ctRoot: randomBytes(1088),
-      introNonce: randomBytes(16), transcriptSignature: randomBytes(64), firstMessageBytes: new Uint8Array(0),
+      keyIdA: randomBytes(32), senderEncPublicKey: randomBytes(32), senderMlKemPublicKeyHash: randomBytes(32),
+      ctRoot: randomBytes(1088), introNonce: randomBytes(16), transcriptSignature: randomBytes(64),
+      introConfirmTag: randomBytes(32), firstMessageBytes: new Uint8Array(0),
     });
     const badMagic = new Uint8Array(good); badMagic[0] ^= 0xff;
     expect(() => parseIntroPayload(badMagic)).toThrow(/magic/i);
@@ -154,7 +159,7 @@ describe('intro-handshake (INTRO lane first-contact — clean-16 hybrid)', () =>
     const A: any = await createMessagingIdentity();
     const t = await buildIntroTranscript({
       keyIdA: A.encryptionKeyPair.keyId, keyIdB: A.encryptionKeyPair.keyId,
-      senderEncPublicKey: A.encryptionKeyPair.x25519PublicKey,
+      senderEncPublicKey: A.encryptionKeyPair.x25519PublicKey, senderMlKemPublicKeyHash: randomBytes(32),
       ephemeralR: randomBytes(32), bodyKemCiphertext: randomBytes(1088), ctRoot: randomBytes(1088),
       viewTag: 0xbeef, introNonce: randomBytes(16),
     });
@@ -162,5 +167,44 @@ describe('intro-handshake (INTRO lane first-contact — clean-16 hybrid)', () =>
     expect(verifyIntroTranscript(t, sig, A.signingPublicKey)).toBe(true);
     const t2 = new Uint8Array(t); t2[t2.length - 1] ^= 0xff;
     expect(verifyIntroTranscript(t2, sig, A.signingPublicKey)).toBe(false);
+  });
+
+  // ── clean-17 first-contact authenticity: the two bindings that replace the deleted Vault keyId→keys guard ──
+  it('INTRO-HS-11: a VALIDLY-SIGNED payload whose keyId_A ≠ H(senderEnc, senderMlKemHash) is rejected (keyId binding)', async () => {
+    const { A, B, r, viewTag, bodyKemCiphertext, recipientBundle } = await pair();
+    const built = await buildIntroHandshake({ senderIdentity: A, recipientBundle, ephemeralSecretKey: r, viewTag, bodyKemCiphertext });
+    const parsed = parseIntroPayload(built.introPayloadBytes);
+    // Forge: keep A's real enc + ML-KEM hash (so the K_root still derives), but CLAIM a different keyId (B's). Re-sign
+    // the transcript with A's key so the signature verifies — the keyId binding, not the signature, must catch it.
+    const forgedKeyId = B.encryptionKeyPair.keyId;
+    const forgedTranscript = await buildIntroTranscript({
+      keyIdA: forgedKeyId, keyIdB: B.encryptionKeyPair.keyId,
+      senderEncPublicKey: parsed.senderEncPublicKey, senderMlKemPublicKeyHash: parsed.senderMlKemPublicKeyHash,
+      ephemeralR: built.ephemeralR, bodyKemCiphertext, ctRoot: parsed.ctRoot, viewTag, introNonce: parsed.introNonce,
+    });
+    const forgedPayload = serializeIntroPayload({
+      keyIdA: forgedKeyId, senderEncPublicKey: parsed.senderEncPublicKey, senderMlKemPublicKeyHash: parsed.senderMlKemPublicKeyHash,
+      ctRoot: parsed.ctRoot, introNonce: parsed.introNonce,
+      transcriptSignature: signIntroTranscript(forgedTranscript, A.signingSecretKey),
+      introConfirmTag: parsed.introConfirmTag, firstMessageBytes: new Uint8Array(0),
+    });
+    await expect(openIntroHandshake({
+      introPayloadBytes: forgedPayload, recipientIdentity: B,
+      senderSigningPublicKey: A.signingPublicKey, ephemeralR: built.ephemeralR, bodyKemCiphertext, viewTag,
+    })).rejects.toThrow(/bind|impersonation/i);
+  });
+
+  it('INTRO-HS-12: a tampered K_root confirm tag is rejected (K_root possession proof)', async () => {
+    const { A, B, r, viewTag, bodyKemCiphertext, recipientBundle } = await pair();
+    const built = await buildIntroHandshake({ senderIdentity: A, recipientBundle, ephemeralSecretKey: r, viewTag, bodyKemCiphertext });
+    const tampered = new Uint8Array(built.introPayloadBytes);
+    // confirm tag sits after magic+keyIdA+enc+mlKemHash+ctRoot+nonce+sig; it is NOT in the transcript, so the signature
+    // still verifies and the open reaches the K_root confirmation check, which must fail closed.
+    const confirmTagOffset = 4 + 32 + 32 + 32 + 1088 + 16 + 64;
+    tampered[confirmTagOffset] ^= 0xff;
+    await expect(openIntroHandshake({
+      introPayloadBytes: tampered, recipientIdentity: B,
+      senderSigningPublicKey: A.signingPublicKey, ephemeralR: built.ephemeralR, bodyKemCiphertext, viewTag,
+    })).rejects.toThrow(/confirmation|impersonation/i);
   });
 });

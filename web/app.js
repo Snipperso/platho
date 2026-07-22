@@ -29781,6 +29781,14 @@ function publicLaneDirectPayEnabled() {
   return appConfig.publicLane?.directPay === true;
 }
 
+// When appConfig.privateLane.directPay is true, PRIVATE messaging runs on the clean-17 direct-pay shards: CONV
+// messages publish straight from the wallet into RecordShard, first contact is scanned off IntroShard and its pairwise
+// K_root adopted into the local conv key store, and durability writes go to RecoveryShard. DEFAULT OFF: clean-15 is the
+// live genesis and the shards are not deployed yet, so the flag flips at clean-17 genesis alongside publicLane.directPay.
+function privateLaneDirectPayEnabled() {
+  return appConfig.privateLane?.directPay === true;
+}
+
 // PPH2 payload parts for a composed public post — mirrors createPublicPayloadParts' multipart plan, but calls the
 // V2 builder (uniform 32-byte header, no profile pointer / parent id / is_profile — all removed in the shard model)
 // and returns the client header/body cells the wallet builder consumes directly.
