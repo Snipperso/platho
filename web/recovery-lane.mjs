@@ -6,10 +6,35 @@
 import { selfRecoveryShardSpace } from './conv-discovery.mjs?v=1';
 import { sealRecoveryBlob, openRecoveryBlob } from './recovery-blob.mjs?v=1';
 import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=1';
+import { RECOVERY_MAX_SLOTS } from './shard-discovery.mjs?v=1';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS — the immutable on-chain cap on the blob's cell tree (gate 13560).
 // Mirrored (not imported) so an over-cap backup is refused CLIENT-SIDE before it bounces on chain and is mis-recorded.
 const RS_MAX_BLOB_CELLS = 79;
+
+/**
+ * The recovery SLOT a conversation is backed up into. A DETERMINISTIC, STABLE hash of the convId over [0, MAX_SLOTS):
+ * a conversation always lands in the same slot (so its backups overwrite one another rather than scattering), the load
+ * spreads roughly evenly across the 256 slots, and — since restore probes ALL slots and merges — the mapping never has
+ * to be agreed cross-device. convId is already `${hex(lo)}:${hex(hi)}` (hash-derived, uniform), so a cheap sync string
+ * hash distributes it well without WebCrypto. Multi-slot lifts the single-slot cap (~30 conversations) to ~256×that.
+ */
+export function recoverySlotForConversation(convId) {
+  let h = 0;
+  for (let i = 0; i < convId.length; i += 1) h = (Math.imul(h, 31) + convId.charCodeAt(i)) >>> 0;
+  return h % RECOVERY_MAX_SLOTS;
+}
+
+/** Group a conversation map by recovery slot: Map<slotIndex, Map<convId, record>>. Each slot is backed up independently. */
+export function partitionRecoveryMap(map) {
+  const bySlot = new Map();
+  for (const [convId, rec] of map) {
+    const slot = recoverySlotForConversation(convId);
+    if (!bySlot.has(slot)) bySlot.set(slot, new Map());
+    bySlot.get(slot).set(convId, rec);
+  }
+  return bySlot;
+}
 
 /** Cells in a snake blob (a linear chain linked by refs[0]) — what the contract's computeDataSize(body).cells counts. */
 function countCells(cell) {

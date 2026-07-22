@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup } from '../web/recovery-lane.mjs';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, recoverySlotForConversation, partitionRecoveryMap } from '../web/recovery-lane.mjs';
 import { selfRecoveryShardSpace } from '../web/conv-discovery.mjs';
 import { sealRecoveryBlob } from '../web/recovery-blob.mjs';
 import { createMemoryConvKeyStore } from '../web/conv-key-store.mjs';
@@ -101,5 +101,27 @@ describe('RECOVERY-LANE', () => {
     await expect(
       prepareRecoveryBackup({ seed: SEED, slotIndex: 0, map, readView: async () => { throw new Error('429'); }, value: VALUE }),
     ).rejects.toThrow(/429/);
+  });
+
+  it('RL-07: multi-slot — slot mapping is deterministic + in range, and partition loses no conversation', async () => {
+    const store = createMemoryConvKeyStore();
+    for (let i = 0; i < 50; i += 1) {
+      await store.upsertConversationKRoot(A, new Uint8Array(32).fill(i + 100), { kRoot: kroot(i + 100), createdAt: 100 + i, introNonce: new Uint8Array(16).fill((i % 40) + 1) });
+    }
+    const map = store.snapshot();
+    for (const id of map.keys()) {
+      const slot = recoverySlotForConversation(id);
+      expect(slot, 'deterministic').toBe(recoverySlotForConversation(id));
+      expect(slot).toBeGreaterThanOrEqual(0);
+      expect(slot, 'within [0, RECOVERY_MAX_SLOTS)').toBeLessThan(256);
+    }
+    const bySlot = partitionRecoveryMap(map);
+    let total = 0;
+    for (const [slot, part] of bySlot) {
+      total += part.size;
+      for (const id of part.keys()) expect(recoverySlotForConversation(id), 'each conversation is in ITS slot').toBe(slot);
+    }
+    expect(total, 'no conversation lost across the partition').toBe(map.size);
+    expect(bySlot.size, '50 conversations spread across more than one slot').toBeGreaterThan(1);
   });
 });
