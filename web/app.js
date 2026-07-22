@@ -185,7 +185,7 @@ import { createConvReadLane } from './conv-lane.mjs?v=1';
 import { createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane } from './intro-lane-send.mjs?v=1';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=1';
 import {
@@ -29140,85 +29140,114 @@ async function attemptIntroFirstContactDirect(context) {
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) throw new Error('INTRO direct-pay: RPC transport unavailable');
   if (!convKeyStore) convKeyStore = createMemoryConvKeyStore();
-
-  // Resolve the recipient's FULL bundle from their KeyShard (by the wallet the thread targets — the initiator chose it,
-  // and a KeyShard is address-bound to its wallet, so the keys are authentic and the resolved keyId defines the peer).
-  const peerWallet = requireBasechainAddress(await resolveRecipientWalletForThread(thread), 'Recipient wallet');
-  const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
-  const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
-  const bundle = await resolveRecipientBundleByWallet({ provider, wallet: peerWallet, callOptions: criticalChainReadOptions() });
-  const peerKeyId = bundle.keyId;
-
-  // The composed document becomes the INTRO's first message (INTRO carries it, so first contact is one transaction).
-  const firstMessageBytes = messageDocumentBytesFromDraft(
-    context.text, context.attachments,
-    context.payment ?? context.paymentDraft ?? null, {},
-    context.replyDraft === undefined ? privateReplyDraft : context.replyDraft,
-    context.fileAttachments === undefined ? privateFileAttachments : context.fileAttachments,
-    context.shareDraft === undefined ? privateShareDraft : context.shareDraft);
-  if (!firstMessageBytes) throw new Error('INTRO direct-pay: nothing to send');
-
-  const capsule = await createEncryptedIntroCapsule(bundle, localIdentity, {
-    firstMessageBytes, now: Date.now(), ...currentProfilePointerFields(),
-  });
-
-  // Pick a bucket the recipient scans (densely from the bottom) and publish.
-  const readScanPage = createScanPageReader((call) => transport.runGetMethod(call));
   const readEntry = createEntryReader((call) => transport.runGetMethod(call));
-  const introEpochNow = Math.floor(Date.now() / 86400000);
-  const slot = await pickIntroSendSlot({ readScanPage, epoch: introEpochNow });
-  const result = await publishIntroLane({
-    wallet: plathoWallet, transport, epoch: slot.epoch, bucket: slot.bucket, capsule, value: INTRO_PUBLISH_VALUE,
-  });
 
-  // Read back the CONTRACT created_at (fork-safety — the recipient stores THIS same value). Bounded retries cover the
-  // indexer lag right after broadcast; if still not visible, adopt a provisional time and log (re-INTRO ordering, an
-  // edge case, is the only thing at risk — a proper confirm driver is the follow-up).
+  // IDEMPOTENT RETRY: a prior attempt already SIGNED (and maybe broadcast) this INTRO. Re-broadcast the SAME external
+  // rather than minting a NEW capsule (new K_root/introNonce) + publishing again — a re-mint double-charges and, if the
+  // two INTROs ordered differently on the two sides, could fork. The captured stealth fields (r/view_tag) + K_root drive
+  // the confirm + adoption below identically. Only past the validity window is a fresh mint reached (old external dead).
+  let sendState = message.introDirectSend;
+  if (sendState?.boc && (Date.now() - sendState.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
+    if (transport?.sendBoc) await transport.sendBoc({ boc: sendState.boc, walletAddress: plathoWallet.address });
+  } else {
+    // FRESH mint + publish (first attempt, or the prior external has expired so a re-mint cannot double-execute).
+    // Resolve the recipient's FULL bundle from their KeyShard (by the wallet the thread targets — a KeyShard is
+    // address-bound to its wallet, so the keys are authentic and the resolved keyId defines the peer).
+    const peerWallet = requireBasechainAddress(await resolveRecipientWalletForThread(thread), 'Recipient wallet');
+    const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
+    const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
+    const bundle = await resolveRecipientBundleByWallet({ provider, wallet: peerWallet, callOptions: criticalChainReadOptions() });
+    const peerKeyId = bundle.keyId;
+
+    const firstMessageBytes = messageDocumentBytesFromDraft(
+      context.text, context.attachments,
+      context.payment ?? context.paymentDraft ?? null, {},
+      context.replyDraft === undefined ? privateReplyDraft : context.replyDraft,
+      context.fileAttachments === undefined ? privateFileAttachments : context.fileAttachments,
+      context.shareDraft === undefined ? privateShareDraft : context.shareDraft);
+    if (!firstMessageBytes) throw new Error('INTRO direct-pay: nothing to send');
+
+    const capsule = await createEncryptedIntroCapsule(bundle, localIdentity, {
+      firstMessageBytes, now: Date.now(), ...currentProfilePointerFields(),
+    });
+    const { r, viewTag } = introCapsuleStealthFields(capsule);
+
+    const readScanPage = createScanPageReader((call) => transport.runGetMethod(call));
+    const introEpochNow = Math.floor(Date.now() / 86400000);
+    const slot = await pickIntroSendSlot({ readScanPage, epoch: introEpochNow });
+    // Capture everything the confirm + adoption need BEFORE the broadcast, so an ambiguous throw still re-broadcasts.
+    const pending = {
+      at: Date.now(), boc: null, kRoot: capsule.kRoot, introNonce: capsule.introNonce,
+      peerKeyId, peerWallet, epoch: slot.epoch, bucket: slot.bucket, expectedEntryId: slot.expectedEntryId, r, viewTag,
+    };
+    message.introDirectSend = pending;
+    try {
+      const result = await publishIntroLane({ wallet: plathoWallet, transport, epoch: slot.epoch, bucket: slot.bucket, capsule, value: INTRO_PUBLISH_VALUE });
+      pending.boc = result?.result?.boc ?? null;
+    } catch (error) {
+      if (!pending.boc && error?.builtBoc) pending.boc = error.builtBoc;
+      throw error;
+    }
+    sendState = pending;
+  }
+
+  // Read back the CONTRACT created_at (fork-safety — the recipient stores THIS same value), using the captured stealth
+  // fields so a re-broadcast retry confirms identically. Bounded retries cover the indexer lag right after broadcast.
   let createdAtSec = null;
   for (let attempt = 0; attempt < 6 && createdAtSec === null; attempt += 1) {
     if (attempt > 0) await delay(Math.min(1000 * attempt, 4000));
     try {
       const confirmed = await confirmIntroCreatedAt({
-        readEntry, epoch: slot.epoch, bucket: slot.bucket, fromEntryId: slot.expectedEntryId, r: result.r, viewTag: result.viewTag,
+        readEntry, epoch: sendState.epoch, bucket: sendState.bucket, fromEntryId: sendState.expectedEntryId, r: sendState.r, viewTag: sendState.viewTag,
       });
       if (confirmed) createdAtSec = confirmed.createdAt;
     } catch (error) { if (!noteTonRpcRateLimit(error)) console.warn('[intro] created_at confirm read failed', error); }
   }
   if (createdAtSec === null) {
     // FAIL CLOSED — never a local clock. adoptKRoot orders re-INTRO by createdAt, and the recipient stores the CONTRACT
-    // created_at; if the sender kept Date.now() and the two later disagreed on which re-INTRO is newest, the conversation
-    // would SILENTLY, PERMANENTLY fork. The INTRO is already on chain (the recipient receives it regardless), so we do
-    // NOT establish the conversation here — a resend confirms the contract time. (No-re-mint idempotent resend is the
-    // send-retry-hardening follow-up mandated before the flag flips.) [intro-send review; reintro-kroot-adoption-invariant]
+    // created_at; a local time here would let the two sides disagree on which re-INTRO is newest and SILENTLY fork the
+    // conversation. The INTRO is on chain and the send state is retained, so a resend RE-BROADCASTS (no re-mint) and
+    // re-confirms — it does not establish the conversation on a guessed time. [intro-send review; reintro-kroot-adoption-invariant]
     const error = new Error('INTRO published, but its on-chain time is not yet visible — resend to establish the conversation');
     error.code = 'INTRO_CREATED_AT_UNCONFIRMED';
     throw error;
   }
 
-  // Adopt the minted K_root under (self, peer) so CONV send/receive work; stamp the thread so the next message is CONV.
-  await convKeyStore.upsertConversationKRoot(selfKeyId, peerKeyId, {
-    kRoot: capsule.kRoot, createdAt: createdAtSec, introNonce: capsule.introNonce, peerKeyId, peerEncPublicKey: null, peerWallet,
+  // Adopt the minted K_root (idempotent — re-upserting the same kRoot/introNonce is a 'duplicate' no-op) + stamp the thread.
+  await convKeyStore.upsertConversationKRoot(selfKeyId, sendState.peerKeyId, {
+    kRoot: sendState.kRoot, createdAt: createdAtSec, introNonce: sendState.introNonce, peerKeyId: sendState.peerKeyId, peerEncPublicKey: null, peerWallet: sendState.peerWallet,
   });
-  thread.convPeerKeyId = peerKeyId;
+  thread.convPeerKeyId = sendState.peerKeyId;
 
+  globalThis.plathoLastIntroDirectSend = { peerKeyId: sendState.peerKeyId, epoch: sendState.epoch, bucket: sendState.bucket, createdAtSec };
+  markDirectSendPublished(thread, message);
+  return { peerKeyId: sendState.peerKeyId };
+}
+
+// How long a captured direct-pay external stays re-broadcastable. The wallet external is valid for ~300s (its
+// timeout), so within this window a retry RE-BROADCASTS the SAME signed external (bound to its seqno → the chain runs
+// it at most once, whether or not the first copy landed). Past this — comfortably beyond the 300s validity — the
+// external is GUARANTEED dead, so a fresh rebuild cannot double-execute. [direct-pay send hardening]
+const DIRECT_SEND_REBROADCAST_WINDOW_MS = 330_000;
+
+/** The identical terminal-delivered bookkeeping both direct-pay send paths (and their idempotent re-broadcast) run. */
+function markDirectSendPublished(thread, message) {
   clearPrivateSendRetry(message);
   clearPrivateMessageManualRecovery(message);
-  message.meta = 'published';
+  message.meta = 'published';        // terminal-delivered (green). A shard-read confirm driver is a follow-up.
   message.privateManualRetryAvailable = false;
   message.privateCancelAvailable = false;
   thread.state = 'sealed';
   refreshThreadAfterMessageChange(thread);
-  await updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
-  globalThis.plathoLastIntroDirectSend = { peerKeyId, epoch: slot.epoch, bucket: slot.bucket, createdAtSec, to: result.to };
+  updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
   refreshMessagingControls();
-  return result;
 }
 
 // FIRST CONTACT vs ESTABLISHED. A thread with no adopted conversation (no convPeerKeyId) is a not-yet-introduced peer:
 // the FIRST message routes to attemptIntroFirstContactDirect, which mints the pairwise K_root via an INTRO (carrying
 // that first message) and stamps convPeerKeyId — so every message after it lands here on the CONV lane.
-// Send retry/confirm hardening (no-double-publish on an ambiguous broadcast) mirrors the public confirm driver and is
-// a follow-up; the send path gets an adversarial review before the flag is ever flipped. [clean17-private-lane-plan]
+// SEND HARDENING: an ambiguous broadcast is retried by RE-BROADCASTING the captured signed external (idempotent),
+// never by rebuilding — a rebuild would bump the seq + seal a new capsule and double-publish if the first landed.
 async function attemptConvMessagePublishDirect(context) {
   const { thread, message } = context;
   const selfKeyId = localRecipientKeyPair?.keyId;
@@ -29227,6 +29256,18 @@ async function attemptConvMessagePublishDirect(context) {
   // contact: send an INTRO (which mints the K_root and carries this message) instead of a CONV publish.
   const peerKeyId = thread?.convPeerKeyId ?? null;
   if (!peerKeyId) return attemptIntroFirstContactDirect(context);
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+
+  // IDEMPOTENT RETRY: a prior attempt already signed (and maybe broadcast) this message's external. Re-broadcast the
+  // SAME one rather than rebuilding — no seq re-bump, no new capsule, no double-publish. Only past the validity window
+  // (below) is a rebuild reached, when the old copy is guaranteed expired.
+  const captured = message.convDirectSend;
+  if (captured?.boc && (Date.now() - captured.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
+    if (transport?.sendBoc) await transport.sendBoc({ boc: captured.boc, walletAddress: plathoWallet.address });
+    markDirectSendPublished(thread, message);
+    return { rebroadcast: true };
+  }
+
   const rec = convKeyStore?.getConversation(selfKeyId, peerKeyId) ?? null;
   if (!rec?.kRootCurrent) throw new Error('CONV direct-pay: no K_root for this conversation — receive/adopt the INTRO first');
   if (!rec.peerWallet) throw new Error('CONV direct-pay: conversation has no peer wallet to resolve the reply bundle');
@@ -29275,19 +29316,20 @@ async function attemptConvMessagePublishDirect(context) {
     parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE });
   }
 
-  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
-  const result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
+  let result;
+  try {
+    result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
+    message.convDirectSend = { boc: result?.result?.boc ?? null, at: Date.now() };
+  } catch (error) {
+    // Capture the signed external even on an AMBIGUOUS broadcast throw, so the retry re-broadcasts it (never rebuilds/
+    // re-seals/re-bumps the seq). Without this a transient sendBoc failure whose external actually landed would
+    // double-publish on the next attempt.
+    if (!message.convDirectSend?.boc && error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, at: Date.now() };
+    throw error;
+  }
 
-  clearPrivateSendRetry(message);
-  clearPrivateMessageManualRecovery(message);
-  message.meta = 'published';        // terminal-delivered (green). A confirm driver like the public lane's is a follow-up.
-  message.privateManualRetryAvailable = false;
-  message.privateCancelAvailable = false;
-  thread.state = 'sealed';
-  refreshThreadAfterMessageChange(thread);
-  await updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
   globalThis.plathoLastConvDirectSend = { peerKeyId, epoch: route.epoch, parts: parts.length, to: result?.parts?.[0]?.to ?? null };
-  refreshMessagingControls();
+  markDirectSendPublished(thread, message);
   return result;
 }
 
