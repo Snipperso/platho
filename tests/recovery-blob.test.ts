@@ -38,7 +38,11 @@ describe('RECOVERY-BLOB', () => {
     expect(hex(rec.kRootCurrent), 'K_root recovered').toBe(hex(kroot(0x5a)));
     expect(rec.peerWallet).toBe('w-A');
     expect(rec.lastScannedEpoch, 'scan cursor recovered').toBe(19005);
-    expect(rec.outgoingSeq, 'outgoing seq recovered').toEqual({ 19005: 1 });
+    // COMPACT FORM: outgoingSeq / kRootsForRead / peerEncPublicKey are NOT stored on chain (unbounded / re-derivable) —
+    // they default on restore, and the next send cold-floors the seq from the shard's chain last_seq. [compact blob]
+    expect(rec.outgoingSeq, 'outgoing seq is NOT persisted — re-derived from chain on send').toEqual({});
+    expect(rec.kRootsForRead, 'retired roots are not persisted').toEqual([]);
+    expect(rec.peerEncPublicKey, 'peer enc key re-read from the KeyShard bundle').toBeNull();
   });
 
   it('RB-02: a DIFFERENT seed cannot open the blob (the durability is seed-bound)', async () => {
