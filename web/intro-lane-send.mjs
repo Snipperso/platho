@@ -68,6 +68,8 @@ export async function buildIntroPublishWalletMessage({ epoch, bucket, capsule, v
     body: built.body,
     epoch,
     bucket,
+    r,           // the uint256 ephemeral r the publish carries — the sender matches it to read back its own created_at
+    viewTag,
     message: {
       address: built.to,
       amount: built.value,
