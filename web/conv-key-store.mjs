@@ -167,6 +167,28 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
       return next;
     },
 
+    /**
+     * Merge restored conversation records (from the RECOVERY lane) into the store and persist. On a collision the
+     * NEWER record wins (higher adoptedCreatedAt), so importing an older on-chain backup can never roll a live K_root
+     * back to a key the user has already rotated past. Records slot in by their own convId (both devices compute it
+     * identically from the seed-derived key ids), so a reinstalled device lands each conversation where it belongs.
+     * Returns how many records were written. [RECOVERY restore]
+     */
+    async importConversations(map) {
+      if (!(map instanceof Map)) return 0;
+      let changed = 0;
+      for (const [id, incoming] of map) {
+        if (!incoming?.kRootCurrent) continue;
+        const existing = byConv.get(id);
+        if (!existing || Number(incoming.adoptedCreatedAt ?? 0) > Number(existing.adoptedCreatedAt ?? 0)) {
+          byConv.set(id, incoming);
+          changed += 1;
+        }
+      }
+      if (changed > 0 && persist) await persist(byConv);
+      return changed;
+    },
+
     /** Hydrate from the injected loader (a Map of convId -> record). */
     async load() {
       if (!loadImpl) return;
