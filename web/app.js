@@ -175,6 +175,7 @@ import { publicPublishValueForKind, CONV_PUBLISH_VALUE } from './publish-price.m
 import { createIntroLane } from './intro-lane.mjs?v=1';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=1';
 import { createMemoryConvKeyStore } from './conv-key-store.mjs?v=1';
+import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=1';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
 import { outgoingRecordShard } from './conv-discovery.mjs?v=1';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
@@ -1716,6 +1717,12 @@ function currentMessageHistoryDbName(walletAddress = plathoWallet?.address) {
 
 function currentReplayDbName(walletAddress = plathoWallet?.address) {
   return walletScopedIndexedDbName(LEGACY_REPLAY_DB_NAME, walletAddress);
+}
+
+// The direct-pay CONV lane's sealed K_root store lives in a WALLET-SCOPED IndexedDB so one wallet's conversation keys
+// never bleed into another's ([[cross-wallet-identity-bleed]]); the seal key is device-local within that DB.
+function currentConvKeyDbName(walletAddress = plathoWallet?.address) {
+  return walletScopedIndexedDbName('platho-conv-keys-v1', walletAddress);
 }
 
 function deploymentScopedStorage(storage, scopedKeys) {
@@ -14893,9 +14900,25 @@ async function bootEncryptedMessageHistory() {
   await restoreEncryptedMessageHistory();
 }
 
+// Persistent, device-sealed K_root store for the direct-pay CONV lane. WITHOUT it a reload drops every conversation's
+// K_root and scan cursor, so an offline recipient permanently loses messages that are still on chain — the persistence
+// half of the receive silent-loss fix. Wallet-scoped + AES-GCM sealed (conv-key-persist); memory fallback if IndexedDB
+// is unavailable. Gated behind privateLane.directPay: the clean-15 private path does not use convKeyStore at all. Runs
+// BEFORE armIntroReceiveLane (unlock order) so the intro handler captures the persistent store, not a transient memory one.
+async function bootConvKeyStore() {
+  if (!privateLaneDirectPayEnabled() || !plathoWallet?.address) return;
+  try {
+    convKeyStore = await createIndexedDbConvKeyStore({ dbName: currentConvKeyDbName() });
+  } catch (error) {
+    console.warn('[conv] persistent key store unavailable, using memory (K_roots will not survive reload)', error);
+    if (!convKeyStore) convKeyStore = createMemoryConvKeyStore();
+  }
+}
+
 async function bootWalletScopedLocalStores() {
   await bootReplayStore();
   await bootEncryptedMessageHistory();
+  await bootConvKeyStore();
   if (plathoWallet?.address) activeRuntimeWalletAddress = plathoWallet.address;
   // Saved messages (v652): the self-dialog exists from the first unlock (top of the list until real dialogs push it).
   if (ensureSavedMessagesThread()) renderThreads();
