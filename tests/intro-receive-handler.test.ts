@@ -16,12 +16,13 @@ const fromUtf8 = (b: Uint8Array): string => new TextDecoder().decode(b);
 
 /** Shape a built INTRO as what fetchIntroCapsule delivers: the two published cells (parsed from their BoC) + the
  *  CONTRACT-stamped created_at (the field name fetchIntroCapsule actually surfaces — the adoption ordering key). */
-const asScanCapsule = (built: any, created_at: number) => ({
+const asScanCapsule = (built: any, created_at: number, source: string | null = null) => ({
   header0: parseBocBase64(built.chainCells.header0.boc),
   body: parseBocBase64(built.chainCells.body.boc),
   r: 0n,
   viewTag: built.header0.viewTag,
   created_at,
+  source,
 });
 
 describe('INTRO-RECEIVE-HANDLER', () => {
@@ -38,12 +39,15 @@ describe('INTRO-RECEIVE-HANDLER', () => {
       onFirstContact: (r: any) => { firstContact = r; },
     });
 
-    const opened = await onIntro(asScanCapsule(built, 1_790_000_000));
+    const senderWallet = '0:' + 'ab'.repeat(32);
+    const opened = await onIntro(asScanCapsule(built, 1_790_000_000, senderWallet));
     expect(opened.adoption).toBe('created');
 
     const rec = store.getConversation(recipient.encryptionKeyPair.keyId, opened.senderKeyId);
     expect(rec, 'the conversation is now in the store').not.toBeNull();
     expect(hex(rec.kRootCurrent), 'the store holds the SAME pairwise root the sender minted').toBe(hex(built.kRoot));
+    // The INTRO tx src is captured as peerWallet so a reply can resolve the sender's full bundle (KeyShard). [Y]
+    expect(rec.peerWallet, 'the INTRO publish source is stored for reply-bundle resolution').toBe(senderWallet);
     expect(fromUtf8(firstContact.firstMessageBytes), 'the first message is surfaced to the app').toBe('привет');
   });
 

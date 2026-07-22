@@ -30,5 +30,26 @@ describe('FETCH-INTRO-CAPSULE surfaces the contract created_at', () => {
     const fetched = await fetchIntroCapsule({ address: '0:' + '11'.repeat(32), entryId: 0n, readEntry, readMessages });
     expect(fetched, 'the intro was matched by commitment').not.toBeNull();
     expect(fetched.created_at, 'the contract created_at is surfaced for adoption ordering').toBe(CONTRACT_CREATED_AT);
+    // Source-free reader (plain cells) → source is null (no bundle-resolution hint available).
+    expect(fetched.source, 'a plain-cell reader yields no source').toBeNull();
+  });
+
+  it('FIC-02: fetchIntroCapsule surfaces the matched message source from a with-source reader (Y reply resolution)', async () => {
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, {});
+    const header0 = parseBocBase64(built.chainCells.header0.boc);
+    const body = parseBocBase64(built.chainCells.body.boc);
+    const publish = await buildIntroPublishBrowser({ epoch: 20000, bucket: 0, r: 1n, viewTag: built.header0.viewTag, header0, body, value: 0n });
+    const commit = await introBodyCommitBrowser(header0, body);
+
+    const SENDER_WALLET = '0:' + 'cd'.repeat(32);
+    const readEntry = async () => ({ exists: true, body_commit: commit, created_at: 1_790_000_000 });
+    // The with-source reader yields { bodyCell, source } — the INTRO publish transaction's src = the sender's wallet.
+    const readMessages = async () => [{ bodyCell: publish.body, source: SENDER_WALLET }];
+
+    const fetched = await fetchIntroCapsule({ address: '0:' + '22'.repeat(32), entryId: 0n, readEntry, readMessages });
+    expect(fetched, 'the intro was matched by commitment').not.toBeNull();
+    expect(fetched.source, 'the sender wallet (tx src) is surfaced for reply-bundle resolution').toBe(SENDER_WALLET);
   });
 });

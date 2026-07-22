@@ -59,4 +59,18 @@ describe('CONV-KEY-STORE', () => {
     // a different epoch has its own counter, seeded by its own floor
     expect(await store.nextOutgoingSeq(A, B, 19001, 0)).toBe(1);
   });
+
+  it('CKS-06: peerWallet (the INTRO tx src) is stored on create and preserved across a re-INTRO', async () => {
+    const store = createMemoryConvKeyStore();
+    const walletA = '0:' + 'ab'.repeat(32);
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1), peerWallet: walletA });
+    expect(store.getConversation(A, B)!.peerWallet, 'wallet captured on first contact').toBe(walletA);
+    // a re-INTRO with no wallet must NOT wipe the known peer wallet (a reply must still resolve the bundle)...
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(2), createdAt: 200, introNonce: nonce(2) });
+    expect(store.getConversation(A, B)!.peerWallet, 'a walletless re-INTRO keeps the known wallet').toBe(walletA);
+    // ...and a re-INTRO carrying a NEW wallet updates it.
+    const walletA2 = '0:' + 'cd'.repeat(32);
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(3), createdAt: 300, introNonce: nonce(3), peerWallet: walletA2 });
+    expect(store.getConversation(A, B)!.peerWallet, 'a newer INTRO updates the wallet').toBe(walletA2);
+  });
 });
