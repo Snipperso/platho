@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { beginCell } from '@ton/core';
 import { createHash } from 'node:crypto';
 import { createMessagingIdentity } from '../web/crypto/platho-crypto.mjs';
-import { resolvePeerBundleFromKeyShardView, resolvePeerReplyBundle } from '../web/conv-reply-bundle.mjs';
+import { resolveBundleFromKeyShardView, resolvePeerBundleFromKeyShardView, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from '../web/conv-reply-bundle.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // CONV-REPLY-BUNDLE — the responder resolves the initiator's FULL bundle from their KeyShard (Y). The security
@@ -76,5 +76,24 @@ describe('CONV-REPLY-BUNDLE (Y: resolve + verify the peer bundle from their KeyS
     const bundle = await resolvePeerReplyBundle({ provider, peerWallet: '0:' + 'ab'.repeat(32), peerKeyId: peer.encryptionKeyPair.keyId });
     expect(askedWallet, 'the provider was asked for the peer wallet').toBe('0:' + 'ab'.repeat(32));
     expect(bundle.keyId).toBe(peer.encryptionKeyPair.keyId);
+  });
+
+  it('CRB-05: INITIATOR — resolveRecipientBundleByWallet builds the bundle with NO pre-known keyId (keyId is output)', async () => {
+    const recipient: any = await createMessagingIdentity();
+    const view = keyShardViewFor(recipient);
+    let askedWallet: string | null = null;
+    const provider = { getView: async (wallet: string) => { askedWallet = wallet; return view; } };
+    const wallet = '0:' + 'cd'.repeat(32);
+    const bundle = await resolveRecipientBundleByWallet({ provider, wallet });
+    expect(askedWallet, 'the provider was asked for the recipient wallet').toBe(wallet);
+    // the keyId is DERIVED from the shard keys — it becomes the conversation peerKeyId
+    expect(bundle.keyId, 'derived keyId is the recipient identity keyId').toBe(recipient.encryptionKeyPair.keyId);
+    expect(bundle.mlKem768PublicKey, 'ML-KEM key present (snake decoded)').toBeTruthy();
+    expect(bundle.scanPublicKey, 'scan key present (needed for an INTRO seal)').toBe(
+      Buffer.from(recipient.scanPublicKey).toString('base64url'));
+  });
+
+  it('CRB-06: the ungated core fails closed on an unregistered shard', async () => {
+    await expect(resolveBundleFromKeyShardView({ exists: false })).rejects.toThrow(/not registered/i);
   });
 });
