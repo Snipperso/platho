@@ -88,7 +88,10 @@ export function adoptKRoot(existing, candidate) {
   // Stored as-is; verified against peerKeyId at reply time, never trusted alone. [Y reply-bundle resolution]
   const peerWallet = candidate.peerWallet == null ? null : String(candidate.peerWallet);
   if (!existing) {
-    return { outcome: 'created', record: { kRootCurrent: kRoot, kRootsForRead: [], peerKeyId, peerEncPublicKey, peerWallet, adoptedCreatedAt: createdAt, adoptedIntroNonce: introNonce, outgoingSeq: {} } };
+    // lastScannedEpoch: the highest epoch the receive lane has fully scanned for this conversation. null = never
+    // scanned; the receiver starts at the steady window and extends BACK to this cursor to catch up after being
+    // offline, so a message whose epoch scrolled past the steady window is not silently lost. [conv-receive review]
+    return { outcome: 'created', record: { kRootCurrent: kRoot, kRootsForRead: [], peerKeyId, peerEncPublicKey, peerWallet, adoptedCreatedAt: createdAt, adoptedIntroNonce: introNonce, outgoingSeq: {}, lastScannedEpoch: null } };
   }
   const cmp = compareAdoption({ createdAt, introNonce }, existing);
   if (cmp === 0) return { outcome: 'duplicate', record: existing };
@@ -129,6 +132,23 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
     /** The current record for a conversation, or null. kRootCurrent drives derivation; kRootsForRead decrypt history. */
     getConversation(selfKeyId, peerKeyId) {
       return byConv.get(conversationId(selfKeyId, peerKeyId)) ?? null;
+    },
+
+    /**
+     * Advance the per-conversation receive scan cursor to `epoch` (the highest epoch fully scanned this pass).
+     * MONOTONIC — never rewinds, so a later pass that scanned a narrower window cannot drop the cursor and re-open the
+     * offline gap. Only call after a CLEAN scan (no shard read failed); a failed read must leave the cursor so the
+     * missed epochs are retried. No-op if the conversation is unknown. [conv-receive review — offline catch-up]
+     */
+    async advanceConvScanCursor(selfKeyId, peerKeyId, epoch) {
+      const record = byConv.get(conversationId(selfKeyId, peerKeyId));
+      if (!record) return;
+      const e = Number(epoch);
+      if (!Number.isFinite(e)) return;
+      if (record.lastScannedEpoch == null || e > record.lastScannedEpoch) {
+        record.lastScannedEpoch = e;
+        if (persist) await persist(byConv);
+      }
     },
 
     /**

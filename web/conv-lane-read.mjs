@@ -58,8 +58,19 @@ function cellReader(cell) {
   };
 }
 
-/** The first 64 bytes of a sig sub-cell (buildConvPublishBody stored the 64-byte ed25519 sig as the cell's data). */
+/** The first 64 bytes of a sig sub-cell (buildConvPublishBody stored the 64-byte ed25519 sig as the cell's data).
+ *  Dual-mode like cellReader: reads an @ton/core cell (loadBuffer) or a client cell (.data), so the whole parse is
+ *  genuinely usable on either input, not just the client cell production feeds it. */
 function sigBytesFromCell(cell) {
+  if (cell && typeof cell.beginParse === 'function') {
+    try {
+      const slice = cell.beginParse();
+      if (slice.remainingBits < 512) return null;
+      return Uint8Array.from(slice.loadBuffer(64));
+    } catch {
+      return null;
+    }
+  }
   const bytes = cell?.data ?? null;
   if (!bytes || bytes.length < 64) return null;
   return Uint8Array.from(bytes.subarray(0, 64));
