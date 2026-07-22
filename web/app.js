@@ -18872,7 +18872,13 @@ function refreshMessagingControls() {
       : activationPending
       ? t('vault.statusActivating')
       : t('vault.activationFeeGram', { fee: plathoAccountActivationFeeLabel() }));
-  if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !signedActionsReady;
+  if (replaceVaultKeysButton) {
+    // clean-17: "Replace message keys" is VESTIGIAL under direct-pay — the messaging keys are wallet-frozen (no real
+    // rotation is possible), and register/activate is now repair-aware (re-writes stale keys), so a separate replace
+    // button would only let the user pay to bump a generation nothing depends on. Hide it. [rotation: keys are frozen]
+    replaceVaultKeysButton.hidden = privateLaneDirectPayEnabled();
+    replaceVaultKeysButton.disabled = privateLaneDirectPayEnabled() || !plathoWallet || !signedActionsReady;
+  }
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady || messageSyncManualInFlight;
   if (mintUsernameButton) mintUsernameButton.disabled = false;
   if (linkUsernameButton) linkUsernameButton.disabled = false;
@@ -26060,18 +26066,24 @@ async function submitKeyShardRegisterDirect() {
   const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) throw new Error('KeyShard register: RPC transport unavailable');
-  // Already registered? Read the OWN KeyShard. exists ⇒ keys already published; re-registering would only bump
-  // key_generation (a rotation), which the activation button must not do silently. A TRANSIENT read must NOT be read as
-  // "not registered" (it would drive an unnecessary re-register that changes key_id) — only a definitive uninit does.
+  // Read the OWN KeyShard. Registered WITH THE CURRENT keys ⇒ active, no-op. There is no real "rotation" here: the
+  // messaging keys are DETERMINISTICALLY derived from the wallet seed with frozen info-strings, so re-deriving always
+  // yields the same keys and the conversation keyId (H(enc,mlkem), generation-independent) can never change. So this is
+  // register-OR-REPAIR: if the shard holds STALE keys (a derivation-version change or a prior bad write), re-register to
+  // overwrite them — KSG1 is register-or-replace and the contract charges the replace floor for a re-write (overpay
+  // refunded), so KEYSHARD_REGISTER_VALUE funds both. A TRANSIENT read must NOT drive a write — only a definitive uninit.
   const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
   let view = null;
   try {
     view = await provider.getView(ownerWallet, criticalChainReadOptions());
   } catch (error) {
-    if (!isKeyShardUninitError(error)) throw error;   // transient — abort rather than re-register on a bad read
+    if (!isKeyShardUninitError(error)) throw error;   // transient — abort rather than write on a bad read
     view = { exists: false };
   }
-  if (view?.exists) { vaultDraftStatus.textContent = t('vault.active'); return null; }
+  const registeredMine = view?.exists === true
+    && BigInt(view.enc_pubkey ?? 0n) === BigInt(localVaultDraft.message.enc_pubkey ?? 0n)
+    && BigInt(view.sign_pubkey ?? 0n) === BigInt(localVaultDraft.message.sign_pubkey ?? 0n);
+  if (registeredMine) { vaultDraftStatus.textContent = t('vault.active'); return null; }
   const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
   if (!(await confirmPlathoAccountActivation(view ?? { exists: false }, { needsKeyBackup }))) return null;
   if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
