@@ -14,15 +14,20 @@ const hex = (b: Uint8Array): string => Buffer.from(b).toString('hex');
 const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s);
 const fromUtf8 = (b: Uint8Array): string => new TextDecoder().decode(b);
 
-/** Shape a built INTRO as what fetchIntroCapsule delivers: the two published cells (parsed from their BoC) + the
- *  CONTRACT-stamped created_at (the field name fetchIntroCapsule actually surfaces — the adoption ordering key). */
+/** Shape a built INTRO as the EXACT delivery the scan runner hands onIntro: `{ ...hit, capsule }`, where the fetched
+ *  capsule (the two published cells parsed from BoC + the CONTRACT-stamped created_at + the publish src) is NESTED
+ *  under `.capsule`, alongside the hit's r/view_tag/epoch/bucket/entryId. Feeding the flat capsule the handler used to
+ *  read would test a shape the runner never produces — the seam-green-while-broken this test now guards. [intro-send review] */
 const asScanCapsule = (built: any, created_at: number, source: string | null = null) => ({
-  header0: parseBocBase64(built.chainCells.header0.boc),
-  body: parseBocBase64(built.chainCells.body.boc),
-  r: 0n,
-  viewTag: built.header0.viewTag,
-  created_at,
-  source,
+  r: 0n, view_tag: built.header0.viewTag, epoch: 0, bucket: 0, entryId: 0,   // hit fields the runner spreads
+  capsule: {
+    header0: parseBocBase64(built.chainCells.header0.boc),
+    body: parseBocBase64(built.chainCells.body.boc),
+    r: 0n,
+    viewTag: built.header0.viewTag,
+    created_at,
+    source,
+  },
 });
 
 describe('INTRO-RECEIVE-HANDLER', () => {
@@ -85,11 +90,14 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     const builtA = await createEncryptedIntroCapsule(bundle, sender, { firstMessageBytes: utf8('a') });
     const builtB = await createEncryptedIntroCapsule(bundle, sender, { firstMessageBytes: utf8('b') });
     const frankenstein = {
-      header0: parseBocBase64(builtA.chainCells.header0.boc),
-      body: parseBocBase64(builtB.chainCells.body.boc),
-      r: 0n,
-      viewTag: builtA.header0.viewTag,
-      created_at: 100,
+      r: 0n, view_tag: builtA.header0.viewTag, epoch: 0, bucket: 0, entryId: 0,
+      capsule: {
+        header0: parseBocBase64(builtA.chainCells.header0.boc),
+        body: parseBocBase64(builtB.chainCells.body.boc),
+        r: 0n,
+        viewTag: builtA.header0.viewTag,
+        created_at: 100,
+      },
     };
     await expect(onIntro(frankenstein), 'a mismatched header/body cannot open').rejects.toThrow();
     expect(store.getConversation(recipient.encryptionKeyPair.keyId, sender.encryptionKeyPair.keyId), 'nothing stored for a rejected forgery').toBeNull();

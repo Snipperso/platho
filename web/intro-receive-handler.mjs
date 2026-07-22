@@ -40,7 +40,13 @@ export function createIntroReceiveHandler({
   if (!recipientKeyPair?.keyId) throw new Error('createIntroReceiveHandler requires recipientKeyPair with a keyId');
   if (typeof convKeyStore?.upsertConversationKRoot !== 'function') throw new Error('createIntroReceiveHandler requires a conv key store');
 
-  return async function onIntro(capsule) {
+  return async function onIntro(delivery) {
+    // THE SCAN RUNNER DELIVERS { ...hit, capsule } — the fetched+verified capsule (header0/body/created_at/source, flat
+    // from fetchIntroCapsule) is NESTED under `.capsule`, alongside the hit's r/view_tag/epoch/bucket/entryId. Read it
+    // from there. A flat capsule (a direct caller / an old test shape) is tolerated so both work. Getting this wrong is
+    // silent: header0 reads undefined, the open throws, and EVERY first contact is lost while the sender thinks it
+    // succeeded — exactly the seam a same-commit fixture cannot prove. [intro-send review]
+    const capsule = delivery?.capsule ?? delivery;
     const header0Bytes = asBytes(capsule.header0, 'intro header0');
     const bodyBytes = asBytes(capsule.body, 'intro body');
     const opened = await openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, recipientKeyPair, {
