@@ -7,6 +7,22 @@ import { selfRecoveryShardSpace } from './conv-discovery.mjs?v=1';
 import { sealRecoveryBlob, openRecoveryBlob } from './recovery-blob.mjs?v=1';
 import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=1';
 
+// MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS — the immutable on-chain cap on the blob's cell tree (gate 13560).
+// Mirrored (not imported) so an over-cap backup is refused CLIENT-SIDE before it bounces on chain and is mis-recorded.
+const RS_MAX_BLOB_CELLS = 79;
+
+/** Cells in a snake blob (a linear chain linked by refs[0]) — what the contract's computeDataSize(body).cells counts. */
+function countCells(cell) {
+  let n = 0;
+  let cur = cell;
+  while (cur) {
+    n += 1;
+    cur = Array.isArray(cur.refs) && cur.refs.length > 0 ? cur.refs[0] : null;
+    if (n > 4096) break;   // a malformed/branching tree — stop rather than loop; the cap check will refuse it anyway
+  }
+  return n;
+}
+
 /**
  * Restore the conversation key map from chain on a fresh device that has only the seed. Probes EVERY slot in
  * [0, RECOVERY_MAX_SLOTS) — never stops at the first gap, because a slot can be evicted after 3 years leaving a hole
@@ -21,19 +37,22 @@ export async function restoreConvKeysFromRecovery({ seed, readView, readBody }) 
   const { slots } = await selfRecoveryShardSpace(seed);
   const merged = new Map();
   const found = [];
+  let clean = true;   // FALSE if ANY read threw — an unclean restore may be MISSING on-chain conversations
   for (const slot of slots) {
     let view;
-    try { view = await readView(slot.address); } catch { continue; }
+    try { view = await readView(slot.address); } catch { clean = false; continue; }
     if (!view?.bound) continue;                    // fresh / never-written slot — nothing to restore, keep probing
     let body;
-    try { body = await readBody(slot.address); } catch { continue; }
-    if (!body) continue;
+    try { body = await readBody(slot.address); } catch { clean = false; continue; }
+    if (!body) { clean = false; continue; }        // a bound slot with no body = failed/incomplete read, not empty
     let map;
-    try { map = await openRecoveryBlob(seed, body); } catch { continue; }   // foreign/corrupt blob → skip, never throw
+    try { map = await openRecoveryBlob(seed, body); } catch { continue; }   // foreign/corrupt blob -> skip (not our loss)
     for (const [convId, rec] of map) merged.set(convId, rec);
     found.push({ slotIndex: slot.slotIndex, seq: Number(view.seq), count: map.size });
   }
-  return { map: merged, found };
+  // clean=false means a transient failure hid part of the backup: the caller MUST retry and MUST NOT overwrite the
+  // on-chain blob with this partial map (it would destroy the conversations this scan missed). [recovery-wiring review #1]
+  return { map: merged, found, clean };
 }
 
 /**
@@ -48,13 +67,22 @@ export async function prepareRecoveryBackup({ seed, slotIndex, map, readView, va
   const { slots } = await selfRecoveryShardSpace(seed);
   const slot = slots[slotIndex];
   if (!slot) throw new Error(`prepareRecoveryBackup: slotIndex ${slotIndex} out of range`);
-  let currentSeq = 0n;
-  try {
-    const view = await readView(slot.address);
-    if (view?.bound) currentSeq = BigInt(view.seq);
-  } catch { /* a fresh slot has no view — seq starts at 0, so the first backup is seq 1 */ }
+  // Read the slot's current seq. A read that THROWS must NOT be swallowed as "fresh slot, seq 0" — that would publish
+  // at seq 1 and either bounce gate 13564 (bound at a higher seq) or pick below the retained high-water. Let a transient
+  // failure propagate so the caller retries; the reader returns null (not a throw) ONLY for a genuinely absent slot.
+  const view = await readView(slot.address);
+  const currentSeq = view?.bound ? BigInt(view.seq) : 0n;
   const nextSeq = Number(currentSeq) + 1;
   const { body, h0, h1 } = await sealRecoveryBlob(seed, map);
+  // OVERFLOW GUARD: the immutable contract caps the blob at RS_MAX_BLOB_CELLS (gate 13560); a bigger blob BOUNCES. The
+  // caller fire-and-forgets, so without this an over-cap backup would be recorded as success while nothing landed — a
+  // reinstall would then silently lose every conversation past the cap. Fail loudly. [recovery-wiring review #3/#4]
+  const cells = countCells(body);
+  if (cells > RS_MAX_BLOB_CELLS) {
+    const error = new Error(`recovery blob is ${cells} cells, over the on-chain cap of ${RS_MAX_BLOB_CELLS} — the conversation set does not fit one slot (multi-slot sharding is the follow-up)`);
+    error.code = 'RECOVERY_BLOB_OVERFLOW';
+    throw error;
+  }
   const built = await buildRecoveryPublishBrowser({ seed, slotIndex, seq: nextSeq, h0, h1, body, value });
-  return { ...built, seq: nextSeq };
+  return { ...built, seq: nextSeq, cells };
 }

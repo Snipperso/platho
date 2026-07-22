@@ -3667,7 +3667,9 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   convKeyStore = null;
   introReplayGuard = null;
   convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
+  convRecoveryBackupAllowed = false;      // block backups until the new wallet's restore proves the local map is complete
   if (recoveryBackupTimer) { clearTimeout(recoveryBackupTimer); recoveryBackupTimer = null; }
+  // NOTE: convRecoveryBackupDirty deliberately survives — a backup deferred by a background-lock is re-armed on unlock.
   localReplayStore = createMemoryReplayStore();
   encryptedMessageStore = null;
   knownVaultKeyOwnerBySignPubkey.clear();
@@ -4164,7 +4166,9 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   convKeyStore = null;
   introReplayGuard = null;
   convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
+  convRecoveryBackupAllowed = false;      // block backups until the new wallet's restore proves the local map is complete
   if (recoveryBackupTimer) { clearTimeout(recoveryBackupTimer); recoveryBackupTimer = null; }
+  // NOTE: convRecoveryBackupDirty deliberately survives — a backup deferred by a background-lock is re-armed on unlock.
   delete globalThis.plathoVaultBinding;
   resetVaultPocketState();
   renderWalletIdentity();
@@ -14931,59 +14935,81 @@ async function bootConvKeyStore() {
 
 // A fresh device / reinstall has an EMPTY conv key store — the IndexedDB is gone but the seed re-derives the recovery
 // owner key. Read every recovery slot on chain, decrypt the blob with the seed, and import the K_roots so conversations
-// survive a reinstall. Runs at most once per session (the 256-slot probe is not free) and only while the store is empty
-// — a device that already holds conversations has nothing to restore. [RECOVERY restore; recovery-lane]
-let convRecoveryRestoreAttempted = false;
+// survive a reinstall. Only while the store is empty (a populated store is authoritative), and only latched on a CLEAN
+// scan — a transient RPC failure mid-scan returns a PARTIAL map, which must be retried, not treated as authoritative
+// (and must never be backed up over the fuller on-chain blob). [RECOVERY restore; recovery-wiring review #1/#2]
+let convRecoveryRestoreAttempted = false;   // a CLEAN restore (or clean-empty scan) completed — do not re-scan
+let convRecoveryBackupAllowed = false;      // the local map is known ⊇ the on-chain blob → safe to overwrite it
 async function restoreConvKeysFromRecoveryIfEmpty() {
   if (convRecoveryRestoreAttempted || !convKeyStore || !plathoWallet?.seed) return;
-  if (convKeyStore.snapshot().size > 0) return;
-  convRecoveryRestoreAttempted = true;
+  if (convKeyStore.snapshot().size > 0) {
+    // Already holds conversations (original device, or a prior clean restore) → authoritative; backups are safe.
+    convRecoveryRestoreAttempted = true;
+    convRecoveryBackupAllowed = true;
+    return;
+  }
   const transport = globalThis.plathoTonRpcTransport;
-  if (!transport?.runGetMethod) return;
+  if (!transport?.runGetMethod) return;   // no transport yet — do NOT latch; retry on the next unlock/visible
   try {
     const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
     const readBody = createRecoveryBodyReader((call) => transport.runGetMethod(call));
-    const { map, found } = await restoreConvKeysFromRecovery({ seed: plathoWallet.seed, readView, readBody });
+    const { map, found, clean } = await restoreConvKeysFromRecovery({ seed: plathoWallet.seed, readView, readBody });
     const imported = map.size > 0 ? await convKeyStore.importConversations(map) : 0;
-    globalThis.plathoLastConvRecoveryRestore = { imported, slots: found.length, at: new Date().toISOString() };
+    globalThis.plathoLastConvRecoveryRestore = { imported, slots: found.length, clean, at: new Date().toISOString() };
+    if (clean) {
+      // A clean scan is authoritative — the store now holds the whole on-chain backup, so a later backup can only grow it.
+      convRecoveryRestoreAttempted = true;
+      convRecoveryBackupAllowed = true;
+    }  // unclean → leave both false: retry next unlock/visible, and BLOCK any backup from clobbering the fuller on-chain blob.
     if (imported > 0) renderThreads();
   } catch (error) {
-    if (!noteTonRpcRateLimit(error)) console.warn('[recovery] restore failed', error);
+    if (!noteTonRpcRateLimit(error)) console.warn('[recovery] restore failed', error);   // no latch — retry later
   }
 }
 
 // Back up the conversation K_root map on chain so a future reinstall can restore it. Debounced + triggered only when a
 // K_root actually changes (a new conversation established via INTRO) — NOT on every CONV message, so the backup cost
-// (RECOVERY_PUBLISH_VALUE per write) tracks new conversations, not traffic. First cut writes the whole map into slot 0
-// (holds ~155 conversations); multi-slot sharding for scale is a follow-up.
+// (RECOVERY_PUBLISH_VALUE per write) tracks new conversations, not traffic. First cut writes the whole map into slot 0;
+// the immutable blob cap (RS_MAX_BLOB_CELLS) is refused loudly by prepareRecoveryBackup, and multi-slot sharding for a
+// larger conversation set is the follow-up. `convRecoveryBackupDirty` survives a lock so a backup deferred by a
+// background-lock is re-armed on the next unlock rather than lost. [recovery-wiring review #3/#5/#6]
 const RECOVERY_BACKUP_DEBOUNCE_MS = 45_000;
 let recoveryBackupTimer = null;
+let convRecoveryBackupDirty = false;
 function scheduleRecoveryBackup(delayMs = RECOVERY_BACKUP_DEBOUNCE_MS) {
   if (!privateLaneDirectPayEnabled() || !convKeyStore || !plathoWallet?.seed) return;
+  convRecoveryBackupDirty = true;   // a backup is owed — remembered even if a lock cancels the timer below
   if (recoveryBackupTimer) clearTimeout(recoveryBackupTimer);
   recoveryBackupTimer = setTimeout(() => {
     recoveryBackupTimer = null;
     runRecoveryBackup().catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[recovery] backup failed', error); });
   }, delayMs);
 }
+// Re-arm a backup that a background-lock cancelled before it fired (called after unlock / on return-to-visible).
+function rearmRecoveryBackupIfDirty() {
+  if (convRecoveryBackupDirty && convRecoveryBackupAllowed && !recoveryBackupTimer) scheduleRecoveryBackup(3_000);
+}
 async function runRecoveryBackup() {
   if (!convKeyStore || !plathoWallet?.seed) return;
+  if (!convRecoveryBackupAllowed) return;   // a partial/unknown local map must NOT overwrite the on-chain blob [#1]
   const map = convKeyStore.snapshot();
-  if (map.size === 0) return;
+  if (map.size === 0) { convRecoveryBackupDirty = false; return; }
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
-  if (!transport?.runGetMethod || !transport?.sendBoc) return;
+  if (!transport?.runGetMethod || !transport?.sendBoc) return;   // no transport — keep dirty, retry later
   const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
   const built = await prepareRecoveryBackup({ seed: plathoWallet.seed, slotIndex: 0, map, readView, value: RECOVERY_PUBLISH_VALUE });
   await sendPlathoWalletTransaction(plathoWallet, {
     messages: [{ address: built.to, amount: built.value, payload: tonCell.bytesToBase64(tonCell.serializeBoc(built.body)), stateInit: built.init, bounce: true }],
   }, { transport });
-  globalThis.plathoLastConvRecoveryBackup = { slotIndex: 0, seq: built.seq, conversations: map.size, at: new Date().toISOString() };
+  convRecoveryBackupDirty = false;   // cleared ONLY on a successful publish — a throw leaves it dirty for a retry [#6]
+  globalThis.plathoLastConvRecoveryBackup = { slotIndex: 0, seq: built.seq, conversations: map.size, cells: built.cells, at: new Date().toISOString() };
 }
 
 async function bootWalletScopedLocalStores() {
   await bootReplayStore();
   await bootEncryptedMessageHistory();
   await bootConvKeyStore();
+  rearmRecoveryBackupIfDirty();   // re-fire a backup a background-lock cancelled before it landed (now that restore ran)
   if (plathoWallet?.address) activeRuntimeWalletAddress = plathoWallet.address;
   // Saved messages (v652): the self-dialog exists from the first unlock (top of the list until real dialogs push it).
   if (ensureSavedMessagesThread()) renderThreads();
@@ -31180,6 +31206,9 @@ document.addEventListener('visibilitychange', () => {
     scheduleWalletUnlockPrompt();
     scheduleMessageAutoSync(2_000);
     armIntroReceiveLane().catch((error) => console.warn('[intro] arm on visible failed', error));
+    // Retry a recovery restore that a transient RPC error left incomplete (it did not latch), and re-fire a backup a
+    // background-lock cancelled — a foreground-only session never re-boots, so this is the only place these recover.
+    restoreConvKeysFromRecoveryIfEmpty().then(rearmRecoveryBackupIfDirty).catch((error) => console.warn('[recovery] visible retry failed', error));
     // Return-from-wallet-app: refresh a quick-start balance step so topped-up funds show right away.
     quickStartRefreshCurrentBalanceStep();
     if (isVaultViewActive()) {
