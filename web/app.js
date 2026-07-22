@@ -1,5 +1,6 @@
 import {
   CRYPTO_SUITES,
+  createEncryptedConvCapsule,
   createEncryptedPrivateCapsuleFromPublicBundle,
   createVaultMessagingKeyDraft,
   encodeCompactPayload,
@@ -170,10 +171,14 @@ import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v
 import { createPublicLane } from './public-lane.mjs?v=1';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=1';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
-import { publicPublishValueForKind } from './publish-price.mjs?v=1';
+import { publicPublishValueForKind, CONV_PUBLISH_VALUE } from './publish-price.mjs?v=1';
 import { createIntroLane } from './intro-lane.mjs?v=1';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=1';
 import { createMemoryConvKeyStore } from './conv-key-store.mjs?v=1';
+// clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
+import { outgoingRecordShard } from './conv-discovery.mjs?v=1';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
+import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -10630,6 +10635,10 @@ function handleIntroFirstContact(opened) {
   const created = createInboundPeerThread({ senderKeyId, keyId: senderKeyId, label: null });
   let thread = threads.find((item) => item.id === created.id);
   if (!thread) { thread = created; threads.push(thread); }
+  // The clean bridge from INTRO-receive to CONV-send: stash the peer's messaging keyId (base64url) on the thread so a
+  // CONV reply can look up this conversation's adopted K_root in convKeyStore by (selfKeyId, peerKeyId). The thread id
+  // is a normalised/anonymised peer id (a lossy round-trip), so the raw keyId is kept here explicitly. [CONV-send]
+  thread.convPeerKeyId = senderKeyId;
   const bytes = opened.firstMessageBytes;
   if (bytes && bytes.length > 0) {
     const blocks = introFirstMessageBlocks(bytes);
@@ -20888,9 +20897,13 @@ composer?.addEventListener('submit', async (event) => {
   renderConversation();
 
   try {
-    await assertVaultHasPrivatePublishHold(selectedSuite, sendPlan, {
-      allowOwnVaultActionReadFallback: false,
-    });
+    // clean-17 direct-pay pays the RecordShard straight from the wallet — there is no Vault hold to reserve. Skip the
+    // Vault preflight; the direct publish path (attemptConvMessagePublishDirect) does its own wallet-GRAM check.
+    if (!privateLaneDirectPayEnabled()) {
+      await assertVaultHasPrivatePublishHold(selectedSuite, sendPlan, {
+        allowOwnVaultActionReadFallback: false,
+      });
+    }
   } catch (error) {
     await settlePrivateComposerSendError(sendContext, error);
     refreshThreadAfterMessageChange(thread);
@@ -28918,7 +28931,7 @@ async function retryPrivateMessageFromUi(thread, message) {
       await runPrivatePublishConfirmationRetry(context);
       return;
     }
-    if (!privateMessageHasPublishAttempt(message) && !context.paymentIntentCreated) {
+    if (!privateMessageHasPublishAttempt(message) && !context.paymentIntentCreated && !privateLaneDirectPayEnabled()) {
       const plan = privateComposerSendPlan(context.text, context.attachments, context.senderOptions, {
         paymentCheck: context.paymentDraft,
         replyDraft: context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null,
@@ -28953,7 +28966,93 @@ function cancelPrivateMessageFromUi(thread, message) {
   }
 }
 
+// clean-17 direct-pay CONV publish. Seals the composed document to the peer's KeyShard bundle and publishes every part
+// into the conversation-direction RecordShard in ONE wallet transfer. Reuses the shared composer document/part model
+// (messageDocumentBytesFromDraft + splitBytesToCapsuleParts) so a CONV body decodes exactly like every other private
+// message; the ONLY swap vs the Vault path is the seal (createEncryptedConvCapsule / bucketKey) and the transport
+// (publishConvLaneParts / RecordShard) instead of Vault→CapsuleHub. Gated behind privateLane.directPay.
+//
+// SCOPE OF THIS FIRST CUT (gated OFF, functionally unverifiable until genesis): only the RESPONDER path — a thread
+// whose K_root was adopted from a received INTRO. The INITIATOR path (mint a K_root via INTRO send, then CONV) is not
+// wired yet, so a thread without an adopted conversation FAILS CLOSED with a clear message, never a silent no-op.
+// Send retry/confirm hardening (no-double-publish on an ambiguous broadcast) mirrors the public confirm driver and is
+// a follow-up; the send path gets an adversarial review before the flag is ever flipped. [clean17-private-lane-plan]
+async function attemptConvMessagePublishDirect(context) {
+  const { thread, message } = context;
+  const selfKeyId = localRecipientKeyPair?.keyId;
+  if (!selfKeyId || !localIdentity) throw new Error('Messaging identity is not ready');
+  // The peer's messaging keyId, stashed on the thread by handleIntroFirstContact. Absent ⇒ not-yet-introduced peer.
+  const peerKeyId = thread?.convPeerKeyId ?? null;
+  if (!peerKeyId) throw new Error('CONV direct-pay: establish first contact via INTRO before sending a CONV message');
+  const rec = convKeyStore?.getConversation(selfKeyId, peerKeyId) ?? null;
+  if (!rec?.kRootCurrent) throw new Error('CONV direct-pay: no K_root for this conversation — receive/adopt the INTRO first');
+  if (!rec.peerWallet) throw new Error('CONV direct-pay: conversation has no peer wallet to resolve the reply bundle');
+
+  // Resolve + VERIFY the peer's full bundle from their KeyShard: by the INTRO src wallet, gated so a wrong/hostile
+  // src whose shard hashes to a different keyId is refused (resolvePeerReplyBundle). [Y reply-bundle resolution]
+  const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
+  const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
+  const bundle = await resolvePeerReplyBundle({ provider, peerWallet: rec.peerWallet, peerKeyId, callOptions: criticalChainReadOptions() });
+
+  // Build the composer document + split into capsule-sized parts (the shared private-composer model).
+  const senderOptions = context.senderOptions ?? currentPrivateSenderOptions();
+  const documentBytes = messageDocumentBytesFromDraft(
+    context.text, context.attachments,
+    context.payment ?? context.paymentDraft ?? null, {},
+    context.replyDraft === undefined ? privateReplyDraft : context.replyDraft,
+    context.fileAttachments === undefined ? privateFileAttachments : context.fileAttachments,
+    context.shareDraft === undefined ? privateShareDraft : context.shareDraft);
+  if (!documentBytes) throw new Error('CONV direct-pay: nothing to send');
+  const documentParts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
+    perPartOverheadBytes: privateCompactPayloadOverhead(senderOptions),
+  });
+  assertPrivateComposerPartLimit(documentParts.length);
+
+  // Route: the conversation-direction RecordShard for this send's timestamp (epoch + bucketKey + write keypair),
+  // all derived from the adopted K_root with zero on-chain lookups.
+  const createdAtSec = Math.floor(Date.now() / 1000);
+  const route = await outgoingRecordShard({ kRoot: rec.kRootCurrent, selfKeyId, peerKeyId, createdAtSec });
+
+  // Seal each part as a CONV capsule and assign a strictly-increasing outgoing seq (local monotonic counter — the
+  // chain last_seq is only a cold-start floor, so two fast messages cannot collide on the same seq).
+  const streamId = randomBytes(16);
+  const parts = [];
+  for (let index = 0; index < documentParts.length; index += 1) {
+    const part = documentParts[index];
+    const payloadBytes = encodeCompactPayload({
+      type: 'document', bytes: part.bytes, sizeClass: part.sizeClass,
+      streamId, partIndex: index, partCount: documentParts.length,
+      reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
+    });
+    const capsule = await createEncryptedConvCapsule('', bundle, localIdentity, route.bucketKey, {
+      payloadBytes, sizeClass: part.sizeClass, senderRecovery: true, now: createdAtSec * 1000,
+      ...currentProfilePointerFields(),
+    });
+    const seq = await convKeyStore.nextOutgoingSeq(selfKeyId, peerKeyId, route.epoch, 0);
+    parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE });
+  }
+
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  const result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
+
+  clearPrivateSendRetry(message);
+  clearPrivateMessageManualRecovery(message);
+  message.meta = 'published';        // terminal-delivered (green). A confirm driver like the public lane's is a follow-up.
+  message.privateManualRetryAvailable = false;
+  message.privateCancelAvailable = false;
+  thread.state = 'sealed';
+  refreshThreadAfterMessageChange(thread);
+  await updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+  globalThis.plathoLastConvDirectSend = { peerKeyId, epoch: route.epoch, parts: parts.length, to: result?.parts?.[0]?.to ?? null };
+  refreshMessagingControls();
+  return result;
+}
+
 async function attemptPrivateComposerMessagePublish(context) {
+  // clean-17 direct-pay: the whole Vault→CapsuleHub publish machinery below (publishState, publish nonce, confirm
+  // retry) is bypassed. A CONV message is sealed to the recipient's KeyShard bundle and published straight from the
+  // wallet into the conversation-direction RecordShard. Mirrors submitPublicPostThroughVault's top branch.
+  if (privateLaneDirectPayEnabled()) return attemptConvMessagePublishDirect(context);
   const endPrivateOutboundWork = beginPrivateOutboundWork();
   try {
   // Yield to an in-flight sync pass before sending. beginPrivateOutboundWork above already blocks the NEXT
