@@ -4,6 +4,7 @@ import { Address, beginCell, toNano, Cell } from '@ton/core';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { buildConvPublish } from '../web/publish-builder.mjs';
 import { buildConvPublishBrowser } from '../web/conv-publish-browser.mjs';
+import { decodeRecordShardLastSeq } from '../web/conv-lane-read.mjs';
 import { computeCellHashAndDepth, serializeBoc, beginCell as clientCell } from '../web/pwa-contract-transactions.mjs';
 import { CONV_PUBLISH_VALUE } from '../web/publish-price.mjs';
 import { ed25519 } from '../web/vendor/@noble/curves/ed25519.js';
@@ -86,5 +87,12 @@ describe('CONV-PUBLISH-BROWSER — the same signed CONV capsule, built without @
     const view = await shard.getGetView();
     expect(view.record_count, 'one record stored').toBe(1n);
     expect(view.last_seq, 'last_seq advanced to the published seq').toBe(1n);
+
+    // CONV-03 (inline): the client last_seq decoder reads the SAME last_seq off the REAL getter stack — the cold-start
+    // seq floor a send uses when the local counter has no value for this (conversation, epoch). Wire-mapped like SCAN-04.
+    const raw: any = await bc.runGetMethod(dest, 'get_view', [] as any);
+    const wire = (raw.stack as any[]).map((item: any) => item.type === 'cell' || item.type === 'slice' || item.type === 'builder'
+      ? { type: 'cell', value: item.cell.toBoc().toString('base64') } : { type: 'int', value: String(item.value) });
+    expect(decodeRecordShardLastSeq(wire), 'the client decoder reads last_seq off the real stack').toBe(1);
   }, 240_000);
 });
