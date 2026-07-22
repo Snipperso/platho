@@ -10,6 +10,7 @@ import {
   randomBytes,
 } from '../web/crypto/platho-crypto.mjs';
 import { buildKeyShardRegisterBrowser } from '../web/key-shard-register-browser.mjs';
+import { KEYSHARD_REGISTER_VALUE } from '../web/publish-price.mjs';
 import { computeCellHashAndDepth, serializeBoc } from '../web/pwa-contract-transactions.mjs';
 import { ed25519 } from '../web/vendor/@noble/curves/ed25519.js';
 
@@ -67,7 +68,7 @@ describe('KEY-SHARD-REGISTER', () => {
     const keyRecord = await validKeyRecord();
 
     const built = await buildKeyShardRegisterBrowser({
-      ownerWallet: owner.address.toRawString(), profileRegistry: registry.address.toRawString(), keyRecord, value: toNano('0.2'),
+      ownerWallet: owner.address.toRawString(), profileRegistry: registry.address.toRawString(), keyRecord, value: KEYSHARD_REGISTER_VALUE,
     });
     const dest = Address.parseRaw(built.to);
     const initCore = toCoreCell(built.init);
@@ -86,6 +87,8 @@ describe('KEY-SHARD-REGISTER', () => {
     expect(view.sign_pubkey, 'sign key stored').toBe(BigInt(keyRecord.sign_pubkey));
     expect(view.scan_pubkey, 'scan key stored (stealth scannability)').toBe(BigInt(keyRecord.scan_pubkey));
     expect(view.key_id, 'key_id computed').not.toBe(0n);
+    // PIN the funding figure against the LIVE contract floor: KEYSHARD_REGISTER_VALUE must cover min_register_value.
+    expect(BigInt(view.min_register_value) <= KEYSHARD_REGISTER_VALUE, 'the funded value covers the shard register floor').toBe(true);
   }, 240_000);
 
   it('KSR-AUTH-GUARD: the builder REFUSES a missing/zero/degenerate auth key (the contract would brick, gates 22118/22119)', async () => {

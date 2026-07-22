@@ -172,7 +172,8 @@ import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v
 import { createPublicLane } from './public-lane.mjs?v=1';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=1';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
-import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE } from './publish-price.mjs?v=1';
+import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=1';
 import { createIntroLane } from './intro-lane.mjs?v=1';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=1';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=1';
@@ -15633,6 +15634,9 @@ function currentVaultMessagingKeyId() {
 }
 
 function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
+  // clean-17 direct-pay: a KeyShard register is a fixed wallet send of KEYSHARD_REGISTER_VALUE (the shard reserves its
+  // rent and refunds the surplus), NOT a Vault-estimated external. Gate so every fee-display site is correct at cutover.
+  if (privateLaneDirectPayEnabled()) return KEYSHARD_REGISTER_VALUE;
   return estimateVaultAttachedValueNanotons('RegisterMessagingKeys', localVaultDraft?.message ?? { crypto_suite_mask: VAULT_CRYPTO_SUITE.HYBRID }, {
     userExists: user?.exists === true,
   });
@@ -25950,8 +25954,38 @@ async function runProfileAvatarSubmitPhase(owner, avatar, avatarHash) {
   return finality?.result ?? finality;
 }
 
+// clean-17 DIRECT-PAY register: publish the messaging keys straight to the user's KeyShard from their own wallet, no
+// Vault external. sender() == owner_wallet is the shard's whole authorisation. Gated behind privateLane.directPay so the
+// clean-15 Vault path below is untouched until cutover; the byte-exact KSG1 builder is pinned in tests/key-shard-register.
+async function submitKeyShardRegisterDirect() {
+  if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
+  const ownerWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) throw new Error('KeyShard register: RPC transport unavailable');
+  // Already registered? Read the OWN KeyShard. exists ⇒ keys already published; re-registering would only bump
+  // key_generation (a rotation), which the activation button must not do silently. A read failure is treated as
+  // not-registered — the register is idempotent enough (a duplicate would replace with the SAME bundle at gen+1).
+  const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
+  const view = await provider.getView(ownerWallet, criticalChainReadOptions()).catch(() => null);
+  if (view?.exists) { vaultDraftStatus.textContent = t('vault.active'); return null; }
+  const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
+  if (!(await confirmPlathoAccountActivation(view ?? { exists: false }, { needsKeyBackup }))) return null;
+  if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
+  vaultDraftStatus.textContent = t('vault.signing');
+  const result = await publishKeyShardRegister({
+    wallet: requirePlathoWallet(), transport, ownerWallet, profileRegistry: registry,
+    keyRecord: localVaultDraft.message, value: KEYSHARD_REGISTER_VALUE,
+  });
+  plathoAccountActivationPending = true;
+  vaultDraftStatus.textContent = t('vault.activationSent');
+  queueVaultPostTransactionRefresh({ pollActivation: true });
+  return result;
+}
+
 async function submitVaultRegisterMessagingKeys() {
   if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
+  if (privateLaneDirectPayEnabled()) return submitKeyShardRegisterDirect();   // clean-17 direct-pay register
   const provider = await resolveVaultChainProvider();
   const user = await readFreshConnectedVaultUser(provider);
   if (user.current_key_id && BigInt(user.current_key_id) !== 0n) {
