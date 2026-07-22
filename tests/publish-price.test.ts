@@ -9,7 +9,7 @@ import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumu
 import { buildConvPublish, buildIntroPublish } from '../web/publish-builder.mjs';
 import { epochOf } from '../web/shard-discovery.mjs';
 import {
-  CONV_MIN_VALUE, CONV_PUBLISH_VALUE, INTRO_MIN_VALUE, INTRO_PUBLISH_VALUE, publishValueFor,
+  CONV_MIN_VALUE, CONV_PUBLISH_VALUE, INTRO_MIN_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, publishValueFor,
 } from '../web/publish-price.mjs';
 import { ed25519 } from '@noble/curves/ed25519.js';
 
@@ -44,6 +44,7 @@ describe('PUBLISH-PRICE — the client pays the deploy figure, always', () => {
     // Four hand-held copies of contract constants. Every one of them, wrong, is a publish refused in production.
     const rec = readFileSync('contracts/RecordShard.tact', 'utf8');
     const intro = readFileSync('contracts/IntroShard.tact', 'utf8');
+    const recov = readFileSync('contracts/RecoveryShard.tact', 'utf8');
     const constOf = (src: string, name: string, depth = 0): bigint => {
       const m = src.match(new RegExp(`const\\s+${name}\\s*:\\s*Int\\s*=\\s*([^;]+);`));
       if (!m) throw new Error(`${name} not found`);
@@ -57,9 +58,12 @@ describe('PUBLISH-PRICE — the client pays the deploy figure, always', () => {
     expect(constOf(rec, 'RS_DEPLOY_MIN_VALUE'), 'CONV deploy').toBe(CONV_PUBLISH_VALUE);
     expect(constOf(intro, 'IS_MIN_VALUE'), 'INTRO steady').toBe(INTRO_MIN_VALUE);
     expect(constOf(intro, 'IS_DEPLOY_MIN_VALUE'), 'INTRO deploy').toBe(INTRO_PUBLISH_VALUE);
+    // RECOVERY: RS_MIN_VALUE is required on every write (endowment + path gas); one figure, no separate deploy value.
+    expect(constOf(recov, 'RS_MIN_VALUE'), 'RECOVERY write value').toBe(RECOVERY_PUBLISH_VALUE);
     expect(publishValueFor('conv')).toBe(CONV_PUBLISH_VALUE);
     expect(publishValueFor('intro')).toBe(INTRO_PUBLISH_VALUE);
-    expect(() => publishValueFor('recovery' as any), 'an unknown lane must throw, not guess').toThrow();
+    expect(publishValueFor('recovery')).toBe(RECOVERY_PUBLISH_VALUE);
+    expect(() => publishValueFor('bogus' as any), 'an unknown lane must throw, not guess').toThrow();
   });
 
   it('PP-02: the deploy figure works for BOTH the first publish and every later one, and the surplus returns', async () => {
