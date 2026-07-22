@@ -43,13 +43,21 @@ export const INTRO_MIN_VALUE = 15_310_000n;
 export const INTRO_PUBLISH_VALUE = 17_810_000n;
 
 /**
+ * RS_MIN_VALUE — required on EVERY recovery write (gate 13572), NOT just the first: it is RS_RECOVERY_ENDOWMENT
+ * (29_000_000, the ~3-year on-chain rent float) + RS_RECOVERY_PATH_GAS, and the first bind retains the endowment while
+ * an overwrite returns the surplus. So one figure covers both cases. Pinned == 37_000_000 by tests/publish-builder.test.ts.
+ */
+export const RECOVERY_PUBLISH_VALUE = 37_000_000n;
+
+/**
  * What to attach to a publish on the given lane. Takes no state and asks nothing of the chain, on purpose —
  * see the note above for why every state-derived rule is either an extra round trip or forgeable.
  */
 export function publishValueFor(lane) {
   if (lane === 'conv') return CONV_PUBLISH_VALUE;
   if (lane === 'intro') return INTRO_PUBLISH_VALUE;
-  throw new Error(`publishValueFor: unknown lane "${lane}" (expected "conv" or "intro")`);
+  if (lane === 'recovery') return RECOVERY_PUBLISH_VALUE;
+  throw new Error(`publishValueFor: unknown lane "${lane}" (expected "conv", "intro" or "recovery")`);
 }
 
 // PublicShard deploy figures per KIND (0 CHANNEL, 1 THREAD, 2 BEACON, 3 AVATAR) — PS_DEPLOY_MIN_VALUE. Same
