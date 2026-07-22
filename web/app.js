@@ -25422,13 +25422,58 @@ async function submitVaultWithdrawAthAmount(amount) {
   return { ...result, ...athWithdrawal };
 }
 
+// clean-17 direct-pay username mint values (proven by tests/username-registry-ath-wallet-integration.test.ts). The mint
+// deploys a UsernameNFTItem, so it needs far more than an avatar pointer write: the registry retains ~0.91 TON (100-year
+// item endowment). notify carries that downstream; the request is notify + forwarding fees; the ATH wallet refunds every
+// excess nanoton (refund_owner_excess), so an ample request is free.
+const USERNAME_MINT_DIRECT_NOTIFY_VALUE = 1_000_000_000n;
+const USERNAME_MINT_DIRECT_REQUEST_VALUE = 1_100_000_000n;
+
+// clean-17 DIRECT-PAY username mint: the user's OWN ATH jetton wallet pays the UsernameRegistry directly — the registry
+// is Vault-INDEPENDENT by design (UsernameRegistry.tact:588), authenticated by the official ATH wallet's transfer
+// notification. The byte-exact ATHTransferRequestRegistryMintUsername (KSG-style) is pinned in pwa-contract-transactions.
+async function submitUsernameMintDirect(username) {
+  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const registry = requireBasechainAddress(requireUsernameRegistryAddress(), 'UsernameRegistry');
+  const provider = await resolveUsernameRegistryProvider();
+  const priceAtomic = await readUsernameMintPriceForOwnVaultAction(provider, registry, username);   // registry read (Vault-independent)
+  setUsernameMintStatus(t('username.checkingAvailability'));
+  await readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username);
+  assertNoPendingUsernameMintRetry(username, owner);
+  // Affordability from the user's OWN ATH jetton wallet (NOT the Vault balance the synthesized activation user lacks).
+  const athBalance = await loadConnectedAthWalletBalance();
+  if (athBalance < priceAtomic) {
+    throw new Error(`Not enough ATH: need ${formatAthAtomic(priceAtomic)} ATH, have ${formatAthAtomic(athBalance)} ATH`);
+  }
+  setUsernameMintStatus(t('username.signing'));
+  const athWalletAddress = await loadConnectedAthWalletAddress();
+  const athRequest = createAthWalletMessage('ATHTransferRequestRegistryMintUsername', {
+    query_id: nextQueryId(),
+    amount: priceAtomic,
+    recipient: registry,
+    response_destination: owner,
+    notify_value: USERNAME_MINT_DIRECT_NOTIFY_VALUE,
+    owner_wallet: owner,
+    username: new TextEncoder().encode(username),
+  }, { athWalletAddress, valueNanotons: USERNAME_MINT_DIRECT_REQUEST_VALUE });
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), { messages: [athRequest] }, { transport });
+  rememberPendingUsernameMint(username, owner, result);
+  setUsernameMintStatus(result?.confirmationPending === true ? t('username.mintSubmittedFinalizing') : t('username.mintFinalizing'));
+  autoLinkMintedUsername(username, owner, {
+    attempts: USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS,
+    delayMs: USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS,
+  }).catch((error) => {
+    setUsernameMintStatus(t('username.mintSubmittedLinkAfterSync'));
+    console.error(error);
+  });
+  return result;
+}
+
 async function submitUsernameMint() {
-  // clean-17 INTERIM: username minting still pays ATH through the Vault and reads the Vault ath_balance (which the
-  // synthesized direct-pay activation user does not carry → a false "insufficient ATH"). Refuse under direct-pay until
-  // minting has its own direct-pay path (ATH jetton → UsernameRegistry). [activation review: ath_balance false-block]
-  if (privateLaneDirectPayEnabled()) throw new Error('Username minting is not yet available on direct-pay');
   const username = await requestUsernameMintName();
   if (!username) return null;
+  if (privateLaneDirectPayEnabled()) return submitUsernameMintDirect(username);   // clean-17 direct-pay: user's ATH wallet pays
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const registry = requireBasechainAddress(requireUsernameRegistryAddress(), 'UsernameRegistry');
   const provider = await resolveUsernameRegistryProvider();
