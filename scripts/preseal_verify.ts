@@ -1,11 +1,10 @@
-// Pre-seal verification of the clean-14 live genesis: confirm bindings + fund distributions
+// Pre-seal verification of the clean-17 live genesis: confirm bindings + fund distributions
 // are correct BEFORE the irreversible seal. Run: ts-node --compiler-options '{"module":"CommonJS"}'
 import { readFileSync } from 'fs';
 import { Address, TupleReader } from '@ton/core';
 import { TonClient } from '@ton/ton';
 import { BuybackBurn } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
-import { Vault } from '../build/Vault/Vault_Vault';
 import { MarketStabilitySeller } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
 
 function j(x: any) { return JSON.stringify(x, (_k, v) => typeof v === 'bigint' ? v.toString() : (v?.toString && v.toString().startsWith('EQ') || v?.toString && v.toString().startsWith('UQ') ? v.toString() : v), 0); }
@@ -31,10 +30,6 @@ async function main() {
   const ms = client.open(MarketStabilitySeller.fromAddress(Address.parse(A.market_stability_seller)));
   const mscfg = await ms.getGetMarketStabilitySellerConfig();
   console.log('\nMSS config:', j({ sealed: (mscfg as any).sealed, official_ath_wallet_bound: (mscfg as any).official_ath_wallet_bound, official_ath_wallet: (mscfg as any).official_ath_wallet_address?.toString() }));
-
-  const v = client.open(Vault.fromAddress(Address.parse(A.vault)));
-  const vg = await v.getGetGlobal();
-  console.log('\nVault global:', j({ sealed: (vg as any).sealed, ath_master: (vg as any).ath_master_address?.toString(), capsulehub: (vg as any).capsulehub_address?.toString() }));
 
   // fund distributions: MSS + Vesting official ATH wallet balances
   async function athBal(addr: string) {

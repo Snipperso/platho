@@ -3,12 +3,6 @@ import { Address, beginCell, Cell } from '@ton/core';
 import { ed25519 } from '../web/vendor/@noble/curves/ed25519.js';
 import { describe, expect, it } from 'vitest';
 import {
-  storeDepositTon,
-  storeMintUsernameFromVaultBalance,
-  storeRegisterMessagingKeys,
-  storeSetProfileAvatarFromVaultBalance,
-} from '../build/Vault/Vault_Vault';
-import {
   storeATHBurn,
   storeATHTransferRequest,
   storeATHTransferRequestWithNotify,
@@ -194,38 +188,6 @@ describe('PWA contract transaction builders', () => {
     }))).toEqual(bytes);
   });
 
-  it.each([
-    [
-      'DepositTon',
-      { amount: 123_000_000n },
-      storeDepositTon({ $$type: 'DepositTon', amount: 123_000_000n }),
-    ],
-    [
-      'RegisterMessagingKeys',
-      {
-        enc_pubkey: 0x11n,
-        sign_pubkey: 0x22n,
-        auth_pubkey: 0x33n,
-        pq_kem_pubkey_hash: 0x55n,
-        pq_kem_pubkey_len: 1184n,
-        pq_kem_pubkey: PQ_PUBKEY_BYTES,
-        crypto_suite_mask: 2n,
-      },
-      storeRegisterMessagingKeys({
-        $$type: 'RegisterMessagingKeys',
-        enc_pubkey: 0x11n,
-        sign_pubkey: 0x22n,
-        auth_pubkey: 0x33n,
-        pq_kem_pubkey_hash: 0x55n,
-        pq_kem_pubkey_len: 1184n,
-        pq_kem_pubkey: PQ_PUBKEY_CELL,
-        crypto_suite_mask: 2n,
-      }),
-    ],
-  ])('PWA-TX-01: %s body matches generated Tact wrapper encoding', (type, params, store) => {
-    expect(buildVaultMessageBody(type, params)).toBe(generatedBody(store));
-  });
-
   it('PWA-TX-01B: TON withdrawal and key rotation are signed Vault external BOCs, not wallet message bodies', async () => {
     const signingSecretKey = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
     expect(() => buildVaultMessageBody('ReplaceMessagingKeys', {})).toThrow(/Unsupported Vault message type/);
@@ -301,27 +263,6 @@ describe('PWA contract transaction builders', () => {
     expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: true })).toBe(2_001_000n);
     expect(() => estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 1n }, { userExists: false })).toThrow(/hybrid-v1/);
     expect(estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 2n }, { userExists: true })).toBe(32_000_000n);
-  });
-
-  it('PWA-TX-03: creates embedded wallet transaction messages with decimal nanotons and payload', () => {
-    const message = createVaultWalletMessage('DepositTon', {
-      amount: 44_000_000n,
-    }, {
-      vaultAddress: VAULT,
-      userExists: true,
-    });
-
-    expect(message.address).toBe(VAULT);
-    expect(message.amount).toBe('46000000');
-    expect(message.payload).toBe(generatedBody(storeDepositTon({
-      $$type: 'DepositTon',
-      amount: 44_000_000n,
-    })));
-
-    expect(createWalletTransaction(message, { nowMs: 1_700_000_000_000, ttlSeconds: 60 })).toEqual({
-      validUntil: 1_700_000_060,
-      messages: [message],
-    });
   });
 
   it.each([
@@ -588,63 +529,6 @@ describe('PWA contract transaction builders', () => {
     expect(built.signature).toHaveLength(128);
   });
 
-  it('PWA-TX-04D: creates signed Vault-funded profile avatar registration messages', async () => {
-    const signingSecretKey = new Uint8Array(32).fill(0x33);
-    const built = await buildVaultProfileAvatarBodyCell({
-      owner_wallet: OWNER,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      profile_registry_address: PROFILE_REGISTRY,
-      client_nonce: 9n,
-      max_ton_charge: PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
-      avatar_hash: `0x${'aa'.repeat(32)}`,
-      avatar_entry_id: 17n,
-      avatar_stream_id: 0xbbn,
-      avatar_part_count: 2n,
-      media_format: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
-      signingSecretKey,
-    });
-    const signedPayloadCell = Cell.fromBoc(Buffer.from(
-      tonCell.bytesToBase64(tonCell.serializeBoc(built.signedData)),
-      'base64',
-    ))[0];
-
-    expect(PROFILE_AVATAR_PRICE_ATH).toBe(100_000_000_000n);
-    expect(PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS).toBe(115_000_000n);
-    expect(ed25519.verify(
-      Buffer.from(built.signature, 'hex'),
-      Buffer.from(built.signedDataHash, 'hex'),
-      ed25519.getPublicKey(signingSecretKey),
-    )).toBe(true);
-    expectRegistrySignedDataEnvelope(built.signedData, VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, OWNER);
-    expect(tonCell.bytesToBase64(tonCell.serializeBoc(built.bodyCell))).toBe(generatedBody(storeSetProfileAvatarFromVaultBalance({
-      $$type: 'SetProfileAvatarFromVaultBalance',
-      owner_wallet: Address.parseRaw(OWNER),
-      signature: Buffer.from(built.signature, 'hex'),
-      signed_payload: signedPayloadCell,
-      envelope_padding: beginCell().endCell().asSlice(),
-    })));
-
-    const external = await buildVaultProfileAvatarExternalBoc({
-      owner_wallet: OWNER,
-      profile_registry_address: PROFILE_REGISTRY,
-      client_nonce: 9n,
-      max_ton_charge: PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
-      avatar_hash: `0x${'aa'.repeat(32)}`,
-      avatar_entry_id: 17n,
-      avatar_stream_id: 0xbbn,
-      avatar_part_count: 2n,
-      media_format: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH.slice(2),
-      signingSecretKey,
-    }, {
-      vaultAddress: VAULT,
-    });
-    expect(external.vaultAddress).toBe(VAULT);
-    expect(external.boc).toMatch(/^te6/);
-    expectRegistrySignedDataEnvelope(external.signedData, VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, OWNER);
-  });
-
   it('PWA-TX-04D2: profile avatar route verifies the derived ProfileRegistry ATH wallet', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const route = app.match(/async function requireProfileRegistryVaultRoute[\s\S]*?async function requireProfileRegistryVaultRouteForOwnVaultAction/);
@@ -653,69 +537,6 @@ describe('PWA contract transaction builders', () => {
     expect(route?.[0]).toContain('registryGlobal.official_ath_wallet_address');
     expect(route?.[0]).toContain('ProfileRegistry official ATH wallet is not the derived registry wallet');
     expect(route?.[0]).toContain('ProfileRegistry ATHMaster binding does not match this app config');
-  });
-
-  it('PWA-TX-04E: creates signed Vault-funded username mint messages', async () => {
-    const signingSecretKey = new Uint8Array(32).fill(0x44);
-    const built = await buildVaultUsernameMintBodyCell({
-      owner_wallet: OWNER,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      username_registry_address: USERNAME_REGISTRY,
-      client_nonce: 11n,
-      max_ton_charge: USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
-      username: 'platho',
-      signingSecretKey,
-    });
-    const signedPayloadCell = Cell.fromBoc(Buffer.from(
-      tonCell.bytesToBase64(tonCell.serializeBoc(built.signedData)),
-      'base64',
-    ))[0];
-
-    expect(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS).toBe(617_000_000n); // clean-11: +36M name-record endowment (signed ceiling; safe on clean-10 which still debits 581M)
-    expect(ed25519.verify(
-      Buffer.from(built.signature, 'hex'),
-      Buffer.from(built.signedDataHash, 'hex'),
-      ed25519.getPublicKey(signingSecretKey),
-    )).toBe(true);
-    expectRegistrySignedDataEnvelope(built.signedData, VAULT_USERNAME_MINT_SIGNING_DOMAIN, OWNER);
-    expect(tonCell.bytesToBase64(tonCell.serializeBoc(built.bodyCell))).toBe(generatedBody(storeMintUsernameFromVaultBalance({
-      $$type: 'MintUsernameFromVaultBalance',
-      owner_wallet: Address.parseRaw(OWNER),
-      signature: Buffer.from(built.signature, 'hex'),
-      signed_payload: signedPayloadCell,
-      envelope_padding: beginCell().endCell().asSlice(),
-    })));
-
-    const external = await buildVaultUsernameMintExternalBoc({
-      owner_wallet: OWNER,
-      username_registry_address: USERNAME_REGISTRY,
-      client_nonce: 11n,
-      max_ton_charge: USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
-      username: 'platho.ath',
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH.slice(2),
-      signingSecretKey,
-    }, {
-      vaultAddress: VAULT,
-    });
-    expect(external.vaultAddress).toBe(VAULT);
-    expect(external.boc).toMatch(/^te6/);
-    expectRegistrySignedDataEnvelope(external.signedData, VAULT_USERNAME_MINT_SIGNING_DOMAIN, OWNER);
-
-    const separatorPolicyExternal = await buildVaultUsernameMintExternalBoc({
-      owner_wallet: OWNER,
-      username_registry_address: USERNAME_REGISTRY,
-      client_nonce: 12n,
-      max_ton_charge: USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
-      username: '----.ath',
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH.slice(2),
-      signingSecretKey,
-    }, {
-      vaultAddress: VAULT,
-    });
-    expect(separatorPolicyExternal.vaultAddress).toBe(VAULT);
-    expect(separatorPolicyExternal.boc).toMatch(/^te6/);
-    expectRegistrySignedDataEnvelope(separatorPolicyExternal.signedData, VAULT_USERNAME_MINT_SIGNING_DOMAIN, OWNER);
   });
 
   it('PWA-USERNAME-ROUTE-ATHMASTER-01: username route verifies official ATH wallet owner and ATHMaster', () => {

@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { Blockchain, defaultConfig, loadConfig, createShardAccount } from '@ton/sandbox';
 import { contractAddress, toNano } from '@ton/core';
-import { Vault } from '../build/Vault/Vault_Vault';
 
-// clean-16 — AUTHORITATIVE verification of the basechain storage-rent rate, so the endowment constants are frozen
+// clean-17 — AUTHORITATIVE verification of the basechain storage-rent rate, so the endowment constants are frozen
 // against the REAL config-18, not a stale textbook value. The sweep/solvency audit assumed cell_price_ps=500 +
-// bit_price_ps=1 (→ 240,631/cell/yr) — but the project's own config guard (scripts/publish_reserve_pricing.ts,
-// preprod_guard.mjs) pins the mainnet-verified basechain values as cell_price_ps=135, bit_price_ps=0.
+// bit_price_ps=1 (→ 240,631/cell/yr) — but the project's own config guard (preprod_guard.mjs) pins the
+// mainnet-verified basechain values as cell_price_ps=135, bit_price_ps=0.
 // This test reads the ACTUAL bundled config AND empirically measures what the TVM charges.
 
 const YEAR = 31_536_000;

@@ -3,8 +3,6 @@ import { Address, contractAddress, toNano } from '@ton/core';
 import { Blockchain, SandboxContract, TreasuryContract, createShardAccount } from '@ton/sandbox';
 import { keyPairFromSeed } from '@ton/crypto';
 import { AirdropPool } from '../build/AirdropPool/AirdropPool_AirdropPool';
-import { CreditIssuer } from '../build/CreditIssuer/CreditIssuer_CreditIssuer';
-import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // AIRDROP — the 15M ATH pool, paid out per SETTLED credit purchase.
@@ -34,56 +32,32 @@ function exitOf(res: any, dest: Address): number {
   return Number(tx?.description?.computePhase?.exitCode ?? -999);
 }
 
-// A full genesis: Hub + CreditIssuer + AirdropPool, cross-bound and sealed, with the pool funded to 15M.
-// The pool's "ATHWallet" is a treasury stand-in: it accepts the payout request and its balance delta IS the
-// observable we assert on. The real ATHWallet leg is exercised by the ATH suite; what matters here is whether a
-// payout is emitted at all, and for exactly whom.
+// clean-17 genesis: the pool alone, cross-bound and sealed with the 15M funded. The old CapsuleHub+CreditIssuer
+// credit-purchase drive is gone — accrual now originates from the bound distributor (FeeAccumulator in production),
+// so here a plain treasury stands in as that distributor and AirdropAccrue is sent directly (the pool's real entry
+// point). The pool's "ATHWallet" is a treasury stand-in whose balance delta IS the observable.
 async function setup(blockchain: Blockchain) {
   const deployer = await blockchain.treasury('adr-deployer');
-  const dummyVault = await blockchain.treasury('adr-vault');
-  const feeAcc = await blockchain.treasury('adr-fee');
   const poolWallet = await blockchain.treasury('adr-pool-wallet');
   const treasury = await blockchain.treasury('adr-treasury');
   const athMaster = await blockchain.treasury('adr-ath-master');
-
-  const ci = blockchain.openContract(await CreditIssuer.fromInit(deployer.address, MANIFEST, 0n, false));
-  await ci.send(deployer.getSender(), { value: toNano('1') }, null);
-
-  const hubInit = await CapsuleHub.init(feeAcc.address, dummyVault.address, false, false, 0n, deployer.address);
-  const hubAddr = contractAddress(0, hubInit);
-  await blockchain.setShardAccount(hubAddr, createShardAccount({
-    address: hubAddr, code: hubInit.code, data: hubInit.data, balance: toNano('500'), workchain: 0,
-  }));
-  const hub = blockchain.openContract(new CapsuleHub(hubAddr, hubInit));
+  const distributor = await blockchain.treasury('adr-distributor');   // stands in for the bound FeeAccumulator distributor
 
   const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false));
   await pool.send(deployer.getSender(), { value: toNano('1') }, null);
 
-  const dep = (to: any, body: any, v = '0.05') => to.send(deployer.getSender(), { value: toNano(v) }, body);
+  const dep = (body: any, v = '0.05') => pool.send(deployer.getSender(), { value: toNano(v) }, body);
 
-  await dep(hub, { $$type: 'BindDeploymentManifest', deployment_manifest_hash: MANIFEST, counterpart_address: dummyVault.address });
-  await dep(hub, { $$type: 'BindCreditIssuer', credit_issuer_address: ci.address });
-  for (let i = 0; i < 8; i++) {
-    await dep(ci, { $$type: 'CreditUploadIssuerKey', slot: BigInt(i), pubkey: issuerPubkey(i) });
-    await dep(hub, { $$type: 'HubMirrorIssuerKey', slot: BigInt(i), pubkey: issuerPubkey(i), active: true, version: 0n });
-  }
-  await dep(hub, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST });
-
-  await dep(ci, { $$type: 'CreditSetPrice', credit_price: PREPAID_UNIT });
-  await dep(ci, { $$type: 'CreditBindHub', capsule_hub_address: hubAddr });
-  await dep(ci, { $$type: 'CreditBindAirdropPool', airdrop_pool_address: pool.address });
-  await dep(ci, { $$type: 'CreditSealGenesis', deployment_manifest_hash: MANIFEST }, '0.1');
-
-  await dep(pool, { $$type: 'AirdropBindAthMaster', ath_master_address: athMaster.address, pool_ath_wallet_address: poolWallet.address });
-  await dep(pool, { $$type: 'AirdropBindCreditIssuer', credit_issuer_address: ci.address });
-  await dep(pool, { $$type: 'AirdropBindTreasury', treasury_address: treasury.address });
+  await dep({ $$type: 'AirdropBindAthMaster', ath_master_address: athMaster.address, pool_ath_wallet_address: poolWallet.address });
+  await dep({ $$type: 'AirdropBindCreditIssuer', credit_issuer_address: distributor.address });
+  await dep({ $$type: 'AirdropBindTreasury', treasury_address: treasury.address });
   // Fund: only the pool's OWN wallet may report a deposit (26019).
   await pool.send(poolWallet.getSender(), { value: toNano('0.1') }, {
     $$type: 'AthTransferNotification', query_id: 1n, sender_key: 0n, amount: TOTAL_POOL, sender_wallet: treasury.address,
   } as any);
-  await dep(pool, { $$type: 'AirdropSealGenesis', deployment_manifest_hash: MANIFEST }, '0.1');
+  await dep({ $$type: 'AirdropSealGenesis', deployment_manifest_hash: MANIFEST }, '0.1');
 
-  return { deployer, ci, hub, hubAddr, pool, poolWallet, treasury, dep };
+  return { deployer, pool, poolWallet, treasury, distributor, dep };
 }
 
 describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
@@ -166,37 +140,14 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     expect(g.deployment_manifest_hash, 'seal bound the real manifest hash into the pool').toBe(MANIFEST);
   }, 120_000);
 
-  it('AIRDROP-DRAIN-01: the bad-epoch free-ATH loop the design called FATAL is CLOSED', async () => {
-    // The exact attack from the design doc: buy credits declaring an out-of-window epoch. The Hub refuses the
-    // funding (13617), CreditIssuer's bounce path refunds the buyer in full — and the pool must pay NOTHING,
-    // because no ack ever fired. Accruing at purchase time would hand out ATH here, refund the TON, and loop.
-    const { ci, pool } = await setup(blockchain);
-    const attacker = await blockchain.treasury('attacker');
-
-    const before = await pool.getGetGlobal();
-    const balBefore = await attacker.getBalance();
-
-    const farFuture = BigInt(Math.floor(blockchain.now! / 86400) + 5000);   // way outside [now-4, now+4]
-    await ci.send(attacker.getSender(), { value: 10n * PREPAID_UNIT + toNano('0.2') }, {
-      $$type: 'CreditBuyCredits', credits_k: 10n, redeem_pubkey: issuerPubkey(77), epoch: farFuture,
-    } as any);
-
-    const after = await pool.getGetGlobal();
-    expect(after.distributed_total, 'a bounced purchase must accrue ZERO ATH').toBe(before.distributed_total);
-    expect(after.remaining_budget, 'the budget must be untouched').toBe(before.remaining_budget);
-    expect(after.claim_count).toBe(before.claim_count);
-    // ...and the attacker did get their TON back (that is the refund path working) — so the ONLY thing standing
-    // between them and free ATH is the ack gate.
-    expect(await attacker.getBalance()).toBeGreaterThan(balBefore - toNano('0.3'));
-  }, 180_000);
-
-  it('AIRDROP-ACCRUE-01: a SETTLED purchase accrues 10 ATH per credit to the exact buyer', async () => {
-    const { ci, pool, poolWallet } = await setup(blockchain);
+  it('AIRDROP-ACCRUE-01: a SETTLED accrual credits 10 ATH per credit to the exact buyer', async () => {
+    // clean-17: accrual originates from the bound distributor (the FeeAccumulator in production; a treasury stand-in
+    // here). The CreditIssuer purchase→ack drive is gone — the pool's entry point is AirdropAccrue direct.
+    const { pool, poolWallet, distributor } = await setup(blockchain);
     const buyer = await blockchain.treasury('buyer');
-    const nowEpoch = BigInt(Math.floor(blockchain.now! / 86400));
 
-    const res = await ci.send(buyer.getSender(), { value: 10n * PREPAID_UNIT + toNano('0.3') }, {
-      $$type: 'CreditBuyCredits', credits_k: 10n, redeem_pubkey: issuerPubkey(55), epoch: nowEpoch,
+    const res = await pool.send(distributor.getSender(), { value: toNano('0.1') }, {
+      $$type: 'AirdropAccrue', purchase_id: 1n, buyer: buyer.address, credits_k: 10n,
     } as any);
 
     const g = await pool.getGetGlobal();
@@ -204,8 +155,7 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     expect(g.remaining_budget).toBe(TOTAL_POOL - 10n * ATH_PER_CREDIT);
     expect(g.claim_count).toBe(1n);
 
-    // The payout is commanded from the pool's OWN wallet and addressed to the buyer — not to the relay, not to
-    // CreditIssuer. Assert the request actually left, aimed at the pool's wallet.
+    // The payout is commanded from the pool's OWN wallet and addressed to the buyer. Assert it actually left.
     const payout = res.transactions.some((t: any) =>
       t.inMessage?.info?.dest?.toString() === poolWallet.address.toString() && t.inMessage?.info?.type === 'internal');
     expect(payout, 'an ATHTransferRequest must reach the pool wallet').toBe(true);
@@ -221,25 +171,6 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     expect(exitOf(res, pool.address)).toBe(26110);
     expect((await pool.getGetGlobal()).distributed_total).toBe(0n);
   }, 120_000);
-
-  it('AIRDROP-BUDGET-01: an exhausted budget stops the airdrop but NOT the messenger', async () => {
-    // The 15M is finite by design. When it runs out, credit purchases must keep settling normally — the airdrop
-    // going quiet must never become a liveness failure of the product.
-    const { ci, pool } = await setup(blockchain);
-    const buyer = await blockchain.treasury('big-buyer');
-    const nowEpoch = BigInt(Math.floor(blockchain.now! / 86400));
-
-    // Accrue is capped per call, so drain via the getter's arithmetic instead: assert the guard's shape directly
-    // by checking that a purchase larger than the remaining budget accrues nothing while the purchase succeeds.
-    const g0 = await pool.getGetGlobal();
-    expect(g0.remaining_budget).toBe(TOTAL_POOL);
-
-    const res = await ci.send(buyer.getSender(), { value: 5n * PREPAID_UNIT + toNano('0.3') }, {
-      $$type: 'CreditBuyCredits', credits_k: 5n, redeem_pubkey: issuerPubkey(66), epoch: nowEpoch,
-    } as any);
-    expect(exitOf(res, ci.address), 'the purchase itself must settle').toBe(0);
-    expect((await pool.getGetGlobal()).distributed_total).toBe(5n * ATH_PER_CREDIT);
-  }, 180_000);
 
   it('AIRDROP-SWEEP-01: the residual sweep is dead-man gated and can only reach the frozen treasury', async () => {
     const { pool } = await setup(blockchain);

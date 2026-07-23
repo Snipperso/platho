@@ -41,34 +41,9 @@
             "output": "build/M20TFeeAccumulatorHarness"
         },
         {
-            "name": "CapsuleHub",
-            "path": "contracts/CapsuleHub.tact",
-            "output": "build/CapsuleHub"
-        },
-        {
             "name": "ProfileRegistry",
             "path": "contracts/ProfileRegistry.tact",
             "output": "build/ProfileRegistry"
-        },
-        {
-            "name": "MockVaultAckSink",
-            "path": "contracts/MockVaultAckSink.tact",
-            "output": "build/MockVaultAckSink"
-        },
-        {
-            "name": "MockVaultAthWallet",
-            "path": "contracts/MockVaultAthWallet.tact",
-            "output": "build/MockVaultAthWallet"
-        },
-        {
-            "name": "Vault",
-            "path": "contracts/Vault.tact",
-            "output": "build/Vault"
-        },
-        {
-            "name": "PlathoController",
-            "path": "contracts/PlathoController.tact",
-            "output": "build/PlathoController"
         },
         {
             "name": "UsernameNFTItem",
@@ -104,11 +79,6 @@
             "name": "UsernameRegistry",
             "path": "contracts/UsernameRegistry.tact",
             "output": "build/UsernameRegistry"
-        },
-        {
-            "name": "CreditIssuer",
-            "path": "contracts/CreditIssuer.tact",
-            "output": "build/CreditIssuer"
         },
         {
             "name": "AirdropPool",

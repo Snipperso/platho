@@ -8,8 +8,6 @@ function read(path: string): string {
 
 describe('PWA on-chain self-sufficiency', () => {
   it('PWA-CHAIN-01: immutable V1 contracts expose the get-methods the PWA needs without a Platho backend', () => {
-    const vault = read('contracts/Vault.tact');
-    const capsuleHub = read('contracts/CapsuleHub.tact');
     const profileRegistry = read('contracts/ProfileRegistry.tact');
     const usernameRegistry = read('contracts/UsernameRegistry.tact');
     const athMaster = read('contracts/ATHMaster.tact');
@@ -17,16 +15,6 @@ describe('PWA on-chain self-sufficiency', () => {
     const feeAccumulator = read('contracts/FeeAccumulator.tact');
     const buybackBurn = read('contracts/BuybackBurn.tact');
 
-    for (const method of [
-      'get_global',
-      'get_user',
-      'get_key_record',
-    ]) {
-      expect(vault, `Vault must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
-    }
-    for (const method of ['get_state', 'get_private_entry', 'get_public_entry', 'get_private_page', 'get_public_page']) {
-      expect(capsuleHub, `CapsuleHub must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
-    }
     // get_avatar / get_avatar_version RETIRED 2026-07-21 with the maps behind them: holding a pointer per profile
     // cost a MEASURED 5.0000 cells each against a ~65536-cell account and capped the product at 13,076 profiles,
     // silently. The pointer lives in the buyer's own KeyShard, and get_key_shard_address is how a client reaches

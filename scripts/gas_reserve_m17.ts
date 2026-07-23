@@ -6,7 +6,6 @@ import * as path from 'path';
 
 import { ATHWallet, ATHTransferRequest, ATHBurn } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
-import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator, DepositProtocolFee, EnableBuybackSplit, SplitAccumulated, FlushTreasuryDue, FlushBuybackDue } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import {
   UsernameRegistry,
@@ -17,18 +16,6 @@ import {
   FlushBurnAthDue,
   PrunePendingUsernameMint,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
-import { Vault } from '../build/Vault/Vault_Vault';
-import {
-  KIND_PRIVATE as VPB2_KIND_PRIVATE,
-  KIND_PUBLIC as VPB2_KIND_PUBLIC,
-  GENESIS_HASH as VPB2_GENESIS_HASH,
-  marketingCell,
-  partsList,
-  batchExternalBody,
-  setupVault,
-  registerHybrid,
-  depositTon,
-} from '../tests/helpers/vpb2';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const USERNAME_MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
@@ -228,59 +215,6 @@ async function athBurnScenario(): Promise<M17ScenarioMetric> {
   return scenario('ATH_BURN_SUCCESS', [opMetric('wallet_to_master_burn_finalized', value, res)]);
 }
 
-async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-  const deployer = await blockchain.treasury('m17-capsule-deployer');
-  const author = await blockchain.treasury('m17-capsule-author');
-  const feeAccumulator = await blockchain.treasury('m17-capsule-feeacc');
-  const vaultAddress = fixtureAddress('M17_CAPSULE_VAULT');
-  const init = await CapsuleHub.init(feeAccumulator.address, vaultAddress, true, true, MANIFEST_HASH, vaultAddress);
-  const address = contractAddress(0, init);
-  await blockchain.setShardAccount(address, createShardAccount({ address, code: init.code, data: init.data, balance: toNano('2'), workchain: address.workChain }));
-  const capsule = blockchain.openContract(new CapsuleHub(address, init));
-  const privateValue = toNano('0.1');
-  const publicValue = toNano('0.1');
-  const flushValue = toNano('0.05');
-  const privateRes = await capsule.send(blockchain.sender(vaultAddress), { value: privateValue }, {
-    $$type: 'PublishBatchToHub',
-    bounce_id: 17_101n,
-    bounce_tag: 17_101n,
-    publish_id: GENESIS_HASH,
-    publish_kind: VPB2_KIND_PRIVATE,
-    part_count: 1n,
-    protocol_fee_total: 10_000_000n,
-    author_wallet: author.address,
-    parts: partsList(VPB2_KIND_PRIVATE, 1),
-    marketing: null,
-  } as any);
-  const publicRes = await capsule.send(blockchain.sender(vaultAddress), { value: publicValue }, {
-    $$type: 'PublishBatchToHub',
-    bounce_id: 17_102n,
-    bounce_tag: 17_102n,
-    publish_id: GENESIS_HASH + 1n,
-    publish_kind: VPB2_KIND_PUBLIC,
-    part_count: 1n,
-    protocol_fee_total: 10_000_000n,
-    author_wallet: author.address,
-    parts: partsList(VPB2_KIND_PUBLIC, 1),
-    marketing: marketingCell(),
-  } as any);
-  const state = await capsule.getGetState();
-  if (state.private_latest_id !== 1n || state.public_latest_id !== 1n) {
-    throw new Error('CapsuleHub Vault publish scenario did not create both entries');
-  }
-  // No FeeAccumulator contract is deployed here; this measures CapsuleHub send path and bounce recovery.
-  const flushRes = await capsule.send(deployer.getSender(), { value: flushValue }, {
-    $$type: 'FlushFees',
-    amount: 10_000_000n,
-  } as any);
-  return scenario('CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE', [
-    opMetric('private_vault_publish', privateValue, privateRes),
-    opMetric('public_vault_publish', publicValue, publicRes),
-    opMetric('flush_fee_to_missing_accumulator_bounce', flushValue, flushRes),
-  ]);
-}
 
 async function feeAccumulatorScenario(): Promise<M17ScenarioMetric> {
   const blockchain = await Blockchain.create();
@@ -452,65 +386,13 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
   ]);
 }
 
-// A standalone bound+sealed Vault whose capsule_hub_address points at a *missing* (uninitialized) contract,
-// so a forwarded PublishBatchToHub bounces back to the Vault. Mirrors the helper setupVault construction
-// (genesis_config_hash = VPB2_GENESIS_HASH so signed batch bodies validate) but swaps the hub for a fixture.
-async function setupVaultMissingHub() {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-  const user = await blockchain.treasury('m17-vault-bounce-user');
-  const athWallet = await blockchain.treasury('m17-vault-bounce-ath');
-  const missingHub = fixtureAddress('M17_MISSING_CAPSULEHUB_FOR_BOUNCE');
-  const init = await Vault.init(athWallet.address, athWallet.address, missingHub, VPB2_GENESIS_HASH, true, true, 0n);
-  const address = contractAddress(0, init);
-  await blockchain.setShardAccount(address, createShardAccount({
-    address, code: init.code, data: init.data, balance: toNano('3'), workchain: address.workChain,
-  }));
-  const vault = blockchain.openContract(new Vault(address, init));
-  return { blockchain, vault, user };
-}
-
-// Drives a signed VPB2 batch external (op 0x7e1f5041, domain 0x56504232) through a Vault and returns the
-// resulting transactions. The Vault accepts, charges, and forwards a PublishBatchToHub to its bound hub.
-async function sendVaultBatch(blockchain: any, vault: any, user: any) {
-  const nonce = (await vault.getGetUser(user.address)).publish_nonce;
-  const partsRoot = partsList(VPB2_KIND_PRIVATE, 1);
-  return blockchain.sendMessage(external({
-    to: vault.address,
-    body: batchExternalBody({
-      vaultAddr: vault.address, owner: user.address, nonce, maxCharge: toNano('1'),
-      partCount: 1n, partsRoot, kind: VPB2_KIND_PRIVATE,
-    }),
-  }));
-}
-
-async function vaultScenario(): Promise<M17ScenarioMetric> {
-  // Leg 1: a bound+sealed Vault forwarding a 1-part private batch to its (treasury stand-in) CapsuleHub.
-  const ok = await setupVault();
-  await registerHybrid(ok.vault, ok.user);
-  await depositTon(ok.vault, ok.user, toNano('2'));
-  const publishRes = await sendVaultBatch(ok.blockchain, ok.vault, ok.user);
-
-  // Leg 2: the same signed batch external to a Vault whose CapsuleHub is missing — the forward bounces.
-  const bounce = await setupVaultMissingHub();
-  await registerHybrid(bounce.vault, bounce.user);
-  await depositTon(bounce.vault, bounce.user, toNano('2'));
-  const pendingRes = await sendVaultBatch(bounce.blockchain, bounce.vault, bounce.user);
-
-  return scenario('VAULT_BALANCE_PUBLISH', [
-    opMetric('vault_balance_private_publish_to_capsulehub_ack', 0n, publishRes),
-    opMetric('vault_balance_private_publish_to_missing_capsulehub_bounce', 0n, pendingRes),
-  ]);
-}
 
 export async function runM17GasReserveSanity(writeArtifacts = true): Promise<M17Report> {
   const scenarios = [
     await athTransferScenario(),
     await athBurnScenario(),
-    await capsuleHubScenario(),
     await feeAccumulatorScenario(),
     await usernameRegistryScenario(),
-    await vaultScenario(),
   ];
   scenarios.forEach(assertScenarioHealthy);
   const report: M17Report = {
