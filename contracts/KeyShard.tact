@@ -59,8 +59,9 @@
 // silent ACTION-phase-50 death as the key directory, on the same product.
 //
 // The username cure (delete the map in favour of the contract that already held the record) had no counterpart
-// here: NOTHING held a wallet's current avatar pointer authoritatively. The image bytes live in CapsuleHub under
-// a GLOBAL, evictable entry id, so `avatar_entry_id` is a hint, not an address. So the pointer needs a per-wallet
+// here: NOTHING held a wallet's current avatar pointer authoritatively. The image bytes live in PublicShard under
+// the AVATAR domain (CapsuleHub, their clean-16 home, was removed 2026-07-21), so `avatar_entry_id` is a hint, not
+// an address. So the pointer needs a per-wallet
 // home, and this contract already is one — the client resolving a contact reads this shard anyway, which means
 // the avatar now arrives in the SAME batched accountStates read instead of a second getter against a registry.
 //
@@ -107,6 +108,22 @@ const KS_MIN_REPLACE_VALUE: Int = KS_REGISTER_GAS;
 // this message pays gas only. That is also why 22202 requires registration first — see the receiver.
 const KS_AVATAR_WRITE_GAS: Int = 8000000;
 
+// [MIGRATION HOOK] A redeploy gives ProfileRegistry a NEW address, and this shard's address is a function of it
+// (see init), so every KeyShard moves and a wallet's published key bundle + avatar pointer would be orphaned.
+// KeyShardProveOwnership lets the shard state its own PUBLIC identity to the next generation so it can adopt it
+// with no wallet action — the same self-attestation shape as UsernameNFTItem's proof path. Sized exactly like it:
+// a fixed forward reserve, an exec reserve, and a cap so the shard can never be turned into a value relay. Value
+// rides in from the caller and the shard NEVER pays from its storage endowment.
+// [RE-MEASURE BEFORE SEAL] Exec is 4M, not the item's 1M, because the proof body is a larger cell tree (full
+// bundle + ML-KEM snake + avatar pointer). MEASURED at the min-value boundary (value = FORWARD + EXEC) with an
+// initialised receiver: this tx's gas ~1.37M + separate fwd fee ~0.63M = ~2.0M. At exec=2M the shard netted only
+// +3331 nanoton — the "never pays from endowment" invariant held by a hair and would flip negative on any mainnet
+// gas/fwd-fee drift. exec=4M (~2x the measured cost) leaves ~+2M of margin at the boundary; the min value is 9M,
+// which for a one-time migration trigger is negligible. Pinned by tests/key-shard-prove-ownership.test.ts KS-PROVE-05.
+const KS_PROOF_FORWARD_RESERVE: Int = 5000000;
+const KS_PROOF_EXEC_RESERVE: Int = 4000000;
+const KS_PROOF_MAX_VALUE: Int = 20000000;
+
 message(0x4B534731) KeyShardRegisterKeys {          // "KSG1" — internal, wallet-authorised
     enc_pubkey: Int as uint256;
     sign_pubkey: Int as uint256;
@@ -144,6 +161,49 @@ message(0x4B534735) KeyShardSetAvatarPointer {
 message(0x4B534736) KeyShardAvatarPointerAck {     // "KSG6" — shard -> registry: the write landed, settle the payment
     write_id: Int as uint64;
     version: Int as uint32;
+}
+
+// "KSG7" — permissionless migration export request. Anyone may ask the shard to state its public identity to the
+// next-generation registry `to`, so an identity is never stranded because its owner went quiet. It names the
+// CURRENT owner, so a permissionless trigger cannot steal anything. Mirrors UsernameNFTItem.ProveUsernameOwnership.
+message(0x4B534737) KeyShardProveOwnership {
+    query_id: Int as uint64;
+    to: Address;
+}
+
+// "KSG8" — shard -> next generation: everything a new KeyShard/registry needs to adopt this wallet's public
+// identity in ONE message. auth_pubkey is NEVER exported (the rotation-key privacy invariant, same as get_view):
+// it authorises rotation, so advertising it would hand an observer the key to attack; the owner re-establishes it
+// with a fresh registration. All fixed-width fields plus the ML-KEM snake as a ref — no `as remaining`, so Tact
+// spills cleanly across the cell tree (the failure mode that broke the username-mint notification lived in an
+// inline remaining slice, which this deliberately avoids).
+// CONSUMER NOTE (the next generation that adopts this): the bundle and the avatar pointer advance on TWO
+// independent monotonic axes — key_generation (bundle) and avatar_version (avatar). A consumer must apply
+// last-writer-wins on EACH axis separately, or a proof taken before an avatar change silently loses the newer
+// avatar. And auth_pubkey is absent by design: an adopted identity is READABLE immediately but cannot rotate via
+// the external path until its owner does one fresh KeyShardRegisterKeys — reachability is preserved, rotation is
+// re-established by the owner, not migrated.
+message(0x4B534738) KeyShardOwnershipProof {
+    query_id: Int as uint64;
+    owner_wallet: Address;
+    key_id: Int as uint256;
+    key_generation: Int as uint32;
+    rotation_nonce: Int as uint64;
+    enc_pubkey: Int as uint256;
+    sign_pubkey: Int as uint256;
+    scan_pubkey: Int as uint256;
+    pq_kem_pubkey_hash: Int as uint256;
+    pq_kem_pubkey_len: Int as uint16;
+    pq_kem_pubkey: Cell;
+    crypto_suite_mask: Int as uint16;
+    created_at: Int as uint64;
+    avatar_version: Int as uint32;
+    avatar_hash: Int as uint256;
+    avatar_entry_id: Int as uint64;
+    avatar_stream_id: Int as uint128;
+    avatar_part_count: Int as uint16;
+    avatar_media_format: Int as uint8;
+    avatar_updated_at: Int as uint64;
 }
 
 struct KeyShardView {
@@ -292,6 +352,11 @@ contract KeyShard {
         return true;
     }
 
+    fun isBasechainAddress(address: Address): Bool {
+        let std: StdAddress = parseStdAddress(address.asSlice());
+        return std.workchain == 0;
+    }
+
     fun validateKeyProfile(encPubkey: Int, signPubkey: Int, scanPubkey: Int, pqHash: Int, pqLen: Int, pqPubkey: Cell, cryptoSuiteMask: Int) {
         throwUnless(22101, encPubkey != 0);
         throwUnless(22102, signPubkey != 0);
@@ -435,6 +500,52 @@ contract KeyShard {
             mode: SendRemainingValue | SendIgnoreErrors,
             bounce: false,
             body: KeyShardAvatarPointerAck { write_id: msg.write_id, version: self.avatar_version }.toCell()
+        });
+    }
+
+    // ---- migration export, permissionless (mirrors UsernameNFTItem.ProveUsernameOwnership) ----
+    //
+    // The shard states its own PUBLIC facts — the exact fields get_view already exposes, minus auth_pubkey — so the
+    // next generation can adopt this wallet's identity with no wallet action after a redeploy moves the address.
+    // Permissionless so a quiet owner is never stranded; the proof names the CURRENT owner, so it cannot be abused
+    // to move an identity. The shard is NOT consumed and may prove as many times as needed, so a refused or
+    // mistimed claim costs nothing. Value rides in from the caller and is capped, and the shard never pays out of
+    // its storage endowment — the cost of a mistimed claim falls on the triggerer, not the shard.
+    receive(msg: KeyShardProveOwnership) {
+        throwUnless(22220, self.registered);
+        throwUnless(22221, self.isBasechainAddress(msg.to));
+        throwUnless(22222, context().value >= KS_PROOF_FORWARD_RESERVE + KS_PROOF_EXEC_RESERVE);
+        throwUnless(22223, context().value <= KS_PROOF_MAX_VALUE);
+
+        message(MessageParameters {
+            to: msg.to,
+            value: KS_PROOF_FORWARD_RESERVE,
+            mode: SendPayFwdFeesSeparately,
+            // Bounceable so a proof aimed at a non-existent or refusing registry returns the value here instead of
+            // burning it into an uninitialised account.
+            bounce: true,
+            body: KeyShardOwnershipProof {
+                query_id: msg.query_id,
+                owner_wallet: self.owner_wallet,
+                key_id: self.key_id,
+                key_generation: self.key_generation,
+                rotation_nonce: self.rotation_nonce,
+                enc_pubkey: self.enc_pubkey,
+                sign_pubkey: self.sign_pubkey,
+                scan_pubkey: self.scan_pubkey,
+                pq_kem_pubkey_hash: self.pq_kem_pubkey_hash,
+                pq_kem_pubkey_len: self.pq_kem_pubkey_len,
+                pq_kem_pubkey: self.pq_kem_pubkey,
+                crypto_suite_mask: self.crypto_suite_mask,
+                created_at: self.created_at,
+                avatar_version: self.avatar_version,
+                avatar_hash: self.avatar_hash,
+                avatar_entry_id: self.avatar_entry_id,
+                avatar_stream_id: self.avatar_stream_id,
+                avatar_part_count: self.avatar_part_count,
+                avatar_media_format: self.avatar_media_format,
+                avatar_updated_at: self.avatar_updated_at
+            }.toCell()
         });
     }
 
