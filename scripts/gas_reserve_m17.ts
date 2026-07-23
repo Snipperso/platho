@@ -16,6 +16,7 @@ import {
   FlushBurnAthDue,
   PrunePendingUsernameMint,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
+import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const USERNAME_MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
@@ -321,8 +322,16 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
   const ownerA = fixtureAddress('M17_USERNAME_OWNER_A');
   const ownerRejected = fixtureAddress('M17_USERNAME_REJECTED_OWNER');
   const mintA = await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerA, 'platho', ctx.vaultAddress);
-  if ((await ctx.registry.getGetNameRecord(nameHash('platho'))).exists !== true) {
-    throw new Error('Username mint scenario did not create NameRecord');
+  // name_records was deleted 2026-07-20 ("THE ITEM IS THE RECORD"): a successful mint is now witnessed on the
+  // per-name NFT item — its account exists (deployed) AND its get_state().initialized is true — not on a registry map.
+  const platoInit = await UsernameNFTItem.init(ctx.registry.address, nameHash('platho'));
+  const platoItemAddress = contractAddress(0, platoInit);
+  if ((await ctx.blockchain.getContract(platoItemAddress)).accountState?.type !== 'active') {
+    throw new Error('Username mint scenario did not deploy the NFT item (name not minted)');
+  }
+  const platoItem = ctx.blockchain.openContract(new UsernameNFTItem(platoItemAddress, platoInit));
+  if ((await platoItem.getGetState()).initialized !== true) {
+    throw new Error('Username mint scenario did not initialize the NFT item');
   }
 
   const invalidValue = toNano('0.1');
