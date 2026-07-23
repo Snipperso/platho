@@ -38,7 +38,11 @@ const OFFER = toNano('50');
 const PTON_TRANSFER_GAS = 50_000_000n;
 const ACCOUNTING_RECYCLE_EXEC_RESERVE = 2_000_000n;
 const ATH_BURN_REQUEST_VALUE = 30_000_000n;
-const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 35_000_000n;
+// 2026-07-20: ATHWallet.ATH_TRANSFER_NOTIFY_MIN_VALUE floor rose to 45M and BuybackBurn's paired route-notify
+// buffer went 35M->50M (BuybackBurn.tact:16-27). A forward_ton_amount below 45M is now rejected at ATHWallet
+// gate 14703, so the STON.fi notification never fires and the phase stays PENDING_STONFI_SWAP. Must be >= 45M;
+// the canonical production suite (buybackburn-production.test.ts:54) already uses 50M.
+const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 50_000_000n;
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
 const PHASE_PENDING_ATH_BURN = 2n;
