@@ -45,10 +45,11 @@
 // which is what keeps the ~65536-cell account ceiling irrelevant. body_commit is computed HERE from the cell
 // hashes, so a captured body cannot be spliced onto a different commit and publisher/reader cannot disagree.
 
-// [RE-MEASURE BEFORE SEAL — every rent figure below is a DERIVATION at the frozen 64962 nanoton/cell/year rate
-//  (config-18, bits free), and MUST be re-measured against the storage phase with blockchain.now >= 1_790_000_000,
-//  because config-18 is a SCHEDULE: with the sandbox clock pinned to 2023 a cell costs 486975 and the whole table
-//  reads as catastrophically under-funded.]
+// [MEASURED 2026-07-24 — the figures below are no longer derivations. They are pinned against the REAL storage
+//  phase by tests/public-shard-rent-solvency.test.ts at blockchain.now >= 1_790_000_000 (config-18 is a SCHEDULE:
+//  with the sandbox clock at 2023 a cell costs 486975 and the whole table misreads as catastrophically
+//  under-funded). That test also deploys the fee sink: a bounceable fee to a NON-existent sink bounces BACK and
+//  inflates the shard's retained balance by ~9_647_932, which reports a margin the live lane does not have.]
 
 const PS_SAFE_CAP: Int = 4096;             // entries per shard; refuse in COMPUTE, never code 50 in ACTION
 
@@ -78,7 +79,9 @@ const PS_POST_UID_DOMAIN: Int = 0x50535544;  // "PSUD" — how a comment thread'
 // 2*eraSeconds. Using the 2-era figure under-funds every shard by one era of rent, and the failure is regressive
 // and silent: sparse shards (small new channels, the ones the directory exists for) starve first while full ones
 // look healthy, and re-measuring cell count would never catch it because the error is in the lifetime multiplier.
-// [entry ~4 cells MEASURED-PENDING; RecordShard measured 3 for a 288-bit entry, this one is ~587 bits.]
+// [MEASURED 2026-07-24 — the per-entry figures below are CONFIRMED solvent: measured marginal per-entry rent is
+//  242_941 / 779_546 / 1_169_319, so these constants deliver 2.05x each, comfortably over the 1.5x rule. Only the
+//  BASE endowments were short; see the block below.]
 //   CHANNEL/THREAD  4 x 64962 x (3*2592000+31536000)/31536000 x 1.5 =  485_900 ->   500_000
 //   BEACON          4 x 64962 x (4*31536000)/31536000          x 1.5 = 1_559_088 -> 1_600_000
 //   AVATAR          4 x 64962 x (3*31536000+94608000)/31536000  x 1.5 = 2_338_632 -> 2_400_000
@@ -86,11 +89,24 @@ const PS_ENTRY_ENDOWMENT_POST: Int = 500000;
 const PS_ENTRY_ENDOWMENT_BEACON: Int = 1600000;
 const PS_ENTRY_ENDOWMENT_AVATAR: Int = 2400000;
 
-// The shard's own code+data rent over its life plus the one retire call (~960_339 flat, MEASURED on RecordShard,
-// independent of entry count). Longer-lived kinds carry more.
-const PS_BASE_ENDOWMENT_POST: Int = 3500000;
-const PS_BASE_ENDOWMENT_BEACON: Int = 7000000;
-const PS_BASE_ENDOWMENT_AVATAR: Int = 11000000;
+// The shard's own code+data rent over its life plus the one retire call, independent of entry count.
+//
+// [RAISED 2026-07-24 — WAS 3_500_000 / 7_000_000 / 11_000_000, WHICH WAS INSOLVENT AT TODAY'S RATE.]
+// The old figures borrowed RecordShard's flat ~960_339, but THIS contract's code is far larger, and the base
+// endowment is what carries the CODE rent. Measured against the real storage phase
+// (tests/public-shard-rent-solvency.test.ts, clock 1_790_000_000, rate 64962, fee sink deployed so the fee really
+// leaves) a 1-entry shard cost MORE than it kept:
+//     AVATAR  kept 13_400_000 vs 15_201_146 rent over 6.00y  = 0.88x  -> froze BEFORE its 3-year retention
+//     BEACON  kept  8_600_000 vs 10_134_097 rent over 4.00y  = 0.85x  -> same
+//     CHANNEL kept  4_000_000 vs  3_158_229 rent over 1.25y  = 1.27x  -> solvent but under the 1.5x rule
+// Decomposed by measuring 1-entry vs 11-entry shards (PS-CAL), the rent splits as:
+//     CHANNEL/THREAD  base 2_915_288  per-entry   242_941   -> base >= 4_372_933
+//     BEACON          base 9_354_551  per-entry   779_546   -> base >= 14_031_827
+//     AVATAR          base 14_031_827 per-entry 1_169_319   -> base >= 21_047_741
+// The ENTRY endowments already clear 1.5x (2.05x each) and are unchanged; only the BASE was short.
+const PS_BASE_ENDOWMENT_POST: Int = 4500000;      // 1.54x measured base rent
+const PS_BASE_ENDOWMENT_BEACON: Int = 14500000;   // 1.55x
+const PS_BASE_ENDOWMENT_AVATAR: Int = 21500000;   // 1.53x
 
 const PS_PUBLISH_GAS: Int = 2500000;       // this receiver's own compute + the change-return; no ed25519 here
 

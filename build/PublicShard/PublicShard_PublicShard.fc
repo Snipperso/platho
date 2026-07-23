@@ -603,14 +603,14 @@ builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
     int $k = ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf();
     if (($k == 3)) {
-        var $fresh$ret_9 = 11000000;
+        var $fresh$ret_9 = 21500000;
         return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_9);
     }
     if (($k == 2)) {
-        var $fresh$ret_10 = 7000000;
+        var $fresh$ret_10 = 14500000;
         return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_10);
     }
-    var $fresh$ret_11 = 3500000;
+    var $fresh$ret_11 = 4500000;
     return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_11);
 }
 

@@ -270,13 +270,13 @@ PROGRAM{
     3 EQINT
     IFJMP:<{
       DROP
-      11000000 PUSHINT
+      21500000 PUSHINT
     }>
     2 EQINT
     IFJMP:<{
-      7000000 PUSHINT
+      14500000 PUSHINT
     }>
-    3500000 PUSHINT
+    4500000 PUSHINT
   }>
   $PublicShard$_fun_minValue PROCREF:<{
     $PublicShard$_fun_entryEndowment INLINECALLDICT
