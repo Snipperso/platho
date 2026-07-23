@@ -176,7 +176,7 @@ _ %get_state() method_id(86957) {
         var $msg'payer_wallet = in_msg~load_msg_addr();
         var $msg'owner_wallet = in_msg~load_msg_addr();
         var $msg'username_len = in_msg~load_uint(8);
-        var $msg'username = in_msg;
+        var $msg'username = in_msg~load_ref();
         $self'username_count = $self'username_count + 1;
         $self'last_query_id = $msg'query_id;
         $MockRegistryNotificationNoAck$_contract_store(($self'profile_count, $self'username_count, $self'last_query_id));

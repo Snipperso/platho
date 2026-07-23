@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
-import { ATHWallet, storeATHTransferRequestRegistryMintUsername } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHWallet, storeATHTransferRequestRegistryMintUsername, storeAthTransferNotificationRegistryMintUsername } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const OP_ATH_TRANSFER_NOTIFICATION_VAULT_MINT_USERNAME = 0x89129D60n;
@@ -31,16 +31,19 @@ function nameHash(name: string): bigint {
 }
 
 function mintPayload(payer: Address, owner: Address, name: string, amount: bigint, queryId = 1n) {
-  return beginCell()
-    .storeUint(OP_ATH_TRANSFER_NOTIFICATION_VAULT_MINT_USERNAME, 32)
-    .storeUint(queryId, 64)
-    .storeUint(0n, 160)
-    .storeUint(amount, 128)
-    .storeAddress(payer)
-    .storeAddress(owner)
-    .storeUint(Buffer.from(name, 'ascii').length, 8)
-    .storeBuffer(Buffer.from(name, 'ascii'))
-    .endCell();
+  // Use the generated store so the wire layout always mirrors the compiled contract. Since §4c the notification's
+  // `username` is a `Cell` (its own ref, not inline) — hand-rolling the body would silently drift to the old inline
+  // shape and emit a contract-invalid notification BOC.
+  return beginCell().store(storeAthTransferNotificationRegistryMintUsername({
+    $$type: 'AthTransferNotificationRegistryMintUsername',
+    query_id: queryId,
+    sender_key: 0n,
+    amount,
+    payer_wallet: payer,
+    owner_wallet: owner,
+    username_len: BigInt(Buffer.from(name, 'ascii').length),
+    username: beginCell().storeBuffer(Buffer.from(name, 'ascii')).endCell(),
+  })).endCell();
 }
 
 function mintRequestPayload(vault: Address, owner: Address, registryAddress: Address, name: string, amount: bigint, queryId = 1n) {

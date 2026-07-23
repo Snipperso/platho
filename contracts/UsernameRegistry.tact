@@ -591,7 +591,9 @@ contract UsernameRegistry {
         self.requireSealed();
         throwUnless(19180, sender() == self.official_ath_wallet_address);
         throwUnless(19183, self.isBasechainAddress(msg.payer_wallet));
-        self.acceptUsernameMint(msg.query_id, msg.sender_key, msg.amount, msg.owner_wallet, msg.username_len, msg.username);
+        // §4c: username now arrives as its own ref cell (see ATHWallet decl). Parse to a flat slice; acceptUsernameMint's
+        // isValidUsernameBytes still enforces refsEmpty + bits==len*8, so a malformed cell is rejected there.
+        self.acceptUsernameMint(msg.query_id, msg.sender_key, msg.amount, msg.owner_wallet, msg.username_len, msg.username.beginParse());
     }
 
     receive(msg: UsernameItemDeployedAck) {

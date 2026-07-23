@@ -148,7 +148,7 @@ async function sendMint(params: {
     payer_wallet: params.payerWallet,
     owner_wallet: params.owner,
     username_len: BigInt(Buffer.from(params.username, 'ascii').length),
-    username: usernameSlice(params.username),
+    username: usernameSlice(params.username).asCell(),
   } as AthTransferNotificationRegistryMintUsername);
 }
 

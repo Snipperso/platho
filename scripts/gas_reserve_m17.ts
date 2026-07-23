@@ -311,7 +311,7 @@ async function mintValidName(blockchain: Blockchain, registry: any, officialAthW
     payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   } as AthTransferNotificationRegistryMintUsername);
   return { value, res };
 }
@@ -334,7 +334,7 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
     payer_wallet: ctx.vaultAddress,
     owner_wallet: ownerRejected,
     username_len: 6n,
-    username: usernameSlice('Larisa'),
+    username: usernameSlice('Larisa').asCell(),
   } as AthTransferNotificationRegistryMintUsername);
 
   const treasuryValue = toNano('0.2');
