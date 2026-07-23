@@ -43,9 +43,12 @@ const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = contractConst('USERNAME_PENDING_
 const USERNAME_STATE_GROWTH_EXEC_RESERVE = contractConst('USERNAME_STATE_GROWTH_EXEC_RESERVE');
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE = contractConst('USERNAME_NFT_ITEM_DEPLOY_RESERVE');
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE = contractConst('USERNAME_ATH_NOTIFICATION_ACK_VALUE');
-const USERNAME_NAME_RECORD_STORAGE_ENDOWMENT = contractConst('USERNAME_NAME_RECORD_STORAGE_ENDOWMENT');
-// The registry retains pending endowment + item deploy reserve + ack value + state-growth reserve + name-record
-// endowment, then forwards the deploy reserve to the item. The notify must carry the full retained value plus a
+// 2026-07-20: name_records was deleted ("THE ITEM IS THE RECORD"), so the old USERNAME_NAME_RECORD_STORAGE_ENDOWMENT
+// slot is now USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION — same 100M in the same gate-19122 retained-value sum, it just
+// funds the REGISTRY'S own code rent instead of a per-name map entry.
+const USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION = contractConst('USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION');
+// The registry retains pending endowment + item deploy reserve + ack value + state-growth reserve + self-rent
+// contribution, then forwards the deploy reserve to the item. The notify must carry the full retained value plus a
 // gas/fwd margin for the registry's own accept + deploy send. Figures are NOT written here on purpose — they are
 // read from the contract above, because the two that were written here are exactly the two that drifted.
 const USERNAME_RETAINED_VALUE =
@@ -53,8 +56,8 @@ const USERNAME_RETAINED_VALUE =
   USERNAME_NFT_ITEM_DEPLOY_RESERVE +
   USERNAME_ATH_NOTIFICATION_ACK_VALUE +
   USERNAME_STATE_GROWTH_EXEC_RESERVE +
-  USERNAME_NAME_RECORD_STORAGE_ENDOWMENT;
-const USERNAME_NOTIFY_VALUE = USERNAME_RETAINED_VALUE + 89_000_000n; // 636M total: full retained value + thick exec/fwd margin
+  USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION;
+const USERNAME_NOTIFY_VALUE = USERNAME_RETAINED_VALUE + 89_000_000n; // full retained value (read from contract) + thick exec/fwd margin
 const USERNAME_ITEM_ACK_FORWARD_RESERVE = 3_000_000n;
 const USERNAME_ITEM_ACK_EXEC_RESERVE = 1_000_000n;
 const USERNAME_ITEM_ACK_FWD_FEE_ALLOWANCE = 100_000n;
@@ -70,7 +73,6 @@ type StorageCase = {
   expected_item_floor_nanotons: string;
   retained_margin_vs_registry_endowment_nanotons: string;
   item_margin_vs_floor_nanotons: string;
-  name_record_count: string;
   pending_mint_count: string;
 };
 
@@ -205,9 +207,10 @@ async function successfulMintCase(label: string, name: string, price: bigint): P
   const registryMargin = registryDelta - USERNAME_PENDING_MINT_STORAGE_ENDOWMENT;
   const itemMargin = itemBalance - USERNAME_ITEM_MIN_RETAINED_AFTER_INIT;
   assertNonNegative(label, registryMargin);
-  // clean-11: the never-evicted name_records entry must retain its dedicated century-rent endowment beyond the
-  // transient pending endowment, so the ownership record self-funds its storage rent for the life of the collection.
-  assertNonNegative(`${label} name-record endowment`, registryMargin - USERNAME_NAME_RECORD_STORAGE_ENDOWMENT);
+  // Since name_records was deleted (2026-07-20) this 100M no longer funds a per-name map entry — it is the
+  // registry's own century-rent self-contribution, retained beyond the transient pending endowment so the registry
+  // self-funds its code storage for the life of the collection.
+  assertNonNegative(`${label} registry self-rent`, registryMargin - USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION);
   assertNonNegative(`${label} item`, itemMargin);
 
   return {
@@ -219,7 +222,6 @@ async function successfulMintCase(label: string, name: string, price: bigint): P
     expected_item_floor_nanotons: String(USERNAME_ITEM_MIN_RETAINED_AFTER_INIT),
     retained_margin_vs_registry_endowment_nanotons: String(registryMargin),
     item_margin_vs_floor_nanotons: String(itemMargin),
-    name_record_count: String(global.name_record_count),
     pending_mint_count: String(global.pending_mint_count),
   };
 }
@@ -241,7 +243,7 @@ async function itemBounceCase(): Promise<StorageCase> {
   }));
 
   const beforeRegistry = await balance(ctx.blockchain, ctx.registry.address);
-  await sendMint(ctx, owner, 'bounce', PRICE_6_PLUS, 1n, USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE + USERNAME_NAME_RECORD_STORAGE_ENDOWMENT);
+  await sendMint(ctx, owner, 'bounce', PRICE_6_PLUS, 1n, USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE + USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION);
   const afterRegistry = await balance(ctx.blockchain, ctx.registry.address);
   const global = await ctx.registry.getGetGlobal();
   const registryDelta = afterRegistry - beforeRegistry;
@@ -256,7 +258,6 @@ async function itemBounceCase(): Promise<StorageCase> {
     expected_item_floor_nanotons: '0',
     retained_margin_vs_registry_endowment_nanotons: String(registryDelta),
     item_margin_vs_floor_nanotons: '0',
-    name_record_count: String(global.name_record_count),
     pending_mint_count: String(global.pending_mint_count),
   };
 }
@@ -294,7 +295,6 @@ async function itemResendCase(): Promise<StorageCase> {
     expected_item_floor_nanotons: String(USERNAME_ITEM_MIN_RETAINED_AFTER_INIT),
     retained_margin_vs_registry_endowment_nanotons: String(registryDelta),
     item_margin_vs_floor_nanotons: String(itemMargin),
-    name_record_count: String(global.name_record_count),
     pending_mint_count: String(global.pending_mint_count),
   };
 }
@@ -340,7 +340,6 @@ async function itemTransferCase(label: string, value: bigint, forwardAmount: big
     expected_item_floor_nanotons: String(USERNAME_ITEM_MIN_RETAINED_AFTER_INIT),
     retained_margin_vs_registry_endowment_nanotons: String(afterRegistry - beforeRegistry),
     item_margin_vs_floor_nanotons: String(itemMargin),
-    name_record_count: String(global.name_record_count),
     pending_mint_count: String(global.pending_mint_count),
   };
 }
