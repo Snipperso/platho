@@ -9,10 +9,10 @@ export const DEFAULT_MAINNET_GENESIS_VERIFY_INPUT_PATH = join(ARTIFACTS_DIR, 'ma
 const FINAL_MANIFEST_DOMAIN = 'PLATHO.V1.FINAL_GENESIS_MANIFEST';
 const EXPECTED_ATH_TOTAL_SUPPLY_ATOMIC = '100000000000000000';
 const EXPECTED_VAULT_ACTIVITY_AIRDROP_TOTAL_ATOMIC = '15000000000000000';
-// clean-15 certifies the FINAL genesis state: the 60M MarketStabilitySeller reserve is capitalized
-// as part of genesis, so the treasury owner retains exactly the 15M activity-airdrop allocation
-// (100M - 15M Vault - 10M Vesting - 60M MSS reserve). clean-14 snapshotted the pre-reserve
-// checkpoint at 75M; clean-15's reserve capitalization is folded into the certified genesis.
+// clean-17 certifies the FINAL genesis state: the 60M MarketStabilitySeller reserve is capitalized
+// as part of genesis, so the treasury owner retains exactly the 15M liquidity allocation
+// (100M - 15M AirdropPool - 10M Vesting - 60M MSS reserve). The 15M activity airdrop is custodied in
+// the AirdropPool (not the treasury owner); the treasury-owner remaining 15M is the separate liquidity bucket.
 const EXPECTED_ATH_TREASURY_OWNER_REMAINING_ATOMIC = '15000000000000000';
 const EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC = '60000000000000000';
 const EXPECTED_ATH_LONG_TERM_VESTING_ATOMIC = '10000000000000000';
@@ -25,12 +25,11 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY: Record<string, string> = {
   ATH_WALLET_CODE_HASH: 'ath_wallet',
   BUYBACKBURN_CODE_HASH: 'buyback_burn',
   MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
-  CAPSULEHUB_CODE_HASH: 'capsulehub',
   FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
   PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
   USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
   USERNAME_REGISTRY_CODE_HASH: 'username_registry',
-  VAULT_CODE_HASH: 'vault',
+  AIRDROP_POOL_CODE_HASH: 'airdrop_pool',
 };
 
 type Issue = { code: string; message: string };
@@ -65,25 +64,24 @@ export interface MainnetGenesisVerifyInput {
       treasury_owner_address: string;
       treasury_supply_deployed: boolean;
     };
-    vault: BaseSnapshot & {
-      capsule_hub_bound: boolean;
-      capsule_hub_address: string;
-      profile_registry_bound: boolean;
-      profile_registry_address: string;
-      username_registry_bound: boolean;
-      username_registry_address: string;
-      vault_ath_wallet_address: string;
+    airdrop_pool: BaseSnapshot & {
+      ath_master_bound: boolean;
+      credit_issuer_bound: boolean;
+      treasury_bound: boolean;
       ath_master_address: string;
-      user_count: string;
-      key_record_count: string;
-      receive_intent_count: string;
-      pending_ath_withdrawal_count: string;
-      pending_publish_count: string;
-      processed_ath_deposit_count: string;
-      airdrop_remaining_ath: string;
-      airdrop_distributed_ath: string;
+      pool_ath_wallet_address: string;
+      credit_issuer_address: string;
+      treasury_address: string;
+      ath_per_credit: string;
+      total_pool: string;
+      funded_amount: string;
+      remaining_budget: string;
+      distributed_total: string;
+      claim_count: string;
+      sealed_at: string;
+      genesis_config_hash: string;
     };
-    vault_official_ath_wallet: BaseSnapshot & {
+    airdrop_pool_official_ath_wallet: BaseSnapshot & {
       owner_address: string;
       ath_master_address: string;
       balance_atomic: string;
@@ -140,15 +138,6 @@ export interface MainnetGenesisVerifyInput {
       owner_address: string;
       ath_master_address: string;
       balance_atomic: string;
-    };
-    capsulehub: BaseSnapshot & {
-      ton_balance: string;
-      vault_bound: boolean;
-      vault_address: string;
-      fee_accumulator_address: string;
-      private_latest_id: string;
-      public_latest_id: string;
-      accrued_plato_fee_ton: string;
     };
     username_registry: BaseSnapshot & {
       official_ath_wallet_bound: boolean;
@@ -212,6 +201,7 @@ export interface MainnetGenesisVerifyInput {
       accumulated_ton: string;
       treasury_due_ton: string;
       buyback_due_ton: string;
+      airdrop_pool_address: string;
     };
   };
   evidenceRefs: {
@@ -533,8 +523,8 @@ const PROTOCOL_TREASURY_DENYLIST_KEYS = [
   'buyback_burn_initial_genesis_controller',
   'buyback_burn_launch_controller',
   'buyback_burn_official_ath_wallet',
-  'capsulehub',
-  'capsulehub_initial_vault_placeholder',
+  'airdrop_pool',
+  'airdrop_pool_official_ath_wallet',
   'fee_accumulator',
   'genesis_controller_one_shot',
   'market_stability_seller',
@@ -547,9 +537,6 @@ const PROTOCOL_TREASURY_DENYLIST_KEYS = [
   'username_registry',
   'username_registry_initial_ath_wallet_placeholder',
   'username_registry_official_ath_wallet',
-  'vault',
-  'vault_initial_capsulehub_placeholder',
-  'vault_official_ath_wallet',
 ];
 
 function addManifestTreasuryReceiverNotProtocolOwned(
@@ -693,14 +680,13 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       ath_long_term_vesting_official_ath_wallet: 'REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS',
       ath_treasury_owner: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
       ath_treasury_owner_ath_wallet: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ATH_WALLET_ADDRESS',
-      vault: 'REQUIRED_MAINNET_VAULT_ADDRESS',
-      vault_official_ath_wallet: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
+      airdrop_pool: 'REQUIRED_MAINNET_AIRDROP_POOL_ADDRESS',
+      airdrop_pool_official_ath_wallet: 'REQUIRED_MAINNET_AIRDROP_POOL_OFFICIAL_ATH_WALLET_ADDRESS',
       market_stability_seller: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
       market_stability_seller_initial_genesis_controller: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_ADDRESS',
       market_stability_seller_official_ath_wallet: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS',
       market_stability_reserve_funder: 'REQUIRED_MAINNET_MARKET_STABILITY_RESERVE_FUNDER_ADDRESS',
       market_stability_ton_treasury_receiver: 'REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS',
-      capsulehub: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
       fee_accumulator: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
       fee_accumulator_ton_treasury_receiver: 'REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS',
       buyback_burn: 'REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
@@ -717,9 +703,8 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       ath_master: 'required: current ATHMaster code hash',
       ath_vesting: 'required: current ATHVesting code hash',
       ath_wallet: 'required: current ATHWallet code hash',
-      vault: 'required: current Vault code hash',
       market_stability_seller: 'required: current MarketStabilitySeller code hash',
-      capsulehub: 'required: current CapsuleHub code hash',
+      airdrop_pool: 'required: current AirdropPool code hash',
       username_nft_item: 'required: current UsernameNFTItem code hash',
       username_registry: 'required: current UsernameRegistry code hash',
       profile_registry: 'required: current ProfileRegistry code hash',
@@ -731,9 +716,8 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       ath_treasury_owner_ath_wallet: 'required: 64 lowercase hex Treasury Owner ATHWallet StateInit hash',
       ath_long_term_vesting: 'required: 64 lowercase hex ATHVesting StateInit hash',
       ath_long_term_vesting_official_ath_wallet: 'required: 64 lowercase hex ATHVesting official ATHWallet StateInit hash',
-      vault: 'required: 64 lowercase hex Vault StateInit hash',
-      vault_official_ath_wallet: 'required: 64 lowercase hex Vault official ATHWallet StateInit hash',
-      capsulehub: 'required: 64 lowercase hex CapsuleHub StateInit hash',
+      airdrop_pool: 'required: 64 lowercase hex AirdropPool StateInit hash',
+      airdrop_pool_official_ath_wallet: 'required: 64 lowercase hex AirdropPool official ATHWallet StateInit hash',
       fee_accumulator: 'required: 64 lowercase hex FeeAccumulator StateInit hash',
       buyback_burn: 'required: 64 lowercase hex BuybackBurn StateInit hash',
       buyback_burn_official_ath_wallet: 'required: 64 lowercase hex BuybackBurn official ATHWallet StateInit hash',
@@ -776,31 +760,30 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         treasury_owner_address: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
         treasury_supply_deployed: true,
       },
-      vault: {
+      airdrop_pool: {
         ...base,
-        address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
-        capsule_hub_bound: true,
-        capsule_hub_address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
-        profile_registry_bound: true,
-        profile_registry_address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
-        username_registry_bound: true,
-        username_registry_address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
-        vault_ath_wallet_address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
+        address: 'REQUIRED_MAINNET_AIRDROP_POOL_ADDRESS',
+        ath_master_bound: true,
+        credit_issuer_bound: true,
+        treasury_bound: true,
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
-        user_count: '0',
-        key_record_count: '0',
-        receive_intent_count: '0',
-        pending_ath_withdrawal_count: '0',
-        pending_publish_count: '0',
-        processed_ath_deposit_count: '0',
-        airdrop_remaining_ath: 'required: full activity airdrop allocation',
-        airdrop_distributed_ath: '0',
+        pool_ath_wallet_address: 'REQUIRED_MAINNET_AIRDROP_POOL_OFFICIAL_ATH_WALLET_ADDRESS',
+        credit_issuer_address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
+        treasury_address: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
+        ath_per_credit: '10000000000',
+        total_pool: '15000000000000000',
+        funded_amount: '15000000000000000',
+        remaining_budget: '15000000000000000',
+        distributed_total: '0',
+        claim_count: '0',
+        sealed_at: 'required: nonzero seal unix timestamp',
+        genesis_config_hash: '0',
       },
-      vault_official_ath_wallet: {
-        address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
+      airdrop_pool_official_ath_wallet: {
+        address: 'REQUIRED_MAINNET_AIRDROP_POOL_OFFICIAL_ATH_WALLET_ADDRESS',
         account_state: 'active',
         code_hash: 'required: current ATHWallet code hash',
-        owner_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
+        owner_address: 'REQUIRED_MAINNET_AIRDROP_POOL_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         balance_atomic: 'required: decimal ATH balance from get_wallet_data',
       },
@@ -810,7 +793,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         code_hash: 'required: current ATHWallet code hash',
         owner_address: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
-        balance_atomic: 'required: exact remaining 15M ATH airdrop-allocation custody balance (post 60M reserve capitalization)',
+        balance_atomic: 'required: exact remaining 15M ATH liquidity-allocation custody balance (post 60M reserve capitalization)',
       },
       ath_long_term_vesting: {
         address: 'REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS',
@@ -869,17 +852,6 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         owner_address: 'optional when uninit; if active, REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
         ath_master_address: 'optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         balance_atomic: '0',
-      },
-      capsulehub: {
-        ...base,
-        address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
-        ton_balance: 'required: decimal raw account TON balance in nanotons; no genesis reserve prefund is required',
-        vault_bound: true,
-        vault_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
-        fee_accumulator_address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
-        private_latest_id: '0',
-        public_latest_id: '0',
-        accrued_plato_fee_ton: '0',
       },
       username_registry: {
         ...base,
@@ -1005,7 +977,7 @@ export function verifyMainnetGenesisSnapshot(
   addDistinctManifestAddresses(
     issues,
     manifest,
-    ['vault', 'capsulehub', 'profile_registry', 'username_registry'],
+    ['airdrop_pool', 'profile_registry', 'username_registry'],
     'FINAL_GENESIS_CORE_CONTRACT_ADDRESS_COLLISION',
   );
   const manifestBasechainChecks: [string, string][] = [
@@ -1016,9 +988,8 @@ export function verifyMainnetGenesisSnapshot(
     ['ath_treasury_owner', 'ATH_TREASURY_OWNER_NOT_BASECHAIN'],
     ['ath_treasury_owner_ath_wallet', 'ATH_TREASURY_OWNER_ATH_WALLET_NOT_BASECHAIN'],
     ['genesis_controller_one_shot', 'GENESIS_CONTROLLER_ONE_SHOT_NOT_BASECHAIN'],
-    ['vault', 'VAULT_NOT_BASECHAIN'],
-    ['vault_official_ath_wallet', 'VAULT_OFFICIAL_ATH_WALLET_NOT_BASECHAIN'],
-    ['capsulehub', 'CAPSULEHUB_NOT_BASECHAIN'],
+    ['airdrop_pool', 'AIRDROP_POOL_NOT_BASECHAIN'],
+    ['airdrop_pool_official_ath_wallet', 'AIRDROP_POOL_OFFICIAL_ATH_WALLET_NOT_BASECHAIN'],
     ['fee_accumulator', 'FEE_ACCUMULATOR_NOT_BASECHAIN'],
     ['buyback_burn', 'BUYBACK_BURN_NOT_BASECHAIN'],
     ['buyback_burn_initial_genesis_controller', 'BUYBACK_BURN_INITIAL_GENESIS_CONTROLLER_NOT_BASECHAIN'],
@@ -1151,9 +1122,8 @@ export function verifyMainnetGenesisSnapshot(
     ['ATH_LONG_TERM_VESTING_ADDRESS_NOT_BASECHAIN', (s as any).ath_long_term_vesting?.address, 'ath_long_term_vesting.address'],
     ['ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS_NOT_BASECHAIN', (s as any).ath_long_term_vesting_official_ath_wallet?.address, 'ath_long_term_vesting_official_ath_wallet.address'],
     ['ATH_TREASURY_OWNER_ATH_WALLET_ADDRESS_NOT_BASECHAIN', (s as any).ath_treasury_owner_ath_wallet?.address, 'ath_treasury_owner_ath_wallet.address'],
-    ['VAULT_ADDRESS_NOT_BASECHAIN', (s as any).vault?.address, 'vault.address'],
-    ['VAULT_OFFICIAL_ATH_WALLET_ADDRESS_NOT_BASECHAIN', (s as any).vault_official_ath_wallet?.address, 'vault_official_ath_wallet.address'],
-    ['CAPSULEHUB_ADDRESS_NOT_BASECHAIN', (s as any).capsulehub?.address, 'capsulehub.address'],
+    ['AIRDROP_POOL_ADDRESS_NOT_BASECHAIN', (s as any).airdrop_pool?.address, 'airdrop_pool.address'],
+    ['AIRDROP_POOL_OFFICIAL_ATH_WALLET_ADDRESS_NOT_BASECHAIN', (s as any).airdrop_pool_official_ath_wallet?.address, 'airdrop_pool_official_ath_wallet.address'],
     ['FEE_ACCUMULATOR_ADDRESS_NOT_BASECHAIN', (s as any).fee_accumulator?.address, 'fee_accumulator.address'],
     ['BUYBACK_BURN_ADDRESS_NOT_BASECHAIN', (s as any).buyback_burn?.address, 'buyback_burn.address'],
     ['BUYBACK_BURN_OFFICIAL_ATH_WALLET_ADDRESS_NOT_BASECHAIN', (s as any).buyback_burn_official_ath_wallet?.address, 'buyback_burn_official_ath_wallet.address'],
@@ -1182,54 +1152,47 @@ export function verifyMainnetGenesisSnapshot(
   }
   addTrue(issues, 'ATH_TREASURY_SUPPLY_NOT_DEPLOYED', s.ath_master.treasury_supply_deployed, 'ath_master.treasury_supply_deployed');
 
-  checkBase(issues, manifest, s.vault, 'vault', 'vault', 'vault');
-  checkSealed(issues, manifest, s.vault, 'vault');
-  addTrue(issues, 'VAULT_CAPSULE_HUB_NOT_BOUND', s.vault.capsule_hub_bound, 'vault.capsule_hub_bound');
-  addAddressEq(issues, 'VAULT_CAPSULE_HUB_ADDRESS_MISMATCH', s.vault.capsule_hub_address, manifest.addresses.capsulehub, 'vault.capsule_hub_address');
-  addTrue(issues, 'VAULT_PROFILE_REGISTRY_NOT_BOUND', s.vault.profile_registry_bound, 'vault.profile_registry_bound');
-  addAddressEq(issues, 'VAULT_PROFILE_REGISTRY_ADDRESS_MISMATCH', s.vault.profile_registry_address, manifest.addresses.profile_registry, 'vault.profile_registry_address');
-  addBasechainAddress(issues, 'VAULT_PROFILE_REGISTRY_ADDRESS_NOT_BASECHAIN', s.vault.profile_registry_address, 'vault.profile_registry_address');
-  addTrue(issues, 'VAULT_USERNAME_REGISTRY_NOT_BOUND', s.vault.username_registry_bound, 'vault.username_registry_bound');
-  addAddressEq(issues, 'VAULT_USERNAME_REGISTRY_ADDRESS_MISMATCH', s.vault.username_registry_address, manifest.addresses.username_registry, 'vault.username_registry_address');
-  addBasechainAddress(issues, 'VAULT_USERNAME_REGISTRY_ADDRESS_NOT_BASECHAIN', s.vault.username_registry_address, 'vault.username_registry_address');
-  addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_MISMATCH', s.vault.vault_ath_wallet_address, manifest.addresses.vault_official_ath_wallet, 'vault.vault_ath_wallet_address');
-  addAddressEq(issues, 'VAULT_ATH_MASTER_MISMATCH', s.vault.ath_master_address, manifest.addresses.ath_master, 'vault.ath_master_address');
-  addDecimalZero(issues, 'VAULT_USER_COUNT_NOT_ZERO_AT_GENESIS', s.vault.user_count, 'vault.user_count');
-  addDecimalZero(issues, 'VAULT_KEY_RECORD_COUNT_NOT_ZERO_AT_GENESIS', s.vault.key_record_count, 'vault.key_record_count');
-  addDecimalZero(issues, 'VAULT_RECEIVE_INTENT_COUNT_NOT_ZERO_AT_GENESIS', s.vault.receive_intent_count, 'vault.receive_intent_count');
-  addDecimalZero(issues, 'VAULT_PENDING_ATH_WITHDRAWAL_COUNT_NOT_ZERO_AT_GENESIS', s.vault.pending_ath_withdrawal_count, 'vault.pending_ath_withdrawal_count');
-  addDecimalZero(issues, 'VAULT_PENDING_PUBLISH_COUNT_NOT_ZERO_AT_GENESIS', s.vault.pending_publish_count, 'vault.pending_publish_count');
-  addDecimalZero(issues, 'VAULT_PROCESSED_ATH_DEPOSIT_COUNT_NOT_ZERO_AT_GENESIS', s.vault.processed_ath_deposit_count, 'vault.processed_ath_deposit_count');
+  checkBase(issues, manifest, s.airdrop_pool, 'airdrop_pool', 'airdrop_pool', 'airdrop_pool');
+  checkSealed(issues, manifest, s.airdrop_pool, 'airdrop_pool');
+  addTrue(issues, 'AIRDROP_POOL_ATH_MASTER_NOT_BOUND', s.airdrop_pool.ath_master_bound, 'airdrop_pool.ath_master_bound');
+  addTrue(issues, 'AIRDROP_POOL_CREDIT_ISSUER_NOT_BOUND', s.airdrop_pool.credit_issuer_bound, 'airdrop_pool.credit_issuer_bound');
+  addTrue(issues, 'AIRDROP_POOL_TREASURY_NOT_BOUND', s.airdrop_pool.treasury_bound, 'airdrop_pool.treasury_bound');
+  addAddressEq(issues, 'AIRDROP_POOL_ATH_MASTER_MISMATCH', s.airdrop_pool.ath_master_address, manifest.addresses.ath_master, 'airdrop_pool.ath_master_address');
+  addAddressEq(issues, 'AIRDROP_POOL_OFFICIAL_ATH_WALLET_MISMATCH', s.airdrop_pool.pool_ath_wallet_address, manifest.addresses.airdrop_pool_official_ath_wallet, 'airdrop_pool.pool_ath_wallet_address');
+  addBasechainAddress(issues, 'AIRDROP_POOL_POOL_ATH_WALLET_NOT_BASECHAIN', s.airdrop_pool.pool_ath_wallet_address, 'airdrop_pool.pool_ath_wallet_address');
+  // clean-17: the accrual authenticator is the FeeAccumulator address (the airdrop distributor). The getter field is
+  // NAMED credit_issuer_address but there is no CreditIssuer contract — it MUST equal manifest.addresses.fee_accumulator.
+  addAddressEq(issues, 'AIRDROP_POOL_DISTRIBUTOR_NOT_FEE_ACCUMULATOR', s.airdrop_pool.credit_issuer_address, manifest.addresses.fee_accumulator, 'airdrop_pool.credit_issuer_address');
+  addBasechainAddress(issues, 'AIRDROP_POOL_DISTRIBUTOR_NOT_BASECHAIN', s.airdrop_pool.credit_issuer_address, 'airdrop_pool.credit_issuer_address');
+  addAddressEq(issues, 'AIRDROP_POOL_TREASURY_MISMATCH', s.airdrop_pool.treasury_address, manifest.addresses.airdrop_pool_treasury, 'airdrop_pool.treasury_address');
+  addBasechainAddress(issues, 'AIRDROP_POOL_TREASURY_NOT_BASECHAIN', s.airdrop_pool.treasury_address, 'airdrop_pool.treasury_address');
+  addDecimalZero(issues, 'AIRDROP_POOL_DISTRIBUTED_NOT_ZERO_AT_GENESIS', s.airdrop_pool.distributed_total, 'airdrop_pool.distributed_total');
+  addDecimalZero(issues, 'AIRDROP_POOL_CLAIM_COUNT_NOT_ZERO_AT_GENESIS', s.airdrop_pool.claim_count, 'airdrop_pool.claim_count');
   if (isDecimalString(vaultActivityAirdropTotal)) {
-    addDecimalEq(
-      issues,
-      'VAULT_AIRDROP_REMAINING_NOT_FULL_AT_GENESIS',
-      s.vault.airdrop_remaining_ath,
-      vaultActivityAirdropTotal,
-      'vault.airdrop_remaining_ath',
-    );
+    addDecimalEq(issues, 'AIRDROP_POOL_TOTAL_POOL_MISMATCH', s.airdrop_pool.total_pool, vaultActivityAirdropTotal, 'airdrop_pool.total_pool');
+    addDecimalEq(issues, 'AIRDROP_POOL_FUNDED_NOT_FULL_AT_GENESIS', s.airdrop_pool.funded_amount, vaultActivityAirdropTotal, 'airdrop_pool.funded_amount');
+    addDecimalEq(issues, 'AIRDROP_POOL_REMAINING_NOT_FULL_AT_GENESIS', s.airdrop_pool.remaining_budget, vaultActivityAirdropTotal, 'airdrop_pool.remaining_budget');
   }
-  addDecimalZero(issues, 'VAULT_AIRDROP_DISTRIBUTED_NOT_ZERO_AT_GENESIS', s.vault.airdrop_distributed_ath, 'vault.airdrop_distributed_ath');
 
-  const vaultOfficialAthWallet = (s as any).vault_official_ath_wallet ?? {
+  const airdropPoolOfficialAthWallet = (s as any).airdrop_pool_official_ath_wallet ?? {
     address: '',
     code_hash: '',
     owner_address: '',
     ath_master_address: '',
     balance_atomic: '',
   };
-  if (!(s as any).vault_official_ath_wallet) {
-    issues.push(issue('MISSING_VAULT_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.vault_official_ath_wallet getter data is required.'));
+  if (!(s as any).airdrop_pool_official_ath_wallet) {
+    issues.push(issue('MISSING_AIRDROP_POOL_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.airdrop_pool_official_ath_wallet getter data is required.'));
   }
   checkFundedOfficialAthWallet(
     issues,
     manifest,
-    vaultOfficialAthWallet,
-    'vault_official_ath_wallet',
-    'vault_official_ath_wallet',
-    manifest.addresses.vault,
+    airdropPoolOfficialAthWallet,
+    'airdrop_pool_official_ath_wallet',
+    'airdrop_pool_official_ath_wallet',
+    manifest.addresses.airdrop_pool,
     vaultActivityAirdropTotal ?? '',
-    'VAULT_ACTIVITY_AIRDROP_BACKING_BALANCE_NOT_EXACT',
+    'ACTIVITY_AIRDROP_BACKING_BALANCE_NOT_EXACT',
   );
 
   const athTreasuryOwnerAthWallet = (s as any).ath_treasury_owner_ath_wallet ?? {
@@ -1402,16 +1365,6 @@ export function verifyMainnetGenesisSnapshot(
     'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS',
   );
 
-  checkBase(issues, manifest, s.capsulehub, 'capsulehub', 'capsulehub', 'capsulehub');
-  checkSealed(issues, manifest, s.capsulehub, 'capsulehub');
-  addTrue(issues, 'CAPSULEHUB_VAULT_NOT_BOUND', s.capsulehub.vault_bound, 'capsulehub.vault_bound');
-  addAddressEq(issues, 'CAPSULEHUB_VAULT_ADDRESS_MISMATCH', s.capsulehub.vault_address, manifest.addresses.vault, 'capsulehub.vault_address');
-  addAddressEq(issues, 'CAPSULEHUB_FEE_ACCUMULATOR_MISMATCH', s.capsulehub.fee_accumulator_address, manifest.addresses.fee_accumulator, 'capsulehub.fee_accumulator_address');
-  addDecimalGte(issues, 'CAPSULEHUB_TON_BALANCE_INVALID_AT_GENESIS', s.capsulehub.ton_balance, '0', 'capsulehub.ton_balance');
-  addDecimalZero(issues, 'CAPSULEHUB_PRIVATE_LATEST_NOT_ZERO_AT_GENESIS', s.capsulehub.private_latest_id, 'capsulehub.private_latest_id');
-  addDecimalZero(issues, 'CAPSULEHUB_PUBLIC_LATEST_NOT_ZERO_AT_GENESIS', s.capsulehub.public_latest_id, 'capsulehub.public_latest_id');
-  addDecimalZero(issues, 'CAPSULEHUB_ACCRUED_PLATO_FEE_NOT_ZERO_AT_GENESIS', s.capsulehub.accrued_plato_fee_ton, 'capsulehub.accrued_plato_fee_ton');
-
   checkBase(issues, manifest, s.username_registry, 'username_registry', 'username_registry', 'username_registry');
   checkSealed(issues, manifest, s.username_registry, 'username_registry');
   addTrue(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_NOT_BOUND', s.username_registry.official_ath_wallet_bound, 'username_registry.official_ath_wallet_bound');
@@ -1422,7 +1375,7 @@ export function verifyMainnetGenesisSnapshot(
   addBasechainAddress(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_NOT_BASECHAIN', s.username_registry.treasury_ath_receiver, 'username_registry.treasury_ath_receiver');
   addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_USERNAME_REGISTRY', s.username_registry.treasury_ath_receiver, manifest.addresses.username_registry, 'username_registry.treasury_ath_receiver', 'username_registry');
   addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_OFFICIAL_ATH_WALLET', s.username_registry.treasury_ath_receiver, manifest.addresses.username_registry_official_ath_wallet, 'username_registry.treasury_ath_receiver', 'username_registry_official_ath_wallet');
-  addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_VAULT', s.username_registry.treasury_ath_receiver, manifest.addresses.vault, 'username_registry.treasury_ath_receiver', 'vault');
+  addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_AIRDROP_POOL', s.username_registry.treasury_ath_receiver, manifest.addresses.airdrop_pool, 'username_registry.treasury_ath_receiver', 'airdrop_pool');
   addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_ATH_MASTER', s.username_registry.treasury_ath_receiver, manifest.addresses.ath_master, 'username_registry.treasury_ath_receiver', 'ath_master');
   addDecimalZero(issues, 'USERNAME_REGISTRY_NAME_RECORDS_NOT_ZERO_AT_GENESIS', s.username_registry.name_record_count, 'username_registry.name_record_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_MINTS_NOT_ZERO_AT_GENESIS', s.username_registry.pending_mint_count, 'username_registry.pending_mint_count');
@@ -1454,7 +1407,7 @@ export function verifyMainnetGenesisSnapshot(
   addBasechainAddress(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_NOT_BASECHAIN', s.profile_registry.treasury_ath_receiver, 'profile_registry.treasury_ath_receiver');
   addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_PROFILE_REGISTRY', s.profile_registry.treasury_ath_receiver, manifest.addresses.profile_registry, 'profile_registry.treasury_ath_receiver', 'profile_registry');
   addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_OFFICIAL_ATH_WALLET', s.profile_registry.treasury_ath_receiver, manifest.addresses.profile_registry_official_ath_wallet, 'profile_registry.treasury_ath_receiver', 'profile_registry_official_ath_wallet');
-  addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_VAULT', s.profile_registry.treasury_ath_receiver, manifest.addresses.vault, 'profile_registry.treasury_ath_receiver', 'vault');
+  addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_AIRDROP_POOL', s.profile_registry.treasury_ath_receiver, manifest.addresses.airdrop_pool, 'profile_registry.treasury_ath_receiver', 'airdrop_pool');
   addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_ATH_MASTER', s.profile_registry.treasury_ath_receiver, manifest.addresses.ath_master, 'profile_registry.treasury_ath_receiver', 'ath_master');
   addDecimalZero(issues, 'PROFILE_REGISTRY_PROFILE_COUNT_NOT_ZERO_AT_GENESIS', s.profile_registry.profile_count, 'profile_registry.profile_count');
   // The per-profile record count retired 2026-07-21 with the maps behind it. What must be zero at genesis is
@@ -1526,6 +1479,11 @@ export function verifyMainnetGenesisSnapshot(
   addAddressEq(issues, 'FEE_ACCUMULATOR_BUYBACK_BURN_MISMATCH', s.fee_accumulator.buyback_burn_address, manifest.addresses.buyback_burn, 'fee_accumulator.buyback_burn_address');
   addAddressEq(issues, 'FEE_ACCUMULATOR_TON_TREASURY_MISMATCH', s.fee_accumulator.ton_treasury_receiver, manifest.addresses.fee_accumulator_ton_treasury_receiver, 'fee_accumulator.ton_treasury_receiver');
   addBasechainAddress(issues, 'FEE_ACCUMULATOR_TON_TREASURY_RECEIVER_NOT_BASECHAIN', s.fee_accumulator.ton_treasury_receiver, 'fee_accumulator.ton_treasury_receiver');
+  // clean-17: the reciprocal FeeAccumulator.BindAirdropPool (op 0xFA110003) must have landed — this is the only
+  // on-chain proof the accrual routing (FeeAccumulator TicketRedeem -> AirdropPool) is wired. FeeAccumulator is not
+  // sealed, so without this check a ceremony that skipped the leg still verifies GREEN.
+  addAddressEq(issues, 'FEE_ACCUMULATOR_AIRDROP_POOL_MISMATCH', s.fee_accumulator.airdrop_pool_address, manifest.addresses.airdrop_pool, 'fee_accumulator.airdrop_pool_address');
+  addBasechainAddress(issues, 'FEE_ACCUMULATOR_AIRDROP_POOL_NOT_BASECHAIN', s.fee_accumulator.airdrop_pool_address, 'fee_accumulator.airdrop_pool_address');
   if (s.fee_accumulator.buyback_split_enabled !== false) {
     issues.push(issue('FEE_ACCUMULATOR_BUYBACK_SPLIT_ENABLED_AT_GENESIS', 'fee_accumulator.buyback_split_enabled must be false at final genesis; buyback split is enabled only after the 15% activity distribution / pool-launch gate.'));
   }
