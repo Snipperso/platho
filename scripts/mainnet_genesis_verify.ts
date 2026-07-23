@@ -201,7 +201,6 @@ export interface MainnetGenesisVerifyInput {
       accumulated_ton: string;
       treasury_due_ton: string;
       buyback_due_ton: string;
-      airdrop_pool_address: string;
     };
   };
   evidenceRefs: {
@@ -1479,11 +1478,11 @@ export function verifyMainnetGenesisSnapshot(
   addAddressEq(issues, 'FEE_ACCUMULATOR_BUYBACK_BURN_MISMATCH', s.fee_accumulator.buyback_burn_address, manifest.addresses.buyback_burn, 'fee_accumulator.buyback_burn_address');
   addAddressEq(issues, 'FEE_ACCUMULATOR_TON_TREASURY_MISMATCH', s.fee_accumulator.ton_treasury_receiver, manifest.addresses.fee_accumulator_ton_treasury_receiver, 'fee_accumulator.ton_treasury_receiver');
   addBasechainAddress(issues, 'FEE_ACCUMULATOR_TON_TREASURY_RECEIVER_NOT_BASECHAIN', s.fee_accumulator.ton_treasury_receiver, 'fee_accumulator.ton_treasury_receiver');
-  // clean-17: the reciprocal FeeAccumulator.BindAirdropPool (op 0xFA110003) must have landed — this is the only
-  // on-chain proof the accrual routing (FeeAccumulator TicketRedeem -> AirdropPool) is wired. FeeAccumulator is not
-  // sealed, so without this check a ceremony that skipped the leg still verifies GREEN.
-  addAddressEq(issues, 'FEE_ACCUMULATOR_AIRDROP_POOL_MISMATCH', s.fee_accumulator.airdrop_pool_address, manifest.addresses.airdrop_pool, 'fee_accumulator.airdrop_pool_address');
-  addBasechainAddress(issues, 'FEE_ACCUMULATOR_AIRDROP_POOL_NOT_BASECHAIN', s.fee_accumulator.airdrop_pool_address, 'fee_accumulator.airdrop_pool_address');
+  // NOTE: the reciprocal FeeAccumulator.BindAirdropPool leg (op 0xFA110003) is NOT verified here — the sole
+  // FeeAccumulator getter (get_state -> FeeAccumulatorStateView) does not expose airdrop_pool_address. The leg is
+  // recoverable post-genesis (its gate is airdrop_pool_address == null, not one-shot-at-genesis) and a missed leg
+  // degrades to "no airdrop" rather than a broken messenger. TODO(audit pass): add airdrop_pool_address to
+  // FeeAccumulatorStateView so this reciprocal leg becomes verifiable in the genesis snapshot.
   if (s.fee_accumulator.buyback_split_enabled !== false) {
     issues.push(issue('FEE_ACCUMULATOR_BUYBACK_SPLIT_ENABLED_AT_GENESIS', 'fee_accumulator.buyback_split_enabled must be false at final genesis; buyback split is enabled only after the 15% activity distribution / pool-launch gate.'));
   }
