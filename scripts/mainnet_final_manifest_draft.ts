@@ -6,13 +6,12 @@ import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { ATHVesting } from '../build/ATHVesting/ATHVesting_ATHVesting';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { BuybackBurn } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
-import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { MarketStabilitySeller } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
 import { ProfileRegistry } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
-import { Vault } from '../build/Vault/Vault_Vault';
+import { AirdropPool } from '../build/AirdropPool/AirdropPool_AirdropPool';
 import { computeFinalGenesisManifestHashHex } from './mainnet_genesis_verify';
 
 type RoleEntry = {
@@ -188,8 +187,6 @@ async function buildDraft(rolesPath: string) {
   requireSameAddress(buybackLaunchController, genesisController, 'manual_roles.buyback_launch_controller.address', 'manual_roles.genesis_controller_one_shot.address');
   requireSameAddress(marketStabilityLaunchController, genesisController, 'manual_roles.market_stability_launch_controller.address', 'manual_roles.genesis_controller_one_shot.address');
 
-  const vaultCapsulePlaceholder = placeholderAddress('VAULT_INITIAL_CAPSULEHUB_COUNTERPART');
-  const capsuleVaultPlaceholder = placeholderAddress('CAPSULEHUB_INITIAL_VAULT_COUNTERPART');
   const usernameAthPlaceholder = placeholderAddress('USERNAME_REGISTRY_INITIAL_ATH_WALLET');
   const profileAthPlaceholder = placeholderAddress('PROFILE_REGISTRY_INITIAL_ATH_WALLET');
 
@@ -211,11 +208,12 @@ async function buildDraft(rolesPath: string) {
   const feeAccumulator = await FeeAccumulator.init(tonTreasuryReceiver, buybackBurnAddress);
   const feeAccumulatorAddress = contractAddress(0, feeAccumulator);
 
-  const vault = await Vault.init(genesisController, athMasterAddress, vaultCapsulePlaceholder, addressHash(genesisController), false, false, 0n);
-  const vaultAddress = contractAddress(0, vault);
-
-  const capsuleHub = await CapsuleHub.init(feeAccumulatorAddress, capsuleVaultPlaceholder, false, false, 0n, genesisController);
-  const capsuleHubAddress = contractAddress(0, capsuleHub);
+  // clean-17: AirdropPool replaces Vault as the 15M activity-airdrop custodian. It deploys STAGED (manifest_hash=0,
+  // config_hash=0, unsealed) — its address must not depend on the manifest hash that commits to its address; the real
+  // manifest hash is bound at AirdropSealGenesis (contract change b0d771cb, mirrors ProfileRegistry). CapsuleHub is
+  // removed entirely (the public lane is the lazy PublicShard, not a genesis contract).
+  const airdropPool = await AirdropPool.init(genesisController, 0n, 0n, false);
+  const airdropPoolAddress = contractAddress(0, airdropPool);
 
   const usernameRegistry = await UsernameRegistry.init(usernameAthPlaceholder, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, genesisController);
   const usernameRegistryAddress = contractAddress(0, usernameRegistry);
@@ -223,15 +221,15 @@ async function buildDraft(rolesPath: string) {
   const profileRegistry = await ProfileRegistry.init(profileAthPlaceholder, athMasterAddress, profileTreasuryAthReceiver, false, 0n, 0n, genesisController);
   const profileRegistryAddress = contractAddress(0, profileRegistry);
 
-  const vaultOfficialAthWallet = await ATHWallet.init(0n, vaultAddress, athMasterAddress);
-  const vaultOfficialAthWalletAddress = contractAddress(vaultAddress.workChain, vaultOfficialAthWallet);
+  const airdropPoolOfficialAthWallet = await ATHWallet.init(0n, airdropPoolAddress, athMasterAddress);
+  const airdropPoolOfficialAthWalletAddress = contractAddress(airdropPoolAddress.workChain, airdropPoolOfficialAthWallet);
 
   const usernameRegistryOfficialAthWallet = await ATHWallet.init(0n, usernameRegistryAddress, athMasterAddress);
   const usernameRegistryOfficialAthWalletAddress = contractAddress(usernameRegistryAddress.workChain, usernameRegistryOfficialAthWallet);
 
   requireDifferentAddress(treasuryAthReceiver, usernameRegistryAddress, 'manual_roles.treasury_ath_receiver.address', 'derived username_registry address');
   requireDifferentAddress(treasuryAthReceiver, usernameRegistryOfficialAthWalletAddress, 'manual_roles.treasury_ath_receiver.address', 'derived username_registry_official_ath_wallet address');
-  requireDifferentAddress(treasuryAthReceiver, vaultAddress, 'manual_roles.treasury_ath_receiver.address', 'derived vault address');
+  requireDifferentAddress(treasuryAthReceiver, airdropPoolAddress, 'manual_roles.treasury_ath_receiver.address', 'derived airdrop_pool address');
   requireDifferentAddress(treasuryAthReceiver, athMasterAddress, 'manual_roles.treasury_ath_receiver.address', 'derived ath_master address');
 
   const profileRegistryOfficialAthWallet = await ATHWallet.init(0n, profileRegistryAddress, athMasterAddress);
@@ -239,7 +237,7 @@ async function buildDraft(rolesPath: string) {
 
   requireDifferentAddress(profileTreasuryAthReceiver, profileRegistryAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived profile_registry address');
   requireDifferentAddress(profileTreasuryAthReceiver, profileRegistryOfficialAthWalletAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived profile_registry_official_ath_wallet address');
-  requireDifferentAddress(profileTreasuryAthReceiver, vaultAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived vault address');
+  requireDifferentAddress(profileTreasuryAthReceiver, airdropPoolAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived airdrop_pool address');
   requireDifferentAddress(profileTreasuryAthReceiver, athMasterAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived ath_master address');
 
   const buybackBurnOfficialAthWallet = await ATHWallet.init(0n, buybackBurnAddress, athMasterAddress);
@@ -260,16 +258,13 @@ async function buildDraft(rolesPath: string) {
     ['derived buyback_burn_official_ath_wallet address', buybackBurnOfficialAthWalletAddress],
     ['derived market_stability_seller address', marketStabilitySellerAddress],
     ['derived market_stability_seller_official_ath_wallet address', marketStabilitySellerOfficialAthWalletAddress],
-    ['derived capsulehub address', capsuleHubAddress],
     ['derived fee_accumulator address', feeAccumulatorAddress],
     ['derived profile_registry address', profileRegistryAddress],
     ['derived profile_registry_official_ath_wallet address', profileRegistryOfficialAthWalletAddress],
     ['derived username_registry address', usernameRegistryAddress],
     ['derived username_registry_official_ath_wallet address', usernameRegistryOfficialAthWalletAddress],
-    ['derived vault address', vaultAddress],
-    ['derived vault_official_ath_wallet address', vaultOfficialAthWalletAddress],
-    ['placeholder vault_initial_capsulehub address', vaultCapsulePlaceholder],
-    ['placeholder capsulehub_initial_vault address', capsuleVaultPlaceholder],
+    ['derived airdrop_pool address', airdropPoolAddress],
+    ['derived airdrop_pool_official_ath_wallet address', airdropPoolOfficialAthWalletAddress],
     ['placeholder username_registry_initial_ath_wallet address', usernameAthPlaceholder],
     ['placeholder profile_registry_initial_ath_wallet address', profileAthPlaceholder],
     ['manual_roles.genesis_controller_one_shot.address', genesisController],
@@ -299,8 +294,6 @@ async function buildDraft(rolesPath: string) {
     market_stability_seller_official_ath_wallet: friendly(marketStabilitySellerOfficialAthWalletAddress),
     market_stability_reserve_funder: friendly(marketReserveFunder),
     market_stability_ton_treasury_receiver: friendly(marketTonTreasuryReceiver),
-    capsulehub: friendly(capsuleHubAddress),
-    capsulehub_initial_vault_placeholder: friendly(capsuleVaultPlaceholder),
     fee_accumulator: friendly(feeAccumulatorAddress),
     fee_accumulator_buyback_burn: friendly(buybackBurnAddress),
     fee_accumulator_ton_treasury_receiver: friendly(tonTreasuryReceiver),
@@ -313,12 +306,11 @@ async function buildDraft(rolesPath: string) {
     username_registry_initial_ath_wallet_placeholder: friendly(usernameAthPlaceholder),
     genesis_controller_one_shot: friendly(genesisController),
     username_registry_official_ath_wallet: friendly(usernameRegistryOfficialAthWalletAddress),
-    vault: friendly(vaultAddress),
-    vault_ath_master: friendly(athMasterAddress),
-    vault_initial_controller_slot: friendly(genesisController),
-    vault_initial_genesis_controller: friendly(genesisController),
-    vault_initial_capsulehub_placeholder: friendly(vaultCapsulePlaceholder),
-    vault_official_ath_wallet: friendly(vaultOfficialAthWalletAddress),
+    airdrop_pool: friendly(airdropPoolAddress),
+    airdrop_pool_initial_genesis_controller: friendly(genesisController),
+    airdrop_pool_fee_accumulator_distributor: friendly(feeAccumulatorAddress),
+    airdrop_pool_treasury: friendly(treasuryAthReceiver),
+    airdrop_pool_official_ath_wallet: friendly(airdropPoolOfficialAthWalletAddress),
   };
 
   const code_hashes: HashMap = {
@@ -327,12 +319,11 @@ async function buildDraft(rolesPath: string) {
     ath_wallet: codeHash('build/ATHWallet/ATHWallet_ATHWallet.code.boc'),
     buyback_burn: codeHash('build/BuybackBurn/BuybackBurn_BuybackBurn.code.boc'),
     market_stability_seller: codeHash('build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller.code.boc'),
-    capsulehub: codeHash('build/CapsuleHub/CapsuleHub_CapsuleHub.code.boc'),
     fee_accumulator: codeHash('build/FeeAccumulator/FeeAccumulator_FeeAccumulator.code.boc'),
     profile_registry: codeHash('build/ProfileRegistry/ProfileRegistry_ProfileRegistry.code.boc'),
     username_nft_item: codeHash('build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem.code.boc'),
     username_registry: codeHash('build/UsernameRegistry/UsernameRegistry_UsernameRegistry.code.boc'),
-    vault: codeHash('build/Vault/Vault_Vault.code.boc'),
+    airdrop_pool: codeHash('build/AirdropPool/AirdropPool_AirdropPool.code.boc'),
   };
 
   const state_init_hashes: HashMap = {
@@ -344,14 +335,13 @@ async function buildDraft(rolesPath: string) {
     buyback_burn_official_ath_wallet: stateInitHash(buybackBurnOfficialAthWallet),
     market_stability_seller_initial: stateInitHash(marketStabilitySeller),
     market_stability_seller_official_ath_wallet: stateInitHash(marketStabilitySellerOfficialAthWallet),
-    capsulehub_initial: stateInitHash(capsuleHub),
     fee_accumulator: stateInitHash(feeAccumulator),
     profile_registry_initial: stateInitHash(profileRegistry),
     profile_registry_official_ath_wallet: stateInitHash(profileRegistryOfficialAthWallet),
     username_registry_initial: stateInitHash(usernameRegistry),
     username_registry_official_ath_wallet: stateInitHash(usernameRegistryOfficialAthWallet),
-    vault_initial: stateInitHash(vault),
-    vault_official_ath_wallet: stateInitHash(vaultOfficialAthWallet),
+    airdrop_pool_initial: stateInitHash(airdropPool),
+    airdrop_pool_official_ath_wallet: stateInitHash(airdropPoolOfficialAthWallet),
   };
 
   const constants: ConstantMap = {
@@ -378,7 +368,6 @@ async function buildDraft(rolesPath: string) {
     profile_avatar_max_parts: '16',
     username_pending_mint_stale_ttl_seconds: '86400',
     username_item_ack_forward_reserve_nanotons: '3000000',
-    vault_pending_publish_stale_ttl_seconds: '86400',
     vault_activity_airdrop_total_atomic: '15000000000000000',
     vault_activity_airdrop_reward_per_message_atomic: '10000000000',
     vault_activity_airdrop_per_wallet_cap_atomic: '0',
@@ -403,8 +392,7 @@ async function buildDraft(rolesPath: string) {
     buyback_burn: { address: buybackBurnAddress, stateInitHash: state_init_hashes.buyback_burn_initial },
     market_stability_seller: { address: marketStabilitySellerAddress, stateInitHash: state_init_hashes.market_stability_seller_initial },
     fee_accumulator: { address: feeAccumulatorAddress, stateInitHash: state_init_hashes.fee_accumulator },
-    vault: { address: vaultAddress, stateInitHash: state_init_hashes.vault_initial },
-    capsulehub: { address: capsuleHubAddress, stateInitHash: state_init_hashes.capsulehub_initial },
+    airdrop_pool: { address: airdropPoolAddress, stateInitHash: state_init_hashes.airdrop_pool_initial },
     username_registry: { address: usernameRegistryAddress, stateInitHash: state_init_hashes.username_registry_initial },
     profile_registry: { address: profileRegistryAddress, stateInitHash: state_init_hashes.profile_registry_initial },
   };
@@ -443,7 +431,7 @@ async function buildDraft(rolesPath: string) {
       ]),
     ),
     official_ath_wallets: {
-      vault_official_ath_wallet: friendly(vaultOfficialAthWalletAddress),
+      airdrop_pool_official_ath_wallet: friendly(airdropPoolOfficialAthWalletAddress),
       ath_long_term_vesting_official_ath_wallet: friendly(athLongTermVestingOfficialAthWalletAddress),
       username_registry_official_ath_wallet: friendly(usernameRegistryOfficialAthWalletAddress),
       profile_registry_official_ath_wallet: friendly(profileRegistryOfficialAthWalletAddress),
@@ -462,11 +450,11 @@ async function buildDraft(rolesPath: string) {
     funding_checklist: [
       {
         phase: 'final_genesis',
-        required_balance_wallet: friendly(vaultOfficialAthWalletAddress),
-        wallet_owner_address: friendly(vaultAddress),
+        required_balance_wallet: friendly(airdropPoolOfficialAthWalletAddress),
+        wallet_owner_address: friendly(airdropPoolAddress),
         amount_ath: '15000000',
         amount_atomic: constants.vault_activity_airdrop_total_atomic,
-        funding_route: 'Send ATHTransferRequest to treasury_owner_ath_wallet with recipient_owner_address set to Vault.',
+        funding_route: 'Send ATHTransferRequest to treasury_owner_ath_wallet with recipient_owner_address set to AirdropPool.',
         requirement: 'exact balance before mainnet_genesis_verify',
       },
       {
@@ -494,11 +482,11 @@ async function buildDraft(rolesPath: string) {
       ['MarketStabilitySeller.BindMarketStabilityReserveFunder', friendly(marketReserveFunder)],
       ['MarketStabilitySeller.BindMarketStabilityOfficialAthWallet', friendly(marketStabilitySellerOfficialAthWalletAddress)],
       ['MarketStabilitySeller.BindMarketStabilityTreasury', friendly(marketTonTreasuryReceiver)],
-      ['Vault.BindDeploymentManifest.counterpart', friendly(capsuleHubAddress)],
-      ['Vault.BindOfficialAthWallet', friendly(vaultOfficialAthWalletAddress)],
-      ['Vault.BindProfileRegistry', friendly(profileRegistryAddress)],
-      ['Vault.BindUsernameRegistry', friendly(usernameRegistryAddress)],
-      ['CapsuleHub.BindDeploymentManifest.counterpart', friendly(vaultAddress)],
+      ['AirdropPool.AirdropBindAthMaster.ath_master_address', friendly(athMasterAddress)],
+      ['AirdropPool.AirdropBindAthMaster.pool_ath_wallet_address', friendly(airdropPoolOfficialAthWalletAddress)],
+      ['AirdropPool.AirdropBindCreditIssuer.credit_issuer_address', friendly(feeAccumulatorAddress)],
+      ['AirdropPool.AirdropBindTreasury.treasury_address', friendly(treasuryAthReceiver)],
+      ['FeeAccumulator.BindAirdropPool.airdrop_pool_address', friendly(airdropPoolAddress)],
       ['UsernameRegistry.BindOfficialAthWallet', friendly(usernameRegistryOfficialAthWalletAddress)],
       ['ProfileRegistry.BindProfileOfficialAthWallet', friendly(profileRegistryOfficialAthWalletAddress)],
     ],
