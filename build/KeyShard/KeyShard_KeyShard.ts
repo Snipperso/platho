@@ -937,6 +937,227 @@ export function dictValueParserKeyShardAvatarPointerAck(): DictionaryValue<KeySh
     }
 }
 
+export type KeyShardProveOwnership = {
+    $$type: 'KeyShardProveOwnership';
+    query_id: bigint;
+    to: Address;
+}
+
+export function storeKeyShardProveOwnership(src: KeyShardProveOwnership) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1263748919, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.to);
+    };
+}
+
+export function loadKeyShardProveOwnership(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1263748919) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _to = sc_0.loadAddress();
+    return { $$type: 'KeyShardProveOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function loadTupleKeyShardProveOwnership(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _to = source.readAddress();
+    return { $$type: 'KeyShardProveOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function loadGetterTupleKeyShardProveOwnership(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _to = source.readAddress();
+    return { $$type: 'KeyShardProveOwnership' as const, query_id: _query_id, to: _to };
+}
+
+export function storeTupleKeyShardProveOwnership(source: KeyShardProveOwnership) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.to);
+    return builder.build();
+}
+
+export function dictValueParserKeyShardProveOwnership(): DictionaryValue<KeyShardProveOwnership> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShardProveOwnership(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShardProveOwnership(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type KeyShardOwnershipProof = {
+    $$type: 'KeyShardOwnershipProof';
+    query_id: bigint;
+    owner_wallet: Address;
+    key_id: bigint;
+    key_generation: bigint;
+    rotation_nonce: bigint;
+    enc_pubkey: bigint;
+    sign_pubkey: bigint;
+    scan_pubkey: bigint;
+    pq_kem_pubkey_hash: bigint;
+    pq_kem_pubkey_len: bigint;
+    pq_kem_pubkey: Cell;
+    crypto_suite_mask: bigint;
+    created_at: bigint;
+    avatar_version: bigint;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    avatar_media_format: bigint;
+    avatar_updated_at: bigint;
+}
+
+export function storeKeyShardOwnershipProof(src: KeyShardOwnershipProof) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1263748920, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.key_id, 256);
+        b_0.storeUint(src.key_generation, 32);
+        b_0.storeUint(src.rotation_nonce, 64);
+        b_0.storeUint(src.enc_pubkey, 256);
+        const b_1 = new Builder();
+        b_1.storeUint(src.sign_pubkey, 256);
+        b_1.storeUint(src.scan_pubkey, 256);
+        b_1.storeUint(src.pq_kem_pubkey_hash, 256);
+        b_1.storeUint(src.pq_kem_pubkey_len, 16);
+        b_1.storeRef(src.pq_kem_pubkey);
+        b_1.storeUint(src.crypto_suite_mask, 16);
+        b_1.storeUint(src.created_at, 64);
+        b_1.storeUint(src.avatar_version, 32);
+        const b_2 = new Builder();
+        b_2.storeUint(src.avatar_hash, 256);
+        b_2.storeUint(src.avatar_entry_id, 64);
+        b_2.storeUint(src.avatar_stream_id, 128);
+        b_2.storeUint(src.avatar_part_count, 16);
+        b_2.storeUint(src.avatar_media_format, 8);
+        b_2.storeUint(src.avatar_updated_at, 64);
+        b_1.storeRef(b_2.endCell());
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadKeyShardOwnershipProof(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1263748920) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _owner_wallet = sc_0.loadAddress();
+    const _key_id = sc_0.loadUintBig(256);
+    const _key_generation = sc_0.loadUintBig(32);
+    const _rotation_nonce = sc_0.loadUintBig(64);
+    const _enc_pubkey = sc_0.loadUintBig(256);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _sign_pubkey = sc_1.loadUintBig(256);
+    const _scan_pubkey = sc_1.loadUintBig(256);
+    const _pq_kem_pubkey_hash = sc_1.loadUintBig(256);
+    const _pq_kem_pubkey_len = sc_1.loadUintBig(16);
+    const _pq_kem_pubkey = sc_1.loadRef();
+    const _crypto_suite_mask = sc_1.loadUintBig(16);
+    const _created_at = sc_1.loadUintBig(64);
+    const _avatar_version = sc_1.loadUintBig(32);
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _avatar_hash = sc_2.loadUintBig(256);
+    const _avatar_entry_id = sc_2.loadUintBig(64);
+    const _avatar_stream_id = sc_2.loadUintBig(128);
+    const _avatar_part_count = sc_2.loadUintBig(16);
+    const _avatar_media_format = sc_2.loadUintBig(8);
+    const _avatar_updated_at = sc_2.loadUintBig(64);
+    return { $$type: 'KeyShardOwnershipProof' as const, query_id: _query_id, owner_wallet: _owner_wallet, key_id: _key_id, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function loadTupleKeyShardOwnershipProof(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _key_id = source.readBigNumber();
+    const _key_generation = source.readBigNumber();
+    const _rotation_nonce = source.readBigNumber();
+    const _enc_pubkey = source.readBigNumber();
+    const _sign_pubkey = source.readBigNumber();
+    const _scan_pubkey = source.readBigNumber();
+    const _pq_kem_pubkey_hash = source.readBigNumber();
+    const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
+    const _crypto_suite_mask = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    const _avatar_version = source.readBigNumber();
+    source = source.readTuple();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _avatar_media_format = source.readBigNumber();
+    const _avatar_updated_at = source.readBigNumber();
+    return { $$type: 'KeyShardOwnershipProof' as const, query_id: _query_id, owner_wallet: _owner_wallet, key_id: _key_id, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function loadGetterTupleKeyShardOwnershipProof(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _key_id = source.readBigNumber();
+    const _key_generation = source.readBigNumber();
+    const _rotation_nonce = source.readBigNumber();
+    const _enc_pubkey = source.readBigNumber();
+    const _sign_pubkey = source.readBigNumber();
+    const _scan_pubkey = source.readBigNumber();
+    const _pq_kem_pubkey_hash = source.readBigNumber();
+    const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
+    const _crypto_suite_mask = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    const _avatar_version = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _avatar_media_format = source.readBigNumber();
+    const _avatar_updated_at = source.readBigNumber();
+    return { $$type: 'KeyShardOwnershipProof' as const, query_id: _query_id, owner_wallet: _owner_wallet, key_id: _key_id, key_generation: _key_generation, rotation_nonce: _rotation_nonce, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, scan_pubkey: _scan_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, avatar_version: _avatar_version, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, avatar_media_format: _avatar_media_format, avatar_updated_at: _avatar_updated_at };
+}
+
+export function storeTupleKeyShardOwnershipProof(source: KeyShardOwnershipProof) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.key_id);
+    builder.writeNumber(source.key_generation);
+    builder.writeNumber(source.rotation_nonce);
+    builder.writeNumber(source.enc_pubkey);
+    builder.writeNumber(source.sign_pubkey);
+    builder.writeNumber(source.scan_pubkey);
+    builder.writeNumber(source.pq_kem_pubkey_hash);
+    builder.writeNumber(source.pq_kem_pubkey_len);
+    builder.writeCell(source.pq_kem_pubkey);
+    builder.writeNumber(source.crypto_suite_mask);
+    builder.writeNumber(source.created_at);
+    builder.writeNumber(source.avatar_version);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.avatar_media_format);
+    builder.writeNumber(source.avatar_updated_at);
+    return builder.build();
+}
+
+export function dictValueParserKeyShardOwnershipProof(): DictionaryValue<KeyShardOwnershipProof> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeKeyShardOwnershipProof(src)).endCell());
+        },
+        parse: (src) => {
+            return loadKeyShardOwnershipProof(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type KeyShardView = {
     $$type: 'KeyShardView';
     exists: boolean;
@@ -1344,7 +1565,7 @@ function initKeyShard_init_args(src: KeyShard_init_args) {
 }
 
 async function KeyShard_init(owner_wallet: Address, profile_registry: Address) {
-    const __code = Cell.fromHex('b5ee9c7241022101000b44000114ff00f4a413f4bcf2c80b010201200210020148030e04d4d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e9dfa40fa405902d101707054700054700053008854711154700054700020e30d1118945f0f5f09e0705617d74920c21f97311117d31f1118de2182104b534731bae3022182104b534735ba1112040a01fe5b1116d3ffd3ffd3ffd430d0d3ffd3ffd30fd4d30f30815622f842561ec705f2f41116111c11161115111b11151114111a11141113111911131112111811121111111711111110111c11100f111b0f0e111a0e0d11190d0c11180c0b11170b0a111c0a09111b0908111a0807111907061118060511170504111c0403111b030502f602111a0201111d01111e561956195619561e561e56225624db3c815666561dc300f2f4815667561d561abdf2f481565ef8416f24135f035616958208b71b0095820b65c040e2bef2f48156655612841fb9f2f4561420935612a49170e21118111e11181117111d11171116111c11161115111b11151114111a11140608017081565507c30017f2f481565605c30015f2f481565703c30013f2f481565b24c002f2f481565901c300f2f481565a218104a0baf2f459db3c0700e881565b02c00212f2f4207af94181565c03c00a13f2f481565d01812500baf2f481566101c009f2f49321c2008e44807f228104a0ba933080299722c17f923021dee221d081566221d74923aa02baf2f45331bc9e3281566322d74ac001f2f401d4309b81566401d74ac000f2f401e259a101e85b02fc1113111911131112111811121111111711111110111611100f11150f0e11140e0d11130d0c11120c0b11110b0a11100a109f108e107d106c105b104a1039481710364514401301111f011120db3c57121116917095820aaea540e276fb02f8427081008270136d5520c8cf8580ca00cf8440ce01fa02806acf40f400c9011d090148fb001114111611141113111511131112111411121111111311110f11110f0e11100e551d2003eee30257182082104b534734ba8eab3057161114111611141113111511131112111411121111111311111110111211100f11110f0e11100e551de0c0001117c12101111701b08ea81114111611141113111511131112111411121111111311111110111211100f11110f0e11100e551de05f0f5f08f2c0820b202002fe10235f0357161114d33ffa40d3ffd33fd37fd30fd307308156b8f842561ac705f2f48156b906561ac70516f2f48156ba5617f2f48156bbf8416f24135f0382087a1200bef2f48156be29841fb9f2f428c2009b03111a030211190236365be30d04a4f823f842708042705165c85982104b5347365003cb1fcb3fcb1fc910340c0d005a5173ba9511185618ba93571870e2935144ba923470e294111721ba93571770e28156bd01b3f2f402111502102301b2413016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df10ce10bd10ac109b108a107910681057060550442003d7a052a5da89a1a400031d3bf481f480b205a202e0e0a8e000a8e000a60110a8e222a8e000a8e00041c61bb678ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30222e222c222a22282226222422222220abc111120f0088820b65c0408208b71b00561602561902561702561602561602561602561602561602561602561602561602561602561602561602562556175617561756175617561756170382f2ed44d0d200018e9dfa40fa405902d101707054700054700053008854711154700054700020e30d1117d70d1ff2e0820182104b534732bae3025f0f5f09f2c082111213000000f6fa40fa40d200d3ffd401d0d3ffd31fd33fd3ffd3ffd430d0d3ffd3ffd30fd4d30fd33fd33fd31fd3ffd430d0d33fd37fd30fd307d33f3011131117111311131116111311131115111311131114111357171115111611151114111511141113111411131112111311121111111211111110111111100f11100f550e01e28308d718d41117111811171116111811161115111811151114111811141113111811131112111811121111111811111110111811100f11180f0e11180e0d11180d0c11180c0b11180b0a11180a0911180908111808071118070611180605111805041118040311180302111802011119011401fc81597421d749c000f2f481597501d74ac000f2f48156685615f2f48156705613c300f2f48156725619f9000111195614f91001111801f2f41117d081567821d749810160baf2f481567921d74ac001f2f4d31f8156730282104b534b31ba12f2f4d3fff82881567501d30a018309ba12f2f481567501d3ff3013ba12f2f41503fcd33f815677025611ba12f2f4f8000fa4f80f0fd430d020d749810320ba8eab301114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df551ce120d74ac0028eab301114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df551ce120201603f4d3ffd3ffd3ffd30fd30fd4d430d020d7498307ba8eac5f071114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df551ce120d74ac0008eac5f071114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df551ce1d3ff3020201703fe1116111b11161115111a11151114111911141113111811131112111711121111111b11111110111a11100f11190f0e11180e0d11170d0c111b0c0b111a0b0a11190a091118090811170807111b0706111a0605111905041118040311170302111b0201111d01111c561a561a561a561f561b56225621db3ce30356195613bd181a1b015806935f0670e104935f0570e102935f0470e123c302935f0470e0935f0370e1208104a0bd935f0370e059db3c1900eeeda2edfb01c302925b70e0207af94102c30a935f0470e0812500bd935f0370e0c309925b70e09321c2008e48807f228104a0ba933080299722c17f923021dee221d020d74922aa02bd955f0470db31e05331bc8e103221d74ac301955f0370db31e001d4309ad74a955f0370db31e001e259a101e85b7f015857175717571757175717571757170f11160f0e11150e0d11140d0c11130c0b11120b0a11110a0911100955682003fc8eac57175717571757175717571757170f11160f0e11150e0d11140d0c11130c0b11120b0a11110a091110095568e15611841fb98eac57175717571757175717571757170f11160f0e11150e0d11140d0c11130c0b11120b0a11110a091110095568e15611a41117111e11171116111d11161115111c11151114111b111420201c027c1113111a11131112111911121111111811111110111711100f11160f0e11150e0d11140d0c11130c0b11120b0a11110a09111009108f107e55664330db3c1d2002f61116111e11161115111d11151114111c11141113111b11131112111a11121111111911111110111811100f11170f0e111e0e0d111d0d0c111c0c0b111b0b0a111a0a09111909081118080711170706111e0605111d0504111c0403111b0302111a020111190111185617561f561f561e561e561ddb3c6c8838393a1e1f0046c815cbff13cbffcbffc9c882104b45594901cb1f561bcf1614cb1fcb0fcb0fccc9f900005a3af823f8250d11150d0c11140c7f1114071113070a11120a0f11110f0811100810ef0d0e107c0a0b108948070200e0c87f01ca001117111611151114111311121111111055e0011116011117ce01111401ce01111201ca0001111001cbff0ec8cbff1dcb1f1bcb3f19cbff17cbff05c8cbff14cbff12cb0fcccb0f12cb3f12cb3f12cb1f12cbff03c8cb3f14cb7f14cb0f14cb0714cb3f12cd12cdcdc9ed54d99530c3');
+    const __code = Cell.fromHex('b5ee9c7241022701000cdf000114ff00f4a413f4bcf2c80b010201200216020148031404d4d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e9dfa40fa405902d101707054700054700053008854711154700054700020e30d1118945f0f5f09e0705617d74920c21f97311117d31f1118de2182104b534731bae3022182104b534735ba1718040a01fe5b1116d3ffd3ffd3ffd430d0d3ffd3ffd30fd4d30f30815622f842561ec705f2f41116111c11161115111b11151114111a11141113111911131112111811121111111711111110111c11100f111b0f0e111a0e0d11190d0c11180c0b11170b0a111c0a09111b0908111a0807111907061118060511170504111c0403111b030502f602111a0201111d01111e561956195619561e561e56225624db3c815666561dc300f2f4815667561d561abdf2f481565ef8416f24135f035616958208b71b0095820b65c040e2bef2f48156655612841fb9f2f4561420935612a49170e21118111e11181117111d11171116111c11161115111b11151114111a11140608017081565507c30017f2f481565605c30015f2f481565703c30013f2f481565b24c002f2f481565901c300f2f481565a218104a0baf2f459db3c0700e881565b02c00212f2f4207af94181565c03c00a13f2f481565d01812500baf2f481566101c009f2f49321c2008e44807f228104a0ba933080299722c17f923021dee221d081566221d74923aa02baf2f45331bc9e3281566322d74ac001f2f401d4309b81566401d74ac000f2f401e259a101e85b02fc1113111911131112111811121111111711111110111611100f11150f0e11140e0d11130d0c11120c0b11110b0a11100a109f108e107d106c105b104a1039481710364514401301111f011120db3c57121116917095820aaea540e276fb02f8427081008270136d5520c8cf8580ca00cf8440ce01fa02806acf40f400c90123090148fb001114111611141113111511131112111411121111111311110f11110f0e11100e551d26049ee3022182104b534737bae30257182082104b534734ba8eab3057161114111611141113111511131112111411121111111311111110111211100f11110f0e11100e551de0c0001117c12101111701b00b0e261302fe10235f0357161114d33ffa40d3ffd33fd37fd30fd307308156b8f842561ac705f2f48156b906561ac70516f2f48156ba5617f2f48156bbf8416f24135f0382087a1200bef2f48156be29841fb9f2f428c2009b03111a030211190236365be30d04a4f823f842708042705165c85982104b5347365003cb1fcb3fcb1fc910340c0d005a5173ba9511185618ba93571870e2935144ba923470e294111721ba93571770e28156bd01b3f2f402111502102301b2413016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df10ce10bd10ac109b108a107910681057060550442602fc5b1116d33ffa40308156cc5615f2f41115111611151114111611141113111611131112111611121111111611111110111611100f11160f0e11160e0d11160d0c11160c0b11160b0a11160a09111609081116080711160706111606051116050411160403111603021116020111160111178156cd11195618db3c01111a010f10000afa4430c00002fef2f48156cef8416f24135f038208895440bef2f48156cff8416f24135f038209312d00bbf2f482084c4b40717f1119561856165615561556155615561556155615561556155615561456145614561456145614562dc81114111311121111111055e0db3cc904111a04413001111901441359c8cf8580ca00cf8440ce01fa021112009882104b534738011115cb1f01111301cb3f01111101ce1fcbff1dcb1f1bcb3f19cbff07c8cbff16cbff14cbff12cb0fcccb0fcb3f12cb1f02c8cbff13cb3f13cb7f13cb0f13cb0713cb3fcdcd0160806acf40f400c901fb001113111611131112111511121111111411111110111311100f11120f0e11110e0d11100d552c2601648ea81114111611141113111511131112111411121111111311111110111211100f11110f0e11100e551de05f0f5f08f2c0822603d7a052a5da89a1a400031d3bf481f480b205a202e0e0a8e000a8e000a60110a8e222a8e000a8e00041c61bb678ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30ae30222e222c222a22282226222422222220abc11718150088820b65c0408208b71b00561602561902561702561602561602561602561602561602561602561602561602561602561602561602562556175617561756175617561756170382f2ed44d0d200018e9dfa40fa405902d101707054700054700053008854711154700054700020e30d1117d70d1ff2e0820182104b534732bae3025f0f5f09f2c082171819000000f6fa40fa40d200d3ffd401d0d3ffd31fd33fd3ffd3ffd430d0d3ffd3ffd30fd4d30fd33fd33fd31fd3ffd430d0d33fd37fd30fd307d33f3011131117111311131116111311131115111311131114111357171115111611151114111511141113111411131112111311121111111211111110111111100f11100f550e01e28308d718d41117111811171116111811161115111811151114111811141113111811131112111811121111111811111110111811100f11180f0e11180e0d11180d0c11180c0b11180b0a11180a0911180908111808071118070611180605111805041118040311180302111802011119011a01fc81597421d749c000f2f481597501d74ac000f2f48156685615f2f48156705613c300f2f48156725619f9000111195614f91001111801f2f41117d081567821d749810160baf2f481567921d74ac001f2f4d31f8156730282104b534b31ba12f2f4d3fff82881567501d30a018309ba12f2f481567501d3ff3013ba12f2f41b03fcd33f815677025611ba12f2f4f8000fa4f80f0fd430d020d749810320ba8eab301114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df551ce120d74ac0028eab301114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df551ce126261c03f4d3ffd3ffd3ffd30fd30fd4d430d020d7498307ba8eac5f071114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df551ce120d74ac0008eac5f071114111611141113111511131112111411121111111311111110111211100f11110f0e11100e10df551ce1d3ff3026261d03fe1116111b11161115111a11151114111911141113111811131112111711121111111b11111110111a11100f11190f0e11180e0d11170d0c111b0c0b111a0b0a11190a091118090811170807111b0706111a0605111905041118040311170302111b0201111d01111c561a561a561a561f561b56225621db3ce30356195613bd1e2021015806935f0670e104935f0570e102935f0470e123c302935f0470e0935f0370e1208104a0bd935f0370e059db3c1f00eeeda2edfb01c302925b70e0207af94102c30a935f0470e0812500bd935f0370e0c309925b70e09321c2008e48807f228104a0ba933080299722c17f923021dee221d020d74922aa02bd955f0470db31e05331bc8e103221d74ac301955f0370db31e001d4309ad74a955f0370db31e001e259a101e85b7f015857175717571757175717571757170f11160f0e11150e0d11140d0c11130c0b11120b0a11110a0911100955682603fc8eac57175717571757175717571757170f11160f0e11150e0d11140d0c11130c0b11120b0a11110a091110095568e15611841fb98eac57175717571757175717571757170f11160f0e11150e0d11140d0c11130c0b11120b0a11110a091110095568e15611a41117111e11171116111d11161115111c11151114111b1114262622027c1113111a11131112111911121111111811111110111711100f11160f0e11150e0d11140d0c11130c0b11120b0a11110a09111009108f107e55664330db3c232602f61116111e11161115111d11151114111c11141113111b11131112111a11121111111911111110111811100f11170f0e111e0e0d111d0d0c111c0c0b111b0b0a111a0a09111909081118080711170706111e0605111d0504111c0403111b0302111a020111190111185617561f561f561e561e561ddb3c6c8838393a24250046c815cbff13cbffcbffc9c882104b45594901cb1f561bcf1614cb1fcb0fcb0fccc9f900005a3af823f8250d11150d0c11140c7f1114071113070a11120a0f11110f0811100810ef0d0e107c0a0b108948070200e0c87f01ca001117111611151114111311121111111055e0011116011117ce01111401ce01111201ca0001111001cbff0ec8cbff1dcb1f1bcb3f19cbff17cbff05c8cbff14cbff12cb0fcccb0f12cb3f12cb3f12cb1f12cbff03c8cb3f14cb7f14cb0f14cb0714cb3f12cd12cdcdc9ed543bbb349b');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initKeyShard_init_args({ $$type: 'KeyShard_init_args', owner_wallet, profile_registry })(builder);
@@ -1446,6 +1667,8 @@ const KeyShard_types: ABIType[] = [
     {"name":"KeyShardTopUpStorageReserve","header":1263748916,"fields":[]},
     {"name":"KeyShardSetAvatarPointer","header":1263748917,"fields":[{"name":"write_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"KeyShardAvatarPointerAck","header":1263748918,"fields":[{"name":"write_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"version","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"KeyShardProveOwnership","header":1263748919,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"to","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"KeyShardOwnershipProof","header":1263748920,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"rotation_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"scan_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_version","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"avatar_media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"avatar_updated_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"KeyShardView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"key_generation","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"rotation_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"enc_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sign_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"scan_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_register_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_replace_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"profile_registry","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_version","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_part_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_media_format","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"avatar_updated_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"KeyShard$Data","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_registry","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered","type":{"kind":"simple","type":"bool","optional":false}},{"name":"key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"rotation_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"scan_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_version","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"avatar_media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"avatar_updated_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
 ]
@@ -1456,6 +1679,8 @@ const KeyShard_opcodes = {
     "KeyShardTopUpStorageReserve": 1263748916,
     "KeyShardSetAvatarPointer": 1263748917,
     "KeyShardAvatarPointerAck": 1263748918,
+    "KeyShardProveOwnership": 1263748919,
+    "KeyShardOwnershipProof": 1263748920,
 }
 
 const KeyShard_getters: ABIGetter[] = [
@@ -1469,6 +1694,7 @@ export const KeyShard_getterMapping: { [key: string]: string } = {
 const KeyShard_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"KeyShardRegisterKeys"}},
     {"receiver":"internal","message":{"kind":"typed","type":"KeyShardSetAvatarPointer"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"KeyShardProveOwnership"}},
     {"receiver":"external","message":{"kind":"typed","type":"KeyShardReplaceKeys"}},
     {"receiver":"internal","message":{"kind":"typed","type":"KeyShardTopUpStorageReserve"}},
     {"receiver":"internal","message":{"kind":"empty"}},
@@ -1490,6 +1716,9 @@ export const KS_REGISTER_GAS = 12000000n;
 export const KS_MIN_REGISTER_VALUE = 57000000n;
 export const KS_MIN_REPLACE_VALUE = 12000000n;
 export const KS_AVATAR_WRITE_GAS = 8000000n;
+export const KS_PROOF_FORWARD_RESERVE = 5000000n;
+export const KS_PROOF_EXEC_RESERVE = 4000000n;
+export const KS_PROOF_MAX_VALUE = 20000000n;
 
 export class KeyShard implements Contract {
     
@@ -1525,7 +1754,7 @@ export class KeyShard implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: KeyShardRegisterKeys | KeyShardSetAvatarPointer | KeyShardTopUpStorageReserve | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: KeyShardRegisterKeys | KeyShardSetAvatarPointer | KeyShardProveOwnership | KeyShardTopUpStorageReserve | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'KeyShardRegisterKeys') {
@@ -1533,6 +1762,9 @@ export class KeyShard implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'KeyShardSetAvatarPointer') {
             body = beginCell().store(storeKeyShardSetAvatarPointer(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'KeyShardProveOwnership') {
+            body = beginCell().store(storeKeyShardProveOwnership(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'KeyShardTopUpStorageReserve') {
             body = beginCell().store(storeKeyShardTopUpStorageReserve(message)).endCell();

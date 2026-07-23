@@ -4,6 +4,8 @@ PROGRAM{
   DECLPROC __tact_context_get_sender
   DECLPROC $KeyShardAvatarPointerAck$_store
   DECLPROC $KeyShardAvatarPointerAck$_store_cell
+  DECLPROC $KeyShardOwnershipProof$_store
+  DECLPROC $KeyShardOwnershipProof$_store_cell
   DECLPROC $KeyShard$_store
   DECLPROC $KeyShard$_load
   DECLPROC $Context$_get_value
@@ -14,6 +16,7 @@ PROGRAM{
   DECLPROC $KeyShard$_contract_store
   DECLPROC $KeyShard$_fun_validatePqPubkeyCell
   DECLPROC $KeyShard$_fun_isValidPqPubkeyCell
+  DECLPROC $KeyShard$_fun_isBasechainAddress
   DECLPROC $KeyShard$_fun_validateKeyProfile
   DECLPROC $KeyShard$_fun_isValidKeyProfile
   DECLPROC $KeyShard$_fun_computeKeyId
@@ -24,6 +27,7 @@ PROGRAM{
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $KeyShardAvatarPointerAck$_constructor_write_id_version
+  DECLPROC $KeyShardOwnershipProof$_constructor_query_id_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at
   76114 DECLMETHOD %get_view
   DECLPROC recv_internal
   DECLPROC recv_external
@@ -48,6 +52,63 @@ PROGRAM{
   $KeyShardAvatarPointerAck$_store_cell PROCINLINE:<{
     -ROT
     $KeyShardAvatarPointerAck$_store INLINECALLDICT
+    ENDC
+  }>
+  $KeyShardOwnershipProof$_store PROCREF:<{
+    1263748920 PUSHINT
+    SWAP
+    s0 21 s() XCHG
+    32 STU
+    s1 19 s() XCHG
+    64 STU
+    s1 17 s() XCHG
+    STSLICE
+    s1 s15 XCHG
+    256 STU
+    s1 s13 XCHG
+    32 STU
+    s1 s11 XCHG
+    64 STU
+    s1 s9 XCHG
+    256 STU
+    s0 s7 XCHG
+    NEWC
+    256 STU
+    s1 s6 XCHG
+    256 STU
+    s1 s4 XCHG
+    256 STU
+    s1 s2 XCHG
+    16 STU
+    STREF
+    16 STU
+    64 STU
+    s1 s2 XCHG
+    32 STU
+    s0 s2 XCHG
+    NEWC
+    256 STU
+    s1 s3 XCHG
+    64 STU
+    s1 s3 XCHG
+    128 STU
+    s1 s3 XCHG
+    16 STU
+    s1 s3 XCHG
+    8 STU
+    s1 s3 XCHG
+    64 STU
+    STBREFR
+    STBREFR
+  }>
+  $KeyShardOwnershipProof$_store_cell PROCINLINE:<{
+    s0 20 s() XCHG
+    s0 19 s() XCHG
+    s0 18 s() XCHG
+    s0 17 s() XCHG
+    s0 16 s() XCHG
+    15 -ROLL
+    $KeyShardOwnershipProof$_store INLINECALLDICT
     ENDC
   }>
   $KeyShard$_store PROCINLINE:<{
@@ -377,6 +438,11 @@ PROGRAM{
     2DROP
     TRUE
   }>
+  $KeyShard$_fun_isBasechainAddress PROCREF:<{
+        REWRITESTDADDR
+    DROP
+    0 EQINT
+  }>
   $KeyShard$_fun_validateKeyProfile PROCREF:<{
     22101 PUSHINT
     s0 s7 XCHG
@@ -588,6 +654,8 @@ PROGRAM{
     -ROT
   }>
   $KeyShardAvatarPointerAck$_constructor_write_id_version PROCINLINE:<{
+  }>
+  $KeyShardOwnershipProof$_constructor_query_id_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at PROCINLINE:<{
   }>
   %get_view PROC:<{
     $KeyShard$_contract_load INLINECALLDICT
@@ -947,6 +1015,115 @@ PROGRAM{
       s0 s6 XCHG
       s0 s5 XCHG
       s4 s4 XCHG2
+      $KeyShard$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1263748919 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 22 s() XCHG
+      64 LDU
+      LDMSGADDR
+      DROP
+      22220 PUSHINT
+      21 s() PUSH
+      THROWANYIFNOT
+      21 s() 22 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 22 s() XCHG
+      18 s() 22 s() XCHG
+      17 s() 22 s() XCHG
+      16 s() 22 s() XCHG
+      s15 22 s() XCHG
+      s14 22 s() XCHG
+      s13 22 s() XCHG
+      s12 22 s() XCHG
+      s11 22 s() XCHG
+      s10 22 s() XCHG
+      s9 22 s() XCHG
+      s8 22 s() XCHG
+      s7 22 s() XCHG
+      s6 22 s() XCHG
+      s5 22 s() XCHG
+      s4 22 s() XCHG
+      s3 22 s() XCHG
+      s2 22 s() XCHG
+      s1 22 s() XCHG
+      s0 23 s() XCHG
+      22221 PUSHINT
+      s0 25 s() XCHG
+      24 s() PUSH
+      $KeyShard$_fun_isBasechainAddress INLINECALLDICT
+      s1 26 s() XCHG
+      THROWANYIFNOT
+      22222 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      9000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      22223 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      20000000 PUSHINT
+      LEQ
+      THROWANYIFNOT
+      5000000 PUSHINT
+      1 PUSHINT
+      TRUE
+      s0 25 s() XCHG
+      24 s() PUSH
+      22 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      21 s() PUSH
+      20 s() PUSH
+      20 s() PUSH
+      20 s() PUSH
+      20 s() PUSH
+      20 s() PUSH
+      20 s() PUSH
+      45 s() PUSH
+      $KeyShardOwnershipProof$_constructor_query_id_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at INLINECALLDICT
+      NEWC
+      $KeyShardOwnershipProof$_store_cell INLINECALLDICT
+      s4 26 s() XCHG
+      s1 s3 s0 XCHG3
+      s1 25 s() XCHG
+      $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      19 s() 22 s() XCHG
+      18 s() 21 s() XCHG
+      17 s() 20 s() XCHG
+      16 s() 19 s() XCHG
+      s15 18 s() XCHG
+      s14 17 s() XCHG
+      s13 16 s() XCHG
+      3 13 BLKSWAP
       $KeyShard$_contract_store INLINECALLDICT
     }>
     24 s() POP
