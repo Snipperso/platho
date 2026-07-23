@@ -507,11 +507,12 @@ _ %get_global() method_id(126899) {
         var $msg'deployment_manifest_hash = in_msg~load_uint(256);
         ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireUnsealed();
         ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireController();
-        throw_unless(26040, ($msg'deployment_manifest_hash == $self'deployment_manifest_hash));
+        throw_unless(26040, ($msg'deployment_manifest_hash > 1));
         throw_unless(26041, $self'ath_master_bound);
         throw_unless(26042, $self'credit_issuer_bound);
         throw_unless(26043, $self'treasury_bound);
         throw_unless(26044, ($self'funded_amount == 15000000000000000));
+        $self'deployment_manifest_hash = $msg'deployment_manifest_hash;
         $self'sealed = true;
         $self'sealed_at = $global_now();
         $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));

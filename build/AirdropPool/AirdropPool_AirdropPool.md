@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: AirdropPool
-BoC Size: 2171 bytes
+BoC Size: 2169 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 22

@@ -598,12 +598,11 @@ PROGRAM{
       $AirdropPool$_fun_requireUnsealed INLINECALLDICT
       $AirdropPool$_fun_requireController INLINECALLDICT
       NIP
-      s15 POP
+      s13 POP
+      s14 POP
       26040 PUSHINT
-      s0 16 s() XCHG
-      s13 PUSH
-      EQUAL
-      s1 16 s() XCHG
+      s15 PUSH
+      1 GTINT
       THROWANYIFNOT
       26041 PUSHINT
       s8 PUSH
@@ -622,7 +621,9 @@ PROGRAM{
       TRUE
           NOW
       s1 16 s() XCHG
-      15 ROLL
+      s1 s14 XCHG
+      s1 s15 XCHG
+      13 ROLL
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     OVER
