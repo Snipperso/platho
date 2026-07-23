@@ -264,7 +264,13 @@ contract AirdropPool {
     receive(msg: AirdropSealGenesis) {
         self.requireUnsealed();
         self.requireController();
-        throwUnless(26040, msg.deployment_manifest_hash == self.deployment_manifest_hash);
+        // clean-17: the pool DEPLOYS with deployment_manifest_hash=0. Its address (contractAddress of the init) must
+        // not depend on the manifest hash, because the manifest hash commits to the pool's OWN address — baking a
+        // non-zero hash at init would be circular. Seal binds the real manifest hash here, exactly as every other
+        // sealed genesis contract commits to it (mirrors ProfileRegistry.SealGenesis 21040 `> 1`): the pool
+        // cryptographically commits to the genesis it belongs to, and the post-seal AirdropRebindCreditIssuer
+        // manifest gate (26013) becomes a meaningful replay guard instead of a vestigial `== 0`.
+        throwUnless(26040, msg.deployment_manifest_hash > 1);
         throwUnless(26041, self.ath_master_bound);
         throwUnless(26042, self.credit_issuer_bound);
         throwUnless(26043, self.treasury_bound);
@@ -272,6 +278,7 @@ contract AirdropPool {
         // so the ceremony's read-only verify (get_wallet_data(pool_wallet).balance == 15M) pairs with this gate:
         // fund -> verify -> seal, never seal-then-fund.
         throwUnless(26044, self.funded_amount == AIRDROP_TOTAL_POOL);
+        self.deployment_manifest_hash = msg.deployment_manifest_hash;
         self.sealed = true;
         self.sealed_at = now();
     }

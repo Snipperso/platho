@@ -131,6 +131,41 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     expect(g.remaining_budget).toBe(TOTAL_POOL);
   }, 120_000);
 
+  it('AIRDROP-GENESIS-02: the pool DEPLOYS with manifest hash 0 and seal BINDS the real hash (clean-17 ceremony path)', async () => {
+    // clean-17 breaks the manifest-hash circularity by deploying the pool with deployment_manifest_hash=0 (so its
+    // address does not depend on the manifest that commits to its address), and letting seal bind the real hash —
+    // exactly as every other sealed genesis contract commits to the manifest. This is the ceremony's real flow, so
+    // it is deployed with 0 here (not MANIFEST as the older cases do).
+    const deployer = await blockchain.treasury('g2-deployer');
+    const poolWallet = await blockchain.treasury('g2-pool-wallet');
+    const ciAddr = (await blockchain.treasury('g2-ci')).address;
+    const treasuryAddr = (await blockchain.treasury('g2-treasury')).address;
+    const athMasterAddr = (await blockchain.treasury('g2-ath-master')).address;
+    const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, 0n, 0n, false));
+    await pool.send(deployer.getSender(), { value: toNano('1') }, null);
+    const dep = (body: any, v = '0.05') => pool.send(deployer.getSender(), { value: toNano(v) }, body);
+
+    // Deployed with 0 — the getter reflects it before seal.
+    expect((await pool.getGetGlobal()).deployment_manifest_hash).toBe(0n);
+
+    await dep({ $$type: 'AirdropBindAthMaster', ath_master_address: athMasterAddr, pool_ath_wallet_address: poolWallet.address });
+    await dep({ $$type: 'AirdropBindCreditIssuer', credit_issuer_address: ciAddr });
+    await dep({ $$type: 'AirdropBindTreasury', treasury_address: treasuryAddr });
+    await pool.send(poolWallet.getSender(), { value: toNano('0.1') }, {
+      $$type: 'AthTransferNotification', query_id: 1n, sender_key: 0n, amount: TOTAL_POOL, sender_wallet: treasuryAddr,
+    } as any);
+
+    // Sealing with a 0/1 hash is refused by the new non-zero gate (26040) — a genesis must carry a real manifest.
+    expect(exitOf(await dep({ $$type: 'AirdropSealGenesis', deployment_manifest_hash: 0n }, '0.1'), pool.address)).toBe(26040);
+    expect(exitOf(await dep({ $$type: 'AirdropSealGenesis', deployment_manifest_hash: 1n }, '0.1'), pool.address)).toBe(26040);
+
+    // Seal with the real manifest binds it — the pool now cryptographically commits to the genesis it belongs to.
+    expect(exitOf(await dep({ $$type: 'AirdropSealGenesis', deployment_manifest_hash: MANIFEST }, '0.1'), pool.address)).toBe(0);
+    const g = await pool.getGetGlobal();
+    expect(g.sealed).toBe(true);
+    expect(g.deployment_manifest_hash, 'seal bound the real manifest hash into the pool').toBe(MANIFEST);
+  }, 120_000);
+
   it('AIRDROP-DRAIN-01: the bad-epoch free-ATH loop the design called FATAL is CLOSED', async () => {
     // The exact attack from the design doc: buy credits declaring an out-of-window epoch. The Hub refuses the
     // funding (13617), CreditIssuer's bounce path refunds the buyer in full — and the pool must pay NOTHING,
