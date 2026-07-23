@@ -99,6 +99,55 @@ describe('RECOVERY RENT SOLVENCY — measured against the storage phase, not a c
       .toBeGreaterThanOrEqual(G8_MARGIN);
   }, 180_000);
 
+  // W1-008 (audit Волна 5). A refresh RESETS updated_at — and with it the 3-year eviction deadline (gate 13562) —
+  // but reserves `wasUnbound ? ENDOWMENT : 0` with ReserveAddOriginalBalance, so it keeps only the already-drained
+  // balance and returns ALL of the incoming value. The retention PROMISE therefore renews indefinitely while the
+  // FUNDING never does. This measures the gap: how long a diligently-refreshing live user actually stays funded.
+  it('RENT-03: does a RecoveryStore refresh top the endowment up, or only move the deadline?', async () => {
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x43));
+    const selfBucket = slotKeyForOwner(bufToInt(owner.publicKey), 0);
+    const init = await RecoveryShard.init(selfBucket);
+    const rs = bc.openContract(new RecoveryShard(await RecoveryShard.fromInit(selfBucket).then((c) => c.address), init));
+    const payer = await bc.treasury('rent-refresh-payer');
+    const blob = blobOf(MAX_BLOB_CELLS);
+
+    await rs.send(payer.getSender(), { value: MIN_VALUE }, storeMsg(owner, rs.address, selfBucket, 0n, 1n, blob) as any);
+    const afterBind = (await bc.getContract(rs.address)).balance;
+    expect(afterBind, 'first bind keeps exactly the endowment').toBe(ENDOWMENT);
+
+    // A diligent user refreshes every year. Measure the balance right after each refresh.
+    const trail: string[] = [];
+    let seq = 2n;
+    let frozenAtYear: number | null = null;
+    for (let year = 1; year <= 8; year += 1) {
+      bc.now = CLOCK + year * 31_536_000;
+      await rs.send(payer.getSender(), { value: MIN_VALUE }, storeMsg(owner, rs.address, selfBucket, 0n, seq, blob) as any);
+      seq += 1n;
+      const bal = (await bc.getContract(rs.address)).balance;
+      trail.push(`y${year}=${bal}`);
+      if (bal <= 0n && frozenAtYear === null) frozenAtYear = year;
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[RENT-03] afterBind=${afterBind} | ${trail.join(' ')} | frozenAtYear=${frozenAtYear ?? 'not within 8y'}`);
+
+    // The question this pins: if a refresh topped the endowment up, the balance would return to ENDOWMENT every
+    // year and a live user could never freeze. If it does not, the balance only ever falls.
+    // CHARACTERISATION, NOT APPROVAL. This pins the CURRENT behaviour so the gap cannot drift unnoticed while the
+    // owner decides. Measured: 29_000_000 -> y1 22_568_746 -> ... -> y5 0, i.e. a user who refreshes EVERY year
+    // still freezes in year 5, losing the K_root blob the lane exists to protect, while get_view keeps reporting
+    // retention=3y/endowment=29M with no hint of the funding horizon.
+    // Two fixes are possible and BOTH are owner decisions on an immutable contract:
+    //   (a) make the refresh top up  -> `nativeReserve(RS_RECOVERY_ENDOWMENT, ReserveAtMost)` (drop
+    //       AddOriginalBalance) so every refresh restores the full endowment and the user pays to stay alive;
+    //   (b) keep funding fixed but stop the deadline outliving it (or surface the horizon in get_view).
+    // If (a) is taken, this expectation flips to toBe(ENDOWMENT).
+    const afterFirstRefresh = BigInt(trail[0].split('=')[1]);
+    expect(afterFirstRefresh, 'MEASURED GAP (W1-008): a refresh moves the eviction deadline but adds no funding')
+      .toBeLessThan(ENDOWMENT);
+  }, 300_000);
+
   it('RENT-02: the blob cap is what the endowment is calibrated for — one cell over is refused, not absorbed', async () => {
     // The cap and the endowment are one decision in two constants. If the cap could be exceeded the slot would buy
     // storage it never funded, which is the same insolvency from the other direction.
