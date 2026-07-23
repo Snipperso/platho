@@ -309,7 +309,6 @@ function finalInput(): MainnetGenesisVerifyInput {
         accumulated_ton: '0',
         treasury_due_ton: '0',
         buyback_due_ton: '0',
-        airdrop_pool_address: addresses.airdrop_pool,
       },
     },
     evidenceRefs: {
@@ -482,14 +481,16 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('FINAL_MANIFEST_STATE_INIT_HASHES_MISSING');
   });
 
-  it('rejects final genesis when FeeAccumulator did not bind the AirdropPool (reciprocal leg missing)', () => {
+  it('rejects final genesis when the AirdropPool distributor is not the FeeAccumulator address', () => {
+    // clean-17: the pool's accrual authenticator (getter field credit_issuer_address, a clean-16 holdover name) must
+    // be the FeeAccumulator address. There is no CreditIssuer contract; a wrong distributor is a fatal misroute.
     const input = finalInput();
-    input.snapshot.fee_accumulator.airdrop_pool_address = addr('wrong_pool');
+    input.snapshot.airdrop_pool.credit_issuer_address = addr('not_the_fee_accumulator');
 
     const report = verifyMainnetGenesisSnapshot(input);
 
     expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('FEE_ACCUMULATOR_AIRDROP_POOL_MISMATCH');
+    expect(report.issue_codes).toContain('AIRDROP_POOL_DISTRIBUTOR_NOT_FEE_ACCUMULATOR');
   });
 
   it('rejects final genesis when AirdropPool bind flags are false', () => {
@@ -590,7 +591,6 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     input.snapshot.ath_long_term_vesting_official_ath_wallet.address = addresses.ath_long_term_vesting_official_ath_wallet;
     input.snapshot.ath_long_term_vesting_official_ath_wallet.owner_address = addresses.ath_long_term_vesting;
     input.snapshot.fee_accumulator.address = addresses.fee_accumulator;
-    input.snapshot.fee_accumulator.airdrop_pool_address = addresses.airdrop_pool;
     input.snapshot.fee_accumulator.buyback_burn_address = addresses.buyback_burn;
     input.snapshot.fee_accumulator.ton_treasury_receiver = addresses.fee_accumulator_ton_treasury_receiver;
     input.snapshot.buyback_burn.address = addresses.buyback_burn;
