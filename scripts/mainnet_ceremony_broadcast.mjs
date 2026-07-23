@@ -87,8 +87,8 @@ async function gwSeqno(addr) {
   return 0;
 }
 async function gwSend(bocB64) {
-  // Redundant broadcast. CRITICAL: toncenter /sendBoc AND the gateway silently DROP large externals (the Vault
-  // 44KB / UsernameRegistry 40KB deploys ACK 200 but never deliver — proven 2026-07-04). tonapi
+  // Redundant broadcast. CRITICAL: toncenter /sendBoc AND the gateway silently DROP large externals (the ~40KB
+  // UsernameRegistry deploy ACKs 200 but never delivers — proven 2026-07-04). tonapi
   // /v2/blockchain/message delivers them, so it goes FIRST. Actual delivery is confirmed by the seqno-advance poll.
   const out = []; let anyOk = false;
   try {
