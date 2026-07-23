@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const OFFICIAL_ATH_WALLET_KEYS = [
   'ath_treasury_owner_ath_wallet',
   'ath_long_term_vesting_official_ath_wallet',
-  'vault_official_ath_wallet',
+  'airdrop_pool_official_ath_wallet',
   'buyback_burn_official_ath_wallet',
   'market_stability_seller_official_ath_wallet',
   'username_registry_official_ath_wallet',

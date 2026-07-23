@@ -11,12 +11,7 @@ import {
   storeBindBuybackOfficialAthWallet,
   storeSealBuybackBurnGenesis,
 } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
-import {
-  CapsuleHub,
-  storeBindDeploymentManifest as storeCapsuleBindDeploymentManifest,
-  storeSealGenesis as storeCapsuleSealGenesis,
-} from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
-import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
+import { FeeAccumulator, storeBindAirdropPool } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import {
   MarketStabilitySeller,
   storeBindMarketStabilityOfficialAthWallet,
@@ -35,13 +30,12 @@ import {
   storeSealGenesis as storeUsernameSealGenesis,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
-  Vault,
-  storeBindDeploymentManifest as storeVaultBindDeploymentManifest,
-  storeBindOfficialAthWallet as storeVaultBindOfficialAthWallet,
-  storeBindProfileRegistry as storeVaultBindProfileRegistry,
-  storeBindUsernameRegistry as storeVaultBindUsernameRegistry,
-  storeSealGenesis as storeVaultSealGenesis,
-} from '../build/Vault/Vault_Vault';
+  AirdropPool,
+  storeAirdropBindAthMaster,
+  storeAirdropBindCreditIssuer,
+  storeAirdropBindTreasury,
+  storeAirdropSealGenesis,
+} from '../build/AirdropPool/AirdropPool_AirdropPool';
 
 type Draft = {
   document: string;
@@ -205,8 +199,6 @@ async function deriveState(draft: Draft) {
   const athContent = readAthContentCell();
   const vestingStartTime = constantBigInt(draft, 'ath_long_term_vesting_start_time_unix');
 
-  const vaultCapsulePlaceholder = placeholderAddress('VAULT_INITIAL_CAPSULEHUB_COUNTERPART');
-  const capsuleVaultPlaceholder = placeholderAddress('CAPSULEHUB_INITIAL_VAULT_COUNTERPART');
   const usernameAthPlaceholder = placeholderAddress('USERNAME_REGISTRY_INITIAL_ATH_WALLET');
   const profileAthPlaceholder = placeholderAddress('PROFILE_REGISTRY_INITIAL_ATH_WALLET');
 
@@ -225,11 +217,10 @@ async function deriveState(draft: Draft) {
   const feeAccumulator = await FeeAccumulator.init(tonTreasuryReceiver, buybackBurnAddress);
   const feeAccumulatorAddress = contractAddress(0, feeAccumulator);
 
-  const vault = await Vault.init(genesisController, athMasterAddress, vaultCapsulePlaceholder, addressHash(genesisController), false, false, 0n);
-  const vaultAddress = contractAddress(0, vault);
-
-  const capsuleHub = await CapsuleHub.init(feeAccumulatorAddress, capsuleVaultPlaceholder, false, false, 0n, genesisController);
-  const capsuleHubAddress = contractAddress(0, capsuleHub);
+  // clean-17: AirdropPool replaces Vault (15M airdrop custodian), CapsuleHub is removed. Staged deploy — manifest
+  // hash 0, config 0, unsealed; the real manifest hash is bound at AirdropSealGenesis (must run AFTER funding).
+  const airdropPool = await AirdropPool.init(genesisController, 0n, 0n, false);
+  const airdropPoolAddress = contractAddress(0, airdropPool);
 
   const usernameRegistry = await UsernameRegistry.init(usernameAthPlaceholder, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, genesisController);
   const usernameRegistryAddress = contractAddress(0, usernameRegistry);
@@ -237,8 +228,8 @@ async function deriveState(draft: Draft) {
   const profileRegistry = await ProfileRegistry.init(profileAthPlaceholder, athMasterAddress, profileTreasuryAthReceiver, false, 0n, 0n, genesisController);
   const profileRegistryAddress = contractAddress(0, profileRegistry);
 
-  const vaultOfficialAthWallet = await ATHWallet.init(0n, vaultAddress, athMasterAddress);
-  const vaultOfficialAthWalletAddress = contractAddress(0, vaultOfficialAthWallet);
+  const airdropPoolOfficialAthWallet = await ATHWallet.init(0n, airdropPoolAddress, athMasterAddress);
+  const airdropPoolOfficialAthWalletAddress = contractAddress(0, airdropPoolOfficialAthWallet);
 
   const athLongTermVestingOfficialAthWallet = await ATHWallet.init(0n, athLongTermVestingAddress, athMasterAddress);
   const athLongTermVestingOfficialAthWalletAddress = contractAddress(0, athLongTermVestingOfficialAthWallet);
@@ -264,8 +255,7 @@ async function deriveState(draft: Draft) {
     buyback_burn: { init: buybackBurn, address: buybackBurnAddress, manifestKey: 'buyback_burn', stateKey: 'buyback_burn_initial' },
     market_stability_seller: { init: marketStabilitySeller, address: marketStabilitySellerAddress, manifestKey: 'market_stability_seller', stateKey: 'market_stability_seller_initial' },
     fee_accumulator: { init: feeAccumulator, address: feeAccumulatorAddress, manifestKey: 'fee_accumulator', stateKey: 'fee_accumulator' },
-    vault: { init: vault, address: vaultAddress, manifestKey: 'vault', stateKey: 'vault_initial' },
-    capsulehub: { init: capsuleHub, address: capsuleHubAddress, manifestKey: 'capsulehub', stateKey: 'capsulehub_initial' },
+    airdrop_pool: { init: airdropPool, address: airdropPoolAddress, manifestKey: 'airdrop_pool', stateKey: 'airdrop_pool_initial' },
     username_registry: { init: usernameRegistry, address: usernameRegistryAddress, manifestKey: 'username_registry', stateKey: 'username_registry_initial' },
     profile_registry: { init: profileRegistry, address: profileRegistryAddress, manifestKey: 'profile_registry', stateKey: 'profile_registry_initial' },
   };
@@ -277,8 +267,8 @@ async function deriveState(draft: Draft) {
     assertStateHash(label, stateInitCell(value.init).hash().toString('hex'), expectedHash);
   }
 
-  assertAddress('vault official ATH wallet', vaultOfficialAthWalletAddress, manifestAddress(draft, 'vault_official_ath_wallet'));
-  assertStateHash('vault official ATH wallet', stateInitCell(vaultOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.vault_official_ath_wallet);
+  assertAddress('AirdropPool official ATH wallet', airdropPoolOfficialAthWalletAddress, manifestAddress(draft, 'airdrop_pool_official_ath_wallet'));
+  assertStateHash('AirdropPool official ATH wallet', stateInitCell(airdropPoolOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.airdrop_pool_official_ath_wallet);
   assertAddress('ATHVesting official ATH wallet', athLongTermVestingOfficialAthWalletAddress, manifestAddress(draft, 'ath_long_term_vesting_official_ath_wallet'));
   assertStateHash('ATHVesting official ATH wallet', stateInitCell(athLongTermVestingOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.ath_long_term_vesting_official_ath_wallet);
   assertAddress('Treasury Owner ATH wallet', treasuryOwnerAthWalletAddress, manifestAddress(draft, 'ath_treasury_owner_ath_wallet'));
@@ -301,11 +291,10 @@ async function deriveState(draft: Draft) {
       buybackBurn: buybackBurnAddress,
       marketStabilitySeller: marketStabilitySellerAddress,
       feeAccumulator: feeAccumulatorAddress,
-      vault: vaultAddress,
-      capsuleHub: capsuleHubAddress,
+      airdropPool: airdropPoolAddress,
       usernameRegistry: usernameRegistryAddress,
       profileRegistry: profileRegistryAddress,
-      vaultOfficialAthWallet: vaultOfficialAthWalletAddress,
+      airdropPoolOfficialAthWallet: airdropPoolOfficialAthWalletAddress,
       athLongTermVestingOfficialAthWallet: athLongTermVestingOfficialAthWalletAddress,
       treasuryOwnerAthWallet: treasuryOwnerAthWalletAddress,
       buybackBurnOfficialAthWallet: buybackBurnOfficialAthWalletAddress,
@@ -317,7 +306,7 @@ async function deriveState(draft: Draft) {
     officialWalletStateInits: {
       ath_treasury_owner_ath_wallet: { address: treasuryOwnerAthWalletAddress, init: treasuryOwnerAthWallet, owner: athTreasuryOwner, athMaster: athMasterAddress },
       ath_long_term_vesting_official_ath_wallet: { address: athLongTermVestingOfficialAthWalletAddress, init: athLongTermVestingOfficialAthWallet, owner: athLongTermVestingAddress, athMaster: athMasterAddress },
-      vault_official_ath_wallet: { address: vaultOfficialAthWalletAddress, init: vaultOfficialAthWallet, owner: vaultAddress, athMaster: athMasterAddress },
+      airdrop_pool_official_ath_wallet: { address: airdropPoolOfficialAthWalletAddress, init: airdropPoolOfficialAthWallet, owner: airdropPoolAddress, athMaster: athMasterAddress },
       buyback_burn_official_ath_wallet: { address: buybackBurnOfficialAthWalletAddress, init: buybackBurnOfficialAthWallet, owner: buybackBurnAddress, athMaster: athMasterAddress },
       market_stability_seller_official_ath_wallet: { address: marketStabilitySellerOfficialAthWalletAddress, init: marketStabilitySellerOfficialAthWallet, owner: marketStabilitySellerAddress, athMaster: athMasterAddress },
       username_registry_official_ath_wallet: { address: usernameRegistryOfficialAthWalletAddress, init: usernameRegistryOfficialAthWallet, owner: usernameRegistryAddress, athMaster: athMasterAddress },
@@ -345,10 +334,9 @@ async function buildDryRunPacket(draft: Draft) {
     ['D04', 'MarketStabilitySeller', 'genesis_controller_one_shot', derived.addresses.marketStabilitySeller, derived.initial.market_stability_seller.init],
     ['D05', 'FeeAccumulator', 'ton_treasury_receiver', derived.addresses.feeAccumulator, derived.initial.fee_accumulator.init],
     ['D06', 'ATHVesting', 'ath_long_term_vesting_beneficiary', derived.addresses.athLongTermVesting, derived.initial.ath_long_term_vesting.init],
-    ['D07', 'Vault', 'genesis_controller_one_shot', derived.addresses.vault, derived.initial.vault.init],
-    ['D08', 'CapsuleHub', 'genesis_controller_one_shot', derived.addresses.capsuleHub, derived.initial.capsulehub.init],
-    ['D09', 'UsernameRegistry', 'genesis_controller_one_shot', derived.addresses.usernameRegistry, derived.initial.username_registry.init],
-    ['D10', 'ProfileRegistry', 'genesis_controller_one_shot', derived.addresses.profileRegistry, derived.initial.profile_registry.init],
+    ['D07', 'AirdropPool', 'genesis_controller_one_shot', derived.addresses.airdropPool, derived.initial.airdrop_pool.init],
+    ['D08', 'UsernameRegistry', 'genesis_controller_one_shot', derived.addresses.usernameRegistry, derived.initial.username_registry.init],
+    ['D09', 'ProfileRegistry', 'genesis_controller_one_shot', derived.addresses.profileRegistry, derived.initial.profile_registry.init],
   ].map(([id, contract, signerRole, target, init]) => ({
     id,
     contract,
@@ -471,21 +459,24 @@ async function buildDryRunPacket(draft: Draft) {
         { deployment_manifest_hash_hex: mh, ton_treasury_receiver_address: friendly(roleAddress(draft, 'market_stability_ton_treasury_receiver')) },
       ),
     },
+    // clean-17 AirdropPool pre-seal binds. NOTE: AirdropBind* structs carry NO deployment_manifest_hash field (the
+    // Vault binds did) — the pool commits to the manifest only at AirdropSealGenesis. Order within the bind phase:
+    // AthMaster must precede the F01 funding (gate 26011 ath_master_bound on the fund receiver).
     {
       id: 'B06',
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.vault),
+      target_address: friendly(derived.addresses.airdropPool),
       value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
       body: txBody(
-        'Vault.BindDeploymentManifest',
-        bodyCell(storeVaultBindDeploymentManifest({
-          $$type: 'BindDeploymentManifest',
-          deployment_manifest_hash: manifestHash,
-          counterpart_address: derived.addresses.capsuleHub,
+        'AirdropPool.AirdropBindAthMaster',
+        bodyCell(storeAirdropBindAthMaster({
+          $$type: 'AirdropBindAthMaster',
+          ath_master_address: derived.addresses.athMaster,
+          pool_ath_wallet_address: derived.addresses.airdropPoolOfficialAthWallet,
         })),
-        { deployment_manifest_hash_hex: mh, counterpart_address: friendly(derived.addresses.capsuleHub) },
+        { ath_master_address: friendly(derived.addresses.athMaster), pool_ath_wallet_address: friendly(derived.addresses.airdropPoolOfficialAthWallet) },
       ),
     },
     {
@@ -493,16 +484,17 @@ async function buildDryRunPacket(draft: Draft) {
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.vault),
+      target_address: friendly(derived.addresses.airdropPool),
       value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      // clean-17: the accrual authenticator ("credit_issuer_address") is the FeeAccumulator address, NOT a CreditIssuer
+      // contract (CreditIssuer is deleted). The field name is a clean-16 holdover; the bound value is fee_accumulator.
       body: txBody(
-        'Vault.BindOfficialAthWallet',
-        bodyCell(storeVaultBindOfficialAthWallet({
-          $$type: 'BindOfficialAthWallet',
-          deployment_manifest_hash: manifestHash,
-          official_ath_wallet_address: derived.addresses.vaultOfficialAthWallet,
+        'AirdropPool.AirdropBindCreditIssuer',
+        bodyCell(storeAirdropBindCreditIssuer({
+          $$type: 'AirdropBindCreditIssuer',
+          credit_issuer_address: derived.addresses.feeAccumulator,
         })),
-        { deployment_manifest_hash_hex: mh, official_ath_wallet_address: friendly(derived.addresses.vaultOfficialAthWallet) },
+        { credit_issuer_address: friendly(derived.addresses.feeAccumulator) },
       ),
     },
     {
@@ -510,54 +502,38 @@ async function buildDryRunPacket(draft: Draft) {
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.vault),
+      target_address: friendly(derived.addresses.airdropPool),
       value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
       body: txBody(
-        'Vault.BindProfileRegistry',
-        bodyCell(storeVaultBindProfileRegistry({
-          $$type: 'BindProfileRegistry',
-          deployment_manifest_hash: manifestHash,
-          profile_registry_address: derived.addresses.profileRegistry,
+        'AirdropPool.AirdropBindTreasury',
+        bodyCell(storeAirdropBindTreasury({
+          $$type: 'AirdropBindTreasury',
+          treasury_address: roleAddress(draft, 'treasury_ath_receiver'),
         })),
-        { deployment_manifest_hash_hex: mh, profile_registry_address: friendly(derived.addresses.profileRegistry) },
+        { treasury_address: friendly(roleAddress(draft, 'treasury_ath_receiver')) },
       ),
     },
     {
       id: 'B09',
       phase: 'pre_seal_binding',
-      signer_role: 'genesis_controller_one_shot',
-      signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.vault),
+      // CRITICAL: FeeAccumulator.BindAirdropPool is guarded by requireTreasury() (gate 15050, sender ==
+      // treasury_receiver_address == ton_treasury_receiver). It MUST be signed by ton_treasury_receiver, NOT the
+      // genesis controller — otherwise it bounces exit 15050 on-chain and the accrual routing is never wired.
+      signer_role: 'ton_treasury_receiver',
+      signer_address: friendly(roleAddress(draft, 'ton_treasury_receiver')),
+      target_address: friendly(derived.addresses.feeAccumulator),
       value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
       body: txBody(
-        'Vault.BindUsernameRegistry',
-        bodyCell(storeVaultBindUsernameRegistry({
-          $$type: 'BindUsernameRegistry',
-          deployment_manifest_hash: manifestHash,
-          username_registry_address: derived.addresses.usernameRegistry,
+        'FeeAccumulator.BindAirdropPool',
+        bodyCell(storeBindAirdropPool({
+          $$type: 'BindAirdropPool',
+          airdrop_pool_address: derived.addresses.airdropPool,
         })),
-        { deployment_manifest_hash_hex: mh, username_registry_address: friendly(derived.addresses.usernameRegistry) },
+        { airdrop_pool_address: friendly(derived.addresses.airdropPool) },
       ),
     },
     {
       id: 'B10',
-      phase: 'pre_seal_binding',
-      signer_role: 'genesis_controller_one_shot',
-      signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.capsuleHub),
-      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
-      body: txBody(
-        'CapsuleHub.BindDeploymentManifest',
-        bodyCell(storeCapsuleBindDeploymentManifest({
-          $$type: 'BindDeploymentManifest',
-          deployment_manifest_hash: manifestHash,
-          counterpart_address: derived.addresses.vault,
-        })),
-        { deployment_manifest_hash_hex: mh, counterpart_address: friendly(derived.addresses.vault) },
-      ),
-    },
-    {
-      id: 'B11',
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -574,7 +550,7 @@ async function buildDryRunPacket(draft: Draft) {
       ),
     },
     {
-      id: 'B12',
+      id: 'B11',
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -592,24 +568,18 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'S01',
+      // Runs in the seal phase, which the ceremony executes AFTER the fund phase — AirdropSealGenesis requires
+      // funded_amount == 15M (gate 26044). This seal BINDS the real manifest hash into the pool (message name is
+      // AirdropSealGenesis; gate 26040 requires hash > 1).
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.vault),
+      target_address: friendly(derived.addresses.airdropPool),
       value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
-      body: txBody('Vault.SealGenesis', bodyCell(storeVaultSealGenesis({ $$type: 'SealGenesis', deployment_manifest_hash: manifestHash })), { deployment_manifest_hash_hex: mh }),
+      body: txBody('AirdropPool.AirdropSealGenesis', bodyCell(storeAirdropSealGenesis({ $$type: 'AirdropSealGenesis', deployment_manifest_hash: manifestHash })), { deployment_manifest_hash_hex: mh }),
     },
     {
       id: 'S02',
-      phase: 'seal',
-      signer_role: 'genesis_controller_one_shot',
-      signer_address: friendly(derived.addresses.genesisController),
-      target_address: friendly(derived.addresses.capsuleHub),
-      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
-      body: txBody('CapsuleHub.SealGenesis', bodyCell(storeCapsuleSealGenesis({ $$type: 'SealGenesis', deployment_manifest_hash: manifestHash })), { deployment_manifest_hash_hex: mh }),
-    },
-    {
-      id: 'S03',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -618,7 +588,7 @@ async function buildDryRunPacket(draft: Draft) {
       body: txBody('UsernameRegistry.SealGenesis', bodyCell(storeUsernameSealGenesis({ $$type: 'SealGenesis', deployment_manifest_hash: manifestHash })), { deployment_manifest_hash_hex: mh }),
     },
     {
-      id: 'S04',
+      id: 'S03',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -627,7 +597,7 @@ async function buildDryRunPacket(draft: Draft) {
       body: txBody('ProfileRegistry.SealGenesis', bodyCell(storeProfileSealGenesis({ $$type: 'SealGenesis', deployment_manifest_hash: manifestHash })), { deployment_manifest_hash_hex: mh }),
     },
     {
-      id: 'S05',
+      id: 'S04',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -636,7 +606,7 @@ async function buildDryRunPacket(draft: Draft) {
       body: txBody('BuybackBurn.SealBuybackBurnGenesis', bodyCell(storeSealBuybackBurnGenesis({ $$type: 'SealBuybackBurnGenesis', deployment_manifest_hash: manifestHash })), { deployment_manifest_hash_hex: mh }),
     },
     {
-      id: 'S06',
+      id: 'S05',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -649,10 +619,10 @@ async function buildDryRunPacket(draft: Draft) {
   const fundingMessages = [
     {
       id: 'F01',
-      purpose: 'Fund Vault activity airdrop backing with exactly 15M ATH',
+      purpose: 'Fund AirdropPool activity airdrop backing with exactly 15M ATH',
       query_id: 1001n,
-      recipient_owner: derived.addresses.vault,
-      expected_recipient_ath_wallet: derived.addresses.vaultOfficialAthWallet,
+      recipient_owner: derived.addresses.airdropPool,
+      expected_recipient_ath_wallet: derived.addresses.airdropPoolOfficialAthWallet,
       amount_atomic: constantBigInt(draft, 'vault_activity_airdrop_total_atomic'),
     },
     {

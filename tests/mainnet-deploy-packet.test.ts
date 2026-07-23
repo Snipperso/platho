@@ -15,9 +15,8 @@ const ADDR = {
   marketReserveFunder: 'UQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOATH',
   marketTonTreasury: 'UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH',
   feeAccumulator: 'UQA9tgsJkoJsPEmxOyN0CWti9IYo8gAl2VQDECLRfDFGicpD',
-  vault: 'UQDjCu9J-a50z8pwgBp9AWpuD9MDQufKiKHPi-1VHRWpQbvc',
-  vaultOfficialWallet: 'UQCUSL4Ml8O1gnrl-F5e1E3OHigm3IywXKiBnWkCUuIf4Qb9',
-  capsuleHub: 'UQBgFJQvewAICmABKDysX1-i-nrdLsZlJX-efaNEWXnfEWwG',
+  airdropPool: 'UQDjCu9J-a50z8pwgBp9AWpuD9MDQufKiKHPi-1VHRWpQbvc',
+  airdropPoolOfficialWallet: 'UQCUSL4Ml8O1gnrl-F5e1E3OHigm3IywXKiBnWkCUuIf4Qb9',
   usernameRegistry: 'UQBT1BIkKWCHrqL6tXKw5aUMXJjFbDNrcEVzpzCRxJ8Cf3ls',
   profileRegistry: 'UQC4ncVFmD7s4xX7Q-lsjE9hyvaOrtXlNfi_Gha97NDQwUN0',
   profileRegistryTreasuryReceiver: 'UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH',
@@ -44,9 +43,8 @@ function draft() {
     market_stability_ton_treasury_receiver: ADDR.marketTonTreasury,
     fee_accumulator: ADDR.feeAccumulator,
     fee_accumulator_ton_treasury_receiver: ADDR.treasuryReceiver,
-    vault: ADDR.vault,
-    vault_official_ath_wallet: ADDR.vaultOfficialWallet,
-    capsulehub: ADDR.capsuleHub,
+    airdrop_pool: ADDR.airdropPool,
+    airdrop_pool_official_ath_wallet: ADDR.airdropPoolOfficialWallet,
     username_registry: ADDR.usernameRegistry,
     profile_registry: ADDR.profileRegistry,
     profile_registry_treasury_ath_receiver: ADDR.profileRegistryTreasuryReceiver,
@@ -62,8 +60,7 @@ function draft() {
     'market_stability_seller',
     'fee_accumulator',
     'ath_vesting',
-    'vault',
-    'capsulehub',
+    'airdrop_pool',
     'username_registry',
     'profile_registry',
   ].map((key, index) => [key, fakeHash(`${index + 1}`)]));
@@ -73,8 +70,7 @@ function draft() {
     'market_stability_seller_initial',
     'fee_accumulator',
     'ath_long_term_vesting_initial',
-    'vault_initial',
-    'capsulehub_initial',
+    'airdrop_pool_initial',
     'username_registry_initial',
     'profile_registry_initial',
   ].map((key, index) => [key, fakeHash(`${index + 11}`)]));
@@ -84,8 +80,7 @@ function draft() {
     buyback_burn: 'buyback_burn_initial',
     market_stability_seller: 'market_stability_seller_initial',
     fee_accumulator: 'fee_accumulator',
-    vault: 'vault_initial',
-    capsulehub: 'capsulehub_initial',
+    airdrop_pool: 'airdrop_pool_initial',
     username_registry: 'username_registry_initial',
     profile_registry: 'profile_registry_initial',
   };
@@ -111,10 +106,10 @@ function draft() {
       ath_long_term_vesting_beneficiary: { label: 'Treasury Receiver', normalized_address: ADDR.treasuryReceiver },
     },
     initial_state_init: Object.fromEntries(Object.entries(addresses)
-      .filter(([key]) => ['ath_master', 'ath_long_term_vesting', 'buyback_burn', 'market_stability_seller', 'fee_accumulator', 'vault', 'capsulehub', 'username_registry', 'profile_registry'].includes(key))
+      .filter(([key]) => ['ath_master', 'ath_long_term_vesting', 'buyback_burn', 'market_stability_seller', 'fee_accumulator', 'airdrop_pool', 'username_registry', 'profile_registry'].includes(key))
       .map(([key, address]) => [key, { address, raw_address: `0:${key}`, state_init_hash: state_init_hashes[initialStateKeyByContract[key]] }])),
     official_ath_wallets: {
-      vault_official_ath_wallet: ADDR.vaultOfficialWallet,
+      airdrop_pool_official_ath_wallet: ADDR.airdropPoolOfficialWallet,
       ath_long_term_vesting_official_ath_wallet: ADDR.athVestingOfficialWallet,
     },
     derived_ath_wallets: {
@@ -133,11 +128,11 @@ function draft() {
       ['MarketStabilitySeller.BindMarketStabilityReserveFunder', ADDR.marketReserveFunder],
       ['MarketStabilitySeller.BindMarketStabilityOfficialAthWallet', ADDR.marketOfficialWallet],
       ['MarketStabilitySeller.BindMarketStabilityTreasury', ADDR.marketTonTreasury],
-      ['Vault.BindDeploymentManifest.counterpart', ADDR.capsuleHub],
-      ['Vault.BindOfficialAthWallet', ADDR.vaultOfficialWallet],
-      ['Vault.BindProfileRegistry', ADDR.profileRegistry],
-      ['Vault.BindUsernameRegistry', ADDR.usernameRegistry],
-      ['CapsuleHub.BindDeploymentManifest.counterpart', ADDR.vault],
+      ['AirdropPool.AirdropBindAthMaster.ath_master_address', ADDR.athMaster],
+      ['AirdropPool.AirdropBindAthMaster.pool_ath_wallet_address', ADDR.airdropPoolOfficialWallet],
+      ['AirdropPool.AirdropBindCreditIssuer.credit_issuer_address', ADDR.feeAccumulator],
+      ['AirdropPool.AirdropBindTreasury.treasury_address', ADDR.treasuryReceiver],
+      ['FeeAccumulator.BindAirdropPool.airdrop_pool_address', ADDR.airdropPool],
       ['UsernameRegistry.BindOfficialAthWallet', ADDR.usernameOfficialWallet],
       ['ProfileRegistry.BindProfileOfficialAthWallet', ADDR.profileOfficialWallet],
     ],
@@ -171,8 +166,8 @@ describe('mainnet deploy packet funding semantics', () => {
       id: 'F01',
       target_address: ADDR.treasuryOwnerAthWallet,
       target_is: 'Treasury Owner ATHWallet',
-      recipient_owner_address: ADDR.vault,
-      expected_recipient_ath_wallet: ADDR.vaultOfficialWallet,
+      recipient_owner_address: ADDR.airdropPool,
+      expected_recipient_ath_wallet: ADDR.airdropPoolOfficialWallet,
       amount_atomic: '15000000000000000',
     });
     expect(funding[1]).toMatchObject({
@@ -191,8 +186,7 @@ describe('mainnet deploy packet funding semantics', () => {
     }
 
     expect(packet.phase_4_seal_contracts.map((step: any) => step.message)).toEqual([
-      'Vault.SealGenesis',
-      'CapsuleHub.SealGenesis',
+      'AirdropPool.AirdropSealGenesis',
       'UsernameRegistry.SealGenesis',
       'ProfileRegistry.SealGenesis',
       'BuybackBurn.SealBuybackBurnGenesis',
@@ -200,7 +194,7 @@ describe('mainnet deploy packet funding semantics', () => {
     ]);
   });
 
-  it('H-DEP-BIND-01: deploy packet carries Vault/ProfileRegistry avatar payment bindings before seal', () => {
+  it('H-DEP-BIND-01: deploy packet carries AirdropPool/registry bindings before seal', () => {
     const source = draft();
 
     const packet = buildPacket(source);
@@ -210,11 +204,11 @@ describe('mainnet deploy packet funding semantics', () => {
       ['MarketStabilitySeller.BindMarketStabilityReserveFunder', ADDR.marketReserveFunder],
       ['MarketStabilitySeller.BindMarketStabilityOfficialAthWallet', ADDR.marketOfficialWallet],
       ['MarketStabilitySeller.BindMarketStabilityTreasury', ADDR.marketTonTreasury],
-      ['Vault.BindDeploymentManifest.counterpart', ADDR.capsuleHub],
-      ['Vault.BindOfficialAthWallet', ADDR.vaultOfficialWallet],
-      ['Vault.BindProfileRegistry', ADDR.profileRegistry],
-      ['Vault.BindUsernameRegistry', ADDR.usernameRegistry],
-      ['CapsuleHub.BindDeploymentManifest.counterpart', ADDR.vault],
+      ['AirdropPool.AirdropBindAthMaster.ath_master_address', ADDR.athMaster],
+      ['AirdropPool.AirdropBindAthMaster.pool_ath_wallet_address', ADDR.airdropPoolOfficialWallet],
+      ['AirdropPool.AirdropBindCreditIssuer.credit_issuer_address', ADDR.feeAccumulator],
+      ['AirdropPool.AirdropBindTreasury.treasury_address', ADDR.treasuryReceiver],
+      ['FeeAccumulator.BindAirdropPool.airdrop_pool_address', ADDR.airdropPool],
       ['UsernameRegistry.BindOfficialAthWallet', ADDR.usernameOfficialWallet],
       ['ProfileRegistry.BindProfileOfficialAthWallet', ADDR.profileOfficialWallet],
     ]);
@@ -233,16 +227,16 @@ describe('mainnet deploy packet funding semantics', () => {
 
   it('H-DEP-BIND-02: deploy packet refuses missing, duplicate, unknown, or mismatched pre-seal bindings', () => {
     const missing = draft();
-    missing.pre_seal_bindings = missing.pre_seal_bindings.filter(([message]: [string, string]) => message !== 'Vault.BindUsernameRegistry');
-    expect(() => buildPacket(missing)).toThrow(/Missing required pre-seal binding Vault\.BindUsernameRegistry/);
+    missing.pre_seal_bindings = missing.pre_seal_bindings.filter(([message]: [string, string]) => message !== 'FeeAccumulator.BindAirdropPool.airdrop_pool_address');
+    expect(() => buildPacket(missing)).toThrow(/Missing required pre-seal binding FeeAccumulator\.BindAirdropPool\.airdrop_pool_address/);
 
     const duplicate = draft();
-    duplicate.pre_seal_bindings.push(['Vault.BindProfileRegistry', ADDR.profileRegistry]);
-    expect(() => buildPacket(duplicate)).toThrow(/Duplicate pre-seal binding Vault\.BindProfileRegistry/);
+    duplicate.pre_seal_bindings.push(['AirdropPool.AirdropBindTreasury.treasury_address', ADDR.treasuryReceiver]);
+    expect(() => buildPacket(duplicate)).toThrow(/Duplicate pre-seal binding AirdropPool\.AirdropBindTreasury\.treasury_address/);
 
     const unknown = draft();
-    unknown.pre_seal_bindings.push(['Vault.BindSurprise', ADDR.profileRegistry]);
-    expect(() => buildPacket(unknown)).toThrow(/Unexpected pre-seal binding Vault\.BindSurprise/);
+    unknown.pre_seal_bindings.push(['AirdropPool.BindSurprise', ADDR.profileRegistry]);
+    expect(() => buildPacket(unknown)).toThrow(/Unexpected pre-seal binding AirdropPool\.BindSurprise/);
 
     const mismatched = draft();
     mismatched.pre_seal_bindings = mismatched.pre_seal_bindings.map(([message, value]: [string, string]) => (
@@ -253,18 +247,17 @@ describe('mainnet deploy packet funding semantics', () => {
 
   it('H-DEP-STATE-01: deploy packet refuses stale or mismatched initial StateInit evidence', () => {
     const wrongAddress = draft();
-    wrongAddress.initial_state_init.vault.address = ADDR.capsuleHub;
-    expect(() => buildPacket(wrongAddress)).toThrow(/Initial StateInit vault address mismatch/);
+    wrongAddress.initial_state_init.airdrop_pool.address = ADDR.usernameRegistry;
+    expect(() => buildPacket(wrongAddress)).toThrow(/Initial StateInit airdrop_pool address mismatch/);
 
     const wrongHash = draft();
-    wrongHash.initial_state_init.vault.state_init_hash = fakeHash('55');
-    expect(() => buildPacket(wrongHash)).toThrow(/Initial StateInit vault hash mismatch/);
+    wrongHash.initial_state_init.airdrop_pool.state_init_hash = fakeHash('55');
+    expect(() => buildPacket(wrongHash)).toThrow(/Initial StateInit airdrop_pool hash mismatch/);
 
     for (const entryKey of [
       'buyback_burn',
       'market_stability_seller',
-      'vault',
-      'capsulehub',
+      'airdrop_pool',
       'username_registry',
       'profile_registry',
     ]) {
@@ -273,20 +266,17 @@ describe('mainnet deploy packet funding semantics', () => {
       expect(() => buildPacket(sealedInitialState)).toThrow(new RegExp(`${entryKey} must be unsealed`));
     }
 
-    const preboundCapsuleHub = draft();
-    preboundCapsuleHub.initial_state_init.capsulehub.vault_bound = true;
-    expect(() => buildPacket(preboundCapsuleHub)).toThrow(/capsulehub must start unbound/);
+    // AirdropPool must deploy fully unbound (ath_master/credit_issuer/treasury) — the generic _bound scan catches it.
+    const preboundAirdropPool = draft();
+    preboundAirdropPool.initial_state_init.airdrop_pool.ath_master_bound = true;
+    expect(() => buildPacket(preboundAirdropPool)).toThrow(/airdrop_pool must start unbound/);
 
-    const preboundVault = draft();
-    preboundVault.initial_state_init.vault.binding_flags = '1';
-    expect(() => buildPacket(preboundVault)).toThrow(/vault must start unbound/);
-
-    const nonzeroManifestCapsuleHub = draft();
-    nonzeroManifestCapsuleHub.initial_state_init.capsulehub.deployment_manifest_hash = '0x1234';
-    expect(() => buildPacket(nonzeroManifestCapsuleHub)).toThrow(/capsulehub must not carry deployment_manifest_hash/);
+    const nonzeroManifestAirdropPool = draft();
+    nonzeroManifestAirdropPool.initial_state_init.airdrop_pool.deployment_manifest_hash = '0x1234';
+    expect(() => buildPacket(nonzeroManifestAirdropPool)).toThrow(/airdrop_pool must not carry deployment_manifest_hash/);
   });
 
-  it('H-DEP-ROLE-01: deploy packet refuses a collapsed Vault/Profile/Username/CapsuleHub role graph', () => {
+  it('H-DEP-ROLE-01: deploy packet refuses a collapsed AirdropPool/Profile/Username role graph', () => {
     const source = draft();
     source.manifest.addresses.profile_registry = ADDR.usernameRegistry;
     source.initial_state_init.profile_registry.address = ADDR.usernameRegistry;
@@ -295,7 +285,7 @@ describe('mainnet deploy packet funding semantics', () => {
   });
 
   it('H-DEP-ROLE-02: deploy packet refuses protocol-owned ProfileRegistry treasury receivers', () => {
-    for (const forbiddenKey of ['profile_registry', 'profile_registry_official_ath_wallet', 'vault', 'ath_master']) {
+    for (const forbiddenKey of ['profile_registry', 'profile_registry_official_ath_wallet', 'airdrop_pool', 'ath_master']) {
       const source = draft();
       source.manifest.addresses.profile_registry_treasury_ath_receiver = source.manifest.addresses[forbiddenKey];
 
@@ -304,7 +294,7 @@ describe('mainnet deploy packet funding semantics', () => {
   });
 
   it('H-DEP-ROLE-03: deploy packet refuses protocol-owned UsernameRegistry treasury receivers', () => {
-    for (const forbiddenKey of ['username_registry', 'username_registry_official_ath_wallet', 'vault', 'ath_master']) {
+    for (const forbiddenKey of ['username_registry', 'username_registry_official_ath_wallet', 'airdrop_pool', 'ath_master']) {
       const source = draft();
       source.manifest.addresses.treasury_ath_receiver = source.manifest.addresses[forbiddenKey];
 
@@ -342,7 +332,9 @@ describe('mainnet deploy packet funding semantics', () => {
     );
     expect(step, 'step 7 of the runbook must be findable').not.toBe('');
 
-    const documented = [...step.matchAll(/`([A-Za-z]+\.Bind[A-Za-z.]+)`/g)].map((m) => m[1]).sort();
+    // clean-17: bindings include dotless-after-contract names like AirdropPool.AirdropBindAthMaster.* — the old
+    // /Word\.Bind.../ pattern (dot immediately before Bind) missed those. Match any backtick token containing Bind.
+    const documented = [...step.matchAll(/`([A-Za-z.]*Bind[A-Za-z._]*)`/g)].map((m) => m[1]).sort();
     // buildPacket already rejects a draft whose bindings are missing or unexpected, so a draft that builds
     // carries exactly the required set — which makes it a sound reference for the runbook.
     const required = buildPacket(draft()).phase_2_pre_seal_bindings.map((s: any) => s.message).sort();

@@ -232,20 +232,20 @@ Keep deploy order simple and auditable.
    - `Vault`;
    - `UsernameRegistry`;
    - `ProfileRegistry`.
-7. Perform pre-seal bindings by `genesis_controller_one_shot`:
+7. Perform pre-seal bindings by `genesis_controller_one_shot` (except the FeeAccumulator leg, noted below):
    - `BuybackBurn.BindBuybackFeeAccumulator`;
    - `BuybackBurn.BindBuybackOfficialAthWallet`;
    - `MarketStabilitySeller.BindMarketStabilityReserveFunder`;
    - `MarketStabilitySeller.BindMarketStabilityOfficialAthWallet`;
    - `MarketStabilitySeller.BindMarketStabilityTreasury`;
-   - `Vault.BindDeploymentManifest.counterpart`;
-   - `Vault.BindOfficialAthWallet`;
-   - `Vault.BindProfileRegistry`;
-   - `Vault.BindUsernameRegistry`;
-   - `CapsuleHub.BindDeploymentManifest.counterpart`;
+   - `AirdropPool.AirdropBindAthMaster.ath_master_address`;
+   - `AirdropPool.AirdropBindAthMaster.pool_ath_wallet_address` (this and the previous entry are the SAME on-chain message, which carries both fields — send it once);
+   - `AirdropPool.AirdropBindCreditIssuer.credit_issuer_address` (bind the **FeeAccumulator** address — the clean-17 airdrop distributor; the field name is a clean-16 holdover, there is no CreditIssuer contract);
+   - `AirdropPool.AirdropBindTreasury.treasury_address`;
+   - `FeeAccumulator.BindAirdropPool.airdrop_pool_address` — **signed by `ton_treasury_receiver`, NOT the genesis controller** (FeeAccumulator gate 15050 `requireTreasury`; a genesis-controller signature bounces exit 15050 and the accrual routing is never wired);
    - `UsernameRegistry.BindOfficialAthWallet`;
    - `ProfileRegistry.BindProfileOfficialAthWallet`.
-8. Fund the genesis-backed official ATH wallets before Vault/CapsuleHub become usable:
+8. Fund the genesis-backed official ATH wallets before AirdropPool becomes usable:
    - transfer exactly `15,000,000 ATH` from the treasury ATH wallet to `vault_official_ath_wallet`;
    - transfer exactly `10,000,000 ATH` from the treasury ATH wallet to `ath_long_term_vesting_official_ath_wallet`.
 9. Verify the pre-seal funding landed:

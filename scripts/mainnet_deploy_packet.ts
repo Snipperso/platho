@@ -105,8 +105,8 @@ function protocolRoleDenylist(draft: Draft): Array<[string, string]> {
     'buyback_burn_initial_genesis_controller',
     'buyback_burn_launch_controller',
     'buyback_burn_official_ath_wallet',
-    'capsulehub',
-    'capsulehub_initial_vault_placeholder',
+    'airdrop_pool',
+    'airdrop_pool_official_ath_wallet',
     'fee_accumulator',
     'genesis_controller_one_shot',
     'market_stability_seller',
@@ -119,9 +119,6 @@ function protocolRoleDenylist(draft: Draft): Array<[string, string]> {
     'username_registry',
     'username_registry_initial_ath_wallet_placeholder',
     'username_registry_official_ath_wallet',
-    'vault',
-    'vault_initial_capsulehub_placeholder',
-    'vault_official_ath_wallet',
   ];
   return keys
     .map((key): [string, string | null] => [key, optionalAddress(draft, key)])
@@ -138,7 +135,7 @@ function validateTreasuryReceiverNotProtocolOwned(draft: Draft, receiverKey: str
 }
 
 function validateDistinctManifestAddresses(draft: Draft) {
-  const keys = ['vault', 'capsulehub', 'profile_registry', 'username_registry'];
+  const keys = ['airdrop_pool', 'profile_registry', 'username_registry'];
   for (let i = 0; i < keys.length; i += 1) {
     for (let j = i + 1; j < keys.length; j += 1) {
       const leftKey = keys[i];
@@ -152,7 +149,7 @@ function validateDistinctManifestAddresses(draft: Draft) {
   }
 
   const profileTreasury = address(draft, 'profile_registry_treasury_ath_receiver');
-  for (const forbiddenKey of ['profile_registry', 'profile_registry_official_ath_wallet', 'vault', 'ath_master']) {
+  for (const forbiddenKey of ['profile_registry', 'profile_registry_official_ath_wallet', 'airdrop_pool', 'ath_master']) {
     const forbidden = address(draft, forbiddenKey);
     if (sameAddressString(profileTreasury, forbidden)) {
       throw new Error(`ProfileRegistry treasury receiver must not equal ${forbiddenKey}: ${profileTreasury}`);
@@ -160,7 +157,7 @@ function validateDistinctManifestAddresses(draft: Draft) {
   }
 
   const usernameTreasury = address(draft, 'treasury_ath_receiver');
-  for (const forbiddenKey of ['username_registry', 'username_registry_official_ath_wallet', 'vault', 'ath_master']) {
+  for (const forbiddenKey of ['username_registry', 'username_registry_official_ath_wallet', 'airdrop_pool', 'ath_master']) {
     const forbidden = address(draft, forbiddenKey);
     if (sameAddressString(usernameTreasury, forbidden)) {
       throw new Error(`UsernameRegistry treasury receiver must not equal ${forbiddenKey}: ${usernameTreasury}`);
@@ -181,8 +178,7 @@ function requiredInitialStateEntries(): Array<[string, string, string]> {
     ['buyback_burn', 'buyback_burn', 'buyback_burn_initial'],
     ['market_stability_seller', 'market_stability_seller', 'market_stability_seller_initial'],
     ['fee_accumulator', 'fee_accumulator', 'fee_accumulator'],
-    ['vault', 'vault', 'vault_initial'],
-    ['capsulehub', 'capsulehub', 'capsulehub_initial'],
+    ['airdrop_pool', 'airdrop_pool', 'airdrop_pool_initial'],
     ['username_registry', 'username_registry', 'username_registry_initial'],
     ['profile_registry', 'profile_registry', 'profile_registry_initial'],
   ];
@@ -191,8 +187,7 @@ function requiredInitialStateEntries(): Array<[string, string, string]> {
 const STAGED_BIND_SEAL_INITIAL_STATE: Record<string, string> = {
   buyback_burn: 'bind FeeAccumulator and official ATH wallet before SealBuybackBurnGenesis',
   market_stability_seller: 'bind reserve funder, official ATH wallet, and treasury before SealMarketStabilityGenesis',
-  vault: 'bind CapsuleHub, official ATH wallet, ProfileRegistry, and UsernameRegistry before SealGenesis',
-  capsulehub: 'bind Vault before SealGenesis',
+  airdrop_pool: 'bind ATHMaster + pool ATH wallet, credit issuer (=FeeAccumulator in clean-17), and treasury before AirdropSealGenesis',
   username_registry: 'bind official ATH wallet before SealGenesis',
   profile_registry: 'bind official ATH wallet before SealGenesis',
 };
@@ -249,19 +244,19 @@ function requiredPreSealBindings(draft: Draft): Array<[string, string]> {
     ['MarketStabilitySeller.BindMarketStabilityReserveFunder', address(draft, 'market_stability_reserve_funder')],
     ['MarketStabilitySeller.BindMarketStabilityOfficialAthWallet', address(draft, 'market_stability_seller_official_ath_wallet')],
     ['MarketStabilitySeller.BindMarketStabilityTreasury', address(draft, 'market_stability_ton_treasury_receiver')],
-    ['Vault.BindDeploymentManifest.counterpart', address(draft, 'capsulehub')],
-    ['Vault.BindOfficialAthWallet', address(draft, 'vault_official_ath_wallet')],
-    ['Vault.BindProfileRegistry', address(draft, 'profile_registry')],
-    ['Vault.BindUsernameRegistry', address(draft, 'username_registry')],
-    ['CapsuleHub.BindDeploymentManifest.counterpart', address(draft, 'vault')],
+    ['AirdropPool.AirdropBindAthMaster.ath_master_address', address(draft, 'ath_master')],
+    ['AirdropPool.AirdropBindAthMaster.pool_ath_wallet_address', address(draft, 'airdrop_pool_official_ath_wallet')],
+    ['AirdropPool.AirdropBindCreditIssuer.credit_issuer_address', address(draft, 'fee_accumulator')],
+    ['AirdropPool.AirdropBindTreasury.treasury_address', address(draft, 'treasury_ath_receiver')],
+    ['FeeAccumulator.BindAirdropPool.airdrop_pool_address', address(draft, 'airdrop_pool')],
     ['UsernameRegistry.BindOfficialAthWallet', address(draft, 'username_registry_official_ath_wallet')],
     ['ProfileRegistry.BindProfileOfficialAthWallet', address(draft, 'profile_registry_official_ath_wallet')],
   ];
 }
 
 function bindingOwnerAddress(draft: Draft, message: string): string | null {
-  if (message.startsWith('Vault.')) return address(draft, 'vault');
-  if (message.startsWith('CapsuleHub.')) return address(draft, 'capsulehub');
+  if (message.startsWith('AirdropPool.')) return address(draft, 'airdrop_pool');
+  if (message.startsWith('FeeAccumulator.')) return address(draft, 'fee_accumulator');
   if (message.startsWith('UsernameRegistry.')) return address(draft, 'username_registry');
   if (message.startsWith('ProfileRegistry.')) return address(draft, 'profile_registry');
   if (message.startsWith('BuybackBurn.')) return address(draft, 'buyback_burn');
@@ -364,24 +359,14 @@ export function buildPacket(draft: Draft) {
       id: 'D07',
       signer_role: 'genesis_controller_one_shot',
       signer_address: role(draft, 'genesis_controller_one_shot'),
-      action: 'Deploy Vault',
-      target_address: address(draft, 'vault'),
-      code_hash: codeHash(draft, 'vault'),
-      state_init_hash: stateHash(draft, 'vault_initial'),
-      stop_check: 'Vault unsealed, CapsuleHub not bound, official ATH wallet not yet bound.',
+      action: 'Deploy AirdropPool',
+      target_address: address(draft, 'airdrop_pool'),
+      code_hash: codeHash(draft, 'airdrop_pool'),
+      state_init_hash: stateHash(draft, 'airdrop_pool_initial'),
+      stop_check: 'AirdropPool unsealed; ath_master/credit_issuer/treasury unbound; deployment_manifest_hash=0; funded_amount=0.',
     },
     {
       id: 'D08',
-      signer_role: 'genesis_controller_one_shot',
-      signer_address: role(draft, 'genesis_controller_one_shot'),
-      action: 'Deploy CapsuleHub',
-      target_address: address(draft, 'capsulehub'),
-      code_hash: codeHash(draft, 'capsulehub'),
-      state_init_hash: stateHash(draft, 'capsulehub_initial'),
-      stop_check: 'CapsuleHub unsealed and Vault not bound.',
-    },
-    {
-      id: 'D09',
       signer_role: 'genesis_controller_one_shot',
       signer_address: role(draft, 'genesis_controller_one_shot'),
       action: 'Deploy UsernameRegistry',
@@ -391,7 +376,7 @@ export function buildPacket(draft: Draft) {
       stop_check: 'UsernameRegistry unsealed, official ATH wallet placeholder still present.',
     },
     {
-      id: 'D10',
+      id: 'D09',
       signer_role: 'genesis_controller_one_shot',
       signer_address: role(draft, 'genesis_controller_one_shot'),
       action: 'Deploy ProfileRegistry',
@@ -402,23 +387,29 @@ export function buildPacket(draft: Draft) {
     },
   ];
 
-  const bindingSteps = draft.pre_seal_bindings.map(([message, value], index) => ({
-    id: `B${String(index + 1).padStart(2, '0')}`,
-    signer_role: 'genesis_controller_one_shot',
-    signer_address: role(draft, 'genesis_controller_one_shot'),
-    message,
-    value,
-    deployment_manifest_hash: manifestHash,
-    stop_check: 'Getter must show bound value exactly; second/replay binding must remain impossible after seal.',
-  }));
+  const bindingSteps = draft.pre_seal_bindings.map(([message, value], index) => {
+    // clean-17: FeeAccumulator.BindAirdropPool is authorized by requireTreasury() (FeeAccumulator gate 15050,
+    // sender == treasury_receiver_address == the ton_treasury_receiver role that deploys FeeAccumulator), NOT the
+    // genesis controller. Signing it with genesis_controller_one_shot would BOUNCE on-chain (exit 15050). Every
+    // AirdropPool.* binding + all other binds use requireController -> genesis_controller_one_shot.
+    const signerRole = message.startsWith('FeeAccumulator.') ? 'ton_treasury_receiver' : 'genesis_controller_one_shot';
+    return {
+      id: `B${String(index + 1).padStart(2, '0')}`,
+      signer_role: signerRole,
+      signer_address: role(draft, signerRole),
+      message,
+      value,
+      deployment_manifest_hash: manifestHash,
+      stop_check: 'Getter must show bound value exactly; second/replay binding must remain impossible after seal.',
+    };
+  });
 
   const sealSteps = [
-    ['S01', 'Vault.SealGenesis', address(draft, 'vault')],
-    ['S02', 'CapsuleHub.SealGenesis', address(draft, 'capsulehub')],
-    ['S03', 'UsernameRegistry.SealGenesis', address(draft, 'username_registry')],
-    ['S04', 'ProfileRegistry.SealGenesis', address(draft, 'profile_registry')],
-    ['S05', 'BuybackBurn.SealBuybackBurnGenesis', address(draft, 'buyback_burn')],
-    ['S06', 'MarketStabilitySeller.SealMarketStabilityGenesis', address(draft, 'market_stability_seller')],
+    ['S01', 'AirdropPool.AirdropSealGenesis', address(draft, 'airdrop_pool')],
+    ['S02', 'UsernameRegistry.SealGenesis', address(draft, 'username_registry')],
+    ['S03', 'ProfileRegistry.SealGenesis', address(draft, 'profile_registry')],
+    ['S04', 'BuybackBurn.SealBuybackBurnGenesis', address(draft, 'buyback_burn')],
+    ['S05', 'MarketStabilitySeller.SealMarketStabilityGenesis', address(draft, 'market_stability_seller')],
   ].map(([id, message, target_address]) => ({
     id,
     signer_role: 'genesis_controller_one_shot',
@@ -434,14 +425,14 @@ export function buildPacket(draft: Draft) {
       id: 'F01',
       signer_role: 'ath_treasury_owner',
       signer_address: role(draft, 'ath_treasury_owner'),
-      action: 'Send ATHTransferRequest from Treasury Owner ATHWallet to fund Vault airdrop backing',
+      action: 'Send ATHTransferRequest from Treasury Owner ATHWallet to fund AirdropPool airdrop backing',
       target_address: derivedAthWallet(draft, 'treasury_owner_ath_wallet'),
       target_is: 'Treasury Owner ATHWallet',
-      recipient_owner_address: address(draft, 'vault'),
-      expected_recipient_ath_wallet: address(draft, 'vault_official_ath_wallet'),
+      recipient_owner_address: address(draft, 'airdrop_pool'),
+      expected_recipient_ath_wallet: address(draft, 'airdrop_pool_official_ath_wallet'),
       amount_atomic: draft.manifest.constants.vault_activity_airdrop_total_atomic,
       warning: 'Do not send directly to the official ATH wallet address. ATHTransferRequest.recipient is the owner contract address.',
-      stop_check: 'Vault official ATHWallet balance is exactly 15M ATH; Vault airdrop_remaining_ath is 15M and distributed is 0.',
+      stop_check: 'AirdropPool official ATHWallet balance is exactly 15M ATH; AirdropPool funded_amount/remaining_budget is 15M and distributed_total is 0.',
     },
     {
       id: 'F02',
@@ -481,7 +472,7 @@ export function buildPacket(draft: Draft) {
       command: 'npm.cmd run mainnet:genesis:verify',
       must_pass_before: [
         'production PWA mainnet config release',
-        '15M activity airdrop distribution through Vault',
+        '15M activity airdrop distribution through AirdropPool',
         'initial liquidity pool launch',
         'MarketStability pricing freeze',
         'Buyback route freeze',
@@ -490,7 +481,7 @@ export function buildPacket(draft: Draft) {
     },
     post_genesis_not_in_this_packet: [
       'Release production PWA/mainnet config only after preprod and crypto gates pass.',
-      'Distribute the 15M ATH activity airdrop through Vault until airdrop_remaining_ath is zero.',
+      'Distribute the 15M ATH activity airdrop through AirdropPool until remaining_budget is zero.',
       'Open 15M ATH / 100,000 TON liquidity pool only after the activity airdrop is fully distributed.',
       'Collect STON.fi route evidence and run M20F route preflights.',
       'Freeze BuybackBurn route.',
@@ -505,7 +496,7 @@ export function buildPacket(draft: Draft) {
       'Stop on any address mismatch between this packet, Tonkeeper transaction preview, and live getter.',
       'Stop if a wallet asks for seed phrase in a browser page.',
       'Stop if final manifest hash changes after funding begins.',
-      'Stop if Vault or ATHVesting official ATHWallet is not active with exact funding, or if zero-balance official ATHWallets are active with non-zero ATH. Username/Profile/Buyback/MSS official ATHWallets may still be uninit at their deterministic StateInit addresses.',
+      'Stop if AirdropPool or ATHVesting official ATHWallet is not active with exact funding, or if zero-balance official ATHWallets are active with non-zero ATH. Username/Profile/Buyback/MSS official ATHWallets may still be uninit at their deterministic StateInit addresses.',
       'Stop if any post-seal binding still succeeds.',
     ],
   };
