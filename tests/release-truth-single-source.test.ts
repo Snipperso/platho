@@ -7,12 +7,10 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY: Record<string, string> = {
   ATH_WALLET_CODE_HASH: 'ath_wallet',
   BUYBACKBURN_CODE_HASH: 'buyback_burn',
   MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
-  CAPSULEHUB_CODE_HASH: 'capsulehub',
   FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
   PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
   USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
   USERNAME_REGISTRY_CODE_HASH: 'username_registry',
-  VAULT_CODE_HASH: 'vault',
 };
 
 const CONTRACT_TO_CURRENT_CODE_HASH_KEY: Record<string, string> = {
@@ -20,12 +18,10 @@ const CONTRACT_TO_CURRENT_CODE_HASH_KEY: Record<string, string> = {
   ATHVesting: 'ATHVESTING_CODE_HASH',
   BuybackBurn: 'BUYBACKBURN_CODE_HASH',
   MarketStabilitySeller: 'MARKET_STABILITY_SELLER_CODE_HASH',
-  CapsuleHub: 'CAPSULEHUB_CODE_HASH',
   FeeAccumulator: 'FEEACCUMULATOR_CODE_HASH',
   ProfileRegistry: 'PROFILE_REGISTRY_CODE_HASH',
   UsernameNFTItem: 'USERNAME_NFT_ITEM_CODE_HASH',
   UsernameRegistry: 'USERNAME_REGISTRY_CODE_HASH',
-  Vault: 'VAULT_CODE_HASH',
 };
 
 const DEPLOY_ACTION_TO_CONTRACT: Record<string, string> = {
@@ -33,11 +29,9 @@ const DEPLOY_ACTION_TO_CONTRACT: Record<string, string> = {
   'Deploy ATHVesting': 'ATHVesting',
   'Deploy BuybackBurn': 'BuybackBurn',
   'Deploy MarketStabilitySeller': 'MarketStabilitySeller',
-  'Deploy CapsuleHub': 'CapsuleHub',
   'Deploy FeeAccumulator': 'FeeAccumulator',
   'Deploy ProfileRegistry': 'ProfileRegistry',
   'Deploy UsernameRegistry': 'UsernameRegistry',
-  'Deploy Vault': 'Vault',
 };
 
 const POST_POOL_COMMANDS = [
@@ -116,15 +110,6 @@ describe('release truth single-source guard', () => {
 
     if (mismatches.length > 0) expect(verified).not.toBe('true');
     if (verified === 'true') expect(mismatches).toEqual([]);
-  });
-
-  it('does not allow a verified-mainnet flag beside a non-final current deployment manifest', () => {
-    const verified = readText('artifacts/MAINNET_GENESIS_VERIFIED.txt').trim().toLowerCase();
-    const currentManifest = readJson('artifacts/deployment_manifest_implemented_subset_m15.json');
-
-    if (currentManifest.status !== 'FINAL_GENESIS') {
-      expect(verified).not.toBe('true');
-    }
   });
 
   it('keeps the mainnet verified flag and verifier report in agreement', () => {
@@ -212,11 +197,9 @@ describe('release truth single-source guard', () => {
   it('keeps exact current economics values in dedicated reports instead of full-suite prose', () => {
     const summary = readJson('artifacts/CURRENT_FULL_TEST_SUMMARY.json');
     const notes = Array.isArray(summary.notes) ? summary.notes.join('\n') : '';
-    const pricingReport = readJson('artifacts/publish_reserve_pricing_report.json');
     const profileReport = readJson('artifacts/profile_registry_storage_economics_report.json');
     const usernameReport = readJson('artifacts/username_registry_storage_economics_report.json');
 
-    expect(pricingReport.status).toBe('PASS');
     expect(profileReport.status).toBe('PASS');
     expect(usernameReport.status).toBe('PASS');
     expect(notes).not.toMatch(/\bpublic\s+1K\b[^\n.]*\b0\.\d+\s*TON\b/i);

@@ -47,12 +47,10 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
   ATH_WALLET_CODE_HASH: 'ath_wallet',
   BUYBACKBURN_CODE_HASH: 'buyback_burn',
   MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
-  CAPSULEHUB_CODE_HASH: 'capsulehub',
   FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
   PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
   USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
   USERNAME_REGISTRY_CODE_HASH: 'username_registry',
-  VAULT_CODE_HASH: 'vault',
 };
 
 const PRODUCTION_CODE_HASH_KEYS = Object.freeze(Object.keys(CURRENT_CODE_HASH_TO_MANIFEST_KEY).sort());
@@ -69,12 +67,10 @@ const CONTRACT_TO_CURRENT_CODE_HASH_KEY = {
   ATHVesting: 'ATHVESTING_CODE_HASH',
   BuybackBurn: 'BUYBACKBURN_CODE_HASH',
   MarketStabilitySeller: 'MARKET_STABILITY_SELLER_CODE_HASH',
-  CapsuleHub: 'CAPSULEHUB_CODE_HASH',
   FeeAccumulator: 'FEEACCUMULATOR_CODE_HASH',
   ProfileRegistry: 'PROFILE_REGISTRY_CODE_HASH',
   UsernameNFTItem: 'USERNAME_NFT_ITEM_CODE_HASH',
   UsernameRegistry: 'USERNAME_REGISTRY_CODE_HASH',
-  Vault: 'VAULT_CODE_HASH',
 };
 
 const DEPLOY_ACTION_TO_CONTRACT = {
@@ -82,11 +78,9 @@ const DEPLOY_ACTION_TO_CONTRACT = {
   'Deploy ATHVesting': 'ATHVesting',
   'Deploy BuybackBurn': 'BuybackBurn',
   'Deploy MarketStabilitySeller': 'MarketStabilitySeller',
-  'Deploy CapsuleHub': 'CapsuleHub',
   'Deploy FeeAccumulator': 'FeeAccumulator',
   'Deploy ProfileRegistry': 'ProfileRegistry',
   'Deploy UsernameRegistry': 'UsernameRegistry',
-  'Deploy Vault': 'Vault',
 };
 
 function readTextIfExists(file) {
@@ -329,8 +323,6 @@ function validatePwaConfigMatchesFinalManifest(input) {
   }
 
   const addressChecks = [
-    ['PWA_VAULT_ADDRESS_MISMATCH', 'vault.address', PLATHO_APP_CONFIG?.vault?.address, manifest?.addresses?.vault],
-    ['PWA_CAPSULEHUB_ADDRESS_MISMATCH', 'capsuleHub.address', PLATHO_APP_CONFIG?.capsuleHub?.address, manifest?.addresses?.capsulehub],
     ['PWA_ATH_MASTER_ADDRESS_MISMATCH', 'ath.masterAddress', PLATHO_APP_CONFIG?.ath?.masterAddress, manifest?.addresses?.ath_master],
     ['PWA_USERNAME_REGISTRY_ADDRESS_MISMATCH', 'usernameRegistry.address', PLATHO_APP_CONFIG?.usernameRegistry?.address, manifest?.addresses?.username_registry],
     ['PWA_PROFILE_REGISTRY_ADDRESS_MISMATCH', 'profileRegistry.address', PLATHO_APP_CONFIG?.profileRegistry?.address, manifest?.addresses?.profile_registry],

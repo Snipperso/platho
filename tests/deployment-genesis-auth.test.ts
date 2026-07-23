@@ -1,20 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { Address, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
-import {
-  Vault,
-  BindDeploymentManifest as VaultBind,
-  BindOfficialAthWallet as VaultBindAth,
-  BindProfileRegistry as VaultBindProfile,
-  BindUsernameRegistry as VaultBindUsername,
-  SealGenesis as VaultSeal,
-} from '../build/Vault/Vault_Vault';
-import {
-  CapsuleHub,
-  BindDeploymentManifest as CapsuleBind,
-  SealGenesis as CapsuleSeal,
-} from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import {
   UsernameRegistry,
   BindOfficialAthWallet as RegistryBindAth,
@@ -25,7 +12,6 @@ import {
   BindProfileOfficialAthWallet as ProfileBindAth,
   SealGenesis as ProfileSeal,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
-import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x67656e657369735f617574685f6d616e69666573745f763100000000000001n;
 
@@ -34,51 +20,7 @@ function fixtureAddress(label: string, workchain = 0): Address {
 }
 
 
-function addressHash(address: Address): bigint {
-  return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
-}
 
-async function deriveAthWallet(owner: Address, athMasterAddress: Address): Promise<Address> {
-  const walletInit = await ATHWallet.init(0n, owner, athMasterAddress);
-  return contractAddress(owner.workChain, walletInit);
-}
-
-async function deployUnsealedVaultCapsulePair() {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-
-  const genesisController = await blockchain.treasury('genesis-controller');
-  const attacker = await blockchain.treasury('genesis-attacker');
-  const feeAccumulator = await blockchain.treasury('genesis-fee-accumulator');
-
-  const vaultPlaceholder = fixtureAddress('GENESIS_AUTH_VAULT_CAPSULE_PLACEHOLDER');
-  const capsulePlaceholder = fixtureAddress('GENESIS_AUTH_CAPSULE_VAULT_PLACEHOLDER');
-
-  const vaultInit = await Vault.init(genesisController.address, genesisController.address, vaultPlaceholder, addressHash(genesisController.address), false, false, 0n);
-  const vaultAddress = contractAddress(0, vaultInit);
-  const officialAthWallet = await deriveAthWallet(vaultAddress, genesisController.address);
-  await blockchain.setShardAccount(vaultAddress, createShardAccount({
-    address: vaultAddress,
-    code: vaultInit.code,
-    data: vaultInit.data,
-    balance: toNano('2'),
-    workchain: vaultAddress.workChain,
-  }));
-  const vault = blockchain.openContract(new Vault(vaultAddress, vaultInit));
-
-  const capsuleInit = await CapsuleHub.init(feeAccumulator.address, capsulePlaceholder, false, false, 0n, genesisController.address);
-  const capsuleAddress = contractAddress(0, capsuleInit);
-  await blockchain.setShardAccount(capsuleAddress, createShardAccount({
-    address: capsuleAddress,
-    code: capsuleInit.code,
-    data: capsuleInit.data,
-    balance: toNano('2'),
-    workchain: capsuleAddress.workChain,
-  }));
-  const capsule = blockchain.openContract(new CapsuleHub(capsuleAddress, capsuleInit));
-
-  return { blockchain, genesisController, attacker, officialAthWallet, vault, vaultAddress, vaultPlaceholder, capsule, capsuleAddress, capsulePlaceholder };
-}
 
 async function deployUnsealedUsernameRegistry() {
   const blockchain = await Blockchain.create();
@@ -145,118 +87,6 @@ async function deployUnsealedProfileRegistry() {
 }
 
 describe('Deployment genesis controller auth', () => {
-  it('DEPLOY-AUTH-01/02/03: arbitrary sender cannot bind or seal Vault genesis', async () => {
-    const { genesisController, attacker, officialAthWallet, vault, capsuleAddress, vaultPlaceholder } = await deployUnsealedVaultCapsulePair();
-    const attackerCapsule = fixtureAddress('GENESIS_AUTH_ATTACKER_CAPSULE');
-    const attackerAthWallet = fixtureAddress('GENESIS_AUTH_ATTACKER_ATH_WALLET');
-    const profileRegistryAddress = fixtureAddress('GENESIS_AUTH_VAULT_PROFILE_REGISTRY');
-    const usernameRegistryAddress = fixtureAddress('GENESIS_AUTH_VAULT_USERNAME_REGISTRY');
-
-    await vault.send(attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindDeploymentManifest',
-      deployment_manifest_hash: MANIFEST_HASH,
-      counterpart_address: attackerCapsule,
-    } as VaultBind);
-    let global = await vault.getGetGlobal();
-    expect(global.capsule_hub_bound).toBe(false);
-    expect(global.capsule_hub_address.equals(vaultPlaceholder)).toBe(true);
-    expect(global.deployment_manifest_hash).toBe(0n);
-
-    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindDeploymentManifest',
-      deployment_manifest_hash: MANIFEST_HASH,
-      counterpart_address: capsuleAddress,
-    } as VaultBind);
-
-    await vault.send(attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindOfficialAthWallet',
-      deployment_manifest_hash: MANIFEST_HASH,
-      official_ath_wallet_address: attackerAthWallet,
-    } as VaultBindAth);
-    global = await vault.getGetGlobal();
-    expect(global.vault_ath_wallet_address.equals(genesisController.address)).toBe(true);
-    expect(global.vault_ath_wallet_address.equals(attackerAthWallet)).toBe(false);
-
-    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindOfficialAthWallet',
-      deployment_manifest_hash: MANIFEST_HASH,
-      official_ath_wallet_address: officialAthWallet,
-    } as VaultBindAth);
-
-    await vault.send(attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as VaultSeal);
-    expect((await vault.getGetGlobal()).sealed).toBe(false);
-
-    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as VaultSeal);
-    expect((await vault.getGetGlobal()).sealed).toBe(false);
-
-    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindProfileRegistry',
-      deployment_manifest_hash: MANIFEST_HASH,
-      profile_registry_address: profileRegistryAddress,
-    } as VaultBindProfile);
-    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindUsernameRegistry',
-      deployment_manifest_hash: MANIFEST_HASH,
-      username_registry_address: usernameRegistryAddress,
-    } as VaultBindUsername);
-    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as VaultSeal);
-    expect((await vault.getGetGlobal()).sealed).toBe(true);
-  });
-
-  it('DEPLOY-AUTH-04: arbitrary sender cannot bind or seal CapsuleHub genesis', async () => {
-    const { genesisController, attacker, capsule, vaultAddress, capsulePlaceholder } = await deployUnsealedVaultCapsulePair();
-    const attackerVault = fixtureAddress('GENESIS_AUTH_ATTACKER_VAULT');
-
-    await capsule.send(attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindDeploymentManifest',
-      deployment_manifest_hash: MANIFEST_HASH,
-      counterpart_address: attackerVault,
-    } as CapsuleBind);
-    let state = await capsule.getGetState();
-    expect(state.vault_bound).toBe(false);
-    expect(state.vault_address.equals(capsulePlaceholder)).toBe(true);
-    expect(state.deployment_manifest_hash).toBe(0n);
-
-    await capsule.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindDeploymentManifest',
-      deployment_manifest_hash: MANIFEST_HASH,
-      counterpart_address: vaultAddress,
-    } as CapsuleBind);
-
-    // clean-16 B3: the seal now also requires a bound CreditIssuer (gate 12923) — the anon-publish path spends
-    // prepaid credits, so a Hub sealed without its issuer would be permanently unable to accept a publish. The
-    // ceremony below predates that gate; without this bind the CONTROLLER's own legitimate seal is refused, which
-    // read as "the auth test broke" when the auth half was in fact working perfectly (the attacker stays rejected).
-    const creditIssuerAddress = fixtureAddress('GENESIS_AUTH_CREDIT_ISSUER');
-    await capsule.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindCreditIssuer',
-      credit_issuer_address: creditIssuerAddress,
-    } as any);
-
-    // An arbitrary sender must still be refused — this is the assertion the test exists for.
-    await capsule.send(attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as CapsuleSeal);
-    expect((await capsule.getGetState()).sealed).toBe(false);
-
-    await capsule.send(genesisController.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
-    } as CapsuleSeal);
-    state = await capsule.getGetState();
-    expect(state.sealed).toBe(true);
-    expect(state.vault_address.equals(vaultAddress)).toBe(true);
-  });
 
   it('DEPLOY-AUTH-05/06/07: arbitrary sender cannot bind/seal UsernameRegistry and controller has no post-seal authority', async () => {
     const { genesisController, attacker, registry, placeholderAthWallet } = await deployUnsealedUsernameRegistry();

@@ -15,7 +15,7 @@ import {
   ATHBurnFailed,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { MockUsernameNFTItemNoAck } from '../build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck';
-import { MockVaultAthWallet } from '../build/MockVaultAthWallet/MockVaultAthWallet_MockVaultAthWallet';
+import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 
 const MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
@@ -53,7 +53,6 @@ async function deploySealedRegistryWithMockOfficial() {
 
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);
-  const mockOfficialInit = await MockVaultAthWallet.init(false);
 
   await blockchain.setShardAccount(registryAddress, createShardAccount({
     address: registryAddress,
@@ -65,6 +64,10 @@ async function deploySealedRegistryWithMockOfficial() {
 
   const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
   const mockOfficialAddress = await registry.getGetAthWalletAddress(registryAddress);
+  // Install a no-ACK sink at the official ATH wallet address so a FlushTreasuryAthDue/FlushBurnAthDue transfer is
+  // ABSORBED (not bounced) and its pending flush stays OPEN — the invariant NEG-03/NEG-04 assert a forged callback
+  // cannot clear. (Was MockVaultAthWallet; that Vault-named mock is gone, MockAthWalletNoAck is the same sink.)
+  const mockOfficialInit = await MockAthWalletNoAck.init();
   await blockchain.setShardAccount(mockOfficialAddress, createShardAccount({
     address: mockOfficialAddress,
     code: mockOfficialInit.code,
@@ -72,7 +75,6 @@ async function deploySealedRegistryWithMockOfficial() {
     balance: toNano('2'),
     workchain: mockOfficialAddress.workChain,
   }));
-  const mockOfficial = blockchain.openContract(new MockVaultAthWallet(mockOfficialAddress, mockOfficialInit));
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'BindOfficialAthWallet',
@@ -84,7 +86,7 @@ async function deploySealedRegistryWithMockOfficial() {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, mockOfficial, mockOfficialAddress, attacker, flusher, athMasterAddress, treasuryAthReceiver, vaultAddress };
+  return { blockchain, registry, mockOfficialAddress, attacker, flusher, athMasterAddress, treasuryAthReceiver, vaultAddress };
 }
 
 async function sendMintFromOfficialAddress(

@@ -129,39 +129,6 @@ describe('v1 on-chain message source of truth', () => {
     }
   });
 
-  it('RT-CFEE-004/SPEC-MSG-SOURCE-03AA: CapsuleHub fee flush docs reject stale 0.005 TON min-flush wording', () => {
-    const capsuleHub = read('contracts/CapsuleHub.tact');
-    expect(capsuleHub).toMatch(/const CAPSULEHUB_MIN_FEE_FLUSH_TON: Int = PLATO_PUBLIC_POST_FEE_TON;/);
-    expect(capsuleHub).toMatch(/msg\.amount >= CAPSULEHUB_MIN_FEE_FLUSH_TON \|\| msg\.amount == self\.accrued_plato_fee_ton/);
-
-    const currentFlushDocs = [
-      'artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md',
-      'web/CRYPTO_PROTOCOL.md',
-      'web/docs/crypto-protocol.md',
-    ];
-    for (const path of currentFlushDocs) {
-      const text = read(path);
-      const coin = path.startsWith('web/') ? 'GRAM' : 'TON';
-      expect(text, path).toMatch(new RegExp(`partial \`?FlushFees\`? calls must be at least[\\s\\S]{0,80}\`?0\\.010 ${coin}\`?`, 'i'));
-      expect(text, path).toMatch(/smaller amount[\s\S]{0,120}entire remaining accrued bucket/i);
-      expect(text, path).toMatch(/discounted dust/i);
-    }
-
-    const staleCapsuleHubFlushPatterns = [
-      /CapsuleHub[\s\S]{0,180}(minimum|min(?:imum)? partial|partial fee flush|min(?:imum)? fee flush)[\s\S]{0,80}0\.005 TON/i,
-      /0\.005 TON[\s\S]{0,180}CapsuleHub[\s\S]{0,180}(minimum|min(?:imum)? partial|partial fee flush|min(?:imum)? fee flush)/i,
-      /CAPSULEHUB_MIN_FEE_FLUSH_TON[\s\S]{0,80}0\.005/i,
-      /CapsuleHub[\s\S]{0,120}5,000,000 nanotons[\s\S]{0,120}(minimum|min(?:imum)? partial|partial fee flush|min(?:imum)? fee flush)/i,
-    ];
-
-    for (const path of ACTIVE_INTERFACE_DOCS) {
-      const text = read(path);
-      for (const pattern of staleCapsuleHubFlushPatterns) {
-        expect(text, `${path} must not match stale CapsuleHub min-flush wording ${pattern}`).not.toMatch(pattern);
-      }
-    }
-  });
-
   it('SPEC-MSG-SOURCE-03A: public pricing copy uses current exact public/private canonical examples', () => {
     const publicPriceDocs = [
       'DEPLOYMENT_RUNBOOK.md',
@@ -509,23 +476,6 @@ describe('v1 on-chain message source of truth', () => {
       expect(text, path).toMatch(/ResendDeployedAck|late ACK/i);
       expect(text, path).not.toMatch(/pending mint is pruned|pending mint.*pruned after a missing item ACK/i);
     }
-  });
-
-  it('SPEC-MSG-SOURCE-04C: public body docs match byte-aligned contract validation', () => {
-    const capsuleHub = read('contracts/CapsuleHub.tact');
-    const vault = read('contracts/Vault.tact');
-    const docs = [
-      read('web/CRYPTO_PROTOCOL.md'),
-      read('web/docs/crypto-protocol.md'),
-      read('artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md'),
-    ].join('\n');
-
-    expect(capsuleHub).toMatch(/fun requirePublicPayloadCell/);
-    expect(capsuleHub).toMatch(/size\.bits % 8 == 0/);
-    expect(vault).toMatch(/fun isPublicCapsuleShapeValid/);
-    expect(vault).toMatch(/requireByteAligned/);
-    expect(docs).toMatch(/raw public content bytes|public body text and public image\/avatar bytes use the same\s+1, 2, 4, 8, 16, or 32 KiB public capsule size classes/i);
-    expect(docs).toMatch(/ton-snake-byte-cell\.v1|snake-cell/i);
   });
 
   it('SPEC-MSG-SOURCE-05: Vault ATH deposit and withdrawal wording matches notify-flow accounting', () => {

@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
-import { Vault, TopUpStorageReserve as VaultTopUpStorageReserve } from '../build/Vault/Vault_Vault';
-import { CapsuleHub, TopUpStorageReserve as CapsuleHubTopUpStorageReserve } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator, TopUpStorageReserve as FeeAccumulatorTopUpStorageReserve } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { BuybackBurn, TopUpStorageReserve as BuybackBurnTopUpStorageReserve } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
 import { MarketStabilitySeller, MarketStabilityTopUpStorageReserve } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
@@ -61,30 +59,9 @@ describe('Storage top-up ABI coverage', () => {
     const controller = await blockchain.treasury('storage-topup-controller');
     const athMaster = fixtureAddress('ATH_MASTER');
     const athWallet = fixtureAddress('ATH_WALLET');
-    const capsuleVault = fixtureAddress('CAPSULE_VAULT');
     const treasury = fixtureAddress('TREASURY');
     const buyback = fixtureAddress('BUYBACK');
-    const manifestHash = 0x53544f524147455f544f5055505f4d414e4946455354n;
 
-    const vaultInit = await Vault.init(athWallet, athMaster, capsuleVault, 0n, true, true, 0n);
-    const vault = await deploy(blockchain, vaultInit, (address, init) => new Vault(address, init));
-    const vaultBefore = await vault.getGetGlobal();
-    const vaultBalanceBefore = await contractBalance(blockchain, vault.address);
-    await vault.send(donor.getSender(), { value: toNano('0.05') }, {
-      $$type: 'TopUpStorageReserve',
-    } as VaultTopUpStorageReserve);
-    expect(normalizeState(await vault.getGetGlobal())).toEqual(normalizeState(vaultBefore));
-    expect(await contractBalance(blockchain, vault.address)).toBeGreaterThan(vaultBalanceBefore);
-
-    const capsuleInit = await CapsuleHub.init(treasury, capsuleVault, true, true, manifestHash, controller.address);
-    const capsule = await deploy(blockchain, capsuleInit, (address, init) => new CapsuleHub(address, init));
-    const capsuleBefore = await capsule.getGetState();
-    const capsuleBalanceBefore = await contractBalance(blockchain, capsule.address);
-    await capsule.send(donor.getSender(), { value: toNano('0.05') }, {
-      $$type: 'TopUpStorageReserve',
-    } as CapsuleHubTopUpStorageReserve);
-    expect(normalizeState(await capsule.getGetState())).toEqual(normalizeState(capsuleBefore));
-    expect(await contractBalance(blockchain, capsule.address)).toBeGreaterThan(capsuleBalanceBefore);
 
     const feeInit = await FeeAccumulator.init(treasury, buyback);
     const fee = await deploy(blockchain, feeInit, (address, init) => new FeeAccumulator(address, init));

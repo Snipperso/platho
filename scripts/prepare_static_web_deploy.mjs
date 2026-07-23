@@ -85,12 +85,10 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
   ATH_WALLET_CODE_HASH: 'ath_wallet',
   BUYBACKBURN_CODE_HASH: 'buyback_burn',
   MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
-  CAPSULEHUB_CODE_HASH: 'capsulehub',
   FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
   PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
   USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
   USERNAME_REGISTRY_CODE_HASH: 'username_registry',
-  VAULT_CODE_HASH: 'vault',
 };
 
 function toPosix(path) {
