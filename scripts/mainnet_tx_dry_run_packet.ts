@@ -9,9 +9,23 @@ import {
   BuybackBurn,
   storeBindBuybackFeeAccumulator,
   storeBindBuybackOfficialAthWallet,
+  storeBindBuybackTreasury,
   storeSealBuybackBurnGenesis,
 } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
-import { FeeAccumulator, storeBindAirdropPool } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
+import {
+  FeeAccumulator,
+  storeBindAirdropPool,
+  storeBindShardCode,
+  storeBindIntroShardCode,
+  storeBindPublicShardCode,
+  storeBindTicketCode,
+} from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
+// Lane/ticket CODE cells for the FeeAccumulator binds. The compiled code is independent of init args, so any
+// arguments yield the cell that must be bound.
+import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
+import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
+import { PublicShard } from '../build/PublicShard/PublicShard_PublicShard';
+import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicket';
 import {
   MarketStabilitySeller,
   storeBindMarketStabilityOfficialAthWallet,
@@ -363,6 +377,21 @@ async function buildDryRunPacket(draft: Draft) {
     },
   );
 
+  // ── W1-001 / W1-002 (audit 2026-07-24): binds that were MISSING from every packet builder ──────────────────
+  // Without them the standard ceremony CANNOT complete genesis, and the broadcaster does not notice because it
+  // checks seqno advance, not the seal getter:
+  //   * BuybackBurn.SealBuybackBurnGenesis (S04) throws 22509 (treasury_bound) -> BuybackBurn stays sealed=false
+  //     FOREVER. MarketStabilitySeller had its treasury bind (B05); BuybackBurn's was simply never written.
+  //   * FeeAccumulator.DepositCapsuleFee throws 15055 (laneCodeBound) and TicketRedeem throws 15060 (ticket_code)
+  //     -> EVERY capsule fee bounces, 0 GRAM reaches the pool and the 15M ATH activity airdrop is unreachable.
+  // The compiled CODE cell does not depend on init arguments, so any arguments yield the cell that must be bound.
+  const laneCodes = {
+    record: (await RecordShard.init(0n, 0n)).code,
+    intro: (await IntroShard.init(0n, 0n)).code,
+    publicLane: (await PublicShard.init(0n, 0n)).code,
+    ticket: (await AirdropTicket.init(derived.addresses.feeAccumulator)).code,
+  };
+
   const controlMessages = [
     {
       id: 'D02',
@@ -565,6 +594,86 @@ async function buildDryRunPacket(draft: Draft) {
         })),
         { deployment_manifest_hash_hex: mh, official_ath_wallet_address: draft.manifest.addresses.profile_registry_official_ath_wallet },
       ),
+    },
+    {
+      id: 'B12',
+      phase: 'pre_seal_binding',
+      signer_role: 'genesis_controller_one_shot',
+      signer_address: friendly(derived.addresses.genesisController),
+      target_address: friendly(derived.addresses.buybackBurn),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'BuybackBurn.BindBuybackTreasury',
+        bodyCell(storeBindBuybackTreasury({
+          $$type: 'BindBuybackTreasury',
+          deployment_manifest_hash: manifestHash,
+          treasury_address: roleAddress(draft, 'ton_treasury_receiver'),
+        })),
+        { deployment_manifest_hash_hex: mh, treasury_address: friendly(roleAddress(draft, 'ton_treasury_receiver')) },
+      ),
+      safety_check: 'W1-001. Without this bind SealBuybackBurnGenesis (S04) throws 22509 and BuybackBurn stays '
+        + 'UNSEALED forever. CONFIRM THE ROLE BEFORE SIGNING: this one-shot bind fixes, permanently, where '
+        + 'BuybackBurn sweeps stuck TON (SweepStuckReserveToTreasury). It is set to ton_treasury_receiver — the same '
+        + 'protocol TON treasury FeeAccumulator uses — because no buyback-specific treasury role exists in the '
+        + 'manifest; MarketStabilitySeller by contrast has its own market_stability_ton_treasury_receiver.',
+    },
+    {
+      id: 'B13',
+      phase: 'pre_seal_binding',
+      // CRITICAL: all four FeeAccumulator code binds are guarded by requireTreasury() (gate 15050), exactly like
+      // BindAirdropPool (B09). They MUST be signed by ton_treasury_receiver, NOT the genesis controller.
+      signer_role: 'ton_treasury_receiver',
+      signer_address: friendly(roleAddress(draft, 'ton_treasury_receiver')),
+      target_address: friendly(derived.addresses.feeAccumulator),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'FeeAccumulator.BindShardCode',
+        bodyCell(storeBindShardCode({ $$type: 'BindShardCode', shard_code: laneCodes.record })),
+        { shard_code_hash_hex: laneCodes.record.hash().toString('hex') },
+      ),
+      safety_check: 'W1-002, lane 0 (CONV/RecordShard). Without it every CONV capsule fee bounces at gate 15055.',
+    },
+    {
+      id: 'B14',
+      phase: 'pre_seal_binding',
+      signer_role: 'ton_treasury_receiver',
+      signer_address: friendly(roleAddress(draft, 'ton_treasury_receiver')),
+      target_address: friendly(derived.addresses.feeAccumulator),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'FeeAccumulator.BindIntroShardCode',
+        bodyCell(storeBindIntroShardCode({ $$type: 'BindIntroShardCode', intro_shard_code: laneCodes.intro })),
+        { intro_shard_code_hash_hex: laneCodes.intro.hash().toString('hex') },
+      ),
+      safety_check: 'W1-002, lane 1 (INTRO). Without it every INTRO capsule fee bounces at gate 15055.',
+    },
+    {
+      id: 'B15',
+      phase: 'pre_seal_binding',
+      signer_role: 'ton_treasury_receiver',
+      signer_address: friendly(roleAddress(draft, 'ton_treasury_receiver')),
+      target_address: friendly(derived.addresses.feeAccumulator),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'FeeAccumulator.BindPublicShardCode',
+        bodyCell(storeBindPublicShardCode({ $$type: 'BindPublicShardCode', public_shard_code: laneCodes.publicLane })),
+        { public_shard_code_hash_hex: laneCodes.publicLane.hash().toString('hex') },
+      ),
+      safety_check: 'W1-002, lane 2 (PUBLIC/avatar). Without it every public capsule fee bounces at gate 15055.',
+    },
+    {
+      id: 'B16',
+      phase: 'pre_seal_binding',
+      signer_role: 'ton_treasury_receiver',
+      signer_address: friendly(roleAddress(draft, 'ton_treasury_receiver')),
+      target_address: friendly(derived.addresses.feeAccumulator),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'FeeAccumulator.BindTicketCode',
+        bodyCell(storeBindTicketCode({ $$type: 'BindTicketCode', ticket_code: laneCodes.ticket })),
+        { ticket_code_hash_hex: laneCodes.ticket.hash().toString('hex') },
+      ),
+      safety_check: 'W1-002. Without it TicketRedeem throws 15060 and the 15M ATH activity airdrop never accrues.',
     },
     {
       id: 'S01',

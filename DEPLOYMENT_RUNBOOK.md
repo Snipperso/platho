@@ -238,11 +238,13 @@ Keep deploy order simple and auditable.
    - `MarketStabilitySeller.BindMarketStabilityReserveFunder`;
    - `MarketStabilitySeller.BindMarketStabilityOfficialAthWallet`;
    - `MarketStabilitySeller.BindMarketStabilityTreasury`;
+   - `BuybackBurn.BindBuybackTreasury` — **without it `SealBuybackBurnGenesis` throws 22509 and BuybackBurn can never be sealed**; it fixes permanently where the contract sweeps stuck TON, so confirm the address is the intended protocol treasury before signing;
    - `AirdropPool.AirdropBindAthMaster.ath_master_address`;
    - `AirdropPool.AirdropBindAthMaster.pool_ath_wallet_address` (this and the previous entry are the SAME on-chain message, which carries both fields — send it once);
    - `AirdropPool.AirdropBindCreditIssuer.credit_issuer_address` (bind the **FeeAccumulator** address — the clean-17 airdrop distributor; the field name is a clean-16 holdover, there is no CreditIssuer contract);
    - `AirdropPool.AirdropBindTreasury.treasury_address`;
    - `FeeAccumulator.BindAirdropPool.airdrop_pool_address` — **signed by `ton_treasury_receiver`, NOT the genesis controller** (FeeAccumulator gate 15050 `requireTreasury`; a genesis-controller signature bounces exit 15050 and the accrual routing is never wired);
+   - `FeeAccumulator.BindShardCode.shard_code`, `FeeAccumulator.BindIntroShardCode.intro_shard_code`, `FeeAccumulator.BindPublicShardCode.public_shard_code`, `FeeAccumulator.BindTicketCode.ticket_code` — the four lane/ticket CODE binds, **all signed by `ton_treasury_receiver`** (same `requireTreasury` gate 15050 as the pool bind above). Each carries the compiled code cell, and the packet records its hash. **Without them the sink rejects EVERY capsule fee (gate 15055) and every `TicketRedeem` (15060): publishing still appears to succeed, but 0 GRAM reaches the pool and the 15M ATH activity airdrop is permanently unreachable.**
    - `UsernameRegistry.BindOfficialAthWallet`;
    - `ProfileRegistry.BindProfileOfficialAthWallet`.
 8. Fund the genesis-backed official ATH wallets before AirdropPool becomes usable:
@@ -255,6 +257,14 @@ Keep deploy order simple and auditable.
    - `ath_long_term_vesting_official_ath_wallet.owner == ATHVesting`;
    - `ath_long_term_vesting_official_ath_wallet.master == ATHMaster`;
    - `ath_long_term_vesting_official_ath_wallet.balance == 10,000,000 ATH`.
+9b. Upload and seal the username collection art and TEP-64 metadata (audit W1: this step was missing from the
+   runbook entirely, and nothing in the packet or the verifier enforces it):
+   - `UsernameRegistry.UploadArt` parts, then `UsernameRegistry.SealArt`;
+   - `UsernameRegistry.UploadCollectionMeta` parts, then `UsernameRegistry.SealCollectionMeta`.
+   - **Why it matters:** `SealGenesis` does NOT require `art_sealed` / `meta_sealed` — the registry seals happily
+     without them. But `get_collection_content` is gated by `throwUnless(19360, meta_sealed)`, so a collection sealed
+     without metadata serves NOTHING to wallets and marketplaces: the username NFTs ship with no image and no TEP-64
+     content, permanently. Confirm both getters report sealed before Phase 3 verification.
 10. Seal staged contracts only after the funding checks above pass:
    - `Vault.SealGenesis`;
    - `CapsuleHub.SealGenesis`;
