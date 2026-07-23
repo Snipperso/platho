@@ -36,6 +36,44 @@ describe('mainnet transaction dry-run packet', () => {
     expect(deployedTargets).not.toEqual(expect.arrayContaining([expect.stringMatching(TEST_DEPLOY_TARGET_RE)]));
   });
 
+  // W1-001 / W1-002 (audit 2026-07-24). Two pre-seal binds were absent from the executable packet for the whole of
+  // clean-17 and NOTHING noticed: BuybackBurn.BindBuybackTreasury (seal S04 then throws 22509 and the contract can
+  // never be sealed) and the four FeeAccumulator lane/ticket code binds (every capsule fee then bounces at 15055 and
+  // the 15M ATH airdrop is unreachable). The manifest-level validator only checks the DRAFT's binding list; nothing
+  // checked that the packet actually BUILDS a message for each. This guard closes that gap at the source level.
+  it('H-DEP-DRYRUN-04: packet builds a message for every pre-seal bind genesis requires', () => {
+    const script = readFileSync('scripts/mainnet_tx_dry_run_packet.ts', 'utf8');
+    const required = [
+      'storeBindBuybackFeeAccumulator',
+      'storeBindBuybackOfficialAthWallet',
+      'storeBindBuybackTreasury',
+      'storeBindMarketStabilityReserveFunder',
+      'storeBindMarketStabilityOfficialAthWallet',
+      'storeBindMarketStabilityTreasury',
+      'storeAirdropBindAthMaster',
+      'storeAirdropBindCreditIssuer',
+      'storeAirdropBindTreasury',
+      'storeBindAirdropPool',
+      'storeBindShardCode',
+      'storeBindIntroShardCode',
+      'storeBindPublicShardCode',
+      'storeBindTicketCode',
+      'storeUsernameBindOfficialAthWallet',
+      'storeBindProfileOfficialAthWallet',
+    ];
+    const missing = required.filter((fn) => !script.includes(`${fn}(`));
+    expect(missing, 'every pre-seal bind must be BUILT by the packet, not merely listed in the manifest').toEqual([]);
+
+    // The four FeeAccumulator code binds are guarded by requireTreasury (gate 15050) exactly like BindAirdropPool:
+    // a genesis-controller signature bounces and the lane stays unbound. Pin the signer next to each of them.
+    for (const fn of ['storeBindShardCode', 'storeBindIntroShardCode', 'storeBindPublicShardCode', 'storeBindTicketCode']) {
+      const at = script.indexOf(`${fn}(`);
+      const block = script.slice(Math.max(0, at - 700), at);
+      expect(block, `${fn} must be signed by ton_treasury_receiver (gate 15050), not the genesis controller`)
+        .toMatch(/signer_role: 'ton_treasury_receiver'/);
+    }
+  });
+
   it('H-DEP-DRYRUN-01: script derives every official ATHWallet StateInit used by final genesis', () => {
     const script = readFileSync('scripts/mainnet_tx_dry_run_packet.ts', 'utf8');
 

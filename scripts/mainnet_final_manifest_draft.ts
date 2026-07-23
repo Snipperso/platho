@@ -324,6 +324,13 @@ async function buildDraft(rolesPath: string) {
     username_nft_item: codeHash('build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem.code.boc'),
     username_registry: codeHash('build/UsernameRegistry/UsernameRegistry_UsernameRegistry.code.boc'),
     airdrop_pool: codeHash('build/AirdropPool/AirdropPool_AirdropPool.code.boc'),
+    // W1-002 (audit 2026-07-24): the four lane/ticket codes FeeAccumulator must bind pre-seal. They were absent
+    // from the manifest entirely, so nothing recorded which code the sink would authenticate — and the binds were
+    // never sent. Recording the hashes here makes the ceremony auditable and lets the packet validator enforce them.
+    record_shard: codeHash('build/RecordShard/RecordShard_RecordShard.code.boc'),
+    intro_shard: codeHash('build/IntroShard/IntroShard_IntroShard.code.boc'),
+    public_shard: codeHash('build/PublicShard/PublicShard_PublicShard.code.boc'),
+    airdrop_ticket: codeHash('build/AirdropTicket/AirdropTicket_AirdropTicket.code.boc'),
   };
 
   const state_init_hashes: HashMap = {
@@ -482,11 +489,21 @@ async function buildDraft(rolesPath: string) {
       ['MarketStabilitySeller.BindMarketStabilityReserveFunder', friendly(marketReserveFunder)],
       ['MarketStabilitySeller.BindMarketStabilityOfficialAthWallet', friendly(marketStabilitySellerOfficialAthWalletAddress)],
       ['MarketStabilitySeller.BindMarketStabilityTreasury', friendly(marketTonTreasuryReceiver)],
+      // W1-001 (audit 2026-07-24): was MISSING. BuybackBurn.SealBuybackBurnGenesis throws 22509 without it, so the
+      // contract stays UNSEALED forever and the ceremony cannot finish. Bound to the protocol TON treasury (the same
+      // role FeeAccumulator uses) because no buyback-specific treasury role exists — CONFIRM before the live run.
+      ['BuybackBurn.BindBuybackTreasury', friendly(tonTreasuryReceiver)],
       ['AirdropPool.AirdropBindAthMaster.ath_master_address', friendly(athMasterAddress)],
       ['AirdropPool.AirdropBindAthMaster.pool_ath_wallet_address', friendly(airdropPoolOfficialAthWalletAddress)],
       ['AirdropPool.AirdropBindCreditIssuer.credit_issuer_address', friendly(feeAccumulatorAddress)],
       ['AirdropPool.AirdropBindTreasury.treasury_address', friendly(treasuryAthReceiver)],
       ['FeeAccumulator.BindAirdropPool.airdrop_pool_address', friendly(airdropPoolAddress)],
+      // W1-002: without these four the sink rejects EVERY capsule fee (gate 15055) and TicketRedeem (15060) — no
+      // GRAM reaches the pool and the 15M ATH activity airdrop is unreachable. Value is the bound CODE hash.
+      ['FeeAccumulator.BindShardCode.shard_code', code_hashes.record_shard],
+      ['FeeAccumulator.BindIntroShardCode.intro_shard_code', code_hashes.intro_shard],
+      ['FeeAccumulator.BindPublicShardCode.public_shard_code', code_hashes.public_shard],
+      ['FeeAccumulator.BindTicketCode.ticket_code', code_hashes.airdrop_ticket],
       ['UsernameRegistry.BindOfficialAthWallet', friendly(usernameRegistryOfficialAthWalletAddress)],
       ['ProfileRegistry.BindProfileOfficialAthWallet', friendly(profileRegistryOfficialAthWalletAddress)],
     ],

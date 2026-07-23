@@ -65,6 +65,14 @@ function address(draft: Draft, key: string): string {
   return value;
 }
 
+// W1-002: the FeeAccumulator lane/ticket binds carry a CODE cell, not an address, so their required value is the
+// bound code hash recorded in the manifest.
+function codeHashOf(draft: Draft, key: string): string {
+  const value = (draft.manifest as any).code_hashes?.[key];
+  if (!value) throw new Error(`Missing manifest code hash ${key}`);
+  return value;
+}
+
 function derivedAthWallet(draft: Draft, key: string): string {
   const value = draft.derived_ath_wallets?.[key]?.address;
   if (!value) throw new Error(`Missing derived ATH wallet ${key}`);
@@ -244,11 +252,18 @@ function requiredPreSealBindings(draft: Draft): Array<[string, string]> {
     ['MarketStabilitySeller.BindMarketStabilityReserveFunder', address(draft, 'market_stability_reserve_funder')],
     ['MarketStabilitySeller.BindMarketStabilityOfficialAthWallet', address(draft, 'market_stability_seller_official_ath_wallet')],
     ['MarketStabilitySeller.BindMarketStabilityTreasury', address(draft, 'market_stability_ton_treasury_receiver')],
+    // W1-001: BuybackBurn's treasury bind was missing from every artifact; seal (22509) is impossible without it.
+    ['BuybackBurn.BindBuybackTreasury', address(draft, 'fee_accumulator_ton_treasury_receiver')],
     ['AirdropPool.AirdropBindAthMaster.ath_master_address', address(draft, 'ath_master')],
     ['AirdropPool.AirdropBindAthMaster.pool_ath_wallet_address', address(draft, 'airdrop_pool_official_ath_wallet')],
     ['AirdropPool.AirdropBindCreditIssuer.credit_issuer_address', address(draft, 'fee_accumulator')],
     ['AirdropPool.AirdropBindTreasury.treasury_address', address(draft, 'treasury_ath_receiver')],
     ['FeeAccumulator.BindAirdropPool.airdrop_pool_address', address(draft, 'airdrop_pool')],
+    // W1-002: missing from every artifact -> every capsule fee bounced (15055) and the airdrop never accrued.
+    ['FeeAccumulator.BindShardCode.shard_code', codeHashOf(draft, 'record_shard')],
+    ['FeeAccumulator.BindIntroShardCode.intro_shard_code', codeHashOf(draft, 'intro_shard')],
+    ['FeeAccumulator.BindPublicShardCode.public_shard_code', codeHashOf(draft, 'public_shard')],
+    ['FeeAccumulator.BindTicketCode.ticket_code', codeHashOf(draft, 'airdrop_ticket')],
     ['UsernameRegistry.BindOfficialAthWallet', address(draft, 'username_registry_official_ath_wallet')],
     ['ProfileRegistry.BindProfileOfficialAthWallet', address(draft, 'profile_registry_official_ath_wallet')],
   ];
