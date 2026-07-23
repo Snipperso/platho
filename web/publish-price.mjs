@@ -73,13 +73,17 @@ export function publishValueFor(lane) {
 // "always attach the deploy figure" rule as CONV/INTRO: the shard keeps only what it needs and mode-128 returns the
 // surplus, so a client that always pays this is never refused and never overspends. CHANNEL and THREAD share the
 // post endowment (30-day era, 1-year retention); BEACON funds a 1-year era, AVATAR a 3-year retention.
-// MEASURED 2026-07-21 against get_view.deploy_min_value; pinned in tests/public-lane-price.test.ts against the live
-// getter so a contract drift is a red test, not a refused publish. [RE-MEASURE BEFORE SEAL — PublicShard
-// endowments are still derivations, see PLATHO_CLEAN17_MASTER_ROADMAP "ЗАМЕРИТЬ ДО SEAL".]
-export const PUBLIC_CHANNEL_PUBLISH_VALUE = 19_300_000n;
-export const PUBLIC_THREAD_PUBLISH_VALUE = 19_300_000n;
-export const PUBLIC_BEACON_PUBLISH_VALUE = 23_900_000n;
-export const PUBLIC_AVATAR_PUBLISH_VALUE = 28_700_000n;
+// MEASURED against get_view.deploy_min_value; pinned in tests/public-lane-price.test.ts against the live getter so a
+// contract drift is a red test, not a refused publish.
+// [RAISED 2026-07-24 with PS_BASE_ENDOWMENT_* — was 19_300_000 / 19_300_000 / 23_900_000 / 28_700_000. The old
+//  PublicShard base endowments were measured INSOLVENT at today's rate (AVATAR 0.88x, BEACON 0.85x — the shard froze
+//  before its retention expired and the avatar/beacon was lost). Raising the contract's base endowment raises
+//  deploy_min_value by the same amount, so these MUST move together: a client still sending the old figure is
+//  refused by gate 13704 on every first publish.]
+export const PUBLIC_CHANNEL_PUBLISH_VALUE = 20_300_000n;
+export const PUBLIC_THREAD_PUBLISH_VALUE = 20_300_000n;
+export const PUBLIC_BEACON_PUBLISH_VALUE = 31_400_000n;
+export const PUBLIC_AVATAR_PUBLISH_VALUE = 39_200_000n;
 
 const PUBLIC_PUBLISH_VALUE_BY_KIND = Object.freeze({
   0: PUBLIC_CHANNEL_PUBLISH_VALUE,
