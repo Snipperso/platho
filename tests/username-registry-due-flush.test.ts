@@ -113,7 +113,7 @@ async function mintValidName(blockchain: Blockchain, registry: any, officialAthW
     payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   } as AthTransferNotificationRegistryMintUsername);
 }
 

@@ -133,7 +133,7 @@ async function createStuckPendingMint(ctx: Awaited<ReturnType<typeof deploySeale
     payer_wallet: ctx.vaultAddress,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   } as AthTransferNotificationRegistryMintUsername);
 
   return { hash, itemAddress, noAckItem };
@@ -276,7 +276,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
       payer_wallet: ctx.vaultAddress,
       owner_wallet: ownerWallet,
       username_len: 6n,
-      username: usernameSlice('remint'),
+      username: usernameSlice('remint').asCell(),
     } as AthTransferNotificationRegistryMintUsername);
 
     expect(findTransaction(remint.transactions, {

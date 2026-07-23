@@ -129,6 +129,13 @@ message(0x504E5052) PruneStaleNotification {
 // Official username ATH wallet -> UsernameRegistry for a registry-funded username mint. payer_wallet is stamped by
 // the official ATH wallet from the real payer's derived address, owner_wallet is the wallet receiving the NFT.
 // (Named "Vault" until 2026-07-19: this lane predates the Vault's cancellation and the registries took the role.)
+// [§4c 2026-07-23] username is a `Cell` (a dedicated ref), NOT `Slice as remaining` like its 0x4154481C/1D
+// siblings. Those siblings carry >1023 fixed bits, so Tact auto-spills the trailing remaining-slice into a fresh
+// cell and a 16-char name fits. THIS message's fixed part is only 926 bits (op32+query_id64+sender_key160+
+// amount128+payer267+owner267+len8), leaving 97 inline bits = 12 chars; a 13..16-char name (all sold at full
+// price) overflowed the 1023-bit cell → exit 8 when the wallet built the notification. A `Cell` field is always a
+// ref, so the name now lives in its own cell (name bytes only, still FLAT — UsernameRegistry.isValidUsernameBytes
+// parses it and requires refsEmpty + bits==len*8). Root = 926 bits + 1 ref; fits any name up to 127 chars.
 message(0x89129D60) AthTransferNotificationRegistryMintUsername {
     query_id: Int as uint64;
     sender_key: Int as uint160;
@@ -136,7 +143,7 @@ message(0x89129D60) AthTransferNotificationRegistryMintUsername {
     payer_wallet: Address;
     owner_wallet: Address;
     username_len: Int as uint8;
-    username: Slice as remaining;
+    username: Cell;
 }
 
 // Official profile ATH wallet -> ProfileRegistry for a registry-funded profile avatar. payer_wallet is stamped by
@@ -977,7 +984,8 @@ contract ATHWallet {
                 payer_wallet: msg.sender_owner,
                 owner_wallet: msg.owner_wallet,
                 username_len: msg.username_len,
-                username: msg.username
+                // Wrap the inbound remaining-slice name into its own ref cell (see the message decl for why).
+                username: beginCell().storeSlice(msg.username).endCell()
             }.toCell()
         });
 

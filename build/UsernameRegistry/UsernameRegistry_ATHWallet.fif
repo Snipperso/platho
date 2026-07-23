@@ -232,7 +232,7 @@ PROGRAM{
     STSLICE
     STSLICE
     8 STU
-    STSLICE
+    STREF
   }>
   $AthTransferNotificationRegistryMintUsername$_store_cell PROCINLINE:<{
     7 -ROLL
@@ -2937,19 +2937,23 @@ PROGRAM{
       __tact_dict_set_int_cell INLINECALLDICT
       1 PUSHINT
       TRUE
+          NEWC
+      s0 s11 XCHG2
+          STSLICER
+          ENDC
       s9 PUSH
       s5 s9 XCPU
       s5 s8 XCHG
       s0 s4 XCHG
       s3 s9 XCHG
-      s14 s13 s12 XCHG3
+      s14 s13 s14 XCHG3
       $AthTransferNotificationRegistryMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username INLINECALLDICT
       NEWC
       $AthTransferNotificationRegistryMintUsername$_store_cell INLINECALLDICT
       s7 PUSH
       s0 s4 XCHG
       s3 s10 XCHG
-      s0 s9 s9 XCHG3
+      s0 s7 s7 XCHG3
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -2996,8 +3000,7 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s4 s0 s3 XCHG3
-      s0 s2 XCHG
+      s3 s3 s4 XCHG3
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER

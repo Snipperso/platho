@@ -107,7 +107,7 @@ async function sendMintFromOfficialAddress(
     payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   } as AthTransferNotificationRegistryMintUsername);
 }
 
@@ -164,7 +164,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       payer_wallet: fixtureAddress('USERNAME_AUTH_VAULT'),
       owner_wallet: ownerWallet,
       username_len: 6n,
-      username: usernameSlice('forged'),
+      username: usernameSlice('forged').asCell(),
     } as AthTransferNotificationRegistryMintUsername);
     // Gate 19180 rejects the forged notification, so no item was ever deployed for this name: the
     // account at the derived address does not exist, which is the chain's answer to "is 'forged' taken".

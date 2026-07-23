@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: ATHWallet
-BoC Size: 6202 bytes
+BoC Size: 6207 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 64
+Total structures: 66
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -86,8 +86,8 @@ TL-B: `prune_stale_notification#504e5052 query_id:uint64 sender_key:uint160 = Pr
 Signature: `PruneStaleNotification{query_id:uint64,sender_key:uint160}`
 
 ### AthTransferNotificationRegistryMintUsername
-TL-B: `ath_transfer_notification_registry_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationRegistryMintUsername`
-Signature: `AthTransferNotificationRegistryMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+TL-B: `ath_transfer_notification_registry_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:^cell = AthTransferNotificationRegistryMintUsername`
+Signature: `AthTransferNotificationRegistryMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,username_len:uint8,username:^cell}`
 
 ### AthTransferNotificationRegistryProfileAvatar
 TL-B: `ath_transfer_notification_registry_profile_avatar#a11a7002 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationRegistryProfileAvatar`
@@ -192,6 +192,14 @@ Signature: `KeyShardSetAvatarPointer{write_id:uint64,owner_wallet:address,avatar
 ### KeyShardAvatarPointerAck
 TL-B: `key_shard_avatar_pointer_ack#4b534736 write_id:uint64 version:uint32 = KeyShardAvatarPointerAck`
 Signature: `KeyShardAvatarPointerAck{write_id:uint64,version:uint32}`
+
+### KeyShardProveOwnership
+TL-B: `key_shard_prove_ownership#4b534737 query_id:uint64 to:address = KeyShardProveOwnership`
+Signature: `KeyShardProveOwnership{query_id:uint64,to:address}`
+
+### KeyShardOwnershipProof
+TL-B: `key_shard_ownership_proof#4b534738 query_id:uint64 owner_wallet:address key_id:uint256 key_generation:uint32 rotation_nonce:uint64 enc_pubkey:uint256 sign_pubkey:uint256 scan_pubkey:uint256 pq_kem_pubkey_hash:uint256 pq_kem_pubkey_len:uint16 pq_kem_pubkey:^cell crypto_suite_mask:uint16 created_at:uint64 avatar_version:uint32 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 avatar_media_format:uint8 avatar_updated_at:uint64 = KeyShardOwnershipProof`
+Signature: `KeyShardOwnershipProof{query_id:uint64,owner_wallet:address,key_id:uint256,key_generation:uint32,rotation_nonce:uint64,enc_pubkey:uint256,sign_pubkey:uint256,scan_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,pq_kem_pubkey:^cell,crypto_suite_mask:uint16,created_at:uint64,avatar_version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,avatar_media_format:uint8,avatar_updated_at:uint64}`
 
 ### KeyShardView
 TL-B: `_ exists:bool owner_wallet:address key_id:int257 key_generation:int257 rotation_nonce:int257 enc_pubkey:int257 sign_pubkey:int257 scan_pubkey:int257 pq_kem_pubkey_hash:int257 pq_kem_pubkey_len:int257 pq_kem_pubkey:^cell crypto_suite_mask:int257 created_at:int257 created_lt:int257 min_register_value:int257 min_replace_value:int257 profile_registry:address avatar_version:int257 avatar_hash:int257 avatar_entry_id:int257 avatar_stream_id:int257 avatar_part_count:int257 avatar_media_format:int257 avatar_updated_at:int257 = KeyShardView`

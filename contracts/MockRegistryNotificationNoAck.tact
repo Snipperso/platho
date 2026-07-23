@@ -14,6 +14,7 @@ message(0xA11A7002) AthTransferNotificationRegistryProfileAvatar {
     media_format: Int as uint8;
 }
 
+// MIRROR of ATHWallet.tact's declaration — MUST stay byte-for-byte identical (username is a `Cell` ref, §4c).
 message(0x89129D60) AthTransferNotificationRegistryMintUsername {
     query_id: Int as uint64;
     sender_key: Int as uint160;
@@ -21,7 +22,7 @@ message(0x89129D60) AthTransferNotificationRegistryMintUsername {
     payer_wallet: Address;
     owner_wallet: Address;
     username_len: Int as uint8;
-    username: Slice as remaining;
+    username: Cell;
 }
 
 struct MockRegistryNotificationNoAckStateView {

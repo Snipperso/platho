@@ -721,7 +721,7 @@ export type AthTransferNotificationRegistryMintUsername = {
     payer_wallet: Address;
     owner_wallet: Address;
     username_len: bigint;
-    username: Slice;
+    username: Cell;
 }
 
 export function storeAthTransferNotificationRegistryMintUsername(src: AthTransferNotificationRegistryMintUsername) {
@@ -734,7 +734,7 @@ export function storeAthTransferNotificationRegistryMintUsername(src: AthTransfe
         b_0.storeAddress(src.payer_wallet);
         b_0.storeAddress(src.owner_wallet);
         b_0.storeUint(src.username_len, 8);
-        b_0.storeBuilder(src.username.asBuilder());
+        b_0.storeRef(src.username);
     };
 }
 
@@ -747,7 +747,7 @@ export function loadAthTransferNotificationRegistryMintUsername(slice: Slice) {
     const _payer_wallet = sc_0.loadAddress();
     const _owner_wallet = sc_0.loadAddress();
     const _username_len = sc_0.loadUintBig(8);
-    const _username = sc_0;
+    const _username = sc_0.loadRef();
     return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
@@ -758,7 +758,7 @@ export function loadTupleAthTransferNotificationRegistryMintUsername(source: Tup
     const _payer_wallet = source.readAddress();
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
-    const _username = source.readCell().asSlice();
+    const _username = source.readCell();
     return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
@@ -769,7 +769,7 @@ export function loadGetterTupleAthTransferNotificationRegistryMintUsername(sourc
     const _payer_wallet = source.readAddress();
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
-    const _username = source.readCell().asSlice();
+    const _username = source.readCell();
     return { $$type: 'AthTransferNotificationRegistryMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
@@ -781,7 +781,7 @@ export function storeTupleAthTransferNotificationRegistryMintUsername(source: At
     builder.writeAddress(source.payer_wallet);
     builder.writeAddress(source.owner_wallet);
     builder.writeNumber(source.username_len);
-    builder.writeSlice(source.username.asCell());
+    builder.writeCell(source.username);
     return builder.build();
 }
 
@@ -1019,7 +1019,7 @@ const MockRegistryNotificationNoAck_types: ABIType[] = [
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
     {"name":"AthTransferNotificationRegistryProfileAvatar","header":2702864386,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
-    {"name":"AthTransferNotificationRegistryMintUsername","header":2299698528,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"AthTransferNotificationRegistryMintUsername","header":2299698528,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"MockRegistryNotificationNoAckStateView","header":null,"fields":[{"name":"profile_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"MockRegistryNotificationNoAck$Data","header":null,"fields":[{"name":"profile_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"username_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"last_query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
 ]

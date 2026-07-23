@@ -209,7 +209,7 @@ describe('UsernameRegistry integration with Vault-owned ATHWallet', () => {
       payer_wallet: vaultAddress,
       owner_wallet: user.address,
       username_len: BigInt(Buffer.from(username, 'ascii').length),
-      username: usernameSlice(username),
+      username: usernameSlice(username).asCell(),
     } as AthTransferNotificationRegistryMintUsername);
 
     const global = await registry.getGetGlobal();

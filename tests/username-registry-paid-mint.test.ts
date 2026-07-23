@@ -123,7 +123,7 @@ async function sendMint(
     payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   } as AthTransferNotificationRegistryMintUsername);
 }
 
@@ -136,7 +136,7 @@ function vaultMintNotificationBody(ownerWallet: Address, name: string, amount: b
     payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   })).endCell();
 }
 
@@ -613,7 +613,7 @@ describe('UsernameRegistry paid mint milestone', () => {
       payer_wallet: fixtureAddress('USERNAME_REGISTRY_VAULT'),
       owner_wallet: ownerWallet,
       username_len: 6n,
-      username: usernameSlice('platho'),
+      username: usernameSlice('platho').asCell(),
     } as AthTransferNotificationRegistryMintUsername);
 
     // The spoofed mint neither finalised nor left a pending entry.

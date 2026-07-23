@@ -50,8 +50,8 @@ TL-B: `ath_transfer_notification_registry_profile_avatar#a11a7002 query_id:uint6
 Signature: `AthTransferNotificationRegistryProfileAvatar{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
 
 ### AthTransferNotificationRegistryMintUsername
-TL-B: `ath_transfer_notification_registry_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationRegistryMintUsername`
-Signature: `AthTransferNotificationRegistryMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+TL-B: `ath_transfer_notification_registry_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:^cell = AthTransferNotificationRegistryMintUsername`
+Signature: `AthTransferNotificationRegistryMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,username_len:uint8,username:^cell}`
 
 ### MockRegistryNotificationNoAckStateView
 TL-B: `_ profile_count:int257 username_count:int257 last_query_id:int257 = MockRegistryNotificationNoAckStateView`

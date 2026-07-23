@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: MarketStabilitySeller
-BoC Size: 11997 bytes
+BoC Size: 12002 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 53
@@ -86,8 +86,8 @@ TL-B: `prune_stale_notification#504e5052 query_id:uint64 sender_key:uint160 = Pr
 Signature: `PruneStaleNotification{query_id:uint64,sender_key:uint160}`
 
 ### AthTransferNotificationRegistryMintUsername
-TL-B: `ath_transfer_notification_registry_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationRegistryMintUsername`
-Signature: `AthTransferNotificationRegistryMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+TL-B: `ath_transfer_notification_registry_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:^cell = AthTransferNotificationRegistryMintUsername`
+Signature: `AthTransferNotificationRegistryMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,username_len:uint8,username:^cell}`
 
 ### AthTransferNotificationRegistryProfileAvatar
 TL-B: `ath_transfer_notification_registry_profile_avatar#a11a7002 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationRegistryProfileAvatar`

@@ -177,7 +177,7 @@ function mintBody(owner: Address, name: string, amount: bigint, queryId: bigint,
     payer_wallet: payerWallet,
     owner_wallet: owner,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   };
 }
 

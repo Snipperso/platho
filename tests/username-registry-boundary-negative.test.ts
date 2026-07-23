@@ -209,7 +209,7 @@ async function sendMint(registry: any, officialSender: any, ownerWallet: Address
     payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   } as AthTransferNotificationRegistryMintUsername);
 }
 
@@ -222,7 +222,7 @@ async function sendMintFromAddress(blockchain: Blockchain, registry: any, offici
     payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
-    username: usernameSlice(name),
+    username: usernameSlice(name).asCell(),
   } as AthTransferNotificationRegistryMintUsername);
 }
 
@@ -291,6 +291,27 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
 
     // The pending mint cleared on the item's ACK, which is what finalised the mint.
     expect((await registry.getGetPendingMint(validHash)).exists).toBe(false);
+  });
+
+  it('USERNAME-REG-BND-16CHAR: a 16-char name (USERNAME_MAX_LENGTH) mints end to end (§4c overflow fix)', async () => {
+    const { blockchain, registry, officialAthWallet, vaultAddress } = await deploySealedRegistryWithTreasuryOfficial();
+    const owner = fixtureAddress('MAXLEN_OWNER');
+    const name = 'abcdefghijklmnop'; // 16 chars — before §4c this notification could not be built at all (exit 8)
+    expect(name.length).toBe(16);
+
+    await sendMint(
+      registry,
+      officialAthWallet,
+      owner,
+      name,
+      PRICE_6_PLUS,
+      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE + REGISTRY_SELF_RENT_CONTRIBUTION,
+      vaultAddress,
+    );
+
+    expect(await nameIsMinted(blockchain, registry.address, name)).toBe(true);
+    const { item } = await itemForName(blockchain, registry.address, name);
+    expect((await item.getGetState()).owner_wallet.equals(owner)).toBe(true);
   });
 
   it('USERNAME-REG-BND-02: UsernameNFTItem resend ACK rejects min-1 and accepts exact reserve', async () => {
