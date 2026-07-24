@@ -138,6 +138,16 @@ contract AirdropTicket {
     // only if 0.01 GRAM actually reached the fee pool for a published capsule.
     receive(_: TicketCredit) {
         throwUnless(27001, sender() == AT_FEE_SINK);
+        // [W1-006 FIX 2026-07-24] Refuse to accumulate a credit for a MASTERCHAIN owner. AirdropPool pays the airdrop
+        // to `buyer` and rejects a masterchain buyer at gate 26111 (with no bounced<AirdropAccrue> to restore it), so a
+        // masterchain-owned ticket's credits are UNDELIVERABLE — a claim would debit them into a redeem the pool burns.
+        // Refusing here, at the source, means such a ticket never accumulates anything, so there is nothing to burn.
+        // The fee still reached the pool (this is downstream of that); only the airdrop credit — which could never be
+        // paid to a masterchain address anyway — is declined. Gated at the TICKET, not at FeeAccumulator: the ticket's
+        // address is not baked as a constant anywhere (FeeAccumulator binds ticket code at runtime), so unlike a gate
+        // on FeeAccumulator this shifts no genesis address. Every real publisher is basechain, so the honest path is
+        // untouched. `owner` is fixed at mint, so this can never flip on an existing ticket.
+        throwUnless(27003, self.isBasechainAddress(self.owner));
         // uint32 holds 4.29e9; the whole airdrop is 1.5e6 capsules, so this cannot be reached by publishing.
         // Gated anyway, in COMPUTE, because an overflow here would wrap a publisher's balance to zero silently.
         throwUnless(27002, self.credits < 4294967295);
