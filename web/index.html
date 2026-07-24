@@ -336,66 +336,6 @@
           </header>
 
           <div class="vault-scroll-content">
-            <div class="vault-move-list" id="vaultMoveList">
-              <form class="vault-asset-move-card" id="vaultMoveTonForm" data-vault-move-asset="TON">
-                <header class="vault-asset-move-header">
-                  <div>
-                    <span>GRAM</span>
-                    <strong data-i18n="vault.moveGram">Move GRAM</strong>
-                  </div>
-                  <div class="vault-asset-balances">
-                    <span>Wallet <strong id="vaultMoveTonWalletBalance" data-vault-wallet-balance>0</strong></span>
-                    <span>Vault <strong id="vaultMoveTonVaultBalance" data-vault-vault-balance>0</strong></span>
-                  </div>
-                </header>
-
-                <div class="vault-asset-move-body">
-                  <div class="vault-asset-route">
-                    <span id="vaultMoveTonFromLabel" data-vault-from-label data-i18n="common.wallet">Wallet</span>
-                    <button class="vault-asset-switch" id="vaultMoveTonDirectionButton" type="button" data-vault-direction-button aria-label="Switch GRAM direction" title="Switch direction" data-i18n-aria-label="vault.switchGramDirection" data-i18n-title="vault.switchDirection">
-                      <span class="icon icon-swap-circular"></span>
-                    </button>
-                    <span id="vaultMoveTonToLabel" data-vault-to-label data-i18n="common.vault">Vault</span>
-                  </div>
-                  <div class="vault-asset-amount">
-                    <input id="vaultMoveTonAmountInput" data-vault-move-input type="text" inputmode="decimal" autocomplete="off" placeholder="0">
-                    <button id="vaultMoveTonMaxButton" data-vault-max-button type="button" data-i18n="vault.max">MAX</button>
-                  </div>
-                </div>
-
-                <button class="vault-move-submit" id="vaultMoveTonSubmitButton" data-vault-submit-button type="submit" data-i18n="vault.moveGramToVault">Move GRAM to Vault</button>
-              </form>
-
-              <form class="vault-asset-move-card" id="vaultMoveAthForm" data-vault-move-asset="ATH">
-                <header class="vault-asset-move-header">
-                  <div>
-                    <span>ATH</span>
-                    <strong data-i18n="vault.moveAth">Move ATH</strong>
-                  </div>
-                  <div class="vault-asset-balances">
-                    <span>Wallet <strong id="vaultMoveAthWalletBalance" data-vault-wallet-balance>0</strong></span>
-                    <span>Vault <strong id="vaultMoveAthVaultBalance" data-vault-vault-balance>0</strong></span>
-                  </div>
-                </header>
-
-                <div class="vault-asset-move-body">
-                  <div class="vault-asset-route">
-                    <span id="vaultMoveAthFromLabel" data-vault-from-label data-i18n="common.wallet">Wallet</span>
-                    <button class="vault-asset-switch" id="vaultMoveAthDirectionButton" type="button" data-vault-direction-button aria-label="Switch ATH direction" title="Switch direction" data-i18n-aria-label="vault.switchAthDirection" data-i18n-title="vault.switchDirection">
-                      <span class="icon icon-swap-circular"></span>
-                    </button>
-                    <span id="vaultMoveAthToLabel" data-vault-to-label data-i18n="common.vault">Vault</span>
-                  </div>
-                  <div class="vault-asset-amount">
-                    <input id="vaultMoveAthAmountInput" data-vault-move-input type="text" inputmode="decimal" autocomplete="off" placeholder="0">
-                    <button id="vaultMoveAthMaxButton" data-vault-max-button type="button" data-i18n="vault.max">MAX</button>
-                  </div>
-                </div>
-
-                <button class="vault-move-submit" id="vaultMoveAthSubmitButton" data-vault-submit-button type="submit" data-i18n="vault.moveAthToVault">Move ATH to Vault</button>
-              </form>
-            </div>
-
             <div class="action-grid" id="actionGrid"></div>
 
             <div class="vault-pocket-note">

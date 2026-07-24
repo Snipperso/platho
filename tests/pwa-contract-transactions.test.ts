@@ -423,39 +423,6 @@ describe('PWA contract transaction builders', () => {
     expect(ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue).toBe(45_000_000n);
   });
 
-  it('PWA-TX-07B: Vault ATH deposit uses the current 32m notify envelope', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const depositFlow = app.match(/async function submitVaultDepositAthAmount[\s\S]*?async function submitVaultWithdrawAth/);
-    expect(depositFlow?.[0]).toContain('notify_value: 32_000_000n');
-
-    const depositNotifyValue = 32_000_000n;
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', {
-      notify_value: depositNotifyValue,
-    })).toBe(71_000_000n);
-
-    const athMessage = createAthWalletMessage('ATHTransferRequestWithNotify', {
-      query_id: 16n,
-      amount: 1_000_000_000n,
-      recipient: VAULT,
-      response_destination: OWNER,
-      notify_destination: VAULT,
-      notify_value: depositNotifyValue,
-    }, {
-      athWalletAddress: ATH_WALLET,
-    });
-
-    expect(athMessage.amount).toBe('71000000');
-    expect(athMessage.payload).toBe(generatedBody(storeATHTransferRequestWithNotify({
-      $$type: 'ATHTransferRequestWithNotify',
-      query_id: 16n,
-      amount: 1_000_000_000n,
-      recipient: Address.parseRaw(VAULT),
-      response_destination: Address.parseRaw(OWNER),
-      notify_destination: Address.parseRaw(VAULT),
-      notify_value: depositNotifyValue,
-    })));
-  });
-
   it('PWA-TX-08: builds generic ATHWallet wallet messages only', () => {
     const athMessage = createAthWalletMessage('ATHTransferRequest', {
       query_id: 11n,
