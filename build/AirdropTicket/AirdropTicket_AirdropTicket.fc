@@ -345,6 +345,7 @@ _ %get_ticket() method_id(104158) {
         in_msg~skip_bits(32);
         var $_ = empty_tuple();
         throw_unless(27001, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57()) ));
+        throw_unless(27003, ($self'owner, $self'credits, $self'in_flight)~$AirdropTicket$_fun_isBasechainAddress($self'owner));
         throw_unless(27002, ($self'credits < 4294967295));
         $self'credits = $self'credits + 1;
         $AirdropTicket$_contract_store(($self'owner, $self'credits, $self'in_flight));

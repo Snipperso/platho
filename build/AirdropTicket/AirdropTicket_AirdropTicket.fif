@@ -227,12 +227,16 @@ PROGRAM{
           B{b5ee9c7241010101002400004380152cc7265d0c7d36bdf6dc6c0ffa8f87c7e5acae1ee28cc9d6f4f4ddf9d8ba0a109591c174} B>boc <s PUSHSLICE
       SDEQ
       THROWANYIFNOT
+      27003 PUSHINT
+      s2 s3 s2 XC2PU
+      $AirdropTicket$_fun_isBasechainAddress INLINECALLDICT
+      s1 s4 XCHG
+      THROWANYIFNOT
       27002 PUSHINT
-      s2 PUSH
+      OVER
       32 PUSHPOW2DEC
       LESS
       THROWANYIFNOT
-      SWAP
       INC
       ROT
       $AirdropTicket$_contract_store INLINECALLDICT

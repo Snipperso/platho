@@ -86,6 +86,22 @@ describe('AIRDROP TICKET — credits cannot be minted, and cannot be lost', () =
     expect((await ticket.getGetTicket()).owner.toString()).toBe(owner.address.toString());
   });
 
+  it('TICKET-01b: [W1-006] a masterchain-owned ticket refuses credits — an undeliverable airdrop never accumulates', async () => {
+    const { bc } = await setup();
+    // A ticket whose owner is on the MASTERCHAIN (workchain -1). AirdropPool pays the airdrop to this owner as `buyer`
+    // and rejects a masterchain buyer at 26111, so its credits could never be delivered; a claim would only debit them
+    // into a redeem the pool burns. The ticket refuses to accumulate them at the source (27003).
+    const masterOwner = new Address(-1, Buffer.alloc(32, 0x9c));
+    const mticket = await deployTicket(bc, masterOwner);
+    await mticket.send(bc.sender(FEE_SINK), { value: toNano('0.05') }, { $$type: 'TicketCredit' } as any);
+    expect((await mticket.getGetTicket()).credits, 'a masterchain owner accumulates nothing to burn later').toBe(0n);
+
+    // The basechain path is untouched — a real (basechain) publisher still accrues normally.
+    const bTicket = await deployTicket(bc, (await bc.treasury('basechain-pub')).address);
+    await bTicket.send(bc.sender(FEE_SINK), { value: toNano('0.05') }, { $$type: 'TicketCredit' } as any);
+    expect((await bTicket.getGetTicket()).credits, 'a basechain publisher still gets its credit').toBe(1n);
+  });
+
   it('TICKET-02: only the owner may claim', async () => {
     const { bc, owner, stranger, ticket } = await setup();
     await credit(bc, ticket, 64);
