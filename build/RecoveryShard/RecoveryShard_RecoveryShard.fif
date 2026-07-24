@@ -12,6 +12,7 @@ PROGRAM{
   DECLPROC $RecoveryShard$_contract_store
   DECLPROC $RecoveryShard$_fun_slotKeyForOwner
   DECLPROC $RecoveryShard$_fun_recoveryDigest
+  DECLPROC $RecoveryShard$_fun_evictDigest
   DECLPROC $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells
   DECLPROC $RecoveryShard$_fun_get_view
   DECLPROC $RecoveryShard$_fun_get_body
@@ -147,11 +148,27 @@ PROGRAM{
         ENDC
         HASHCU
   }>
+  $RecoveryShard$_fun_evictDigest PROCREF:<{
+        NEWC
+    1381188950 PUSHINT
+    SWAP
+    32 STU
+        MYADDR
+        STSLICER
+    s10 s(-1) PUXC
+    256 STU
+    s7 s(-1) PUXC
+    64 STU
+    SWAP
+        STSLICER
+        ENDC
+        HASHCU
+  }>
   $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells PROCINLINE:<{
   }>
   $RecoveryShard$_fun_get_view PROCREF:<{
     94608000 PUSHINT
-    29000000 PUSHINT
+    29300000 PUSHINT
     8 PUSHPOW2
     79 PUSHINT
     s12 PUSH
@@ -260,7 +277,7 @@ PROGRAM{
       13572 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      37000000 PUSHINT
+      37300000 PUSHINT
       GEQ
       THROWANYIFNOT
       OVER
@@ -346,7 +363,7 @@ PROGRAM{
       s1 s9 XCHG
       THROWANYIFNOT
           NOW
-      29000000 PUSHINT
+      29300000 PUSHINT
       2 PUSHINT
           RAWRESERVE
       __tact_context_get_sender INLINECALLDICT
@@ -427,32 +444,41 @@ PROGRAM{
       s1 s3 s0 XCHG3
       $RecoveryShard$_contract_store INLINECALLDICT
     }>
-    s10 POP
-    DUP
+    OVER
     1380144690 PUSHINT
     EQUAL
     IFJMP:<{
-      s5 s6 XCHG
-      6 BLKDROP
-      s3 POP
+      2DROP
+      s0 s8 XCHG
+      LDMSGADDR
+      LDREF
+      DROP
       13561 PUSHINT
-      SWAP
+      s8 PUSH
       THROWANYIFNOT
-      13562 PUSHINT
-      s0 s3 XCHG
-      94608000 PUSHINT
-      ADD
-          NOW
-      LESS
-      s1 s3 XCHG
+      s1 s8 XCHG
+      s1 s7 XCHG
+      s6 s9 XCHG2
+      s1 s5 XCHG
+      s1 s4 XCHG
+      s3 s3 s0 XCHG3
+      13565 PUSHINT
+      s11 s9 XCPU
+      $RecoveryShard$_fun_evictDigest INLINECALLDICT
+      s8 POP
+      5 BLKDROP
+      s0 s5 XCHG
+          CTOS
+      SWAP
+          CHKSIGNU
+      s1 s4 XCHG
       THROWANYIFNOT
       FALSE
       0 PUSHINT
       s0 s0 s0 PUSH3
           <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
-      OVER
-      __tact_context_get_sender INLINECALLDICT
-      OVER
+      s1 s1 PUSH2
+      s1 s8 XCHG
       130 PUSHINT
       FALSE
       $SendParameters$_constructor_to_value_mode_bounce INLINECALLDICT
@@ -522,10 +548,12 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s6 s7 XCHG
-      s5 s6 XCHG
+      s5 s7 XCHG
+      s4 s6 XCHG
+      4 ROLL
       $RecoveryShard$_contract_store INLINECALLDICT
     }>
+    s10 POP
     0 EQINT
     s0 s9 XCHG
     33 LESSINT

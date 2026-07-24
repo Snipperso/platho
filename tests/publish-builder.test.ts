@@ -530,8 +530,10 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // project 1.5x rule. The value below is the MEASURED 3-year rent x 1.5, and
     // tests/recovery-rent-solvency.test.ts RENT-01 now reads that rent off the storage phase so this constant can
     // never again be validated against a cell model that leaves something out.
-    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT'), 'measured 3yr rent 19_293_761 x 1.5 = 28_940_642 -> 29_000_000').toBe(29_000_000n);
-    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(37_000_000n);
+    // [RAISED 2026-07-24: 29_000_000 -> 29_300_000. The W1-009 owner-signed eviction added code cells, lifting the
+    // measured 3-year rent 19_293_761 -> 19_488_648 and the old margin to 1.488x; re-measured x1.5 = 29_232_972.]
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT'), 'measured 3yr rent 19_488_648 x 1.5 = 29_232_972 -> 29_300_000').toBe(29_300_000n);
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(37_300_000n);
     // the STORAGE+GAS part is still materially cheaper than the old two-hop floor (7_710_000) — the hop is gone
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS')).toBeLessThan(7_710_000n);
   });

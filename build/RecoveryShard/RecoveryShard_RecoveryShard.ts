@@ -703,31 +703,43 @@ export function dictValueParserRecoveryStore(): DictionaryValue<RecoveryStore> {
 
 export type EvictRecovery = {
     $$type: 'EvictRecovery';
+    refund_to: Address;
+    owner_sig: Cell;
 }
 
 export function storeEvictRecovery(src: EvictRecovery) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(1380144690, 32);
+        b_0.storeAddress(src.refund_to);
+        b_0.storeRef(src.owner_sig);
     };
 }
 
 export function loadEvictRecovery(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1380144690) { throw Error('Invalid prefix'); }
-    return { $$type: 'EvictRecovery' as const };
+    const _refund_to = sc_0.loadAddress();
+    const _owner_sig = sc_0.loadRef();
+    return { $$type: 'EvictRecovery' as const, refund_to: _refund_to, owner_sig: _owner_sig };
 }
 
 export function loadTupleEvictRecovery(source: TupleReader) {
-    return { $$type: 'EvictRecovery' as const };
+    const _refund_to = source.readAddress();
+    const _owner_sig = source.readCell();
+    return { $$type: 'EvictRecovery' as const, refund_to: _refund_to, owner_sig: _owner_sig };
 }
 
 export function loadGetterTupleEvictRecovery(source: TupleReader) {
-    return { $$type: 'EvictRecovery' as const };
+    const _refund_to = source.readAddress();
+    const _owner_sig = source.readCell();
+    return { $$type: 'EvictRecovery' as const, refund_to: _refund_to, owner_sig: _owner_sig };
 }
 
 export function storeTupleEvictRecovery(source: EvictRecovery) {
     const builder = new TupleBuilder();
+    builder.writeAddress(source.refund_to);
+    builder.writeCell(source.owner_sig);
     return builder.build();
 }
 
@@ -971,7 +983,7 @@ function initRecoveryShard_init_args(src: RecoveryShard_init_args) {
 }
 
 async function RecoveryShard_init(self_bucket_key: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241021101000389000114ff00f4a413f4bcf2c80b01020162020b04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e21d3ffd200d3ffd33fd3ffd401d0d3ffd3ffd4d33f30104910481047104610456c198e90810101d7000101d17070547000208821e20a925f0ae07029d74920c21f953109d31f0ade21821052435631bae3023a20821052435632bae3020f03080a02fc5b08d3ffd31fd33fd3ffd3ffd430d0d3ffd4d43081350325c3009324c3009170e29323c3009170e2f2f48134f522f90024baf2f4813504f8416f24135f03820a349340bef2f4218309f9415b8134f801c150f2f42d8e12368134fb517cba17f2f48134fc534abcf2f4e30e107c106b105a104910384cbd813506543f9d2e0406019e813505536cbcf2f481350827810110b9f2f48135072f09111009108f107e106d105c104b103a02111102011112015610011110db3c373750d5ba1ff2f4103d102c104b7f0b105a4980104706050304050024c8821052534c4b01cb1f12cbffcb1fc9f90002c05611db3c6c6105d0541505f91019f2f4f8238209ba814072fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00181710365e22413007090044c813cbffcbffcbffc9c882104252533101cb1ff828cf1652b0cbff12cb3fccc9f90002ca10565f06338134f901f2f48134fa03821005a39a80a0f823b913f2f470705470008821f8422181008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00106710560f09004cc87f01ca0055805089cbff16ca0014cbff12cb3fcbff01c8cbff12cbff12cc12cb3fcdc9ed540072c00009c12119b08e2a10685515c87f01ca0055805089cbff16ca0014cbff12cb3fcbff01c8cbff12cbff12cc12cb3fcdc9ed54e05f09f2c0820201200c0e0285bd4a976a268690000c710e9ffe90069ffe99fe9ffea00e869ffe9ffea699f9808248824082388230822b60cc748408080eb800080e8b8382a3800104410f16d9e364e40f0d003e821005a39a808209ba81408307804f2c514c514c514c51485530546dd052d00285bcc2df6a268690000c710e9ffe90069ffe99fe9ffea00e869ffe9ffea699f9808248824082388230822b60cc748408080eb800080e8b8382a3800104410f16d9e3648c0f1000000002219abd0e73');
+    const __code = Cell.fromHex('b5ee9c72410212010003b3000114ff00f4a413f4bcf2c80b01020162020c04f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e21d3ffd200d3ffd33fd3ffd401d0d3ffd3ffd4d33f30104910481047104610456c198e90810101d7000101d17070547000208821e20a925f0ae07029d74920c21f953109d31f0ade21821052435631bae30221821052435632bae3023a1003080b02fc5b08d3ffd31fd33fd3ffd3ffd430d0d3ffd4d43081350325c3009324c3009170e29323c3009170e2f2f48134f522f90024baf2f4813504f8416f24135f03820a392720bef2f4218309f9415b8134f801c150f2f42d8e12368134fb517cba17f2f48134fc534abcf2f4e30e107c106b105a104910384cbd813506543f9d2e0406019e813505536cbcf2f481350827810110b9f2f48135072f09111009108f107e106d105c104b103a02111102011112015610011110db3c373750d5ba1ff2f4103d102c104b7f0b105a4980104706050304050024c8821052534c4b01cb1f12cbffcb1fc9f90002c05611db3c6c6105d0541505f91019f2f4f8238209bf152072fb02f8427081008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00181710365e224130070a0044c813cbffcbffcbffc9c882104252533101cb1ff828cf1652b0cbff12cb3fccc9f90003e05b08fa40d4308134f928f2f418175069151443308134fd51b9db3c385f0505d001f91014f2f470705470008853111881008270136d6d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010571046550309100a0038c882105253455601cb1ff828cf1652a0cbff5270cb3f01cf16c9f900004cc87f01ca0055805089cbff16ca0014cbff12cb3fcbff01c8cbff12cbff12cc12cb3fcdc9ed540072c00009c12119b08e2a10685515c87f01ca0055805089cbff16ca0014cbff12cb3fcbff01c8cbff12cbff12cc12cb3fcdc9ed54e05f09f2c0820201200d0f0285bd4a976a268690000c710e9ffe90069ffe99fe9ffea00e869ffe9ffea699f9808248824082388230822b60cc748408080eb800080e8b8382a3800104410f16d9e364e4100e003e821005a39a808209bf15208307804f2c514c514c514c51485530546dd052d00285bcc2df6a268690000c710e9ffe90069ffe99fe9ffea00e869ffe9ffea699f9808248824082388230822b60cc748408080eb800080e8b8382a3800104410f16d9e3648c10110000000221c4c82759');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initRecoveryShard_init_args({ $$type: 'RecoveryShard_init_args', self_bucket_key })(builder);
@@ -1069,7 +1081,7 @@ const RecoveryShard_types: ABIType[] = [
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
     {"name":"RecoveryStore","header":1380144689,"fields":[{"name":"owner_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"slot_index","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"h0","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"h1","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"bh","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"owner_sig","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"EvictRecovery","header":1380144690,"fields":[]},
+    {"name":"EvictRecovery","header":1380144690,"fields":[{"name":"refund_to","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_sig","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"RecoveryShardView","header":null,"fields":[{"name":"self_bucket_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"seq","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"updated_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"retention","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"endowment","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_slots","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"h0","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"h1","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"bh","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_blob_cells","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"RecoveryShard$Data","header":null,"fields":[{"name":"self_bucket_key","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"h0","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"h1","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"bh","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"updated_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
 ]
@@ -1097,14 +1109,15 @@ const RecoveryShard_receivers: ABIReceiver[] = [
 
 export const RS_RECOVERY_DOMAIN = 1112691505n;
 export const RS_SLOT_DOMAIN = 1381190731n;
+export const RS_EVICT_DOMAIN = 1381188950n;
 export const RS_MAX_SLOTS = 256n;
 export const RS_NAMED_SLOTS = 16n;
 export const RS_RECOVERY_RETENTION = 94608000n;
-export const RS_RECOVERY_ENDOWMENT = 29000000n;
+export const RS_RECOVERY_ENDOWMENT = 29300000n;
 export const RS_MAX_BLOB_CELLS = 79n;
 export const RS_BLOB_PROBE_CELLS = 1024n;
 export const RS_RECOVERY_PATH_GAS = 8000000n;
-export const RS_MIN_VALUE = 37000000n;
+export const RS_MIN_VALUE = 37300000n;
 
 export class RecoveryShard implements Contract {
     
