@@ -132,20 +132,17 @@ describe('RECOVERY RENT SOLVENCY — measured against the storage phase, not a c
     // eslint-disable-next-line no-console
     console.log(`[RENT-03] afterBind=${afterBind} | ${trail.join(' ')} | frozenAtYear=${frozenAtYear ?? 'not within 8y'}`);
 
-    // The question this pins: if a refresh topped the endowment up, the balance would return to ENDOWMENT every
-    // year and a live user could never freeze. If it does not, the balance only ever falls.
-    // CHARACTERISATION, NOT APPROVAL. This pins the CURRENT behaviour so the gap cannot drift unnoticed while the
-    // owner decides. Measured: 29_000_000 -> y1 22_568_746 -> ... -> y5 0, i.e. a user who refreshes EVERY year
-    // still freezes in year 5, losing the K_root blob the lane exists to protect, while get_view keeps reporting
-    // retention=3y/endowment=29M with no hint of the funding horizon.
-    // Two fixes are possible and BOTH are owner decisions on an immutable contract:
-    //   (a) make the refresh top up  -> `nativeReserve(RS_RECOVERY_ENDOWMENT, ReserveAtMost)` (drop
-    //       AddOriginalBalance) so every refresh restores the full endowment and the user pays to stay alive;
-    //   (b) keep funding fixed but stop the deadline outliving it (or surface the horizon in get_view).
-    // If (a) is taken, this expectation flips to toBe(ENDOWMENT).
-    const afterFirstRefresh = BigInt(trail[0].split('=')[1]);
-    expect(afterFirstRefresh, 'MEASURED GAP (W1-008): a refresh moves the eviction deadline but adds no funding')
-      .toBeLessThan(ENDOWMENT);
+    // W1-008 FIX (2026-07-24): a RecoveryStore refresh now TOPS THE ENDOWMENT UP — nativeReserve keeps the full
+    // RS_RECOVERY_ENDOWMENT (not `wasUnbound ? ENDOWMENT : 0` + original balance), so a diligent owner who refreshes
+    // pays for the rent consumed since the last write and the slot NEVER freezes while it is being refreshed. The
+    // CapsuleHub:1722 caution the old comment cited does not apply here: that was a MULTI-endowment pool where an
+    // absolute reserve would leak the accumulated surplus to the caller; a single-slot RecoveryShard has no surplus
+    // and its writes are owner-signature-gated, so the overpayment returns to the owner who sent it.
+    for (let i = 0; i < trail.length; i += 1) {
+      const bal = BigInt(trail[i].split('=')[1]);
+      expect(bal, `refresh in year ${i + 1} must keep the slot solvent (balance stays at the endowment)`).toBe(ENDOWMENT);
+    }
+    expect(frozenAtYear, 'a diligently-refreshed slot must never freeze').toBeNull();
   }, 300_000);
 
   it('RENT-02: the blob cap is what the endowment is calibrated for — one cell over is refused, not absorbed', async () => {
