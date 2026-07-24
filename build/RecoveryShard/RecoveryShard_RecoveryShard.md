@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: RecoveryShard
-BoC Size: 917 bytes
+BoC Size: 959 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 14
@@ -50,8 +50,8 @@ TL-B: `recovery_store#52435631 owner_pubkey:uint256 slot_index:uint32 seq:uint64
 Signature: `RecoveryStore{owner_pubkey:uint256,slot_index:uint32,seq:uint64,h0:uint256,h1:uint256,bh:uint256,body:^cell,owner_sig:^cell}`
 
 ### EvictRecovery
-TL-B: `evict_recovery#52435632  = EvictRecovery`
-Signature: `EvictRecovery{}`
+TL-B: `evict_recovery#52435632 refund_to:address owner_sig:^cell = EvictRecovery`
+Signature: `EvictRecovery{refund_to:address,owner_sig:^cell}`
 
 ### RecoveryShardView
 TL-B: `_ self_bucket_key:int257 bound:bool owner_pubkey:int257 seq:int257 updated_at:int257 retention:int257 endowment:int257 max_slots:int257 h0:int257 h1:int257 bh:int257 max_blob_cells:int257 = RecoveryShardView`

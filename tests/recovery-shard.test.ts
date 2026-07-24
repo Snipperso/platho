@@ -15,6 +15,7 @@ import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShar
 
 const RECOVERY_DOMAIN = 0x42525331n; // "BRS1"
 const SLOT_DOMAIN = 0x52534C4Bn;     // "RSLK" — self_bucket_key = H(SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index)
+const EVICT_DOMAIN = 0x52534556n;    // "RSEV" — owner-signed eviction digest (W1-009)
 const MAX_SLOTS = 256;               // MUST equal RS_MAX_SLOTS
 const NAMED_SLOTS = 16;              // MUST equal RS_NAMED_SLOTS — the named durable slots above the scan range
 const RETENTION = 94608000;          // 3 years
@@ -54,6 +55,27 @@ function store(owner: KeyPair, shard: Address, selfBucket: bigint, seq: bigint, 
     slot_index: slotIndex,
     seq, h0, h1, bh, body,
     owner_sig: cellOf(sign(d, (sigOwner ?? owner).secretKey)),
+  };
+}
+
+// An owner-signed eviction (W1-009). The digest binds the current stored seq and the refund address, so a relayer
+// forwarding it cannot redirect the reclaimed endowment and a stale eviction cannot be replayed after a re-bind.
+function evictDigest(shard: Address, selfBucket: bigint, seq: bigint, refundTo: Address): Buffer {
+  return beginCell()
+    .storeUint(EVICT_DOMAIN, 32)
+    .storeAddress(shard)
+    .storeUint(selfBucket, 256)
+    .storeUint(seq, 64)
+    .storeAddress(refundTo)
+    .endCell()
+    .hash();
+}
+
+function evict(owner: KeyPair, shard: Address, selfBucket: bigint, seq: bigint, refundTo: Address, sigOwner?: KeyPair) {
+  return {
+    $$type: 'EvictRecovery' as const,
+    refund_to: refundTo,
+    owner_sig: cellOf(sign(evictDigest(shard, selfBucket, seq, refundTo), (sigOwner ?? owner).secretKey)),
   };
 }
 
@@ -154,18 +176,35 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     expect(exitOf(res, rs.address)).toBe(13572);
   }, 120_000);
 
-  it('RECOVERY-07: eviction is refused before 3 years and clears the slot after', async () => {
+  it('RECOVERY-07: eviction is OWNER-SIGNED — a stranger cannot clear a slot, the owner reclaims on demand to the address it signed', async () => {
+    // W1-009: eviction USED to be permissionless and swept the whole residual to sender() the moment a slot aged 3
+    // years past its last write, so a stranger could destroy a live user's oldest K_root blob and pocket the endowment.
     const owner = keyPairFromSeed(Buffer.alloc(32, 0x16));
     const self = selfOf(owner);
     const rs = await shard(self);
     await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
     const keeper = await blockchain.treasury('rec-keeper');
-    // before 3 years: refused
-    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05'), bounce: true }, { $$type: 'EvictRecovery' } as any), rs.address)).toBe(13562);
-    // after 3 years + a day: cleared
+    const stranger = keyPairFromSeed(Buffer.alloc(32, 0xE7));
+
+    // A stranger's signature cannot evict — 13565.
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05'), bounce: true },
+      evict(owner, rs.address, self, 1n, keeper.address, stranger) as any), rs.address), 'stranger sig -> 13565').toBe(13565);
+    expect((await rs.getGetView()).bound, 'a forged eviction leaves the slot intact').toBe(true);
+
+    // Even years later a stranger still cannot evict — there is no permissionless self-heal any more.
     blockchain.now = blockchain.now! + RETENTION + 86400;
-    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecovery' } as any), rs.address)).toBe(0);
-    expect((await rs.getGetView()).bound).toBe(false);
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05'), bounce: true },
+      evict(owner, rs.address, self, 1n, keeper.address, stranger) as any), rs.address), 'stranger sig, aged -> 13565').toBe(13565);
+    expect((await rs.getGetView()).bound).toBe(true);
+
+    // The owner reclaims their OWN slot on demand (no 3-year wait), and the residual goes to the address THEY signed,
+    // not to whoever relayed the message — proven by sending it through `keeper` but refunding to `refund`.
+    const refund = await blockchain.treasury('rec-refund');
+    const refundBefore = await refund.getBalance();
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') },
+      evict(owner, rs.address, self, 1n, refund.address) as any), rs.address), 'owner-signed eviction succeeds').toBe(0);
+    expect((await rs.getGetView()).bound, 'slot cleared').toBe(false);
+    expect(await refund.getBalance() > refundBefore, 'the reclaimed endowment went to the signed refund_to, not the relayer').toBe(true);
   }, 120_000);
 
   it('RECOVERY-09: the anti-rollback seq SURVIVES eviction — a freed slot cannot be re-bound with a stale blob', async () => {
@@ -185,7 +224,7 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     // the owner goes quiet for 3 years and the slot is evicted
     blockchain.now = blockchain.now! + RETENTION + 86400;
     const keeper = await blockchain.treasury('rec-keeper9');
-    await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecovery' } as any);
+    await rs.send(keeper.getSender(), { value: toNano('0.05') }, evict(owner, rs.address, self, 7n, keeper.address) as any);
     const freed = await rs.getGetView();
     expect(freed.bound, 'slot freed').toBe(false);
     expect(freed.seq, 'but the high-water mark is retained').toBe(7n);
@@ -218,7 +257,7 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any), rs.address)).toBe(0);
     blockchain.now = blockchain.now! + RETENTION + 86400;
     const keeper = await blockchain.treasury('rec-keeper8');
-    await rs.send(keeper.getSender(), { value: toNano('0.05') }, { $$type: 'EvictRecovery' } as any);
+    await rs.send(keeper.getSender(), { value: toNano('0.05') }, evict(owner, rs.address, self, 1n, keeper.address) as any);
     expect((await rs.getGetView()).bound, 'slot freed by eviction').toBe(false);
 
     // (b) AFTER eviction: the squatter STILL cannot bind the freed slot — identity is the owner key, not first-writer.

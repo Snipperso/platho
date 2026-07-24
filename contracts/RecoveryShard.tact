@@ -24,6 +24,7 @@
 
 const RS_RECOVERY_DOMAIN: Int = 0x42525331;       // "BRS1" — recovery digest preimage, MUST mirror CapsuleHub.tact
 const RS_SLOT_DOMAIN: Int = 0x52534C4B;           // "RSLK" — self_bucket_key = H(this ‖ owner_pubkey ‖ slot_index)
+const RS_EVICT_DOMAIN: Int = 0x52534556;          // "RSEV" — owner-authenticated slot-clear digest preimage (W1-009)
 // [OWNER DECISION 2026-07-19] A slot holds RS_MAX_BLOB_CELLS of blob — about 155 conversations at 64 bytes each.
 // The derivation used to be H(domain ‖ owner_pubkey) with NO index, so one owner key named exactly ONE address and
 // that ~155 was a HARD CEILING on how many conversations survive a reinstall. It could not be raised later: the
@@ -48,7 +49,9 @@ const RS_MAX_SLOTS: Int = 256;
 // slot key derivation is UNCHANGED (still H(domain ‖ owner_pubkey ‖ index)); only the accepted index range widens. 16
 // leaves headroom for several future named data types without a re-seal. Anything at/above the top is still refused.
 const RS_NAMED_SLOTS: Int = 16;
-const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15); permissionless evict after updated_at + this
+const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15). No longer an eviction deadline
+// (eviction is owner-signed now, W1-009) — it is the CLIENT's refresh cadence: every bound slot is refreshed within
+// this window so its endowment is topped back up (W1-008) and an idle slot of a live user never freezes.
 // The endowment must cover the WHOLE ACCOUNT for the whole retention, not just the payload. Unlike its two siblings
 // this lane has no separate base endowment (compare RS_BASE_ENDOWMENT in RecordShard and IS_BASE_ENDOWMENT in
 // IntroShard), so this one constant is everything the account ever keeps. If it falls short the slot freezes and the
@@ -63,11 +66,14 @@ const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15);
 //
 // tests/recovery-rent-solvency.test.ts RENT-01 now reads the real figure off the STORAGE PHASE after advancing the
 // full retention, so this constant can never again be validated against a cell model that leaves something out:
-//   measured 3-year rent at the frozen rate = 19_293_761  ->  x1.5 = 28_940_642  ->  29_000_000 (margin 1.503x)
+//   measured 3-year rent at the frozen rate = 19_488_648  ->  x1.5 = 29_232_972  ->  29_300_000 (margin 1.503x)
+// [RAISED 2026-07-24: was 29_000_000 against 19_293_761. The W1-009 owner-signed eviction added code cells
+// (evictDigest + the signature check + the refund_to field), lifting the measured 3-year rent by ~195k and dropping
+// the old margin to 1.488x. Re-measured and re-calibrated to hold the 1.5x rule.]
 // Both sibling lanes were raised pre-seal for this same class of error (RecordShard at 1.026x, IntroShard at
 // 1.21x). That margin is the entire defence against a governance rate change on a contract that can never be
 // repriced.
-const RS_RECOVERY_ENDOWMENT: Int = 29000000;
+const RS_RECOVERY_ENDOWMENT: Int = 29300000;
 // The endowment above is calibrated for EXACTLY the blob cap below, so
 // the blob MUST be capped at it. The monolith gated this as RECOVERY_MAX_SIZE_CLASS (13560); the sharded rewrite
 // dropped the gate, which let an oversized blob buy permanent storage for a fixed endowment — the slot then goes
@@ -95,7 +101,11 @@ message(0x52435631) RecoveryStore {               // "RCV1"
     owner_sig: Cell;                              // ed25519 over the recovery digest
 }
 
-message(0x52435632) EvictRecovery {}              // "RCV2" — permissionless self-heal after 3 years of inactivity
+message(0x52435632) EvictRecovery {               // "RCV2" — OWNER-authenticated slot clear + endowment reclaim (W1-009)
+    refund_to: Address;                           // where the reclaimed endowment goes; committed in the digest so a
+                                                  // relayer cannot redirect it to themselves
+    owner_sig: Cell;                              // ed25519 over evictDigest(refund_to)
+}
 
 struct RecoveryShardView {
     self_bucket_key: Int;
@@ -164,6 +174,21 @@ contract RecoveryShard {
             .hash();
     }
 
+    // digest = H(EVICT_DOMAIN ‖ myAddress ‖ self_bucket_key ‖ seq ‖ refund_to). Binds an eviction to THIS deployment,
+    // THIS slot, the CURRENT seq (so a stale eviction cannot be replayed after the slot is re-bound with a higher
+    // seq), and the payout address (so a relayer forwarding the owner's signed eviction cannot redirect the reclaimed
+    // endowment to itself).
+    fun evictDigest(refundTo: Address): Int {
+        return beginCell()
+            .storeUint(RS_EVICT_DOMAIN, 32)
+            .storeAddress(myAddress())
+            .storeUint(self.self_bucket_key, 256)
+            .storeUint(self.seq, 64)
+            .storeAddress(refundTo)
+            .endCell()
+            .hash();
+    }
+
     receive(msg: RecoveryStore) {
         throwUnless(13571, (msg.h0 != 0) && (msg.h1 != 0) && (msg.bh != 0));
         // [RESTORED 13557] Bind the stored blob to the SIGNED frame. The signature covers bh, but the body itself
@@ -226,9 +251,10 @@ contract RecoveryShard {
         //
         // The OLD code reserved `wasUnbound ? ENDOWMENT : 0` with AddOriginalBalance — free refreshes that kept only
         // the already-drained balance. Measured (tests/recovery-rent-solvency.test.ts RENT-03): the endowment funds
-        // ~4.5 years from the first bind, but each refresh RESETS updated_at and with it the 3-year eviction deadline
-        // (gate 13562), so a user who refreshes every year renewed the retention PROMISE indefinitely while the
-        // FUNDING never renewed — freezing in year 5 and losing the K_root blob the lane exists to protect.
+        // ~4.5 years from the first bind, but each refresh only RESET updated_at, so a user who refreshed every year
+        // renewed the retention PROMISE indefinitely while the FUNDING never renewed — freezing in year 5 and losing
+        // the K_root blob the lane exists to protect. Topping up on every write is what lets the client's periodic
+        // refresh of ALL bound slots (W1-009) actually keep an idle slot alive instead of just resetting a timer.
         //
         // The old comment cited CapsuleHub.tact:1722 against an "absolute reserve". That hazard does NOT apply here:
         // CapsuleHub was a MULTI-endowment pool whose whole accumulated balance would leak to the caller under an
@@ -238,54 +264,37 @@ contract RecoveryShard {
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
-    // Permissionless self-heal: after 3 years with no refresh, the slot may be cleared so the address is reusable
-    // (and the endowment reclaimed by the caller).
+    // OWNER-AUTHENTICATED slot clear + endowment reclaim. [W1-009 FIX 2026-07-24, owner-approved.]
     //
-    // THE RETENTION CLOCK IS PER-SLOT, AND THAT IS A CLIENT OBLIGATION, NOT A CONTRACT GUARANTEE. This comment used
-    // to read "a user active within 3 years never hits this — griefing is impossible while the user lives", and that
-    // was true only while one owner key named one address. Across RS_MAX_SLOTS it is FALSE: updated_at lives on each
-    // account separately, so a user who fills slot 0, then spends three years writing only slot 1, leaves slot 0
-    // untouched and evictable — and sweeping it is PROFITABLE, so it will not stay hypothetical. The user is
-    // demonstrably alive and still loses their oldest conversations.
+    // WHAT THIS USED TO BE, AND WHY IT WAS UNSAFE. It was PERMISSIONLESS: any sender could clear a bound slot once it
+    // was 3 years past its last write (gate 13562) and sweep the WHOLE residual to itself (mode 128). The retention
+    // clock is PER-SLOT, and the client only refreshed a slot when its OWN partition changed — never the idle ones.
+    // So a demonstrably-alive user who filled slot 0, then wrote only slot 1 for three years, left slot 0 evictable,
+    // and clearing it was PROFITABLE — a stranger could destroy the oldest K_root blob and pocket the endowment. The
+    // "client refreshes every bound slot" mitigation this used to promise was never in the client (W1-009).
     //
-    // Nothing here can fix that: these are independent accounts and coupling them would cost a read per slot per
-    // write. The client MUST refresh every bound slot inside the retention window, not merely the slot it is
-    // writing. A refresh is an ordinary RecoveryStore with a higher seq; it costs gas plus the RS_MIN_VALUE float,
-    // which is returned.
+    // NOW ONLY THE OWNER MAY CLEAR IT, proven by a signature over evictDigest(refund_to) against the bound
+    // owner_pubkey. A stranger has neither the key nor a reason: the address commits to owner_pubkey, so no one else
+    // can ever reuse a freed slot. The 3-year timer is GONE — it only ever existed to time-limit stranger eviction;
+    // the owner reclaims their OWN slot on demand (reclaiming the endowment they would otherwise bleed to rent). The
+    // payout goes to the signed refund_to, NOT sender(), so a relayer forwarding the owner's eviction cannot steal it.
     //
-    // The 3-year clock also RESETS on every publish while the reserve increment is zero on an overwrite (see the
-    // nativeReserve note below), so a refresh moves the deadline without moving money. Funding therefore lasts a
-    // fixed ~4.4 years from the first bind however often the slot is refreshed. That is deliberate — an absolute
-    // reserve would hand any top-up to whoever writes next — but it means a long-lived slot eventually carries a
-    // retention promise it cannot fund. Freeze is still roughly two decades of continuous use away at the frozen
-    // rate, so this is a known and accepted horizon rather than an imminent loss.
-    //
-    // THIS LANE DELIBERATELY DOES NOT DESTROY ITS ACCOUNT, unlike RecordShard.RetireShard and
-    // IntroShard.RetireShard, which do. The asymmetry is load-bearing and a future reader must not "tidy" it:
-    // destroying an account resets its state to init, and `seq` below is retained precisely so that it CANNOT be
-    // reset — it is the anti-rollback high-water mark, and a fresh seq of 0 would make every previously signed
-    // RecoveryStore valid again, letting anyone re-bind the freed slot with the owner's own OUTDATED blob and
-    // roll their K_root back to a key they had rotated away from.
-    // The other two lanes are safe to destroy because their identity carries no such monotonic guard: a
-    // resurrected RecordShard/IntroShard is refused by the epoch gate, so nothing can be written into it at all.
-    // This one also needs no destroy to be economical — clearing the slot is already O(1) and the caller already
-    // takes the whole residual through mode 128, which is exactly the shape the other two lanes had to be
-    // rebuilt to reach. It never carried a per-entry bounty, so it never had the defect that removed them.
-    receive(_: EvictRecovery) {
+    // THIS LANE STILL DELIBERATELY DOES NOT DESTROY ITS ACCOUNT (unlike RecordShard/IntroShard RetireShard): `seq` is
+    // retained as the anti-rollback high-water mark. A fresh seq of 0 would make every previously signed RecoveryStore
+    // valid again, letting the freed slot be re-bound with the owner's own OUTDATED blob and rolling their K_root back
+    // to a key they had rotated away from. The first-bind branch honours the retained seq (13573) for the same reason.
+    receive(msg: EvictRecovery) {
         throwUnless(13561, self.bound);
-        throwUnless(13562, (self.updated_at + RS_RECOVERY_RETENTION) < now());
+        throwUnless(13565, checkSignature(self.evictDigest(msg.refund_to), msg.owner_sig.beginParse(), self.owner_pubkey));
         self.bound = false;
         self.owner_pubkey = 0;
-        // seq is deliberately NOT reset — it is the anti-rollback high-water mark. Clearing it made every
-        // previously signed RecoveryStore valid again, so anyone could re-bind the freed slot with the owner's own
-        // OUTDATED blob and roll their K_root back to a key they had rotated away from. Eight bytes of retained
-        // state is a trivial price for closing that.
+        // seq is deliberately NOT reset — anti-rollback high-water mark (see the note above).
         self.h0 = 0;
         self.h1 = 0;
         self.bh = 0;
         self.body = emptyCell();
         self.updated_at = 0;
-        send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
+        send(SendParameters{ to: msg.refund_to, value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
     receive() {}
