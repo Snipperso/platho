@@ -1,0 +1,144 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MockGasBurnNotifyOwner_MockGasBurnNotifyOwner.headers.fc
+;;
+;; Header files for MockGasBurnNotifyOwner
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $MockGasBurnNotifyOwner$_store
+builder $MockGasBurnNotifyOwner$_store(builder build_0, (int) v) inline;
+
+;; $MockGasBurnNotifyOwner$_load
+(slice, ((int))) $MockGasBurnNotifyOwner$_load(slice sc_0) inline;
+
+;; $MockGasBurnNotifyOwner$init$_load
+(slice, ((int))) $MockGasBurnNotifyOwner$init$_load(slice sc_0) inline;
+
+;; $MockGasBurnNotifyOwner$_contract_init
+(int) $MockGasBurnNotifyOwner$_contract_init(int $burn_iters) impure inline;
+
+;; $MockGasBurnNotifyOwner$_contract_load
+(int) $MockGasBurnNotifyOwner$_contract_load() impure inline;
+
+;; $MockGasBurnNotifyOwner$_contract_store
+() $MockGasBurnNotifyOwner$_contract_store((int) v) impure inline;
+
+
+;; MockGasBurnNotifyOwner_MockGasBurnNotifyOwner.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+;; MockGasBurnNotifyOwner_MockGasBurnNotifyOwner.storage.fc
+;;
+;; Type: MockGasBurnNotifyOwner
+;; TLB: _ burn_iters:uint32 = MockGasBurnNotifyOwner
+;;
+
+builder $MockGasBurnNotifyOwner$_store(builder build_0, (int) v) inline {
+    var (v'burn_iters) = v;
+    build_0 = build_0.store_uint(v'burn_iters, 32);
+    return build_0;
+}
+
+(slice, ((int))) $MockGasBurnNotifyOwner$_load(slice sc_0) inline {
+    var v'burn_iters = sc_0~load_uint(32);
+    return (sc_0, (v'burn_iters));
+}
+
+(slice, ((int))) $MockGasBurnNotifyOwner$init$_load(slice sc_0) inline {
+    var v'burn_iters = sc_0~load_int(257);
+    return (sc_0, (v'burn_iters));
+}
+
+(int) $MockGasBurnNotifyOwner$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$MockGasBurnNotifyOwner$_load();
+    }
+    else {
+        (int $burn_iters) = $sc~$MockGasBurnNotifyOwner$init$_load();
+        $sc.end_parse();
+        return $MockGasBurnNotifyOwner$_contract_init($burn_iters);
+    }
+}
+
+() $MockGasBurnNotifyOwner$_contract_store((int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $MockGasBurnNotifyOwner$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MockGasBurnNotifyOwner functions
+;;
+
+(int) $MockGasBurnNotifyOwner$_contract_init(int $burn_iters) impure inline {
+    var (($self'burn_iters)) = (null());
+    $self'burn_iters = $burn_iters;
+    return ($self'burn_iters);
+}
+
+;;
+;; Get methods of a Contract MockGasBurnNotifyOwner
+;;
+
+;;
+;; Routing of a Contract MockGasBurnNotifyOwner
+;;
+
+;; message opcode reader utility: binary receivers and empty fallback receiver
+;; Returns 32 bit message opcode, or returns immediately if the message is shorter than 32 bits
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ IFNOTRET";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'burn_iters) = $MockGasBurnNotifyOwner$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg.preload_uint(32);
+    }
+    ;; Receive AthTransferNotification message
+    if (op == 0x472d9d7d) {
+        in_msg~skip_bits(32);
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'sender_key = in_msg~load_uint(160);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'sender_wallet = in_msg~load_msg_addr();
+        int $x = 7;
+        repeat ($self'burn_iters) {
+            $x = ((($x * 1103515245) + 12345) % 2147483647);
+        }
+        throw_unless(60004, ($x == -1));
+        $MockGasBurnNotifyOwner$_contract_store(($self'burn_iters));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $MockGasBurnNotifyOwner$_contract_store(($self'burn_iters));
+        return ();
+    }
+    ;; Receiver fallback
+    $MockGasBurnNotifyOwner$_contract_store(($self'burn_iters));
+}
