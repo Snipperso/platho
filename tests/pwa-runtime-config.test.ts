@@ -5202,7 +5202,10 @@ describe('PWA runtime config guard', () => {
     // re-arms instead, and the refresh updates the nav balance itself (applyVaultUserPocketState).
     const navFn = app.slice(
       app.indexOf('async function refreshVaultNavBalanceInBackground'),
-      app.indexOf('async function refreshVaultNavBalanceInBackground') + 1600,
+      // [WIDENED 2026-07-24 1600 -> 1900] The function grew: `return vaultRefreshPromise.catch` now sits at offset
+      // ~1647 from the fn start, past the old 1600 slice. All three invariants (defer on vaultRefreshPromise, the
+      // retry marker, the promise-chained return) are still present — the guard window just under-sliced.
+      app.indexOf('async function refreshVaultNavBalanceInBackground') + 1900,
     );
     expect(navFn).toMatch(/if \(vaultRefreshPromise\) \{/);
     expect(navFn).toMatch(/markNavVaultBalanceRetryNeeded\('vault refresh in progress'\)/);

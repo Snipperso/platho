@@ -8,9 +8,9 @@ Output: C:\platho\artifacts\platho-web-static-production
 ## Runtime
 
 ```text
-fileCount=183
-totalBytes=5729082
-bundleSha256=76c6e02c82020ddd5902bc793ebde44e1fa6ce95f75ae956cb98d1baa34c00e2
+fileCount=218
+totalBytes=6135133
+bundleSha256=1a6cfbfae764e4a7b08a3df12947792dfb2e86d2eea4b9d4a7dcc905c0fe00ca
 noBackendRuntime=true
 ```
 
@@ -33,4 +33,4 @@ None
 
 ## Production Findings
 
-- MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH: MAINNET_GENESIS_VERIFIED=true must match current build code hashes: ath_master, ath_vesting, ath_wallet, buyback_burn, market_stability_seller, capsulehub, fee_accumulator, profile_registry, username_nft_item, username_registry, vault. (artifacts/mainnet_genesis_verify_input.json)
+- MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH: MAINNET_GENESIS_VERIFIED=true must match current build code hashes: ath_master, ath_vesting, ath_wallet, buyback_burn, market_stability_seller, fee_accumulator, profile_registry, username_nft_item, username_registry. (artifacts/mainnet_genesis_verify_input.json)
