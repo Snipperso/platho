@@ -328,6 +328,11 @@ contract AirdropPool {
                 query_id: self.payout_seq,
                 amount: payout,
                 recipient: msg.buyer,
+                // response_destination MUST be this pool: ATHWallet gate 14201 refuses any owner-initiated transfer
+                // whose response_destination is not the wallet's own owner. [TRIED 2026-07-24: routing the leftover
+                // to msg.buyer instead — the pool's ATHWallet threw 14201, the internal transfer never left, and the
+                // recipient wallet was never created, i.e. the ATH was not delivered at all. The ~11.6M that returns
+                // here is structural to the wallet's owner-response security model, not a reclaimable surplus.]
                 response_destination: myAddress(),
             }.toCell(),
         });
