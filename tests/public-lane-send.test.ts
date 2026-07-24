@@ -37,7 +37,7 @@ describe('PUBLIC-LANE-SEND', () => {
   }, 120_000);
 
   it('PLS-MSG: the wallet message carries the built PublicPublish unchanged', async () => {
-    const ownerHash = publicWalletHash('EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-');
+    const ownerHash = publicWalletHash('EQBOSbFHf8Iqe390MhsuN8RywBimRbzTwq8dtnN9fN4MyZOP');
     const partitionKey = await publicChannelPartitionKey(ownerHash, 0);
     const epochTag = publicEpochTag(0, publicEraOf(0, CLOCK));
     const header = cellOf(0x11);

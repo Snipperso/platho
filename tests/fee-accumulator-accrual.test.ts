@@ -20,7 +20,7 @@ import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 
 // The address AirdropTicket names in AT_FEE_SINK and RecordShard in RS_FEE_SINK. In production FeeAccumulator
 // genuinely occupies it; here it is placed there directly, which is what makes the ticket's own gate meaningful.
-const FEE_SINK = Address.parse('EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-');
+const FEE_SINK = Address.parse('EQBOSbFHf8Iqe390MhsuN8RywBimRbzTwq8dtnN9fN4MyZOP');
 const RS_PROTOCOL_FEE = 10_000_000n;
 const OP_TICKET_CREDIT = 0x41544331;
 
@@ -132,5 +132,27 @@ describe('FEE ACCUMULATOR ACCRUAL — a capsule fee becomes a credit, and only a
     expect((await bc.openContract(new AirdropTicket(ticketAddr)).getGetTicket()).credits, 'both credits landed').toBe(2n);
     // If this ever fails, always-attach has stopped being affordable and onboarding must pre-deploy tickets.
     expect(total(second), 'crediting must cost well under the fee it accompanies').toBeLessThan(RS_PROTOCOL_FEE / 2n);
+  });
+
+  it('FAACC-BACKING: [token-cluster audit CRIT] TicketRedeem must not over-send from the sink balance', async () => {
+    // A redeem sends an EXPLICIT 60M accrue leg to the pool, then acks the ticket. If the ack uses mode-64
+    // SendRemainingValue it carries the FULL inbound (NOT inbound-60M), so total out = inbound + 60M and the sink pays
+    // the 60M from its OWN balance — uncounted, eroding the backing (balance >= accumulated + treasury_due + buyback_due)
+    // by ~60M PER CLAIM. The claimant is meant to fund the 60M (gate 15063 / AT_CLAIM_MIN_VALUE) and get the change.
+    const { bc, fa, publisher, ticketCode } = await setup();
+    const ticketAddr = contractAddress(0, { code: ticketCode, data: ticketData(publisher.address) });
+
+    const before = (await bc.getContract(FEE_SINK)).balance;
+    const inbound = toNano('0.1');   // 100M — well above gate 15063 (62M)
+    await fa.send(bc.sender(ticketAddr), { value: inbound }, {
+      $$type: 'TicketRedeem', credits_k: 10n, owner: publisher.address,
+    } as any);
+    const after = (await bc.getContract(FEE_SINK)).balance;
+
+    // The sink is a PASSTHROUGH: it received `inbound` and must forward ~all of it (60M pool + change to the ticket),
+    // keeping only gas. Its balance must NOT fall — a fall of ~60M is the accrue leg being paid from its own balance.
+    const drained = before - after;
+    expect(drained, `the sink balance fell by ${drained} — it is funding the 60M accrue leg from its own balance`)
+      .toBeLessThan(5_000_000n);
   });
 });
