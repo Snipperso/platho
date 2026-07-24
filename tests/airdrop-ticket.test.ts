@@ -21,7 +21,7 @@ import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicke
 // constants were rebaked on 2026-07-20. Rebaking a constant in the contracts and not in the tests that
 // mirror it turns the whole suite red for a reason that looks like a protocol defect and is not one.
 const FEE_SINK = Address.parse('EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-');
-const AT_MIN_CLAIM_CREDITS = 64n;
+const AT_MIN_CLAIM_CREDITS = 10n;
 const AT_MAX_CREDITS_PER_CLAIM = 1000n;
 const AT_CLAIM_MIN_VALUE = 63_000_000n;
 const AT_EXPORT_MIN_VALUE = 20_000_000n;
@@ -91,7 +91,7 @@ describe('AIRDROP TICKET — credits cannot be minted, and cannot be lost', () =
     await credit(bc, ticket, 64);
 
     // A stranger forcing claims is not theft — the payout still goes to the owner — but it burns the delivery
-    // cost this contract exists to amortise, 64 credits at a time, for free.
+    // cost this contract exists to amortise, one minimum batch at a time, for free.
     await ticket.send(stranger.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
     expect((await ticket.getGetTicket()).credits, 'a stranger cannot spend the owner\'s credits').toBe(64n);
 
@@ -105,11 +105,11 @@ describe('AIRDROP TICKET — credits cannot be minted, and cannot be lost', () =
     await credit(bc, ticket, Number(AT_MIN_CLAIM_CREDITS) - 1);
 
     await ticket.send(owner.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
-    expect((await ticket.getGetTicket()).credits, '63 credits must not be deliverable').toBe(AT_MIN_CLAIM_CREDITS - 1n);
+    expect((await ticket.getGetTicket()).credits, '9 credits must not be deliverable').toBe(AT_MIN_CLAIM_CREDITS - 1n);
 
     await credit(bc, ticket, 1);
     await ticket.send(owner.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
-    expect((await ticket.getGetTicket()).credits, 'the 64th credit unlocks the claim').toBe(0n);
+    expect((await ticket.getGetTicket()).credits, 'the 10th credit unlocks the claim').toBe(0n);
   });
 
   it('TICKET-04: a claim is capped at what AirdropPool will accept, and the remainder survives', async () => {
@@ -209,14 +209,14 @@ describe('AIRDROP TICKET — credits cannot be minted, and cannot be lost', () =
   it('TICKET-09: the owner exports unclaimed credits to a clean-18 successor — consumed here, delivered there, dust included', async () => {
     const { bc, owner, ticket } = await setup();
     const successor = await bc.treasury('clean18-successor');
-    await credit(bc, ticket, 50);   // BELOW the 64 claim threshold on purpose: dust must migrate, never strand
+    await credit(bc, ticket, 5);   // BELOW the 10 claim threshold on purpose: dust must migrate, never strand
 
     const r = await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
       { $$type: 'TicketExportCredits', to: successor.address } as any);
 
     const view = await ticket.getGetTicket();
     expect(view.credits, 'the credits are consumed here so they cannot also be claimed').toBe(0n);
-    expect(view.in_flight, 'and held in flight, which is what blocks a re-spend').toBe(50n);
+    expect(view.in_flight, 'and held in flight, which is what blocks a re-spend').toBe(5n);
     expect(findTransaction(r.transactions, { from: ticket.address, to: successor.address, op: OP_CREDITS_MIGRATED }),
       'the successor receives exactly the credits and owner to adopt').toBeDefined();
   });

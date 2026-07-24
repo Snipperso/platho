@@ -1,16 +1,19 @@
 // AirdropTicket — one account per publisher, holding that publisher's unredeemed capsule credits.
 //
-// WHY THIS CONTRACT EXISTS AT ALL, in one measured number. Delivering an airdrop payout costs the caller
-// 60,368,203 nanoton (tests/airdrop-delivery-cost.test.ts), and the caller pays exactly that whether the payout
-// carries ONE credit or a THOUSAND — the cost is per DELIVERY, not per credit. None of it comes back: ATHWallet
-// has no TON exit path at all (no myBalance, no nativeReserve, no SendRemainingBalance, no mode 128 in any of
-// its receivers) and neither has AirdropPool, so every nanoton over-attached is immured for the life of the
-// contract. Paying out per capsule would therefore immure ~90,000 GRAM across the 1.5M-capsule airdrop against
-// the 15,000 GRAM those same capsules collect in protocol fees.
+// WHY THIS CONTRACT EXISTS AT ALL, in measured numbers. A delivery ATTACHES ~60,363,936 nanoton (0.060 GRAM), and
+// that attach is per DELIVERY, not per credit — the caller pays the same whether the payout carries ONE credit or
+// a THOUSAND. But the ATTACH IS NOT THE COST. Measured through the real pool path (tests/airdrop-delivery-cost.test
+// .ts, AIRCOST-02): ~39,255,529 of it lands in the RECIPIENT's OWN ATHWallet — the user's own money, funding their
+// wallet, NOT a loss — and only ~16,633,315 (0.0166 GRAM) is truly unrecoverable: ~5,001,852 burned as gas and
+// ~11,631,463 immured in AirdropPool, which has no TON exit path (no myBalance / nativeReserve / SendRemainingBalance
+// / mode-128 in any receiver), so anything over-attached is stuck for the life of the contract.
+// [CORRECTED 2026-07-24: the old comment read "60,368,203, none of it comes back" and kept misleading into quoting
+// 0.06 GRAM as THE COST. The attach is 0.06; the unrecoverable cost is 0.017. Most of the attach returns to the user.]
 //
-// Batching removes that entirely and — this is the point — WITHOUT touching the owner's frozen arithmetic. The
-// accrual rate stays 10 ATH per capsule, 1.5M capsules, 15M ATH. Only the delivery granularity moves. At 1000
-// credits per delivery the cost falls to ~16,635 per capsule, 0.17% of the fee.
+// This fixed ~16.6M unrecoverable per delivery is why deliveries are BATCHED. Per-capsule delivery across the
+// 1.5M-capsule airdrop would immure ~24,900 GRAM against the ~15,000 GRAM those capsules collect in protocol fees;
+// batching amortises the fixed cost over many credits WITHOUT touching the owner's frozen arithmetic — the rate
+// stays 10 ATH per capsule, 1.5M capsules, 15M ATH, only the delivery granularity moves.
 //
 // WHY A CONTRACT PER PUBLISHER rather than a map in a singleton: a per-publisher map is a permanent entry per
 // user on one account, and an account dies at ~65536 cells — silently, with compute reporting exit 0 while the
@@ -34,11 +37,13 @@ const AT_FEE_SINK: Address = address("EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzs
 // plus cushion. Charged once, on the deploy that the first credit performs.
 const AT_BASE_ENDOWMENT: Int = 40000000;
 
-// The batching threshold, and the whole economic argument in one constant. Below this a claim would spend more
-// on delivery than the credits are worth collecting: 64 credits carry 640 ATH and cost one 60,368,203 delivery,
-// i.e. ~943,253 per capsule — still under the 10,000,000 fee that capsule paid, with ~10x margin. Anything
-// lower starts eating the pool's own funding.
-const AT_MIN_CLAIM_CREDITS: Int = 64;
+// The minimum batch a claim may deliver. 10 credits = 100 ATH — enough to mint an avatar or a username, which is
+// the smallest amount worth one delivery. [OWNER 2026-07-24: minimum 10; 100 ATH is exactly what an avatar/username
+// needs, and at the MEASURED ~0.017 GRAM unrecoverable per delivery — NOT the 0.06 attach — that cost is acceptable.]
+// The floor is kept deliberately low: the delivery cost is borne by the OWNER who claims (it comes out of their
+// claim value, most of which returns to their own wallet), so this is not the pool's money to protect — the floor
+// only stops a literal dust delivery that would burn ~0.017 GRAM to move a single credit.
+const AT_MIN_CLAIM_CREDITS: Int = 10;
 
 // AirdropPool gate 26112 refuses credits_k > 1000, so a claim may never ask for more than that in one delivery.
 // A publisher with more simply claims repeatedly; nothing is lost, only batched again.

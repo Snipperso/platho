@@ -127,7 +127,7 @@ PROGRAM{
   $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value PROCINLINE:<{
   }>
   $AirdropTicket$_fun_get_ticket PROCREF:<{
-    64 PUSHINT
+    10 PUSHINT
     1000 PUSHINT
     63000000 PUSHINT
     s5 PUSH
@@ -255,7 +255,7 @@ PROGRAM{
       THROWANYIFNOT
       27012 PUSHINT
       OVER
-      63 GTINT
+      9 GTINT
       THROWANYIFNOT
       27013 PUSHINT
       __tact_context_get INLINECALLDICT
