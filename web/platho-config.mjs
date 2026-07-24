@@ -146,22 +146,19 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     // and discovery/resolve use the on-chain global profile chain (get_public_profile_head / get_public_profile_index).
     profilePointer: true,
   },
-  // clean-17 public/avatar lane cutover. false = live clean-15 path (public posts batch through the Vault into
-  // CapsuleHub, feed reads the CapsuleHub author chains). Flip to true ONLY once the clean-17 PublicShard genesis is
-  // live: posts publish DIRECT-PAY from the wallet into the author's CHANNEL shard (PPH2), and the feed reads those
-  // shards via public-lane. On-chain correctness is validated by a live run — the sandbox proves the message and the
-  // deploy figures, not the app's wallet/broadcast/feed round-trip against a real toncenter.
+  // clean-17 public/avatar lane. DIRECT-PAY is the shipping path: public posts publish straight from the wallet into
+  // the author's CHANNEL PublicShard (PPH2, StateInit-lazy-deploy) and the feed reads those shards via public-lane.
+  // [CUTOVER 2026-07-24] clean-15 has zero live users and balances are withdrawn — the Vault/CapsuleHub batch path is
+  // being removed (capsulehub-vault-removal-plan phase 3), so this defaults ON. On-chain correctness is validated by a
+  // live run against the clean-17 PublicShard genesis; the sandbox proves the message + deploy figures.
   publicLane: {
-    directPay: false,
+    directPay: true,
   },
-  // clean-17 private lane cutover (CONV messages / INTRO first contact / RECOVERY durability). false = live clean-15
-  // path (private capsules batch through the Vault; INTRO/CONV read the Vault recipient/sender indexes). Flip to true
-  // ONLY once the clean-17 RecordShard/IntroShard/RecoveryShard genesis is live: messages publish DIRECT-PAY from the
-  // wallet straight into the shards, first contact is scanned stealthily off IntroShard, and the pairwise K_root is
-  // adopted into the local conv key store. On-chain correctness is validated by a live run — the sandbox proves the
-  // messages + adoption logic (tests/conv-*, tests/intro-*, tests/recovery-*), not the app's wallet/scan round-trip.
+  // clean-17 private lane (CONV messages / INTRO first contact / RECOVERY durability). DIRECT-PAY is the shipping path:
+  // messages publish straight from the wallet into the shards, first contact is scanned stealthily off IntroShard, and
+  // the pairwise K_root is adopted into the local conv key store. [CUTOVER 2026-07-24] see publicLane — Vault path removed.
   privateLane: {
-    directPay: false,
+    directPay: true,
   },
   feeAccumulator: {
     address: 'UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr',
