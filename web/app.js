@@ -743,18 +743,6 @@ const navVaultTonBalances = [...document.querySelectorAll('[data-nav-vault-ton]'
 const navVaultAthBalances = [...document.querySelectorAll('[data-nav-vault-ath]')];
 const navVaultBalanceContainers = [...document.querySelectorAll('[data-nav-vault-balance]')];
 const balanceGrid = document.querySelector('#balanceGrid');
-const vaultMoveCards = Array.from(document.querySelectorAll('[data-vault-move-asset]')).map((form) => ({
-  asset: form.dataset.vaultMoveAsset === 'ATH' ? 'ATH' : 'TON',
-  form,
-  input: form.querySelector('[data-vault-move-input]'),
-  walletBalance: form.querySelector('[data-vault-wallet-balance]'),
-  vaultBalance: form.querySelector('[data-vault-vault-balance]'),
-  fromLabel: form.querySelector('[data-vault-from-label]'),
-  toLabel: form.querySelector('[data-vault-to-label]'),
-  maxButton: form.querySelector('[data-vault-max-button]'),
-  directionButton: form.querySelector('[data-vault-direction-button]'),
-  submitButton: form.querySelector('[data-vault-submit-button]'),
-}));
 const actionGrid = document.querySelector('#actionGrid');
 const ledgerRows = document.querySelector('#ledgerRows');
 const profileHandle = document.querySelector('#profileHandle');
@@ -995,14 +983,6 @@ const profileAvatarInlineSubmitKeys = new Map();
 // previous tick's async body is still running the same publishState.
 const profileAvatarRecoveryTicksInFlight = new Set();
 let profileAvatarPublishRecoverySeq = 0;
-let vaultMoveDirections = { TON: 'to-vault', ATH: 'to-vault' };
-// Per-asset deposit/withdraw "processing" lock: from the tap until the moved funds actually leave the source
-// pocket (a balance change from the pre-move snapshot) or a safety timeout. The submit button shows a spinner and
-// is disabled meanwhile — so it is obvious the tap registered and a second tap can't double-submit while the
-// transaction settles. Cleared by watchVaultMoveProcessing (the queued post-transaction balance refreshes update
-// vaultMoveBalance, which the watcher polls) or on an immediate broadcast error.
-const VAULT_MOVE_PROCESSING_MAX_MS = 30000;
-const vaultMoveProcessing = { TON: null, ATH: null };
 let deferredInstallPrompt = null;
 let installedRelatedPwaDetected = false;
 let walletIdentityFlashTimer = null;
@@ -1360,8 +1340,6 @@ const VAULT_PUBLISH_PRIVATE_HYBRID_LOCAL_EXEC_RESERVE_NANOTONS = Object.freeze({
 });
 const VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS = 90_000;
 const VAULT_PUBLISH_NONCE_POLL_MS = 1_000;
-const VAULT_ATH_WITHDRAW_CONFIRM_TIMEOUT_MS = 90_000;
-const VAULT_ATH_WITHDRAW_POLL_MS = 1_500;
 const PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS = 90_000;
 const PAYMENT_CHECK_CLAIM_POLL_MS = 1_500;
 const PLATO_PRIVATE_LONG_TERM_FEE_NANOTONS = 10_000_000n;
@@ -1387,7 +1365,6 @@ const CAPSULEHUB_PUBLIC_EXEC_RESERVE_NANOTONS = Object.freeze({
 });
 const CAPSULEHUB_PRIVATE_STORAGE_CHARGE_NANOTONS = 1_000_000n + 3_300_000n + CAPSULEHUB_ACK_FORWARD_RESERVE_NANOTONS;
 const CAPSULEHUB_PUBLIC_STORAGE_CHARGE_NANOTONS = 1_000_000n + 7_400_000n + CAPSULEHUB_ACK_FORWARD_RESERVE_NANOTONS;
-const VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS = 50_000_000n;
 const DEFAULT_IMAGE_COMPRESSION_MODE_ID = 'good';
 const IMAGE_COMPRESSION_MODES = Object.freeze({
   low: Object.freeze({ id: 'low', label: 'Low', maxBytes: 8 * 1024 }),
@@ -3682,11 +3659,6 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // and must die with the account on a switch so the previous owner's address can never leak into the next
   // account's routing guards (clearWalletScopedRuntimeState runs ONLY on a wallet change, never on a mere lock).
   lastKnownOwnWalletRaw = null;
-  // A vault-move button lock is scoped to the wallet that started the move — drop it on a wallet change so the NEW
-  // wallet's deposit/withdraw button never inherits a spinner for a move it never made (else it stays locked until
-  // the old 30s timeout). Sibling to plathoAccountActivationPending, which queueVaultRefreshAfterWalletChange clears.
-  vaultMoveProcessing.TON = null;
-  vaultMoveProcessing.ATH = null;
   // Supersede any in-flight prefs background confirm so it can't stamp "saved"/"not saved" onto the NEW wallet's
   // subscription state (prefs are per-wallet). The bump makes the stranded confirm bail on its generation guard, but
   // that same guard means it will NOT release the in-flight UI it was holding — so release it HERE, or a wallet switch
@@ -15870,17 +15842,6 @@ function privateSendBlockedStatusText(error) {
   return `not sent: ${privateSendPreflightStatusText(error)}`;
 }
 
-function vaultActionBlockedStatusText(error, fallback = t('vault.moveBlocked')) {
-  const message = shortUiErrorText(error, fallback);
-  if (/unlock and activate your platho account before moving ton from vault/i.test(message)) {
-    return t('vault.activateBeforeMove');
-  }
-  if (/local vault auth key is not ready/i.test(message)) {
-    return t('vault.unlockActivateBeforeActions');
-  }
-  return message;
-}
-
 function canEditPrivateComposerDraft(thread = activeThread()) {
   return Boolean(thread)
     && thread.readOnly !== true
@@ -20073,89 +20034,6 @@ document.addEventListener('keydown', (event) => {
   closePublicDiscovery();
 });
 
-actionGrid?.addEventListener('click', async (event) => {
-  const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-  const button = target?.closest('button[data-action]');
-  if (!button) return;
-  try {
-    button.disabled = true;
-    let result = null;
-    if (button.dataset.action === 'vault-deposit-ton') {
-      result = await submitVaultDepositTon();
-    } else if (button.dataset.action === 'vault-withdraw-ton') {
-      result = await submitVaultWithdrawTon();
-    } else if (button.dataset.action === 'vault-deposit-ath') {
-      result = await submitVaultDepositAth();
-    } else if (button.dataset.action === 'vault-withdraw-ath') {
-      result = await submitVaultWithdrawAth();
-    }
-    if (result) queueVaultPostTransactionRefresh();
-  } catch (error) {
-    const rateLimited = noteTonRpcRateLimit(error);
-    setVaultStatus(rateLimited ? 'RPC busy, retrying' : vaultActionBlockedStatusText(error, 'transaction blocked'));
-    if (!rateLimited) console.error(error);
-  } finally {
-    button.disabled = false;
-  }
-});
-
-for (const card of vaultMoveCards) {
-  card.directionButton?.addEventListener('click', () => {
-    vaultMoveDirections = {
-      ...vaultMoveDirections,
-      [card.asset]: vaultMoveDirections[card.asset] === 'to-vault' ? 'from-vault' : 'to-vault',
-    };
-    refreshVaultMoveWidget();
-  });
-
-  card.maxButton?.addEventListener('click', () => {
-    const max = vaultMoveMaxAmount(card.asset);
-    if (max === null) return;
-    if (card.input) card.input.value = formatVaultMoveAmountInput(max);
-    refreshVaultMoveWidget();
-  });
-
-  card.form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!plathoWallet) return;
-    if (vaultMoveProcessingActive(card.asset)) return; // already in flight — ignore a double-submit
-    const raw = card.input?.value ?? '';
-    const direction = vaultMoveDirection(card.asset);
-    try {
-      // Lock + spinner from the tap. The lock persists AFTER the broadcast resolves (watchVaultMoveProcessing)
-      // until the moved funds actually leave the source pocket or the safety timeout — so the button stays busy
-      // "until the funds transfer" instead of re-enabling the instant the external is merely broadcast.
-      beginVaultMoveProcessing(card);
-      const amount = card.asset === 'ATH' ? parseAthAmountAtomic(raw) : parseTonAmountNanotons(raw);
-      let moveResult;
-      if (card.asset === 'TON' && direction === 'to-vault') {
-        moveResult = await submitVaultDepositTonAmount(amount); // trap-guard confirm lives inside; returns null on cancel
-      } else if (card.asset === 'TON') {
-        moveResult = await submitVaultWithdrawTonAmount(amount);
-      } else if (direction === 'to-vault') {
-        moveResult = await submitVaultDepositAthAmount(amount);
-      } else {
-        moveResult = await submitVaultWithdrawAthAmount(amount);
-      }
-      // null = the move never broadcast (the trap-guard confirm was declined; the sole no-op return path) — unlock
-      // now instead of sitting spinning until the timeout. A successful broadcast returns a truthy result.
-      if (moveResult === null) {
-        endVaultMoveProcessing(card.asset);
-        return;
-      }
-      if (card.input) card.input.value = '';
-      queueVaultPostTransactionRefresh();
-    } catch (error) {
-      endVaultMoveProcessing(card.asset); // the move never broadcast — unlock immediately for a retry
-      const rateLimited = noteTonRpcRateLimit(error);
-      setVaultStatus(rateLimited ? 'RPC busy, retrying' : vaultActionBlockedStatusText(error, 'move blocked'));
-      if (!rateLimited) console.error(error);
-    } finally {
-      refreshVaultMoveWidget();
-    }
-  });
-}
-
 publicSyncWindowSelect?.addEventListener('change', async () => {
   const value = writePublicSyncWindow(publicSyncWindowSelect.value);
   updatePublicSyncWindowUi();
@@ -21792,11 +21670,6 @@ function renderAthProfileStats() {
   setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(issued)}`);
 }
 
-function formatVaultMoveAmountInput(units) {
-  if (units === null || units === undefined) return '';
-  return formatDecimalAmount(units, 9, 9);
-}
-
 function normalizeUsernameInput(input) {
   const raw = String(input ?? '').trim().toLowerCase();
   const username = raw.endsWith('.ath') ? raw.slice(0, -4) : raw;
@@ -22986,53 +22859,6 @@ function unverifiedCriticalChainReadOptions() {
     cacheTtlMs: 0,
     queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS,
   };
-}
-
-async function readVaultGlobalForAthDeposit(provider, options = {}) {
-  return loadConnectedVaultGlobal({
-    provider,
-    verify: options.verify !== false,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
-}
-
-async function readVaultGlobalForAthDepositWithFallback(provider) {
-  return readVaultGlobalForAthDeposit(provider);
-}
-
-async function deriveVaultAthWalletAddressFromAthMaster(vault, options = {}) {
-  const provider = await resolveAthMasterProvider();
-  if (!provider?.getWalletAddress) throw new Error('ATHMaster provider cannot derive Vault ATH wallet');
-  return provider.getWalletAddress(vault, {
-    address: requireAthMasterAddress(),
-    verify: options.verify !== false,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
-}
-
-async function deriveVaultAthWalletAddressFromAthMasterWithFallback(vault) {
-  return deriveVaultAthWalletAddressFromAthMaster(vault);
-}
-
-async function requireVaultAthDepositRouteForOwnVaultAction(provider) {
-  const vault = requireBasechainAddress(requireVaultAddress(), 'Vault');
-  const global = await readVaultGlobalForAthDepositWithFallback(provider);
-  const boundOfficialWallet = global.vault_ath_wallet_address
-    ? requireBasechainAddress(global.vault_ath_wallet_address, 'Vault official ATH wallet')
-    : null;
-  if (!boundOfficialWallet) throw new Error('Vault official ATH wallet is not configured on this network');
-  const derivedOfficialWallet = requireBasechainAddress(
-    await deriveVaultAthWalletAddressFromAthMasterWithFallback(vault),
-    'Vault derived ATH wallet',
-  );
-  if (boundOfficialWallet !== derivedOfficialWallet) {
-    throw new Error('Vault official ATH wallet does not match ATHMaster-derived Vault wallet');
-  }
-  return { global, vault, vaultAthWalletAddress: boundOfficialWallet };
 }
 
 function optionalBalanceText(value, formatter) {
@@ -24261,18 +24087,6 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
   }
 }
 
-function vaultMoveDirection(asset) {
-  return vaultMoveDirections[asset] === 'from-vault' ? 'from-vault' : 'to-vault';
-}
-
-function vaultMoveSourcePocket(asset) {
-  return vaultMoveDirection(asset) === 'to-vault' ? 'wallet' : 'vault';
-}
-
-function vaultMoveTargetPocket(asset) {
-  return vaultMoveDirection(asset) === 'to-vault' ? 'vault' : 'wallet';
-}
-
 function vaultMoveBalance(pocket, asset) {
   return asset === 'ATH'
     ? vaultPocketState[pocket]?.ath_balance
@@ -24291,39 +24105,6 @@ function navVaultBalanceHasKnownValue() {
     && vaultPocketState.vault?.ton_balance !== undefined
     && vaultPocketState.vault?.ath_balance !== null
     && vaultPocketState.vault?.ath_balance !== undefined;
-}
-
-// GRAM to KEEP in the external wallet on a wallet->Vault move: always the transfer gas, PLUS — while the account
-// is not yet activated — the activation cost. Depositing needs no activation but WITHDRAWING does (the withdraw
-// external is signed by the on-chain-registered auth key), and activation itself is a wallet transaction. So a
-// user who moved everything in would be stranded: can't activate (no wallet GRAM) and can't withdraw (not
-// activated). Reserving the activation cost here keeps MAX from ever creating that trap.
-// Buffer on top of gas + activation fee: the DepositTon message itself attaches ~0.012 GRAM of overhead
-// (depositTonExec + first-time userStateStorage) that comes OUT of the kept reserve, plus a margin for
-// wallet-tx gas and forward-fee fluctuation. Sized so the wallet REALLY keeps enough to activate afterward.
-const VAULT_MOVE_ACTIVATION_RESERVE_BUFFER_NANOTONS = 25_000_000n;
-
-function vaultMoveWalletTonReserveNanotons() {
-  if (hasActivePlathoAccount()) return VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS;
-  return VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS
-    + plathoAccountActivationFeeNanotons()
-    + VAULT_MOVE_ACTIVATION_RESERVE_BUFFER_NANOTONS;
-}
-
-function vaultMoveMaxAmount(asset) {
-  const source = vaultMoveSourcePocket(asset);
-  const balance = vaultMoveBalance(source, asset);
-  if (balance === null || balance === undefined) return null;
-  if (asset === 'TON' && source === 'wallet') {
-    const reserve = vaultMoveWalletTonReserveNanotons();
-    return balance > reserve ? balance - reserve : 0n;
-  }
-  if (asset === 'TON' && source === 'vault') {
-    return balance > VAULT_RESERVES_NANOTONS.withdrawTonExec
-      ? balance - VAULT_RESERVES_NANOTONS.withdrawTonExec
-      : 0n;
-  }
-  return balance;
 }
 
 function refreshNavVaultBalance() {
@@ -24357,105 +24138,10 @@ function refreshNavVaultBalance() {
   }
 }
 
-// TRUE while a deposit/withdraw for this asset is in flight (button locked). Self-expires when the source-pocket
-// balance changes from the pre-move snapshot (the funds moved) or the safety timeout elapses; reading it also
-// PRUNES an expired entry, so callers never see a stuck lock.
-// Watch BOTH pockets, not just the source: a DEPOSIT's source (wallet) external balance loads on the slow DEFERRED
-// read and starts null, so keying on it alone spun the spinner the whole 30s timeout even though the deposit
-// settled — but the TARGET (vault) balance is refreshed by the IMMEDIATE get_user read, so it registers the move
-// promptly. (Withdraw is the mirror: its source, the vault, is the immediate read.) A null before/after never
-// counts as "changed" (the balance simply isn't loaded yet).
-function vaultMoveBalanceChanged(before, current) {
-  return current !== null && before !== null && current !== before;
-}
-function vaultMoveProcessingActive(asset) {
-  const state = vaultMoveProcessing[asset];
-  if (!state) return false;
-  const moved = vaultMoveBalanceChanged(state.beforeSource, vaultMoveBalance(state.sourcePocket, asset))
-    || vaultMoveBalanceChanged(state.beforeTarget, vaultMoveBalance(state.targetPocket, asset));
-  if (moved || Date.now() >= state.until) {
-    vaultMoveProcessing[asset] = null;
-    return false;
-  }
-  return true;
-}
-
-function beginVaultMoveProcessing(card) {
-  const sourcePocket = vaultMoveSourcePocket(card.asset);
-  const targetPocket = vaultMoveTargetPocket(card.asset);
-  vaultMoveProcessing[card.asset] = {
-    sourcePocket,
-    targetPocket,
-    beforeSource: vaultMoveBalance(sourcePocket, card.asset),
-    beforeTarget: vaultMoveBalance(targetPocket, card.asset),
-    until: Date.now() + VAULT_MOVE_PROCESSING_MAX_MS,
-  };
-  refreshVaultMoveWidget();
-  watchVaultMoveProcessing(card.asset);
-}
-
-function endVaultMoveProcessing(asset) {
-  vaultMoveProcessing[asset] = null;
-}
-
-// Poll the lock so it lifts (re-rendering the button) the moment the moved funds land — the post-transaction
-// balance refreshes update vaultMoveBalance, which vaultMoveProcessingActive reads — or at the safety timeout.
-function watchVaultMoveProcessing(asset) {
-  if (!vaultMoveProcessingActive(asset)) {
-    refreshVaultMoveWidget();
-    return;
-  }
-  window.setTimeout(() => watchVaultMoveProcessing(asset), 1500);
-}
-
+// clean-17 direct-pay: the deposit/withdraw move widget is gone (custody removed); this now only refreshes the
+// nav-corner wallet balance, which the activation/pocket-state KEEP paths still call through here.
 function refreshVaultMoveWidget() {
   refreshNavVaultBalance();
-  for (const card of vaultMoveCards) {
-    const direction = vaultMoveDirection(card.asset);
-    const source = vaultMoveSourcePocket(card.asset);
-    const target = vaultMoveTargetPocket(card.asset);
-    const sourceLabel = source === 'wallet' ? t('vault.wallet') : t('vault.vault');
-    const targetLabel = target === 'wallet' ? t('vault.wallet') : t('vault.vault');
-    setText(card.walletBalance, vaultMoveFormattedBalance('wallet', card.asset));
-    setText(card.vaultBalance, vaultMoveFormattedBalance('vault', card.asset));
-    setText(card.fromLabel, sourceLabel);
-    setText(card.toLabel, targetLabel);
-    const processing = vaultMoveProcessingActive(card.asset);
-    if (card.submitButton) {
-      // card.asset is the internal key ('TON'/'ATH'); show the user-facing coin label (TON -> GRAM rebrand).
-      const assetLabel = card.asset === 'ATH' ? 'ATH' : 'GRAM';
-      card.submitButton.textContent = direction === 'to-vault'
-        ? t('vault.moveToVault', { asset: assetLabel })
-        : t('vault.moveToWallet', { asset: assetLabel });
-      // Processing: locked + spinner (data-processing) so the tap is obviously registered and can't double-fire.
-      card.submitButton.disabled = !plathoWallet || processing;
-      if (processing) card.submitButton.dataset.processing = 'true';
-      else delete card.submitButton.dataset.processing;
-    }
-    if (card.form) {
-      card.form.dataset.direction = direction;
-      card.form.dataset.source = source;
-      card.form.dataset.target = target;
-    }
-    // The whole card freezes while a move settles — no changing the amount / direction mid-transaction.
-    if (card.input) card.input.disabled = !plathoWallet || processing;
-    if (card.maxButton) card.maxButton.disabled = !plathoWallet || processing;
-    if (card.directionButton) card.directionButton.disabled = !plathoWallet || processing;
-    // Explain the wallet reserve while un-activated (answers "why does some GRAM stay after MAX?"): created
-    // lazily, class-styled (prod CSP bans inline styles).
-    if (card.asset === 'TON') {
-      if (!card.note) {
-        card.note = document.createElement('p');
-        card.note.className = 'vault-move-note';
-        card.form?.appendChild(card.note);
-      }
-      const showReserveNote = Boolean(plathoWallet) && !hasActivePlathoAccount() && direction === 'to-vault';
-      card.note.hidden = !showReserveNote;
-      if (showReserveNote) {
-        card.note.textContent = t('vault.activationReserveNote', { fee: formatTonNanotons(plathoAccountActivationFeeNanotons()) });
-      }
-    }
-  }
 }
 
 async function refreshVaultDashboard() {
@@ -25251,247 +24937,6 @@ async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, u
     confirmationPending: Boolean(nonceWaitError),
     nonceWaitError: nonceWaitError ? String(nonceWaitError?.message ?? nonceWaitError) : null,
   };
-}
-
-async function readFreshPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce, options = {}) {
-  if (!provider?.getPendingAthWithdrawalFor) throw new Error('Vault provider cannot confirm ATH withdrawal');
-  return provider.getPendingAthWithdrawalFor(owner, clientNonce, {
-    vaultAddress: requireVaultAddress(),
-    verify: options.verify !== false,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
-}
-
-async function readPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce) {
-  return callWithVerificationUnavailableReadFallback(
-    () => readFreshPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce),
-    () => readFreshPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce, unverifiedCriticalChainReadOptions()),
-  );
-}
-
-async function waitForVaultAthWithdrawalCompletion(provider, owner, clientNonce) {
-  if (!provider?.getPendingAthWithdrawalFor) {
-    return {
-      pendingWithdrawal: null,
-      athTransferPending: true,
-      pendingWithdrawalError: 'Vault provider cannot confirm ATH withdrawal',
-    };
-  }
-  const deadline = Date.now() + VAULT_ATH_WITHDRAW_CONFIRM_TIMEOUT_MS;
-  let pendingWithdrawal = null;
-  let pendingWithdrawalError = null;
-  while (Date.now() <= deadline) {
-    try {
-      pendingWithdrawal = await readPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce);
-      pendingWithdrawalError = null;
-      if (pendingWithdrawal?.exists === false) {
-        return {
-          pendingWithdrawal,
-          athTransferPending: false,
-          pendingWithdrawalError: null,
-        };
-      }
-    } catch (error) {
-      pendingWithdrawalError = error;
-      if (!noteTonRpcRateLimit(error)) break;
-    }
-    await delay(VAULT_ATH_WITHDRAW_POLL_MS);
-  }
-  return {
-    pendingWithdrawal,
-    athTransferPending: true,
-    pendingWithdrawalError: pendingWithdrawalError ? String(pendingWithdrawalError?.message ?? pendingWithdrawalError) : null,
-  };
-}
-
-async function submitAthWalletMessage(type, params, options = {}) {
-  requireNoPendingServiceWorkerAppShellReload();
-  requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const athWalletAddress = options.athWalletAddress ?? await loadConnectedAthWalletAddress();
-  const message = createAthWalletMessage(type, params, {
-    athWalletAddress,
-    ...options,
-  });
-  const transaction = createWalletTransaction(message);
-  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
-  globalThis.plathoLastAthWalletTransaction = { type, params, message, transaction, result };
-  markNavVaultBalancePending('ATH transaction submitted', {
-    resetRetry: true,
-    retry: true,
-    retryDelayMs: 2_000,
-  });
-  return result;
-}
-
-async function submitVaultDepositTon() {
-  const amount = await requestTonAmountNanotons(t('vault.moveGramToVaultTitle'), t('vault.moveGramToVaultHint'));
-  if (amount === null) return null;
-  return submitVaultDepositTonAmount(amount);
-}
-
-// Warn before a wallet->Vault GRAM move that would leave too little to ACTIVATE (and thus too little to ever
-// withdraw — the withdraw external needs the registered auth key). Only fires for an un-activated account; a
-// known-sufficient or unknown balance passes silently. Returns true to proceed.
-async function confirmVaultDepositKeepsActivationReserve(amount) {
-  if (hasActivePlathoAccount()) return true;
-  const raw = vaultPocketState?.wallet?.ton_balance;
-  if (raw === null || raw === undefined) return true;
-  let walletBal;
-  let amt;
-  try { walletBal = BigInt(raw); amt = BigInt(amount); } catch { return true; }
-  const reserve = vaultMoveWalletTonReserveNanotons();
-  if (walletBal - amt >= reserve) return true;
-  const fee = plathoAccountActivationFeeNanotons();
-  const result = await openActionDialog({
-    title: t('vault.keepGramToActivateTitle'),
-    tone: 'error',
-    submitLabel: t('vault.moveAnyway'),
-    hint: t('vault.keepGramToActivateHint', { fee: formatTonNanotons(fee) }),
-    fields: [],
-    summary: [
-      { label: t('common.walletGram'), value: t('common.gramAmount', { amount: formatTonNanotons(walletBal) }) },
-      { label: t('vault.movingToVault'), value: t('common.gramAmount', { amount: formatTonNanotons(amt) }) },
-      { label: t('vault.activationCosts'), value: t('common.gramAmount', { amount: formatTonNanotons(fee) }) },
-    ],
-  });
-  return result !== null;
-}
-
-async function submitVaultDepositTonAmount(amount) {
-  // Trap guard lives HERE so EVERY deposit entry point is covered (the vault-move card, the submitVaultDepositTon
-  // wrapper, and the plathoVaultTransactions global export) — not just the card submit handler.
-  if (!(await confirmVaultDepositKeepsActivationReserve(amount))) {
-    setVaultStatus('move cancelled');
-    return null;
-  }
-  const provider = await resolveVaultChainProvider();
-  const user = await readFreshConnectedVaultUser(provider);
-  setVaultStatus('moving GRAM to Vault');
-  const result = await submitVaultMessage('DepositTon', { amount }, {
-    userExists: user.exists === true,
-  });
-  setVaultStatus('move submitted');
-  return result;
-}
-
-async function submitVaultWithdrawTon() {
-  const amount = await requestTonAmountNanotons(t('vault.moveGramFromVaultTitle'), t('vault.moveGramFromVaultHint'));
-  if (amount === null) return null;
-  return submitVaultWithdrawTonAmount(amount);
-}
-
-async function submitVaultWithdrawTonAmount(amount) {
-  setVaultStatus('moving GRAM from Vault');
-  requireNoPendingServiceWorkerAppShellReload();
-  const provider = await resolveVaultChainProvider();
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const user = await loadConnectedVaultUser({
-    provider,
-    verify: true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
-  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n || BigInt(user.auth_pubkey ?? 0n) === 0n) {
-    throw new Error('Unlock and activate your Platho account before moving GRAM from Vault');
-  }
-  const totalDebit = BigInt(amount) + VAULT_RESERVES_NANOTONS.withdrawTonExec;
-  if (BigInt(user.ton_balance ?? 0n) < totalDebit) {
-    throw new Error('Vault GRAM balance is too low for amount plus transfer reserve');
-  }
-  const result = await submitVaultAuthExternalWithNonceConfirmation({
-    provider,
-    owner,
-    user,
-    buildExternal: (clientNonce) => buildVaultWithdrawTonExternalBoc({
-      owner_wallet: owner,
-      amount,
-      recipient: owner,
-      client_nonce: clientNonce,
-      signingSecretKey: requireVaultAuthSecretKey(),
-    }, {
-      vaultAddress: requireVaultAddress(),
-      deploymentManifestHash: requireVaultDeploymentManifestHash(),
-    }),
-  });
-  setVaultStatus('move submitted');
-  return result;
-}
-
-async function submitVaultDepositAth() {
-  const amount = await requestAthAmountAtomic(t('vault.moveAthToVaultTitle'), t('vault.moveAthToVaultHint'));
-  if (amount === null) return null;
-  return submitVaultDepositAthAmount(amount);
-}
-
-async function submitVaultDepositAthAmount(amount) {
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const provider = await resolveVaultChainProvider();
-  setVaultStatus('checking ATH Vault route');
-  const { vault } = await requireVaultAthDepositRouteForOwnVaultAction(provider);
-  setVaultStatus('moving ATH to Vault');
-  const result = await submitAthWalletMessage('ATHTransferRequestWithNotify', {
-    query_id: nextQueryId(),
-    amount,
-    recipient: vault,
-    response_destination: owner,
-    notify_destination: vault,
-    notify_value: 32_000_000n,
-  });
-  setVaultStatus('move submitted');
-  return result;
-}
-
-async function submitVaultWithdrawAth() {
-  const amount = await requestAthAmountAtomic(t('vault.moveAthFromVaultTitle'), t('vault.moveAthFromVaultHint'));
-  if (amount === null) return null;
-  return submitVaultWithdrawAthAmount(amount);
-}
-
-async function submitVaultWithdrawAthAmount(amount) {
-  setVaultStatus('moving ATH from Vault');
-  requireNoPendingServiceWorkerAppShellReload();
-  const provider = await resolveVaultChainProvider();
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const user = await loadConnectedVaultUser({
-    provider,
-    verify: true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
-  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n || BigInt(user.auth_pubkey ?? 0n) === 0n) {
-    throw new Error('Unlock and activate your Platho account before moving ATH from Vault');
-  }
-  if (BigInt(user.ath_balance ?? 0n) < BigInt(amount)) {
-    throw new Error('Vault ATH balance is too low');
-  }
-  if (BigInt(user.ton_balance ?? 0n) < VAULT_RESERVES_NANOTONS.withdrawAthMinValue) {
-    throw new Error('Vault GRAM balance is too low for ATH transfer reserve');
-  }
-  const result = await submitVaultAuthExternalWithNonceConfirmation({
-    provider,
-    owner,
-    user,
-    buildExternal: (clientNonce) => buildVaultWithdrawAthExternalBoc({
-      owner_wallet: owner,
-      amount,
-      recipient: owner,
-      client_nonce: clientNonce,
-      signingSecretKey: requireVaultAuthSecretKey(),
-    }, {
-      vaultAddress: requireVaultAddress(),
-      deploymentManifestHash: requireVaultDeploymentManifestHash(),
-    }),
-  });
-  if (result.confirmationPending) {
-    setVaultStatus('ATH transfer pending');
-    return { ...result, athTransferPending: true, pendingWithdrawal: null };
-  }
-  setVaultStatus('ATH transfer pending');
-  const athWithdrawal = await waitForVaultAthWithdrawalCompletion(provider, owner, result.clientNonce);
-  setVaultStatus(athWithdrawal.athTransferPending ? 'ATH transfer pending' : 'move submitted');
-  return { ...result, ...athWithdrawal };
 }
 
 // clean-17 direct-pay username mint values (proven by tests/username-registry-ath-wallet-integration.test.ts). The mint
@@ -31136,11 +30581,6 @@ globalThis.plathoVaultTransactions = {
   createPublicPostPayload,
   createWalletTransaction,
   submitVaultMessage,
-  submitAthWalletMessage,
-  submitVaultDepositTon,
-  submitVaultWithdrawTon,
-  submitVaultDepositAth,
-  submitVaultWithdrawAth,
   submitUsernameMint,
   submitVaultUsernameMint,
   submitAthDueFlush,

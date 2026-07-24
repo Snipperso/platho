@@ -3173,187 +3173,6 @@ button.feed-item:hover {
   color: var(--text);
 }
 
-.vault-move-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.vault-asset-move-card {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel-2);
-}
-
-.vault-asset-move-card:focus-within {
-  border-color: rgba(48, 213, 176, 0.55);
-  box-shadow: 0 0 0 1px rgba(48, 213, 176, 0.16) inset;
-}
-
-.vault-asset-move-header,
-.vault-asset-move-body {
-  display: grid;
-  gap: 14px;
-  align-items: center;
-}
-
-.vault-asset-move-header {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-}
-
-.vault-asset-move-body {
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 12px;
-}
-
-.vault-asset-move-header span,
-.vault-asset-route span {
-  color: var(--muted);
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
-.vault-asset-move-header strong {
-  display: block;
-  margin-top: 4px;
-  font-size: 20px;
-}
-
-.vault-asset-balances {
-  display: grid;
-  gap: 5px;
-  justify-items: end;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.vault-asset-balances strong {
-  display: inline;
-  margin: 0 0 0 6px;
-  color: var(--text);
-  font-size: 13px;
-}
-
-.vault-asset-route {
-  display: grid;
-  grid-template-columns: 54px 32px 54px;
-  align-items: center;
-  gap: 4px;
-  width: max-content;
-  max-width: 100%;
-  justify-self: start;
-  padding: 4px;
-  border: 1px solid var(--line-soft);
-  border-radius: 999px;
-  background: #0d1012;
-}
-
-.vault-asset-route span {
-  color: var(--text);
-  text-align: center;
-  text-transform: none;
-}
-
-.vault-asset-switch {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--panel-3);
-  color: var(--accent);
-}
-
-.vault-asset-switch .icon {
-  width: 17px;
-  height: 17px;
-}
-
-.vault-asset-amount {
-  display: grid;
-  grid-template-columns: minmax(44px, 1fr) minmax(58px, auto);
-  align-items: center;
-  width: 100%;
-  max-width: none;
-  justify-self: stretch;
-  gap: 6px;
-  min-width: 0;
-}
-
-.vault-asset-amount input {
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: clamp(26px, 2vw, 34px);
-  line-height: 1;
-  text-align: right;
-}
-
-.vault-asset-amount input::placeholder {
-  color: var(--muted-2);
-}
-
-.vault-asset-amount button {
-  min-width: 58px;
-  min-height: 40px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel-3);
-  color: var(--accent);
-  font-weight: 900;
-}
-
-.vault-move-submit {
-  min-height: 50px;
-  border-radius: 8px;
-  border-color: transparent;
-  background: var(--accent);
-  color: #07110f;
-  font-size: 17px;
-  font-weight: 900;
-}
-
-/* Processing lock: from the tap until the moved funds settle (or a timeout) the button is disabled and shows a
-   spinner in place of its label, so it is obvious the tap registered and a second tap can't double-submit. The
-   attribute selector (0,2,0) outranks button:disabled (0,1,1), so the spinner stays legible over the disabled dim.
-   Class/attribute-driven (prod CSP bans inline styles). */
-.vault-move-submit[data-processing="true"] {
-  color: transparent;
-  opacity: 0.9;
-  cursor: progress;
-  position: relative;
-}
-.vault-move-submit[data-processing="true"]::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 20px;
-  height: 20px;
-  margin: -10px 0 0 -10px;
-  border: 2px solid rgba(7, 17, 15, 0.3);
-  border-top-color: #07110f;
-  border-radius: 50%;
-  animation: rail-balance-spin 0.8s linear infinite;
-}
-
-/* Note under the wallet->Vault card explaining the activation reserve kept in the wallet (un-activated only). */
-.vault-move-note {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--text-muted, #8b949e);
-}
-
 .action-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
@@ -4656,7 +4475,6 @@ button.feed-item:hover {
 .icon-back { --mask: url("./assets/icons/back.svg"); }
 .icon-chevron-down { --mask: url("./assets/icons/chevron-down.svg"); }
 .icon-refresh { --mask: url("./assets/icons/refresh.svg"); }
-.icon-swap-circular { --mask: url("./assets/icons/swap-circular.svg"); }
 .icon-swap-vertical { --mask: url("./assets/icons/swap-vertical.svg"); }
 .icon-text-select { --mask: url("./assets/icons/text-select.svg"); }
 .icon-expand { --mask: url("./assets/icons/expand.svg?v=2"); }
@@ -4932,19 +4750,9 @@ button.feed-item:hover {
   }
 
   .balance-grid,
-  .vault-move-list,
   .action-grid,
   .wallet-ton-group {
     grid-template-columns: 1fr;
-  }
-
-  .vault-asset-move-body {
-    grid-template-columns: max-content minmax(0, 1fr);
-    gap: 10px;
-  }
-
-  .vault-asset-amount input {
-    text-align: right;
   }
 
   .docs-dialog {

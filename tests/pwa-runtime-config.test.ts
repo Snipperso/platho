@@ -638,17 +638,7 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.public-composer\s*{[\s\S]*?max-width: none;/);
     expect(css).toMatch(/\.composer-post-option\s*{[\s\S]*?width: 44px;\s*height: 44px;/);
     expect(css).toMatch(/\.composer \.private-anonymous-button,\s*\.public-composer \.composer-post-option\s*{\s*width: 38px;\s*height: 44px;/);
-    expect(css).toMatch(/\.vault-move-list\s*{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
-    expect(css).toMatch(/\.vault-asset-move-header\s*{\s*grid-template-columns: minmax\(0, 1fr\) auto;/);
-    expect(css).toMatch(/\.vault-asset-move-body\s*{\s*grid-template-columns: max-content minmax\(0, 1fr\);/);
-    expect(css).toMatch(/\.vault-asset-route\s*{\s*display: grid;[\s\S]*grid-template-columns: 54px 32px 54px;[\s\S]*gap: 4px;[\s\S]*width: max-content;[\s\S]*max-width: 100%;[\s\S]*padding: 4px;/);
-    expect(css).toMatch(/\.vault-asset-switch\s*{\s*width: 32px;\s*height: 32px;/);
-    expect(css).toMatch(/\.icon-swap-circular\s*{\s*--mask: url\("\.\/assets\/icons\/swap-circular\.svg"\);/);
-    expect(html).toMatch(/icon-swap-circular/);
-    expect(css).toMatch(/\.vault-asset-amount\s*{\s*display: grid;[\s\S]*grid-template-columns: minmax\(44px, 1fr\) minmax\(58px, auto\);[\s\S]*width: 100%;\s*max-width: none;\s*justify-self: stretch;/);
-    expect(css).toMatch(/\.vault-asset-amount button\s*{\s*min-width: 58px;/);
-    expect(css).toMatch(/\.balance-grid,\s*\.vault-move-list,\s*\.action-grid,\s*\.wallet-ton-group\s*{\s*grid-template-columns: 1fr;/);
-    expect(css).toMatch(/\.vault-asset-move-body\s*{\s*grid-template-columns: max-content minmax\(0, 1fr\);/);
+    expect(css).toMatch(/\.balance-grid,\s*\.action-grid,\s*\.wallet-ton-group\s*{\s*grid-template-columns: 1fr;/);
     expect(app).toMatch(/walletBalanceInfoEndpoint/);
     expect(app).toMatch(/createTonRpcTransport/);
     expect(app).toMatch(/installConfiguredTonRuntime/);
@@ -973,21 +963,6 @@ describe('PWA runtime config guard', () => {
     expect(navBalanceFn).toMatch(/if \(!navVaultBalanceHasKnownValue\(\)\) \{[\s\S]*container\.classList\.add\('is-pending'\)[\s\S]*container\.classList\.remove\('rail-vault-balance-reveal'\)/);
     expect(navBalanceFn).toMatch(/if \(container\.classList\.contains\('is-pending'\)\) \{[\s\S]*?container\.classList\.remove\('is-pending'\)[\s\S]*?container\.classList\.add\('rail-vault-balance-reveal'\)/);
     expect(navBalanceFn).not.toMatch(/is-loading|is-placeholder|container\.hidden/);
-    expect(html).toMatch(/id="vaultMoveTonForm"/);
-    expect(html).toMatch(/id="vaultMoveAthForm"/);
-    expect(html).toMatch(/id="vaultMoveTonWalletBalance"[^>]*>0<\/strong>/);
-    expect(html).toMatch(/id="vaultMoveTonVaultBalance"[^>]*>0<\/strong>/);
-    expect(html).toMatch(/id="vaultMoveAthWalletBalance"[^>]*>0<\/strong>/);
-    expect(html).toMatch(/id="vaultMoveAthVaultBalance"[^>]*>0<\/strong>/);
-    expect(html).toMatch(/id="vaultMoveTonDirectionButton"/);
-    expect(html).toMatch(/id="vaultMoveAthDirectionButton"/);
-    expect(html).toMatch(/Move GRAM to Vault/);
-    expect(html).toMatch(/Move ATH to Vault/);
-    // The DYNAMIC move-button refresh must use the GRAM/ATH display label, not the internal card.asset key
-    // ('TON') -- otherwise the button re-renders as "Move TON to Vault" after the first refresh (the static
-    // HTML default above is correct, but the refresh overwrote it).
-    expect(readFileSync('web/app.js', 'utf8')).toMatch(/const assetLabel = card\.asset === 'ATH' \? 'ATH' : 'GRAM'[\s\S]*?t\('vault\.moveToVault', \{ asset: assetLabel \}\)/);
-    expect(EN_STRINGS['vault.moveToVault']).toBe('Move {asset} to Vault');
     expect(html).not.toMatch(/Wallet runtime|Key auth|Vault record|Replay store|Local state/);
     expect(app).not.toMatch(/window\.prompt|window\.alert/);
     expect(html).not.toMatch(/Messaging key backup|exportMessagingKeyBackupButton|importMessagingKeyBackupButton|messagingKeyBackupInput/);
@@ -1632,69 +1607,6 @@ describe('PWA runtime config guard', () => {
     expect(settleSource).toMatch(/privateSendPreflightStatusText\(error\)/);
     expect(settleSource).toMatch(/markPrivateMessageManualRecovery\(context, error/);
     expect(submitSource).not.toMatch(/\? messageText : 'Send blocked'/);
-  });
-
-  it('PWA-VAULT-MOVE-01: Vault move failures surface activation blockers in the UI status', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const helperSource = app.slice(
-      app.indexOf('function vaultActionBlockedStatusText'),
-      app.indexOf('function canEditPrivateComposerDraft'),
-    );
-    const submitSource = app.slice(
-      app.indexOf('for (const card of vaultMoveCards)'),
-      app.indexOf('publicSyncWindowSelect?.addEventListener'),
-    );
-
-    expect(helperSource).toMatch(/return t\('vault\.activateBeforeMove'\)/);
-    expect(EN_STRINGS['vault.activateBeforeMove']).toBe('Activate Platho account before moving GRAM from Vault');
-    expect(helperSource).toMatch(/return t\('vault\.unlockActivateBeforeActions'\)/);
-    expect(EN_STRINGS['vault.unlockActivateBeforeActions']).toBe('Unlock and activate Platho account before Vault actions');
-    expect(submitSource).toMatch(/vaultActionBlockedStatusText\(error, 'move blocked'\)/);
-  });
-
-  it('PWA-VAULT-MOVE-03: the deposit/withdraw button locks with a spinner until the funds settle', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const css = readFileSync('web/styles.css', 'utf8');
-    const submitSource = app.slice(
-      app.indexOf('for (const card of vaultMoveCards)'),
-      app.indexOf('publicSyncWindowSelect?.addEventListener'),
-    );
-    // The tap locks the card; a re-tap while in flight is ignored; a declined trap-guard (null) unlocks at once;
-    // a broadcast keeps the lock until the moved funds settle (watchVaultMoveProcessing) or the safety timeout.
-    expect(submitSource).toMatch(/if \(vaultMoveProcessingActive\(card\.asset\)\) return;/);
-    expect(submitSource).toMatch(/beginVaultMoveProcessing\(card\);/);
-    expect(submitSource).toMatch(/if \(moveResult === null\) \{\s*\n\s*endVaultMoveProcessing\(card\.asset\);/);
-    // The lock lifts when EITHER pocket balance changes from the pre-move snapshot (a deposit's source/wallet loads
-    // on the slow deferred read, but its target/vault is the immediate get_user read, so watching both clears it
-    // promptly), or at the timeout.
-    expect(app).toMatch(/function vaultMoveProcessingActive\(asset\) \{/);
-    expect(app).toMatch(/const moved = vaultMoveBalanceChanged\(state\.beforeSource, vaultMoveBalance\(state\.sourcePocket, asset\)\)\s*\n\s*\|\| vaultMoveBalanceChanged\(state\.beforeTarget, vaultMoveBalance\(state\.targetPocket, asset\)\);/);
-    expect(app).toMatch(/if \(moved \|\| Date\.now\(\) >= state\.until\) \{\s*\n\s*vaultMoveProcessing\[asset\] = null;/);
-    expect(app).toMatch(/beforeSource: vaultMoveBalance\(sourcePocket, card\.asset\),\s*\n\s*beforeTarget: vaultMoveBalance\(targetPocket, card\.asset\),/);
-    expect(app).toMatch(/function watchVaultMoveProcessing\(asset\) \{/);
-    // The lock is wallet-scoped: a wallet switch drops it so the new wallet never inherits a stale spinner.
-    expect(app).toMatch(/vaultMoveProcessing\.TON = null;\s*\n\s*vaultMoveProcessing\.ATH = null;/);
-    // The widget renders the lock: disabled + data-processing (spinner); the whole card freezes.
-    const widget = app.slice(app.indexOf('function refreshVaultMoveWidget()'), app.indexOf('async function refreshVaultDashboard()'));
-    expect(widget).toMatch(/const processing = vaultMoveProcessingActive\(card\.asset\);/);
-    expect(widget).toMatch(/card\.submitButton\.disabled = !plathoWallet \|\| processing;/);
-    expect(widget).toMatch(/if \(processing\) card\.submitButton\.dataset\.processing = 'true';/);
-    // The spinner overlay (class/attribute-driven; prod CSP bans inline styles).
-    expect(css).toMatch(/\.vault-move-submit\[data-processing="true"\]\s*{[\s\S]*?color: transparent;/);
-    expect(css).toMatch(/\.vault-move-submit\[data-processing="true"\]::after\s*{[\s\S]*?animation: rail-balance-spin/);
-  });
-
-  it('PWA-VAULT-MOVE-02: TON max from Vault leaves the withdrawal execution reserve', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const maxSource = app.slice(
-      app.indexOf('function vaultMoveMaxAmount'),
-      app.indexOf('function refreshNavVaultBalance'),
-    );
-
-    expect(maxSource).toMatch(/asset === 'TON' && source === 'wallet'/);
-    expect(maxSource).toMatch(/asset === 'TON' && source === 'vault'/);
-    expect(maxSource).toMatch(/balance > VAULT_RESERVES_NANOTONS\.withdrawTonExec/);
-    expect(maxSource).toMatch(/balance - VAULT_RESERVES_NANOTONS\.withdrawTonExec/);
   });
 
   it('PWA-SEND-02: prepared Vault send streams multi-part BOCs back-to-back (non-blocking nonce barrier) and preserves partial state', () => {
@@ -2715,17 +2627,10 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function loadConnectedAthWalletAddress'),
       app.indexOf('async function resolveRecipientWalletForThread'),
     );
-    const submitSource = app.slice(
-      app.indexOf('async function submitAthWalletMessage'),
-      app.indexOf('async function submitVaultDepositTon'),
-    );
-
     expect(criticalMethods).toContain('get_wallet_address');
     expect(source).toMatch(/provider\.getWalletAddress\(owner, \{/);
     expect(source).toMatch(/address: requireAthMasterAddress\(\)/);
     expect(source).toMatch(/\.\.\.criticalChainReadOptions\(\)/);
-    expect(submitSource).toMatch(/requireNoPendingServiceWorkerAppShellReload\(\)/);
-    expect(submitSource).toMatch(/await loadConnectedAthWalletAddress\(\)/);
     expect(app).not.toMatch(/async function submitUsernameRegistryMessage/);
     expect(app).not.toMatch(/async function submitUsernameRefundFlush/);
   });
@@ -2836,55 +2741,6 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['username.yourAth']).toBe('Your ATH');
   });
 
-  it('PWA-VAULT-ATH-DEPOSIT-PREFLIGHT-01: Vault ATH deposit preflights Vault ATHMaster and official wallet route', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const athProvider = readFileSync('web/ath-ton-rpc-provider.mjs', 'utf8');
-    const routeSource = app.slice(
-      app.indexOf('async function readVaultGlobalForAthDeposit'),
-      app.indexOf('function optionalBalanceText'),
-    );
-    const submitSource = app.slice(
-      app.indexOf('async function submitVaultDepositAthAmount'),
-      app.indexOf('async function submitVaultWithdrawAth'),
-    );
-    const preflightIndex = submitSource.indexOf('requireVaultAthDepositRouteForOwnVaultAction(provider)');
-    const buildIndex = submitSource.indexOf("submitAthWalletMessage('ATHTransferRequestWithNotify'");
-
-    expect(routeSource).toMatch(/loadConnectedVaultGlobal\(\{[\s\S]*verify: options\.verify !== false/);
-    expect(routeSource).toMatch(/global\.vault_ath_wallet_address/);
-    expect(routeSource).toMatch(/deriveVaultAthWalletAddressFromAthMasterWithFallback\(vault\)/);
-    expect(routeSource).toMatch(/Vault official ATH wallet does not match ATHMaster-derived Vault wallet/);
-    expect(routeSource).toMatch(/async function readVaultGlobalForAthDepositWithFallback[\s\S]*return readVaultGlobalForAthDeposit\(provider\)/);
-    expect(routeSource).toMatch(/async function deriveVaultAthWalletAddressFromAthMasterWithFallback[\s\S]*return deriveVaultAthWalletAddressFromAthMaster\(vault\)/);
-    expect(routeSource).not.toMatch(/unverifiedCriticalChainReadOptions|callWithVerificationUnavailableReadFallback/);
-    expect(app).toMatch(/Vault ATHMaster binding does not match this app config/);
-    expect(preflightIndex).toBeGreaterThanOrEqual(0);
-    expect(buildIndex).toBeGreaterThan(preflightIndex);
-    expect(athProvider).toMatch(/method: 'get_wallet_address'[\s\S]*\.\.\.criticalCallOptions\(callOptions\)/);
-  });
-
-  it('PWA-VAULT-ATH-WITHDRAW-CONFIRM-01: withdraw ATH tracks pending withdrawal after nonce confirmation', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const helperSource = app.slice(
-      app.indexOf('async function readFreshPendingAthWithdrawalForOwnVaultAction'),
-      app.indexOf('async function submitAthWalletMessage'),
-    );
-    const withdrawSource = app.slice(
-      app.indexOf('async function submitVaultWithdrawAthAmount'),
-      app.indexOf('async function submitUsernameMint'),
-    );
-
-    expect(helperSource).toMatch(/provider\.getPendingAthWithdrawalFor\(owner, clientNonce/);
-    expect(helperSource).toMatch(/VAULT_ATH_WITHDRAW_CONFIRM_TIMEOUT_MS/);
-    expect(helperSource).toMatch(/pendingWithdrawal\?\.exists === false/);
-    expect(helperSource).toMatch(/athTransferPending: false/);
-    expect(helperSource).toMatch(/athTransferPending: true/);
-    expect(withdrawSource).toMatch(/submitVaultAuthExternalWithNonceConfirmation/);
-    expect(withdrawSource).toMatch(/waitForVaultAthWithdrawalCompletion\(provider, owner, result\.clientNonce\)/);
-    expect(withdrawSource).toMatch(/setVaultStatus\(athWithdrawal\.athTransferPending \? 'ATH transfer pending' : 'move submitted'\)/);
-    expect(withdrawSource).not.toMatch(/complete/i);
-  });
-
   it('PWA-SW-UPDATE-01: pending service worker update blocks new signed sends and reloads after wallet lock', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const swSource = app.slice(
@@ -2897,7 +2753,7 @@ describe('PWA runtime config guard', () => {
     );
     const submitSource = app.slice(
       app.indexOf('async function submitVaultMessage'),
-      app.indexOf('async function submitVaultDepositTon'),
+      app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
     );
     const prepareSource = app.slice(
       app.indexOf('async function prepareCapsulesThroughVault'),
@@ -2939,7 +2795,6 @@ describe('PWA runtime config guard', () => {
     expect(profileSource).toMatch(/async function submitVaultProfileAvatarRegistration[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).toMatch(/async function submitVaultMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
-    expect(submitSource).toMatch(/async function submitAthWalletMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).not.toMatch(/async function submitUsernameRegistryMessage/);
     expect(prepareSource).toMatch(/async function prepareCapsulesThroughVault[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
   });
@@ -3862,7 +3717,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const helperSource = app.slice(
       app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
-      app.indexOf('async function readFreshPendingAthWithdrawalForOwnVaultAction'),
+      app.indexOf('async function submitUsernameMintDirect'),
     );
     const profileSource = app.slice(
       app.indexOf('async function submitVaultProfileAvatarRegistration'),
@@ -3962,10 +3817,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function requireUsernameRegistryVaultRouteForOwnVaultAction'),
       app.indexOf('async function assertVaultProfileAvatarCanStart'),
     );
-    const depositSource = app.slice(
-      app.indexOf('async function submitVaultDepositTonAmount'),
-      app.indexOf('async function submitVaultWithdrawTon'),
-    );
     const registerSource = app.slice(
       app.indexOf('async function submitVaultRegisterMessagingKeys'),
       app.indexOf('async function confirmPlathoAccountActivation'),
@@ -3984,7 +3835,7 @@ describe('PWA runtime config guard', () => {
     );
     const authExternalSource = app.slice(
       app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
-      app.indexOf('async function readFreshPendingAthWithdrawalForOwnVaultAction'),
+      app.indexOf('async function submitUsernameMintDirect'),
     );
 
     const degradedFallbackHelper = app.slice(
@@ -4017,7 +3868,6 @@ describe('PWA runtime config guard', () => {
     expect(capsuleRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(profileRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(usernameRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
-    expect(depositSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
     expect(registerSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
     expect(nonceReadSource).toMatch(/callWithDegradedTransportReadFallback\(/);
     expect(nonceReadSource).toMatch(/\(\) => readVaultPublishNonce\(provider, owner, options\)/);
@@ -7239,7 +7089,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function queueVaultRefreshAfterWalletChange\(\) \{[\s\S]*markNavVaultBalancePending\('wallet changed'/);
     expect(app).toMatch(/async function sendVaultExternalBoc\(built, options = \{\}\) \{[\s\S]*markNavVaultBalancePending\('Vault action submitted'/);
     expect(app).toMatch(/async function submitVaultMessage\(type, params, options = \{\}\) \{[\s\S]*markNavVaultBalancePending\('wallet transaction submitted'/);
-    expect(app).toMatch(/async function submitAthWalletMessage\(type, params, options = \{\}\) \{[\s\S]*markNavVaultBalancePending\('ATH transaction submitted'/);
     expect(app).toMatch(/function markNavVaultBalanceRetryNeeded[\s\S]*markNavVaultBalancePending\(reason, \{ retry: true \}\)/);
     expect(app).toMatch(/if \(view === 'vault'\)/);
     expect(app).toMatch(/scheduleVaultAutoRefresh\(2_000\)/);
