@@ -271,7 +271,7 @@ builder $AirdropTicket$_store(builder build_0, (slice, int, int) v) inline {
 
 ((slice, int, int), (slice, int, int, int, int, int)) $AirdropTicket$_fun_get_ticket((slice, int, int) $self) impure inline_ref {
     var (($self'owner, $self'credits, $self'in_flight)) = $self;
-    var $fresh$ret_1 = $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value($self'owner, $self'credits, $self'in_flight, 64, 1000, 63000000);
+    var $fresh$ret_1 = $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value($self'owner, $self'credits, $self'in_flight, 10, 1000, 63000000);
     return (($self'owner, $self'credits, $self'in_flight), $fresh$ret_1);
 }
 
@@ -357,7 +357,7 @@ _ %get_ticket() method_id(104158) {
         var $_ = empty_tuple();
         throw_unless(27010, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
         throw_unless(27011, ($self'in_flight == 0));
-        throw_unless(27012, ($self'credits >= 64));
+        throw_unless(27012, ($self'credits >= 10));
         throw_unless(27013, ($Context$_get_value(__tact_context_get()) >= 63000000));
         int $k = $self'credits;
         if (($k > 1000)) {

@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: AirdropTicket
-BoC Size: 812 bytes
+BoC Size: 811 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 18

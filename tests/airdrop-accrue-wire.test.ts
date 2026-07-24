@@ -75,7 +75,7 @@ describe('AIRDROP-ACCRUE-WIRE — FeeAccumulator and AirdropPool must agree on o
       code: (await AirdropTicket.init(FA_TREASURY)).code,
       data: ticketData(publisher.address),
     });
-    // AT_MIN_CLAIM_CREDITS = 64: a claim below the batching threshold is refused outright (27012), so the ticket
+    // AT_MIN_CLAIM_CREDITS = 10: a claim below the batching threshold is refused outright (27012), so the ticket
     // must be credited past it before anything reaches the pool.
     for (let i = 0; i < 70; i++) {
       bc.now = CLOCK + i * 97;
