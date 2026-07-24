@@ -14,6 +14,15 @@
 ;; __tact_context_get_sender
 slice __tact_context_get_sender() inline;
 
+;; $TicketCreditsMigrated$_store
+builder $TicketCreditsMigrated$_store(builder build_0, (int, slice) v) inline;
+
+;; $TicketCreditsMigrated$_store_cell
+cell $TicketCreditsMigrated$_store_cell((int, slice) v, builder b) inline;
+
+;; $TicketCreditsMigrated$_load_bounced
+(slice, ((int))) $TicketCreditsMigrated$_load_bounced(slice sc_0) inline;
+
 ;; $TicketRedeem$_store
 builder $TicketRedeem$_store(builder build_0, (int, slice) v) inline;
 
@@ -47,6 +56,9 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 ;; $AirdropTicket$_contract_store
 () $AirdropTicket$_contract_store((slice, int, int) v) impure inline;
 
+;; $AirdropTicket$_fun_isBasechainAddress
+((slice, int, int), int) $AirdropTicket$_fun_isBasechainAddress((slice, int, int) $self, slice $a) impure inline_ref;
+
 ;; $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value
 ((slice, int, int, int, int, int)) $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value(slice $owner, int $credits, int $in_flight, int $min_claim_credits, int $max_credits_per_claim, int $claim_min_value) inline;
 
@@ -58,6 +70,9 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $TicketRedeem$_constructor_credits_k_owner
 ((int, slice)) $TicketRedeem$_constructor_credits_k_owner(int $credits_k, slice $owner) inline;
+
+;; $TicketCreditsMigrated$_constructor_credits_k_owner
+((int, slice)) $TicketCreditsMigrated$_constructor_credits_k_owner(int $credits_k, slice $owner) inline;
 
 
 ;; AirdropTicket_AirdropTicket.stdlib.fc
@@ -94,6 +109,8 @@ slice __tact_context_get_sender() inline {
     SENDRAWMSG
 """;
 
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
 ;; AirdropTicket_AirdropTicket.constants.fc
 ;; EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-
 slice __gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57() asm """
@@ -118,6 +135,33 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline {
     return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: TicketCreditsMigrated
+;; Header: 0x41544336
+;; TLB: ticket_credits_migrated#41544336 credits_k:uint32 owner:address = TicketCreditsMigrated
+;;
+
+builder $TicketCreditsMigrated$_store(builder build_0, (int, slice) v) inline {
+    var (v'credits_k, v'owner) = v;
+    build_0 = store_uint(build_0, 1096041270, 32);
+    build_0 = build_0.store_uint(v'credits_k, 32);
+    build_0 = build_0.store_slice(v'owner);
+    return build_0;
+}
+
+cell $TicketCreditsMigrated$_store_cell((int, slice) v, builder b) inline {
+    return $TicketCreditsMigrated$_store(b, v).end_cell();
+}
+
+(slice, ((int))) $TicketCreditsMigrated$_load_bounced(slice sc_0) inline {
+    var v'credits_k = sc_0~load_uint(32);
+    return (sc_0, (v'credits_k));
+}
+
+((int, slice)) $TicketCreditsMigrated$_constructor_credits_k_owner(int $credits_k, slice $owner) inline {
+    return ($credits_k, $owner);
 }
 
 ;;
@@ -218,10 +262,17 @@ builder $AirdropTicket$_store(builder build_0, (slice, int, int) v) inline {
     return ($self'owner, $self'credits, $self'in_flight);
 }
 
+((slice, int, int), int) $AirdropTicket$_fun_isBasechainAddress((slice, int, int) $self, slice $a) impure inline_ref {
+    var (($self'owner, $self'credits, $self'in_flight)) = $self;
+    slice $s = $Address$_fun_asSlice($a);
+    var $fresh$ret_0 = ($s~load_uint(11) == 1024);
+    return (($self'owner, $self'credits, $self'in_flight), $fresh$ret_0);
+}
+
 ((slice, int, int), (slice, int, int, int, int, int)) $AirdropTicket$_fun_get_ticket((slice, int, int) $self) impure inline_ref {
     var (($self'owner, $self'credits, $self'in_flight)) = $self;
-    var $fresh$ret_0 = $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value($self'owner, $self'credits, $self'in_flight, 64, 1000, 63000000);
-    return (($self'owner, $self'credits, $self'in_flight), $fresh$ret_0);
+    var $fresh$ret_1 = $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value($self'owner, $self'credits, $self'in_flight, 64, 1000, 63000000);
+    return (($self'owner, $self'credits, $self'in_flight), $fresh$ret_1);
 }
 
 ;;
@@ -273,6 +324,15 @@ _ %get_ticket() method_id(104158) {
             return ();
         }
         
+        ;; Bounced handler for TicketCreditsMigrated message
+        if (op == 0x41544336) {
+            var ($msg'credits_k) = in_msg~$TicketCreditsMigrated$_load_bounced();
+            $self'credits = $self'credits + $msg'credits_k;
+            $self'in_flight = 0;
+            $AirdropTicket$_contract_store(($self'owner, $self'credits, $self'in_flight));
+            return ();
+        }
+        
         return ();
     }
     int op = 0;
@@ -306,6 +366,23 @@ _ %get_ticket() method_id(104158) {
         $self'credits = $self'credits - $k;
         $self'in_flight = $k;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__gen_slice_address_f6cfce67a03e33573ee7cc03c6600763d2c4bcabbe06bf43630986c44b756f57(), 0, 64, true, $TicketRedeem$_store_cell($TicketRedeem$_constructor_credits_k_owner($k, $self'owner), begin_cell())));
+        $AirdropTicket$_contract_store(($self'owner, $self'credits, $self'in_flight));
+        return ();
+    }
+    
+    ;; Receive TicketExportCredits message
+    if (op == 0x41544335) {
+        in_msg~skip_bits(32);
+        var $msg'to = in_msg~load_msg_addr();
+        throw_unless(27030, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        throw_unless(27031, ($self'in_flight == 0));
+        throw_unless(27032, ($self'credits > 0));
+        throw_unless(27033, ($self'owner, $self'credits, $self'in_flight)~$AirdropTicket$_fun_isBasechainAddress($msg'to));
+        throw_unless(27034, ($Context$_get_value(__tact_context_get()) >= 20000000));
+        int $k = $self'credits;
+        $self'credits = 0;
+        $self'in_flight = $k;
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'to, 0, 64, true, $TicketCreditsMigrated$_store_cell($TicketCreditsMigrated$_constructor_credits_k_owner($k, $self'owner), begin_cell())));
         $AirdropTicket$_contract_store(($self'owner, $self'credits, $self'in_flight));
         return ();
     }

@@ -24,7 +24,9 @@ const FEE_SINK = Address.parse('EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-
 const AT_MIN_CLAIM_CREDITS = 64n;
 const AT_MAX_CREDITS_PER_CLAIM = 1000n;
 const AT_CLAIM_MIN_VALUE = 63_000_000n;
+const AT_EXPORT_MIN_VALUE = 20_000_000n;
 const OP_TICKET_REDEEM = 0x41544333;
+const OP_CREDITS_MIGRATED = 0x41544336;
 
 async function deployTicket(bc: Blockchain, owner: Address) {
   const init = await AirdropTicket.init(owner);
@@ -198,5 +200,72 @@ describe('AIRDROP TICKET — credits cannot be minted, and cannot be lost', () =
 
     expect((await ticket.getGetTicket()).credits, 'the credits really accumulated').toBe(501n);
     expect(many, 'a ticket must not grow with credits').toBe(one);
+  });
+
+  // ─── W1-007: migration export. A bug-fix redeploy keeps the permanent pool (ADR9) but repoints the distributor,
+  // after which THIS ticket's claims bounce (26110) and its unclaimed credits would strand. The owner moves them.
+  // [OWNER INVARIANT 2026-07-24: a redeploy must lose neither the undistributed pool nor already-credited coins.]
+
+  it('TICKET-09: the owner exports unclaimed credits to a clean-18 successor — consumed here, delivered there, dust included', async () => {
+    const { bc, owner, ticket } = await setup();
+    const successor = await bc.treasury('clean18-successor');
+    await credit(bc, ticket, 50);   // BELOW the 64 claim threshold on purpose: dust must migrate, never strand
+
+    const r = await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
+      { $$type: 'TicketExportCredits', to: successor.address } as any);
+
+    const view = await ticket.getGetTicket();
+    expect(view.credits, 'the credits are consumed here so they cannot also be claimed').toBe(0n);
+    expect(view.in_flight, 'and held in flight, which is what blocks a re-spend').toBe(50n);
+    expect(findTransaction(r.transactions, { from: ticket.address, to: successor.address, op: OP_CREDITS_MIGRATED }),
+      'the successor receives exactly the credits and owner to adopt').toBeDefined();
+  });
+
+  it('TICKET-10: an exported ticket cannot double-spend — neither a claim nor a second export moves the credits again', async () => {
+    const { bc, owner, ticket } = await setup();
+    const successor = await bc.treasury('clean18-successor');
+    await credit(bc, ticket, 100);
+    await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
+      { $$type: 'TicketExportCredits', to: successor.address } as any);
+    expect((await ticket.getGetTicket()).in_flight, 'the export is genuinely in flight').toBe(100n);
+
+    // A claim is refused by the same 27011 interlock that stops a double-delivery; a second export by 27031.
+    await ticket.send(owner.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
+    await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
+      { $$type: 'TicketExportCredits', to: successor.address } as any);
+
+    const after = await ticket.getGetTicket();
+    expect(after.credits, 'nothing re-appeared to spend a second time').toBe(0n);
+    expect(after.in_flight, 'the credits stay accounted exactly once').toBe(100n);
+  });
+
+  it('TICKET-11: only the owner may export — a stranger cannot redirect a publisher\'s credits to their own sink', async () => {
+    const { bc, owner, stranger, ticket } = await setup();
+    const attackerSink = await bc.treasury('attacker-sink');
+    await credit(bc, ticket, 80);
+
+    await ticket.send(stranger.getSender(), { value: AT_EXPORT_MIN_VALUE },
+      { $$type: 'TicketExportCredits', to: attackerSink.address } as any);
+
+    const view = await ticket.getGetTicket();
+    expect(view.credits, 'a stranger cannot move the owner\'s credits').toBe(80n);
+    expect(view.in_flight, 'and nothing went in flight').toBe(0n);
+  });
+
+  it('TICKET-12: a bounced export returns the credits exactly once — a mistimed migration loses nothing', async () => {
+    const { bc, owner, stranger, ticket } = await setup();
+    await credit(bc, ticket, 90);
+
+    // A successor that is not deployed: the bounceable export bounces back, exactly the case that must not eat an
+    // airdrop. Basechain (so 27033 passes) but uninitialised (so it bounces).
+    const deadSuccessor = contractAddress(0, await AirdropTicket.init(stranger.address));
+
+    await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
+      { $$type: 'TicketExportCredits', to: deadSuccessor } as any);
+
+    const view = await ticket.getGetTicket();
+    expect(view.credits + view.in_flight, 'no credit may evaporate').toBe(90n);
+    expect(view.in_flight, 'a bounced export leaves nothing in flight').toBe(0n);
+    expect(view.credits, 'and every credit is back').toBe(90n);
   });
 });

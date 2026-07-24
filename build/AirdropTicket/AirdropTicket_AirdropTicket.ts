@@ -691,6 +691,106 @@ export function dictValueParserTicketClaim(): DictionaryValue<TicketClaim> {
     }
 }
 
+export type TicketExportCredits = {
+    $$type: 'TicketExportCredits';
+    to: Address;
+}
+
+export function storeTicketExportCredits(src: TicketExportCredits) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096041269, 32);
+        b_0.storeAddress(src.to);
+    };
+}
+
+export function loadTicketExportCredits(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096041269) { throw Error('Invalid prefix'); }
+    const _to = sc_0.loadAddress();
+    return { $$type: 'TicketExportCredits' as const, to: _to };
+}
+
+export function loadTupleTicketExportCredits(source: TupleReader) {
+    const _to = source.readAddress();
+    return { $$type: 'TicketExportCredits' as const, to: _to };
+}
+
+export function loadGetterTupleTicketExportCredits(source: TupleReader) {
+    const _to = source.readAddress();
+    return { $$type: 'TicketExportCredits' as const, to: _to };
+}
+
+export function storeTupleTicketExportCredits(source: TicketExportCredits) {
+    const builder = new TupleBuilder();
+    builder.writeAddress(source.to);
+    return builder.build();
+}
+
+export function dictValueParserTicketExportCredits(): DictionaryValue<TicketExportCredits> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeTicketExportCredits(src)).endCell());
+        },
+        parse: (src) => {
+            return loadTicketExportCredits(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type TicketCreditsMigrated = {
+    $$type: 'TicketCreditsMigrated';
+    credits_k: bigint;
+    owner: Address;
+}
+
+export function storeTicketCreditsMigrated(src: TicketCreditsMigrated) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096041270, 32);
+        b_0.storeUint(src.credits_k, 32);
+        b_0.storeAddress(src.owner);
+    };
+}
+
+export function loadTicketCreditsMigrated(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096041270) { throw Error('Invalid prefix'); }
+    const _credits_k = sc_0.loadUintBig(32);
+    const _owner = sc_0.loadAddress();
+    return { $$type: 'TicketCreditsMigrated' as const, credits_k: _credits_k, owner: _owner };
+}
+
+export function loadTupleTicketCreditsMigrated(source: TupleReader) {
+    const _credits_k = source.readBigNumber();
+    const _owner = source.readAddress();
+    return { $$type: 'TicketCreditsMigrated' as const, credits_k: _credits_k, owner: _owner };
+}
+
+export function loadGetterTupleTicketCreditsMigrated(source: TupleReader) {
+    const _credits_k = source.readBigNumber();
+    const _owner = source.readAddress();
+    return { $$type: 'TicketCreditsMigrated' as const, credits_k: _credits_k, owner: _owner };
+}
+
+export function storeTupleTicketCreditsMigrated(source: TicketCreditsMigrated) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.credits_k);
+    builder.writeAddress(source.owner);
+    return builder.build();
+}
+
+export function dictValueParserTicketCreditsMigrated(): DictionaryValue<TicketCreditsMigrated> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeTicketCreditsMigrated(src)).endCell());
+        },
+        parse: (src) => {
+            return loadTicketCreditsMigrated(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type TicketRedeem = {
     $$type: 'TicketRedeem';
     credits_k: bigint;
@@ -939,7 +1039,7 @@ function initAirdropTicket_init_args(src: AirdropTicket_init_args) {
 }
 
 async function AirdropTicket_init(owner: Address) {
-    const __code = Cell.fromHex('b5ee9c7241020c01000260000114ff00f4a413f4bcf2c80b01020162020a02f0d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019afa40d31fd31f55206c1397fa400101d17020e2048e3633018020d7217021d749c21f9430d31f01de821041544333ba8e18d31f013112a070c87f01ca0055205023cecb1fcb1fc9ed54e05f03e07023d74920c21f9134e30d200304000e3123d70b1f340304e8821041544331ba8e4c3032816979f8428d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e8284c705f2f481697a22841fb9f2f401a458c87f01ca0055205023cecb1fcb1fc9ed54e020821041544332bae30220821041544334bae302c00003c12113b0e302020507080901fa3032816982f84222c705f2f481698303c00013f2f481698421c23ff2f4816985f8416f24135f03820bc14dc0bef2f453008103e8bc94308103e8de66a1218d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e82847080407f5167c8598210415443335003cb1fcb1fcec91034413016060058441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001c87f01ca0055205023cecb1fcb1fc9ed540084306c2281698cf8428d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e8284c705f2f470c87f01ca0055205023cecb1fcb1fc9ed54002402c87f01ca0055205023cecb1fcb1fc9ed540022c87f01ca0055205023cecb1fcb1fc9ed540141a12dbdda89a1a4000335f481a63fa63eaa40d8272ff4800203a2e041c5b678d86d0b002080408103e8820bc14dc0255135513503d228b7b6');
+    const __code = Cell.fromHex('b5ee9c7241020d01000320000114ff00f4a413f4bcf2c80b01020162020b04c0d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019afa40d31fd31f55206c1397fa400101d17020e204e3027023d74920c21f963123d70b1f01de21821041544331bae30221821041544332bae30221821041544335ba0304050700b433018020d7217021d749c21f9430d31f01de20821041544333ba8e1930d31f013112a070c87f01ca0055205023cecb1fcb1fc9ed54e0821041544336ba8e18d31f013112a070c87f01ca0055205023cecb1fcb1fc9ed54e05f0300985b32816979f8428d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e8284c705f2f481697a22841fb9f2f401a458c87f01ca0055205023cecb1fcb1fc9ed5401fa5b32816982f84222c705f2f481698303c00013f2f481698421c23ff2f4816985f8416f24135f03820bc14dc0bef2f453008103e8bc94308103e8de66a1218d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e82847080407f5167c8598210415443335003cb1fcb1fcec91034413016060058441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001c87f01ca0055205023cecb1fcb1fc9ed5403fc8f795b028020d721fa4030816996f84223c705f2f481699724c000f2f481699823c200f2f4028169995143db3c3114f2f481699af8416f24135f038209312d00bef2f470533080407f5175c8598210415443365003cb1fcb1fcec91046413017441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002e0342008090a000cd30a308309ba0022c87f01ca0055205023cecb1fcb1fc9ed5400f4821041544334ba8e42306c2281698cf8428d0860054b31c997431f4daf7db71b03fea3e1f1f96b2b87b8a33275bd3d377e762e8284c705f2f470c87f01ca0055205023cecb1fcb1fc9ed54e0c00003c12113b08e1202c87f01ca0055205023cecb1fcb1fc9ed54e002c87f01ca0055205023cecb1fcb1fc9ed540141a12dbdda89a1a4000335f481a63fa63eaa40d8272ff4800203a2e041c5b678d86d0c002080408103e8820bc14dc02551355135039e120aef');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initAirdropTicket_init_args({ $$type: 'AirdropTicket_init_args', owner })(builder);
@@ -1038,6 +1138,8 @@ const AirdropTicket_types: ABIType[] = [
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
     {"name":"TicketCredit","header":1096041265,"fields":[]},
     {"name":"TicketClaim","header":1096041266,"fields":[]},
+    {"name":"TicketExportCredits","header":1096041269,"fields":[{"name":"to","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"TicketCreditsMigrated","header":1096041270,"fields":[{"name":"credits_k","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"TicketRedeem","header":1096041267,"fields":[{"name":"credits_k","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"AirdropTicketView","header":null,"fields":[{"name":"owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"credits","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"in_flight","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_claim_credits","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_credits_per_claim","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claim_min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"AirdropTicket$Data","header":null,"fields":[{"name":"owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"credits","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"in_flight","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
@@ -1047,6 +1149,8 @@ const AirdropTicket_types: ABIType[] = [
 const AirdropTicket_opcodes = {
     "TicketCredit": 1096041265,
     "TicketClaim": 1096041266,
+    "TicketExportCredits": 1096041269,
+    "TicketCreditsMigrated": 1096041270,
     "TicketRedeem": 1096041267,
     "TicketRedeemAck": 1096041268,
 }
@@ -1062,6 +1166,7 @@ export const AirdropTicket_getterMapping: { [key: string]: string } = {
 const AirdropTicket_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"TicketCredit"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TicketClaim"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"TicketExportCredits"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TicketRedeemAck"}},
     {"receiver":"internal","message":{"kind":"empty"}},
     {"receiver":"internal","message":{"kind":"any"}},
@@ -1072,6 +1177,7 @@ export const AT_BASE_ENDOWMENT = 40000000n;
 export const AT_MIN_CLAIM_CREDITS = 64n;
 export const AT_MAX_CREDITS_PER_CLAIM = 1000n;
 export const AT_CLAIM_MIN_VALUE = 63000000n;
+export const AT_EXPORT_MIN_VALUE = 20000000n;
 
 export class AirdropTicket implements Contract {
     
@@ -1107,7 +1213,7 @@ export class AirdropTicket implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: TicketCredit | TicketClaim | TicketRedeemAck | null | Slice) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: TicketCredit | TicketClaim | TicketExportCredits | TicketRedeemAck | null | Slice) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TicketCredit') {
@@ -1115,6 +1221,9 @@ export class AirdropTicket implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TicketClaim') {
             body = beginCell().store(storeTicketClaim(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TicketExportCredits') {
+            body = beginCell().store(storeTicketExportCredits(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TicketRedeemAck') {
             body = beginCell().store(storeTicketRedeemAck(message)).endCell();
