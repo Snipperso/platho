@@ -501,6 +501,23 @@ contract ATHWallet {
         });
     }
 
+    // [W1-004 — KNOWN, ACCEPTED 2026-07-24. DO NOT "fix" this refund in isolation without re-reading the analysis.]
+    // This clawback refunds the payer with SendRemainingValue (below), i.e. with whatever value came back on the
+    // notification bounce. A MALICIOUS notify recipient can BURN compute gas in its owner-contract before throwing, so
+    // the bounce returns with less; the refund then arrives below the payer's 14212 floor, bounces, and the recipient's
+    // ordinary outgoing-bounce handler RE-CREDITS it — the recipient keeps the ATH, the payer gets nothing. Measured in
+    // tests/ath-notify-theft-w1004.test.ts (theft at >= ~2000 burn iterations). Raising the notify floor cannot close
+    // it: the attacker simply burns more.
+    //
+    // WHY IT IS ACCEPTED rather than fixed: it is NOT a privilege escalation. Gate 14300 means only the PAYER's own key
+    // can initiate a WithNotify, and 14302 forces notify_destination == recipient, so the theft requires the victim to
+    // SIGN sending their OWN ATH to the attacker's wallet — which a plain ATHTransferRequest to the same attacker would
+    // lose identically. The attack gives the attacker nothing beyond a normal transfer, and cannot touch anyone who is
+    // not already sending ATH to them. A malicious/forked client that could trigger this could equally trigger a plain
+    // transfer, so the real boundary is client-distribution integrity, not this receiver. The only genuine delta is a
+    // victim who trusts a malicious recipient with a REFUNDABLE transfer — narrow, and the same recipient could rob them
+    // otherwise. A correct fix is an escrow redesign (credit only on the owner's accept), disproportionate to a latent,
+    // no-privilege-gain issue on the immutable core token wallet. [Owner decision: accept + document.]
     fun refund_pending_notification(query_id: Int, sender_key: Int, amount: Int) {
         throwUnless(14330, amount > 0);
         let pending_key: Int = self.compute_pending_notification_key(query_id, sender_key);
