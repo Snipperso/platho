@@ -97,9 +97,13 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
     // This was genuinely uncovered: mutating shard-discovery's slot_index width from 32 to 64 bits — which changes
     // every slot address, index 0 included — left the entire test suite green.
     const seed = new Uint8Array(32).fill(0x77);
-    const ownerPub = await recoveryOwnerPublicKey(seed);
+    const seenPubkeys = new Set<string>();
 
     for (const slotIndex of [0, 1, 2, 7, 42, 128, 255]) {
+      // W1-015: each slot has its OWN owner key, so the READ path derives it per index — exactly as the client's
+      // selfRecoveryShardSpace now does. A single shared key here would silently pass while the client used per-slot.
+      const ownerPub = await recoveryOwnerPublicKey(seed, slotIndex);
+      seenPubkeys.add(Buffer.from(ownerPub).toString('hex'));
       const read = await recoveryOwnerSlotKey(ownerPub, slotIndex);
       const write = (await buildRecoveryPublish({
         seed, slotIndex, seq: 1, h0: 0x1n, h1: 0x2n,
@@ -107,6 +111,9 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
       })).slotKey;
       expect(read, `slot ${slotIndex}: read path == write path`).toBe(write);
     }
+    // The W1-015 property itself: every slot's owner key is DISTINCT, so one observed owner_pubkey cannot derive the
+    // others and an outsider cannot enumerate the user's recovery trail. A shared key would collapse this to size 1.
+    expect(seenPubkeys.size, 'each slot must carry an independent owner key (no enumeration handle)').toBe(7);
 
     // and the probe space a restoring client walks is the same set of addresses, in index order
     const space = await selfRecoveryShardSpace(seed);

@@ -43,7 +43,7 @@ export async function outgoingRecordShard({ kRoot, selfKeyId, peerKeyId, created
  * `slotIndex` is required; recoveryOwnerSlotKey explains why it must not default.
  */
 export async function selfRecoveryShard(seed, slotIndex) {
-  const ownerPublicKey = await recoveryOwnerPublicKey(seed);
+  const ownerPublicKey = await recoveryOwnerPublicKey(seed, slotIndex);   // W1-015: per-slot key
   const slotKey = await recoveryOwnerSlotKey(ownerPublicKey, slotIndex);
   return { ownerPublicKey, slotKey, slotIndex, address: await recoveryShardAddress(slotKey) };
 }
@@ -61,11 +61,13 @@ export async function selfRecoveryShard(seed, slotIndex) {
  * this lane exists to prevent.
  */
 export async function selfRecoveryShardSpace(seed) {
-  const ownerPublicKey = await recoveryOwnerPublicKey(seed);
+  // W1-015: each slot now has its OWN owner key (per-slot HKDF), so the pubkey is derived INSIDE the loop and each slot
+  // carries its own. There is no single user-wide recovery pubkey any more — that shared key was the enumeration handle.
   const slots = [];
   for (let slotIndex = 0; slotIndex < RECOVERY_MAX_SLOTS; slotIndex += 1) {
+    const ownerPublicKey = await recoveryOwnerPublicKey(seed, slotIndex);
     const slotKey = await recoveryOwnerSlotKey(ownerPublicKey, slotIndex);
-    slots.push({ slotIndex, slotKey, address: await recoveryShardAddress(slotKey) });
+    slots.push({ slotIndex, ownerPublicKey, slotKey, address: await recoveryShardAddress(slotKey) });
   }
-  return { ownerPublicKey, slots };
+  return { slots };
 }

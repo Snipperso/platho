@@ -81,6 +81,31 @@ export async function restoreConvKeysFromRecovery({ seed, readView, readBody }) 
 }
 
 /**
+ * W1-009 FREEZE-PREVENTION SWEEP. The owner-signed eviction (RecoveryShard.tact) means no stranger can ever clear a
+ * slot — but an IDLE bound slot still bleeds its endowment to rent and would FREEZE after ~4.5 years if never
+ * rewritten, losing the K_root blob at the one moment it is needed. The dirty-slot backup only refreshes slots whose
+ * CONTENT changed, so a stable old slot (the oldest conversations, no new K_root) is never touched. This returns the
+ * indices of bound slots the local map still occupies whose last on-chain write is older than refreshAfterS, so the
+ * caller can mark them dirty; runRecoveryBackup then tops each back up (W1-008) and resets its clock, well inside the
+ * funding window. A read that THROWS is skipped (retried next sweep), never treated as stale — a transient RPC error
+ * must not trigger a needless re-publish. Only slots present in localSlotIndices are considered: an emptied slot has
+ * nothing to refresh, and a slot with no local data must not be rewritten from an incomplete map.
+ */
+export async function staleRecoverySlots({ seed, readView, localSlotIndices, nowS, refreshAfterS }) {
+  if (typeof readView !== 'function') throw new Error('staleRecoverySlots requires readView');
+  const { slots } = await selfRecoveryShardSpace(seed);
+  const stale = [];
+  for (const slot of slots) {
+    if (!localSlotIndices.has(slot.slotIndex)) continue;
+    let view;
+    try { view = await readView(slot.address); } catch { continue; }
+    if (!view?.bound) continue;                                    // never-written slot — a content change will bind it
+    if (nowS - Number(view.updated_at) >= refreshAfterS) stale.push(slot.slotIndex);
+  }
+  return stale;
+}
+
+/**
  * Prepare the next recovery backup for one slot: read the slot's current seq (anti-rollback floor), seal the map under
  * the seed, and build the owner-signed wallet message at seq+1. The caller sends it and, like the CONV/INTRO sends,
  * must NOT re-sign a fresh seq on an ambiguous retry (the shard rejects a non-advancing seq, so a naive re-sign at the
@@ -89,9 +114,13 @@ export async function restoreConvKeysFromRecovery({ seed, readView, readBody }) 
  */
 export async function prepareRecoveryBackup({ seed, slotIndex, map, readView, value }) {
   if (typeof readView !== 'function') throw new Error('prepareRecoveryBackup requires readView');
-  const { slots } = await selfRecoveryShardSpace(seed);
-  const slot = slots[slotIndex];
-  if (!slot) throw new Error(`prepareRecoveryBackup: slotIndex ${slotIndex} out of range`);
+  // W1-015: derive ONLY this slot's per-slot key. Deriving the whole space here would compute all RECOVERY_MAX_SLOTS
+  // owner keypairs on every backup (backups fire seconds after each conversation change) — needless now that keys are
+  // per-slot. The conversation range guard is preserved explicitly (named slots go through preparePrefsBackup).
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= RECOVERY_MAX_SLOTS) {
+    throw new Error(`prepareRecoveryBackup: slotIndex ${slotIndex} out of the conversation range [0, ${RECOVERY_MAX_SLOTS})`);
+  }
+  const slot = await selfRecoveryShard(seed, slotIndex);
   // Read the slot's current seq. A read that THROWS must NOT be swallowed as "fresh slot, seq 0" — that would publish
   // at seq 1 and either bounce gate 13564 (bound at a higher seq) or pick below the retained high-water. Let a transient
   // failure propagate so the caller retries; the reader returns null (not a throw) ONLY for a genuinely absent slot.
