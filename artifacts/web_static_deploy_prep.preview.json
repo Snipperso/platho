@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-24T17:32:18.150Z",
+  "generatedAt": "2026-07-24T18:04:39.248Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 218,
-    "totalBytes": 6135133,
-    "bundleSha256": "1a6cfbfae764e4a7b08a3df12947792dfb2e86d2eea4b9d4a7dcc905c0fe00ca",
+    "totalBytes": 6134809,
+    "bundleSha256": "cf7431c47e92ef72f32e28c4c213a466afb7a6596652c50f99730b550cf95089",
     "files": [
       {
         "path": "app.js",
@@ -584,8 +584,8 @@
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 20318,
-        "sha256": "8028667d2293b8c7d344297fc49ee8c8daf99fa8eea0381ddc5c7440d18a63f7"
+        "bytes": 19994,
+        "sha256": "c7368fb21513b053ab8a00d3088503b32505ce5854c3591e2a6672ea8d4295a9"
       },
       {
         "path": "platho-wallet.mjs",
