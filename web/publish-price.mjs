@@ -44,12 +44,12 @@ export const INTRO_PUBLISH_VALUE = 17_810_000n;
 
 /**
  * RS_MIN_VALUE — required on EVERY recovery write (gate 13572), NOT just the first: it is RS_RECOVERY_ENDOWMENT
- * (29_300_000, the ~3-year on-chain rent float) + RS_RECOVERY_PATH_GAS, and the first bind retains the endowment while
- * an overwrite returns the surplus. So one figure covers both cases. Pinned == 37_300_000 by tests/publish-builder.test.ts.
- * [RAISED 2026-07-24 with RS_RECOVERY_ENDOWMENT 29_000_000 -> 29_300_000: the W1-009 owner-signed eviction grew the
- * shard code, lifting its 3-year rent; the endowment (and so this floor) moved to hold the 1.5x solvency rule.]
+ * (29_600_000, the ~3-year on-chain rent float) + RS_RECOVERY_PATH_GAS, and the first bind retains the endowment while
+ * an overwrite returns the surplus. So one figure covers both cases. Pinned == 37_600_000 by tests/publish-builder.test.ts.
+ * [RAISED 2026-07-24, twice, as the W1-009 eviction code grew: 29_000_000 -> 29_300_000 (owner-signed eviction) ->
+ * 29_600_000 (re-audit fix: basechain gate on refund_to). Endowment (and so this floor) moved to hold the 1.5x rule.]
  */
-export const RECOVERY_PUBLISH_VALUE = 37_300_000n;
+export const RECOVERY_PUBLISH_VALUE = 37_600_000n;
 
 /**
  * KS_MIN_REGISTER_VALUE — what a FIRST KeyShard register must bring (gate 22110): KS_BASE_ENDOWMENT (45_000_000, the

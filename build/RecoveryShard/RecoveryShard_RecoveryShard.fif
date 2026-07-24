@@ -13,6 +13,7 @@ PROGRAM{
   DECLPROC $RecoveryShard$_fun_slotKeyForOwner
   DECLPROC $RecoveryShard$_fun_recoveryDigest
   DECLPROC $RecoveryShard$_fun_evictDigest
+  DECLPROC $RecoveryShard$_fun_isBasechainAddress
   DECLPROC $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells
   DECLPROC $RecoveryShard$_fun_get_view
   DECLPROC $RecoveryShard$_fun_get_body
@@ -164,11 +165,17 @@ PROGRAM{
         ENDC
         HASHCU
   }>
+  $RecoveryShard$_fun_isBasechainAddress PROCREF:<{
+    11 LDU
+    DROP
+    10 PUSHPOW2
+    EQUAL
+  }>
   $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells PROCINLINE:<{
   }>
   $RecoveryShard$_fun_get_view PROCREF:<{
     94608000 PUSHINT
-    29300000 PUSHINT
+    29600000 PUSHINT
     8 PUSHPOW2
     79 PUSHINT
     s12 PUSH
@@ -277,7 +284,7 @@ PROGRAM{
       13572 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      37300000 PUSHINT
+      37600000 PUSHINT
       GEQ
       THROWANYIFNOT
       OVER
@@ -363,7 +370,7 @@ PROGRAM{
       s1 s9 XCHG
       THROWANYIFNOT
           NOW
-      29300000 PUSHINT
+      29600000 PUSHINT
       2 PUSHINT
           RAWRESERVE
       __tact_context_get_sender INLINECALLDICT
@@ -462,6 +469,11 @@ PROGRAM{
       s1 s5 XCHG
       s1 s4 XCHG
       s3 s3 s0 XCHG3
+      13566 PUSHINT
+      s11 s9 XCPU
+      $RecoveryShard$_fun_isBasechainAddress INLINECALLDICT
+      s1 s12 XCHG
+      THROWANYIFNOT
       13565 PUSHINT
       s11 s9 XCPU
       $RecoveryShard$_fun_evictDigest INLINECALLDICT
