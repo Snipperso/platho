@@ -304,10 +304,20 @@ contract AirdropPool {
         throwUnless(26112, (msg.credits_k >= 1) && (msg.credits_k <= AIRDROP_MAX_CREDITS_PER_ACCRUAL));
 
         let payout: Int = msg.credits_k * AIRDROP_ATH_PER_CREDIT;
-        // Budget exhaustion is NOT an error: the 15M is finite by design, and once it is gone the messenger must
-        // keep working. Accrue nothing and let the purchase stand.
+        // Budget exhaustion is NOT an error: the 15M is finite by design, and once it is gone the messenger keeps
+        // working. [W3-002 FIX 2026-07-24] At the boundary, PAY THE REMAINDER instead of nothing. The old code
+        // returned the moment a claim exceeded the budget, so the last claimant got ZERO while the leftover ATH — up
+        // to one full claim short of the claim's size — stranded, later swept to the treasury. That is a real loss to
+        // the last users: they are owed what the budget can still cover. Now the pool pays down to the last WHOLE
+        // credit the budget funds; the claim's overflow credits are unbacked (the 15M is final) and simply do not pay,
+        // but nothing the budget could have delivered is left behind. The ticket already debited the full claim, so
+        // the overflow is not restored — there was never any ATH for it — but the claimant receives every ATH there
+        // was. Below one whole credit of budget, there is nothing to pay and the dust sweeps to treasury as before.
         if (self.remaining_budget < payout) {
-            return;
+            payout = (self.remaining_budget / AIRDROP_ATH_PER_CREDIT) * AIRDROP_ATH_PER_CREDIT;
+            if (payout == 0) {
+                return;
+            }
         }
         // fail-closed BEFORE mutating: a payout we cannot afford to deliver must not decrement the budget.
         throwUnless(26114, context().value >= AIRDROP_PAYOUT_PATH_GAS);

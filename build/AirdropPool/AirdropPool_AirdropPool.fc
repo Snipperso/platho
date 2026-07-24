@@ -531,8 +531,11 @@ _ %get_global() method_id(126899) {
         throw_unless(26112, ( (($msg'credits_k >= 1)) ? (($msg'credits_k <= 1000)) : (false) ));
         int $payout = ($msg'credits_k * 10000000000);
         if (($self'remaining_budget < $payout)) {
-            $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
-            return ();
+            $payout = (($self'remaining_budget / 10000000000) * 10000000000);
+            ifnot ($payout) {
+                $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+                return ();
+            }
         }
         throw_unless(26114, ($Context$_get_value(__tact_context_get()) >= 60000000));
         $self'remaining_budget = ($self'remaining_budget - $payout);

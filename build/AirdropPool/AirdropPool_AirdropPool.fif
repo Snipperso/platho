@@ -275,6 +275,8 @@ PROGRAM{
     $AirdropGlobalView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
+    c2 SAVE
+    SAMEALTSAVE
     SWAP
     CTOS
     2 PUSHINT
@@ -681,23 +683,33 @@ PROGRAM{
       MUL
       s3 s0 PUSH2
       LESS
-      IFJMP:<{
+      IF:<{
         DROP
-        16 s() POP
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s10 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s1 s3 XCHG3
-        s4 s2 XCHG2
-        $AirdropPool$_contract_store INLINECALLDICT
+        s2 PUSH
+        10000000000 PUSHINT
+        DIV
+        10000000000 PUSHINT
+        MUL
+        DUP
+        IFNOTJMP:<{
+          DROP
+          16 s() POP
+          s13 16 s() XCHG
+          s12 s15 XCHG
+          s11 s14 XCHG
+          s10 s13 XCHG
+          s9 s12 XCHG
+          s8 s11 XCHG
+          s7 s10 XCHG
+          s6 s9 XCHG
+          s5 s8 XCHG
+          s4 s7 XCHG
+          s3 s6 XCHG
+          s5 s1 s3 XCHG3
+          s4 s2 XCHG2
+          $AirdropPool$_contract_store INLINECALLDICT
+          RETALT
+        }>
       }>
       26114 PUSHINT
       __tact_context_get INLINECALLDICT

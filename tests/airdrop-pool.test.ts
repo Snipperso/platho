@@ -32,6 +32,26 @@ function exitOf(res: any, dest: Address): number {
   return Number(tx?.description?.computePhase?.exitCode ?? -999);
 }
 
+// Drain the sealed pool down to `targetCreditsLeft` by ACTUAL accruals (the real path). Seal demands funded==15M,
+// and one accrual pays at most 1000 credits, so the 15M edge is ~1500 sends away — heavy but honest: it drives the
+// pool to the boundary the exact way production does, with no state surgery that could diverge from the real layout.
+async function drainToCredits(pool: any, distributor: any, buyer: Address, targetCreditsLeft: number, startSeq: bigint) {
+  let seq = startSeq;
+  let left = 1_500_000;   // 15M ATH / 10 ATH per credit
+  while (left > targetCreditsLeft) {
+    const step = Math.min(1000, left - targetCreditsLeft);
+    await pool.send(distributor.getSender(), { value: toNano('0.1') }, {
+      $$type: 'AirdropAccrue', purchase_id: seq, buyer, credits_k: BigInt(step),
+    } as any);
+    seq += 1n;
+    left -= step;
+  }
+  return seq;
+}
+
+const hitPoolWallet = (res: any, poolWalletAddr: Address): boolean => res.transactions.some((t: any) =>
+  t.inMessage?.info?.dest?.toString() === poolWalletAddr.toString() && t.inMessage?.info?.type === 'internal');
+
 // clean-17 genesis: the pool alone, cross-bound and sealed with the 15M funded. The old CapsuleHub+CreditIssuer
 // credit-purchase drive is gone — accrual now originates from the bound distributor (FeeAccumulator in production),
 // so here a plain treasury stands in as that distributor and AirdropAccrue is sent directly (the pool's real entry
@@ -160,6 +180,35 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
       t.inMessage?.info?.dest?.toString() === poolWallet.address.toString() && t.inMessage?.info?.type === 'internal');
     expect(payout, 'an ATHTransferRequest must reach the pool wallet').toBe(true);
   }, 180_000);
+
+  it('AIRDROP-BOUNDARY-01: [W3-002] at the 15M edge the pool pays the REMAINDER then nothing — no budget is stranded', async () => {
+    // The bug: the old code returned the instant a claim exceeded the budget, so the LAST claimant got ZERO and the
+    // leftover ATH — up to one full claim short — stranded, later swept to the treasury. Now the pool pays down to the
+    // last whole credit the budget funds, then an exhausted pool simply pays nothing.
+    const { pool, poolWallet, distributor } = await setup(blockchain);
+    const buyer = await blockchain.treasury('boundary-buyer');
+    let seq = await drainToCredits(pool, distributor, buyer.address, 55, 1n);   // 55 credits (550 ATH) left
+    expect((await pool.getGetGlobal()).remaining_budget, 'drained to the chosen edge').toBe(55n * ATH_PER_CREDIT);
+
+    // A 100-credit claim exceeds the 55 left. OLD: pay 0, strand 550 ATH. NEW: pay exactly the 55 that remain.
+    const edge = await pool.send(distributor.getSender(), { value: toNano('0.1') }, {
+      $$type: 'AirdropAccrue', purchase_id: seq, buyer: buyer.address, credits_k: 100n,
+    } as any);
+    seq += 1n;
+    expect(exitOf(edge, pool.address), 'the boundary accrual is accepted, not thrown').toBe(0);
+    const g = await pool.getGetGlobal();
+    expect(g.remaining_budget, 'the budget is drained to the last whole credit — nothing left to strand').toBe(0n);
+    expect(g.distributed_total, 'the 55-credit remainder was delivered (whole 15M now distributed)').toBe(TOTAL_POOL);
+    expect(hitPoolWallet(edge, poolWallet.address), 'the partial payout is actually commanded from the pool wallet').toBe(true);
+
+    // Now exhausted: a further claim pays nothing, leaves the (zero) budget untouched, and sends no payout leg.
+    const empty = await pool.send(distributor.getSender(), { value: toNano('0.1') }, {
+      $$type: 'AirdropAccrue', purchase_id: seq, buyer: buyer.address, credits_k: 10n,
+    } as any);
+    expect(exitOf(empty, pool.address), 'an empty pool still accepts the accrual, it simply pays nothing').toBe(0);
+    expect((await pool.getGetGlobal()).remaining_budget, 'stays zero').toBe(0n);
+    expect(hitPoolWallet(empty, poolWallet.address), 'no payout leaves an exhausted pool').toBe(false);
+  }, 300_000);
 
   it('AIRDROP-AUTH-01: only the bound CreditIssuer may accrue (26110)', async () => {
     // The pool authenticates exactly ONE sender. Without this, anyone mints themselves 15M ATH.
