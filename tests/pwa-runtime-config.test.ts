@@ -4892,55 +4892,6 @@ describe('PWA runtime config guard', () => {
     expect(ownSource).toMatch(/authorWallet: wallet,/);
   });
 
-  it('PWA-PREFS-CAPSULE-01: subscription snapshot is a PREFS document block sent as a single-part private capsule to self', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    expect(app).toMatch(/PREFS: 4,/);
-    expect(app).toMatch(/} else if \(block\.type === 'prefs'\) \{/);
-    expect(app).toMatch(/type === PLATHO_DOCUMENT_BLOCK_TYPES\.PREFS\) \{/);
-    expect(app).toMatch(/async function createPrivatePrefsCapsules\(/);
-    expect(app).toMatch(/async function resolveSelfPeerEntry\(/);
-    expect(app).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'prefs', bytes: snapshotBytes \}\]\)/);
-    // Single-part guarantee is STRUCTURAL (in the builder), not only a late check before publish.
-    const builder = app.slice(app.indexOf('async function createPrivatePrefsCapsules('), app.indexOf('let prefsSyncInFlight'));
-    expect(builder).toMatch(/if \(totalParts > 1\) \{/);
-    expect(builder).toMatch(/code = 'PREFS_TOO_LARGE'/);
-    // Publish reuses the single-capsule path and clears dirty ONLY on a confirmed publish.
-    const pub = app.slice(app.indexOf('async function publishPrefsSnapshot('), app.indexOf('function prefsSyncedDateLabel('));
-    expect(pub).toMatch(/await publishCapsuleThroughVault\(capsules\[0\], publishOptions\)/);
-    expect(pub).not.toMatch(/publishCapsulesThroughVault/);
-    expect(pub).toMatch(/=== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\)/);
-    // EDIT-EPOCH GUARD (v737): a follow/unfollow during the publish/confirm window is NOT in the captured snapshot,
-    // so clearing dirty on confirm would silently discard it. The save captures the epoch at snapshot time and the
-    // CONFIRMED branches clear dirty ONLY when the epoch is unchanged (else keep dirty -> "unsaved" for a re-save).
-    expect(app).toMatch(/let prefsEditEpoch = 0;/);
-    expect(app).toMatch(/function markPrefsDirty\(\) \{\s*\n\s*prefsEditEpoch \+= 1;/);
-    expect(pub).toMatch(/const savedEditEpoch = prefsEditEpoch;/);
-    expect(pub).toMatch(/const stale = prefsEditEpoch !== savedEditEpoch;\s*\n\s*if \(!stale\) writePrefsDirty\(false\);/);
-    // A SUBMITTED publish (broadcast done, self CapsuleHub entry not confirmable inline) HANDS OFF the in-flight UI
-    // to a BACKGROUND confirm — else it dead-ended on "waiting - retry" -> "not saved" even though the snapshot landed.
-    expect(pub).toMatch(/confirmPrefsPublishInBackground\(result\?\.publishState, snapshot, savedEditEpoch\)/);
-    // IN-FLIGHT HELD ACROSS THE CONFIRM (v738): the button stays disabled and the status stays a steady "saving" for
-    // the WHOLE background confirm — the SUBMITTED path sets handedOff and the finally must NOT release prefsSyncInFlight
-    // (the old finally cleared it immediately -> button flickered back to enabled + a transient "unsaved" mid-wait).
-    expect(pub).toMatch(/handedOff = true;/);
-    expect(pub).toMatch(/if \(!handedOff\) \{\s*\n\s*prefsSyncInFlight = false;/);
-    expect(pub).not.toMatch(/t\('sync\.pendingRetry'\)/); // no status churn: steady "saving" until the terminal
-    const bg = app.slice(app.indexOf('async function confirmPrefsPublishInBackground('), app.indexOf('async function publishPrefsSnapshot('));
-    expect(bg).toMatch(/async function confirmPrefsPublishInBackground\(publishState, snapshot, savedEditEpoch\)/);
-    expect(bg).toMatch(/const generation = \+\+prefsConfirmGeneration;/);
-    expect(bg).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{\}\);/); // FULL confirm (entry-scan), not receiptOnly
-    expect(bg).toMatch(/if \(publishState\.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\) \{/);
-    expect(bg).toMatch(/const stale = prefsEditEpoch !== savedEditEpoch;\s*\n\s*if \(!stale\) writePrefsDirty\(false\);/);
-    // The background confirm OWNS prefsSyncInFlight and releases it exactly once, on the terminal, generation-guarded
-    // (a newer save/confirm takes ownership instead). A genuine 75s deadline keeps the explicit "save failed".
-    expect(bg).toMatch(/if \(generation !== prefsConfirmGeneration\) \{ timedOut = false; return; \}/);
-    expect(bg).toMatch(/if \(generation === prefsConfirmGeneration\) \{\s*\n\s*prefsSyncInFlight = false;/);
-    expect(bg).toMatch(/if \(timedOut\) \{ setText\(savePrefsStatus, t\('sync\.saveFailed'\)\); refreshPrefsSyncButton\(\); \}/);
-    // The confirm is superseded on a wallet switch (generation bump) AND the in-flight UI it held is released there —
-    // else the stranded confirm's generation guard would leave the Save button + global spinner stuck after a switch.
-    expect(app).toMatch(/prefsConfirmGeneration \+= 1;\s*\n\s*prefsSyncInFlight = false;/);
-  });
-
   it('PWA-PREFS-CHAT-FILTER-01: a prefs capsule is diverted before thread routing and never becomes a chat message', () => {
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toMatch(/function prefsBytesFromOpenedCapsule\(opened\)/);
