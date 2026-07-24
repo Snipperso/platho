@@ -34,7 +34,7 @@ const CLOCK = 1_790_000_000;
 const KIND = { CHANNEL: 0, THREAD: 1, BEACON: 2, AVATAR: 3 } as const;
 // a valid friendly address to hash for the CHANNEL/AVATAR owner in the parity test (PUB-01 only needs both
 // builders to receive the SAME partition_key; the real senderHash check is PUB-02 against the chain).
-const OWNER_FRIENDLY = 'EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-';
+const OWNER_FRIENDLY = 'EQBOSbFHf8Iqe390MhsuN8RywBimRbzTwq8dtnN9fN4MyZOP';
 
 /** Capsule cells built with the CLIENT's primitives — where they come from in production. A cell holds 1023 bits,
  *  so anything larger is a snake of chained cells, exactly as real bodies are. Mirrors intro-publish-browser. */

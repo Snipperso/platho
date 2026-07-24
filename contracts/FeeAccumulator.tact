@@ -344,8 +344,18 @@ contract FeeAccumulator {
         });
         message(MessageParameters {
             to: sender(),
-            value: 0,
-            mode: SendRemainingValue,
+            // [FIX 2026-07-24, token-cluster audit CRIT] Was `value: 0, mode: SendRemainingValue` (mode 64). Mode 64
+            // carries the FULL inbound value and does NOT subtract the explicit ACCRUE_LEG sent above in the SAME
+            // transaction, so total out = inbound + 60M and the sink paid the 60M accrue leg out of its OWN balance —
+            // ~60M PER redeem, UNCOUNTED (this handler never debits accumulated_ton/treasury_due/buyback_due), silently
+            // eroding the backing invariant (balance >= accumulated + treasury_due + buyback_due) until FlushTreasuryDue/
+            // FlushBuybackDue become unbackable = permanent loss on this immutable, effectively-unmigratable contract.
+            // Now the change is EXPLICIT — inbound minus the accrue leg minus the redeem exec reserve — so total out =
+            // inbound - EXEC_RESERVE <= inbound, the claimant funds the 60M leg as gate 15063 intends, and the sink keeps
+            // EXEC_RESERVE to pay its own gas. Gate 15063 guarantees context().value >= ACCRUE_LEG + EXEC_RESERVE above,
+            // so this subtraction can never go negative. Regression: tests/fee-accumulator-accrual.test.ts FAACC-BACKING.
+            value: context().value - FEEACCUMULATOR_ACCRUE_LEG_VALUE - FEEACCUMULATOR_REDEEM_EXEC_RESERVE,
+            mode: SendPayGasSeparately,
             bounce: false,
             body: TicketRedeemAck{ credits_k: msg.credits_k }.toCell(),
         });

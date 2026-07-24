@@ -131,7 +131,7 @@ describe('PUBLIC-LANE — the read assembly', () => {
     bc.now = CLOCK;
     const lane = makeLane(bc, { pages: new Map(), messages: new Map(), liveShards: [] });
     const chTag = publicEpochTag(KIND.CHANNEL, publicEraOf(KIND.CHANNEL, CLOCK));
-    const comments = await lane.readThreadComments('EQCpZjky6GPpte-242B_1Hw-Py1lcPcUZk63p6bvzsXQUHy-', chTag, 0n, { channelShardSeq: 0 });
+    const comments = await lane.readThreadComments('EQBOSbFHf8Iqe390MhsuN8RywBimRbzTwq8dtnN9fN4MyZOP', chTag, 0n, { channelShardSeq: 0 });
     expect(comments, 'an uncommented post yields no comments, not a throw').toEqual([]);
   }, 60_000);
 });

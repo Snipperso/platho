@@ -730,7 +730,7 @@ _ %get_state() method_id(86957) {
         throw_unless(15063, ($Context$_get_value(__tact_context_get()) >= 62000000));
         $self'accrual_seq = $self'accrual_seq + 1;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'airdrop_pool_address, 60000000, 1, true, $AirdropAccrue$_store_cell($AirdropAccrue$_constructor_purchase_id_buyer_credits_k($self'accrual_seq, $msg'owner, $msg'credits_k), begin_cell())));
-        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), 0, 64, false, $TicketRedeemAck$_store_cell($TicketRedeemAck$_constructor_credits_k($msg'credits_k), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), (($Context$_get_value(__tact_context_get()) - 60000000) - 2000000), 1, false, $TicketRedeemAck$_store_cell($TicketRedeemAck$_constructor_credits_k($msg'credits_k), begin_cell())));
         $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }

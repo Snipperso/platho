@@ -937,8 +937,13 @@ PROGRAM{
           SWAP
           SENDRAWMSG
       __tact_context_get_sender INLINECALLDICT
-      0 PUSHINT
-      64 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      60000000 PUSHINT
+      SUB
+      2000000 PUSHINT
+      SUB
+      1 PUSHINT
       FALSE
       s0 s14 XCHG
       $TicketRedeemAck$_constructor_credits_k INLINECALLDICT
