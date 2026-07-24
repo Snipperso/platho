@@ -47,6 +47,9 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 ;; $RecoveryShard$_fun_evictDigest
 ((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_evictDigest((int, int, int, int, int, int, int, cell, int) $self, slice $refundTo) impure inline_ref;
 
+;; $RecoveryShard$_fun_isBasechainAddress
+((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_isBasechainAddress((int, int, int, int, int, int, int, cell, int) $self, slice $a) impure inline_ref;
+
 ;; $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells
 ((int, int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells(int $self_bucket_key, int $bound, int $owner_pubkey, int $seq, int $updated_at, int $retention, int $endowment, int $max_slots, int $h0, int $h1, int $bh, int $max_blob_cells) inline;
 
@@ -197,6 +200,8 @@ int $Cell$_fun_hash(cell $self) impure asm """
     HASHCU
 """;
 
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
 ;; RecoveryShard_RecoveryShard.storage.fc
 ;;
 ;; Type: Context
@@ -327,16 +332,23 @@ builder $RecoveryShard$_store(builder build_0, (int, int, int, int, int, int, in
     return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_2);
 }
 
+((int, int, int, int, int, int, int, cell, int), int) $RecoveryShard$_fun_isBasechainAddress((int, int, int, int, int, int, int, cell, int) $self, slice $a) impure inline_ref {
+    var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
+    slice $s = $Address$_fun_asSlice($a);
+    var $fresh$ret_3 = ($s~load_uint(11) == 1024);
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_3);
+}
+
 ((int, int, int, int, int, int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int, int)) $RecoveryShard$_fun_get_view((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
     var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
-    var $fresh$ret_3 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 29300000, 256, $self'h0, $self'h1, $self'bh, 79);
-    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_3);
+    var $fresh$ret_4 = $RecoveryShardView$_constructor_self_bucket_key_bound_owner_pubkey_seq_updated_at_retention_endowment_max_slots_h0_h1_bh_max_blob_cells($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'updated_at, 94608000, 29600000, 256, $self'h0, $self'h1, $self'bh, 79);
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_4);
 }
 
 ((int, int, int, int, int, int, int, cell, int), cell) $RecoveryShard$_fun_get_body((int, int, int, int, int, int, int, cell, int) $self) impure inline_ref {
     var (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)) = $self;
-    var $fresh$ret_4 = $self'body;
-    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_4);
+    var $fresh$ret_5 = $self'body;
+    return (($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at), $fresh$ret_5);
 }
 
 ;;
@@ -397,7 +409,7 @@ _ %get_body() method_id(104539) {
         var $msg'owner_sig = sc_1~load_ref();
         throw_unless(13571, ( (( (($msg'h0 != 0)) ? (($msg'h1 != 0)) : (false) )) ? (($msg'bh != 0)) : (false) ));
         throw_unless(13557, ($Cell$_fun_hash($msg'body) == $msg'bh));
-        throw_unless(13572, ($Context$_get_value(__tact_context_get()) >= 37300000));
+        throw_unless(13572, ($Context$_get_value(__tact_context_get()) >= 37600000));
         var ($blob'cells, $blob'bits, $blob'refs) = $Cell$_fun_computeDataSize($msg'body, 1024);
         throw_unless(13560, ($blob'cells <= 79));
         ifnot ($self'bound) {
@@ -417,7 +429,7 @@ _ %get_body() method_id(104539) {
         $self'bh = $msg'bh;
         $self'body = $msg'body;
         $self'updated_at = $global_now();
-        $global_nativeReserve(29300000, 2);
+        $global_nativeReserve(29600000, 2);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecoveryShard$_contract_store(($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at));
         return ();
@@ -428,6 +440,7 @@ _ %get_body() method_id(104539) {
         var $msg'refund_to = in_msg~load_msg_addr();
         var $msg'owner_sig = in_msg~load_ref();
         throw_unless(13561, $self'bound);
+        throw_unless(13566, ($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)~$RecoveryShard$_fun_isBasechainAddress($msg'refund_to));
         throw_unless(13565, $global_checkSignature(($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at)~$RecoveryShard$_fun_evictDigest($msg'refund_to), $Cell$_fun_beginParse($msg'owner_sig), $self'owner_pubkey));
         $self'bound = false;
         $self'owner_pubkey = 0;

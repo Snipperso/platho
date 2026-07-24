@@ -168,8 +168,7 @@ PROGRAM{
     $AirdropTicket$_contract_load INLINECALLDICT
     s0 s4 XCHG
     IFJMP:<{
-      s3 POP
-      SWAP
+      s0 s2 XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -186,9 +185,10 @@ PROGRAM{
       EQUAL
       IFJMP:<{
         DROP
+        s3 POP
+        s0 s2 XCHG
         $TicketRedeem$_load_bounced INLINECALLDICT
         NIP
-        s1 s2 XCHG
         ADD
         0 PUSHINT
         $AirdropTicket$_contract_store INLINECALLDICT
@@ -200,10 +200,10 @@ PROGRAM{
         NIP
         s1 s2 XCHG
         ADD
-        0 PUSHINT
+        ROT
         $AirdropTicket$_contract_store INLINECALLDICT
       }>
-      3 BLKDROP
+      4 BLKDROP
     }>
     0 PUSHINT
     s3 PUSH
@@ -336,8 +336,7 @@ PROGRAM{
       27033 PUSHINT
       s4 s3 XCPU
       $AirdropTicket$_fun_isBasechainAddress INLINECALLDICT
-      NIP
-      s1 s4 XCHG
+      s1 s5 XCHG
       THROWANYIFNOT
       27034 PUSHINT
       __tact_context_get INLINECALLDICT
@@ -346,16 +345,16 @@ PROGRAM{
       GEQ
       THROWANYIFNOT
       0 PUSHINT
-      s3 s0 PUSH2
+      DUP
       64 PUSHINT
       TRUE
-      s7 s5 XCPU
+      s4 s5 XCPU
       $TicketCreditsMigrated$_constructor_credits_k_owner INLINECALLDICT
       NEWC
       $TicketCreditsMigrated$_store_cell INLINECALLDICT
       s4 s6 XCHG
       s1 s3 s0 XCHG3
-      s1 s7 XCHG
+      s1 s6 XCHG
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true

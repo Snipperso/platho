@@ -328,7 +328,6 @@ _ %get_ticket() method_id(104158) {
         if (op == 0x41544336) {
             var ($msg'credits_k) = in_msg~$TicketCreditsMigrated$_load_bounced();
             $self'credits = $self'credits + $msg'credits_k;
-            $self'in_flight = 0;
             $AirdropTicket$_contract_store(($self'owner, $self'credits, $self'in_flight));
             return ();
         }
@@ -382,7 +381,6 @@ _ %get_ticket() method_id(104158) {
         throw_unless(27034, ($Context$_get_value(__tact_context_get()) >= 20000000));
         int $k = $self'credits;
         $self'credits = 0;
-        $self'in_flight = $k;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'to, 0, 64, true, $TicketCreditsMigrated$_store_cell($TicketCreditsMigrated$_constructor_credits_k_owner($k, $self'owner), begin_cell())));
         $AirdropTicket$_contract_store(($self'owner, $self'credits, $self'in_flight));
         return ();

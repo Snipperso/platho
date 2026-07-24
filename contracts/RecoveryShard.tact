@@ -66,14 +66,14 @@ const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15).
 //
 // tests/recovery-rent-solvency.test.ts RENT-01 now reads the real figure off the STORAGE PHASE after advancing the
 // full retention, so this constant can never again be validated against a cell model that leaves something out:
-//   measured 3-year rent at the frozen rate = 19_488_648  ->  x1.5 = 29_232_972  ->  29_300_000 (margin 1.503x)
-// [RAISED 2026-07-24: was 29_000_000 against 19_293_761. The W1-009 owner-signed eviction added code cells
-// (evictDigest + the signature check + the refund_to field), lifting the measured 3-year rent by ~195k and dropping
-// the old margin to 1.488x. Re-measured and re-calibrated to hold the 1.5x rule.]
+//   measured 3-year rent at the frozen rate = 19_683_534  ->  x1.5 = 29_525_301  ->  29_600_000 (margin 1.504x)
+// [RAISED 2026-07-24, twice, as the W1-009 eviction code grew: 29_000_000 (rent 19_293_761) -> 29_300_000 (owner-sig
+// eviction: evictDigest + sig check + refund_to, rent 19_488_648) -> 29_600_000 (re-audit LOW fix: isBasechainAddress
+// helper + gate 13566 on refund_to, rent 19_683_534, old margin 1.489x). Re-measured each time off the storage phase.]
 // Both sibling lanes were raised pre-seal for this same class of error (RecordShard at 1.026x, IntroShard at
 // 1.21x). That margin is the entire defence against a governance rate change on a contract that can never be
 // repriced.
-const RS_RECOVERY_ENDOWMENT: Int = 29300000;
+const RS_RECOVERY_ENDOWMENT: Int = 29600000;
 // The endowment above is calibrated for EXACTLY the blob cap below, so
 // the blob MUST be capped at it. The monolith gated this as RECOVERY_MAX_SIZE_CLASS (13560); the sharded rewrite
 // dropped the gate, which let an oversized blob buy permanent storage for a fixed endowment — the slot then goes
@@ -189,6 +189,12 @@ contract RecoveryShard {
             .hash();
     }
 
+    // Byte-for-byte the std-address basechain check the sister contracts use (AirdropPool.tact:201).
+    fun isBasechainAddress(a: Address): Bool {
+        let s: Slice = a.asSlice();
+        return s.loadUint(11) == 1024;
+    }
+
     receive(msg: RecoveryStore) {
         throwUnless(13571, (msg.h0 != 0) && (msg.h1 != 0) && (msg.bh != 0));
         // [RESTORED 13557] Bind the stored blob to the SIGNED frame. The signature covers bh, but the body itself
@@ -285,6 +291,14 @@ contract RecoveryShard {
     // to a key they had rotated away from. The first-bind branch honours the retained seq (13573) for the same reason.
     receive(msg: EvictRecovery) {
         throwUnless(13561, self.bound);
+        // [FIX 2026-07-24, re-audit LOW] refund_to MUST be basechain. The reclaim below is mode 128 | SendIgnoreErrors,
+        // so a refund_to on a foreign workchain (or otherwise undeliverable in a way the emulator accepts) would have
+        // its send SILENTLY dropped AFTER the state is cleared — and 13561 then blocks any re-eviction, stranding the
+        // whole endowment forever. Refusing a non-basechain refund_to here, in COMPUTE before any state change, turns
+        // that permanent silent loss into a retryable refusal (the owner re-signs to a basechain address). refund_to is
+        // committed in the signed digest, so this cannot be weaponised by a relayer. (A uninit BASECHAIN address is
+        // safe: mode 128 simply deploys/tops it up — that is a legitimate owner choice, so only foreign chains are refused.)
+        throwUnless(13566, self.isBasechainAddress(msg.refund_to));
         throwUnless(13565, checkSignature(self.evictDigest(msg.refund_to), msg.owner_sig.beginParse(), self.owner_pubkey));
         self.bound = false;
         self.owner_pubkey = 0;

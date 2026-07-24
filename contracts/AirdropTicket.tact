@@ -189,10 +189,17 @@ contract AirdropTicket {
     }
 
     // Migration export — move unclaimed credits to the owner's clean-18 ticket. See TicketExportCredits above.
-    // Double-claim is structurally impossible: this CONSUMES the credits into in_flight, and the 27011 interlock on
-    // TicketClaim plus 27031 here mean the same credits can never be both exported and claimed. A successful export
-    // leaves in_flight set (credits already gone), which is exactly what keeps the dead ticket from re-spending; a
-    // bounce restores both, so a mistimed export loses nothing.
+    // DOUBLE-SPEND of the exported credits is blocked by credits == 0: once exported they are zeroed, so a re-export
+    // fails 27032 and a claim fails 27012 — the SAME credits can never be exported and claimed.
+    //
+    // [FIX 2026-07-24, re-audit MED] in_flight is DELIBERATELY NOT set here. It used to be set to k as a permanent
+    // "migrated" tombstone, but that was wrong: a successful export has no ack to clear it, so in_flight stayed k
+    // forever, and any credit that arrived AFTER the export (a protocol fee settling a block late, a RecordShard not
+    // yet re-routed off the immutable AT_FEE_SINK, or the owner publishing once more) accumulated into self.credits
+    // but could never leave — claim blocked 27011, re-export blocked 27031 — stranding real ATH and violating the very
+    // invariant this hook exists for. Leaving in_flight at 0 keeps the ticket alive for genuinely-new credits; the
+    // export is terminal only for the credits it moved, which credits == 0 already enforces. 27031 stays so an export
+    // cannot start while a CLAIM's pool settlement is in flight.
     receive(msg: TicketExportCredits) {
         throwUnless(27030, sender() == self.owner);
         throwUnless(27031, self.in_flight == 0);
@@ -203,7 +210,6 @@ contract AirdropTicket {
 
         let k: Int = self.credits;
         self.credits = 0;
-        self.in_flight = k;
 
         message(MessageParameters {
             to: msg.to,
@@ -215,10 +221,11 @@ contract AirdropTicket {
     }
 
     // The successor could not adopt (uninitialised, refused, or a wrong-generation ticket). The credits were never
-    // adopted, so they come back — exactly once, symmetric with bounced<TicketRedeem>.
+    // adopted, so they come back — exactly once, symmetric with bounced<TicketRedeem>. in_flight is NOT touched: the
+    // export never set it, and a concurrent CLAIM may legitimately hold in_flight for its own pool settlement — clearing
+    // it here would drop that interlock and risk a double-delivery.
     bounced(msg: bounced<TicketCreditsMigrated>) {
         self.credits += msg.credits_k;
-        self.in_flight = 0;
     }
 
     // Settlement: FeeAccumulator confirms the accrual left for AirdropPool. Only it may say so.

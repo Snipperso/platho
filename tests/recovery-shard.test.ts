@@ -207,6 +207,27 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     expect(await refund.getBalance() > refundBefore, 'the reclaimed endowment went to the signed refund_to, not the relayer').toBe(true);
   }, 120_000);
 
+  it('RECOVERY-07b: [re-audit LOW] a non-basechain refund_to is REFUSED before any state change — the endowment cannot be silently stranded', async () => {
+    // The reclaim is mode 128 | SendIgnoreErrors: a foreign-workchain refund_to would have its send dropped AFTER the
+    // slot is cleared, and 13561 then blocks re-eviction, stranding the endowment forever. 13566 refuses it in COMPUTE.
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x1b));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
+    const keeper = await blockchain.treasury('rec-keeper7b');
+
+    const foreignRefund = new Address(5, Buffer.alloc(32, 0x1));   // workchain 5 — not basechain
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05'), bounce: true },
+      evict(owner, rs.address, self, 1n, foreignRefund) as any), rs.address), 'foreign-workchain refund_to -> 13566').toBe(13566);
+    expect((await rs.getGetView()).bound, 'the slot survives — no silent strand').toBe(true);
+
+    // And the owner can still evict normally to a basechain address afterward.
+    const ok = await blockchain.treasury('rec-refund7b');
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') },
+      evict(owner, rs.address, self, 1n, ok.address) as any), rs.address), 'a basechain refund still works').toBe(0);
+    expect((await rs.getGetView()).bound).toBe(false);
+  }, 120_000);
+
   it('RECOVERY-09: the anti-rollback seq SURVIVES eviction — a freed slot cannot be re-bound with a stale blob', async () => {
     // Eviction used to reset seq to 0, which made every previously signed RecoveryStore valid again: anyone could
     // re-bind the freed slot with the owner's OWN outdated blob and roll their K_root back to a key they had

@@ -231,28 +231,55 @@ describe('AIRDROP TICKET — credits cannot be minted, and cannot be lost', () =
       { $$type: 'TicketExportCredits', to: successor.address } as any);
 
     const view = await ticket.getGetTicket();
-    expect(view.credits, 'the credits are consumed here so they cannot also be claimed').toBe(0n);
-    expect(view.in_flight, 'and held in flight, which is what blocks a re-spend').toBe(5n);
+    expect(view.credits, 'the credits are consumed here (zeroed) so they cannot also be claimed').toBe(0n);
+    expect(view.in_flight, 'in_flight is NOT set by an export — that permanent tombstone was the re-audit bug').toBe(0n);
     expect(findTransaction(r.transactions, { from: ticket.address, to: successor.address, op: OP_CREDITS_MIGRATED }),
       'the successor receives exactly the credits and owner to adopt').toBeDefined();
   });
 
-  it('TICKET-10: an exported ticket cannot double-spend — neither a claim nor a second export moves the credits again', async () => {
+  it('TICKET-10: an exported ticket cannot double-spend the SAME credits — credits==0 blocks a claim and a second export', async () => {
     const { bc, owner, ticket } = await setup();
     const successor = await bc.treasury('clean18-successor');
     await credit(bc, ticket, 100);
     await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
       { $$type: 'TicketExportCredits', to: successor.address } as any);
-    expect((await ticket.getGetTicket()).in_flight, 'the export is genuinely in flight').toBe(100n);
+    expect((await ticket.getGetTicket()).credits, 'the exported credits are zeroed').toBe(0n);
 
-    // A claim is refused by the same 27011 interlock that stops a double-delivery; a second export by 27031.
+    // The SAME credits cannot move again: a claim fails 27012 (credits < threshold), a second export fails 27032
+    // (credits == 0). Double-spend is blocked by credits==0, not by a tombstone.
     await ticket.send(owner.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
     await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
       { $$type: 'TicketExportCredits', to: successor.address } as any);
-
     const after = await ticket.getGetTicket();
     expect(after.credits, 'nothing re-appeared to spend a second time').toBe(0n);
-    expect(after.in_flight, 'the credits stay accounted exactly once').toBe(100n);
+    expect(after.in_flight, 'no stuck in-flight').toBe(0n);
+  });
+
+  it('TICKET-10b: [re-audit MED] credits arriving AFTER a successful export are NOT stranded — the ticket stays alive', async () => {
+    // The bug the re-audit caught: a permanent in_flight tombstone after export bricked the ticket, so any later credit
+    // (a late fee, an un-re-routed shard, or the owner publishing again) could never be claimed or exported. It must.
+    const { bc, owner, ticket } = await setup();
+    const successor = await bc.treasury('clean18-successor');
+    await credit(bc, ticket, 30);
+    await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
+      { $$type: 'TicketExportCredits', to: successor.address } as any);
+    expect((await ticket.getGetTicket()).credits, 'exported').toBe(0n);
+
+    // 40 fresh credits land after the export. They accumulate as normal, and can be RE-EXPORTED (a second migration
+    // hop) — done first, while in_flight is 0, before the claim below leaves the stub's redeem unacked.
+    await credit(bc, ticket, 40);
+    expect((await ticket.getGetTicket()).credits, 'new credits accumulate as normal').toBe(40n);
+    const r2 = await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
+      { $$type: 'TicketExportCredits', to: successor.address } as any);
+    expect(findTransaction(r2.transactions, { from: ticket.address, to: successor.address, op: OP_CREDITS_MIGRATED }),
+      'post-export credits can be exported again — the ticket is not bricked').toBeDefined();
+    expect((await ticket.getGetTicket()).credits, 're-export zeroed the new credits').toBe(0n);
+
+    // ...and a further batch can also be CLAIMED (the other path the old tombstone bricked).
+    await credit(bc, ticket, 15);
+    const claim = await ticket.send(owner.getSender(), { value: AT_CLAIM_MIN_VALUE }, { $$type: 'TicketClaim' } as any);
+    expect(findTransaction(claim.transactions, { from: ticket.address, to: FEE_SINK, op: OP_TICKET_REDEEM }),
+      'post-export credits can also be claimed').toBeDefined();
   });
 
   it('TICKET-11: only the owner may export — a stranger cannot redirect a publisher\'s credits to their own sink', async () => {
