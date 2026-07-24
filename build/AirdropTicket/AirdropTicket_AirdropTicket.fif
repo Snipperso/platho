@@ -2,6 +2,9 @@
 PROGRAM{
   DECLPROC __tact_context_get
   DECLPROC __tact_context_get_sender
+  DECLPROC $TicketCreditsMigrated$_store
+  DECLPROC $TicketCreditsMigrated$_store_cell
+  DECLPROC $TicketCreditsMigrated$_load_bounced
   DECLPROC $TicketRedeem$_store
   DECLPROC $TicketRedeem$_store_cell
   DECLPROC $TicketRedeem$_load_bounced
@@ -13,10 +16,12 @@ PROGRAM{
   DECLPROC $AirdropTicket$_contract_init
   DECLPROC $AirdropTicket$_contract_load
   DECLPROC $AirdropTicket$_contract_store
+  DECLPROC $AirdropTicket$_fun_isBasechainAddress
   DECLPROC $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value
   DECLPROC $AirdropTicket$_fun_get_ticket
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $TicketRedeem$_constructor_credits_k_owner
+  DECLPROC $TicketCreditsMigrated$_constructor_credits_k_owner
   104158 DECLMETHOD %get_ticket
   DECLPROC recv_internal
   DECLGLOBVAR __tact_context
@@ -29,6 +34,22 @@ PROGRAM{
   }>
   __tact_context_get_sender PROCINLINE:<{
     __tact_context_sender GETGLOB
+  }>
+  $TicketCreditsMigrated$_store PROCINLINE:<{
+    1096041270 PUSHINT
+    s0 s3 XCHG2
+    32 STU
+    32 STU
+    STSLICE
+  }>
+  $TicketCreditsMigrated$_store_cell PROCINLINE:<{
+    -ROT
+    $TicketCreditsMigrated$_store INLINECALLDICT
+    ENDC
+  }>
+  $TicketCreditsMigrated$_load_bounced PROCINLINE:<{
+    32 LDU
+    SWAP
   }>
   $TicketRedeem$_store PROCINLINE:<{
     1096041267 PUSHINT
@@ -97,6 +118,12 @@ PROGRAM{
     ENDC
     c4 POP
   }>
+  $AirdropTicket$_fun_isBasechainAddress PROCREF:<{
+    11 LDU
+    DROP
+    10 PUSHPOW2
+    EQUAL
+  }>
   $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value PROCINLINE:<{
   }>
   $AirdropTicket$_fun_get_ticket PROCREF:<{
@@ -114,6 +141,8 @@ PROGRAM{
     -ROT
   }>
   $TicketRedeem$_constructor_credits_k_owner PROCINLINE:<{
+  }>
+  $TicketCreditsMigrated$_constructor_credits_k_owner PROCINLINE:<{
   }>
   %get_ticket PROC:<{
     $AirdropTicket$_contract_load INLINECALLDICT
@@ -152,10 +181,22 @@ PROGRAM{
         32 LDU
         SWAP
       }>
+      DUP
       1096041267 PUSHINT
       EQUAL
       IFJMP:<{
+        DROP
         $TicketRedeem$_load_bounced INLINECALLDICT
+        NIP
+        s1 s2 XCHG
+        ADD
+        0 PUSHINT
+        $AirdropTicket$_contract_store INLINECALLDICT
+      }>
+      1096041270 PUSHINT
+      EQUAL
+      IFJMP:<{
+        $TicketCreditsMigrated$_load_bounced INLINECALLDICT
         NIP
         s1 s2 XCHG
         ADD
@@ -173,16 +214,13 @@ PROGRAM{
       NIP
       s3 PUSH
       32 PLDU
-      s4 POP
-      s0 s3 XCHG
-    }>ELSE<{
-      s4 POP
+      SWAP
     }>
-    DUP
+    OVER
     1096041265 PUSHINT
     EQUAL
     IFJMP:<{
-      DROP
+      2DROP
       s2 POP
       27001 PUSHINT
       __tact_context_get_sender INLINECALLDICT
@@ -199,11 +237,11 @@ PROGRAM{
       ROT
       $AirdropTicket$_contract_store INLINECALLDICT
     }>
-    DUP
+    OVER
     1096041266 PUSHINT
     EQUAL
     IFJMP:<{
-      DROP
+      2DROP
       s2 POP
       27010 PUSHINT
       __tact_context_get_sender INLINECALLDICT
@@ -267,6 +305,75 @@ PROGRAM{
       SWAP
       $AirdropTicket$_contract_store INLINECALLDICT
     }>
+    OVER
+    1096041269 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s2 XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      LDMSGADDR
+      DROP
+      27030 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s3 PUSH
+      SDEQ
+      THROWANYIFNOT
+      27031 PUSHINT
+      s4 PUSH
+      0 EQINT
+      THROWANYIFNOT
+      27032 PUSHINT
+      s3 PUSH
+      0 GTINT
+      THROWANYIFNOT
+      s0 s2 XCHG
+      27033 PUSHINT
+      s4 s3 XCPU
+      $AirdropTicket$_fun_isBasechainAddress INLINECALLDICT
+      NIP
+      s1 s4 XCHG
+      THROWANYIFNOT
+      27034 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      20000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      0 PUSHINT
+      s3 s0 PUSH2
+      64 PUSHINT
+      TRUE
+      s7 s5 XCPU
+      $TicketCreditsMigrated$_constructor_credits_k_owner INLINECALLDICT
+      NEWC
+      $TicketCreditsMigrated$_store_cell INLINECALLDICT
+      s4 s6 XCHG
+      s1 s3 s0 XCHG3
+      s1 s7 XCHG
+      $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s0 s2 XCHG
+      $AirdropTicket$_contract_store INLINECALLDICT
+    }>
+    s4 POP
     DUP
     1096041268 PUSHINT
     EQUAL

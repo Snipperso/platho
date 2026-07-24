@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: AirdropTicket
-BoC Size: 620 bytes
+BoC Size: 812 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 16
+Total structures: 18
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -52,6 +52,14 @@ Signature: `TicketCredit{}`
 ### TicketClaim
 TL-B: `ticket_claim#41544332  = TicketClaim`
 Signature: `TicketClaim{}`
+
+### TicketExportCredits
+TL-B: `ticket_export_credits#41544335 to:address = TicketExportCredits`
+Signature: `TicketExportCredits{to:address}`
+
+### TicketCreditsMigrated
+TL-B: `ticket_credits_migrated#41544336 credits_k:uint32 owner:address = TicketCreditsMigrated`
+Signature: `TicketCreditsMigrated{credits_k:uint32,owner:address}`
 
 ### TicketRedeem
 TL-B: `ticket_redeem#41544333 credits_k:uint32 owner:address = TicketRedeem`

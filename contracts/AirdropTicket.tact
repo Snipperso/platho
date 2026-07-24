@@ -48,12 +48,43 @@ const AT_MAX_CREDITS_PER_CLAIM: Int = 1000;
 // gate 26114 demands 60,000,000 and REFUSES at 59,000,000 — measured), and forward fees for both hops.
 const AT_CLAIM_MIN_VALUE: Int = 63000000;
 
+// What an ExportCredits must carry to fund the one hop to the clean-18 successor plus the successor's own
+// adoption. The successor funds its own DEPLOY at migration time (this ticket cannot know clean-18's code cell,
+// so it attaches no StateInit); this is the forward hop plus a generous cushion for the adopt receiver's compute.
+const AT_EXPORT_MIN_VALUE: Int = 20000000;
+
 // "ATC1" — the credit. Carries nothing: the ticket's own address already commits to its owner, and the amount
 // is always exactly one capsule. A field would only be something to forge.
 message(0x41544331) TicketCredit {}
 
 // "ATC2" — the owner asks for their credits to be delivered.
 message(0x41544332) TicketClaim {}
+
+// "ATC5" — the owner moves their unclaimed credits to the next generation. WHY THIS EXISTS: the permanent
+// AirdropPool survives a bug-fix redeploy holding the undistributed 15M (that is the whole point of ADR9,
+// AirdropPool.tact:54), but a redeploy that changes FeeAccumulator's CODE moves its address and repoints the
+// pool's distributor — after which THIS ticket's claims bounce at the pool's 26110 and its unclaimed credits are
+// stranded. This hook moves them to the owner's clean-18 ticket instead of losing them. [OWNER INVARIANT
+// 2026-07-24: a redeploy must lose neither the undistributed pool nor already-credited user coins.]
+//
+// It is NOT the read-only KeyShard prove-hook: credits are SPENDABLE, so exporting must CONSUME them here (move to
+// in_flight, credits -> 0) to make a double-claim structurally impossible — the same in_flight interlock TicketClaim
+// uses. Owner-gated so no one else can redirect a publisher's credits. Consumed-and-forwarded with bounce-restore
+// so a mistimed export can never lose them. Works below the 64 claim threshold too, so dust credits migrate rather
+// than strand.
+message(0x41544335) TicketExportCredits {
+    to: Address;          // the clean-18 successor ticket that will adopt these credits
+}
+
+// "ATC6" — this ticket -> its clean-18 successor: the credits to adopt and the owner they belong to. The successor
+// authenticates it by rebuilding THIS ticket's address from the clean-17 ticket code plus `owner` (the same
+// derive-and-compare FeeAccumulator uses at gate 15055), so no forged message can inject credits it never earned.
+// credits_k is FIRST so a bounce preserves it — only the first 224 bits of a bounced body survive — exactly as
+// TicketRedeem is ordered for its own bounce handler.
+message(0x41544336) TicketCreditsMigrated {
+    credits_k: Int as uint32;
+    owner: Address;
+}
 
 // "ATC3" — the redeem, sent to FeeAccumulator, which authenticates this ticket by rebuilding its address from
 // the bound ticket code and `owner`, then emits AirdropAccrue to AirdropPool.
@@ -88,6 +119,13 @@ contract AirdropTicket {
         self.owner = owner;
         self.credits = 0;
         self.in_flight = 0;
+    }
+
+    // Byte-for-byte AirdropPool.isBasechainAddress (AirdropPool.tact:201). A masterchain successor would be
+    // unpayable at basechain gas, the same reason the pool refuses a masterchain buyer.
+    fun isBasechainAddress(a: Address): Bool {
+        let s: Slice = a.asSlice();
+        return s.loadUint(11) == 1024;
     }
 
     // The ONLY way credits come into existence. FeeAccumulator emits this after it has authenticated that a real
@@ -131,6 +169,39 @@ contract AirdropTicket {
     // The redeem could not be delivered or was refused. The credits were never paid out, so they come back —
     // exactly once, because in_flight is cleared here and a second bounce for the same claim cannot exist.
     bounced(msg: bounced<TicketRedeem>) {
+        self.credits += msg.credits_k;
+        self.in_flight = 0;
+    }
+
+    // Migration export — move unclaimed credits to the owner's clean-18 ticket. See TicketExportCredits above.
+    // Double-claim is structurally impossible: this CONSUMES the credits into in_flight, and the 27011 interlock on
+    // TicketClaim plus 27031 here mean the same credits can never be both exported and claimed. A successful export
+    // leaves in_flight set (credits already gone), which is exactly what keeps the dead ticket from re-spending; a
+    // bounce restores both, so a mistimed export loses nothing.
+    receive(msg: TicketExportCredits) {
+        throwUnless(27030, sender() == self.owner);
+        throwUnless(27031, self.in_flight == 0);
+        throwUnless(27032, self.credits > 0);
+        throwUnless(27033, self.isBasechainAddress(msg.to));
+        // Fail-closed in COMPUTE, before any state change, exactly as TicketClaim does.
+        throwUnless(27034, context().value >= AT_EXPORT_MIN_VALUE);
+
+        let k: Int = self.credits;
+        self.credits = 0;
+        self.in_flight = k;
+
+        message(MessageParameters {
+            to: msg.to,
+            value: 0,
+            mode: SendRemainingValue,
+            bounce: true,
+            body: TicketCreditsMigrated{ credits_k: k, owner: self.owner }.toCell(),
+        });
+    }
+
+    // The successor could not adopt (uninitialised, refused, or a wrong-generation ticket). The credits were never
+    // adopted, so they come back — exactly once, symmetric with bounced<TicketRedeem>.
+    bounced(msg: bounced<TicketCreditsMigrated>) {
         self.credits += msg.credits_k;
         self.in_flight = 0;
     }
