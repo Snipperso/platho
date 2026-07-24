@@ -176,8 +176,8 @@ export async function buildIntroPublish({ epoch, bucket, r, viewTag, header0, bo
  * one slot's get_view().seq says nothing about another's.
  */
 export async function buildRecoveryPublish({ seed, slotIndex, seq, h0, h1, body, value }) {
-  const ownerSecret = await recoveryOwnerSecret(seed);
-  const ownerPub = await recoveryOwnerPublicKey(seed);
+  const ownerSecret = await recoveryOwnerSecret(seed, slotIndex);   // W1-015: per-slot key
+  const ownerPub = await recoveryOwnerPublicKey(seed, slotIndex);
   const slotKey = recoveryOwnerSlotKey(ownerPub, slotIndex);
   const target = await recoveryShardState(slotKey);
   // bh is DERIVED from the body, never supplied: the contract requires body.hash() == bh (gate 13557), so letting a

@@ -38,8 +38,8 @@ async function cellHashBig(cell) {
  * (gate 13557 requires body.hash() == bh) so it is never passed. FUNDING: pass the RECOVERY deploy figure.
  */
 export async function buildRecoveryPublishBrowser({ seed, slotIndex, seq, h0, h1, body, value }) {
-  const ownerSecret = await recoveryOwnerSecret(seed);
-  const ownerPub = await recoveryOwnerPublicKey(seed);
+  const ownerSecret = await recoveryOwnerSecret(seed, slotIndex);   // W1-015: per-slot key
+  const ownerPub = await recoveryOwnerPublicKey(seed, slotIndex);
   const slotKey = await recoveryOwnerSlotKey(ownerPub, slotIndex);
   const address = await recoveryShardAddressBytes(slotKey);
   const bh = await cellHashBig(body);

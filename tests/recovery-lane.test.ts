@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from '../web/recovery-lane.mjs';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from '../web/recovery-lane.mjs';
 import { selfRecoveryShardSpace, selfRecoveryShard } from '../web/conv-discovery.mjs';
 import { sealRecoveryBlob, sealPrefsBlob } from '../web/recovery-blob.mjs';
 import { PREFS_NAMED_SLOT_INDEX } from '../web/shard-discovery.mjs';
@@ -71,6 +71,26 @@ describe('RECOVERY-LANE', () => {
 
     const backupFresh = await prepareRecoveryBackup({ seed: SEED, slotIndex: 0, map, readView: async () => ({ bound: false }), value: VALUE });
     expect(backupFresh.seq, 'a fresh slot binds at seq 1').toBe(1);
+  });
+
+  it('RL-09: the W1-009 freeze sweep returns only bound, locally-present slots idle past the refresh horizon', async () => {
+    const { slots } = await selfRecoveryShardSpace(SEED);
+    const nowS = 1_800_000_000;
+    const refreshAfterS = 47_304_000;   // 1.5y — mirrors app.js RECOVERY_REFRESH_AFTER_S
+    const views = new Map<string, any>([
+      [slots[1].address, { bound: true, seq: 2n, updated_at: BigInt(nowS - 63_072_000) }],   // 2y idle -> STALE
+      [slots[3].address, { bound: true, seq: 5n, updated_at: BigInt(nowS - 86_400) }],        // 1 day -> fresh
+      [slots[5].address, { bound: true, seq: 1n, updated_at: BigInt(nowS - 63_072_000) }],    // stale but NOT local
+      [slots[9].address, { bound: false }],                                                    // never written
+    ]);
+    const readView = async (addr: string) => {
+      if (addr === slots[7].address) throw new Error('429');   // transient read -> skip, never treat as stale
+      return views.get(addr) ?? { bound: false };
+    };
+    // slot 5 is deliberately EXCLUDED — a slot the local map no longer occupies must not be rewritten from a partial map.
+    const localSlotIndices = new Set([1, 3, 7, 9]);
+    const stale = await staleRecoverySlots({ seed: SEED, readView, localSlotIndices, nowS, refreshAfterS });
+    expect(stale, 'only the bound, locally-present, idle-past-horizon slot is refreshed').toEqual([1]);
   });
 
   it('RL-04: a transient read failure marks the restore UNCLEAN (caller must not treat it as authoritative)', async () => {

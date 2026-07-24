@@ -322,14 +322,25 @@ export async function selfRecoveryBucketKey(seed) {
 // bind — any of the slots, even after a 3-year eviction frees one. Deterministic from the seed so a reinstalled
 // client re-derives the same signing key; the recovery publish signs owner_sig with recoveryOwnerSecret.
 //
-// ONE OWNER KEY, RS_MAX_SLOTS SLOTS [owner decision 2026-07-19]. The index used to be absent, which made a user's
-// single slot a hard ceiling of about 155 conversations surviving a reinstall — unraisable after seal, because the
-// derivation IS the address. The owner key is shared across all of them: the signing key here is per-user, not
-// per-slot, and each slot carries its own independent seq.
-export async function recoveryOwnerSecret(seed) {
-  return hkdf256(assertBytes('seed', seed), utf8(RECOVERY_OWNER_SALT_DOMAIN), utf8(RECOVERY_OWNER_INFO_DOMAIN), 32);
+// PER-SLOT OWNER KEY [W1-015 fix, owner re-approved 2026-07-24 — reverses "ONE OWNER KEY [owner decision 2026-07-19]"].
+// The slotIndex is folded into the HKDF info, so every slot gets an INDEPENDENT owner key. WHY: the old shared key was
+// public (RecoveryStore body + get_view), so from ONE observed slot an attacker computed H(RS_SLOT_DOMAIN ‖ owner_pubkey
+// ‖ i) for every i and enumerated the user's WHOLE recovery trail — slot count and per-slot write timing — and the key
+// was seed-stable, a permanent alias across reinstalls and wallet changes. With a per-slot key, observing slot i's
+// owner_pubkey reveals nothing about slot j (HKDF is one-way), so the trail cannot be enumerated. The owner still finds
+// every slot: they hold the seed and re-derive each key. The contract is agnostic — it only checks the address commits
+// to whatever owner_pubkey is bound and verifies that slot's signature against it (13575/13563/13574).
+//
+// slotIndex is REQUIRED: a missing index would derive the wrong key and bind a slot no restoring client re-derives.
+export async function recoveryOwnerSecret(seed, slotIndex) {
+  const idx = Number(slotIndex);
+  if (!Number.isInteger(idx) || idx < 0) {
+    throw new Error(`recoveryOwnerSecret: slotIndex must be a non-negative integer, got ${slotIndex}`);
+  }
+  return hkdf256(assertBytes('seed', seed), utf8(RECOVERY_OWNER_SALT_DOMAIN),
+    utf8(`${RECOVERY_OWNER_INFO_DOMAIN}:${idx}`), 32);
 }
 
-export async function recoveryOwnerPublicKey(seed) {
-  return ed25519.getPublicKey(await recoveryOwnerSecret(seed));
+export async function recoveryOwnerPublicKey(seed, slotIndex) {
+  return ed25519.getPublicKey(await recoveryOwnerSecret(seed, slotIndex));
 }

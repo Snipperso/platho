@@ -191,7 +191,7 @@ import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.m
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=1';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=1';
 import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=1';
 import {
   publicChannelPartitionKey,
@@ -15053,11 +15053,42 @@ async function runRecoveryBackup() {
   globalThis.plathoLastConvRecoveryBackup = { slotsPublished: published, slotsRemaining: convRecoveryDirtySlots.size, at: new Date().toISOString() };
 }
 
+// W1-009 freeze-prevention sweep — runs ONCE per session once the local map is known authoritative. The owner-signed
+// eviction closed the theft vector, but an idle bound slot still bleeds its endowment to rent and would FREEZE after
+// ~4.5 years without a rewrite; the content-triggered backup never touches a stable slot. This marks any bound slot
+// idle longer than RECOVERY_REFRESH_AFTER_S dirty, so the ordinary backup tops it up (W1-008) and resets its clock.
+// Cheap: one batched scan, re-publishing only genuinely-stale slots (usually none). See recovery-lane.staleRecoverySlots.
+const RECOVERY_REFRESH_AFTER_S = 47_304_000;   // retention/2 = 1.5 years; freeze is ~4.5y out, so this is huge margin
+let recoveryFreezeSweepDone = false;
+async function runRecoveryFreezeSweep() {
+  if (recoveryFreezeSweepDone) return;
+  if (!privateLaneDirectPayEnabled() || !convKeyStore || !plathoWallet?.seed) return;
+  if (!convRecoveryBackupAllowed) return;   // never rewrite from an incomplete local map [same guard as the backup]
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return;     // no transport yet — retry on the next boot/visible
+  recoveryFreezeSweepDone = true;
+  try {
+    const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+    const localSlotIndices = new Set(partitionRecoveryMap(convKeyStore.snapshot()).keys());
+    if (localSlotIndices.size === 0) return;
+    const stale = await staleRecoverySlots({
+      seed: plathoWallet.seed, readView, localSlotIndices,
+      nowS: Math.floor(Date.now() / 1000), refreshAfterS: RECOVERY_REFRESH_AFTER_S,
+    });
+    for (const idx of stale) convRecoveryDirtySlots.add(idx);
+    if (stale.length > 0) scheduleRecoveryBackup(null, 5_000);
+  } catch (error) {
+    recoveryFreezeSweepDone = false;   // transient failure — allow a retry on the next boot/visible
+    if (!noteTonRpcRateLimit(error)) console.warn('[recovery] freeze sweep failed', error);
+  }
+}
+
 async function bootWalletScopedLocalStores() {
   await bootReplayStore();
   await bootEncryptedMessageHistory();
   await bootConvKeyStore();
   rearmRecoveryBackupIfDirty();   // re-fire a backup a background-lock cancelled before it landed (now that restore ran)
+  runRecoveryFreezeSweep().catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[recovery] freeze sweep failed', error); });
   if (plathoWallet?.address) activeRuntimeWalletAddress = plathoWallet.address;
   // Saved messages (v652): the self-dialog exists from the first unlock (top of the list until real dialogs push it).
   if (ensureSavedMessagesThread()) renderThreads();
@@ -31656,7 +31687,7 @@ document.addEventListener('visibilitychange', () => {
     armIntroReceiveLane().catch((error) => console.warn('[intro] arm on visible failed', error));
     // Retry a recovery restore that a transient RPC error left incomplete (it did not latch), and re-fire a backup a
     // background-lock cancelled — a foreground-only session never re-boots, so this is the only place these recover.
-    restoreConvKeysFromRecoveryIfEmpty().then(rearmRecoveryBackupIfDirty).catch((error) => console.warn('[recovery] visible retry failed', error));
+    restoreConvKeysFromRecoveryIfEmpty().then(rearmRecoveryBackupIfDirty).then(runRecoveryFreezeSweep).catch((error) => console.warn('[recovery] visible retry failed', error));
     // Return-from-wallet-app: refresh a quick-start balance step so topped-up funds show right away.
     quickStartRefreshCurrentBalanceStep();
     if (isVaultViewActive()) {
