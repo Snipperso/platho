@@ -184,7 +184,6 @@ contract RecoveryShard {
         let blob: DataSize = msg.body.computeDataSize(RS_BLOB_PROBE_CELLS);
         throwUnless(13560, blob.cells <= RS_MAX_BLOB_CELLS);
 
-        let wasUnbound: Bool = !self.bound;
         if (!self.bound) {
             // First publish binds the owner, and must STILL beat the high-water seq. On a fresh slot self.seq is 0,
             // so this reduces to seq >= 1. After an eviction it is the retained high-water mark, which is the whole
@@ -221,13 +220,21 @@ contract RecoveryShard {
         self.body = msg.body;
         self.updated_at = now();
 
-        // Reserve the INCREMENT over the balance already held: the endowment only on the FIRST bind (the slot is
-        // funded once), zero on an overwrite. An absolute reserve would hand any top-up to whoever writes next —
-        // the monolith flags that exact mistake at CapsuleHub.tact:1722.
-        nativeReserve(
-            wasUnbound ? RS_RECOVERY_ENDOWMENT : 0,
-            ReserveAtMost | ReserveAddOriginalBalance,
-        );
+        // [W1-008 FIX 2026-07-24] Keep the FULL endowment on EVERY write, not only the first. Gate 13572 already
+        // requires every RecoveryStore to bring >= RS_MIN_VALUE (endowment + path gas), so a refresh tops the slot
+        // back up to RS_RECOVERY_ENDOWMENT and the overpayment (the rent NOT yet consumed) returns to the owner.
+        //
+        // The OLD code reserved `wasUnbound ? ENDOWMENT : 0` with AddOriginalBalance — free refreshes that kept only
+        // the already-drained balance. Measured (tests/recovery-rent-solvency.test.ts RENT-03): the endowment funds
+        // ~4.5 years from the first bind, but each refresh RESETS updated_at and with it the 3-year eviction deadline
+        // (gate 13562), so a user who refreshes every year renewed the retention PROMISE indefinitely while the
+        // FUNDING never renewed — freezing in year 5 and losing the K_root blob the lane exists to protect.
+        //
+        // The old comment cited CapsuleHub.tact:1722 against an "absolute reserve". That hazard does NOT apply here:
+        // CapsuleHub was a MULTI-endowment pool whose whole accumulated balance would leak to the caller under an
+        // absolute reserve. A RecoveryShard holds ONE slot's endowment, and every write is owner-signature-gated
+        // (13563/13574), so ReserveAtMost(ENDOWMENT) simply returns the owner's own overpayment to the owner.
+        nativeReserve(RS_RECOVERY_ENDOWMENT, ReserveAtMost);
         send(SendParameters{ to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 

@@ -391,7 +391,6 @@ _ %get_body() method_id(104539) {
         throw_unless(13572, ($Context$_get_value(__tact_context_get()) >= 37000000));
         var ($blob'cells, $blob'bits, $blob'refs) = $Cell$_fun_computeDataSize($msg'body, 1024);
         throw_unless(13560, ($blob'cells <= 79));
-        int $wasUnbound = (~ $self'bound);
         ifnot ($self'bound) {
             throw_unless(13573, ($msg'seq > $self'seq));
             throw_unless(13576, ( (($msg'slot_index >= 0)) ? (($msg'slot_index < 272)) : (false) ));
@@ -409,7 +408,7 @@ _ %get_body() method_id(104539) {
         $self'bh = $msg'bh;
         $self'body = $msg'body;
         $self'updated_at = $global_now();
-        $global_nativeReserve(($wasUnbound ? 29000000 : 0), 6);
+        $global_nativeReserve(29000000, 2);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $RecoveryShard$_contract_store(($self'self_bucket_key, $self'bound, $self'owner_pubkey, $self'seq, $self'h0, $self'h1, $self'bh, $self'body, $self'updated_at));
         return ();
