@@ -3768,11 +3768,11 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/function mergeLocalPendingPublicFeed/);
     expect(source).toMatch(/isPendingPublicFeedItem/);
     expect(source).toMatch(/rememberLocalPublicPost\([^)]*attachments, \{/);
-    expect(source).toMatch(/publishStatus: 'public publish submitted'/);
-    expect(source).toMatch(/publishStatus: 'partial public publish'/);
     expect(source).toMatch(/rememberLocalPublicComment\([^)]*attachments, \{/);
-    expect(source).toMatch(/publishStatus: 'comment submitted'/);
-    expect(source).toMatch(/publishStatus: 'partial comment publish'/);
+    // clean-17 direct-pay: a public post/comment is 'sending' → resolved synchronously (no Vault-only
+    // 'submitted'/'partial' intermediate); isPendingPublicFeedItem is status-agnostic (publishStatus + no entryId),
+    // so mid-flight records still survive reload and are healed by resumePendingPublicPublishConfirmations.
+    expect(source).toMatch(/publishStatus: 'sending'/);
   });
 
   it('PWA-CONFIG-01D3: publish nonce polling bypasses RPC cache', () => {
@@ -5326,7 +5326,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function publicComposerHasSendableContent\(\) \{[\s\S]*?publicDocumentBlocksFromDraft\(publicMessageInput\?\.value \?\? ''\)\.length > 0;/);
     expect(app).toMatch(/const documentBlocks = publicDocumentBlocksFromDraft\(resolvedDraft\.text, attachments, fileAttachments\);\s*\n[\s\S]*?if \(documentBlocks\.length === 0\) return null;/);
     // Symmetric public COMMENT path (generalize-symmetric): same zero-block fail-closed gate, not the old "!text" gate.
-    const commentFn = app.slice(app.indexOf('async function submitPublicCommentThroughVault('), app.indexOf('async function submitPublicCommentThroughVault(') + 1400);
+    const commentFn = app.slice(app.indexOf('async function submitPublicCommentDirect('), app.indexOf('async function submitPublicCommentDirect(') + 1400);
     expect(commentFn).toMatch(/const documentBlocks = publicDocumentBlocksFromDraft\(text, attachments, fileAttachments\);\s*\n[\s\S]*?if \(documentBlocks\.length === 0\) return null;/);
     expect(commentFn).not.toMatch(/if \(!text && attachments\.length === 0\) return null;/);
     // The outer public composer submit gate also checks resolved blocks, so an orphan bails BEFORE the composer clears
@@ -5854,8 +5854,8 @@ describe('PWA runtime config guard', () => {
     // capture-at-submit (before the composer clears) is not dropped by an already-cleared global.
     expect(app).toMatch(/function publicDocumentBlocksFromDraft\(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments\)/);
     expect(app).toMatch(/const fileAttachments = normalizePrivateFileAttachments\(publicFileAttachments\);.*captured BEFORE the clear/);
-    expect(app).toMatch(/await submitPublicPostThroughVault\(\{\s*\n\s*text,\s*\n\s*attachments,\s*\n\s*fileAttachments,/);
-    expect(app).toMatch(/await submitPublicCommentThroughVault\(draftCommentTarget, text, attachments, fileAttachments\)/);
+    expect(app).toMatch(/await submitPublicPostDirect\(\{\s*\n\s*text,\s*\n\s*attachments,\s*\n\s*fileAttachments,/);
+    expect(app).toMatch(/await submitPublicCommentDirect\(draftCommentTarget, text, attachments, fileAttachments\)/);
     // The toolbar is wired (▼ hide + delegated format buttons + open-on-field-click).
     expect(app).toMatch(/setupComposerToolbar\(publicComposerToolbar, publicMessageInput, publicToolbarHide\)/);
     expect(I18N_STRINGS.en['composer.formatBar']).toBeTruthy();

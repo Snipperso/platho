@@ -40,9 +40,11 @@ describe('public publish heal driver guard', () => {
     expect(pass).toMatch(/publishStatus: 'public publish failed'/);
   });
 
-  it('PWA-PUBLIC-HEAL-03: submit paths start the driver and resume runs alongside the private one', () => {
-    // Posts (PARTIAL + SUBMITTED) and comments both wire the driver with the local record reference.
-    expect(app.match(/startPublicPublishConfirmation\(\{ \.\.\.(ref|partialRef|submittedRef), kind: '(post|comment)'/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+  it('PWA-PUBLIC-HEAL-03: resume-on-reload heals pending public records alongside the private driver', () => {
+    // clean-17 direct-pay: public post/comment publish SYNCHRONOUSLY (no Vault PARTIAL/SUBMITTED intermediate), so the
+    // submit path does NOT arm startPublicPublishConfirmation. A mid-flight record (publishStatus 'sending', no
+    // publishState) is healed on reload by the shared resume machinery — merge with the on-chain twin (bodyHash) or
+    // terminal to 'failed' past the no-progress deadline. The driver stays defined for any publishState record.
     expect(app).toMatch(/return \{ channelId, localId \};/);
     expect(app).toMatch(/return \{ channelId, localId: commentLocalId \};/);
     // Resume-on-reload is wired at every private resume hook.
@@ -83,11 +85,9 @@ describe('public publish heal driver guard', () => {
     expect(clearIndex).toBeGreaterThan(-1);
     expect(clearIndex).toBeLessThan(awaitIndex);
     expect(handler).toMatch(/publicMessageInput\.value = text;/);
-    // Both submit paths insert the optimistic record with a streaming private-style status and patch the SAME
-    // record on result (never a second insert).
+    // Both direct-pay submit paths insert the optimistic record with a private-style 'sending' status and patch the
+    // SAME record on result (never a second insert) — post + comment.
     expect(app.match(/publishStatus: 'sending',\s*publishState: null,/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-    expect(app.match(/persistPublicPublishProgress\(\{ \.\.\.ref, publishState \}, \{ publishStatus: publishStateMeta\(publishState\) \|\| 'sending' \}\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-    expect(app.match(/removeLocalPublicPendingRecord\(ref\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     // The feed badge shows the SAME status strings as private messages (publishStateMeta off the live state).
     expect(app).toMatch(/\(item\.publishState \? publishStateMeta\(item\.publishState\) : null\) \|\| item\.publishStatus/);
     // Persisted publishState is variant-stripped (the ~16×47KB BoCs stay in-memory only).

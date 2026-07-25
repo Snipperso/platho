@@ -20918,9 +20918,9 @@ publicComposer?.addEventListener('submit', async (event) => {
   refreshComposerCostStatus();
   try {
     if (draftCommentTarget) {
-      await submitPublicCommentThroughVault(draftCommentTarget, text, attachments, fileAttachments);
+      await submitPublicCommentDirect(draftCommentTarget, text, attachments, fileAttachments);
     } else {
-      await submitPublicPostThroughVault({
+      await submitPublicPostDirect({
         text,
         attachments,
         fileAttachments,
@@ -29248,7 +29248,7 @@ async function attemptConvMessagePublishDirect(context) {
 async function attemptPrivateComposerMessagePublish(context) {
   // clean-17 direct-pay: the whole Vault→CapsuleHub publish machinery below (publishState, publish nonce, confirm
   // retry) is bypassed. A CONV message is sealed to the recipient's KeyShard bundle and published straight from the
-  // wallet into the conversation-direction RecordShard. Mirrors submitPublicPostThroughVault's top branch.
+  // wallet into the conversation-direction RecordShard. Mirrors the public lane's direct-pay send (submitPublicPostDirect).
   if (privateLaneDirectPayEnabled()) return attemptConvMessagePublishDirect(context);
   const endPrivateOutboundWork = beginPrivateOutboundWork();
   try {
@@ -30135,86 +30135,6 @@ async function submitPublicPostDirect(draft = null) {
   return result;
 }
 
-async function submitPublicPostThroughVault(draft = null) {
-  if (publicLaneDirectPayEnabled()) return submitPublicPostDirect(draft);
-  const resolvedDraft = draft ?? {
-    text: publicMessageInput?.value?.trim() ?? '',
-    attachments: publicImageAttachments,
-    fileAttachments: publicFileAttachments,
-    commentsAllowed: publicComposerCommentsCheckbox?.checked !== false,
-  };
-  const attachments = normalizePublicImageAttachments(resolvedDraft.attachments ?? resolvedDraft.attachment);
-  const fileAttachments = normalizePrivateFileAttachments(resolvedDraft.fileAttachments);
-  const documentBlocks = publicDocumentBlocksFromDraft(resolvedDraft.text, attachments, fileAttachments);
-  // Fail closed when nothing real resolves to send — covers an empty draft AND an orphaned "[image N]" marker whose
-  // attachment was removed (its text is non-empty, so the old "!text && no attachments" gate let it through into an
-  // empty publish that dead-ends on "Capsule publish payload is missing").
-  if (documentBlocks.length === 0) return null;
-  setPublicStatus('public publish signing');
-  const blocks = displayBlocksFromDocumentBlocks(documentBlocks);
-  const payloads = await createPublicPayloadParts({
-    type: 'post',
-    text: resolvedDraft.text,
-    attachments,
-    fileAttachments,
-    commentsAllowed: resolvedDraft.commentsAllowed,
-  });
-  // Both consumers of publicShareDraft (the display blocks above + the send plan inside createPublicPayloadParts,
-  // read synchronously on entry) are done — drop the share chip now, like the reply quote in the comment path.
-  // The composer handler restores it on a user-cancelled price change.
-  setPublicShareDraft(null);
-  // Private-composer parity: the post appears in the feed IMMEDIATELY (optimistic local record with a live
-  // private-style status), inserted as soon as the payloads exist so bodyHash-based merging with the on-chain
-  // twin keeps working. The publish pipeline streams part-state updates into the record via onPartState.
-  const ref = rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
-    blocks,
-    publishStatus: 'sending',
-    publishState: null,
-  });
-  const liveState = { publishState: null };
-  const onPartState = (part, publishState) => {
-    liveState.publishState = publishState;
-    if (ref) persistPublicPublishProgress({ ...ref, publishState }, { publishStatus: publishStateMeta(publishState) || 'sending' });
-  };
-  let result;
-  try {
-    result = await publishPublicPayloadParts(payloads, `public-${Date.now()}`, { onPartState });
-  } catch (error) {
-    if (isPublishPriceChangeCancelled(error)) {
-      // User-cancelled: drop the optimistic record; the composer handler restores the draft.
-      if (ref) removeLocalPublicPendingRecord(ref);
-      throw error;
-    }
-    if (!isVaultPublishPartialError(error)) {
-      if (ref) persistPublicPublishProgress({ ...ref, publishState: liveState.publishState }, { publishStatus: 'public publish failed' });
-      throw error;
-    }
-    result = error.publishResult;
-  }
-  // Patch the SAME optimistic record (never insert a second one). The badge renders private-style
-  // publishStateMeta text off the live publishState; publishStatus stays the machine-readable marker.
-  if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    if (ref) persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: null });
-    setPublicStatus('public published');
-  } else if (result?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    if (ref) {
-      persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: 'partial public publish' });
-      if (result.publishState) startPublicPublishConfirmation({ ...ref, kind: 'post', createdAt: Date.now(), publishState: result.publishState });
-    }
-    setPublicStatus('partial public publish');
-  } else if (result?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    if (ref) {
-      persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: 'public publish submitted' });
-      if (result.publishState) startPublicPublishConfirmation({ ...ref, kind: 'post', createdAt: Date.now(), publishState: result.publishState });
-    }
-    setPublicStatus('public publish submitted');
-  } else {
-    setPublicStatus('publish ready');
-  }
-  globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, blocks, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result };
-  return result;
-}
-
 // Publish/update the connected wallet's CHANNEL PROFILE (description + tags) as a normal public top-level POST whose
 // body is a single PROFILE document block. It rides the identical public part-build + broadcast path, lands on the
 // author's on-chain public_author_index, and is read back by resolveChannelProfile walking that author's chain.
@@ -30252,33 +30172,7 @@ async function publishChannelProfileDirect(description, tags) {
 }
 
 async function publishChannelProfile(description, tags) {
-  if (publicLaneDirectPayEnabled()) return publishChannelProfileDirect(description, tags);
-  const desc = String(description ?? '').trim();
-  const normalizedTags = normalizeProfileTags(tags);
-  // Carry the wallet's OWN linked .ath (bare name) as the channel's self-declared owner username — consistent with
-  // how private messages carry senderUsername. Readers verify it against the registry before showing it; publishing
-  // a name you don't own is harmless (verification fails, it falls back to the address). canonicalUsernameDisplay is
-  // safe (strips ".ath", never throws) — normalizeUsernameInput would throw on an empty/odd linked label.
-  const linkedLabel = readLinkedPlathoUsername(plathoWallet?.address)?.label ?? '';
-  const ownerUsername = linkedLabel ? canonicalUsernameDisplay(linkedLabel) : '';
-  // Publish-time stamp (~the on-chain created_at baked into the header a few ms later): used as the profile's cache
-  // recency so latest-wins is consistent with the real created_at the read walk stamps — see finalizeChannelProfile.
-  const createdAtSec = Math.floor(Date.now() / 1000);
-  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername }]);
-  // clean-11: set the is_profile reserved bit so the contract threads this post into the global profile chain +
-  // per-author profile index. Gated on the genesis (clean-10 Vault/Hub reject reserved != 0 -> the profile still
-  // rides as a normal author-index post there, resolved by the author walk).
-  const payloads = await createPublicPayloadParts({ type: 'post', commentsAllowed: false, documentBytes, isProfile: profilePointerEnabled() });
-  if (payloads.length === 0) throw new Error('Channel profile produced no payload');
-  let result;
-  try {
-    result = await publishPublicPayloadParts(payloads, `channel-profile-${Date.now()}`, {});
-  } catch (error) {
-    // A partial publish still lands the external(s); surface its result rather than throwing (mirrors the submit path).
-    if (!isVaultPublishPartialError(error)) throw error;
-    result = error.publishResult;
-  }
-  return { result, description: desc, tags: normalizedTags, ownerUsername, createdAtSec };
+  return publishChannelProfileDirect(description, tags);
 }
 
 // Publish a comment DIRECT-PAY into the parent post's THREAD shard. The thread partition is f(post_uid), post_uid
@@ -30331,81 +30225,6 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
   return result;
 }
 
-async function submitPublicCommentThroughVault(parent, bodyText = null, draftAttachments = publicImageAttachments, draftFileAttachments = publicFileAttachments) {
-  if (publicLaneDirectPayEnabled()) return submitPublicCommentDirect(parent, bodyText, draftAttachments, draftFileAttachments);
-  if (parent?.entryId === undefined || parent?.entryId === null) throw new Error('Public comment parent is not synced from chain');
-  if (!/^0x[0-9a-fA-F]{64}$/.test(String(parent.bodyHash ?? ''))) throw new Error('Public comment parent hash is missing');
-  if (parent.commentsAllowed === false) throw new Error('Comments are closed for this post');
-  const text = bodyText?.trim() ?? publicMessageInput?.value?.trim() ?? '';
-  const attachments = normalizePublicImageAttachments(draftAttachments);
-  const fileAttachments = normalizePrivateFileAttachments(draftFileAttachments);
-  const documentBlocks = publicDocumentBlocksFromDraft(text, attachments, fileAttachments);
-  // Fail closed on zero resolved blocks — same as submitPublicPostThroughVault. An orphaned "[image N]" marker (text
-  // non-empty) would slip the old "!text && no attachments" gate into an empty publish -> "Capsule publish payload is
-  // missing"; a Ctrl+Enter requestSubmit() reaches here past the (correctly) disabled button, so this is the backstop.
-  if (documentBlocks.length === 0) return null;
-  setPublicStatus('comment signing');
-  const blocks = displayBlocksFromDocumentBlocks(documentBlocks);
-  const payloads = await createPublicPayloadParts({
-    type: 'comment',
-    text,
-    attachments,
-    fileAttachments,
-    parent,
-  });
-  // Both consumers of publicCommentReplyTo (the display blocks above + the send plan inside
-  // createPublicPayloadParts, read synchronously on entry) are done — drop the quote strip now, exactly like the
-  // text input clears on send. The composer handler restores it on a user-cancelled price change.
-  setPublicCommentReplyTo(null);
-  setPublicShareDraft(null);
-  // Private-composer parity: insert the optimistic local comment immediately (live private-style status), then
-  // stream part-state updates into it; patch the SAME record on result — never insert a second one.
-  const ref = rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
-    blocks,
-    publishStatus: 'sending',
-    publishState: null,
-  });
-  const liveState = { publishState: null };
-  const onPartState = (part, publishState) => {
-    liveState.publishState = publishState;
-    if (ref) persistPublicPublishProgress({ ...ref, publishState }, { publishStatus: publishStateMeta(publishState) || 'sending' });
-  };
-  let result;
-  try {
-    result = await publishPublicPayloadParts(payloads, `public-comment-${Date.now()}`, { onPartState });
-  } catch (error) {
-    if (isPublishPriceChangeCancelled(error)) {
-      if (ref) removeLocalPublicPendingRecord(ref);
-      throw error;
-    }
-    if (!isVaultPublishPartialError(error)) {
-      if (ref) persistPublicPublishProgress({ ...ref, publishState: liveState.publishState }, { publishStatus: 'public publish failed' });
-      throw error;
-    }
-    result = error.publishResult;
-  }
-  if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    if (ref) persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: null });
-    setPublicStatus('comment published');
-  } else if (result?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    if (ref) {
-      persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: 'partial comment publish' });
-      if (result.publishState) startPublicPublishConfirmation({ ...ref, kind: 'comment', createdAt: Date.now(), publishState: result.publishState });
-    }
-    setPublicStatus('partial comment publish');
-  } else if (result?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    if (ref) {
-      persistPublicPublishProgress({ ...ref, publishState: result.publishState ?? liveState.publishState ?? null }, { publishStatus: 'comment submitted' });
-      if (result.publishState) startPublicPublishConfirmation({ ...ref, kind: 'comment', createdAt: Date.now(), publishState: result.publishState });
-    }
-    setPublicStatus('comment submitted');
-  } else {
-    setPublicStatus('publish ready');
-  }
-  globalThis.plathoLastPublicComment = { parent, text, blocks, payloads, result };
-  return result;
-}
-
 globalThis.plathoVaultTransactions = {
   createVaultWalletMessage,
   createAthWalletMessage,
@@ -30420,8 +30239,6 @@ globalThis.plathoVaultTransactions = {
   submitVaultReplaceMessagingKeys,
   refreshVaultDashboard,
   publishCapsuleThroughVault,
-  submitPublicPostThroughVault,
-  submitPublicCommentThroughVault,
   syncPrivateCapsulesFromChain,
 };
 
