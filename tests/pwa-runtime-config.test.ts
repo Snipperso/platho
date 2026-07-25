@@ -769,16 +769,13 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="profileAvatarInput"/);
     expect(html).toMatch(/Set avatar/);
     expect(app).toMatch(/readCurrentProfileAvatarPointerFromChain/);
-    expect(app).toMatch(/waitForProfileAvatarRegistryUpdate/);
     expect(app).toMatch(/KeyShard provider is required to read current avatar version/);
     expect(app).toMatch(/if \(view === 'profile' && plathoWallet\?\.address\)/);
-    expect(app).toMatch(/assertVaultProfileAvatarCanStart/);
-    expect(app).toMatch(/submitVaultProfileAvatarRegistration/);
-    expect(app).toMatch(/requireProfileRegistryVaultRoute/);
-    expect(app).toMatch(/ProfileRegistry official ATH wallet is not the derived registry wallet/);
-    expect(enCopy).toMatch(/avatar not active yet/);
-    expect(app).toMatch(/setProfileAvatarStatus\(t\('avatar\.notActiveYet'\), 'error'\)/);
-    expect(EN_STRINGS['avatar.notActiveYet']).toBe('avatar not active yet');
+    // Direct pay replaced the Vault avatar leg: the registry address is a config+manifest pin, the price is paid
+    // as ATH from the user's own wallet, and there is no Vault route/canStart/registration external any more.
+    expect(app).toMatch(/requireProfileRegistryAddress\(\)/);
+    expect(app).toMatch(/amount: PROFILE_AVATAR_PRICE_ATH/);
+    expect(app).not.toMatch(/assertVaultProfileAvatarCanStart|submitVaultProfileAvatarRegistration|requireProfileRegistryVaultRoute/);
     expect(html).toMatch(/<h2 data-i18n="public\.channels">Public channels<\/h2>[\s\S]*id="publicSyncWindowSelect"[\s\S]*id="publicCommentsDefaultSelect"/);
     expect(html).toMatch(/<h2 data-i18n="username\.usernamesAndAvatars">Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="linkUsernameButton"[\s\S]*id="setAvatarButton"/);
     expect(html).toMatch(/Mint \.ath name[\s\S]*100-10k ATH \+ GRAM fee/);
@@ -1175,8 +1172,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function writeProfileAvatarMediaCache'),
     );
     const avatarReadSource = app.slice(
-      app.indexOf('async function readAvatarPartsFromCapsuleHub'),
-      app.indexOf('async function loadProfileAvatarImage'),
+      app.indexOf('async function readAvatarPartsFromShard'),
+      app.indexOf('function avatarPartStreamId'),
     );
     const hydrateSource = app.slice(
       app.indexOf('async function hydrateThreadAvatarFromPointer'),
@@ -1307,14 +1304,15 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/const sender = await provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
     expect(syncSource).toMatch(/return \[recipient, sender\]/);
 
-    // Spot-check the ProfileRegistry route verifier (runs twice per avatar op) reads its two checks sequentially.
-    const profileRouteSource = app.slice(
-      app.indexOf('function requireProfileRegistryVaultRoute('),
+    // Spot-check the UsernameRegistry route verifier reads its two checks sequentially. (Its ProfileRegistry twin
+    // went with the Vault avatar path — direct pay does no route read at all.)
+    const usernameRouteSource = app.slice(
       app.indexOf('function requireUsernameRegistryVaultRoute('),
+      app.indexOf('function requireUsernameRegistryVaultRouteForOwnVaultAction('),
     );
-    expect(profileRouteSource).not.toMatch(/Promise\.all\(/);
-    expect(profileRouteSource).toMatch(/const registryGlobal = await resolved\.provider\.getGlobal/);
-    expect(profileRouteSource).toMatch(/const derivedOfficialWallet = await resolved\.provider\.getAthWalletAddress/);
+    expect(usernameRouteSource).not.toMatch(/Promise\.all\(/);
+    expect(usernameRouteSource).toMatch(/const registryGlobal = await provider\.getGlobal/);
+    expect(usernameRouteSource).toMatch(/const derivedOfficialWallet = await provider\.getAthWalletAddress/);
   });
 
   it('PWA-CONFIG-01D2: publish path confirms fresh chain price increases before sendBoc', () => {
@@ -1388,28 +1386,13 @@ describe('PWA runtime config guard', () => {
     // preflight (and its in-flight retry table) belonged to the deleted Vault submit phase.
     expect(app).toMatch(/setProfileAvatarPending\(true\)/);
     expect(app).not.toMatch(/PROFILE_AVATAR_PREFLIGHT_RETRY_DELAYS_MS/);
-    // Recovery auto-retry is capped → parks at a retryable terminal state (no infinite "confirming").
-    const scheduleSource = app.slice(
-      app.indexOf('function scheduleProfileAvatarPublishRecovery'),
-      app.indexOf('async function findProfileAvatarPublishedEntriesFromRecovery'),
-    );
-    expect(scheduleSource).toMatch(/job\.attempts \?\? 0\) >= PROFILE_AVATAR_RECOVERY_MAX_AUTO_ATTEMPTS/);
-    expect(scheduleSource).toMatch(/job\.status = 'needs_retry'/);
-    // Recovery timers paused on wallet lock, resumed owner-scoped on unlock (kills the spontaneous re-fire).
-    expect(app).toMatch(/function pauseProfileAvatarPublishRecoveryTimers/);
-    expect(app).toMatch(/function resumeProfileAvatarPublishRecoveryForOwner/);
-    expect(app).toMatch(/resumeProfileAvatarPublishRecoveryForOwner\(wallet\.address\)/);
-    const lockSource = app.slice(
-      app.indexOf('function lockPlathoWallet'),
-      app.indexOf('function lockPlathoWalletForBackground'),
-    );
-    expect(lockSource).toMatch(/pauseProfileAvatarPublishRecoveryTimers\(\)/);
-    // Confirm reads target the known first entry id before the wide latest-down scan.
-    const findSource = app.slice(
-      app.indexOf('async function findPublishedAvatarEntries'),
-      app.indexOf('async function findConfirmedAvatarEntriesFromPublishState'),
-    );
-    expect(findSource).toMatch(/const targetedStart = publicEntryIdBigInt\(pointer\.avatarEntryId/);
+    // The whole publish-recovery subsystem (persisted job, capped auto-retry, lock/unlock timer pause+resume,
+    // entry-scan confirm) went with the Vault avatar path. It existed because a Vault publish could land
+    // half-confirmed and needed healing across sessions; a direct publish is ONE wallet transfer that either
+    // lands or throws, so there is no job to persist and no timer to pause. Fail closed on any comeback.
+    expect(app).not.toMatch(/ProfileAvatarPublishRecovery/);
+    expect(app).not.toMatch(/profileAvatarRecoveryTicksInFlight|profileAvatarInlineSubmitKeys/);
+    expect(app).not.toMatch(/platho\.profile\.avatar\.publishRecovery/);
   });
 
   it('PWA-PRIVATE-CONFIRM-RETRY-01: stuck multi-part private confirm is bounded and ends in a durable terminal red status', () => {
@@ -2721,7 +2704,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function shouldOpenWalletUnlockPrompt'),
     );
     const profileSource = app.slice(
-      app.indexOf('async function submitVaultProfileAvatarRegistration'),
+      app.indexOf('async function submitVaultUsernameMint'),
       app.indexOf('async function refreshWalletTonBalanceForProfile'),
     );
     const submitSource = app.slice(
@@ -2765,7 +2748,6 @@ describe('PWA runtime config guard', () => {
     expect(swSource).toMatch(/window\.location\.reload\(\)/);
     expect(swSource).toMatch(/reloadForPendingServiceWorkerAppShellUpdate\(\)/);
     expect(swSource).toMatch(/function schedulePendingServiceWorkerAppShellReload/);
-    expect(profileSource).toMatch(/async function submitVaultProfileAvatarRegistration[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).toMatch(/async function submitVaultMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).not.toMatch(/async function submitUsernameRegistryMessage/);
@@ -3169,10 +3151,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function syncPrivateCapsulesFromChain'),
       app.indexOf('async function syncPrivateCapsulesFromChainOnce'),
     );
-    const avatarSource = app.slice(
-      app.indexOf('async function readAvatarPartsFromCapsuleHub'),
-      app.indexOf('async function waitForProfileAvatarRegistryUpdate'),
-    );
     const confirmationSource = app.slice(
       app.indexOf('async function confirmCapsuleHubPublishEntries'),
       app.indexOf('function vaultSendBocRequestTimeoutMs'),
@@ -3200,7 +3178,9 @@ describe('PWA runtime config guard', () => {
     expect(helperSource).toMatch(/verify:\s*false/);
     expect(helperSource).toMatch(/allowUnverifiedCriticalRead:\s*true/);
 
-    for (const source of [publicSyncSource, avatarSource]) {
+    // The avatar reader dropped out of this pair with the Hub: the AVATAR shard reader takes no Hub read
+    // options at all (it reads the owner's own shard, verified by sha256 against the paid pointer).
+    for (const source of [publicSyncSource]) {
       expect(source).toMatch(/const readOptions = criticalCapsuleHubReadOptions\(address\)/);
       expect(source).not.toMatch(/capsuleHubMessageSyncReadOptions\(address\)/);
       expect(source).toMatch(/provider\.getState\(readOptions\)/);
@@ -3215,7 +3195,6 @@ describe('PWA runtime config guard', () => {
     expect(privateSyncSource).toMatch(/provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
     expect(publicSyncSource).toMatch(/provider\.getPublicEntry\(entryIdValue, readOptions\)/);
     expect(privateSyncSource).toMatch(/provider\.getPrivateEntry\(entryId, readOptions\)/);
-    expect(avatarSource).toMatch(/provider\.getPublicEntry\(entryId, readOptions\)/);
     expect(confirmationSource).toMatch(/async function confirmCapsuleHubPublishEntriesWithReadMode/);
     expect(app).toMatch(/function capsuleHubConfirmationProviderCandidates/);
     expect(app).toMatch(/createCapsuleHubTonRpcProvider\(\{ capsuleHubAddress: address, transport: item \}\)/);
@@ -3297,10 +3276,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function runPrivatePublishConfirmationRetry'),
       app.indexOf('function hasPendingPrivatePublishConfirmation'),
     );
-    const avatarFinalizeSource = app.slice(
-      app.indexOf('async function finalizeProfileAvatarUpdate'),
-      app.indexOf('async function runProfileAvatarPublishRecovery'),
-    );
 
     expect(strictSource).toMatch(/const readOptions = publishConfirmReadOptions\(address, options\)/);
     expect(app).toMatch(/function publishConfirmReadOptions\(address, options = \{\}\)[\s\S]*const out = criticalCapsuleHubReadOptions\(address\)/);
@@ -3339,9 +3314,8 @@ describe('PWA runtime config guard', () => {
     expect(retrySource).toMatch(/const softVerification = isTonRpcRecoverableReadError\(error\)/);
     expect(retrySource).toMatch(/if \(!rateLimited && !softVerification\) console\.error\(error\)/);
     expect(retrySource).toMatch(/message\.privatePublishConfirmLastResult = softVerification \? 'rpc delayed' : 'error'/);
-    // The v698 mobilized-confirm loop lived in the Vault avatar submit phase (deleted at cutover — a direct
-    // publish is confirmed by its own wallet transfer). The finalize leg still pins the paid pointer fields.
-    expect(avatarFinalizeSource).toMatch(/avatarEntryId: confirmed\.firstEntryId/);
+    // The whole Vault avatar confirm ladder (mobilized loop + finalize + entry-scan recovery) went at cutover:
+    // a direct avatar publish is confirmed by its own wallet transfer — see PWA-CONFIG-06B.
   });
 
   it('RT-PWA-CAPS-001B: private sync repair confirms stale pending parts by payload hashes', () => {
@@ -3422,7 +3396,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const routeSource = app.slice(
       app.indexOf('function assertCapsuleHubGlobalMatchesConfig'),
-      app.indexOf('async function requireProfileRegistryVaultRoute'),
+      app.indexOf('async function requireUsernameRegistryVaultRoute'),
     );
     const prepareSource = app.slice(
       app.indexOf('async function prepareCapsulesThroughVault'),
@@ -3704,8 +3678,10 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
       app.indexOf('async function submitUsernameMintDirect'),
     );
+    // The avatar registration external is gone (direct pay), so only the username mint external is left in this
+    // slice — it still has to handle an ambiguous broadcast before any finality read.
     const profileSource = app.slice(
-      app.indexOf('async function submitVaultProfileAvatarRegistration'),
+      app.indexOf('async function submitVaultUsernameMint'),
       app.indexOf('async function refreshWalletTonBalanceForProfile'),
     );
     const usernameFlow = app.slice(
@@ -3725,13 +3701,11 @@ describe('PWA runtime config guard', () => {
     expect(helperSource).toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n/);
     expect(helperSource).toMatch(/if \(ambiguousBroadcast \|\| result\) \{[\s\S]*nonceWaitError = error;[\s\S]*\} else \{[\s\S]*throw error;/);
     expect(helperSource).toMatch(/confirmationPending: Boolean\(nonceWaitError\)/);
-    expect(profileSource).toMatch(/async function submitVaultProfileAvatarRegistration[\s\S]*submitVaultAuthExternalWithNonceConfirmation/);
     expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*submitVaultAuthExternalWithNonceConfirmation/);
     expect(keyRotateSource).toMatch(/submitVaultAuthExternalWithNonceConfirmation/);
     expect(keyRotateSource).toMatch(/submission\.confirmationPending \? t\('vault\.keyUpdateSubmittedConfirming'\) : t\('vault\.keyUpdateSent'\)/);
     expect(EN_STRINGS['vault.keyUpdateSubmittedConfirming']).toBe('key update submitted, confirming');
     expect(EN_STRINGS['vault.keyUpdateSent']).toBe('key update sent');
-    expect(profileSource).toMatch(/await waitForProfileAvatarRegistryUpdate\(owner, avatarHash\)/);
     expect(usernameFlow).toMatch(/autoLinkMintedUsername\(username, owner,/);
     // General single-external ambiguous-broadcast guards (shared by every signed Vault external — the
     // definitive per-receiver nonce-reject codes + the provider's prior-delivery-ambiguous flag).
@@ -3792,15 +3766,13 @@ describe('PWA runtime config guard', () => {
     );
     const capsuleRoute = app.slice(
       app.indexOf('async function requireCapsuleHubVaultRouteForPublish'),
-      app.indexOf('async function requireProfileRegistryVaultRoute'),
-    );
-    const profileRoute = app.slice(
-      app.indexOf('async function requireProfileRegistryVaultRouteForOwnVaultAction'),
       app.indexOf('async function requireUsernameRegistryVaultRoute'),
     );
+    // The ProfileRegistry Vault route is gone with the Vault avatar path (direct pay reads the registry address
+    // from config + manifest, never from the Vault global) — only the Hub and username routes remain.
     const usernameRoute = app.slice(
       app.indexOf('async function requireUsernameRegistryVaultRouteForOwnVaultAction'),
-      app.indexOf('async function assertVaultProfileAvatarCanStart'),
+      app.indexOf('async function assertVaultUsernameMintCanStart'),
     );
     const registerSource = app.slice(
       app.indexOf('async function submitVaultRegisterMessagingKeys'),
@@ -3851,7 +3823,6 @@ describe('PWA runtime config guard', () => {
     expect(canonicalHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
     expect(canonicalHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
     expect(capsuleRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
-    expect(profileRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(usernameRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(registerSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
     expect(nonceReadSource).toMatch(/callWithDegradedTransportReadFallback\(/);
@@ -4151,14 +4122,6 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-CONFIG-06: public CapsuleHub sync skips malformed entries per entry', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const readAvatarPartsSource = app.slice(
-      app.indexOf('async function readAvatarPartsFromCapsuleHub'),
-      app.indexOf('async function findPublishedAvatarEntries'),
-    );
-    const findAvatarPartsSource = app.slice(
-      app.indexOf('async function findPublishedAvatarEntries'),
-      app.indexOf('async function waitForProfileAvatarRegistryUpdate'),
-    );
     const syncPublicSource = app.slice(
       app.indexOf('async function syncPublicChannelFromChain'),
       app.indexOf('async function syncPublicChannels'),
@@ -4167,15 +4130,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function tryReadPublicEntryPayload/);
     expect(app).toMatch(/Skipping malformed public CapsuleHub entry/);
     expect(app).toMatch(/Skipping unreadable public CapsuleHub entry/);
-    expect(readAvatarPartsSource).toMatch(/resolvePublicEntryPayload/);
-    expect(findAvatarPartsSource).toMatch(/resolvePublicEntryPayload/);
+    // The avatar readers dropped out of this guard with the Hub: the AVATAR shard reader parses its own parts
+    // (readPublicPostPayloadV2 straight off the shard message), it does not walk a shared public entry log.
     expect(syncPublicSource).toMatch(/resolvePublicEntryPayload/);
     expect(app).toMatch(/PUBLIC_POST_BODY_MAX_BYTES/);
-    expect(readAvatarPartsSource).toMatch(/maxBytes: PUBLIC_POST_BODY_MAX_BYTES/);
-    expect(findAvatarPartsSource).toMatch(/maxBytes: PUBLIC_POST_BODY_MAX_BYTES/);
     expect(syncPublicSource).toMatch(/maxBytes: PUBLIC_POST_BODY_MAX_BYTES/);
-    expect(readAvatarPartsSource).not.toMatch(/maxBytes: SINGLE_CAPSULE_USEFUL_BYTES/);
-    expect(findAvatarPartsSource).not.toMatch(/maxBytes: SINGLE_CAPSULE_USEFUL_BYTES/);
     expect(syncPublicSource).not.toMatch(/maxBytes: SINGLE_CAPSULE_USEFUL_BYTES/);
     expect(syncPublicSource).toMatch(/const unavailableEntries = \[\]/);
     expect(syncPublicSource).toMatch(/isBodyHistoryUnavailableError\(error\)/);
@@ -4213,8 +4172,6 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).toMatch(/chainVerified: true/);
     expect(app).toMatch(/allowUnverifiedStaticPublicFeeds !== true/);
     expect(app).toMatch(/Public channel feed has no verified CapsuleHub anchors/);
-    expect(readAvatarPartsSource).not.toMatch(/readPublicPostPayload/);
-    expect(findAvatarPartsSource).not.toMatch(/readPublicPostPayload/);
     expect(syncPublicSource).not.toMatch(/readPublicPostPayload/);
   });
 
@@ -6601,18 +6558,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function publicAvatarPartMatchesShard\(payload, ownerWallet, pointer\)/);
   });
 
-  it('PWA-CONFIG-06C: profile avatar direct pointer scan accepts CapsuleHub entry id zero', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const readAvatarPartsSource = app.slice(
-      app.indexOf('async function readAvatarPartsFromCapsuleHub'),
-      app.indexOf('async function findPublishedAvatarEntries'),
-    );
-
-    expect(readAvatarPartsSource).toMatch(/publicEntryIdBigInt\(pointer\.avatarEntryId \?\? pointer\.avatar_entry_id\)/);
-    expect(readAvatarPartsSource).toMatch(/if \(start !== null && start >= 0n\)/);
-    expect(readAvatarPartsSource).not.toMatch(/if \(start !== null && start > 0n\)/);
-    expect(readAvatarPartsSource).toMatch(/for \(let entryId = start; entryId <= start \+ maxExtra; entryId \+= 1n\)/);
-  });
+  // PWA-CONFIG-06C removed with readAvatarPartsFromCapsuleHub: the entry-id cursor it guarded does not exist in
+  // the shard reader, which fetches the owner's AVATAR shard directly (no entry ids at all) and authenticates the
+  // assembled bytes by sha256 against the paid pointer — pinned by PWA-CONFIG-06B.
 
   it('PWA-CONFIG-04AD: production config forbids routing through ANY central RPC proxy/gateway (canonical hosts only)', () => {
     // The real config (Orbs + toncenter.com only) routes through no central proxy, so it is not flagged.
@@ -6680,74 +6628,17 @@ describe('PWA runtime config guard', () => {
     expect(withoutSendEndpoint.findings.map((finding) => finding.id)).toContain('PWA_TON_RPC_EMERGENCY_FALLBACK_REQUIRED');
   });
 
-  it('PWA-AVATAR-PART-SCAN-INTERLEAVE-01: avatar media recovery tolerates heavily interleaved public entries', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const readAvatarPartsSource = app.slice(
-      app.indexOf('async function readAvatarPartsFromCapsuleHub'),
-      app.indexOf('async function findPublishedAvatarEntries'),
-    );
-    const findAvatarPartsSource = app.slice(
-      app.indexOf('async function findPublishedAvatarEntries'),
-      app.indexOf('async function waitForProfileAvatarRegistryUpdate'),
-    );
+  // PWA-AVATAR-PART-SCAN-INTERLEAVE-01 removed with the CapsuleHub avatar readers: interleaving was a Hub
+  // problem (avatar parts scattered among unrelated public entries in ONE shared log). The AVATAR shard holds
+  // only that owner's parts, so there is no scan window to size and no interleaving to tolerate.
 
-    expect(app).toMatch(/const PROFILE_AVATAR_ENTRY_SCAN_PADDING = 2048/);
-    expect(app).toMatch(/const PROFILE_AVATAR_FALLBACK_SCAN_LIMIT = 2048/);
-    expect(readAvatarPartsSource).toMatch(/Math\.max\(PROFILE_AVATAR_ENTRY_SCAN_PADDING/);
-    expect(readAvatarPartsSource).toMatch(/const configuredLimit = Number\(options\.scanLimit \?\? appConfig\.capsuleHub\?\.publicAvatarReadLimit \?\? 0\)/);
-    expect(readAvatarPartsSource).toMatch(/Math\.max\(\s*PROFILE_AVATAR_FALLBACK_SCAN_LIMIT/);
-    expect(readAvatarPartsSource).toMatch(/return \(await assembledAvatarPartGroup\(parts, pointer\)\)\?\.imageUrl \?\? null/);
-    expect(findAvatarPartsSource).toMatch(/Math\.max\(PROFILE_AVATAR_FALLBACK_SCAN_LIMIT, expectedParts \+ PROFILE_AVATAR_ENTRY_SCAN_PADDING\)/);
-    expect(findAvatarPartsSource).toMatch(/avatarPartsCompleteForPointer\(parts, pointer\)/);
-    expect(findAvatarPartsSource).not.toMatch(/parts\.length >= expectedParts/);
-    expect(readAvatarPartsSource).not.toMatch(/parts\.length >= Number\(pointer\.avatarPartCount/);
-    expect(app).toMatch(/if \(hash\.toLowerCase\(\) !== pointer\.avatarHash\.toLowerCase\(\)\) return null/);
-  });
+  // PWA-VPROF-STRICT-ROUTE-01 removed with the Vault avatar route: direct pay has no Vault global to read a
+  // ProfileRegistry route out of — the registry address comes from requireProfileRegistryAddress() (config +
+  // manifest pin) and the payment is a plain ATH transfer, pinned by PWA-CONFIG-06B.
 
-  it('PWA-VPROF-STRICT-ROUTE-01: profile avatar value action fails closed on unverified route reads', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const canStartSource = app.slice(
-      app.indexOf('async function assertVaultProfileAvatarCanStart'),
-      app.indexOf('async function assertVaultUsernameMintCanStart'),
-    );
-    const submitSource = app.slice(
-      app.indexOf('async function submitVaultProfileAvatarRegistration'),
-      app.indexOf('async function readProfileAvatarVaultPaymentFinality'),
-    );
-
-    expect(canStartSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
-    expect(canStartSource).toMatch(/loadConnectedVaultGlobal\(\{ provider, \.\.\.criticalChainReadOptions\(\) \}\)/);
-    expect(canStartSource).toMatch(/requireProfileRegistryVaultRouteForOwnVaultAction\(global\)/);
-    expect(canStartSource).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
-    expect(submitSource).toMatch(/loadConnectedVaultGlobal\(\{ provider, \.\.\.criticalChainReadOptions\(\) \}\)/);
-    expect(submitSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
-    expect(submitSource).toMatch(/requireProfileRegistryVaultRouteForOwnVaultAction\(global\)/);
-    expect(submitSource).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
-    expect(app).toMatch(/async function requireProfileRegistryVaultRouteForOwnVaultAction/);
-    expect(app).toMatch(/async function requireProfileRegistryVaultRouteWithRetry/);
-    expect(app).not.toMatch(/requireProfileRegistryVaultRoute\(global, \{ allowUnverifiedRead: true \}\)/);
-  });
-
-  it('PWA-VPROF-PENDING-FINALITY-01: profile avatar success records Vault pending payment finality separately', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const finalitySource = app.slice(
-      app.indexOf('async function readProfileAvatarVaultPaymentFinality'),
-      app.indexOf('async function submitVaultUsernameMint'),
-    );
-    const submitAvatarSource = app.slice(
-      app.indexOf('async function submitProfileAvatarUpdate'),
-      app.indexOf('async function attemptPrivatePaymentCheckPublish'),
-    );
-
-    expect(finalitySource).toMatch(/pending_profile_avatar_payment_count/);
-    expect(finalitySource).toMatch(/pendingCount > 0n/);
-    expect(finalitySource).toMatch(/vault_pending_profile_avatar_payment_count/);
-    expect(finalitySource).toMatch(/profilePaymentFinality = await readProfileAvatarVaultPaymentFinality\(provider, result\)/);
-    expect(finalitySource).toMatch(/active, Vault payment pending/);
-    expect(finalitySource).toMatch(/profilePaymentPending: profilePaymentFinality\?\.pending === true/);
-    expect(submitAvatarSource).not.toMatch(/auto.*refund/i);
-    expect(submitAvatarSource).not.toMatch(/resubmit/i);
-  });
+  // PWA-VPROF-PENDING-FINALITY-01 removed with the Vault avatar path: there is no two-hop Vault payment to
+  // report as "pending" any more. Under direct pay the 100 ATH request rides the same wallet transfer as the
+  // shard bytes, and the pointer either lands or does not — pinned by PWA-CONFIG-06B.
 
   it('RT-VUSER-001: username mint rejects registered or pending names before signing', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -6838,7 +6729,7 @@ describe('PWA runtime config guard', () => {
     expect(routeSource).toMatch(/UsernameRegistry official ATH wallet ATHMaster binding does not match this app config/);
     const ownRouteSource = app.slice(
       app.indexOf('async function requireUsernameRegistryVaultRouteForOwnVaultAction'),
-      app.indexOf('async function assertVaultProfileAvatarCanStart'),
+      app.indexOf('async function assertVaultUsernameMintCanStart'),
     );
     expect(ownRouteSource).toMatch(/return requireUsernameRegistryVaultRoute\(global\)/);
     expect(ownRouteSource).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
