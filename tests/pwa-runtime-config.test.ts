@@ -1009,24 +1009,15 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/Hold/);
     expect(app).toMatch(/composerEstimatedNetCostNanotons/);
     expect(app).toMatch(/composerProfileNetPriceNanotons/);
-    expect(app).toMatch(/function confirmPublishPriceIncrease/);
-    expect(enCopy).toMatch(/The chain returned a higher fresh price before signing/);
-    expect(enCopy).toMatch(/Send with new price/);
-    expect(app).toMatch(/function confirmHighNetworkFeeSurcharge/);
-    expect(enCopy).toMatch(/High network surcharge/);
-    expect(enCopy).toMatch(/Manual network fee override/);
-    expect(app).toMatch(/requiresHighNetworkFeeSurchargeConfirmation/);
-    expect(app).toMatch(/requiresManualNetworkFeeSurchargeOverride/);
-    expect(app).toMatch(/networkFeeSurchargeExceedsMax/);
-    expect(app).toMatch(/function assertNetworkFeeSurchargeWithinCap/);
-    expect(app).toMatch(/assertNetworkFeeSurchargeWithinCap\(\);[\s\S]*const surcharge = currentNetworkFeeSurchargeNanotons\(\)/);
-    expect(app).toMatch(/composerPublishProfilesForCapsules/);
-    expect(app).toMatch(/function createCapsulePublishState/);
+    // The pre-sign price/surcharge dialogs (confirmPublishPriceIncrease, confirmHighNetworkFeeSurcharge) and the
+    // surcharge cap gate went with the Vault publish trunk: they guarded a REFUNDABLE contract hold quoted at
+    // sign time. A direct-pay part carries a fixed message value, so the composer estimate below is the whole
+    // story and there is nothing to re-confirm between quote and signature.
+    expect(app).not.toMatch(/confirmPublishPriceIncrease|confirmHighNetworkFeeSurcharge|assertNetworkFeeSurchargeWithinCap/);
+    expect(app).not.toMatch(/prepareCapsulesThroughVault|sendPreparedCapsulesThroughVault|publishCapsulesThroughVault/);
     expect(app).toMatch(/function setPublishPartStatus/);
     expect(app).toMatch(/function publishStateBroadcastCount/);
     expect(app).toMatch(/function confirmCapsuleHubPublishEntries/);
-    expect(app).toMatch(/async function prepareCapsulesThroughVault/);
-    expect(app).toMatch(/async function sendPreparedCapsulesThroughVault/);
     expect(app).toMatch(/CAPSULEHUB_PUBLISH_STATUS_CONFIRMED/);
     expect(app).toMatch(/VAULT_PUBLISH_STATUS_PARTIAL/);
     expect(app).toMatch(/`submitted \$\{landed\}\/\$\{total\}`/);
@@ -1315,56 +1306,16 @@ describe('PWA runtime config guard', () => {
     expect(usernameRouteSource).toMatch(/const derivedOfficialWallet = await provider\.getAthWalletAddress/);
   });
 
-  it('PWA-CONFIG-01D2: publish path confirms fresh chain price increases before sendBoc', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const prepareSource = app.slice(
-      app.indexOf('async function prepareCapsulesThroughVault'),
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-    );
-    const publishSource = app.slice(
-      app.indexOf('async function publishCapsulesThroughVault'),
-      app.indexOf('function rememberLocalPublicPost'),
-    );
-    const quoteIndex = prepareSource.indexOf('const quotedProfiles = composerPublishProfilesForCapsules(normalizedCapsules)');
-    const freshIndex = prepareSource.indexOf('const finalNetCost = composerNetCostFromHoldNanotons(finalHold, normalizedCapsules.length, quotedProfiles)');
-    const confirmIndex = prepareSource.indexOf('confirmPublishPriceIncrease');
+  // PWA-CONFIG-01D2 removed with the Vault publish trunk (prepare -> sendPrepared -> publishCapsulesThroughVault).
+  // It pinned the pre-sign canonical-charge re-read and the "Price changed" confirm dialog: a Vault publish was
+  // priced by the contract at sign time, so the quote could move between quote and sign. A direct-pay publish
+  // attaches a FIXED per-part value (publicPublishValueForKind / the conv lane's equivalent) inside one wallet
+  // transfer — there is no canonical charge to re-read and no price to re-confirm. Values are pinned in
+  // tests/public-lane-send.test.ts and tests/public-lane-e2e.test.ts.
 
-    expect(quoteIndex).toBeGreaterThanOrEqual(0);
-    expect(freshIndex).toBeGreaterThan(quoteIndex);
-    expect(confirmIndex).toBeGreaterThan(freshIndex);
-    expect(prepareSource).not.toMatch(/sendVaultExternalBoc/);
-    expect(app).toMatch(/async function readCanonicalPublishChargeForOwnVaultAction/);
-    expect(prepareSource).toMatch(/readCanonicalPublishChargeForOwnVaultAction\(provider, owner, publish\.publish_kind, publish\.size_class, publish\.crypto_suite\)/);
-    expect(prepareSource).toMatch(/throw publishPriceChangeCancelledError\(\)/);
-    expect(publishSource).toMatch(/const prepared = await prepareCapsulesThroughVault\(capsules, options\)/);
-    expect(publishSource).toMatch(/return sendPreparedCapsulesThroughVault\(prepared, options\)/);
-  });
-
-  it('PWA-CONFIG-01D3: multi-capsule price recheck uses the amortized batch hold and confirms only on a net-cost rise', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const prepareSource = app.slice(
-      app.indexOf('async function prepareCapsulesThroughVault'),
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-    );
-    const confirmSource = app.slice(
-      app.indexOf('async function confirmPublishPriceIncrease'),
-      app.indexOf('async function confirmHighNetworkFeeSurcharge'),
-    );
-    // finalHold is the grouped AMORTIZED batch hold (SHARED_BASE once per batch) + per-part surcharge,
-    // matching the actually-signed batchMaxChargeForItems — NOT the per-capsule canonical sum (which
-    // N-counts SHARED_BASE and produced the phantom multi-capsule "Price changed" dialog + over-strict
-    // balance gate).
-    expect(app).toMatch(/batchMaxChargeForItems,\s*\n\s*MAX_BATCH_PARTS,\s*\n\} from '\.\/publish-batch-orchestration\.mjs/);
-    expect(prepareSource).toMatch(/const groupedBatchesForHold = groupPublishItemsIntoBatches\(chargePlans\)/);
-    expect(prepareSource).toMatch(/batchMaxChargeForItems\(batch\.items\)/);
-    expect(prepareSource).toMatch(/\+ surcharge \* BigInt\(normalizedCapsules\.length\)/);
-    expect(prepareSource).toMatch(/if \(balance < finalHold\)/);
-    expect(prepareSource).toMatch(/finalHold,\s+previousNetCost: quotedNetCost/);
-    expect(prepareSource).toMatch(/totalMaxCharge: finalHold/);
-    // The dialog must fire ONLY on a real net-cost increase, never on a refundable hold-only delta.
-    expect(confirmSource).toMatch(/if \(newCost <= oldCost\) return true;/);
-    expect(confirmSource).not.toMatch(/if \(newHold <= oldHold && newCost <= oldCost\) return true;/);
-  });
+  // PWA-CONFIG-01D3 (amortized batch hold) removed with the Vault publish trunk: the shared-base amortization it
+  // guarded existed because one Vault batch external covered N capsules under a single contract charge. Direct
+  // parts each carry their own fixed value, so there is no batch hold to amortize.
 
   it('PWA-AVATAR-PENDING-01: avatar row holds an in-flight lock, retries the preflight truthfully, caps recovery, and pauses timers on lock', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -1509,42 +1460,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/error\?\.code === 'INSUFFICIENT_VAULT_GRAM'\) return 'Insufficient Vault GRAM — top up in Vault, then retry'/);
   });
 
-  it('PWA-SEND-01: publish preparation blocks over-cap network surcharge before send-time BOC signing', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const capSource = app.slice(
-      app.indexOf('function assertNetworkFeeSurchargeWithinCap'),
-      app.indexOf('function messageDiscountUnlocked'),
-    );
-    const prepareSource = app.slice(
-      app.indexOf('async function prepareCapsulesThroughVault'),
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-    );
-    const sendSource = app.slice(
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-      app.indexOf('async function publishCapsulesThroughVault'),
-    );
-    const capIndex = prepareSource.indexOf('assertNetworkFeeSurchargeWithinCap();');
-    const surchargeIndex = prepareSource.indexOf('const surcharge = currentNetworkFeeSurchargeNanotons()');
-    const balanceIndex = prepareSource.indexOf('if (balance < finalHold)');
-    const priceConfirmIndex = prepareSource.indexOf('confirmPublishPriceIncrease');
-    const surchargeConfirmIndex = prepareSource.indexOf('confirmHighNetworkFeeSurcharge');
-    // VPB2: send-time signing builds ONE batch external per grouped batch, not one VPB1 external per capsule.
-    const sendBuildIndex = sendSource.indexOf('await buildBatchExternalFromPublishItems(batch');
-    const sendGroupIndex = sendSource.indexOf('groupPublishItemsIntoBatches(results)');
-
-    expect(capSource).toMatch(/networkFeeSurchargeExceedsMax\(estimate, pricingOptions\)/);
-    expect(capSource).toMatch(/throw new Error\(`Network surcharge/);
-    expect(capSource).toMatch(/exceeds the production cap/);
-    expect(capIndex).toBeGreaterThanOrEqual(0);
-    expect(surchargeIndex).toBeGreaterThan(capIndex);
-    expect(balanceIndex).toBeGreaterThan(surchargeIndex);
-    expect(priceConfirmIndex).toBeGreaterThan(balanceIndex);
-    expect(surchargeConfirmIndex).toBeGreaterThan(priceConfirmIndex);
-    expect(prepareSource).not.toMatch(/buildBatchExternalFromPublishItems/);
-    expect(prepareSource).not.toMatch(/sendVaultExternalBoc/);
-    expect(sendGroupIndex).toBeGreaterThanOrEqual(0);
-    expect(sendBuildIndex).toBeGreaterThan(sendGroupIndex);
-  });
+  // PWA-SEND-01 removed with the Vault publish trunk: the network-surcharge cap gate + high-surcharge confirm
+  // guarded the Vault publish HOLD (contract charge + surcharge, refundable). Direct sends pay plain TON message
+  // value from the wallet, so there is no hold to cap and no surcharge dialog before signing.
 
   it('PWA-SEND-01B: private preflight shows actionable blocked reasons instead of generic send blocked', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -1592,330 +1510,10 @@ describe('PWA runtime config guard', () => {
     expect(submitSource).not.toMatch(/\? messageText : 'Send blocked'/);
   });
 
-  it('PWA-SEND-02: prepared Vault send streams multi-part BOCs back-to-back (non-blocking nonce barrier) and preserves partial state', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const sendSource = app.slice(
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-      app.indexOf('async function publishCapsulesThroughVault'),
-    );
-    const firstBatchGateIndex = sendSource.indexOf('if (batchIndex === 0) {');
-    const nonceReadIndex = sendSource.indexOf('clientNonce = options.allowOwnVaultActionReadFallback === true');
-    const floorNonceIndex = sendSource.indexOf('clientNonce = nonceFloor;');
-    const buildIndex = sendSource.indexOf('batchExternal = await buildBatchExternalFromPublishItems(batch');
-    const sendIndex = sendSource.indexOf('lastResult = postableNow ? await sendVaultExternalBoc(batchExternal)');
-    const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
-    const confirmNonceIndex = sendSource.indexOf('shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)');
-    const watchCreateIndex = sendSource.indexOf('burstNonceWatch = createVaultPublishNonceWatch({');
-    const watchRegisterIndex = sendSource.indexOf('registerVaultPublishNonceWatchTarget(burstNonceWatch, {');
-    const partialIndex = sendSource.indexOf('vaultPublishPartialError');
-    // v756: the SENT -> VAULT_SUBMITTED flip + the barrier install live in the shared burst nonce
-    // watcher (one ~1s 'messages'-priority read stream for the WHOLE burst), not in per-batch pollers.
-    const nonceWatchSource = app.slice(
-      app.indexOf('function createVaultPublishNonceWatch'),
-      app.indexOf('async function readVaultPublishNonceForBroadcastRetry'),
-    );
-    const clientNonceSource = sendSource.slice(
-      sendSource.indexOf('clientNonce = options.allowOwnVaultActionReadFallback === true'),
-      sendSource.indexOf('if (clientNonce === null)'),
-    );
-    const nonceWaitSource = app.slice(
-      app.indexOf('async function waitForVaultPublishNonce'),
-      app.indexOf('async function waitForVaultPublishNonceForOwnVaultAction'),
-    );
-    const ownNonceWaitSource = app.slice(
-      app.indexOf('async function waitForVaultPublishNonceForOwnVaultAction'),
-      app.indexOf('async function readVaultPublishNonceForBroadcastRetry'),
-    );
-
-    expect(firstBatchGateIndex).toBeGreaterThanOrEqual(0);
-    expect(nonceReadIndex).toBeGreaterThan(firstBatchGateIndex);
-    // Batch 0 reads the chain nonce; later batches derive it from the monotonic floor (NO chain read ->
-    // no re-block on the just-installed barrier) so all batches sign + broadcast back-to-back.
-    expect(floorNonceIndex).toBeGreaterThan(nonceReadIndex);
-    expect(sendSource).toMatch(/if \(batchIndex === 0\) \{[\s\S]*?readVaultPublishNonce\(provider, owner\)[\s\S]*?\} else \{\s*clientNonce = nonceFloor;\s*\}/);
-    expect(buildIndex).toBeGreaterThan(nonceReadIndex);
-    expect(sendIndex).toBeGreaterThan(buildIndex);
-    expect(sentStatusIndex).toBeGreaterThan(sendIndex);
-    expect(confirmNonceIndex).toBeGreaterThan(sentStatusIndex);
-    // NON-BLOCKING: every NON-FINAL batch registers its target on the ONE shared burst nonce watcher
-    // (v756 — the old per-batch background pollers ran up to SIX concurrent critical-priority 1s read
-    // streams on a 7-batch send and STARVED the heal send POST in the strict-priority serial pump);
-    // there is NO blocking inter-batch wait. The watcher's completion is the publish nonce barrier.
-    expect(watchCreateIndex).toBeGreaterThan(confirmNonceIndex);
-    expect(watchRegisterIndex).toBeGreaterThan(watchCreateIndex);
-    // NO blocking nonce wait anywhere in the send loop (the old per-batch awaits are gone entirely).
-    expect(sendSource).not.toMatch(/await waitForVaultPublishNonce\(/);
-    expect(sendSource).not.toMatch(/installVaultPublishNonceBarrier\(\(async \(\) => \{/);
-    // A FOLLOWING signed vault action still serializes on the publish nonce barrier.
-    expect(sendSource).toMatch(/await awaitVaultPublishNonceBarrier\(\)/);
-    // Monotonic per-owner nonce floor: a lagging replica must never make the
-    // client sign below an observed/consumed nonce (burst-send race), and a
-    // broadcast consumes its nonce immediately from the client's view.
-    expect(sendSource).toMatch(/const nonceFloor = vaultPublishNonceFloor\(owner\)/);
-    expect(sendSource).toMatch(/if \(clientNonce < nonceFloor\) clientNonce = nonceFloor/);
-    expect(sendSource).toMatch(/raiseVaultPublishNonceFloor\(owner, clientNonce \+ 1n\)/);
-    expect(app).toMatch(/function raiseVaultPublishNonceFloor\(owner, nonce\)/);
-    // Wedged-part recovery: when the chain nonce moved past a signed part and
-    // the sender index proves the entry never landed, the part is reset and
-    // re-signed with a fresh nonce instead of staying "confirming" forever.
-    expect(app).toMatch(/async function recoverDroppedSignedPublishParts\(message\)/);
-    expect(app).toMatch(/async function provePublishPartAbsentFromSenderIndex\(publishState, part\)/);
-    expect(app).toMatch(/confirmedBy:\s*'dropped_recovery_scan'/);
-    expect(app).toMatch(/if \(chainNonce <= clientNonce\) continue/);
-    // The watcher owns the barrier install, the observational 'messages'-priority read (must never
-    // outrank the send POST / heal reads), and the SENT -> VAULT_SUBMITTED flip.
-    expect(nonceWatchSource).toMatch(/installVaultPublishNonceBarrier\(watch\.promise\)/);
-    expect(nonceWatchSource).toMatch(/priority: 'messages'/);
-    expect(nonceWatchSource).toMatch(/ignoreNonceBarrier: true/);
-    expect(nonceWatchSource).toMatch(/verify: false/);
-    expect(nonceWatchSource).toMatch(/if \(part && part\.status === PUBLISH_PART_STATUS_SENT\)/);
-    expect(nonceWatchSource).toMatch(/PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
-    // The watcher signs its timeline flips so a send log attributes them unambiguously.
-    expect(nonceWatchSource).toMatch(/confirmedBy: 'nonce_watch'/);
-    // A completed watch RESTARTS for a late-registering batch (else its target never flips and the
-    // resolved barrier is never re-installed), and a NON-recoverable read error releases the barrier
-    // immediately instead of holding every subsequent vault action to the burst deadline.
-    expect(nonceWatchSource).toMatch(/if \(!watch\.running\) \{\s*watch\.running = true;/);
-    expect(nonceWatchSource).toMatch(/if \(!isTonRpcRecoverableReadError\(error\) && !isTonRpcRateLimitError\(error\)\) return;/);
-    expect(nonceWatchSource).toMatch(/\} finally \{\s*watch\.running = false;\s*\}/);
-    expect(sendSource).toMatch(/readVaultPublishNonceForOwnVaultAction\(provider, owner\)/);
-    expect(clientNonceSource).not.toMatch(/allowUnverifiedNonceRead|allowUnverifiedCriticalRead|verify:/);
-    // VPB2: each part of a batch is stamped with the SHARED batch external boc + a single broadcast timestamp.
-    expect(sendSource).toMatch(/partWithPublishId\.externalBoc = batchExternal\.boc/);
-    expect(sendSource).toMatch(/partWithPublishId\.lastBroadcastAt = broadcastAt/);
-    expect(sendSource).toMatch(/const epi1 = publishHashPlain\(batchExternal\.entryPublishIds\[entryIndex\]\)/);
-    expect(sendSource).toMatch(/batchExternal = await buildBatchExternalFromPublishItems\(batch/);
-    // v623/v764: a POST happens ONLY when the signed nonce IS the chain's next expected one — batches 1+
-    // of a burst (v623) AND batch 0 of a message queued behind in-flight sends (v764, the floor clamp
-    // raised it above the fresh chain read) are signed + stamped SENT but NOT broadcast (a guaranteed
-    // pre-accept 16453 bounce = a doomed request + an alarming native red 500 per queued message); the
-    // idempotent re-broadcast path POSTs each the moment its nonce becomes current.
-    expect(sendSource).toMatch(/const postableNow = batchIndex === 0\s*\n\s*&& observedChainNonce !== null\s*\n\s*&& clientNonce === observedChainNonce;/);
-    expect(sendSource).toMatch(/lastResult = postableNow \? await sendVaultExternalBoc\(batchExternal\) : null/);
-    expect(sendSource).toMatch(/'signed, POST deferred \(queued behind in-flight sends\)'/);
-    // Post-broadcast nonce polling is unverified, cache-bypassing, and
-    // tolerant of transient RPC trouble until the deadline decides.
-    expect(nonceWaitSource).toMatch(/ignoreNonceBarrier: true/);
-    expect(nonceWaitSource).toMatch(/verify: false/);
-    expect(nonceWaitSource).toMatch(/allowUnverifiedCriticalRead: true/);
-    expect(nonceWaitSource).toMatch(/isTonRpcRecoverableReadError\(error\)/);
-    expect(nonceWaitSource).toMatch(/isTonRpcRateLimitError\(error\)/);
-    expect(ownNonceWaitSource).toMatch(/return waitForVaultPublishNonce\(provider, owner, expectedNonce, options\)/);
-    expect(sendSource).toMatch(/clientNonce === null[\s\S]*Vault publish nonce could not be read before signing/);
-    expect(nonceWaitSource).toMatch(/Vault publish was not confirmed after broadcast/);
-    expect(nonceWaitSource).toMatch(/error\.code = 'NETWORK_ERROR'/);
-    expect(sendSource).toMatch(/const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError\(error\)/);
-    expect(sendSource).toMatch(/if \(publishState\.submittedCount > 0 \|\| sentBeforeFailure \|\| ambiguousBroadcast\) publishState\.status = VAULT_PUBLISH_STATUS_PARTIAL/);
-    expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*if \(isTonRpcRateLimitError\(error\)\) return false;/);
-    expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*Number\(error\?\.status \?\? error\?\.response\?\.status \?\? 0\) >= 500/);
-    expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*rejected\|bad request\|invalid boc\|invalid message\|exit code\|not enough vault ton\|nonce/);
-    expect(partialIndex).toBeGreaterThan(watchRegisterIndex);
-    expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{ hot: true, receiptOnly: true \}\)/);
-    expect(sendSource).toMatch(/: VAULT_PUBLISH_STATUS_SUBMITTED/);
-    // v620 AGE-based confirm cadence (sub-second TON chain + toncenter queue pacing): settle 1.5s, active ~1s
-    // while a part is in-flight and young, stretch after the active window. A single delay auto-throttles keyless
-    // via the sequential confirm loop. Give-up is age-based (above) so tight polling never trips a terminal.
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_SETTLE_MS = 1_500/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS = 1_000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS = 60 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS = 15 \* 1000/);
-    expect(app).toMatch(/function publishStateHasLandedUnconfirmedPart\(publishState\)[\s\S]*PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
-    expect(app).toMatch(/function privatePublishConfirmDelayMs\(message, error\)/);
-    // Settle: no knowingly-empty poll before ~one block + the toncenter index can reflect a landing.
-    expect(app).toMatch(/ageMs < PRIVATE_PUBLISH_CONFIRM_SETTLE_MS\) return Math\.max\(250, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS - ageMs\)/);
-    expect(app).toMatch(/ageMs < PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS\) return PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS/);
-    expect(app).toMatch(/return PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS/);
-    expect(app).toMatch(/const delayMs = privatePublishConfirmDelayMs\(message, error\)/);
-    // v618: the toncenter reject reason (raw upstream error.responseBody) is surfaced on a (re-)broadcast failure
-    // instead of the bare native 500 — makes an intermittent broadcast drag diagnosable.
-    expect(app).toMatch(/console\.warn\('\[platho\] vault publish re-broadcast failed'/);
-    expect(app).toMatch(/detail: error\?\.responseBody/);
-    // v622: the INITIAL broadcast catch AND the receipt-read catch also surface the raw toncenter reason, so a bare
-    // "500" on the first send, or a silent slow receipt read, is diagnosable. v759: the EXPECTED back-to-back
-    // pipelining bounce (16453 "too early" for a message queued behind in-flight sends) logs at debug — one per
-    // queued message is noise, not a failure — while every other initial-broadcast error keeps the warn.
-    expect(app).toMatch(/const expectedPipelineBounce = isVaultPublishNonceConsumedError\(error\);/);
-    expect(app).toMatch(/\(expectedPipelineBounce \? console\.debug : console\.warn\)\(/);
-    expect(app).toMatch(/'\[platho\] vault publish broadcast failed'/);
-    expect(app).toMatch(/console\.warn\('\[platho\] vault publish receipt read failed'/);
-    // v759: a batch whose turn has NOT come (fresh read: currentNonce < clientNonce) clears its STALE
-    // initial-bounce part.error — a merely-queued message must never trip the 2-minute broadcast-failing
-    // terminal (false red "RPC broadcast unavailable" on quick sends queued behind an 8-cap burst).
-    expect(app).toMatch(/if \(currentNonce !== null && currentNonce < clientNonce\) \{[\s\S]{0,900}part\.error = null;[\s\S]{0,200}clearedStaleError = true;/);
-    // v624: the Vault auth external broadcast path without a [platho] warn now also surfaces the toncenter
-    // reason, so NO broadcast 500 can be a bare mystery on any path.
-    expect(app).toMatch(/console\.warn\('\[platho\] vault auth external broadcast failed'/);
-    // v626: toncenter "duplicate message" on a re-broadcast = the same BoC is ALREADY queued (in flight) -> arm
-    // the 35s cooldown via broadcastDuplicateRelayCount, but do NOT burn a broadcastRetryCount slot: a duplicate
-    // proves "queued", not "relayed" — burning the 6-slot budget on duplicates left an ACKed-but-undelivered
-    // send with NO further re-POSTs after ~3.5min (the multi-minute stall).
-    expect(app).toMatch(/function isTonBroadcastDuplicateMessageError\(error\)[\s\S]*duplicate message/);
-    expect(app).toMatch(/isTonBroadcastDuplicateMessageError\(error\)[\s\S]*broadcastDuplicateRelayCount: duplicateRelayCount \+ 1,\s*lastBroadcastAt: duplicateAt/);
-    const duplicateBranch = app.slice(app.indexOf('if (isTonBroadcastDuplicateMessageError(error))'), app.indexOf('const retryError = shortUiErrorText(error'));
-    expect(duplicateBranch).not.toMatch(/broadcastRetryCount/);
-    // v625: the wallet transfer path (platho-wallet.mjs) also warns with the toncenter reason.
-    const walletModule = readFileSync('web/platho-wallet.mjs', 'utf8');
-    expect(walletModule).toMatch(/console\.warn\('\[platho\] wallet external broadcast failed'/);
-    // v626: 16453 on a re-broadcast is a toncenter FLEET RACE (the send node lags the read pool), NOT landing
-    // proof — the v621 "16453 => VAULT_SUBMITTED" branch permanently orphaned the 2nd capsule of a multi-capsule
-    // send. The part stays SENT with a short race cooldown; only a fresh nonce READ (currentNonce > clientNonce)
-    // may mark it VAULT_SUBMITTED.
-    expect(app).toMatch(/function isVaultPublishNonceConsumedError\(error\)[\s\S]*\\b16453\\b/);
-    expect(app).toMatch(/currentNonce !== null && isVaultPublishNonceConsumedError\(error\)[\s\S]*PUBLISH_PART_STATUS_SENT[\s\S]*broadcastNonceRaceCount: nonceRaceCount \+ 1/);
-    expect(app).not.toMatch(/vault_nonce_consumed/);
-    expect(app).toMatch(/console\.debug\('\[platho\] vault re-broadcast 16453 nonce race/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 3_500/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6/);
-    // v627: early duplicates re-poke at ~4 block-times (sub-second chain) instead of the 35s tail, gated on a
-    // fresh currentNonce === clientNonce read; past the fast limit the conservative 35s tail takes over.
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS = 4_000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT = 6/);
-    expect(app).toMatch(/else if \(duplicateRelayCount > 0\s*&& duplicateRelayCount < PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT\s*&& currentNonce !== null && currentNonce === clientNonce\) \{[\s\S]{0,600}rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS/);
-    expect(app).toMatch(/function clearPublishPartSignedAttempt\(part\)[\s\S]*delete part\.broadcastNonceRaceCount;\s*delete part\.broadcastDuplicateRelayCount;/);
-    expect(app).toMatch(/function resetPublishBroadcastBudgetForManualRetry\(publishState\)[\s\S]*broadcastNonceRaceCount = 0;\s*part\.broadcastDuplicateRelayCount = 0;/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 \* 60 \* 1000/);
-    // Publish + CapsuleHub ACK spans 2-3 basechain blocks; the hot window
-    // covers that so sends do not degrade into the recovery/retry path.
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 25 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 8 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS = 30 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 \* 1000/);
-    expect(app).toMatch(/const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8/);
-    expect(app).toMatch(/async function enterVaultPublishSendLock\(\)/);
-    // Only NON-final batches install a nonce barrier: the final batch's barrier (waiting for the post-burst
-    // nonce, reachable only after the racy last external lands) could hang to its 90s timeout and park the
-    // next signed action. confirmFinalNonce is intentionally no longer honored.
-    expect(app).toMatch(/function shouldConfirmVaultPublishNonceAfterSend\(index, total, options = \{\}\)[\s\S]*return index < total - 1;/);
-    expect(app).not.toMatch(/index < total - 1 \|\| options\.confirmFinalNonce === true/);
-    expect(sendSource).toMatch(/if \(shouldConfirmVaultPublishNonceAfterSend\(batchIndex, batches\.length, options\)\) \{/);
-    // clean-17: the `const publishCallbacks = { ... confirmFinalNonce: true }` call-site literal lived only in the
-    // now-collapsed Vault composer body; the orphaned send machinery it fed is still pinned by this guard until its
-    // follow-up removal batch.
-    // v633: the dead confirmFinalNonce is REMOVED from the public path — the public publish confirm driver
-    // (tests/public-publish-heal.test.ts) owns final-batch heal/confirmation for posts/comments.
-    expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]{0,400}allowOwnVaultActionReadFallback: true \}\);/);
-    // v648: batch K's background nonce watch deadline scales with its burst position (K prior serial
-    // landings first); v756: it is a register-target field, the read options live on the shared watcher.
-    expect(sendSource).toMatch(/timeoutMs: options\.timeoutMs \?\? \(VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS \* \(batchIndex \+ 1\)\),\s*\}\);/);
-    expect(sendSource).toMatch(/createVaultPublishNonceWatch\(\{\s*provider,\s*owner,\s*publishState,\s*requestTimeoutMs: options\.requestTimeoutMs,\s*queueTimeoutMs: options\.queueTimeoutMs,/);
-    expect(sendSource).not.toMatch(/needsQueuedNonce|VAULT_PUBLISH_QUEUE_NONCE_CONFIRM_TIMEOUT_MS/);
-    // v629 mobilization: with max_charge-variant rotation EVERY retry is a REAL broadcast (new root hash beats
-    // all ~60s dedup layers), so the tail is 3.5s and the fast budget is 20 (a ~70s fast window); past it,
-    // healing NEVER silently stops — it degrades to a 30s slow poke bounded by the age terminals.
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 3_500/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS = 30_000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS = 35_000/);
-    expect(app).not.toMatch(/if \(retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT\) continue;/);
-    expect(app).toMatch(/broadcastBudgetExhaustedWarned/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_UNLANDED_POLL_MS = 5 \* 1000/);
-    expect(app).toMatch(/publishPartNeedsBroadcastRetry\(part\)[\s\S]{0,80}\)\) \{\s*return PRIVATE_PUBLISH_CONFIRM_UNLANDED_POLL_MS/);
-    expect(app).toMatch(/publishState\.lastBroadcastRetryNonceReadOkAt = Date\.now\(\)/);
-    expect(app).toMatch(/nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000/);
-    expect(app).toMatch(/console\.info\('\[platho\] send timeline'/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 20/);
-    // v629 max_charge-variant rotation: every retry rotates a pre-signed variant so it is a REAL broadcast.
-    const pwaContractTx = readFileSync('web/pwa-contract-transactions.mjs', 'utf8');
-    expect(pwaContractTx).toMatch(/export async function buildBatchPublishExternalVariants/);
-    expect(app).toMatch(/partWithPublishId\.externalBocVariants = batchExternal\.variants/);
-    expect(app).toMatch(/variantBocs \? variantBocs\[primaryIndex\] : head\.externalBoc/);
-    // v631: ONE send per pass (the v630 3-variant burst REGRESSED ~50s→~100s on-device: the serial per-IP pump
-    // queued the extra ~47KB uploads ahead of the next pass's main send/reads → 8s timeouts + unexplained red
-    // 500s from post-landing stragglers). The variant window advances on the SUM of per-pass counters
-    // (retryCount doesn't advance on race/duplicate branches) so every pass still fires a FRESH variant.
-    expect(app).not.toMatch(/PRIVATE_PUBLISH_BROADCAST_BURST_COUNT/);
-    expect(app).toMatch(/const broadcastPassIndex = retryCount \+ duplicateRelayCount \+ nonceRaceCount \+ timeoutAbortCount/);
-    expect(app).toMatch(/const primaryIndex = variantBocs \? \(1 \+ broadcastPassIndex\) % variantBocs\.length : 0/);
-    // v755: a large-media external's sendBoc ceiling scales with its wire size (+1s/4KB, capped at the
-    // queue tier) — the flat 8s heal ceiling client-aborted every ~47KB POST during a toncenter slow
-    // spell, an endless zero-progress loop. The base mirrors the transport default via IMPORT (not a
-    // hand-copied literal), and a client-aborted (TIMEOUT) POST stamps a dedicated counter so the next
-    // pass paces on the short cooldown and rotates to a fresh max_charge variant.
-    expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS = 1_000/);
-    // The heal queue tier carries a +15s margin OVER the max POST ceiling, so a pass enqueued right
-    // after ANOTHER driver's max-size POST started survives that hold instead of losing the race to
-    // its own queue budget at exactly the boundary.
-    expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_MAX_MS = 30 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = VAULT_SEND_BOC_TIMEOUT_MAX_MS \+ 15 \* 1000/);
-    expect(app).toMatch(/const VAULT_SEND_BOC_TIMEOUT_BASE_MS = TON_RPC_REQUEST_TIMEOUT_MS/);
-    expect(app).toMatch(/request\.requestTimeoutMs = vaultSendBocRequestTimeoutMs\(built\.boc, options\.requestTimeoutMs \?\? options\.timeoutMs\)/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT = 6/);
-    expect(app).toMatch(/broadcastTimeoutAbortCount: timeoutAbortCount \+ 1/);
-    // v755: callSend's operation bound adds the queue allowance so a busy serial pump cannot eat the
-    // upload budget (the fetch itself stays bounded by requestTimeoutMs via its own AbortController).
-    const vaultRpcProviderSrc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
-    expect(vaultRpcProviderSrc).toMatch(/const operationTimeoutMs = requestTimeoutMs > 0 \? requestTimeoutMs \+ queueAllowanceMs : 0/);
-    expect(vaultRpcProviderSrc).toMatch(/export const TON_RPC_REQUEST_TIMEOUT_MS = 15_000/);
-    // v756: pump-starvation cures. (1) The heal (re-)broadcast POST is CRITICAL priority — at
-    // 'background' it starved behind the continuous read stream of a multi-batch send (QUEUE_TIMEOUT
-    // on every pass, zero wire time). (2) The pump's strict-priority queue AGES waiting tasks one
-    // class per 5s so no class can be starved unboundedly. (3) QUEUE_TIMEOUT is a transient error
-    // (local congestion — the request never left the device), not a scary thrown one.
-    const healSendOptionsSource = app.slice(
-      app.indexOf('async function retryUnconfirmedVaultPublishBroadcasts'),
-      app.indexOf('async function retryUnconfirmedPrivatePublishBroadcasts'),
-    );
-    expect(healSendOptionsSource).toMatch(/const sendOptions = \{[\s\S]{0,900}priority: 'critical',\s*\}/);
-    expect(healSendOptionsSource).not.toMatch(/priority: 'background'/);
-    // v757: the nonce-derived flip only LIFTS not-yet-confirmed parts — a concurrent receipt confirm
-    // must never be DOWNGRADED back to vault_submitted by a pass working off a stale group snapshot.
-    expect(healSendOptionsSource).toMatch(/if \(part\.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED\) continue;/);
-    expect(vaultRpcProviderSrc).toMatch(/const TONCENTER_QUEUE_AGING_STEP_MS = 5_000/);
-    // Aging floors at weight 1: aged observational herds must never tie with (and FIFO-beat) a FRESH
-    // interactive critical read that arrives right after a long POST frees the pump.
-    expect(vaultRpcProviderSrc).toMatch(/const TONCENTER_QUEUE_AGING_FLOOR_WEIGHT = 1/);
-    expect(vaultRpcProviderSrc).toMatch(/function toncenterEffectiveTaskWeight\(task, now\)/);
-    expect(vaultRpcProviderSrc).toMatch(/task\.priorityWeight - Math\.floor\(waitedMs \/ TONCENTER_QUEUE_AGING_STEP_MS\)/);
-    expect(vaultRpcProviderSrc).toMatch(/Math\.max\(Math\.min\(task\.priorityWeight, TONCENTER_QUEUE_AGING_FLOOR_WEIGHT\), agedWeight\)/);
-    expect(app).toMatch(/\|\| error\?\.code === 'QUEUE_TIMEOUT'/);
-    // v629: the ~16×47KB variant BoCs are STRIPPED before persisting to encrypted history (else every status
-    // notify would re-encrypt+write ~1.5MB — a latency regression). In-memory rotation keeps them.
-    expect(app).toMatch(/function publishStateForHistory\(publishState\)/);
-    expect(app).toMatch(/publishState: publishStateForHistory\(message\.publishState\)/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS = 30 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS = 60 \* 1000/);
-    expect(app).toMatch(/async function retryUnconfirmedVaultPublishBroadcasts\(publishState, options = \{\}\)/);
-    expect(app).toMatch(/async function retryUnconfirmedPrivatePublishBroadcasts\(publishState, options = \{\}\)[\s\S]*retryUnconfirmedVaultPublishBroadcasts\(publishState, options\)/);
-    expect(app).toMatch(/queueTimeoutMs: options\.queueTimeoutMs \?\? PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS/);
-    expect(app).toMatch(/queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS/);
-    expect(app).toMatch(/readVaultPublishNonceForBroadcastRetry\(provider, owner, \{/);
-    // VPB2: broadcast-retry re-sends each batch's SHARED external once (keyed off the head part of the batch
-    // group); v629 rotates a pre-signed max_charge variant so each retry is a REAL broadcast.
-    expect(app).toMatch(/result = await sendVaultExternalBoc\(\{ boc: retryBoc \}, sendOptions\)/);
-    expect(app).toMatch(/queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS/);
-    expect(app).toMatch(/skipIfRateLimited:\s*true/);
-    expect(app).toMatch(/lastBroadcastRetryError/);
-    expect(app).toMatch(/setPublishPartStatus\(publishState, part\.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
-    expect(app).toMatch(/clearPublishPartSignedAttempt\(part\)/);
-    expect(app).toMatch(/currentNonce !== null && currentNonce > clientNonce[\s\S]*PUBLISH_PART_STATUS_VAULT_SUBMITTED/);
-    // Fix 1: the keyless broadcast-retry nonce read ignores the publish-nonce barrier, so the healing
-    // re-broadcast is never dead-locked behind the very barrier it exists to clear.
-    expect(app).toMatch(/async function readVaultPublishNonceForBroadcastRetry\(provider, owner, options = \{\}\)[\s\S]*ignoreNonceBarrier: true/);
-    // Fix 3: the FIRST re-broadcast of a proven-not-landed external (chain nonce sits exactly at its nonce)
-    // skips the 35s cooldown; repeat attempts keep it. Collapses the residual second-capsule delay.
-    // v626: the cooldown is race-aware — zero on the very first heal, the short race cooldown while 16453
-    // fleet-race bounces are fresh, and the full 35s otherwise (repeat relays / duplicates).
-    // v755: timeout-aborted POSTs join the ladder — zero-cooldown requires a clean timeout history too,
-    // the short race cooldown paces fresh timeout-aborts, and the 35s tail takes over past their limit.
-    expect(app).toMatch(/let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;\s*if \(pastFastBudget\) \{\s*rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS;\s*\} else if \(retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce\) \{\s*if \(nonceRaceCount === 0 && timeoutAbortCount === 0\) rebroadcastCooldownMs = 0;\s*else if \(nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT\s*&& timeoutAbortCount < PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT\) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;/);
-    expect(app).toMatch(/duplicateRelayCount >= PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT\s*\|\| nonceRaceCount >= PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT\s*\|\| timeoutAbortCount >= PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT[\s\S]{0,400}rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS/);
-    expect(app).toMatch(/if \(publishPartLastBroadcastAgeMs\(head\) < rebroadcastCooldownMs\) continue/);
-    expect(app).not.toMatch(/function markPublishPartForFreshNonceRetry/);
-    expect(app).not.toMatch(/fresh nonce retry required/);
-    expect(app).toMatch(/await retryUnconfirmedPrivatePublishBroadcasts\(message\.publishState, \{/);
-    expect(app).toMatch(/rebroadcast=\$\{broadcastRetries\}/);
-    expect(app).toMatch(/Retrying unsent capsule parts/);
-    expect(app).toMatch(/function stopPrivatePublishConfirmationRetry/);
-    expect(app).toMatch(/privatePublishConfirmStopped = true/);
-    expect(app).toMatch(/not confirmed: chain lookup timed out/);
-    expect(app).toMatch(/message\?\.privatePublishConfirmStopped !== true/);
-    expect(app).toMatch(/function resumePendingPrivatePublishConfirmations/);
-    expect(app).toMatch(/hasPendingPrivatePublishConfirmation\(message\)/);
-    expect(app).toMatch(/privatePublishConfirmJobs\.has\(existingKey\)/);
-    expect(app).toMatch(/resumePendingPrivatePublishConfirmations\(\)/);
-  });
+  // PWA-SEND-02 removed with the Vault publish trunk: it pinned the multi-batch Vault external stream (nonce
+  // barrier, per-batch partial state, buildBatchExternalFromPublishItems). Direct sends are wallet transfers
+  // chunked by chunkWalletMessages (byte-aware, pinned in tests/platho-wallet.test.ts) with wallet seqno as the
+  // ordering primitive — no publish nonce and no per-batch external to stream.
 
   it('PWA-SEND-02B: pending publish status renders as confirming/retrying, not scary partial failure', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -1962,10 +1560,6 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-SEND-02C: partial private send retries unsent capsule parts', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const sendSource = app.slice(
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-      app.indexOf('async function publishCapsulesThroughVault'),
-    );
     const settleSource = app.slice(
       app.indexOf('async function settlePrivateComposerSendError'),
       app.indexOf('async function runPrivateSendRetry'),
@@ -2001,12 +1595,14 @@ describe('PWA runtime config guard', () => {
     );
     expect(staleRetrySource).not.toMatch(/parts\.length <= 1/);
     expect(staleRetrySource).not.toMatch(/confirmedCount <= 0/);
-    // VPB2: the already-attempted skip is evaluated per BATCH — a batch whose items were all already attempted
-    // (e.g. on a partial-retry pass) keeps its state and is skipped without re-sending the shared external.
-    expect(sendSource).toMatch(/const pendingItems = batch\.items\.filter\(\(item\) => !publishPartAlreadyAttempted\(publishState\.parts\?\.\[item\.partIndex\]\)\)/);
-    // VPB2 atomic batch: send only when EVERY item is still pending; any already-attempted item means the
-    // whole batch is in-flight and must not be re-sent (which would re-publish + re-charge the attempted parts).
-    expect(sendSource).toMatch(/if \(pendingItems\.length !== batch\.items\.length\) \{[\s\S]*continue;/);
+    // The VPB2 per-batch already-attempted skip (never re-send a batch external whose items were attempted, which
+    // would re-publish and re-charge them) went with the Vault publish trunk. Its direct-pay counterpart is the
+    // wallet-level rule below: an AMBIGUOUS broadcast hands back the signed BOC (error.builtBoc, bound to that
+    // seqno) and the retry re-broadcasts THAT byte-for-byte instead of signing a fresh one — the chain then runs
+    // it at most once. A fresh signature under a new seqno would double-publish a landed message.
+    expect(app).toMatch(/if \(!message\.convDirectSend\?\.boc && error\?\.builtBoc\) message\.convDirectSend = \{ boc: error\.builtBoc/);
+    const walletSend = readFileSync('web/platho-wallet.mjs', 'utf8');
+    expect(walletSend).toMatch(/error\.builtBoc = built\.boc; error\.builtSeqno = seqno;/);
     // clean-17: the live private send is direct-pay (attemptConvMessagePublishDirect); the composer wrapper
     // attemptPrivateComposerMessagePublish no longer carries the Vault capsule-reuse/publishState body, so the
     // former attemptSource assertions (capsule reuse, createCapsulePublishState) were dropped. The orphaned Vault
@@ -2397,12 +1993,16 @@ describe('PWA runtime config guard', () => {
     // Axis A: defer the background auto-lock while a send actively holds the key, bounded by a max grace,
     // set ONCE (never re-armed by later background events) so a wedged send can't pin the wallet unlocked.
     expect(app).toMatch(/const SEND_LOCK_MAX_GRACE_MS = 600 \* 1000/);
-    expect(app).toMatch(/function vaultSendNeedsKeyNow\(\)[\s\S]*vaultPublishSendWaiters > 0 \|\| privateOutboundWorkActive\(\)/);
+    // The Vault publish send-lock counter (vaultPublishSendWaiters) went with the Vault publish trunk; a direct-pay
+    // send signs with the WALLET key inside privateOutboundWork, which is what this now counts.
+    expect(app).toMatch(/function vaultSendNeedsKeyNow\(\)[\s\S]*const needsKey = privateOutboundWorkActive\(\)/);
+    expect(app).not.toMatch(/vaultPublishSendWaiters/);
     expect(app).toMatch(/if \(!needsKey\) vaultSendInFlightUntil = 0/);
     expect(app).toMatch(/if \(vaultSendInFlightUntil === 0\) vaultSendInFlightUntil = now \+ SEND_LOCK_MAX_GRACE_MS/);
     expect(app).toMatch(/function shouldIgnoreTransientWalletLock\(\)[\s\S]*shouldDeferLockForActiveSend\(\)/);
     // Axis C: keyless resume uses the persisted PUBLIC sender address; refuses if a different account unlocked.
-    expect(app).toMatch(/if \(publishState && !publishState\.ownerWallet\) publishState\.ownerWallet = owner/);
+    // (The publishState.ownerWallet STAMP was written by prepareCapsulesThroughVault, which is gone; the reader
+    // below still fails closed on a mismatch and falls back to the live wallet when no stamp is present.)
     expect(app).toMatch(/function resolvePublishOwner\(publishState\)[\s\S]*rawWalletAddress\(live\) !== rawWalletAddress\(stored\)\) return null/);
     expect(app).toMatch(/const owner = options\.owner \?\? resolvePublishOwner\(publishState\);\s*if \(!owner\) return 0/);
     expect(app).toMatch(/owner = resolvePublishOwner\(publishState\);\s*if \(!owner\) return \{ resigned: 0, confirmed: 0 \}/);
@@ -2711,10 +2311,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function submitVaultMessage'),
       app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
     );
-    const prepareSource = app.slice(
-      app.indexOf('async function prepareCapsulesThroughVault'),
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-    );
 
     expect(swSource).toMatch(/async function liveAppRuntimeVersion/);
     expect(swSource).toMatch(/fetch\(`\.\/\?platho_version_check=\$\{Date\.now\(\)\}`/);
@@ -2751,7 +2347,9 @@ describe('PWA runtime config guard', () => {
     expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).toMatch(/async function submitVaultMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).not.toMatch(/async function submitUsernameRegistryMessage/);
-    expect(prepareSource).toMatch(/async function prepareCapsulesThroughVault[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
+    // prepareCapsulesThroughVault (the Vault publish trunk's pre-sign gate) is gone; the direct-pay send surfaces
+    // are gated by publicComposerSendBlocked / privateSendBlockReason above, both of which fail closed on a
+    // pending app-shell reload.
   });
 
   it('PWA-INTERFACE-MATRIX-01: matrix does not claim removed direct identity product actions', () => {
@@ -3089,8 +2687,9 @@ describe('PWA runtime config guard', () => {
     expect(recover).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.CONFIRMED/);
     // The clear+reset (fresh re-sign) happens only after the receipt is missing/EVICTED.
     expect(recover).toMatch(/status !== BATCH_PUBLISH_RECEIPT_STATUS\.EVICTED\) \{\s*\n\s*continue/);
-    // The ambiguous batch catch raises the monotonic nonce floor (cross-path consistency).
-    expect(app).toMatch(/raiseVaultPublishNonceFloor\(owner, batch\.clientNonce \+ 1n\)/);
+    // The ambiguous-broadcast nonce-floor ratchet is still shared by every remaining Vault external path (the
+    // per-BATCH raise lived in the deleted publish trunk).
+    expect(app).toMatch(/raiseVaultPublishNonceFloor\(owner, clientNonce \+ 1n\)/);
   });
 
   it('PWA-SEND-RELIABILITY-01: burst-send hardening — no false-fail, no dual-broadcast, no read storm', () => {
@@ -3155,10 +2754,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function confirmCapsuleHubPublishEntries'),
       app.indexOf('function vaultSendBocRequestTimeoutMs'),
     );
-    const sendPreparedSource = app.slice(
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-      app.indexOf('async function publishCapsulesThroughVault'),
-    );
 
     for (const method of [
       'get_state',
@@ -3214,8 +2809,9 @@ describe('PWA runtime config guard', () => {
     // The CapsuleHub entry-scan strategies never trust unverified critical reads to confirm.
     expect(confirmationSource).not.toMatch(/allowUnverifiedCriticalRead:\s*true/);
     expect(confirmationSource).not.toMatch(/scanAvailableTransports:\s*true/);
-    expect(sendPreparedSource).toMatch(/const softVerification = isTonRpcRecoverableReadError\(error\)/);
-    expect(sendPreparedSource).toMatch(/if \(softVerification \|\| rateLimited\) \{[\s\S]*publishState\.status = VAULT_PUBLISH_STATUS_SUBMITTED;/);
+    // The send-leg's "a soft/rate-limited confirm read must not demote a broadcast batch" rule lived in the
+    // deleted Vault publish trunk; the confirm-side half of it is pinned just above (recoverable read errors and
+    // rate limits are rethrown, never swallowed into a false "not confirmed").
     // The entry-scan recovery matches by payload hashes + publish_id (EPI1) via the 3-arg matcher.
     expect(confirmationSource).toMatch(/publishEntryMatchesPart\(entry, part, \{ allowPublishIdMismatch, requirePublishIdMatch \}\)/);
     // The VPB1 per-message PublishAck history scan is gone; the receipt-ring read replaces it.
@@ -3235,10 +2831,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function publishConfirmCommitScan/);
     expect(app).toMatch(/publishState\.confirmSearch/);
     expect(app).toMatch(/if \(latest > latestSeen\) \{[\s\S]*existing\.nextEntryId = latest > 0n \? String\(latest - 1n\) : null;[\s\S]*existing\.exhausted = false;/);
-    // VPB2: each part's publish_id is the per-entry EPI1 derived by the batch builder (not a VPB1 single-publish id).
+    // VPB2 stamped each part's publish_id with the per-entry EPI1 the BATCH BUILDER derived — that stamping lived
+    // in the deleted Vault publish trunk. The matcher below still honours a stamped publishId when one is present
+    // (allowPublishIdMismatch / requirePublishIdMatch), which is what the remaining confirm paths rely on.
     expect(app).not.toMatch(/async function computeVaultPublishId/);
-    expect(app).toMatch(/const epi1 = publishHashPlain\(batchExternal\.entryPublishIds\[entryIndex\]\)/);
-    expect(app).toMatch(/partWithPublishId\.publishId = epi1/);
     expect(app).toMatch(/function publishEntryMatchesPartPayload\(entry, part\)/);
     expect(app).toMatch(/options\.requirePublishIdMatch === true \|\| expectedPublishId/);
     expect(app).toMatch(/return options\.allowPublishIdMismatch === true/);
@@ -3392,30 +2988,9 @@ describe('PWA runtime config guard', () => {
     expect(resumeSource).toMatch(/!privateMessageHasPublishAttempt\(message\)/);
   });
 
-  it('RT-VCAPS-002: publish preparation preflights CapsuleHub global before signing', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const routeSource = app.slice(
-      app.indexOf('function assertCapsuleHubGlobalMatchesConfig'),
-      app.indexOf('async function requireUsernameRegistryVaultRoute'),
-    );
-    const prepareSource = app.slice(
-      app.indexOf('async function prepareCapsulesThroughVault'),
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-    );
-    const signingIndex = prepareSource.indexOf('return {');
-    const routeIndex = prepareSource.indexOf('requireCapsuleHubVaultRouteForPublish(global)');
-
-    expect(routeSource).toMatch(/global\.sealed !== true/);
-    expect(routeSource).toMatch(/global\.vault_bound !== true/);
-    expect(routeSource).toMatch(/requireManifestHashMatch\(global\.deployment_manifest_hash, 'CapsuleHub'\)/);
-    expect(routeSource).toMatch(/global\.vault_address/);
-    expect(routeSource).toMatch(/CapsuleHub Vault binding does not match this app config/);
-    expect(routeSource).toMatch(/global\.fee_accumulator_address/);
-    expect(routeSource).toMatch(/CapsuleHub FeeAccumulator binding does not match this app config/);
-    expect(routeSource).toMatch(/resolved\.provider\.getState\(readOptions\)/);
-    expect(routeIndex).toBeGreaterThanOrEqual(0);
-    expect(signingIndex).toBeGreaterThan(routeIndex);
-  });
+  // RT-VCAPS-002 removed with the Vault publish trunk: it pinned the CapsuleHub-global preflight before signing a
+  // Vault publish external (sealed / vault_bound / manifest hash / FeeAccumulator binding). A direct publish is
+  // addressed to a shard derived from the wallet + epoch and needs no Hub global read at all.
 
   it('PWA-SEND-18: outbound private work pauses automatic message sync', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -3758,12 +3333,10 @@ describe('PWA runtime config guard', () => {
     );
     const globalHelper = app.slice(
       app.indexOf('async function readConnectedVaultGlobalForOwnVaultAction'),
-      app.indexOf('async function readCanonicalPublishChargeForOwnVaultAction'),
-    );
-    const canonicalHelper = app.slice(
-      app.indexOf('async function readCanonicalPublishChargeForOwnVaultAction'),
       app.indexOf('function delay'),
     );
+    // readCanonicalPublishChargeForOwnVaultAction (the pre-sign contract-price read) went with the Vault publish
+    // trunk — a direct-pay part carries a fixed message value, so nothing reads a canonical charge before signing.
     const capsuleRoute = app.slice(
       app.indexOf('async function requireCapsuleHubVaultRouteForPublish'),
       app.indexOf('async function requireUsernameRegistryVaultRoute'),
@@ -3819,9 +3392,6 @@ describe('PWA runtime config guard', () => {
     expect(globalHelper).toMatch(/loadConnectedVaultGlobal\(\{ provider, \.\.\.criticalChainReadOptions\(\) \}\)/);
     expect(globalHelper).toMatch(/loadConnectedVaultGlobal\(\{ provider, \.\.\.unverifiedCriticalChainReadOptions\(\) \}\)/);
     expect(globalHelper).not.toMatch(/isTonRpcSoftVaultGlobalReadError/);
-    expect(canonicalHelper).toMatch(/verify:\s*true/);
-    expect(canonicalHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
-    expect(canonicalHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
     expect(capsuleRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(usernameRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(registerSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
@@ -4219,8 +3789,8 @@ describe('PWA runtime config guard', () => {
     expect(app.match(/>= publishConfirmNoProgressDeadlineMs\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     // The partial-retry window stays ABOVE the scaled terminal (old relation: 15min = 6min + 9min slack).
     expect(app).toMatch(/publishConfirmNoProgressDeadlineMs\(message\?\.publishState\) \+ 9 \* 60 \* 1000/);
-    // Batch K's background nonce wait scales with its position in the burst.
-    expect(app).toMatch(/VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS \* \(batchIndex \+ 1\)/);
+    // Batch K's position-scaled background nonce wait went with the Vault publish trunk: direct sends order by
+    // wallet seqno (one external per chunk), so there is no publish-nonce queue whose depth needs a scaled wait.
     // ONE message is capped at 8 capsules (= MAX_BATCH_PARTS) on BOTH surfaces — compose-time friendly block +
     // fail-closed asserts on every programmatic path.
     expect(app).toMatch(/const COMPOSER_MAX_MESSAGE_PARTS = MAX_BATCH_PARTS;/);
@@ -5063,8 +4633,8 @@ describe('PWA runtime config guard', () => {
     // INLINE post-broadcast entry-scan (searching for an entry that is not on chain yet, scanning to its deadline).
     // Fix: the inline confirm on the send critical path runs receipt-only; the full receipt+entry-scan confirm runs
     // only in the background retry (schedulePrivatePublishConfirmationRetry), once the entry IS on chain.
-    // The send-leg inline confirm passes receiptOnly:true.
-    expect(app).toMatch(/await confirmCapsuleHubPublishEntries\(publishState, \{ hot: true, receiptOnly: true \}\)/);
+    // The send-leg call site that passed receiptOnly:true was in the deleted Vault publish trunk; the receiptOnly
+    // contract itself stays (below), and it is what any remaining inline confirm must use.
     // The confirm implementation honours receiptOnly by returning right after the fast Vault-receipt confirm, BEFORE
     // resolving the CapsuleHub provider for the entry-scan.
     const fn = app.slice(app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode'), app.indexOf('function isFreshPrivatePublishConfirmation'));
