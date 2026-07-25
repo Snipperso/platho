@@ -3537,8 +3537,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function resolvePaymentCheckRecipientWallet'),
     );
     const capsuleSource = app.slice(
-      app.indexOf('async function createPrivateComposerCapsules'),
-      app.indexOf('function publicPublishDraftFromPayload'),
+      app.indexOf('async function attemptConvMessagePublishDirect'),
+      app.indexOf('async function attemptPrivateComposerMessagePublish'),
     );
     const syncSource = app.slice(
       app.indexOf('async function syncPrivateCapsulesFromChain'),
@@ -3559,7 +3559,7 @@ describe('PWA runtime config guard', () => {
     expect(statusSource).toMatch(/\? \{ text: limitMessage, state: 'short' \}/);
     expect(submitSource).toMatch(/const limitMessage = privateComposerPartLimitMessage\(sendPlan\.length\)/);
     expect(submitSource).toMatch(/privateComposerCostStatus\.textContent = limitMessage/);
-    expect(capsuleSource).toMatch(/assertPrivateComposerPartLimit\(totalParts\)/);
+    expect(capsuleSource).toMatch(/assertPrivateComposerPartLimit\(documentParts\.length\)/);
     expect(syncSource).toMatch(/provider\.getPrivateRecipientIndex\(keyIdIndex, readOptions\)/);
     expect(syncSource).toMatch(/provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
     expect(syncSource).toMatch(/let allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true/);
@@ -3612,17 +3612,23 @@ describe('PWA runtime config guard', () => {
     expect(senderModeUiSource).not.toMatch(/hasActivePlathoAccount\(\)/);
     expect(app).toMatch(/function updatePrivateSenderModeUi\(sendBlockReason = privateSendBlockReason\(\)\)/);
     expect(app).toMatch(/privateSenderModeToggleBlockReason\(sendBlockReason\)/);
-    expect(app).toMatch(/options\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
-    expect(app).toMatch(/const senderUsername = privateSenderUsernameMetadataLabel\(options\)/);
-    expect(app).toMatch(/senderUsername: senderUsername \?\? undefined/);
-    // clean-17: createPrivateComposerCapsules is now only reached by the orphaned Vault composer path (removed from
-    // the live direct-pay send), so its former call-site assertion was dropped; the sender-metadata encoding it
-    // performs is still pinned below (recipientMetadata / senderMetadata / encodeCompactPayload).
+    // clean-17: the anonymous flag (currentPrivateSenderOptions().includeSenderWalletMetadata) is asserted above; the
+    // former createPrivateComposerCapsules internals (the senderMetadata ternary, senderUsername) were removed with the
+    // Vault composer path.
     expect(app).toMatch(/privateComposerSendPlan\(text, attachments, senderOptions, \{ paymentCheck: paymentDraft \}\)/);
-    expect(app).toMatch(/const recipientWallet = requireBasechainAddress\(recipientEntry\?\.walletAddress, 'Recipient wallet'\)/);
-    expect(app).toMatch(/const recipientMetadata = \{[\s\S]*recipientWallet,[\s\S]*\}/);
-    expect(app).toMatch(/encodeCompactPayload\(\{[\s\S]*type: 'document'[\s\S]*\.\.\.senderMetadata[\s\S]*\.\.\.recipientMetadata[\s\S]*reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES/);
-    expect(app).toMatch(/createEncryptedPrivateCapsuleFromPublicBundle[\s\S]*senderRecovery:\s*true/);
+    // clean-17 honest payload invariant: the live direct-pay CONV send (attemptConvMessagePublishDirect) seals to the
+    // peer's KeyShard bundle and NEVER embeds the sender wallet in the capsule payload — the identity is messaging-keys
+    // only, so "omit sender wallet metadata" holds at the payload level regardless of the anonymous toggle. (The removed
+    // Vault composer spread ...senderMetadata{senderWallet} into encodeCompactPayload and stripped it when anonymous.)
+    // NOTE: the sender wallet is still on-chain as the direct-pay fee publisher — pseudonymity is bounded to third
+    // parties (the conversation graph stays hidden), not the recipient. See the pseudonymous-mode privacy memo.
+    const convSendSource = app.slice(
+      app.indexOf('async function attemptConvMessagePublishDirect'),
+      app.indexOf('async function attemptPrivateComposerMessagePublish'),
+    );
+    expect(convSendSource).toMatch(/encodeCompactPayload\(\{\s*type: 'document', bytes: part\.bytes/);
+    expect(convSendSource).not.toMatch(/senderWallet/);
+    expect(convSendSource).not.toMatch(/\.\.\.senderMetadata/);
     expect(identities).toMatch(/const anonymousId = normalizedPeerId\(input\.senderKeyId \?\? input\.keyId\)/);
     expect(identities).toMatch(/id: identity \? recipientThreadId\(identity\) : `peer:\$\{encodeURIComponent\(anonymousId\)\}`/);
     expect(identities).toMatch(/`Anonymous \$\{shortPeerId\(anonymousId\)\}`/);
