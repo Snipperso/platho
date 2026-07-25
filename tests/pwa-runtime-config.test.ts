@@ -3509,6 +3509,21 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 2_500/);
   });
 
+  it('PWA-SEND-18B: keyless direct-pay private send coordinates with sync; a keyed send stays latency-free', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Runtime keyless gate: true ONLY when no toncenter key is active (a rejected key reverts to '').
+    expect(app).toMatch(/function usingKeylessTonRpc\(\) \{\s*\n\s*return !\(globalThis\.plathoToncenterApiKey[\s\S]*globalThis\.plathoTonRpcApiKey[\s\S]*appConfig\.network\?\.tonRpc\?\.apiKey\);/);
+    // The composer send handler pauses sync + yields to an in-flight pass ONLY on the keyless budget (a keyed send
+    // skips both — no added latency); the pause is released in a finally so it can never wedge sync off.
+    expect(app).toMatch(/const keylessBudget = usingKeylessTonRpc\(\);\s*\n\s*const endPrivateOutboundWork = keylessBudget \? beginPrivateOutboundWork\(\) : null;/);
+    expect(app).toMatch(/if \(keylessBudget && privateChainSyncPromise\) \{[\s\S]*Promise\.race\(\[[\s\S]*PRIVATE_SEND_SYNC_WAIT_CAP_MS/);
+    expect(app).toMatch(/await attemptPrivateComposerMessagePublish\(sendContext\);[\s\S]{0,220}?finally \{\s*\n\s*if \(endPrivateOutboundWork\) endPrivateOutboundWork\(\);/);
+    // The direct-pay delivery confirm read (armConvDeliveryConfirm -> runConvDeliveryConfirm) pauses sync for THAT
+    // read only (bounded, per spaced tick) on the keyless budget — never the whole 24h re-arm window.
+    expect(app).toMatch(/const endConfirmOutboundWork = usingKeylessTonRpc\(\) \? beginPrivateOutboundWork\(\) : null;/);
+    expect(app).toMatch(/if \(endConfirmOutboundWork\) endConfirmOutboundWork\(\);/);
+  });
+
   it('PWA-MSG-01: default public sync window covers the maximum public multipart image', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
