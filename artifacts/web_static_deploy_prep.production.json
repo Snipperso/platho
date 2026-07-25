@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-25T07:57:18.144Z",
+  "generatedAt": "2026-07-25T10:06:18.356Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 218,
-    "totalBytes": 6082200,
-    "bundleSha256": "cb8c9c9bb5e0dde17889a73e0fc2bbaeb1d8499e630f3313c67e6e7585e27c60",
+    "totalBytes": 6085978,
+    "bundleSha256": "b73e31524fa46c12a6abc3d0c814d93df53b89a4ddc3874040ed36d22d0a5151",
     "files": [
       {
         "path": "app.js",
@@ -589,8 +589,8 @@
       },
       {
         "path": "platho-wallet.mjs",
-        "bytes": 27194,
-        "sha256": "a115c7719b0650c17fe2546ad3c5e7abaa5bf56b5e6847edbedbccdfed6e77cf"
+        "bytes": 30972,
+        "sha256": "ef73d1a29b8cb181cd221ff8e10f6171a2b684402e6c39fcbeecbcfba2ab368c"
       },
       {
         "path": "profile-avatar-media-store.mjs",
