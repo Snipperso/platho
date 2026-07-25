@@ -519,6 +519,40 @@
   доставки external'ов и отказ середины пачки (seqno-gap блокирует хвост). Замер и обоснование — память
   [[message-size-external-limit]]; ⚠️ ядро отправки требует adversarial-review до seal.
 
+- ○ **АУДИТ ВЫЗЫВАЮЩИХ У ВСЕХ СВЁРНУТЫХ В DIRECT ПУТЕЙ — ДО SEAL, найдено 2026-07-25.** Свёртывание функции в
+  прямую оплату НЕ переписывает её вызывающего, а прямые полосы возвращают ДРУГУЮ форму результата
+  (`publishPublicLaneParts` → `{ parts, result }`: ни `status`, ни `publishState`). Один такой вызывающий уже
+  ловил живой баг: диалог описания канала сравнивал `published.result.status` с Vault-статусами, ни одна ветка
+  не срабатывала, и КАЖДОЕ успешное сохранение показывало «could not save» (исправлено коммитом 26643303).
+  Нужен систематический проход: для каждого `*Direct`-пути прочитать вызывающего и найти чтения `.status` /
+  `.publishState` / сравнения с `VAULT_PUBLISH_STATUS_*` / `CAPSULEHUB_PUBLISH_STATUS_*` и ветки «иначе ошибка».
+
+- ○ **ПРЯМОЙ АВАТАР: нет пред-проверки ATH и нет подтверждения указателя (решение владельца нужно).**
+  Vault-путь звал `assertVaultProfileAvatarCanStart` (читал балансы и падал ДО публикации) и
+  `waitForProfileAvatarRegistryUpdate` (ждал появления указателя). У `submitProfileAvatarDirect` нет ни того,
+  ни другого: если у пользователя не хватает 100 ATH, байты аватара уже опубликованы (GRAM списан), запрос к
+  ProfileRegistry отвалится, указатель не запишется — а статус скажет «avatar submitted». Стоимость промаха
+  невелика (публикация аватара ≈ 0.03 GRAM), поэтому это UX, не деньги; но честный статус или дешёвое чтение
+  баланса ATH-кошелька перед публикацией напрашиваются.
+
+- ○ **Прямая публикация не лечится после ACK-без-доставки (архитектурный пробел, ПРЕДСУЩЕСТВУЮЩИЙ).** У Vault-пути
+  были heal-драйверы (re-broadcast + confirm до подтверждения). У прямого пути одиночная пачка НЕ ждёт
+  подтверждения seqno (`sendPlathoWalletTransaction` ждёт только между чанками), а toncenter документированно
+  может ответить 200 и не доставить. Частично закрыто на уровне кошелька: неоднозначный бродкаст возвращает
+  подписанный BOC (`error.builtBoc`, привязан к seqno) и повтор шлёт ЕГО дословно (цепь исполнит максимум один
+  раз) — это касается путей, которые сохраняют boc (CONV direct, username mint). Публичные пост/коммент/аватар/
+  профиль такого сохранения не делают. Решать вместе с ускорением многочастной отправки — обе задачи про пачку
+  external'ов и seqno.
+
+- ○ **Уборка предсуществующего мёртвого кода клиента (21 нуль-вызываемая функция).** Скрипт-сканер (декларация
+  есть, ссылок вне тела нет) стабильно находит их после каждой волны удаления: `walletAddressChanged`,
+  `publicUnreadCount`, `messageAutoSyncCountdownText`, `privateDebugLines`, `offerEncryptedWalletKeyBackup`,
+  `requestTonAmountNanotons`/`requestAthAmountAtomic`, `bigIntToFixedBytes`/`formatAtomicAmount`/`fixedHexBytes`,
+  `callWithVerificationUnavailableReadFallback`, `removeLocalPublicPendingRecord`, `queueAthProtocolStatsRefresh`
+  и др. Не связаны с Vault — отдельный проход. Плюс осиротевшие i18n-ключи удалённых диалогов
+  (`avatar.broadcastRetrying`, `avatar.publishSubmittedConfirming`, `avatar.broadcastUncertainDetail`,
+  `vault.moveToVault`/`moveAnyway`/`activationReserveNote`) — данные, ничего не ломают, но врут о фичах.
+
 ---
 
 ## 👤 РЕШЕНИЯ ВЛАДЕЛЬЦА (без них дальше проектировать нельзя — каждое двигает init и адреса)
