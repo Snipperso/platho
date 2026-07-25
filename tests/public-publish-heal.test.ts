@@ -70,10 +70,10 @@ describe('public publish heal driver guard', () => {
     expect(css).toMatch(/\.public-publish-status \{/);
     expect(css).toMatch(/\.public-publish-status--failed \{/);
     expect(app).not.toMatch(/style\s*=\s*["'`][^"'`]*public-publish/);
-    // confirmFinalNonce has been dead since v616 (shouldConfirmVaultPublishNonceAfterSend ignores options) —
-    // the public driver owns final-batch confirmation now.
-    const publicParts = app.slice(app.indexOf('async function publishPublicPayloadParts'), app.indexOf('async function createPublicPayloadParts'));
-    expect(publicParts).not.toMatch(/confirmFinalNonce\s*:/);
+    // confirmFinalNonce was already dead since v616; its whole home (publishPublicPayloadParts -> the Vault publish
+    // trunk) is now deleted, so assert it app-wide instead of over a slice that no longer exists (an indexOf(-1)
+    // slice is '' and would pass vacuously).
+    expect(app).not.toMatch(/confirmFinalNonce/);
   });
 
   it('PWA-PUBLIC-HEAL-06: composer parity with private — instant clear, optimistic insert, live private-style status', () => {

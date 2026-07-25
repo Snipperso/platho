@@ -114,12 +114,7 @@ import {
   batchHoldNanotons,
   privateCapsuleBaseNetPriceNanotons,
   publicCapsuleBaseNetPriceNanotons,
-  maxNetworkFeeSurchargeNanotons,
-  networkFeeSurchargeExceedsMax,
-  requiresHighNetworkFeeSurchargeConfirmation,
-  requiresManualNetworkFeeSurchargeOverride,
   networkFeeSurchargeNanotons,
-  rawNetworkFeeSurchargeNanotons,
   resolveNetworkFeeEstimateNanotons,
 } from './message-pricing-policy.mjs?v=14';
 import {
@@ -129,7 +124,6 @@ import {
   createPublicPostPayloadV2,
   createUsernameRegistryMessage,
   createWalletTransaction,
-  buildVaultProfileAvatarExternalBoc,
   buildVaultReplaceMessagingKeysExternalBoc,
   buildVaultWithdrawAthExternalBoc,
   buildVaultWithdrawTonExternalBoc,
@@ -152,12 +146,8 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
-  VAULT_SIZE_CLASS,
 } from './pwa-contract-transactions.mjs?v=33';
 import {
-  groupPublishItemsIntoBatches,
-  buildBatchExternalFromPublishItems,
-  batchMaxChargeForItems,
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=7';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=42';
@@ -1026,8 +1016,6 @@ let messageAutoSyncLoadingFrame = 0;
 let messageAutoSyncStallStreak = 0;
 const privateScanUnknownErrorCounts = new Map();
 let privateOutboundWorkDepth = 0;
-let vaultPublishSendLock = Promise.resolve();
-let vaultPublishSendWaiters = 0;
 // Deadline until which a background auto-lock is DEFERRED because a send is actively holding the key
 // (set once at first defer, never re-armed — so a wedged send cannot pin the wallet unlocked past the cap).
 let vaultSendInFlightUntil = 0;
@@ -4846,23 +4834,15 @@ async function openEditChannelProfileDialog() {
         const description = String(values.description ?? '').trim();
         const tags = String(values.tags ?? '').split(/[,\n]+/);
         const published = await publishChannelProfile(description, tags);
-        const status = published?.result?.status;
         const meta = { description: published.description, tags: published.tags, ownerUsername: published.ownerUsername };
-        const createdAtSec = published.createdAtSec;
-        const publishState = published?.result?.publishState ?? null;
-        if (status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-          // Landed already — commit to the durable cache with the real entry id.
-          finalizeChannelProfile(wallet, meta, publishStateEntryId(publishState), createdAtSec);
-          return { ok: true, result: { status } };
-        }
-        if (status === VAULT_PUBLISH_STATUS_SUBMITTED || status === VAULT_PUBLISH_STATUS_PARTIAL) {
-          // Broadcast but not yet confirmed: show it immediately (overlay, not persisted) and let the heal driver
-          // re-broadcast + confirm until it lands (→ durable cache) or terminals (→ overlay dropped, no masked failure).
-          setChannelProfileOptimistic(wallet, meta, createdAtSec);
-          if (publishState) healChannelProfilePublish(wallet, publishState, meta, createdAtSec);
-          return { ok: true, result: { status } };
-        }
-        return { ok: false, error: t('public.descriptionSaveFailed') };
+        // clean-17 direct pay: the profile IS the wallet transfer. publishPublicLaneParts throws on a failed
+        // broadcast and returns { parts, result } — no Vault status, no publishState. So a RETURN means broadcast:
+        // report success and show the edit immediately from the in-memory overlay. The durable cache is committed
+        // by setChannelProfileFromWalk on the next walk of the author's CHANNEL shard (it carries the real entry
+        // id). Reading `published.result.status` here was the clean-15 protocol: it is always undefined under
+        // direct pay, so a SUCCEEDED save reported "could not save" and never surfaced the new description.
+        setChannelProfileOptimistic(wallet, meta, published.createdAtSec);
+        return { ok: true, result: { status: 'submitted' } };
       } catch (error) {
         if (noteTonRpcRateLimit(error)) return { ok: false, error: t('sync.rpcBusy') };
         console.error(error);
@@ -9709,7 +9689,8 @@ function markChannelProfileAbsent(authorWallet) {
 }
 
 // Show a just-edited profile IMMEDIATELY (in-memory overlay), without persisting — a publish that never lands must
-// not survive a reload as if it saved. The heal driver moves it to the durable cache on confirmation, or drops it.
+// not survive a reload as if it saved. The durable copy is committed by setChannelProfileFromWalk, which reads the
+// profile back off the author's CHANNEL shard with its real entry id.
 function setChannelProfileOptimistic(authorWallet, profile, createdAtSec) {
   const key = channelProfileCacheKey(authorWallet);
   if (!key) return;
@@ -9723,120 +9704,6 @@ function setChannelProfileOptimistic(authorWallet, profile, createdAtSec) {
   }));
   // Verify your OWN just-published username so your own channel shows it immediately (the overlay isn't walked).
   verifyChannelUsernameClaim(authorWallet, profile?.ownerUsername);
-}
-
-// Commit a CONFIRMED profile to the durable cache (unconditional — we KNOW it just landed, so it wins over any prior
-// entry regardless of the recency guard) and clear the optimistic overlay. Recording the real entryId here is what
-// completes the latest-wins reconciliation the walk path can't (its recency guard keeps the fresher optimistic copy).
-function finalizeChannelProfile(authorWallet, profile, entryId, createdAtSec) {
-  const key = channelProfileCacheKey(authorWallet);
-  if (!key) return;
-  pendingChannelProfileOverlay.delete(key);
-  const prevVerified = publicChannelProfileCache[key]?.verifiedUsername ?? '';
-  const committed = normalizeChannelProfile({
-    description: profile?.description ?? '',
-    tags: normalizeProfileTags(profile?.tags),
-    ownerUsername: profile?.ownerUsername ?? '',
-    entryId: entryId === null || entryId === undefined ? '' : String(entryId),
-    createdAtSec: Number(createdAtSec) || nowSec(),
-    fetchedAt: nowSec(),
-  });
-  // Carry a matching prior verification forward so the label doesn't blink; re-verify to catch a re-linked name.
-  if (prevVerified && (publicChannelProfileCache[key]?.ownerUsername ?? '') === committed.ownerUsername) {
-    committed.verifiedUsername = prevVerified;
-  }
-  publicChannelProfileCache = { ...publicChannelProfileCache, [key]: committed };
-  persistChannelProfileCache();
-  verifyChannelUsernameClaim(authorWallet, profile?.ownerUsername);
-}
-
-function publishStateEntryId(publishState) {
-  return publishState?.parts?.find((part) => part?.entryId !== undefined && part?.entryId !== null)?.entryId ?? null;
-}
-
-// Background heal for a profile publish (the send-path parity fix): a profile is channel metadata with no feed
-// record, so the feed confirm/resume driver never touches it. Without this, a SUBMITTED/PARTIAL profile whose
-// external was dropped (toncenter ACKs 200 without delivering — the documented non-delivery hazard) would silently
-// never land while the UI reported "saved". This re-broadcasts + confirms on the same cadence as the post driver,
-// until CONFIRMED (→ commit to the durable cache) or the no-progress deadline (→ drop the optimistic overlay).
-// Heal jobs keyed by author wallet. A newer edit REPLACES the in-flight job (its post has a higher entry id, so it
-// wins the on-chain walk anyway) instead of being dropped — this closes the rapid-double-edit race where the first
-// job would otherwise finalize the durable cache with the OLDER edit and discard the newer overlay.
-const channelProfileHealJobs = new Map();
-
-function scheduleChannelProfileHeal(key, delayMs) {
-  const job = channelProfileHealJobs.get(key);
-  if (!job || job.inFlight) return; // a running pass reschedules itself when it finishes — never stack timers
-  if (job.timer) clearTimeout(job.timer);
-  job.timer = setTimeout(() => {
-    runChannelProfileHealPass(key).catch((error) => { channelProfileHealJobs.delete(key); console.error(error); });
-  }, delayMs);
-}
-
-async function runChannelProfileHealPass(key) {
-  const job = channelProfileHealJobs.get(key);
-  if (!job || job.inFlight) return; // single-flight: never two concurrent passes for one key
-  job.timer = null;
-  job.inFlight = true;
-  if (job.publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    channelProfileHealJobs.delete(key);
-    finalizeChannelProfile(key, job.profile, publishStateEntryId(job.publishState), job.createdAtSec);
-    return;
-  }
-  if (Date.now() - job.startedAt >= publishConfirmNoProgressDeadlineMs(job.publishState)) {
-    channelProfileHealJobs.delete(key);
-    console.warn('[platho] channel profile publish: no-progress terminal', { key });
-    pendingChannelProfileOverlay.delete(key); // drop the optimistic overlay — a never-landed publish is not masked
-    return;
-  }
-  // Don't fight the serial pump while a chain sync pass is in flight (same rule as the post driver).
-  if (privateChainSyncPromise) { job.inFlight = false; scheduleChannelProfileHeal(key, 2_500); return; }
-  let passError = null;
-  try {
-    await retryUnconfirmedVaultPublishBroadcasts(job.publishState, {
-      deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
-      readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
-      sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
-      queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
-    });
-    await confirmCapsuleHubPublishEntries(job.publishState, {
-      deadlineMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS,
-      requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
-      queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
-      owner: resolvePublishOwner(job.publishState),
-    });
-  } catch (error) {
-    passError = error;
-    noteTonRpcRateLimit(error);
-  }
-  // Re-read: a newer edit may have replaced the job while we awaited an RPC.
-  const current = channelProfileHealJobs.get(key);
-  if (!current) return;
-  if (current.publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    channelProfileHealJobs.delete(key);
-    finalizeChannelProfile(key, current.profile, publishStateEntryId(current.publishState), current.createdAtSec);
-    return;
-  }
-  current.inFlight = false;
-  scheduleChannelProfileHeal(key, privatePublishConfirmDelayMs({ publishState: current.publishState, createdAtMs: current.startedAt }, passError));
-}
-
-function healChannelProfilePublish(authorWallet, publishState, profile, createdAtSec) {
-  const key = channelProfileCacheKey(authorWallet);
-  if (!key || !publishState) return;
-  const existing = channelProfileHealJobs.get(key);
-  if (existing) {
-    // Supersede the in-flight/pending job IN PLACE (same object) so a running pass picks up the newer edit on its
-    // next check; scheduleChannelProfileHeal is a no-op while a pass is in flight (it reschedules itself).
-    existing.publishState = publishState;
-    existing.profile = profile;
-    existing.createdAtSec = Number(createdAtSec) || nowSec();
-    existing.startedAt = Date.now();
-    scheduleChannelProfileHeal(key, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS);
-    return;
-  }
-  channelProfileHealJobs.set(key, { publishState, profile, createdAtSec: Number(createdAtSec) || nowSec(), startedAt: Date.now(), timer: null, inFlight: false });
-  scheduleChannelProfileHeal(key, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS);
 }
 
 // Decode a resolved single-part document body and, if it carries a PROFILE block, return it plus whether the
@@ -13850,11 +13717,12 @@ function privateOutboundWorkActive() {
   return privateOutboundWorkDepth > 0;
 }
 
-// True while a send is actively holding the auth key (the vault send-lock is held for the sign+broadcast
-// loop of BOTH private and public sends, or a private re-sign/recovery job is mid-flight). Confirmation is
-// keyless and intentionally NOT counted here, so the wallet may lock once broadcasting is done.
+// True while a send is actively holding the auth key (a private re-sign/recovery job is mid-flight). The old
+// Vault publish send-lock counter dropped out with the Vault publish trunk — direct-pay sends sign with the
+// WALLET key inside privateOutboundWork, which is what this counts. Confirmation is keyless and intentionally
+// NOT counted here, so the wallet may lock once broadcasting is done.
 function vaultSendNeedsKeyNow() {
-  const needsKey = vaultPublishSendWaiters > 0 || privateOutboundWorkActive();
+  const needsKey = privateOutboundWorkActive();
   if (!needsKey) vaultSendInFlightUntil = 0;
   return needsKey;
 }
@@ -13894,41 +13762,12 @@ function usingKeylessTonRpc() {
     || appConfig.network?.tonRpc?.apiKey);
 }
 
-async function enterVaultPublishSendLock() {
-  vaultPublishSendWaiters += 1;
-  const previous = vaultPublishSendLock;
-  let releaseLock = () => {};
-  vaultPublishSendLock = new Promise((resolve) => {
-    releaseLock = resolve;
-  });
-  await previous.catch(() => {});
-  vaultPublishSendWaiters = Math.max(0, vaultPublishSendWaiters - 1);
-  let released = false;
-  return {
-    hasWaiters: () => vaultPublishSendWaiters > 0,
-    release() {
-      if (released) return;
-      released = true;
-      releaseLock();
-    },
-  };
-}
-
 async function awaitVaultPublishNonceBarrier() {
   while (pendingVaultPublishNonceBarrier) {
     const barrier = pendingVaultPublishNonceBarrier;
     await barrier.catch(() => {});
     if (pendingVaultPublishNonceBarrier === barrier) pendingVaultPublishNonceBarrier = null;
   }
-}
-
-function installVaultPublishNonceBarrier(task) {
-  const barrier = Promise.resolve(task).catch(() => {});
-  pendingVaultPublishNonceBarrier = barrier;
-  barrier.then(() => {
-    if (pendingVaultPublishNonceBarrier === barrier) pendingVaultPublishNonceBarrier = null;
-  });
-  return barrier;
 }
 
 function vaultPublishNonceFloor(owner) {
@@ -15315,19 +15154,6 @@ function currentNetworkFeeSurchargeNanotons() {
   return networkFeeSurchargeNanotons(currentNetworkFeeEstimateNanotons(), currentMessagingPricingOptions());
 }
 
-function currentRawNetworkFeeSurchargeNanotons() {
-  return rawNetworkFeeSurchargeNanotons(currentNetworkFeeEstimateNanotons(), currentMessagingPricingOptions());
-}
-
-function assertNetworkFeeSurchargeWithinCap() {
-  const pricingOptions = currentMessagingPricingOptions();
-  const estimate = currentNetworkFeeEstimateNanotons();
-  if (!networkFeeSurchargeExceedsMax(estimate, pricingOptions)) return;
-  const rawSurcharge = currentRawNetworkFeeSurchargeNanotons();
-  const maxSurcharge = maxNetworkFeeSurchargeNanotons(pricingOptions);
-  throw new Error(`Network surcharge ${formatTonNanotons(rawSurcharge)} GRAM exceeds the production cap ${formatTonNanotons(maxSurcharge)} GRAM. Try another RPC/network estimate before sending.`);
-}
-
 function shortUiErrorText(error, fallback = t('common.blockedCap')) {
   const text = String(error?.message ?? error ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return fallback;
@@ -15974,15 +15800,6 @@ function composerEstimatedNetCostNanotons(profile, parts = 1) {
 // is materially below the hold (the bulk of the hold is the refundable import over-hold + ACK float), so we
 // estimate net from the observed-settled fraction of a 1-part hold. Used only for the price-change confirm
 // dialog's "new cost" line; if profiles are available, composerEstimatedNetCostNanotons is exact.
-function composerNetCostFromHoldNanotons(hold, parts = 1, profiles = null) {
-  if (Array.isArray(profiles) && profiles.length > 0) {
-    return composerEstimatedNetCostNanotons(profiles, profiles.length);
-  }
-  const value = nonNegativeBigInt(hold);
-  // Conservative: report the hold itself as the cost ceiling when we lack profiles (never under-quote).
-  return value * BigInt(Math.max(1, Number(parts) || 1)) / BigInt(Math.max(1, Number(parts) || 1));
-}
-
 function composerKnownVaultTonShortfall(profile, parts = 1) {
   // clean-17 direct-pay has NO Vault hold — a CONV/public send is funded from the wallet and the affordability check
   // runs at send time (attemptConvMessagePublishDirect / the public direct path do their own wallet-GRAM check). The
@@ -16011,80 +15828,10 @@ function publicComposerKnownVaultTonShortfall() {
   return composerKnownVaultTonShortfall(publicComposerPublishProfilesForPlan(plan), 1);
 }
 
-function composerPublishProfileForDraft(publish) {
-  if (BigInt(publish?.publish_kind ?? 0n) === VAULT_PUBLISH_KIND.PUBLIC) return publicComposerPublishProfile(Number(publish?.size_class ?? 1));
-  return privateComposerPublishProfile(currentOutgoingPrivateSuite(), Number(publish?.size_class ?? 1));
-}
-
-function composerPublishProfilesForCapsules(capsules) {
-  return (capsules ?? [])
-    .filter((capsule) => capsule?.publish)
-    .map((capsule) => composerPublishProfileForDraft(capsule.publish));
-}
-
 const PUBLISH_PRICE_CHANGE_CANCELLED_CODE = 'PLATHO_PUBLISH_PRICE_CHANGE_CANCELLED';
-
-function publishPriceChangeCancelledError() {
-  const error = new Error('Publish cancelled');
-  error.code = PUBLISH_PRICE_CHANGE_CANCELLED_CODE;
-  return error;
-}
 
 function isPublishPriceChangeCancelled(error) {
   return error?.code === PUBLISH_PRICE_CHANGE_CANCELLED_CODE;
-}
-
-async function confirmPublishPriceIncrease({ previousHold, finalHold, previousNetCost, finalNetCost, parts }) {
-  const oldHold = nonNegativeBigInt(previousHold);
-  const newHold = nonNegativeBigInt(finalHold);
-  const oldCost = nonNegativeBigInt(previousNetCost);
-  const newCost = nonNegativeBigInt(finalNetCost);
-  // Only a higher NET COST (a real, non-refundable debit increase) needs confirmation. A higher
-  // hold alone is a fully-refundable over-reserve and must NOT alarm — otherwise every multi-capsule
-  // batch (whose amortized batch hold and the per-part canonical sum legitimately differ by one
-  // SHARED_BASE per extra part) would prompt spuriously even though the chain price is unchanged.
-  if (newCost <= oldCost) return true;
-  const result = await openActionDialog({
-    title: t('dialog.priceChangedTitle'),
-    hint: t('dialog.priceChangedHint'),
-    tone: 'error',
-    submitLabel: t('dialog.sendWithNewPrice'),
-    dismissOnBackdrop: false,
-    summary: [
-      { label: t('composer.capsulesLabel'), value: String(Math.max(1, Number(parts) || 1)) },
-      { label: t('dialog.previousCostLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(oldCost) }) },
-      { label: t('dialog.newCostLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(newCost) }) },
-      { label: t('dialog.previousHoldLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(oldHold) }) },
-      { label: t('dialog.newHoldLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(newHold) }) },
-    ],
-  });
-  return result !== null;
-}
-
-async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCost, parts }) {
-  const perCapsuleSurcharge = nonNegativeBigInt(surcharge);
-  const pricingOptions = currentMessagingPricingOptions();
-  if (!requiresHighNetworkFeeSurchargeConfirmation(perCapsuleSurcharge, pricingOptions)) return true;
-  const capsuleCount = Math.max(1, Number(parts) || 1);
-  const totalSurcharge = perCapsuleSurcharge * BigInt(capsuleCount);
-  const netCost = nonNegativeBigInt(finalNetCost);
-  const baseNetCost = netCost > totalSurcharge ? netCost - totalSurcharge : 0n;
-  const manualOverride = requiresManualNetworkFeeSurchargeOverride(perCapsuleSurcharge, pricingOptions);
-  const result = await openActionDialog({
-    title: manualOverride ? t('dialog.manualNetworkFeeOverrideTitle') : t('dialog.highNetworkSurchargeTitle'),
-    hint: t('dialog.highNetworkSurchargeHint'),
-    tone: manualOverride ? 'error' : 'warning',
-    submitLabel: manualOverride ? t('dialog.manualOverrideSend') : t('dialog.confirmSurcharge'),
-    dismissOnBackdrop: false,
-    summary: [
-      { label: t('composer.capsulesLabel'), value: String(capsuleCount) },
-      { label: t('dialog.baseCostLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(baseNetCost) }) },
-      { label: t('dialog.networkSurchargeLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(totalSurcharge) }) },
-      { label: t('dialog.expectedCostLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(netCost) }) },
-      { label: t('dialog.holdLabel'), value: t('common.gramAmount', { amount: formatTonNanotons(finalHold) }) },
-    ],
-  });
-  return result !== null;
 }
 
 // Does the private composer resolve to at least one real block to send? composerBlocksFromDraft drops an orphaned
@@ -22220,20 +21967,6 @@ async function readConnectedVaultGlobalForOwnVaultAction(provider) {
   );
 }
 
-async function readCanonicalPublishChargeForOwnVaultAction(provider, owner, publishKind, sizeClass, cryptoSuite) {
-  const readCharge = (readOptions) => provider.getCanonicalPublishCharge(
-    owner,
-    BigInt(publishKind),
-    BigInt(sizeClass),
-    BigInt(cryptoSuite),
-    { vaultAddress: requireVaultAddress(), ...readOptions },
-  );
-  return callWithDegradedTransportReadFallback(
-    () => readCharge({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
-    () => readCharge(unverifiedCriticalChainReadOptions()),
-  );
-}
-
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -22565,70 +22298,6 @@ function requireManifestHashMatch(value, label) {
   if (BigInt(value ?? 0n) !== expectedManifest) {
     throw new Error(`${label} deployment manifest hash does not match this app config`);
   }
-}
-
-function assertCapsuleHubGlobalMatchesConfig(global) {
-  if (!global) throw new Error('CapsuleHub global state is missing');
-  if (global.sealed !== true) {
-    throw new Error('CapsuleHub is not sealed on this network');
-  }
-  if (global.vault_bound !== true) {
-    throw new Error('CapsuleHub Vault route is not bound on this network');
-  }
-  requireManifestHashMatch(global.deployment_manifest_hash, 'CapsuleHub');
-  const expectedVault = requireBasechainAddress(requireVaultAddress(), 'Vault');
-  const boundVault = global.vault_address
-    ? requireBasechainAddress(global.vault_address, 'CapsuleHub Vault')
-    : null;
-  if (boundVault !== expectedVault) {
-    throw new Error('CapsuleHub Vault binding does not match this app config');
-  }
-  const feeAccumulatorAddress = configuredFeeAccumulatorAddress();
-  const expectedFeeAccumulator = feeAccumulatorAddress
-    ? requireBasechainAddress(feeAccumulatorAddress, 'FeeAccumulator')
-    : null;
-  if (expectedFeeAccumulator && global.fee_accumulator_address) {
-    const boundFeeAccumulator = requireBasechainAddress(global.fee_accumulator_address, 'CapsuleHub FeeAccumulator');
-    if (boundFeeAccumulator !== expectedFeeAccumulator) {
-      throw new Error('CapsuleHub FeeAccumulator binding does not match this app config');
-    }
-  }
-  return global;
-}
-
-async function requireCapsuleHubVaultRoute(global, options = {}) {
-  const resolved = await resolveCapsuleHubProvider();
-  if (!resolved?.provider?.getState) {
-    throw new Error('CapsuleHub provider cannot verify Vault binding');
-  }
-  const providerAddress = requireBasechainAddress(resolved.address, 'CapsuleHub');
-  const configuredAddress = configuredCapsuleHubAddress();
-  const expectedCapsuleHub = configuredAddress
-    ? requireBasechainAddress(configuredAddress, 'CapsuleHub')
-    : null;
-  const vaultBoundCapsuleHub = global?.capsule_hub_address
-    ? requireBasechainAddress(global.capsule_hub_address, 'Vault CapsuleHub')
-    : null;
-  if (expectedCapsuleHub && providerAddress !== expectedCapsuleHub) {
-    throw new Error('CapsuleHub provider address does not match this app config');
-  }
-  if (vaultBoundCapsuleHub && providerAddress !== vaultBoundCapsuleHub) {
-    throw new Error('CapsuleHub provider address does not match Vault binding');
-  }
-  const readOptions = options.allowUnverifiedRead === true
-    ? {
-      capsuleHubAddress: providerAddress,
-      verify: false,
-      allowUnverifiedCriticalRead: true,
-      priority: 'critical',
-      cacheTtlMs: 0,
-    }
-    : criticalCapsuleHubReadOptions(providerAddress);
-  return assertCapsuleHubGlobalMatchesConfig(await resolved.provider.getState(readOptions));
-}
-
-async function requireCapsuleHubVaultRouteForPublish(global) {
-  return requireCapsuleHubVaultRoute(global);
 }
 
 async function requireUsernameRegistryVaultRoute(global, options = {}) {
@@ -24268,27 +23937,6 @@ function publishHashPlain(value) {
   }
 }
 
-function publishPartFromCapsule(capsule, index, total) {
-  const publish = capsule.publish ?? {};
-  const isPublic = BigInt(publish.publish_kind ?? 0n) === VAULT_PUBLISH_KIND.PUBLIC;
-  const bodyHash = publishHashPlain(publish.body_hash ?? publish.bodyHash);
-  return {
-    capsuleId: capsule.id ?? null,
-    index,
-    partCount: total,
-    status: PUBLISH_PART_STATUS_BUILT,
-    publishKind: isPublic ? 'public' : 'private',
-    sizeClass: Number(publish.size_class ?? publish.sizeClass ?? 1),
-    cryptoSuite: Number(publish.crypto_suite ?? publish.cryptoSuite ?? 0),
-    publishId: publishHashPlain(publish.publish_id ?? publish.publishId),
-    bodyHash,
-    header0Hash: publishHashPlain(publish.header_0_hash ?? publish.header0Hash ?? publish.header_hash ?? publish.headerHash),
-    header1Hash: publishHashPlain(publish.header_1_hash ?? publish.header1Hash),
-    entryId: null,
-    error: null,
-  };
-}
-
 function publishPartBodyHash(part) {
   return publishHashPlain(part?.bodyHash ?? part?.body_hash);
 }
@@ -24319,20 +23967,6 @@ function publishPartHasPayloadHashes(part) {
 
 function publishIdForPart(part) {
   return publishHashPlain(part?.publishId ?? part?.publish_id);
-}
-
-function createCapsulePublishState(capsules) {
-  const normalized = (capsules ?? []).filter(Boolean);
-  return {
-    status: 'built',
-    partCount: normalized.length,
-    confirmedCount: 0,
-    submittedCount: 0,
-    displaySubmittedCount: 0,
-    confirmSearch: {},
-    updatedAt: new Date().toISOString(),
-    parts: normalized.map((capsule, index) => publishPartFromCapsule(capsule, index, normalized.length)),
-  };
 }
 
 function setPublishPartStatus(publishState, index, status, extra = {}) {
@@ -24429,14 +24063,6 @@ function publishStateVisibleSubmittedCount(publishState) {
   return Math.min(total, Math.max(previous, current));
 }
 
-function notifyPublishState(options, publishState, part) {
-  try {
-    options?.onPartState?.(part, publishState);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
 function publishStateMeta(publishState) {
   const total = Math.max(1, Number(publishState?.partCount) || 1);
   const confirmed = Math.max(0, Number(publishState?.confirmedCount) || 0);
@@ -24488,14 +24114,6 @@ function publishStateMeta(publishState) {
 
 function isVaultPublishPartialError(error) {
   return error?.code === VAULT_PUBLISH_PARTIAL_ERROR_CODE;
-}
-
-function vaultPublishPartialError(message, publishResult, cause) {
-  const error = new Error(message);
-  error.code = VAULT_PUBLISH_PARTIAL_ERROR_CODE;
-  error.publishResult = publishResult;
-  error.cause = cause;
-  return error;
 }
 
 function publishEntryMatchesPartPayload(entry, part) {
@@ -25113,20 +24731,6 @@ async function sendVaultExternalBoc(built, options = {}) {
   return { ...built, result };
 }
 
-function shouldConfirmVaultPublishNonceAfterSend(index, total, options = {}) {
-  // Only NON-FINAL batches install a background nonce barrier. The FINAL batch's barrier would wait for
-  // clientNonce+1 == the nonce AFTER the whole burst — a value the chain only reaches once the racy last
-  // back-to-back external has landed; if that external bounces (out-of-order pre-accept) the barrier hangs
-  // to its 90s timeout and parks the next signed vault action (and, before the broadcast-retry stopped
-  // awaiting it, the healing itself). A non-final batch's barrier waits for a nonce a cleanly-landing
-  // EARLIER external produces, so it resolves promptly. Dropping the final barrier is double-spend-safe:
-  // the monotonic per-owner nonce floor + the contract's nonce-equality check already stop a following
-  // action from re-using a consumed nonce. `options.confirmFinalNonce` (still passed by some callers) is
-  // intentionally no longer honored — kept in the signature only to avoid churn at the call sites.
-  void options;
-  return index < total - 1;
-}
-
 async function readVaultPublishNonce(provider, owner, options = {}) {
   if (!provider?.getUser) return null;
   if (options.ignoreNonceBarrier !== true) await awaitVaultPublishNonceBarrier();
@@ -25204,10 +24808,6 @@ async function waitForVaultPublishNonce(provider, owner, expectedNonce, options 
   throw error;
 }
 
-async function waitForVaultPublishNonceForOwnVaultAction(provider, owner, expectedNonce, options = {}) {
-  return waitForVaultPublishNonce(provider, owner, expectedNonce, options);
-}
-
 // ONE shared nonce watcher per send burst (v756). The old design installed a SEPARATE background
 // poller per non-final batch (waitForVaultPublishNonce, ~1s cadence, critical-priority reads,
 // 90s x batch-position ceiling) — a 7-batch file send ran SIX concurrent pollers, and together with
@@ -25219,94 +24819,6 @@ async function waitForVaultPublishNonceForOwnVaultAction(provider, owner, expect
 // passes that batch, and its completion is the publish nonce barrier for subsequent unrelated vault
 // actions — identical gating to the old code, where each install REPLACED the pending barrier so
 // only the last (highest-nonce, longest-wait) task ever gated anything.
-function createVaultPublishNonceWatch(context) {
-  return {
-    provider: context.provider,
-    owner: context.owner,
-    publishState: context.publishState,
-    notify: context.notify,
-    requestTimeoutMs: context.requestTimeoutMs,
-    queueTimeoutMs: context.queueTimeoutMs,
-    targets: [],
-    deadlineAt: 0,
-    running: false,
-    promise: null,
-  };
-}
-
-function registerVaultPublishNonceWatchTarget(watch, target) {
-  watch.targets.push(target);
-  const timeoutMs = Number(target.timeoutMs);
-  watch.deadlineAt = Math.max(
-    watch.deadlineAt,
-    Date.now() + (Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS),
-  );
-  // (Re)start the loop when it is not live — including a RESTART when a fast-landing earlier batch let
-  // the loop drain and exit before this batch registered (sub-second chain + a slow next-batch POST):
-  // a target pushed into a completed run would otherwise never flip and, worse, never re-install the
-  // publish nonce barrier (the resolved one self-clears). `running` flips false in the runner's own
-  // `finally`, which executes SYNCHRONOUSLY with the loop's return — no microtask window where a fresh
-  // register could observe a stale true.
-  if (!watch.running) {
-    watch.running = true;
-    watch.promise = runVaultPublishNonceWatch(watch);
-    installVaultPublishNonceBarrier(watch.promise);
-  }
-}
-
-async function runVaultPublishNonceWatch(watch) {
-  // Observational-only loop: TRANSIENT read errors never end the watch (the deadline decides), and
-  // every part it leaves un-flipped is healed by the confirmation-retry driver's own nonce read later.
-  try {
-    for (;;) {
-      if (watch.targets.length === 0 || Date.now() >= watch.deadlineAt) return;
-      let nonce = null;
-      let lastError = null;
-      try {
-        nonce = await readVaultPublishNonce(watch.provider, watch.owner, {
-          ignoreNonceBarrier: true,
-          verify: false,
-          allowUnverifiedCriticalRead: true,
-          priority: 'messages',
-          requestTimeoutMs: watch.requestTimeoutMs,
-          queueTimeoutMs: watch.queueTimeoutMs,
-        });
-      } catch (error) {
-        // A NON-recoverable read error (structural provider failure, not rate-limit/transient) ends the
-        // watch at once — same as the old per-batch task, whose waitForVaultPublishNonce threw and
-        // released the barrier immediately. Holding the barrier while hammering a read that cannot
-        // succeed would park every subsequent vault action for up to the full burst deadline.
-        if (!isTonRpcRecoverableReadError(error) && !isTonRpcRateLimitError(error)) return;
-        lastError = error;
-      }
-      if (nonce !== null) {
-        const landed = watch.targets.filter((target) => nonce >= target.expectedNonce);
-        watch.targets = watch.targets.filter((target) => nonce < target.expectedNonce);
-        for (const target of landed) {
-          for (const partIndex of target.partIndexes) {
-            const part = watch.publishState.parts?.[partIndex];
-            if (part && part.status === PUBLISH_PART_STATUS_SENT) {
-              watch.notify(watch.publishState, setPublishPartStatus(watch.publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
-                confirmedBy: 'nonce_watch',
-              }));
-            }
-          }
-        }
-        if (watch.targets.length === 0) return;
-      }
-      const remainingMs = watch.deadlineAt - Date.now();
-      if (remainingMs <= 0) return;
-      let pollMs = VAULT_PUBLISH_NONCE_POLL_MS;
-      if (lastError && isTonRpcRateLimitError(lastError)) {
-        pollMs = Math.max(pollMs, Math.min(tonRpcLimitBackoffMs(lastError), remainingMs));
-      }
-      await delay(Math.max(250, Math.min(pollMs, remainingMs)));
-    }
-  } finally {
-    watch.running = false;
-  }
-}
-
 async function readVaultPublishNonceForBroadcastRetry(provider, owner, options = {}) {
   // OBSERVATIONAL-only read on the keyless re-broadcast path: it decides whether an already-signed,
   // fixed-nonce external must be re-sent or has already landed. It MUST NOT await the publish-nonce
@@ -25321,415 +24833,6 @@ async function readVaultPublishNonceForBroadcastRetry(provider, owner, options =
     () => readVaultPublishNonceForOwnVaultAction(provider, owner, readOptions),
     () => readVaultPublishNonce(provider, owner, { ...readOptions, verify: false, allowUnverifiedCriticalRead: true }),
   );
-}
-
-async function prepareCapsulesThroughVault(capsules, options = {}) {
-  requireNoPendingServiceWorkerAppShellReload();
-  const normalizedCapsules = (capsules ?? []).filter(Boolean);
-  if (normalizedCapsules.length === 0) throw new Error('Capsule publish payload is missing');
-  if (!normalizedCapsules.every((capsule) => capsule?.publish)) {
-    throw new Error('Capsule publish payload is missing');
-  }
-  const provider = await resolveVaultChainProvider();
-  if (!provider?.getCanonicalPublishCharge) {
-    throw new Error('Vault chain provider cannot price publish');
-  }
-  const owner = requirePlathoWalletAddress();
-  if (options.allowOwnVaultActionReadFallback === true) {
-    const global = await readConnectedVaultGlobalForOwnVaultAction(provider);
-    await requireCapsuleHubVaultRouteForPublish(global);
-  } else {
-    const global = await loadConnectedVaultGlobal({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
-    await requireCapsuleHubVaultRouteForPublish(global);
-  }
-  const user = options.allowOwnVaultActionReadFallback === true
-    ? await readFreshConnectedVaultUserForOwnVaultAction(provider)
-    : await loadConnectedVaultUser({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
-  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate Platho account before publishing');
-  }
-  requireVaultAuthSecretKey();
-  assertNetworkFeeSurchargeWithinCap();
-  const surcharge = currentNetworkFeeSurchargeNanotons();
-  refreshComposerCostStatus();
-  const quotedProfiles = composerPublishProfilesForCapsules(normalizedCapsules);
-  const quotedHold = composerEstimatedMaxChargeNanotons(quotedProfiles, 1);
-  const quotedNetCost = composerEstimatedNetCostNanotons(quotedProfiles, 1);
-  const publishState = options.publishState ?? createCapsulePublishState(normalizedCapsules);
-  const chargePlans = [];
-  let totalMaxCharge = 0n;
-  const canonicalChargeCache = new Map();
-  for (let index = 0; index < normalizedCapsules.length; index += 1) {
-    const capsule = normalizedCapsules[index];
-    const publish = capsule.publish;
-    const chargeKey = `${publish.publish_kind}:${publish.size_class}:${publish.crypto_suite}`;
-    let canonicalMaxCharge = canonicalChargeCache.get(chargeKey);
-    if (canonicalMaxCharge === undefined) {
-      canonicalMaxCharge = options.allowOwnVaultActionReadFallback === true
-        ? await readCanonicalPublishChargeForOwnVaultAction(provider, owner, publish.publish_kind, publish.size_class, publish.crypto_suite)
-        : await provider.getCanonicalPublishCharge(
-          owner,
-          BigInt(publish.publish_kind),
-          BigInt(publish.size_class),
-          BigInt(publish.crypto_suite),
-          { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
-        );
-      canonicalChargeCache.set(chargeKey, canonicalMaxCharge);
-    }
-    const maxCharge = BigInt(canonicalMaxCharge) + surcharge;
-    totalMaxCharge += maxCharge;
-    const messageType = BigInt(publish.publish_kind) === VAULT_PUBLISH_KIND.PUBLIC
-      ? 'PublishPublicFromVaultBalance'
-      : 'PublishPrivateFromVaultBalance';
-    chargePlans.push({ capsuleId: capsule.id, messageType, publish, maxCharge, partIndex: index });
-  }
-  // The signed batch external clears the AMORTIZED batchMaxChargeForItems (SHARED_BASE charged ONCE
-  // per batch), NOT the per-capsule canonical SUM accumulated above (which counts a full SHARED_BASE
-  // for every part). Group the charge plan exactly as the send leg does and sum the per-batch
-  // amortized holds (re-adding the per-part network surcharge, which batchMaxChargeForItems excludes),
-  // so the affordability gate and the price-change recheck match what is actually signed. This stops a
-  // multi-capsule send from being falsely blocked on balance or flagged with a phantom "Price changed".
-  const groupedBatchesForHold = groupPublishItemsIntoBatches(chargePlans);
-  const finalHold = groupedBatchesForHold.reduce(
-    (sum, batch) => sum + batchMaxChargeForItems(batch.items),
-    0n,
-  ) + surcharge * BigInt(normalizedCapsules.length);
-  const balance = BigInt(user.ton_balance ?? user.tonBalance ?? 0n);
-  if (balance < finalHold) {
-    throw new Error('Vault GRAM balance is too low for this publish');
-  }
-  const finalNetCost = composerNetCostFromHoldNanotons(finalHold, normalizedCapsules.length, quotedProfiles);
-  if (!(await confirmPublishPriceIncrease({
-    previousHold: quotedHold,
-    finalHold,
-    previousNetCost: quotedNetCost,
-    finalNetCost,
-    parts: normalizedCapsules.length,
-  }))) {
-    throw publishPriceChangeCancelledError();
-  }
-  if (!(await confirmHighNetworkFeeSurcharge({
-    surcharge,
-    finalHold,
-    finalNetCost,
-    parts: normalizedCapsules.length,
-  }))) {
-    throw publishPriceChangeCancelledError();
-  }
-  return {
-    normalizedCapsules,
-    provider,
-    owner,
-    user,
-    publishState,
-    results: chargePlans,
-    totalMaxCharge: finalHold,
-    finalNetCost,
-  };
-}
-
-async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
-  if (!prepared?.results?.length) throw new Error('Prepared capsule publish is missing');
-  const {
-    normalizedCapsules,
-    provider,
-    owner,
-    publishState,
-    results,
-    totalMaxCharge,
-  } = prepared;
-  await options.onReadyToSend?.(publishState);
-  // Persist the PUBLIC sender address on the publish state so the keyless resume paths (idempotent
-  // re-broadcast + receipt confirmation) can run after a background lock without the wallet key — the
-  // address is not secret, and resolvePublishOwner refuses if a different account later unlocks.
-  if (publishState && !publishState.ownerWallet) publishState.ownerWallet = owner;
-  let lastResult = null;
-  // ONE shared background nonce watcher for the whole burst (see createVaultPublishNonceWatch) —
-  // created lazily at the first non-final batch; a later batch failure throws out of the send loop
-  // but the watcher keeps serving the already-registered targets.
-  let burstNonceWatch = null;
-  // VPB2: the flat per-capsule charge plan is packed into batches of
-  // 1..MAX_BATCH_PARTS contiguous same-kind items; each batch is ONE signed
-  // external consuming ONE strictly-sequential nonce. Every item in a batch
-  // shares the fate of that single external (sent/unknown/failed together).
-  const batches = groupPublishItemsIntoBatches(results);
-  const sendTurn = await enterVaultPublishSendLock();
-  try {
-    await awaitVaultPublishNonceBarrier();
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
-      const batch = batches[batchIndex];
-      const pendingItems = batch.items.filter((item) => !publishPartAlreadyAttempted(publishState.parts?.[item.partIndex]));
-      // A batch is atomic (one nonce, one external, one BPI1): it is sent only when EVERY item is still
-      // pending. Once any item has been attempted the whole batch is in-flight, so we keep its state and never
-      // re-send — re-sending here would re-publish (and re-charge) the already-attempted parts under a fresh
-      // nonce. Deterministic grouping makes the mixed case unreachable; this guard keeps that invariant explicit.
-      if (pendingItems.length !== batch.items.length) {
-        for (const item of batch.items) {
-          const existingPart = publishState.parts?.[item.partIndex];
-          if (existingPart) notifyPublishState(options, publishState, existingPart);
-        }
-        continue;
-      }
-      for (const item of batch.items) {
-        notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENDING));
-      }
-      let batchExternal = null;
-      try {
-        // Batch 0 reads the chain nonce; subsequent batches derive the nonce from the monotonic floor
-        // (raised right after the previous batch's broadcast at :raiseVaultPublishNonceFloor) WITHOUT a
-        // chain read. The chain has not yet reflected the prior external, and readVaultPublishNonce would
-        // re-block on the just-installed background nonce barrier (awaitVaultPublishNonceBarrier) — that
-        // inter-batch block is exactly the multi-minute image latency. Signing N batches under N
-        // consecutive nonces and broadcasting them back-to-back is how a wallet streams seqno: the contract
-        // enforces strict sequential nonce on-chain (throwUnless == publish_nonce, pre-accept) and bounces
-        // any out-of-order arrival with NO charge, so back-to-back broadcast cannot double-spend or land
-        // out of order; a bounced (reordered) batch is healed by the idempotent same-nonce re-broadcast in
-        // the confirmation-retry path.
-        const nonceFloor = vaultPublishNonceFloor(owner);
-        let clientNonce;
-        // The freshest CHAIN nonce observed for batch 0 (kept SEPARATE from the floor clamp below):
-        // batch 0 POSTs immediately only when its signed nonce IS the chain's next expected one.
-        let observedChainNonce = null;
-        if (batchIndex === 0) {
-          clientNonce = options.allowOwnVaultActionReadFallback === true
-            ? await readVaultPublishNonceForOwnVaultAction(provider, owner)
-            : await readVaultPublishNonce(provider, owner);
-          if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
-          observedChainNonce = clientNonce;
-        } else {
-          clientNonce = nonceFloor;
-        }
-        if (clientNonce < nonceFloor) {
-          // A lagging replica returned a nonce we already observed consumed
-          // (or consumed ourselves by broadcasting). Re-read briefly, then
-          // trust the monotonic floor: signing below it can only produce a
-          // permanently rejected external racing our own in-flight one.
-          const staleReadDeadline = Date.now() + 10_000;
-          while (clientNonce < nonceFloor && Date.now() < staleReadDeadline) {
-            await delay(500);
-            try {
-              const reread = await readVaultPublishNonce(provider, owner, {
-                verify: false,
-                allowUnverifiedCriticalRead: true,
-                requestTimeoutMs: 4_000,
-              });
-              if (reread !== null && reread > clientNonce) {
-                clientNonce = reread;
-                observedChainNonce = reread;
-              }
-            } catch (rereadError) {
-              if (!isTonRpcRecoverableReadError(rereadError) && !isTonRpcRateLimitError(rereadError)) throw rereadError;
-            }
-          }
-          if (clientNonce < nonceFloor) clientNonce = nonceFloor;
-        }
-        batch.clientNonce = clientNonce;
-        // ONE signed batch external for the whole group.
-        batchExternal = await buildBatchExternalFromPublishItems(batch, {
-          owner,
-          clientNonce,
-          vaultAddress: requireVaultAddress(),
-          manifestHash: requireVaultDeploymentManifestHash(),
-          authSecretKey: requireVaultAuthSecretKey(),
-        });
-        batch.external = batchExternal;
-        batch.batchPublishId = publishHashPlain(batchExternal.batchPublishId);
-        const broadcastAt = new Date().toISOString();
-        // Stamp each item with its per-entry EPI1 publish_id and the SHARED
-        // batch external/nonce: the confirm + broadcast-retry + dropped-recovery
-        // paths key on these per part, but all parts of a batch carry the SAME
-        // external boc and nonce (the one in-flight message they all ride).
-        for (let entryIndex = 0; entryIndex < batch.items.length; entryIndex += 1) {
-          const item = batch.items[entryIndex];
-          item.clientNonce = clientNonce;
-          const epi1 = publishHashPlain(batchExternal.entryPublishIds[entryIndex]);
-          item.publishId = epi1;
-          item.external = batchExternal;
-          const partWithPublishId = publishState.parts?.[item.partIndex];
-          if (partWithPublishId) {
-            partWithPublishId.publishId = epi1;
-            partWithPublishId.clientNonce = clientNonce.toString();
-            partWithPublishId.batchPublishId = batch.batchPublishId;
-            partWithPublishId.batchPartIndex = entryIndex;
-            if (publishPartKind(partWithPublishId) === 'public') partWithPublishId.authorWallet = owner;
-            partWithPublishId.externalBoc = batchExternal.boc;
-            // Pre-signed max_charge variants (same nonce/ids): the keyless retry loop rotates them so every
-            // re-broadcast is a REAL broadcast past the network's ~60s same-bytes dedup windows.
-            partWithPublishId.externalBocVariants = batchExternal.variants ?? null;
-            partWithPublishId.maxCharge = (batchExternal.maxCharge ?? batch.items.reduce((sum, it) => sum + BigInt(it.maxCharge ?? 0n), 0n)).toString();
-            partWithPublishId.lastBroadcastAt = broadcastAt;
-            notifyPublishState(options, publishState, partWithPublishId);
-          }
-        }
-        // An external signed under a nonce the chain has NOT reached yet is GUARANTEED to bounce
-        // pre-accept with Vault exit code 16453 (throwUnless clientNonce == publish_nonce): a wasted
-        // request + an alarming native red 500 in the console for every such POST. That covers TWO
-        // cases: (a) batches 1+ of this burst (batch 0's nonce is still in flight — the v623 rule), and
-        // (b) batch 0 of a message QUEUED behind other in-flight sends, whose signed nonce was raised
-        // above the freshly-read chain nonce by the floor clamp (v764 — the owner's "scary console": a
-        // doomed red 500 per queued message). Defer both: parts are stamped SENT with the signed
-        // externalBoc + nonce below, and the idempotent re-broadcast path POSTs the external the moment
-        // its nonce becomes current (currentNonce === clientNonce) — the same ~1-3.5s cadence that would
-        // have re-sent the bounced copy anyway. Corner cost: a STALE pre-sign read (chain actually at
-        // the floor already) now defers a POST that would have succeeded — one heal-pass of added
-        // latency, traded for zero guaranteed-doomed requests. No double-send:
-        // retryUnconfirmedVaultPublishBroadcasts reads the chain nonce FIRST.
-        const postableNow = batchIndex === 0
-          && observedChainNonce !== null
-          && clientNonce === observedChainNonce;
-        lastResult = postableNow ? await sendVaultExternalBoc(batchExternal) : null;
-        // externalBytes = the REAL serialized external BoC size (base64 -> bytes). The build guard already asserts
-        // < 65535, so a value NEAR the ceiling on a specific image is the tell for "passes emulation, dropped by
-        // validators" (diagnostic for the "one image won't send" report).
-        const externalBytes = Math.floor(((batchExternal?.boc?.length ?? 0) * 3) / 4);
-        console.info('[platho] send timeline', postableNow
-          ? { event: 'external POSTed (200)', nonce: String(clientNonce), batchIndex, externalBytes, parts: batch.items.length }
-          : {
-            event: batchIndex === 0
-              ? 'signed, POST deferred (queued behind in-flight sends)'
-              : 'signed, POST deferred until prior nonce lands',
-            nonce: String(clientNonce),
-            batchIndex,
-            externalBytes,
-            parts: batch.items.length,
-          });
-        batch.result = lastResult;
-        for (const item of batch.items) item.result = lastResult;
-        // The signed external is now out (or, for batchIndex > 0, will be re-broadcast the moment N is reached):
-        // this nonce is consumed from the client's point of view, so the next batch derives N+i+1 from the floor.
-        raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
-        for (const item of batch.items) {
-          notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
-        }
-        if (shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)) {
-          // NON-BLOCKING for EVERY batch (middle and final): never await the chain nonce advance inside
-          // the send loop — the loop proceeds straight to the next batch, which signs at the freshly-
-          // raised floor, so all batches broadcast back-to-back instead of one-land-at-a-time (this is
-          // what collapses the multi-minute image to near-text latency). v756: ONE shared watcher per
-          // burst replaces the old per-batch background pollers (six concurrent critical-priority 1s
-          // read streams on a 7-batch send — the pump-starvation source; see
-          // createVaultPublishNonceWatch). Each batch just registers its target: the watcher flips its
-          // parts SENT -> VAULT_SUBMITTED when the chain nonce passes it, and the watcher's completion
-          // is the publish nonce barrier gating a subsequent unrelated vault action behind the burst.
-          // The deadline still scales with batch position (v648) so a mid-burst slowdown doesn't expire
-          // the watch before a late batch's turn (a lapsed watch is swallowed and healed later anyway).
-          if (!burstNonceWatch) {
-            burstNonceWatch = createVaultPublishNonceWatch({
-              provider,
-              owner,
-              publishState,
-              requestTimeoutMs: options.requestTimeoutMs,
-              queueTimeoutMs: options.queueTimeoutMs,
-              notify: (state, part) => notifyPublishState(options, state, part),
-            });
-          }
-          registerVaultPublishNonceWatchTarget(burstNonceWatch, {
-            expectedNonce: clientNonce + 1n,
-            partIndexes: batch.items.map((item) => item.partIndex),
-            timeoutMs: options.timeoutMs ?? (VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS * (batchIndex + 1)),
-          });
-        }
-      } catch (error) {
-        // Surface WHY toncenter rejected the INITIAL broadcast (raw upstream error.responseBody) — symmetric with
-        // the re-broadcast warn — so a bare "500" on the FIRST send is diagnosable instead of a mystery. Exit code
-        // 16453 ("too early": this message signed ahead of a chain still landing earlier sends) is the EXPECTED
-        // back-to-back pipelining bounce — one per message queued behind an in-flight burst — so it logs at
-        // debug, not as a scary warn wall; anything else (genuine toncenter reject/flakiness) keeps the warn.
-        const expectedPipelineBounce = isVaultPublishNonceConsumedError(error);
-        (expectedPipelineBounce ? console.debug : console.warn)(
-          expectedPipelineBounce
-            ? '[platho] vault publish initial POST bounced 16453 (queued behind in-flight sends), heal delivers it in turn'
-            : '[platho] vault publish broadcast failed',
-          {
-            status: error?.status ?? null,
-            code: error?.code ?? null,
-            detail: error?.responseBody ?? shortUiErrorText(error, 'broadcast failed'),
-            clientNonce: batch.clientNonce === undefined || batch.clientNonce === null ? null : String(batch.clientNonce),
-            batchIndex,
-          },
-        );
-        const sentBeforeFailure = Boolean(batch.result);
-        const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError(error);
-        // If the external may have landed (sent-before-failure, or an ambiguous
-        // broadcast that the success path at line ~16101 never reached because
-        // sendVaultExternalBoc threw), the nonce is consumed from the client's
-        // view — raise the floor exactly like the success path and the single-
-        // external helpers, so no later signing attempt can under-shoot the
-        // consumed nonce. A definitive <500 reject leaves both flags false and is
-        // correctly skipped. (Cross-path consistency / defense-in-depth; the
-        // dropped-recovery guard does not depend on it — it reads the chain nonce
-        // fresh.)
-        if ((sentBeforeFailure || ambiguousBroadcast) && batch.clientNonce !== undefined && batch.clientNonce !== null) {
-          raiseVaultPublishNonceFloor(owner, batch.clientNonce + 1n);
-        }
-        const nextStatus = sentBeforeFailure || ambiguousBroadcast ? PUBLISH_PART_STATUS_UNKNOWN : PUBLISH_PART_STATUS_FAILED;
-        // The whole batch shares the fate of its single external.
-        for (const item of batch.items) {
-          const part = setPublishPartStatus(publishState, item.partIndex, nextStatus, {
-            error: String(error?.message ?? error),
-          });
-          notifyPublishState(options, publishState, part);
-        }
-        if (publishState.submittedCount > 0 || sentBeforeFailure || ambiguousBroadcast) publishState.status = VAULT_PUBLISH_STATUS_PARTIAL;
-        const partialResult = {
-          status: publishState.status === VAULT_PUBLISH_STATUS_PARTIAL ? VAULT_PUBLISH_STATUS_PARTIAL : 'vault-publish-failed',
-          results,
-          maxCharge: totalMaxCharge,
-          result: lastResult,
-          publishState,
-        };
-        if (publishState.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-          throw vaultPublishPartialError('Vault publish partially submitted', partialResult, error);
-        }
-        throw error;
-      }
-    }
-  } finally {
-    sendTurn.release();
-  }
-  // INLINE confirm is RECEIPT-ONLY (fast + authoritative): never run the CapsuleHub entry-scan recovery on the
-  // send's critical path. Right after broadcast the entry is not on chain yet, so that scan searches to its deadline
-  // and hangs the SENDER (the message itself landed fine and shows up for the recipient) — the iPhone dead-freeze
-  // the owner localized as "the app hangs looking for the message in the blockchain, then times out; the next sync
-  // shows it published". The full confirm (receipt + entry-scan) runs in the BACKGROUND retry
-  // (schedulePrivatePublishConfirmationRetry, scheduled by the caller when status != confirmed) once the entry is on
-  // chain, flipping to published without blocking the send. See slow-device-freeze-iphone-se2.
-  try {
-    await confirmCapsuleHubPublishEntries(publishState, { hot: true, receiptOnly: true });
-  } catch (error) {
-    const softVerification = isTonRpcRecoverableReadError(error);
-    const rateLimited = noteTonRpcRateLimit(error);
-    if (softVerification || rateLimited) {
-      publishState.status = VAULT_PUBLISH_STATUS_SUBMITTED;
-    } else {
-      console.error(error);
-    }
-  }
-  for (const part of publishState.parts ?? []) notifyPublishState(options, publishState, part);
-  globalThis.plathoLastVaultPublish = {
-    capsules: normalizedCapsules.map((capsule) => capsule.id),
-    status: publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-      ? CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-      : VAULT_PUBLISH_STATUS_SUBMITTED,
-    results,
-    maxCharge: totalMaxCharge,
-    result: lastResult,
-    publishState,
-  };
-  return {
-    status: publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-      ? CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-      : VAULT_PUBLISH_STATUS_SUBMITTED,
-    results,
-    maxCharge: totalMaxCharge,
-    result: lastResult,
-    publishState,
-  };
-}
-
-async function publishCapsulesThroughVault(capsules, options = {}) {
-  const prepared = await prepareCapsulesThroughVault(capsules, options);
-  return sendPreparedCapsulesThroughVault(prepared, options);
 }
 
 function privateMessageHasPublishAttempt(message) {
@@ -28285,73 +27388,6 @@ function refreshPrefsSyncUi() {
   else if (prefsLastSyncedAt) label = t('sync.savedAt', { date: prefsSyncedDateLabel(prefsLastSyncedAt) });
   else label = t('sync.notSaved');
   setText(savePrefsStatus, label);
-}
-
-function publicPublishDraftFromPayload(payload) {
-  return {
-    publish_kind: VAULT_PUBLISH_KIND.PUBLIC,
-    size_class: BigInt(payload.size_class ?? payload.sizeClass ?? VAULT_SIZE_CLASS.STANDARD),
-    crypto_suite: VAULT_CRYPTO_SUITE.PUBLIC_NONE,
-    header_0_hash: payload.headerHash,
-    body_hash: payload.bodyHash,
-    header_0_cell: payload.header_cell,
-    body_cell: payload.body_cell,
-    // Carry the comment parent to the part so buildBatchPublishPartCell sets parent_link (0 for posts) and the
-    // contract indexes a comment under its parent. Undefined for posts.
-    parent_entry_id: payload.parent_entry_id ?? payload.parentEntryId,
-    // clean-11: carry the is_profile flag through to the part (SAME drop-bug class as parent_entry_id above) so
-    // buildBatchPublishPartCell sets the reserved bit0. Absent/false for every normal post; true only for a gated
-    // channel-profile publish. Dropping it here would silently keep the profile-pointer feature dark on clean-11.
-    is_profile: payload.is_profile === true,
-  };
-}
-
-async function publishPublicPayloadParts(payloads, idPrefix, options = {}) {
-  return publishCapsulesThroughVault(payloads.map((payload, index) => ({
-    id: `${idPrefix}-${index}`,
-    publish: publicPublishDraftFromPayload(payload),
-  // NOTE: the old confirmFinalNonce option is DEAD since v616 (shouldConfirmVaultPublishNonceAfterSend ignores
-  // options) — the final batch is confirmed/healed by the public publish confirm driver instead.
-  })), { ...options, allowOwnVaultActionReadFallback: true });
-}
-
-async function createPublicPayloadParts({ type, text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments, commentsAllowed = true, parent = null, documentBytes = null, isProfile = false }) {
-  // documentBytes override: publish an explicit PDC1 document (e.g. a channel PROFILE block) instead of a composer
-  // draft, while still riding the identical public part-build + broadcast path.
-  const documentParts = documentBytes ? publicSendPlanFromDocumentBytes(documentBytes) : publicComposerSendPlan(text, attachments, fileAttachments);
-  const totalParts = documentParts.length;
-  if (totalParts <= 0) return [];
-  // Fail-closed cap (v648, mirrors assertPrivateComposerPartLimit in attemptConvMessagePublishDirect): the composer
-  // UI blocks earlier with the friendly message; this guard covers every programmatic path.
-  assertPublicComposerPartLimit(totalParts);
-  const streamId = randomBytes(16);
-  const createdAtSec = Math.floor(Date.now() / 1000);
-  const profilePointer = currentProfilePointerFields();
-  const payloads = [];
-  const commentBase = type === 'comment'
-    ? {
-        parentEntryId: BigInt(parent.entryId),
-        parentHash: parent.bodyHash,
-      }
-    : {};
-  for (let index = 0; index < documentParts.length; index += 1) {
-    const part = documentParts[index];
-    payloads.push(await createPublicPostPayload({
-      type: type === 'comment' ? 'document_comment' : 'document',
-      bytes: part.bytes,
-      commentsAllowed,
-      streamId,
-      partIndex: index,
-      partCount: totalParts,
-      createdAtSec,
-      // clean-11: mark ONLY the first part as the channel profile (a profile is single-part by design; the guard
-      // keeps exactly one global-profile-chain node even if a future profile ever spanned parts).
-      is_profile: isProfile === true && index === 0,
-      ...profilePointer,
-      ...commentBase,
-    }, { sizeClass: part.sizeClass }));
-  }
-  return payloads;
 }
 
 // ── clean-17 DIRECT-PAY public lane (gated) ─────────────────────────────────────────────────────────────────
