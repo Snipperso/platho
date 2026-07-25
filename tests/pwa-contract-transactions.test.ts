@@ -496,14 +496,21 @@ describe('PWA contract transaction builders', () => {
     expect(built.signature).toHaveLength(128);
   });
 
-  it('PWA-TX-04D2: profile avatar route verifies the derived ProfileRegistry ATH wallet', () => {
+  it('PWA-TX-04D2: profile avatar pays ProfileRegistry directly, with no Vault route read', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const route = app.match(/async function requireProfileRegistryVaultRoute[\s\S]*?async function requireProfileRegistryVaultRouteForOwnVaultAction/);
+    const direct = app.slice(
+      app.indexOf('async function submitProfileAvatarDirect'),
+      app.indexOf('// clean-17 direct-pay: the avatar rides ONE wallet transfer'),
+    );
 
-    expect(route?.[0]).toContain('resolved.provider.getAthWalletAddress(registry');
-    expect(route?.[0]).toContain('registryGlobal.official_ath_wallet_address');
-    expect(route?.[0]).toContain('ProfileRegistry official ATH wallet is not the derived registry wallet');
-    expect(route?.[0]).toContain('ProfileRegistry ATHMaster binding does not match this app config');
+    // The Vault route verifier (Vault global -> ProfileRegistry -> derived official ATH wallet) is gone with the
+    // Vault avatar path. Direct pay addresses the registry from the config+manifest pin and sends the 100 ATH as
+    // a plain ATHWallet transfer, so there is no registry global to cross-check before signing.
+    expect(app).not.toContain('async function requireProfileRegistryVaultRoute');
+    expect(app).not.toContain('ProfileRegistry official ATH wallet is not the derived registry wallet');
+    expect(direct).toContain("createAthWalletMessage('ATHTransferRequestRegistryProfileAvatar'");
+    expect(direct).toContain('recipient: requireProfileRegistryAddress()');
+    expect(direct).toContain('amount: PROFILE_AVATAR_PRICE_ATH');
   });
 
   it('PWA-USERNAME-ROUTE-ATHMASTER-01: username route verifies official ATH wallet owner and ATHMaster', () => {
