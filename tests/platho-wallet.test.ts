@@ -4,6 +4,8 @@ import { Blockchain } from '@ton/sandbox';
 import { WalletContractV5R1 } from '@ton/ton';
 import {
   PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER,
+  PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET,
+  chunkWalletMessages,
   buildPlathoWalletExternalBoc,
   createPlathoWallet,
   derivePlathoWalletFromMnemonic,
@@ -177,6 +179,31 @@ describe('embedded Platho wallet', () => {
     expect(result.batchCount).toBe(2);
     expect(result.batches.map((batch: any) => batch.seqno)).toEqual([42, 43]);
     expect(result.batches.map((batch: any) => batch.messageCount)).toEqual([255, 5]);
+  });
+
+  it('PLATHO-WALLET-04H: splits a large multipart message across externals by BYTE size, not just count', () => {
+    // A media/multipart message: only 8 parts (well under the 255 COUNT limit) but each carries a ~30KB payload.
+    // Packed whole into ONE external (~240KB) TON validators would DROP it at ingest (the v443 oversized-external
+    // class). The byte-aware chunker must split it so every external stays under the 65535 ceiling.
+    const bigPayload = 'A'.repeat(40000); // 40000 base64 chars -> ~30000 decoded bytes per part
+    const messages = Array.from({ length: 8 }, (_, index) => ({
+      address: `0:${(index + 1).toString(16).padStart(64, '0')}`,
+      amount: '1000000',
+      payload: bigPayload,
+    }));
+    const chunks = chunkWalletMessages(messages);
+    // Count alone would leave 1 chunk; the byte budget forces several.
+    expect(chunks.length).toBeGreaterThan(1);
+    // No capsule is lost or reordered — the flattened chunks are exactly the original parts in order.
+    expect(chunks.flat()).toEqual(messages);
+    // Every chunk's estimated external stays within the byte budget (so the built external clears 65535).
+    for (const chunk of chunks) {
+      const bytes = chunk.reduce((sum, message) => sum + Math.ceil((message.payload.length * 3) / 4) + 300, 0);
+      expect(bytes).toBeLessThanOrEqual(PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET);
+    }
+    // A small message is unaffected: it stays a single external (no forced split, no added send latency).
+    const small = chunkWalletMessages([{ address: '0:' + '0'.repeat(64), amount: '1', payload: null }]);
+    expect(small).toHaveLength(1);
   });
 
   it('PLATHO-WALLET-04D: fails closed when RPC seqno cannot be read before signing', async () => {

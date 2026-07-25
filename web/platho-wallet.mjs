@@ -37,6 +37,22 @@ export const PLATHO_WALLET_NETWORK_GLOBAL_IDS = Object.freeze({
 export const PLATHO_WALLET_SUBWALLET_NUMBER = 0;
 export const PLATHO_WALLET_ID = 0x7fffff11;
 export const PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER = 255;
+// TON config-43 max_ext_msg_size: validators DROP an inbound external BoC larger than this BEFORE the wallet
+// contract runs — a SILENT loss (the v443 "oversized external dropped at ingest" class). So a multi-part media
+// message must be split across externals by BYTE size, not only by the 255-message count. Over-splitting is safe;
+// under-splitting trips the hard guard in buildPlathoWalletExternalBoc (fail-loud) — never a silent drop.
+export const PLATHO_WALLET_MAX_EXTERNAL_MESSAGE_BYTES = 65535;
+// Pack target per external: < the hard ceiling with margin for the signed v5 envelope, the shared ~1.1KB
+// RecordShard StateInit, and BoC cell framing/dedup slack. The existing multi-transfer streaming (seqno-ordered,
+// waitForWalletSeqnoAtLeast) then carries the extra externals — so an 8-capsule media message sends across as
+// many externals as the byte ceiling requires instead of being dropped whole.
+export const PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET = 58000;
+// Per internal-message header (addr/value/flags) + out-action wrapper. Kept small so it does NOT over-split a bulk
+// send of many TINY (null-payload) messages below the 255 count — those actually serialize at ~100 bytes each, so
+// the 255-count external stays far under the ceiling. For a LARGE (media) part the ~30KB payload dominates and this
+// term is negligible; the budget's ~7.5KB margin under 65535 absorbs the uncounted shared StateInit + envelope, so
+// no validly-chunked external can trip the hard guard. [byte-aware chunk calibration]
+const PLATHO_WALLET_MESSAGE_FRAMING_BYTES = 150;
 export const PLATHO_WALLET_V5R1_CODE_BOC =
   'te6ccgECFAEAAoEAART/APSkE/S88sgLAQIBIAINAgFIAwQC3NAg10nBIJFbj2Mg1wsfIIIQZXh0br0hghBzaW50vbCSXwPgghBleHRuuo60gCDXIQHQdNch+kAw+kT4KPpEMFi9kVvg7UTQgQFB1yH0BYMH9A5voTGRMOGAQNchcH/bPOAxINdJgQKAuZEw4HDiEA8CASAFDAIBIAYJAgFuBwgAGa3OdqJoQCDrkOuF/8AAGa8d9qJoQBDrkOuFj8ACAUgKCwAXsyX7UTQcdch1wsfgABGyYvtRNDXCgCAAGb5fD2omhAgKDrkPoCwBAvIOAR4g1wsfghBzaWduuvLgin8PAeaO8O2i7fshgwjXIgKDCNcjIIAg1yHTH9Mf0x/tRNDSANMfINMf0//XCgAK+QFAzPkQmiiUXwrbMeHywIffArNQB7Dy0IRRJbry4IVQNrry4Ib4I7vy0IgikvgA3gGkf8jKAMsfAc8Wye1UIJL4D95w2zzYEAP27aLt+wL0BCFukmwhjkwCIdc5MHCUIccAs44tAdcoIHYeQ2wg10nACPLgkyDXSsAC8uCTINcdBscSwgBSMLDy0InXTNc5MAGk6GwShAe78uCT10rAAPLgk+1V4tIAAcAAkVvg69csCBQgkXCWAdcsCBwS4lIQseMPINdKERITAJYB+kAB+kT4KPpEMFi68uCR7UTQgQFB1xj0BQSdf8jKAEAEgwf0U/Lgi44UA4MH9Fvy4Iwi1woAIW4Bs7Dy0JDiyFADzxYS9ADJ7VQAcjDXLAgkji0h8uCS0gDtRNDSAFETuvLQj1RQMJExnAGBAUDXIdcKAPLgjuLIygBYzxbJ7VST8sCN4gAQk1vbMeHXTNA=';
 
@@ -561,20 +577,55 @@ export async function buildPlathoWalletExternalBoc(wallet, messages, options = {
   const root = externalInMessage(wallet, body, {
     includeStateInit: options.includeStateInit ?? seqno === 0,
   });
-  return {
-    boc: bytesToBase64(serializeBoc(root)),
-    seqno,
-    wallet: wallet.address,
-  };
+  const boc = bytesToBase64(serializeBoc(root));
+  // Hard external-size backstop: TON validators DROP an inbound external larger than max_ext_msg_size (config-43)
+  // at ingest, silently. If the byte-aware chunker ever under-splits, fail LOUD here (the caller retries / surfaces
+  // an error) instead of broadcasting a doomed external that vanishes and only reddens minutes later.
+  const externalBytes = Math.ceil((boc.length * 3) / 4);
+  if (externalBytes > PLATHO_WALLET_MAX_EXTERNAL_MESSAGE_BYTES) {
+    throw new RangeError(
+      `Wallet external is ${externalBytes} bytes, exceeds TON max_ext_msg_size ${PLATHO_WALLET_MAX_EXTERNAL_MESSAGE_BYTES} `
+      + '(validators drop it at ingest) — split the message into fewer/smaller parts',
+    );
+  }
+  return { boc, seqno, wallet: wallet.address };
 }
 
-function chunkWalletMessages(messages, maxPerTransfer = PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER) {
+// Conservative estimate of one internal message's contribution to the serialized external, in bytes: its payload
+// BoC (base64 -> bytes) plus per-message header framing. Over-estimates so the packer over-splits (safe) rather
+// than under-splits (which would trip the hard external-size guard at build). The shared StateInit (~1.1KB) is
+// covered by the budget's margin under the 65535 ceiling, so it is not double-counted per message.
+function estimateWalletMessageExternalBytes(message) {
+  const payload = message?.payload;
+  const payloadBytes = typeof payload === 'string' ? Math.ceil((payload.length * 3) / 4) : 0;
+  return payloadBytes + PLATHO_WALLET_MESSAGE_FRAMING_BYTES;
+}
+
+// Split into externals by BOTH the 255-message count AND the byte budget: a chunk closes when adding the next
+// message would exceed either. A single message always goes in alone (it cannot be split here — a genuinely
+// oversized single message is caught fail-loud by the build guard). The multi-chunk streaming in
+// sendPlathoWalletTransaction then sends each chunk as its own seqno-ordered external.
+export function chunkWalletMessages(
+  messages,
+  maxPerTransfer = PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER,
+  byteBudget = PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET,
+) {
   const list = Array.isArray(messages) ? messages : [messages];
   if (list.length === 0) throw new RangeError('Wallet transaction must include at least one message');
   const chunks = [];
-  for (let index = 0; index < list.length; index += maxPerTransfer) {
-    chunks.push(list.slice(index, index + maxPerTransfer));
+  let current = [];
+  let currentBytes = 0;
+  for (const message of list) {
+    const messageBytes = estimateWalletMessageExternalBytes(message);
+    if (current.length > 0 && (current.length >= maxPerTransfer || currentBytes + messageBytes > byteBudget)) {
+      chunks.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(message);
+    currentBytes += messageBytes;
   }
+  if (current.length > 0) chunks.push(current);
   return chunks;
 }
 
