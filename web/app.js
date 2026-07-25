@@ -14368,6 +14368,20 @@ function beginPrivateOutboundWork() {
   };
 }
 
+// clean-17 keyless-budget gate: true when NO toncenter API key is active, so reads run on the paced ~1 rps keyless
+// budget (with a key it is ~8 rps, plenty of headroom). ONLY on the keyless path does a direct-pay private send
+// coordinate with the background index-walk sync (yield to an in-flight pass + beginPrivateOutboundWork while it
+// broadcasts/confirms) so the send's reads get the scarce budget for a fast delivery-confirm — the paced pump is
+// 429-safe either way, and a keyed send stays latency-free (no sync yield). Matches the "key-primary, keyless-
+// fallback, works-without-a-key" principle. A rejected key reverts to '' (see commitToncenterKeyFromInput), so
+// this reflects the real runtime state.
+function usingKeylessTonRpc() {
+  return !(globalThis.plathoToncenterApiKey
+    || globalThis.plathoTonRpcApiKey
+    || globalThis.PLATHO_TON_RPC_API_KEY
+    || appConfig.network?.tonRpc?.apiKey);
+}
+
 async function enterVaultPublishSendLock() {
   vaultPublishSendWaiters += 1;
   const previous = vaultPublishSendLock;
@@ -21124,10 +21138,24 @@ composer?.addEventListener('submit', async (event) => {
     return;
   }
 
+  const keylessBudget = usingKeylessTonRpc();
+  const endPrivateOutboundWork = keylessBudget ? beginPrivateOutboundWork() : null;
   try {
+    // clean-17 keyless coordination: on the paced ~1 rps keyless path ONLY, yield to an in-flight index-walk sync
+    // pass and pause the next one (beginPrivateOutboundWork, above) while this send broadcasts — so the send + its
+    // delivery confirm get the scarce budget instead of interleaving with the walk. Capped so a stuck sync can never
+    // block a send; skipped entirely with a toncenter key (~8 rps headroom) so keyed sends stay latency-free.
+    if (keylessBudget && privateChainSyncPromise) {
+      await Promise.race([
+        Promise.resolve(privateChainSyncPromise).catch(() => {}),
+        delay(PRIVATE_SEND_SYNC_WAIT_CAP_MS),
+      ]);
+    }
     await attemptPrivateComposerMessagePublish(sendContext);
   } catch (error) {
     await settlePrivateComposerSendError(sendContext, error);
+  } finally {
+    if (endPrivateOutboundWork) endPrivateOutboundWork();
   }
   refreshThreadAfterMessageChange(thread);
   renderThreads();
@@ -29075,6 +29103,10 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   // re-arms — so the up-to-record_count walk runs at most once, not on every tick. [confirm review: per-tick re-walk cost]
   const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS;
   let res;
+  // clean-17 keyless coordination: pause the background index-walk sync for THIS confirm read only (not the whole
+  // re-arm window) so on the paced ~1 rps keyless path the read gets the scarce budget without the walk interleaving;
+  // between the spaced ticks the sync runs normally. No-op with a toncenter key (~8 rps headroom → no send latency).
+  const endConfirmOutboundWork = usingKeylessTonRpc() ? beginPrivateOutboundWork() : null;
   try {
     res = await confirmConvRecordsLanded({ readView, readRecord, address: send.address, commits, minSeq: send.maxSeq ?? null, maxScan: terminal ? null : CONV_CONFIRM_BOUNDED_SCAN });
   } catch (error) {
@@ -29083,6 +29115,8 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
     if (!noteTonRpcRateLimit(error)) console.warn('[conv] delivery confirm read failed', error);
     reArm();
     return;
+  } finally {
+    if (endConfirmOutboundWork) endConfirmOutboundWork();
   }
   // Re-check the generation AFTER the await: a teardown during the shard read must not let this tick write state or
   // re-arm against a swapped-out wallet/transport. [confirm review: fire-after-teardown re-arm escape]
