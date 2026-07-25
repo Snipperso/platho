@@ -1384,10 +1384,10 @@ describe('PWA runtime config guard', () => {
     expect(handlerSource).toMatch(/refreshMessagingControls\(\);/);
     expect(handlerSource).not.toMatch(/setAvatarButton\?\.toggleAttribute\('disabled', false\)/);
     expect(handlerSource).toMatch(/setProfileAvatarStatus\('avatar needs retry', 'error'\)/);
-    // Pre-publish preflight retries IN FLIGHT (truthful "RPC busy - retrying"), bounded by the delay table.
-    expect(app).toMatch(/for \(let preflightAttempt = 0;/);
-    expect(app).toMatch(/PROFILE_AVATAR_PREFLIGHT_RETRY_DELAYS_MS = \[/);
+    // The direct-pay publish holds the lock across the ONE wallet transfer; the rate-limited pre-publish
+    // preflight (and its in-flight retry table) belonged to the deleted Vault submit phase.
     expect(app).toMatch(/setProfileAvatarPending\(true\)/);
+    expect(app).not.toMatch(/PROFILE_AVATAR_PREFLIGHT_RETRY_DELAYS_MS/);
     // Recovery auto-retry is capped → parks at a retryable terminal state (no infinite "confirming").
     const scheduleSource = app.slice(
       app.indexOf('function scheduleProfileAvatarPublishRecovery'),
@@ -3297,10 +3297,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function runPrivatePublishConfirmationRetry'),
       app.indexOf('function hasPendingPrivatePublishConfirmation'),
     );
-    const avatarSource = app.slice(
-      app.indexOf('async function submitProfileAvatarUpdate'),
-      app.indexOf('async function submitVaultRegisterMessagingKeys'),
-    );
     const avatarFinalizeSource = app.slice(
       app.indexOf('async function finalizeProfileAvatarUpdate'),
       app.indexOf('async function runProfileAvatarPublishRecovery'),
@@ -3343,9 +3339,8 @@ describe('PWA runtime config guard', () => {
     expect(retrySource).toMatch(/const softVerification = isTonRpcRecoverableReadError\(error\)/);
     expect(retrySource).toMatch(/if \(!rateLimited && !softVerification\) console\.error\(error\)/);
     expect(retrySource).toMatch(/message\.privatePublishConfirmLastResult = softVerification \? 'rpc delayed' : 'error'/);
-    // v698 mobilized confirm: the avatar publish heals + reads receipts in a driver-style loop instead of
-    // sleeping in read-only waits (the 6-minute 2-capsule avatar).
-    expect(avatarSource).toMatch(/while \(!confirmed && Date\.now\(\) - mobilizedStartedAt < PROFILE_AVATAR_MOBILIZED_CONFIRM_DEADLINE_MS\)/);
+    // The v698 mobilized-confirm loop lived in the Vault avatar submit phase (deleted at cutover — a direct
+    // publish is confirmed by its own wallet transfer). The finalize leg still pins the paid pointer fields.
     expect(avatarFinalizeSource).toMatch(/avatarEntryId: confirmed\.firstEntryId/);
   });
 
@@ -6551,161 +6546,59 @@ describe('PWA runtime config guard', () => {
     expect(handlerSource).toMatch(/finally \{\s*messageSyncManualInFlight = false;/);
   });
 
-  it('PWA-CONFIG-06B: profile avatar registry update waits for CapsuleHub proof and registry finality', () => {
+
+  it('PWA-CONFIG-06B: profile avatar rides ONE direct-pay wallet transfer (shard bytes + paid pointer)', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const submitAvatarSource = app.slice(
-      app.indexOf('async function submitProfileAvatarUpdate'),
-      app.indexOf('async function submitVaultRegisterMessagingKeys'),
+    // The dispatcher has NO Vault fallback left: the clean-15 submit phase (CapsuleHub publishState, mobilized
+    // confirm loop, entry-scan recovery, inline-key exclusion vs recovery ticks) was deleted at cutover — a
+    // direct publish is confirmed by its own wallet transfer, so there is no publishState to heal.
+    expect(app).toMatch(/async function submitProfileAvatarUpdate\(avatar\) \{\s*return submitProfileAvatarDirect\(avatar\);\s*\}/);
+    expect(app).not.toMatch(/runProfileAvatarSubmitPhase\(/);
+
+    const directSource = app.slice(
+      app.indexOf('async function submitProfileAvatarDirect'),
+      // stop BEFORE the dispatcher's comment — it names the removed Vault machinery, which the negative
+      // assertions below would otherwise match.
+      app.indexOf('// clean-17 direct-pay: the avatar rides ONE wallet transfer'),
     );
-    const finalizeAvatarSource = app.slice(
-      app.indexOf('async function finalizeProfileAvatarUpdate'),
-      app.indexOf('async function runProfileAvatarPublishRecovery'),
-    );
-    const readAvatarPartsSource = app.slice(
-      app.indexOf('async function readAvatarPartsFromCapsuleHub'),
-      app.indexOf('async function findPublishedAvatarEntries'),
-    );
-    const findAvatarPartsSource = app.slice(
-      app.indexOf('async function findPublishedAvatarEntries'),
-      app.indexOf('async function waitForProfileAvatarRegistryUpdate'),
-    );
-    const waitRegistrySource = app.slice(
-      app.indexOf('async function waitForProfileAvatarRegistryUpdate'),
-      app.indexOf('async function loadProfileAvatarImage'),
+    const shardReadSource = app.slice(
+      app.indexOf('async function readAvatarPartsFromShard'),
+      app.indexOf('function avatarPartStreamId'),
     );
 
-    // v698 mobilized confirm replaces the read-only wait ladder: heal (the only sender of the deferred
-    // 2nd+ batch) runs INSIDE the loop, before the receipt read; finalize comes after the loop.
-    const mobilizedIdx = submitAvatarSource.indexOf('while (!confirmed && Date.now() - mobilizedStartedAt < PROFILE_AVATAR_MOBILIZED_CONFIRM_DEADLINE_MS)');
-    expect(mobilizedIdx).toBeGreaterThan(-1);
-    expect(submitAvatarSource.indexOf('retryUnconfirmedVaultPublishBroadcasts(publishResult.publishState, {')).toBeGreaterThan(mobilizedIdx);
-    expect(submitAvatarSource).toMatch(/receiptOnly:\s*true/);
-    expect(submitAvatarSource.indexOf('finality = await finalizeProfileAvatarUpdate')).toBeGreaterThan(mobilizedIdx);
-    expect(app).toMatch(/const PROFILE_AVATAR_MOBILIZED_CONFIRM_DEADLINE_MS = 120 \* 1000/);
-    expect(app).toMatch(/const PROFILE_AVATAR_MOBILIZED_CONFIRM_PASS_DELAY_MS = 1_500/);
-    // The pre-publish "already published?" check is capped to a NARROW recent window — the unbounded
-    // 2048-entry fallback scan before every publish was minutes of serial reads.
-    expect(app).toMatch(/const PROFILE_AVATAR_PRECHECK_FALLBACK_SCAN_LIMIT = 64/);
-    expect(submitAvatarSource).toMatch(/\{ fallbackScanLimit: PROFILE_AVATAR_PRECHECK_FALLBACK_SCAN_LIMIT \}/);
-    // Recovery ticks heal FIRST (the serial RPC pump starved the one actual fix behind wide scans).
-    const recoveryFindSource = app.slice(
-      app.indexOf('async function findProfileAvatarPublishedEntriesFromRecovery'),
-      app.indexOf('async function finalizeProfileAvatarUpdate'),
-    );
-    const recoveryHealIdx = recoveryFindSource.indexOf('retryUnconfirmedVaultPublishBroadcasts');
-    expect(recoveryHealIdx).toBeGreaterThan(-1);
-    expect(recoveryHealIdx).toBeLessThan(recoveryFindSource.indexOf('findConfirmedAvatarEntriesFromPublishState'));
-    expect(recoveryHealIdx).toBeLessThan(recoveryFindSource.indexOf('findPublishedAvatarEntries'));
-    // v699 driver exclusion: the inline submit phase and the recovery ticks can NEVER interleave on one
-    // publishState (lock->unlock resume used to run both -> risk of a duplicate paid registry submission).
-    // The inline key is held under try/finally so every exit releases it; ticks defer WITHOUT burning an
-    // auto-retry attempt; the tick body itself is single-flight (a delay-0 manual-re-pick tick cannot run
-    // while a previous tick's finalize is still in flight), and the runtime-only tickInFlight flag never
-    // survives a job-object swap or a reload.
-    // The inline exclusion is a DEPTH counter (a concurrent second submit must not release the first
-    // phase's key), held under try/finally so every exit settles it.
-    expect(submitAvatarSource).toMatch(/profileAvatarInlineSubmitKeys\.set\(inlineKey, \(profileAvatarInlineSubmitKeys\.get\(inlineKey\) \?\? 0\) \+ 1\);\s*try \{\s*return await runProfileAvatarSubmitPhase\(owner, avatar, avatarHash\);/);
-    expect(submitAvatarSource).toMatch(/if \(inlineDepth <= 0\) profileAvatarInlineSubmitKeys\.delete\(inlineKey\);/);
-    const recoveryRunSource = app.slice(
-      app.indexOf('async function runProfileAvatarPublishRecovery(key)'),
-      app.indexOf('async function runProfileAvatarPublishRecoveryTick'),
-    );
-    expect(recoveryRunSource).toMatch(/if \(profileAvatarInlineSubmitKeys\.has\(key\)\)/);
-    expect(recoveryRunSource).toMatch(/scheduleProfileAvatarPublishRecovery\(job\);\s*return null;/);
-    // Tick single-flight lives in MODULE scope keyed by job key — an object-carried flag is reset by the
-    // job swap every re-schedule performs (remember builds a fresh object), so it cannot guard anything.
-    expect(recoveryRunSource).toMatch(/if \(profileAvatarRecoveryTicksInFlight\.has\(key\)\) return null;/);
-    expect(recoveryRunSource).toMatch(/profileAvatarRecoveryTicksInFlight\.add\(key\);\s*try \{\s*return await runProfileAvatarPublishRecoveryTick\(job\);\s*\} finally \{\s*profileAvatarRecoveryTicksInFlight\.delete\(key\);/);
-    expect(app).not.toMatch(/tickInFlight/);
-    // The tick defers BEFORE the attempts increment (deferred ticks must not burn the 8-attempt budget).
-    expect(recoveryRunSource).not.toMatch(/job\.attempts =/);
-    expect(finalizeAvatarSource.indexOf('await submitVaultProfileAvatarRegistration')).toBeGreaterThan(-1);
-    expect(finalizeAvatarSource.indexOf('registryPointer = await waitForProfileAvatarRegistryUpdate')).toBeGreaterThan(
-      finalizeAvatarSource.indexOf('await submitVaultProfileAvatarRegistration'),
-    );
-    expect(finalizeAvatarSource).toMatch(/t\('avatar\.confirmingRegistry'\)/);
-    expect(EN_STRINGS['avatar.confirmingRegistry']).toBe('confirming registry');
-    expect(finalizeAvatarSource).toMatch(/t\('avatar\.notActiveYet'\)/);
-    expect(EN_STRINGS['avatar.notActiveYet']).toBe('avatar not active yet');
-    expect(finalizeAvatarSource).toMatch(/registrySubmission \?\? await submitVaultProfileAvatarRegistration/);
-    expect(submitAvatarSource).toMatch(/profileAvatarPublishRecoveryFor\(owner, avatarHash\)/);
-    expect(submitAvatarSource).toMatch(/scheduleProfileAvatarPublishRecovery\(existingRecovery, 0\)/);
-    expect(submitAvatarSource).toMatch(/scheduleProfileAvatarPublishRecovery\(\{[\s\S]*confirmed,[\s\S]*registrySubmission: finality\.result/);
-    expect(app).toMatch(/async function runProfileAvatarPublishRecovery/);
-    expect(app).toMatch(/globalThis\.plathoProfileAvatarPublishRecoveries/);
-    expect(app).toMatch(/const PROFILE_AVATAR_RECOVERY_RETRY_DELAYS_MS = \[15_000, 30_000, 60_000, 120_000, 180_000\]/);
-    expect(app).toMatch(/PROFILE_AVATAR_PUBLISH_RECOVERY_STORAGE_PREFIX = 'platho\.profile\.avatar\.publishRecovery\.v1'/);
-    expect(app).toMatch(/PROFILE_AVATAR_RECOVERY_LOCAL_PENDING_MS = 15 \* 60 \* 1000/);
-    expect(app).toMatch(/function profileAvatarPublishRecoveryStorageKey\(owner, avatarHash\)/);
-    expect(app).toMatch(/function writeProfileAvatarPublishRecovery\(job\)/);
-    expect(app).toMatch(/function readProfileAvatarPublishRecovery\(owner, avatarHash\)/);
-    expect(app).toMatch(/function clearProfileAvatarPublishRecoveryStorage\(owner, avatarHash\)/);
-    expect(app).toMatch(/writeProfileAvatarPublishRecovery\(job\)/);
-    expect(app).toMatch(/const PROFILE_AVATAR_ROUTE_RETRY_DELAYS_MS = \[1_000, 2_000, 4_000, 8_000\]/);
-    expect(submitAvatarSource).toMatch(/isVaultPublishPartialError\(error\)/);
-    expect(submitAvatarSource).toMatch(/plathoLastProfileAvatarPublishPartial/);
-    expect(submitAvatarSource).toMatch(/t\('avatar\.publishSubmittedConfirming'\)/);
-    expect(EN_STRINGS['avatar.publishSubmittedConfirming']).toBe('publish submitted, confirming');
-    expect(submitAvatarSource).toMatch(/confirmCapsuleHubPublishEntries\(publishResult\.publishState, \{/);
-    expect(submitAvatarSource).toMatch(/findConfirmedAvatarEntriesFromPublishState\(owner, pendingPointer, publishResult\.publishState\)/);
-    expect(submitAvatarSource).toMatch(/scanAvailableTransports:\s*true/);
-    expect(submitAvatarSource).toMatch(/VAULT_PUBLISH_STATUS_PARTIAL/);
-    expect(submitAvatarSource).toMatch(/plathoLastProfileAvatarPublish/);
-    expect(submitAvatarSource).toMatch(/new Error\('Avatar capsules are not visible on-chain yet'\)/);
-    expect(submitAvatarSource).toMatch(/avatarStreamId:\s*null/);
-    expect(submitAvatarSource).toMatch(/PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT/);
-    expect(submitAvatarSource).toMatch(/PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS/);
-    expect(app).toMatch(/const PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS = 60/);
-    expect(app).toMatch(/const PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS = 2000/);
-    expect(app).toMatch(/const PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS = 120 \* 1000/);
-    expect(submitAvatarSource).not.toMatch(/markPublishStateAwaitingPartsForRetry\(/);
-    expect(submitAvatarSource).toMatch(/retryUnconfirmedVaultPublishBroadcasts\(publishResult\.publishState, \{/);
-    expect(submitAvatarSource).toMatch(/owner,/);
-    expect(submitAvatarSource).toMatch(/t\('avatar\.broadcastRetrying'\)/);
-    expect(EN_STRINGS['avatar.broadcastRetrying']).toBe('broadcast retrying');
-    expect(submitAvatarSource).toMatch(/plathoLastProfileAvatarPublishRecovery/);
-    expect(submitAvatarSource).toMatch(/capturePublishSnapshot\('before-public-publish'/);
-    expect(submitAvatarSource).toMatch(/capturePublishSnapshot\('after-avatar-not-visible'/);
-    expect(submitAvatarSource).toMatch(/profileAvatarPublishDiagnosticStatus\(publishDiagnostics\)/);
-    expect(submitAvatarSource).toMatch(/profileAvatarPublishPayloadDiagnostics\(payloads\)/);
-    expect(app).toMatch(/plathoProfileAvatarPublishDiagnosticsJson/);
-    expect(app).toMatch(/safeDiagnosticsJson/);
-    expect(submitAvatarSource).toMatch(/publishDiagnostics\.initialPublishError = shortUiErrorText\(error\.cause \?\? error, 'avatar publish failed'\)/);
-    expect(submitAvatarSource).toMatch(/t\('avatar\.broadcastUncertainDetail', \{ status: broadcastStatus \}\)/);
-    expect(EN_STRINGS['avatar.broadcastUncertainDetail']).toMatch(/^broadcast uncertain: /);
-    expect(app).toMatch(/externalBocLength/);
-    expect(app).toMatch(/TON RPC broadcast failed:/);
-    expect(submitAvatarSource).not.toMatch(/avatar publish retrying/);
-    expect(enCopy).not.toMatch(/avatar publish retrying/);
-    expect(submitAvatarSource).not.toMatch(/profile-avatar-retry-/);
-    expect(enCopy).not.toMatch(/profile-avatar-retry-/);
-    expect(submitAvatarSource).toMatch(/t\('avatar\.stillConfirming'\)/);
-    expect(EN_STRINGS['avatar.stillConfirming']).toBe('avatar still confirming');
-    expect(readAvatarPartsSource).toMatch(/assembledAvatarPartGroup\(parts, pointer\)/);
-    expect(findAvatarPartsSource).toMatch(/assembledAvatarPartGroup\(parts, pointer\)/);
-    expect(app).toMatch(/async function findConfirmedAvatarEntriesFromPublishState\(ownerWallet, pointer, publishState\)/);
-    expect(app).toMatch(/part\.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED/);
-    expect(app).toMatch(/confirmedBy:\s*'publish_state_hashes'/);
-    expect(app).toMatch(/confirmedBy:\s*'recovered_from_existing_identical_payload'/);
-    expect(app).toMatch(/readProfileAvatarMediaCache\(pointer\.avatarHash\)/);
-    expect(app).toMatch(/function publicAvatarPartMatches\(payload, ownerWallet, pointer\)/);
-    expect(app).toMatch(/payload\?\.type !== 'avatar'/);
-    expect(app).toMatch(/payload\.avatarHash \?\? payload\.avatar_hash/);
-    expect(app).toMatch(/payload\.stream_id/);
-    expect(app).toMatch(/payload\.partCount \?\? payload\.part_count/);
-    expect(app).toMatch(/sameWalletAddress\(payload\.authorWallet, ownerWallet\)/);
-    expect(app).toMatch(/function avatarPartsCompleteForPointer\(parts, pointer\)/);
-    expect(app).toMatch(/const streamId = avatarPartStreamId\(part\)/);
-    expect(app).toMatch(/group\.size >= expected/);
-    expect(app).toMatch(/async function assembledAvatarPartGroup\(parts, pointer\)/);
-    expect(app).toMatch(/for \(const groupParts of groups\.values\(\)\)/);
-    expect(app).toMatch(/const hash = await sha256Hex\(bytes\)/);
+    // Idempotence BEFORE paying: re-picking the image already on-chain must not spend a second 100 ATH.
+    expect(directSource).toMatch(/readCurrentProfileAvatarPointerFromChain\(owner, \{ required: false \}\)/);
+    expect(directSource).toMatch(/if \(currentPointer\?\.avatarHash\?\.toLowerCase\?\.\(\) === normalizeAvatarHashHex\(avatarHash\)\.toLowerCase\(\)\)/);
+    expect(directSource).toMatch(/return \{ status: 'active', registryPointer: currentPointer \}/);
+    // Part cap is enforced before the transfer is built (an over-long image must fail loud, not half-publish).
+    expect(directSource).toMatch(/if \(parts\.length > 16\) throw new Error\('Avatar must fit 16 public capsules'\)/);
+    // Bytes go to the owner's AVATAR PublicShard (kind 3), addressed by the avatar partition key + era tag.
+    expect(directSource).toMatch(/createPublicPostPayloadV2\(\{\s*type: 'avatar'/);
+    expect(directSource).toMatch(/const avatarPartitionKey = await publicAvatarPartitionKey\(walletHash\)/);
+    expect(directSource).toMatch(/const avatarEpochTag = publicEpochTag\(3, publicEraOf\(3, createdAtSec\)\)/);
+    expect(directSource).toMatch(/const avatarValue = publicPublishValueForKind\(3\)/);
+    expect(directSource).toMatch(/kind: 3, keyArg: 0n,[\s\S]*partitionKey: avatarPartitionKey, epochTag: avatarEpochTag/);
+    // The PAID pointer write is authorised by the 100 ATH request to ProfileRegistry, and it carries exactly the
+    // fields readAvatarPartsFromShard matches on (streamId as uint128 + part count).
+    expect(directSource).toMatch(/createAthWalletMessage\('ATHTransferRequestRegistryProfileAvatar'/);
+    expect(directSource).toMatch(/amount: PROFILE_AVATAR_PRICE_ATH/);
+    expect(directSource).toMatch(/recipient: requireProfileRegistryAddress\(\)/);
+    expect(directSource).toMatch(/avatar_stream_id: tonCell\.bytesToBigInt\(streamId\)/);
+    expect(directSource).toMatch(/avatar_part_count: BigInt\(parts\.length\)/);
+    // ONE wallet transfer carries both legs — bytes without a paid pointer (or the reverse) is the split-state
+    // this pins against.
+    expect(directSource).toMatch(/publishPublicLaneParts\(\{ wallet: plathoWallet, transport \}, shardParts, \{ extraMessages: \[athRequest\] \}\)/);
+    expect(directSource).toMatch(/await writeProfileAvatarMediaCache\(avatarHash, bytesToImageDataUrl\(avatar\.bytes, 'image\/webp'\)\)/);
+    // No Vault publish machinery on the direct path.
+    expect(directSource).not.toMatch(/publishState/);
+    expect(directSource).not.toMatch(/confirmCapsuleHubPublishEntries|retryUnconfirmedVaultPublishBroadcasts/);
+
+    // The reader trusts the PAID pointer, never the part header: PPH2 dropped avatar_hash/profile_version from
+    // the header, so a part is matched by streamId + partCount + owner and AUTHENTICATED by whole-image sha256.
+    expect(shardReadSource).toMatch(/if \(!publicAvatarPartMatchesShard\(payload, ownerWallet, pointer\)\) continue/);
+    expect(shardReadSource).toMatch(/const assembled = await assembledAvatarPartGroup\(parts, pointer\)/);
     expect(app).toMatch(/if \(hash\.toLowerCase\(\) !== pointer\.avatarHash\.toLowerCase\(\)\) return null/);
-    expect(app).toMatch(/if \(hash\.toLowerCase\(\) !== pointer\.avatarHash\.toLowerCase\(\)\) return null/);
-    expect(waitRegistrySource).toMatch(/let lastTransientError = null/);
-    expect(waitRegistrySource).toMatch(/isTonRpcRecoverableReadError\(error\)/);
-    expect(waitRegistrySource).toMatch(/readCurrentProfileAvatarPointerFromChain\(ownerWallet, \{ required: true \}\)/);
-    expect(waitRegistrySource).toMatch(/pointer\?\.avatarHash\?\.toLowerCase\(\) === expectedHash\.toLowerCase\(\)/);
+    expect(app).toMatch(/function publicAvatarPartMatchesShard\(payload, ownerWallet, pointer\)/);
   });
 
   it('PWA-CONFIG-06C: profile avatar direct pointer scan accepts CapsuleHub entry id zero', () => {
