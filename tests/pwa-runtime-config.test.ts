@@ -1805,7 +1805,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function shouldConfirmVaultPublishNonceAfterSend\(index, total, options = \{\}\)[\s\S]*return index < total - 1;/);
     expect(app).not.toMatch(/index < total - 1 \|\| options\.confirmFinalNonce === true/);
     expect(sendSource).toMatch(/if \(shouldConfirmVaultPublishNonceAfterSend\(batchIndex, batches\.length, options\)\) \{/);
-    expect(app).toMatch(/const publishCallbacks = \{[\s\S]*allowOwnVaultActionReadFallback: true,\s*confirmFinalNonce: true,/);
+    // clean-17: the `const publishCallbacks = { ... confirmFinalNonce: true }` call-site literal lived only in the
+    // now-collapsed Vault composer body; the orphaned send machinery it fed is still pinned by this guard until its
+    // follow-up removal batch.
     // v633: the dead confirmFinalNonce is REMOVED from the public path — the public publish confirm driver
     // (tests/public-publish-heal.test.ts) owns final-batch heal/confirmation for posts/comments.
     expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]{0,400}allowOwnVaultActionReadFallback: true \}\);/);
@@ -1981,10 +1983,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function sendPreparedCapsulesThroughVault'),
       app.indexOf('async function publishCapsulesThroughVault'),
     );
-    const attemptSource = app.slice(
-      app.indexOf('async function attemptPrivateComposerMessagePublish'),
-      app.indexOf('async function settlePrivateComposerSendError'),
-    );
     const settleSource = app.slice(
       app.indexOf('async function settlePrivateComposerSendError'),
       app.indexOf('async function runPrivateSendRetry'),
@@ -2026,10 +2024,10 @@ describe('PWA runtime config guard', () => {
     // VPB2 atomic batch: send only when EVERY item is still pending; any already-attempted item means the
     // whole batch is in-flight and must not be re-sent (which would re-publish + re-charge the attempted parts).
     expect(sendSource).toMatch(/if \(pendingItems\.length !== batch\.items\.length\) \{[\s\S]*continue;/);
-    expect(attemptSource).toMatch(/let capsules = Array\.isArray\(message\.capsules\) && message\.capsules\.length > 0[\s\S]*\? message\.capsules[\s\S]*: \(message\.capsule \? \[message\.capsule\] : null\)/);
-    expect(attemptSource).toMatch(/if \(!capsules\) \{[\s\S]*createPrivateComposerCapsules/);
-    expect(attemptSource).toMatch(/const existingPublishState = message\.publishState/);
-    expect(attemptSource).toMatch(/existingPublishState\?\.partCount === capsules\.length \? existingPublishState : createCapsulePublishState\(capsules\)/);
+    // clean-17: the live private send is direct-pay (attemptConvMessagePublishDirect); the composer wrapper
+    // attemptPrivateComposerMessagePublish no longer carries the Vault capsule-reuse/publishState body, so the
+    // former attemptSource assertions (capsule reuse, createCapsulePublishState) were dropped. The orphaned Vault
+    // retry machinery pinned above stays until its follow-up removal batch.
     expect(settleSource).toMatch(/publishStateHasRetryableSendParts\(message\.publishState\) && isRecoverablePrivateSendError\(error\.cause \?\? error\)/);
     expect(settleSource).toMatch(/schedulePrivateSendRetry\(context, error\.cause \?\? error\)/);
   });
@@ -3481,10 +3479,9 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function scheduleMessageAutoSync'),
       app.indexOf('async function bootReplayStore'),
     );
-    const publishSource = app.slice(
-      app.indexOf('async function attemptPrivateComposerMessagePublish'),
-      app.indexOf('async function settlePrivateComposerSendError'),
-    );
+    // clean-17: the live private SEND is direct-pay and its keyless sync coordination moved to the composer send
+    // handler (proven by PWA-SEND-18B). What remains here is the auto-sync pause CONDITION plus the orphaned Vault
+    // confirm-retry's use of the same beginPrivateOutboundWork primitive (kept until its follow-up removal batch).
     const confirmSource = app.slice(
       app.indexOf('async function runPrivatePublishConfirmationRetry'),
       app.indexOf('function hasPendingPrivatePublishConfirmation'),
@@ -3499,13 +3496,8 @@ describe('PWA runtime config guard', () => {
     // its own vault read burst and concurrent background reads stall the iOS run loop (v509 pattern).
     expect(autoSyncSource).toMatch(/if \(privateOutboundWorkActive\(\) \|\| privatePublishConfirmJobs\.size > 0 \|\| plathoAccountActivationPending\) \{/);
     expect(autoSyncSource).toMatch(/scheduleMessageAutoSync\(PRIVATE_OUTBOUND_SYNC_PAUSE_MS\)/);
-    for (const source of [publishSource, confirmSource]) {
-      expect(source).toMatch(/const endPrivateOutboundWork = beginPrivateOutboundWork\(\)/);
-      expect(source).toMatch(/finally \{[\s\S]*endPrivateOutboundWork\(\);[\s\S]*\}/);
-    }
-    // A send also YIELDS to an in-flight sync pass (privateChainSyncPromise), capped, so the two never fight
-    // the keyless ~1 rps budget. No-op when no sync is running; bounded so a stuck sync can't block sends.
-    expect(publishSource).toMatch(/if \(privateChainSyncPromise\) \{[\s\S]*Promise\.race\(\[[\s\S]*privateChainSyncPromise[\s\S]*PRIVATE_SEND_SYNC_WAIT_CAP_MS/);
+    expect(confirmSource).toMatch(/const endPrivateOutboundWork = beginPrivateOutboundWork\(\)/);
+    expect(confirmSource).toMatch(/finally \{[\s\S]*endPrivateOutboundWork\(\);[\s\S]*\}/);
     expect(app).toMatch(/const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 2_500/);
   });
 
@@ -3648,7 +3640,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/options\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
     expect(app).toMatch(/const senderUsername = privateSenderUsernameMetadataLabel\(options\)/);
     expect(app).toMatch(/senderUsername: senderUsername \?\? undefined/);
-    expect(app).toMatch(/createPrivateComposerCapsules\(text, attachments[\s\S]*recipientEntry, thread\.id, senderOptions/);
+    // clean-17: createPrivateComposerCapsules is now only reached by the orphaned Vault composer path (removed from
+    // the live direct-pay send), so its former call-site assertion was dropped; the sender-metadata encoding it
+    // performs is still pinned below (recipientMetadata / senderMetadata / encodeCompactPayload).
     expect(app).toMatch(/privateComposerSendPlan\(text, attachments, senderOptions, \{ paymentCheck: paymentDraft \}\)/);
     expect(app).toMatch(/const recipientWallet = requireBasechainAddress\(recipientEntry\?\.walletAddress, 'Recipient wallet'\)/);
     expect(app).toMatch(/const recipientMetadata = \{[\s\S]*recipientWallet,[\s\S]*\}/);
@@ -4372,7 +4366,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="privateFileInput"/);
     expect(app).toMatch(/const PRIVATE_FILE_ATTACHMENT_MAX_BYTES = 245 \* 1024;/);
     expect(app).toMatch(/const fileAttachments = normalizePrivateFileAttachments\(privateFileAttachments\);/);
-    expect(app.match(/fileAttachments: context\.fileAttachments \?\? (context\.)?message\?\.privateDraft\?\.fileAttachments \?\? \[\]/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // clean-17: a retry replays the CAPTURED file attachments. The retry-context builder captures them from the
+    // message draft, and BOTH live direct-pay send paths (CONV + INTRO first-contact) prefer the captured value over
+    // the live composer draft. (The former Vault composer/retry copies of this were removed with the cutover.)
+    expect(app).toMatch(/fileAttachments: normalizePrivateFileAttachments\(draft\.fileAttachments \?\? \[\]\)/);
+    expect(app.match(/context\.fileAttachments === undefined \? privateFileAttachments : context\.fileAttachments/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     // Render: download chip on BOTH surfaces; Telegram in-app view gets an explanation instead of a silent fail.
     expect(app).toMatch(/function buildFileBlockChip\(block\)/);
     expect(app.match(/buildFileBlockChip\(block\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
@@ -4751,7 +4749,11 @@ describe('PWA runtime config guard', () => {
     // The public builder pins its OWN reply draft AND an explicit EMPTY file list — private file drafts must
     // never leak into a public post (v652).
     expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\), publicShareDraft\)/);
-    expect(app.match(/context\.replyDraft \?\? (context\.)?message\?\.privateDraft\?\.replyDraft \?\? null/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // clean-17: a retry replays the CAPTURED reply draft. The retry-context builder captures it from the message
+    // draft, and BOTH live direct-pay send paths (CONV + INTRO first-contact) prefer the captured value over the live
+    // composer draft. (The former Vault composer/retry copies of this were removed with the cutover.)
+    expect(app).toMatch(/replyDraft: draft\.replyDraft \?\? null/);
+    expect(app.match(/context\.replyDraft === undefined \? privateReplyDraft : context\.replyDraft/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(app).toMatch(/const replyDraft = privateReplyDraft \? \{ \.\.\.privateReplyDraft \} : null;/);
     // The reply rides FIRST in the block list, only when the draft has a real chain ref.
     expect(app).toMatch(/blocks\.unshift\(\{ type: 'reply', refEntryId: String\(replyDraft\.refEntryId\)/);

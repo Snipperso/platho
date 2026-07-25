@@ -29280,113 +29280,11 @@ async function attemptConvMessagePublishDirect(context) {
 }
 
 async function attemptPrivateComposerMessagePublish(context) {
-  // clean-17 direct-pay: the whole Vault→CapsuleHub publish machinery below (publishState, publish nonce, confirm
-  // retry) is bypassed. A CONV message is sealed to the recipient's KeyShard bundle and published straight from the
-  // wallet into the conversation-direction RecordShard. Mirrors the public lane's direct-pay send (submitPublicPostDirect).
-  if (privateLaneDirectPayEnabled()) return attemptConvMessagePublishDirect(context);
-  const endPrivateOutboundWork = beginPrivateOutboundWork();
-  try {
-  // Yield to an in-flight sync pass before sending. beginPrivateOutboundWork above already blocks the NEXT
-  // auto-sync cycle; here we also wait out the CURRENT pass (privateChainSyncPromise) so the send's
-  // broadcast + confirm reads do not interleave with the index walk on the scarce keyless ~1 rps budget
-  // (the #F shared per-IP budget keeps that safe from 429s, but interleaving still slows the confirm). Capped
-  // by PRIVATE_SEND_SYNC_WAIT_CAP_MS so a long/stuck sync can never block a send. No-op when no sync is running.
-  if (privateChainSyncPromise) {
-    await Promise.race([
-      Promise.resolve(privateChainSyncPromise).catch(() => {}),
-      delay(PRIVATE_SEND_SYNC_WAIT_CAP_MS),
-    ]);
-  }
-  const { thread, message, text, attachments, attachment, selectedSuite, senderOptions, payment } = context;
-  clearPrivateMessageManualRecovery(message);
-  let capsules = Array.isArray(message.capsules) && message.capsules.length > 0
-    ? message.capsules
-    : (message.capsule ? [message.capsule] : null);
-  // Username-transfer guard (FM-2): persisted capsules are encrypted to the recipient resolved when they were
-  // built. If this dialog routes to a .ath whose owner has since moved (NFT transfer), reusing those capsules on a
-  // retry would re-publish them to the OLD owner. Re-resolve the current owner; if it changed, do NOT re-send the
-  // stale capsules — terminal-fail with a durable red status so the user resends (a fresh send rebuilds capsules for
-  // the current owner via resolveRecipientWalletForThread). We deliberately do NOT rebuild/re-sign here, to stay off
-  // the publish-nonce / double-publish path. Best-effort: a transient resolve failure keeps the normal retry path
-  // (most retries are not transfers). Only fires on retry — a first send has no capsules/recipientWallet yet.
-  if (capsules && message.recipientWallet) {
-    let currentRecipientWallet = null;
-    try {
-      currentRecipientWallet = await resolveRecipientWalletForThread(thread);
-    } catch (error) {
-      console.warn('Recipient re-check before retry failed; keeping existing capsules', error);
-    }
-    if (currentRecipientWallet && !sameWalletAddress(message.recipientWallet, currentRecipientWallet)) {
-      stopPrivateSendRetry(context, { code: 'RECIPIENT_OWNER_CHANGED', message: 'recipient username moved to a new wallet' });
-      // Manual retry of THIS message would just re-fail (it's still encrypted to the old owner); the user must
-      // resend, which builds fresh capsules for the new owner. Keep only the durable red status.
-      message.privateManualRetryAvailable = false;
-      refreshThreadAfterMessageChange(thread);
-      renderConversation();
-      await updateMessageInEncryptedHistory(thread, message).catch((err) => console.error(err));
-      return;
-    }
-  }
-  if (!capsules) {
-    const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
-    refreshThreadIdentityFromVariants(thread, privateWalletIdentityVariants(recipientEntry.walletAddress));
-    // replyDraft/shareDraft: the CAPTURED state (context/history), never the live composer — a retry runs after clear.
-    capsules = await createPrivateComposerCapsules(text, attachments ?? (attachment ? [attachment] : []), recipientEntry, thread.id, senderOptions, {
-      payment,
-      replyDraft: context.replyDraft ?? message?.privateDraft?.replyDraft ?? null,
-      shareDraft: context.shareDraft ?? message?.privateDraft?.shareDraft ?? null,
-      fileAttachments: context.fileAttachments ?? message?.privateDraft?.fileAttachments ?? [],
-    });
-    message.recipientWallet = recipientEntry.walletAddress;
-  }
-  const capsule = capsules[0];
-  const existingPublishState = message.publishState;
-  const publishState = existingPublishState?.partCount === capsules.length ? existingPublishState : createCapsulePublishState(capsules);
-  message.capsule = capsule;
-  message.capsules = capsules;
-  message.publishState = publishState;
-  message.meta = publishStateMeta(publishState);
-  refreshThreadAfterMessageChange(thread);
-  renderConversation();
-  const publishCallbacks = {
-    publishState,
-    allowOwnVaultActionReadFallback: true,
-    confirmFinalNonce: true,
-    onReadyToSend: async () => {
-      await persistMessageToEncryptedHistory(thread, message);
-    },
-    onPartState: () => {
-      message.meta = publishStateMeta(publishState);
-      updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
-      renderConversation();
-    },
-  };
-  const publishResult = capsules.length > 1
-    ? await publishCapsulesThroughVault(capsules, publishCallbacks)
-    : await publishCapsuleThroughVault(capsule, publishCallbacks);
-  clearPrivateSendRetry(message);
-  clearPrivateMessageManualRecovery(message);
-  message.privateSendRetryAttempt = 0;
-  message.privateSendRetryStopped = false;
-  message.privateSendRetryStoppedAt = null;
-  message.vaultPublish = publishResult;
-  message.publishState = publishResult.publishState ?? publishState;
-  message.meta = publishStateMeta(message.publishState);
-  thread.state = publishResult.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
-  await updateMessageInEncryptedHistory(thread, message);
-  if (publishResult.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    schedulePrivatePublishConfirmationRetry(context);
-  } else {
-    message.privatePublishConfirmAttempt = 0;
-    message.privatePublishConfirmStopped = false;
-    message.privatePublishConfirmStoppedAt = null;
-    clearPrivatePublishConfirmRetry(message);
-  }
-  refreshMessagingControls();
-  return publishResult;
-  } finally {
-    endPrivateOutboundWork();
-  }
+  // clean-17 direct-pay: a CONV message is sealed to the recipient's KeyShard bundle and published straight from the
+  // wallet into the conversation-direction RecordShard (attemptConvMessagePublishDirect). The removed Vault→CapsuleHub
+  // publish machinery (publishState, publish nonce, confirm retry) is fully off the live send path; the composer
+  // send handler still coordinates keyless sync + surfaces errors via settlePrivateComposerSendError around this call.
+  return attemptConvMessagePublishDirect(context);
 }
 
 async function settlePrivateComposerSendError(context, error) {
