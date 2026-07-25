@@ -2,7 +2,6 @@ import {
   CRYPTO_SUITES,
   createEncryptedConvCapsule,
   createEncryptedIntroCapsule,
-  createEncryptedPrivateCapsuleFromPublicBundle,
   createVaultMessagingKeyDraft,
   encodeCompactPayload,
   exportSignedPublicKeyBundle,
@@ -29726,58 +29725,6 @@ function publicComposerSendPlan(text, attachments = publicImageAttachments, file
   return publicSendPlanFromDocumentBytes(publicDocumentBytesFromDraft(text, attachments, fileAttachments));
 }
 
-async function createPrivateComposerCapsules(text, attachments, recipientEntry, threadId, options = currentPrivateSenderOptions(), extras = {}) {
-  const senderWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const recipientWallet = requireBasechainAddress(recipientEntry?.walletAddress, 'Recipient wallet');
-  const senderVaultKeyId = currentVaultMessagingKeyId();
-  const senderUsername = privateSenderUsernameMetadataLabel(options);
-  const senderMetadata = options.includeSenderWalletMetadata === false
-    ? {}
-    : {
-      senderWallet,
-      senderVaultKeyId: senderVaultKeyId ?? undefined,
-      senderUsername: senderUsername ?? undefined,
-    };
-  const recipientMetadata = {
-    recipientWallet,
-  };
-  // extras.replyDraft: undefined -> live composer draft; explicit null/value -> that captured state (retries).
-  const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.payment ?? extras.paymentDraft ?? null, {},
-    extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft,
-    extras.fileAttachments === undefined ? privateFileAttachments : extras.fileAttachments,
-    extras.shareDraft === undefined ? privateShareDraft : extras.shareDraft);
-  if (!documentBytes) return [];
-  const documentParts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
-    perPartOverheadBytes: privateCompactPayloadOverhead(options),
-  });
-  const totalParts = documentParts.length;
-  assertPrivateComposerPartLimit(totalParts);
-  const streamId = randomBytes(16);
-  const capsules = [];
-  for (let index = 0; index < documentParts.length; index += 1) {
-    const part = documentParts[index];
-    const payloadBytes = encodeCompactPayload({
-      type: 'document',
-      bytes: part.bytes,
-      sizeClass: part.sizeClass,
-      streamId,
-      partIndex: index,
-      partCount: totalParts,
-      ...senderMetadata,
-      ...recipientMetadata,
-      reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
-    });
-    capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
-      payloadBytes,
-      sizeClass: part.sizeClass,
-      threadId,
-      senderRecovery: true,
-      ...currentProfilePointerFields(),
-    }));
-  }
-  return capsules;
-}
-
 let prefsSyncInFlight = false;
 // A monotonic token so a NEWER save (or a wallet change) supersedes a still-running background confirm from an
 // older one — the stale confirm bails instead of stamping a wrong "saved"/"not saved".
@@ -29887,7 +29834,7 @@ async function createPublicPayloadParts({ type, text, attachments = publicImageA
   const documentParts = documentBytes ? publicSendPlanFromDocumentBytes(documentBytes) : publicComposerSendPlan(text, attachments, fileAttachments);
   const totalParts = documentParts.length;
   if (totalParts <= 0) return [];
-  // Fail-closed cap (v648, mirrors assertPrivateComposerPartLimit in createPrivateComposerCapsules): the composer
+  // Fail-closed cap (v648, mirrors assertPrivateComposerPartLimit in attemptConvMessagePublishDirect): the composer
   // UI blocks earlier with the friendly message; this guard covers every programmatic path.
   assertPublicComposerPartLimit(totalParts);
   const streamId = randomBytes(16);
