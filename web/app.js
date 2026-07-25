@@ -24853,40 +24853,6 @@ async function resolveRecipientWalletForThread(thread) {
   throw new Error('Recipient wallet route is not available');
 }
 
-async function resolveRecipientPeerEntry(thread, options = {}) {
-  const walletAddress = await resolveRecipientWalletForThread(thread);
-  const requestedSuite = options.suite === undefined || options.suite === null
-    ? null
-    : normalizeCryptoSuite(options.suite);
-  const provider = await resolveVaultChainProvider();
-  if (!provider?.getUser || !provider?.getKeyRecord) {
-    throw new Error('Vault provider cannot resolve recipient key record');
-  }
-  const recipientReadOptions = { vaultAddress: requireVaultAddress(), ...criticalChainReadOptions() };
-  const user = await provider.getUser(walletAddress, recipientReadOptions);
-  const currentKeyId = BigInt(user.current_key_id ?? 0n);
-  if (user.exists !== true || currentKeyId === 0n) {
-    throw new Error('Recipient is not activated in Platho');
-  }
-  const keyRecord = await provider.getKeyRecord(currentKeyId, {
-    ownerWallet: walletAddress,
-    ...recipientReadOptions,
-  });
-  await assertVaultKeyRecordMatchesOwner(walletAddress, keyRecord, currentKeyId);
-  rememberKnownVaultKeyOwner(walletAddress, keyRecord);
-  const publicBundle = await publicKeyBundleFromVaultKeyRecord(keyRecord, {
-    ownerWallet: walletAddress,
-    suite: requestedSuite,
-  });
-  return {
-    walletAddress,
-    user,
-    keyRecord,
-    currentKeyId,
-    publicBundle,
-  };
-}
-
 async function submitVaultMessage(type, params, options = {}) {
   requireNoPendingServiceWorkerAppShellReload();
   const message = createVaultWalletMessage(type, params, {
@@ -26609,19 +26575,6 @@ async function confirmCapsuleHubPublishEntries(publishState, options = {}) {
       queueTimeoutMs: options.queueTimeoutMs ?? PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS,
     }
     : options);
-}
-
-async function publishCapsuleThroughVault(capsule, options = {}) {
-  const result = await publishCapsulesThroughVault([capsule], options);
-  if (result.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED && result.status !== VAULT_PUBLISH_STATUS_SUBMITTED) return result;
-  const first = result.results?.[0] ?? {};
-  return {
-    status: result.status,
-    external: first.external,
-    result: first.result,
-    maxCharge: result.maxCharge,
-    publishState: result.publishState,
-  };
 }
 
 // Physics-scaled ceiling for a sendBoc POST. The flat tiers (8s heal / 15s transport default) are
@@ -30170,7 +30123,6 @@ globalThis.plathoVaultTransactions = {
   submitVaultRegisterMessagingKeys,
   submitVaultReplaceMessagingKeys,
   refreshVaultDashboard,
-  publishCapsuleThroughVault,
   syncPrivateCapsulesFromChain,
 };
 

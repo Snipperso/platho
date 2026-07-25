@@ -47,7 +47,11 @@ describe('PWA on-chain self-sufficiency', () => {
     const athProvider = read('web/ath-ton-rpc-provider.mjs');
 
     expect(app).toMatch(/readUsernameMintPriceForOwnVaultAction\(provider, registry, username\)/);
-    expect(app).toMatch(/provider\.getUser\(walletAddress/);
+    // clean-17: the recipient's messaging bundle is read from their KeyShard contract on the direct-pay send path
+    // (not the removed Vault get_user) — resolvePeerReplyBundle for a CONV reply, resolveRecipientBundleByWallet for
+    // an INTRO first contact, both through createKeyShardTonRpcProvider. The KeyShard get_view read is pinned below.
+    expect(app).toMatch(/resolvePeerReplyBundle\(\{ provider, peerWallet/);
+    expect(app).toMatch(/resolveRecipientBundleByWallet\(\{ provider, wallet/);
     expect(app).toMatch(/provider\.getKeyRecord\(currentKeyId/);
     expect(app).toMatch(/readCurrentProfileAvatarPointerFromChain/);
 

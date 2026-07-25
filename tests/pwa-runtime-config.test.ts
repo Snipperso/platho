@@ -2197,35 +2197,10 @@ describe('PWA runtime config guard', () => {
     expect(settleSource).not.toMatch(/recoverable \? privateSendRetryMeta\(error\)/);
   });
 
-  it('PWA-RPC-02: outbound private encryption resolves the recipient key through fresh verified reads', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const optionsSource = app.slice(
-      app.indexOf('function criticalChainReadOptions'),
-      app.indexOf('function requireManifestHashMatch'),
-    );
-    const source = app.slice(
-      app.indexOf('async function resolveRecipientPeerEntry'),
-      app.indexOf('async function submitVaultMessage'),
-    );
-    const optionsIndex = source.indexOf('const recipientReadOptions = { vaultAddress: requireVaultAddress(), ...criticalChainReadOptions() }');
-    const userIndex = source.indexOf('const user = await provider.getUser(walletAddress, recipientReadOptions)');
-    const keyIndex = source.indexOf('const keyRecord = await provider.getKeyRecord(currentKeyId, {');
-    const ownerIndex = source.indexOf('ownerWallet: walletAddress');
-    const spreadIndex = source.indexOf('...recipientReadOptions');
-    const bundleIndex = source.indexOf('publicKeyBundleFromVaultKeyRecord(keyRecord');
-
-    expect(optionsIndex).toBeGreaterThanOrEqual(0);
-    expect(userIndex).toBeGreaterThan(optionsIndex);
-    expect(keyIndex).toBeGreaterThan(userIndex);
-    expect(ownerIndex).toBeGreaterThan(keyIndex);
-    expect(spreadIndex).toBeGreaterThan(ownerIndex);
-    expect(bundleIndex).toBeGreaterThan(spreadIndex);
-    expect(source).toMatch(/function resolveRecipientPeerEntry/);
-    expect(source).toMatch(/criticalChainReadOptions\(\)/);
-    expect(optionsSource).toMatch(/verify: true/);
-    expect(optionsSource).toMatch(/priority: 'critical'/);
-    expect(optionsSource).toMatch(/cacheTtlMs: 0/);
-  });
+  // clean-17: PWA-RPC-02 removed — it pinned the Vault-only resolveRecipientPeerEntry (getUser/getKeyRecord/
+  // publicKeyBundleFromVaultKeyRecord under recipientReadOptions), deleted with the direct-pay cutover. The live
+  // direct-pay send resolves the recipient key via resolvePeerReplyBundle / resolveRecipientBundleByWallet with
+  // criticalChainReadOptions() (fresh verified reads), covered by the crypto/keyshard module tests.
 
   it('PWA-SLOW-DEVICE-01: private-sync yields the main thread, self-test is deferred, balance/critical reads have deadlines', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -2607,7 +2582,7 @@ describe('PWA runtime config guard', () => {
     );
     const recipientSource = app.slice(
       app.indexOf('async function resolveRecipientWalletForThread'),
-      app.indexOf('async function resolveRecipientPeerEntry'),
+      app.indexOf('async function submitVaultMessage'),
     );
 
     expect(criticalMethods).toContain('dnsresolve');
@@ -2639,7 +2614,7 @@ describe('PWA runtime config guard', () => {
     // the wallet_address variant is matched BEFORE the platho_nft resolve (reverts the v562 FM-1 band-aid).
     const routeSource = app.slice(
       app.indexOf('async function resolveRecipientWalletForThread'),
-      app.indexOf('async function resolveRecipientPeerEntry'),
+      app.indexOf('async function submitVaultMessage'),
     );
     expect(routeSource.indexOf("type === 'wallet_address'")).toBeLessThan(routeSource.indexOf("type === 'platho_nft'"));
     // Transfer is handled at the identity/dialog layer: strip+relabel the old owner, resolve to the current owner.
@@ -3200,7 +3175,7 @@ describe('PWA runtime config guard', () => {
     );
     const confirmationSource = app.slice(
       app.indexOf('async function confirmCapsuleHubPublishEntries'),
-      app.indexOf('async function publishCapsuleThroughVault'),
+      app.indexOf('function vaultSendBocRequestTimeoutMs'),
     );
     const sendPreparedSource = app.slice(
       app.indexOf('async function sendPreparedCapsulesThroughVault'),
@@ -3305,7 +3280,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const confirmationSource = app.slice(
       app.indexOf('async function confirmVaultBatchReceiptsFromPublishState'),
-      app.indexOf('async function publishCapsuleThroughVault'),
+      app.indexOf('function vaultSendBocRequestTimeoutMs'),
     );
     // The receipt-ring confirm: the authoritative single-read answer for a batch's fate.
     const receiptSource = app.slice(
