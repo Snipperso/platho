@@ -344,7 +344,7 @@ Setelah wallet mendaftarkan kunci on-chain, klien harus mengambil:
 - untuk wallet pengguna sendiri yang tidak terkunci, `UserState.auth_pubkey` yang cocok dengan kunci publik otorisasi Vault yang diturunkan secara lokal;
 - `VaultKeyRecordView` untuk id kunci tersebut.
 
-PWA memaparkan ini sebagai jembatan penyedia yang gagal-tertutup di `web/vault-chain-provider.mjs`. Jembatan tersebut mengharapkan sebuah penyedia dengan:
+> **clean-17.** Kontrak Vault yang dijelaskan di bab ini adalah clean-15. Pada clean-17 ikatan yang sama dibaca dari kontrak KeyShard MILIK dompet itu sendiri (`web/key-shard-ton-rpc-provider.mjs`), yang alamatnya diturunkan dari dompet — sehingga sebuah catatan hanya dapat memuat kunci yang didaftarkan dompet tersebut. Jembatan penyedia `web/vault-chain-provider.mjs` dihapus bersama Vault.
 
 ```js
 {

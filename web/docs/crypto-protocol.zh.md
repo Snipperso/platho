@@ -342,7 +342,7 @@ body_hash || header_0_hash || header_1_hash
 - 对于用户自己已解锁的钱包，与本地派生的 Vault 授权公钥相匹配的 `UserState.auth_pubkey`；
 - 该密钥 id 对应的 `VaultKeyRecordView`。
 
-PWA 在 `web/vault-chain-provider.mjs` 中将其暴露为一个失败关闭的提供方桥接。该桥接期待一个具备如下方法的提供方：
+> **clean-17.** 本章描述的 Vault 合约属于 clean-15。在 clean-17 中，同样的绑定改为从钱包自身的 KeyShard 合约（`web/key-shard-ton-rpc-provider.mjs`）读取，其地址由钱包派生 —— 因此一条记录只可能持有该钱包注册过的密钥。提供方桥接 `web/vault-chain-provider.mjs` 已随 Vault 一并移除。
 
 ```js
 {

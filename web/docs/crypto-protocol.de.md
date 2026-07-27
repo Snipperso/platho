@@ -344,7 +344,7 @@ Nachdem die Wallet Schlüssel On-Chain registriert hat, muss der Client Folgende
 - für die eigene entsperrte Wallet des Benutzers, die `UserState.auth_pubkey`, die mit dem lokal abgeleiteten Vault-Auth-Öffentlichen-Schlüssel übereinstimmt;
 - die `VaultKeyRecordView` für diese Schlüssel-Id.
 
-Die PWA legt dies als fehlgeschlossene Provider-Brücke in `web/vault-chain-provider.mjs` offen. Die Brücke erwartet einen Provider mit:
+> **clean-17.** Der in diesem Kapitel beschriebene Vault-Vertrag gehört zu clean-15. Unter clean-17 wird dieselbe Bindung aus dem EIGENEN KeyShard-Vertrag der Wallet gelesen (`web/key-shard-ton-rpc-provider.mjs`), dessen Adresse aus der Wallet abgeleitet ist — ein Eintrag kann also nur Schlüssel enthalten, die diese Wallet registriert hat. Die Provider-Brücke `web/vault-chain-provider.mjs` wurde mit dem Vault entfernt.
 
 ```js
 {

@@ -341,7 +341,7 @@ body_hash || header_0_hash || header_1_hash
 - ユーザー自身のアンロックされたウォレットについては、ローカルで導出された Vault 認証公開鍵と一致する `UserState.auth_pubkey`;
 - その鍵 id に対する `VaultKeyRecordView`。
 
-PWA は、これを `web/vault-chain-provider.mjs` 内のフェイルクローズなプロバイダーブリッジとして公開します。ブリッジは、次を持つプロバイダーを期待します。
+> **clean-17.** この章で説明する Vault コントラクトは clean-15 のものです。clean-17 では同じバインディングをウォレット自身の KeyShard コントラクト（`web/key-shard-ton-rpc-provider.mjs`）から読み取ります。そのアドレスはウォレットから導出されるため、レコードはそのウォレットが登録した鍵しか保持できません。プロバイダーブリッジ `web/vault-chain-provider.mjs` は Vault とともに削除されました。
 
 ```js
 {

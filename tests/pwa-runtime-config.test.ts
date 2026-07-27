@@ -303,7 +303,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function copyPrivateThreadDiagnostic\(\)/);
     expect(app).toMatch(/appVersionLabel\?\.addEventListener\('click', copyPrivateThreadDiagnostic\)/);
     expect(app).toMatch(/profileVersionLabel\?\.addEventListener\('click', copyPrivateThreadDiagnostic\)/);
-    expect(app).toMatch(/recordSenderResolveDebug\(resolveDbg\)/);
+    // The ring is fed from the LIVE direct-pay receive loop: a shard capsule arrives already bound to a conversation,
+    // so the routing record is the (selfKeyId, peerKeyId) pair and the thread it selected — see recordConvRouteDebug.
+    expect(app).toMatch(/recordConvRouteDebug\(\{ selfKeyId, peerKeyId, targetThread/);
+    expect(app).toMatch(/function recordConvRouteDebug\(/);
+    expect(app).toMatch(/senderResolve: plathoSenderResolveDebug/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
     expect(css).toMatch(/\.message\.in \.bubble\s*\{[\s\S]*?justify-self: start;/);
@@ -349,7 +353,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function verifiedPlathoUsernameIdentityForWallet\(label, walletAddress\)/);
     expect(app).toMatch(/resolvePlathoUsernameOwner\(identity\.value\)/);
     expect(app).toMatch(/sameWalletAddress\(resolved\.ownerWallet, rawWallet\)/);
-    expect(app).toMatch(/const senderUsername = opened\?\.payload\?\.senderUsername \?\? opened\?\.payload\?\.sender_username/);
+    // (The receive-side senderUsername pickup went with the Hub routers. The SEND side still stamps it —
+    // currentPrivateSenderOptions, pinned in PWA-MSG-02B — and the label a dialog wears is revalidated against the
+    // chain on open and on receipt, pinned in PWA-USERNAME-TRANSFER-01.)
     // Any thread (incl. one auto-created from an incoming message) can set/edit a private local name from
     // the "Display as" menu — not only threads created via New Chat's local-label field.
     expect(app).toMatch(/async function promptThreadLocalLabel\(thread\)/);
@@ -1014,9 +1020,9 @@ describe('PWA runtime config guard', () => {
     // story and there is nothing to re-confirm between quote and signature.
     expect(app).not.toMatch(/confirmPublishPriceIncrease|confirmHighNetworkFeeSurcharge|assertNetworkFeeSurchargeWithinCap/);
     expect(app).not.toMatch(/prepareCapsulesThroughVault|sendPreparedCapsulesThroughVault|publishCapsulesThroughVault/);
-    expect(app).toMatch(/function setPublishPartStatus/);
+    // setPublishPartStatus / confirmCapsuleHubPublishEntries went with the Vault batch (a direct-pay message has no
+    // per-part status to set and no Hub entry to scan). The status VOCABULARY the composer renders is still pinned.
     expect(app).toMatch(/function publishStateBroadcastCount/);
-    expect(app).toMatch(/function confirmCapsuleHubPublishEntries/);
     expect(app).toMatch(/CAPSULEHUB_PUBLISH_STATUS_CONFIRMED/);
     expect(app).toMatch(/VAULT_PUBLISH_STATUS_PARTIAL/);
     expect(app).toMatch(/`submitted \$\{landed\}\/\$\{total\}`/);
@@ -1024,8 +1030,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/updateMessageInEncryptedHistory/);
     expect(app).toMatch(/isPublishPriceChangeCancelled/);
     expect(app).toMatch(/publish cancelled/);
-    expect(app).toMatch(/assertVaultHasPrivatePublishHold/);
-    expect(app).toMatch(/Not enough Vault GRAM/);
+    // The Vault publish HOLD preflight (assertVaultHasPrivatePublishHold / "Not enough Vault GRAM") is gone with the
+    // custody it reserved against. Direct pay checks the two things that can actually fail — the wallet's ATH and its
+    // GRAM — right before signing, and names the shortfall in the error (PWA-PUBLIC-DIRECT-01 pins the call sites).
+    expect(app).not.toMatch(/async function assertVaultHasPrivatePublishHold/);
+    expect(app).toMatch(/async function assertConnectedAthAtLeast\(requiredAtomic, action\)/);
+    expect(app).toMatch(/async function assertWalletGramAtLeast\(requiredNanotons, action\)/);
+    expect(app).toMatch(/Not enough ATH to \$\{action\}/);
+    expect(app).toMatch(/Wallet needs ~\$\{formatTonNanotons\(required\)\} GRAM to \$\{action\}/);
     expect(app).not.toMatch(/Checking Vault balance/);
     expect(app).toMatch(/privateComposerKnownVaultTonShortfall/);
     expect(app).toMatch(/networkFeeSurchargeNanotons/);
@@ -1421,16 +1433,19 @@ describe('PWA runtime config guard', () => {
     );
     const messageIndex = submitSource.indexOf('const message = {');
     const insertIndex = submitSource.indexOf('insertThreadMessage(thread, message)');
-    const preflightIndex = submitSource.indexOf('await assertVaultHasPrivatePublishHold');
+    // The preflight moved INTO the publish (attemptConvMessagePublishDirect's assertConnectedAthAtLeast /
+    // assertWalletGramAtLeast), so the ordering invariant is now pinned against the send call itself.
+    const preflightIndex = submitSource.indexOf('await attemptPrivateComposerMessagePublish(');
 
     expect(helperSource).toMatch(/Activate Platho account before sending/);
-    expect(helperSource).toMatch(/network surcharge .* exceeds the production cap/i);
     expect(helperSource).toMatch(/RPC verification pending/);
-    // Insufficient Vault balance is a DETERMINISTIC failure: it must show a clear actionable status AND be
-    // classified FATAL so the send stops retrying (terminal manual-recovery) instead of furiously re-trying.
-    expect(helperSource).toMatch(/Insufficient Vault GRAM — top up in Vault, then retry/);
-    expect(helperSource).toMatch(/Insufficient Vault ATH — top up in Vault, then retry/);
-    expect(app).toMatch(/function isFatalPrivateSendError\(error\)[\s\S]*vault \(\?:ton\|gram\|ath\) balance is too low/);
+    // A funds shortfall is a DETERMINISTIC failure: it must show a clear actionable status AND be classified FATAL so
+    // the send stops retrying (terminal manual-recovery) instead of furiously re-trying a balance that cannot appear.
+    // Direct pay raises both by CODE, so the classification cannot drift with the wording of the message.
+    expect(helperSource).toMatch(/error\?\.code === 'PLATHO_ATH_REQUIRED' \|\| error\?\.code === 'PLATHO_WALLET_GRAM_REQUIRED'/);
+    expect(app).toMatch(/function isFatalPrivateSendError\(error\)[\s\S]*error\?\.code === 'PLATHO_ATH_REQUIRED'[\s\S]*error\?\.code === 'PLATHO_WALLET_GRAM_REQUIRED'/);
+    // ...and the message the user sees names the asset, the amount needed and the amount held.
+    expect(app).toMatch(/Not enough ATH to \$\{action\}: need \$\{formatAthAtomic\(required\)\} ATH, have/);
     expect(messageIndex).toBeGreaterThanOrEqual(0);
     expect(insertIndex).toBeGreaterThan(messageIndex);
     expect(preflightIndex).toBeGreaterThan(insertIndex);
@@ -1688,19 +1703,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS/);
     // E: the progressing-catch-up re-fire is floored at 8s so it cannot re-burst the sync every 2s.
     expect(app).toMatch(/Math\.max\(8_000, Math\.min\(2_000 \* 2 \*\* Math\.min\(messageAutoSyncStallStreak, 5\), MESSAGE_AUTO_SYNC_MS\)\)/);
-    // v476 FIX: the with-wallet capture proved the freeze is the ASYNC Vault-open read burst hanging (degraded
-    // RPC: keyless toncenter fallback + verify cross-check + backoff -> minutes), NOT a CPU loop. refreshVaultDashboard
-    // now bounds the read burst with a hard VAULT_OPEN_READ_DEADLINE_MS; on timeout it renders with cached
-    // state + 'RPC busy, retrying' instead of awaiting forever, so the Vault tab can never hang open.
-    expect(app).toMatch(/const VAULT_OPEN_READ_DEADLINE_MS = 12_000/);
-    // v515: the Vault-open critical path reads get_user ALONE (the concurrent get_user+get_global burst was
-    // the iOS freeze; the working nav path reads get_user alone), raced against the deadline; get_global +
-    // external balances load deferred + strictly sequentially off the render path.
-    expect(app).toMatch(/delay\(VAULT_OPEN_READ_DEADLINE_MS\)\.then\(\(\) => vaultUserTimedOut\)/);
-    expect(app).toMatch(/if \(settledUser === vaultUserTimedOut\) \{/);
-    expect(app).toMatch(/function refreshVaultDeferredReadsInBackground\(/);
-    // And an overall backstop on refreshVaultNow so the activation/stats jobs (same verify:true reads) can't
-    // keep the single-flight lock held for minutes either.
+    // v476 FIX: the with-wallet capture proved the freeze is the ASYNC read burst HANGING (degraded RPC: keyless
+    // toncenter fallback + verify cross-check + backoff -> minutes), NOT a CPU loop, so the tab must render from
+    // cached state on a deadline instead of awaiting forever. The per-read burst that needed its own deadline
+    // (VAULT_OPEN_READ_DEADLINE_MS, the get_user+get_global fan-out) went with the custodial dashboard; what remains
+    // is the whole-refresh backstop, which covers every job the tab now runs.
     expect(app).toMatch(/const VAULT_REFRESH_DEADLINE_MS = 16_000/);
     expect(app).toMatch(/Promise\.race\(\[\s*vaultWork,\s*delay\(VAULT_REFRESH_DEADLINE_MS\)\.then\(\(\) => vaultRefreshTimedOut\)/);
     expect(app).toMatch(/vaultWork\.catch\(\(\) => \{\}\)/);
@@ -2103,7 +2110,10 @@ describe('PWA runtime config guard', () => {
     // serialized through the shared username-hygiene queue (never N concurrent resolves -> the v509 iOS freeze).
     expect(app).toMatch(/function queueUsernameHygiene\(task\)/);
     expect(app).toMatch(/queueUsernameHygiene\(\(\) => revalidateThreadUsernameVariants\(thread\)\)/);
-    expect(app).toMatch(/queueUsernameHygiene\(\(\) => revalidateThreadUsernameVariants\(identityThread\)\)/);
+    // On RECEIPT: the direct lane resolves a conversation's thread by its peer keyId, and revalidates the label there
+    // (the Hub-era routers that carried the identityThread call are gone).
+    const convResolve = app.slice(app.indexOf('function resolveConvReceiveThread('), app.indexOf('async function appendConvOpenedCapsules('));
+    expect(convResolve).toMatch(/queueUsernameHygiene\(\(\) => revalidateThreadUsernameVariants\(thread\)\)/);
     // The sender stops stamping a .ath it no longer owns; falls back to another owned name or none.
     expect(app).toMatch(/async function reconcileOwnLinkedUsername\(\)/);
     // Cardinal rule: never strip/clear a username off an unverifiable (structurally-degraded / hostile-RPC) read.
@@ -2227,14 +2237,17 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const activationSource = app.slice(
       app.indexOf('async function refreshVaultActivationStatus'),
-      app.indexOf('async function bootCrypto'),
+      app.indexOf('// ── Boot screen'),
     );
 
-    expect(app).toMatch(/function hasCurrentWalletVaultBinding\(\)/);
-    expect(activationSource).toMatch(/const expectedUnavailable = isExpectedVaultProviderUnavailable\(error\)/);
-    expect(activationSource).toMatch(/const keepCurrentBinding = expectedUnavailable && hasCurrentWalletVaultBinding\(\)/);
-    expect(activationSource).toMatch(/if \(!keepCurrentBinding\) delete globalThis\.plathoVaultBinding/);
-    expect(activationSource).toMatch(/setText\(vaultRecordStatus, keepCurrentBinding[\s\S]*\? t\('vault\.activated'\)/);
+    // clean-15 kept the binding by CLASSIFYING the error (expectedUnavailable && hasCurrentWalletVaultBinding).
+    // clean-17 inverts it, which is stronger: the ONLY answer that may clear a binding is a definitive uninit shard;
+    // every other failure lands in the catch, which never touches globalThis.plathoVaultBinding and returns it as-is.
+    // So no error classification can go wrong and no transient read can clear an active composer binding.
+    expect(activationSource).toMatch(/if \(!isKeyShardUninitError\(readError\)\) throw readError;/);
+    expect(activationSource).toMatch(/catch \(error\) \{[\s\S]{0,600}?return globalThis\.plathoVaultBinding \?\? null;/);
+    expect(activationSource).not.toMatch(/delete globalThis\.plathoVaultBinding/);
+    expect(activationSource).toMatch(/setText\(vaultRecordStatus, t\('vault\.keysPending'\)\)/);
     expect(EN_STRINGS['vault.activated']).toBe('activated');
   });
 
@@ -2507,7 +2520,6 @@ describe('PWA runtime config guard', () => {
   it('PWA-SEND-RELIABILITY-01: burst-send hardening — no false-fail, no dual-broadcast, no read storm', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const vaultRpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
-    const capsuleRpc = readFileSync('web/capsulehub-ton-rpc-provider.mjs', 'utf8');
 
     // #6: the keyword hard-fail guard only fires for definitive client-side <500
     // rejections, so a 5xx (possibly-delivered) broadcast is never marked rejected.
@@ -2540,102 +2552,18 @@ describe('PWA runtime config guard', () => {
     // #5: the message-history path parks a verifier that 429s and skips parked
     // transports, closing the direct toncenter /messages 429 leak.
     expect(vaultRpc).toMatch(/export function noteTonRpcReadTransportRateLimited\(transport, error\)/);
-    expect(capsuleRpc).toMatch(/import \{ decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited \}/);
-    expect(capsuleRpc).toMatch(/if \(isTonRpcTransportDead\(resolved\)\) continue;/);
-    expect(capsuleRpc).toMatch(/noteTonRpcReadTransportRateLimited\(historyTransport, error\)/);
+    // (The CapsuleHub half of this guard went with capsulehub-ton-rpc-provider.mjs; the parking mechanism itself
+    // lives in vault-ton-rpc-provider.mjs — the shared RPC pump every clean-17 reader goes through — and is pinned
+    // by the assertion above.)
   });
 
-  it('PWA-CAPSULE-ENTRY-VERIFY-01: CapsuleHub sync verifies entry anchors before trusting history bodies', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const criticalMethods = PLATHO_APP_CONFIG.network.tonRpc.criticalMethods;
-    const helperSource = app.slice(
-      app.indexOf('function criticalChainReadOptions'),
-      app.indexOf('function requireManifestHashMatch'),
-    );
-    const confirmationSource = app.slice(
-      app.indexOf('async function confirmCapsuleHubPublishEntries'),
-      app.indexOf('function vaultSendBocRequestTimeoutMs'),
-    );
-
-    for (const method of [
-      'get_state',
-      'get_private_entry',
-      'get_private_recipient_index',
-      'get_private_sender_index',
-      'get_private_page',
-      'get_public_entry',
-      'get_public_page',
-    ]) {
-      expect(criticalMethods).toContain(method);
-    }
-    expect(helperSource).toMatch(/function criticalCapsuleHubReadOptions\(address\)/);
-    expect(helperSource).toMatch(/capsuleHubAddress: address/);
-    expect(helperSource).toMatch(/criticalChainReadOptions\(\)/);
-    // capsuleHubMessageSyncReadOptions went with the Hub sync: a shard read carries no per-hub read mode.
-    // (verify:false / allowUnverifiedCriticalRead:true were that helper's two properties — both gone with it.)
-
-    // (The read-mode pair this loop compared — Hub sync options vs critical options — died with the Hub sync:
-    // a shard read takes no per-hub read mode at all.)
-    expect(confirmationSource).toMatch(/async function confirmCapsuleHubPublishEntriesWithReadMode/);
-    expect(app).toMatch(/function capsuleHubConfirmationProviderCandidates/);
-    expect(app).toMatch(/createCapsuleHubTonRpcProvider\(\{ capsuleHubAddress: address, transport: item \}\)/);
-    expect(confirmationSource).toMatch(/const readOptions = publishConfirmReadOptions\(address, options\)/);
-    expect(app).toMatch(/function publishConfirmReadOptions\(address, options = \{\}\)[\s\S]*const out = criticalCapsuleHubReadOptions\(address\)/);
-    expect(confirmationSource).not.toMatch(/capsuleHubMessageSyncReadOptions\(address\)/);
-    expect(confirmationSource).toMatch(/async function confirmCapsuleHubPublishEntries\(publishState, options = \{\}\)[\s\S]*return confirmCapsuleHubPublishEntriesWithReadMode\(publishState, options\.hot === true/);
-    // VPB2: the receipt ring is the PRIMARY confirm; the CapsuleHub entry scan is the recovery fallback.
-    expect(confirmationSource).toMatch(/if \(options\.skipBatchReceipt !== true\)[\s\S]*confirmVaultBatchReceiptsFromPublishState/);
-    expect(confirmationSource).toMatch(/CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT/);
-    expect(confirmationSource).toMatch(/PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS/);
-    expect(confirmationSource).toMatch(/PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS/);
-    expect(app).toMatch(/function publishConfirmDeadlineExpired\(deadlineAt\)/);
-    expect(app).toMatch(/function publishConfirmReadOptions\(address, options = \{\}\)/);
-    expect(confirmationSource).not.toMatch(/stillPending[\s\S]*scanAvailableTransports/);
-    expect(confirmationSource).toMatch(/catch \(error\) \{[\s\S]*if \(isTonRpcRecoverableReadError\(error\)\) throw error;[\s\S]*if \(noteTonRpcRateLimit\(error\)\) throw error;/);
-    // The CapsuleHub entry-scan strategies never trust unverified critical reads to confirm.
-    expect(confirmationSource).not.toMatch(/allowUnverifiedCriticalRead:\s*true/);
-    expect(confirmationSource).not.toMatch(/scanAvailableTransports:\s*true/);
-    // The send-leg's "a soft/rate-limited confirm read must not demote a broadcast batch" rule lived in the
-    // deleted Vault publish trunk; the confirm-side half of it is pinned just above (recoverable read errors and
-    // rate limits are rethrown, never swallowed into a false "not confirmed").
-    // The entry-scan recovery matches by payload hashes + publish_id (EPI1) via the 3-arg matcher.
-    expect(confirmationSource).toMatch(/publishEntryMatchesPart\(entry, part, \{ allowPublishIdMismatch, requirePublishIdMatch \}\)/);
-    // The VPB1 per-message PublishAck history scan is gone; the receipt-ring read replaces it.
-    expect(app).not.toMatch(/const CAPSULEHUB_PUBLISH_ACK_OP/);
-    expect(app).not.toMatch(/function parseCapsuleHubPublishAckBody/);
-    expect(app).not.toMatch(/confirmCapsuleHubPublishEntriesFromVaultAckHistory/);
-    expect(app).not.toMatch(/readVaultPublishAckHistory/);
-    expect(app).not.toMatch(/confirmedBy:\s*'vault_ack_history'/);
-    expect(app).toMatch(/async function confirmVaultBatchReceiptsFromPublishState\(publishState, options = \{\}\)/);
-    expect(app).toMatch(/readBatchPublishReceipt\(provider, vaultAddress, owner, batch\.nonce, readOptions\)/);
-    expect(app).toMatch(/confirmedBy:\s*'vault_batch_receipt'/);
-    expect(app).toMatch(/async function confirmPrivatePublishEntriesFromSenderIndex/);
-    expect(app).toMatch(/confirmedBy:\s*'private_sender_index'/);
-    expect(confirmationSource).toMatch(/await confirmPrivatePublishEntriesFromSenderIndex\(publishState, pendingParts, providerCandidates, readOptions, \{/);
-    expect(app).toMatch(/candidateProvider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
-    expect(app).toMatch(/function publishConfirmScanBounds/);
-    expect(app).toMatch(/function publishConfirmCommitScan/);
-    expect(app).toMatch(/publishState\.confirmSearch/);
-    expect(app).toMatch(/if \(latest > latestSeen\) \{[\s\S]*existing\.nextEntryId = latest > 0n \? String\(latest - 1n\) : null;[\s\S]*existing\.exhausted = false;/);
-    // VPB2 stamped each part's publish_id with the per-entry EPI1 the BATCH BUILDER derived — that stamping lived
-    // in the deleted Vault publish trunk. The matcher below still honours a stamped publishId when one is present
-    // (allowPublishIdMismatch / requirePublishIdMatch), which is what the remaining confirm paths rely on.
-    expect(app).not.toMatch(/async function computeVaultPublishId/);
-    expect(app).toMatch(/function publishEntryMatchesPartPayload\(entry, part\)/);
-    expect(app).toMatch(/options\.requirePublishIdMatch === true \|\| expectedPublishId/);
-    expect(app).toMatch(/return options\.allowPublishIdMismatch === true/);
-    expect(app).toMatch(/const entryPublishId = publishHashPlain\(entry\.publish_id\)/);
-    expect(app).toMatch(/entryPublishId === expectedPublishId/);
-    expect(app).toMatch(/const expectedAuthorWallet = part\.authorWallet \?\? part\.author_wallet \?\? null/);
-    expect(app).toMatch(/sameWalletAddress\(entryAuthorWallet, expectedAuthorWallet\)/);
-    expect(confirmationSource).toMatch(/const requirePublishIdMatch = group\.kind === 'public'/);
-    expect(confirmationSource).toMatch(/const allowPublishIdMismatch = group\.kind === 'private'/);
-    expect(confirmationSource).toMatch(/publishEntryMatchesPart\(entry, part, \{ allowPublishIdMismatch, requirePublishIdMatch \}\)/);
-    expect(confirmationSource).toMatch(/confirmedBy:\s*requirePublishIdMatch \? 'confirmed_by_publish_id' : 'entry_payload_recovery'/);
-    expect(confirmationSource).not.toMatch(/group\.kind === 'public' && Boolean\(part\.authorWallet \?\? part\.author_wallet\)/);
-    expect(confirmationSource).toMatch(/candidateProvider\.getPrivateEntry\(entryId, readOptions\)/);
-    expect(confirmationSource).toMatch(/candidateProvider\.getPublicEntry\(entryId, readOptions\)/);
-  });
+  // PWA-CAPSULE-ENTRY-VERIFY-01 removed with the CapsuleHub publish confirmation it verified end to end: the entry
+  // scan, the receipt ring, the sender-index recovery and the per-part matcher all went with the Vault batch, and
+  // every symbol it pinned (confirmCapsuleHubPublishEntries*, publishConfirm*, capsuleHubConfirmationProvider-
+  // Candidates, createCapsuleHubTonRpcProvider) no longer exists. A direct-pay message is ONE wallet transfer, so
+  // its confirmation is the wallet seqno plus the CONV delivery confirm — pinned in PWA-CONV-DELIVERY-01, whose
+  // #1..#6 carry this test's actual invariants (never claim delivery without an authoritative read, never turn an
+  // inconclusive read into a false red).
 
   // RT-PWA-CAPS-001 removed with the CapsuleHub publish confirmation: it required a verified, fail-closed read
   // before marking a Vault batch confirmed. The direct lane's equivalent — never claim delivery without an
@@ -2830,18 +2758,19 @@ describe('PWA runtime config guard', () => {
     expect(identities).toMatch(/const anonymousId = normalizedPeerId\(input\.senderKeyId \?\? input\.keyId\)/);
     expect(identities).toMatch(/id: identity \? recipientThreadId\(identity\) : `peer:\$\{encodeURIComponent\(anonymousId\)\}`/);
     expect(identities).toMatch(/`Anonymous \$\{shortPeerId\(anonymousId\)\}`/);
-    expect(app).toMatch(/function knownPrivateWalletForSigningPubkey\(signPubkey\)/);
-    expect(app).toMatch(/message\?\.type !== 'in'/);
-    expect(app).toMatch(/knownVaultKeyOwnerBySignPubkey\.set\(key, wallet\)/);
-    expect(app).toMatch(/created\.pendingIdentityResolution = true/);
+    // (knownPrivateWalletForSigningPubkey and its session cache went with the Hub receive path: they inferred a peer's
+    // wallet from the dialog a message currently sits in, which is the "position decides identity" mistake the
+    // cross-wallet bleed review named. The direct lane never guesses — the peer wallet is a field of the conversation
+    // record, written when the INTRO was adopted and re-verified against the peer's KeyShard on every reply.)
+    // v725 hid an unidentified inbound dialog during a grace window when its sender was CLAIMED but not yet verified,
+    // so a real dialog only appeared once resolved (no "Anonymous …" flicker); a GENUINELY anonymous sender was shown
+    // straight away. Direct pay only ever produces the second case: a first contact arrives as an INTRO, which by
+    // design carries no sender wallet at all, so there is nothing claimed to wait on and the thread is shown at once —
+    // it gets a name when a later CONV message brings the wallet. The predicates survive (a restored thread can still
+    // carry the flag); nothing sets them any more, which is the correct behaviour, not a lost one.
     expect(app).toMatch(/function isPendingIdentityResolutionThread\(thread\)/);
-    // v725: an unidentified inbound dialog whose sender was CLAIMED (share mode) but not yet verified is hidden
-    // during a grace window (and its entry re-scanned) so a real dialog only appears once resolved — no
-    // "Anonymous …" flicker. A genuinely anonymous sender (no claim) is shown; a stuck one is shown after the grace.
-    expect(app).toMatch(/if \(isTransientPendingResolutionThread\(thread\)\) return false;/);
     expect(app).toMatch(/function isTransientPendingResolutionThread\(thread\)/);
-    expect(app).toMatch(/created\.pendingClaimedSenderResolution = hadClaimedSender;/);
-    expect(app).toMatch(/if \(hadClaimedSender\) queuePendingSenderRescan\(entry, created\);/);
+    expect(app).toMatch(/if \(isTransientPendingResolutionThread\(thread\)\) return false;/);
     expect(app).not.toMatch(/privateChainSyncPromise && isPendingIdentityResolutionThread\(thread\)/);
     expect(app).toMatch(/function pruneEmptyAnonymousPeerThreads\(\)/);
     expect(app).toMatch(/pruneEmptyAnonymousPeerThreads\(\)/);
@@ -2897,8 +2826,9 @@ describe('PWA runtime config guard', () => {
     expect(appendPartsSource).toMatch(/const message = messageFromOpenedPrivateParts\(parts, meta\)/);
     expect(appendPartsSource).toMatch(/if \(!targetThread\) throw new Error\('Private chain multipart target thread could not be resolved'\)/);
     expect(appendPartsSource).toMatch(/if \(existing\) return upsertOpenedPrivateMessage\(existing, targetThread, message\)/);
-    expect(app).toMatch(/async function threadForOpenedSenderCapsule\(opened\)[\s\S]*recipientWallet[\s\S]*createRecipientThread\(recipientWallet\)/);
-    expect(app).toMatch(/async function threadForOpenedSenderCapsule\(opened\)[\s\S]*label: 'Recovered sent'/);
+    // (threadForOpenedSenderCapsule — the "recovered sent" router that rebuilt a dialog from an OWN capsule read back
+    // off the Hub's sender index — went with that index. The direct lane reads a conversation's own RecordShards by
+    // bucketKey, so a recovered own message lands in the conversation it was addressed to by construction.)
   });
 
   // PWA-CONFIG-01D4C removed with submitVaultAuthExternalWithNonceConfirmation — the last Vault auth external is
@@ -3294,13 +3224,10 @@ describe('PWA runtime config guard', () => {
     const shortfallIdx = reason.indexOf('privateComposerKnownVaultTonShortfall()');
     expect(limitIdx).toBeGreaterThan(-1);
     expect(shortfallIdx).toBeGreaterThan(limitIdx);
-    // Receipt foreign-slot guard: a nonce-keyed receipt whose partCount differs from OUR batch is never used to
-    // confirm/fail our parts (an orphaned prior external landing a race must not misattribute). Compared against
-    // ALL parts signed under the nonce — batch.parts holds only PENDING ones, so a partially-confirmed batch
-    // must not make our own receipt look foreign.
-    expect(app).toMatch(/Number\(interp\.partCount\) !== nonceTotalParts/);
-    expect(app).toMatch(/BigInt\(statePart\.clientNonce\) === batch\.nonce/);
-    expect(app).toMatch(/foreign slot \(partCount mismatch\)/);
+    // (The receipt foreign-slot guard — "a nonce-keyed receipt whose partCount differs from OUR batch must never
+    // confirm/fail our parts" — went with the receipt ring. It existed because one Vault slot was keyed by a nonce
+    // that a racing orphaned external could also occupy. A direct-pay message is bound to the WALLET SEQNO, which no
+    // other external can share, so there is no slot to misattribute.)
   });
 
   // PWA-PRIVATE-STRADDLE-01 removed with the CapsuleHub index walk. A private multipart group could straddle that
@@ -3977,45 +3904,42 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-IOS-VAULT-READ-SERIAL-01: nav-balance read defers to an in-flight vault refresh (no concurrent get_user / iOS activation freeze)', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // refreshVaultNavBalanceInBackground must NOT issue a second get_user while a full vault refresh (lock A,
-    // vaultRefreshPromise) is already reading one — two concurrent app-level chain reads hard-freeze iOS WebKit
-    // (this was the permanent "Activate Platho account" freeze on the post-transaction read fan-out). It defers +
-    // re-arms instead, and the refresh updates the nav balance itself (applyVaultUserPocketState).
+    // Two concurrent app-level chain reads hard-freeze iOS WebKit (the permanent "Activate Platho account" freeze
+    // on the post-transaction read fan-out). Under clean-17 the balance path reads the WALLET (there is no Vault
+    // get_user to collide with), and the rule is enforced two ways: the two balance reads are strictly sequential
+    // inside the refresh, and a single-flight promise stops overlapping refreshes stacking a second pair.
     const navFn = app.slice(
       app.indexOf('async function refreshVaultNavBalanceInBackground'),
-      // [WIDENED 2026-07-24 1600 -> 1900] The function grew: `return vaultRefreshPromise.catch` now sits at offset
-      // ~1647 from the fn start, past the old 1600 slice. All three invariants (defer on vaultRefreshPromise, the
-      // retry marker, the promise-chained return) are still present — the guard window just under-sliced.
-      app.indexOf('async function refreshVaultNavBalanceInBackground') + 1900,
+      app.indexOf('function walletFormattedBalance'),
     );
-    expect(navFn).toMatch(/if \(vaultRefreshPromise\) \{/);
-    expect(navFn).toMatch(/markNavVaultBalanceRetryNeeded\('vault refresh in progress'\)/);
-    expect(navFn).toMatch(/return vaultRefreshPromise\.catch/);
+    expect(navFn).toMatch(/if \(navVaultBalanceRefreshPromise\) return navVaultBalanceRefreshPromise;/);
+    expect(navFn).toMatch(/const ton = await loadConnectedTonWalletBalance\(\);\s*\n\s*const ath = await loadConnectedAthWalletBalance\(\)\.catch\(\(\) => null\);/);
+    expect(navFn).toMatch(/navVaultBalanceRefreshPromise = null;/);
+    // Both leaf reads hold the shared read mutex, so they cannot overlap ANY other app-level read either.
+    expect(app).toMatch(/async function loadConnectedTonWalletBalance[\s\S]{0,400}?return withVaultReadLock\(async \(\) => \{/);
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getWalletData\(/);
   });
 
   it('PWA-VAULT-ACTIVATION-GUARD-01: a not-activated read for a wallet already seen activated never tears down the activated UI', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // Activation is MONOTONIC on-chain (exists && current_key_id>0 never reverts), so a not-activated read for a
-    // wallet we've already observed activated is a TRANSIENT bad read (lagging replica / pre-registration height /
-    // reorg) — it must never flip the UI to "activate your account" (Vault tab locked, profile row, nav balance gone)
-    // until the next good read heals it. A downgrade guard rejects it; only a wallet change resets the memory.
-    expect(app).toMatch(/let lastKnownActivatedVaultWalletRaw = null;/);
-    expect(app).toMatch(/function vaultUserIsActivated\(user\) \{[\s\S]*?BigInt\(user\.current_key_id \?\? 0n\) > 0n/);
-    expect(app).toMatch(/function isTransientVaultActivationDowngrade\(user\) \{[\s\S]*?vaultUserIsActivated\(user\)[\s\S]*?return false;[\s\S]*?sameWalletAddress\(raw, lastKnownActivatedVaultWalletRaw\)/);
-    // rememberConnectedVaultUser (pre-sign + own-action reads): keep the good binding, return the RAW read so a
-    // pre-sign caller still fails closed instead of signing against a bad read.
-    const remember = app.slice(app.indexOf('function rememberConnectedVaultUser(user)'), app.indexOf('function hasActiveVaultMessagingKeys('));
-    expect(remember).toMatch(/if \(isTransientVaultActivationDowngrade\(user\)\) return user;/);
-    expect(remember).toMatch(/noteVaultUserActivationObserved\(user\);/);
-    // applyVaultUserPocketState (nav background refresh): keep last-known, re-read — do NOT zero the vault pocket.
-    const applyPocket = app.slice(app.indexOf('function applyVaultUserPocketState(user)'), app.indexOf('async function refreshVaultNavBalanceInBackground'));
-    expect(applyPocket).toMatch(/if \(isTransientVaultActivationDowngrade\(user\)\) \{\s*\n\s*markNavVaultBalanceRetryNeeded\('vault user read inconsistent'\);\s*\n\s*return;/);
-    // refreshVaultDashboard: intercept BEFORE renderVaultPocketCards (which would render the vault pocket as 0) and
-    // before the binding write — never setVaultStatus('Vault setup required') on a transient downgrade.
-    const dash = app.slice(app.indexOf('async function refreshVaultDashboard()'), app.indexOf('const VAULT_DEFERRED_READ_TIMEOUT_MS'));
-    expect(dash).toMatch(/if \(user && isTransientVaultActivationDowngrade\(user\)\) \{[\s\S]*?markNavVaultBalanceRetryNeeded\('vault user read inconsistent'\)[\s\S]*?return null;/);
-    // Wallet change forgets the previous wallet's activated state (the NEW wallet's first not-activated read is honoured).
-    expect(app).toMatch(/prefsSyncInFlight = false;[\s\S]{0,400}?lastKnownActivatedVaultWalletRaw = null;/);
+    // Registration is MONOTONIC on-chain (a registered KeyShard never un-registers), so a "not registered" answer
+    // that is not a DEFINITIVE uninit shard is a transient bad read (lagging replica / pre-registration height /
+    // reorg) and must never flip the UI to "activate your account" until a good read heals it.
+    //
+    // clean-15 enforced this AFTER the fact, with a downgrade guard that remembered the last wallet seen activated
+    // and rejected contradicting reads. clean-17 enforces it at the SOURCE, which is strictly stronger: the only
+    // read is the wallet's own KeyShard, and only an uninit shard is accepted as "not registered" — every other
+    // failure is rethrown to a catch that PRESERVES the existing binding. A bad read cannot produce a downgrade to
+    // guard against, so there is nothing left to remember.
+    const activation = app.slice(
+      app.indexOf('async function refreshVaultActivationStatus'),
+      app.indexOf('// ── Boot screen'),
+    );
+    expect(activation).toMatch(/if \(!isKeyShardUninitError\(readError\)\) throw readError;\s*\n\s*view = \{ exists: false \};/);
+    expect(activation).toMatch(/catch \(error\) \{[\s\S]{0,600}?return globalThis\.plathoVaultBinding \?\? null;/);
+    // The downgrade guard and its per-wallet memory are gone with the read that needed them.
+    expect(app).not.toMatch(/lastKnownActivatedVaultWalletRaw/);
+    expect(app).not.toMatch(/function isTransientVaultActivationDowngrade\(/);
   });
 
   it('PWA-VAULT-ACTIVATION-XWALLET-02: a stale get_user resolving after a wallet switch never marks the NEW wallet activated', () => {
@@ -4025,32 +3949,39 @@ describe('PWA runtime config guard', () => {
     // masked B's genuine not-activated reads all session (the review's cross-wallet poison + a ~1/sec read storm).
     // Fix: STAMP each read with the wallet it was issued for (loadConnectedVaultUser, the single choke point) and
     // attribute note/guard only to a read whose stamp matches the currently-connected wallet.
-    expect(app).toMatch(/const VAULT_USER_READ_WALLET = Symbol\('vaultUserReadWallet'\);/);
-    expect(app).toMatch(/function vaultUserReadIsStale\(user\) \{[\s\S]*?const readWallet = vaultUserReadWalletRaw\(user\);[\s\S]*?!sameWalletAddress\(readWallet, current\)/);
-    // The stamp is applied at the single choke point for EVERY vault-user read (display + pre-sign).
-    const load = app.slice(app.indexOf('async function loadConnectedVaultUser'), app.indexOf('async function loadConnectedVaultGlobal'));
-    expect(load).toMatch(/const forWallet = requirePlathoWalletAddress\(\);/);
-    expect(load).toMatch(/Object\.defineProperty\(user, VAULT_USER_READ_WALLET, \{ value: forWalletRaw/);
-    // note/guard only attribute a read to the CURRENT wallet (a stale cross-wallet read is ignored, never poisons).
-    expect(app).toMatch(/function noteVaultUserActivationObserved\(user\) \{[\s\S]*?if \(!current \|\| vaultUserReadIsStale\(user\)\) return;/);
-    expect(app).toMatch(/function isTransientVaultActivationDowngrade\(user\) \{[\s\S]*?vaultUserReadIsStale\(user\)\) return false;/);
-    // Both display read paths discard a stale cross-wallet read entirely (no render / no binding write / no stamp).
-    const nav = app.slice(app.indexOf('navVaultBalanceRefreshPromise = (async () =>'), app.indexOf('navVaultBalanceRefreshPromise = (async () =>') + 700);
-    expect(nav).toMatch(/if \(vaultUserReadIsStale\(user\)\) return null;\s*\n\s*applyVaultUserPocketState\(user\);/);
-    const dash = app.slice(app.indexOf('async function refreshVaultDashboard()'), app.indexOf('const VAULT_DEFERRED_READ_TIMEOUT_MS'));
-    expect(dash).toMatch(/if \(user && vaultUserReadIsStale\(user\)\) return null;/);
-    // Wallet change also wipes the cached pocket balances so the NEW wallet never inherits wallet A's funds (also makes
-    // the v739 external-balance carry-forward safe across an in-app A->B switch).
-    expect(app).toMatch(/vaultPocketState = \{ wallet: \{ ton_balance: null, ath_balance: null \}, vault: \{ ton_balance: null, ath_balance: null \} \};\s*\n\s*privateImageAttachments = \[\];/);
+    // Every wallet-scoped read captures the wallet it is ISSUED for BEFORE the network await and discards itself if
+    // the connected wallet changed while it was in flight. Both live paths carry it: the activation read (whose
+    // binding would otherwise name B while holding A's registration) and the balance refresh (which would otherwise
+    // render A's funds under B).
+    const activation = app.slice(
+      app.indexOf('async function refreshVaultActivationStatus'),
+      app.indexOf('// ── Boot screen'),
+    );
+    expect(activation).toMatch(/const forWallet = plathoWallet\.address;\s*\n\s*const forWalletRaw = rawWalletAddress\(forWallet\);/);
+    expect(activation).toMatch(/if \(!plathoWallet\?\.address \|\| rawWalletAddress\(plathoWallet\.address\) !== forWalletRaw\) return globalThis\.plathoVaultBinding \?\? null;/);
+    // ...and the binding is written under the wallet the read was ISSUED for, never the ambient one.
+    expect(activation).not.toMatch(/walletAddress: plathoWallet\.address, user/);
+    expect(activation).toMatch(/globalThis\.plathoVaultBinding = \{ walletAddress: forWallet, user/);
+    const nav = app.slice(
+      app.indexOf('async function refreshVaultNavBalanceInBackground'),
+      app.indexOf('function walletFormattedBalance'),
+    );
+    expect(nav).toMatch(/const forWalletRaw = rawWalletAddress\(plathoWallet\.address\);/);
+    expect(nav).toMatch(/if \(!plathoWallet\?\.address \|\| rawWalletAddress\(plathoWallet\.address\) !== forWalletRaw\) return null;/);
+    // Wallet change also wipes the cached balances so the NEW wallet never inherits wallet A's funds (this is what
+    // makes the failed-read carry-forward safe across an in-app A->B switch).
+    expect(app).toMatch(/vaultPocketState = \{ wallet: \{ ton_balance: null, ath_balance: null \} \};\s*\n\s*privateImageAttachments = \[\];/);
   });
 
   it('PWA-WALLET-BALANCE-CARRY-RETRY-01: a failed external-balance read keeps last-known and retries, never a dash-and-give-up', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // loadConnectedTonWalletBalance resolves NULL on a total failure (it does not throw). Rendering that null wiped a
-    // known balance to "-" and never re-read. Fix 1: renderVaultPocketCards carries forward last-known on null (a real
-    // 0 balance is a bigint so it survives; only null/undefined falls through). Wallet change resets separately.
-    expect(app).toMatch(/ton_balance: walletBalances\?\.ton_balance \?\? vaultPocketState\.wallet\?\.ton_balance \?\? null,/);
-    expect(app).toMatch(/ath_balance: walletBalances\?\.ath_balance \?\? vaultPocketState\.wallet\?\.ath_balance \?\? null,/);
+    // known balance to "-" and never re-read. Fix 1: the nav-balance refresh carries forward last-known on null (a
+    // real 0 balance is a bigint so it survives; only null/undefined falls through), and marks a retry when BOTH
+    // reads failed. Wallet change resets separately.
+    expect(app).toMatch(/ton_balance: ton \?\? vaultPocketState\.wallet\?\.ton_balance \?\? null,/);
+    expect(app).toMatch(/ath_balance: ath \?\? vaultPocketState\.wallet\?\.ath_balance \?\? null,/);
+    expect(app).toMatch(/if \(ton === null && ath === null\) \{\s*\n\s*markNavVaultBalanceRetryNeeded\('balance unavailable'\);/);
     // Fix 2: the Profile external-GRAM reader carries forward on null AND arms a bounded, view-gated retry.
     const prof = app.slice(app.indexOf('async function refreshWalletTonBalanceForProfile'), app.indexOf('function isProfileViewActive'));
     expect(prof).toMatch(/if \(balance === null\) \{\s*\n[\s\S]*?scheduleWalletTonProfileBalanceRetry\(\);[\s\S]*?return vaultPocketState\.wallet\?\.ton_balance \?\? null;/);
@@ -4061,7 +3992,8 @@ describe('PWA runtime config guard', () => {
     expect(retry).toMatch(/if \(!plathoWallet\?\.address \|\| !isProfileViewActive\(\)\) return;/);
     expect(retry).toMatch(/refreshWalletTonBalanceForProfile\(\)\.catch/);
     // Cleared on a wallet change so a stale timer never chases the old wallet's balance.
-    expect(app).toMatch(/lastKnownActivatedVaultWalletRaw = null;\s*\n\s*clearWalletTonProfileBalanceRetry\(\);/);
+    const teardown = app.slice(app.indexOf('function clearWalletScopedRuntimeState('), app.indexOf('function lockPlathoWallet('));
+    expect(teardown).toMatch(/clearWalletTonProfileBalanceRetry\(\);/);
   });
 
   it('PWA-IOS-VAULT-READ-MUTEX-01: ALL leaf Vault chain reads serialize through one withVaultReadLock mutex', () => {
@@ -4074,36 +4006,28 @@ describe('PWA runtime config guard', () => {
     // reads (cache hit / fast reject) can never starve the iOS run loop in microtasks (the v604 dead-freeze fix).
     expect(app).toMatch(/function withVaultReadLock\(fn\) \{[\s\S]*?vaultReadMutexTail\.then\(\(\) => delay\(0\)\)\.then\([\s\S]*?return fn\(\);[\s\S]*?vaultReadMutexTail = run\.then\(\(\) => \{\}, \(\) => \{\}\)/);
     // Every leaf read primitive on the Vault-tab / activation paths is wrapped.
-    expect(app).toMatch(/withVaultReadLock\(async \(\) => \{[\s\S]*?provider\.getUser\(forWallet/); // loadConnectedVaultUser (nav + dashboard), reads stamped with the origin wallet
-    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getGlobal\(\{\s*vaultAddress: requireVaultAddress\(\)/); // loadConnectedVaultGlobal
-    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getKeyRecord\(user\.current_key_id/); // activation key record
+    // Every leaf read primitive on the balance / activation paths is wrapped. The Vault leaves (get_user,
+    // get_global, get_key_record) are gone; the KeyShard get_view that replaced the activation read inherits the
+    // rule — it is the very read that used to freeze iOS on the activation path, so it must not be the one leaf
+    // outside the mutex.
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getView\(forWallet/); // activation (own registration)
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getView\(ownerWallet/); // register-or-repair preflight
+    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getGlobal\(\{ address: requireUsernameRegistryAddress\(\)/); // username registry
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getJettonData\(/); // ATH stats
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getWalletData\(/); // external ATH balance
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getWalletAddress\(owner/); // ATH wallet address
-    // The mutex wraps LEAF reads only — refreshVaultNow / refreshVaultDashboard (drivers) are NEVER wrapped (would
-    // self-deadlock across their inner wrapped leaves).
+    expect(app).toMatch(/async function loadConnectedTonWalletBalance[\s\S]{0,400}?return withVaultReadLock\(async \(\) => \{/); // external GRAM balance
+    // The mutex wraps LEAF reads only — refreshVaultNow (a driver) is NEVER wrapped (it would self-deadlock across
+    // its inner wrapped leaves).
     const refreshNow = app.slice(app.indexOf('async function refreshVaultNow'), app.indexOf('async function refreshVaultNow') + 200);
     expect(refreshNow).not.toMatch(/withVaultReadLock/);
   });
 
-  it('PWA-IOS-CONFIRM-RECEIPT-ONLY-01: the inline post-send confirm is receipt-only (the chain entry-scan is deferred to the background retry)', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    // The iPhone dead-freeze the owner localized as "the app hangs looking for the just-sent message in the
-    // blockchain, then times out; the next sync shows it published". The message lands fine; the SENDER hung on the
-    // INLINE post-broadcast entry-scan (searching for an entry that is not on chain yet, scanning to its deadline).
-    // Fix: the inline confirm on the send critical path runs receipt-only; the full receipt+entry-scan confirm runs
-    // only in the background retry (schedulePrivatePublishConfirmationRetry), once the entry IS on chain.
-    // The send-leg call site that passed receiptOnly:true was in the deleted Vault publish trunk; the receiptOnly
-    // contract itself stays (below), and it is what any remaining inline confirm must use.
-    // The confirm implementation honours receiptOnly by returning right after the fast Vault-receipt confirm, BEFORE
-    // resolving the CapsuleHub provider for the entry-scan.
-    const fn = app.slice(app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode'), app.indexOf('function isFreshPrivatePublishConfirmation'));
-    const guardIdx = fn.indexOf('if (options.receiptOnly === true) return publishState;');
-    const scanIdx = fn.indexOf('const resolved = await resolveCapsuleHubProvider();');
-    expect(guardIdx).toBeGreaterThan(-1);
-    expect(scanIdx).toBeGreaterThan(-1);
-    expect(guardIdx).toBeLessThan(scanIdx); // the receiptOnly bail is BEFORE the entry-scan provider resolve
-  });
+  // PWA-IOS-CONFIRM-RECEIPT-ONLY-01 removed with the confirm it split. The iPhone dead-freeze it fixed was the INLINE
+  // post-broadcast entry-scan on the send critical path: the sender hung searching CapsuleHub for an entry that was
+  // not on chain yet. Direct pay has no entry scan at all — the send ends at the wallet broadcast, and the delivery
+  // check is a single deferred read (armConvDeliveryConfirm, pinned in PWA-CONV-DELIVERY-01). There is no longer an
+  // inline scan to keep off the critical path.
 
   it('PWA-IOS-LOADUINT-CHUNKED-01: cell bit reader builds ints in chunks, not one BigInt op per bit (iOS JSC receipt-decode freeze)', () => {
     const rpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
@@ -4135,25 +4059,25 @@ describe('PWA runtime config guard', () => {
     expect(rpc).toMatch(/function delay\(ms\)\s*\{\s*return new Promise\(\(resolve\) => setTimeout\(resolve, ms\)\)/);
   });
 
-  it('PWA-IOS-ACT-FAST-KEYID-01: activation status verifies the binding from current_key_id locally, skipping the get_key_record read on the common path', () => {
+  it('PWA-IOS-ACT-KEYSHARD-SINGLE-READ-01: activation status costs ONE chain read (the get_key_record freeze is structurally gone)', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // The localized permanent iOS freeze was the get_key_record read on the boot / Vault /
-    // activation critical path. current_key_id IS the contract's collision-resistant binding hash of (owner + our key
-    // fields + key_generation == 0 for the first, never-rotated key, see contracts/Vault.tact RegisterMessagingKeys).
-    // So the fast path recomputes that hash from the LOCAL draft and, on a match, marks the account activated WITHOUT
-    // the chain read -> no freeze. The heavy get_key_record read survives ONLY as the fallback (rotation / mismatch).
-    const fn = app.slice(app.indexOf('async function refreshVaultActivationStatus'), app.indexOf('async function bootCrypto'));
-    const fastIdx = fn.indexOf('computeVaultMessagingKeyId({');
-    const readIdx = fn.indexOf('provider.getKeyRecord(user.current_key_id');
-    expect(fastIdx).toBeGreaterThan(-1);
-    expect(readIdx).toBeGreaterThan(-1);
-    // The local key-id recompute MUST come before the chain read (it short-circuits it).
-    expect(fastIdx).toBeLessThan(readIdx);
-    // Computed at generation 0 (the first, never-rotated key) from the local draft fields.
-    expect(fn).toMatch(/key_generation: 0n,[\s\S]{0,260}enc_pubkey: localVaultDraft\.message\.enc_pubkey/);
-    // Gated on the same auth_pubkey identity check as the slow path, and short-circuits with keyRecord: null.
-    expect(fn).toMatch(/BigInt\(user\.auth_pubkey \?\? 0n\) === fastLocalAuthPubkey/);
-    expect(fn).toMatch(/BigInt\(user\.current_key_id\) === expectedKeyId[\s\S]{0,200}keyRecord: null \};/);
+    // The localized permanent iOS freeze was the get_key_record read on the boot / activation critical path. clean-15
+    // dodged it with a fast path that recomputed the contract's binding hash locally and skipped the read on a match,
+    // keeping the heavy read as the rotation fallback. clean-17 removes the read itself: registration lives in the
+    // wallet's OWN KeyShard, whose ADDRESS is derived from the wallet, so a single get_view answers both "am I
+    // registered" and "with which keys" — there is no second record to fetch and no fallback that could reintroduce
+    // one. Pin the shape so a future change cannot quietly add a second read back onto this path.
+    const fn = app.slice(
+      app.indexOf('async function refreshVaultActivationStatus'),
+      app.indexOf('// ── Boot screen'),
+    );
+    expect(fn).not.toMatch(/getKeyRecord|computeVaultMessagingKeyId/);
+    expect((fn.match(/await withVaultReadLock\(/g) ?? []).length).toBe(1);
+    expect(fn).toMatch(/provider\.getView\(forWallet, \{ verify: true, priority: 'critical', cacheTtlMs: 0 \}\)/);
+    // The keys are compared against the LOCAL draft (the address-binding already proves the shard is ours), so a
+    // local key change shows as "activate" and prompts the re-register that overwrites the shard.
+    expect(fn).toMatch(/BigInt\(view\.enc_pubkey \?\? 0n\) === BigInt\(localVaultDraft\.message\.enc_pubkey \?\? 0n\)/);
+    expect(fn).toMatch(/BigInt\(view\.sign_pubkey \?\? 0n\) === BigInt\(localVaultDraft\.message\.sign_pubkey \?\? 0n\)/);
   });
 
   it('PWA-IOS-SHARED-TONCENTER-QUEUE-01: keyed + keyless toncenter share one limiter queue (no parallel connections / iOS freeze)', () => {
@@ -5837,17 +5761,16 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-CONFIG-07A: expected missing Vault provider is a quiet preview state', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const dashboardSource = app.slice(
-      app.indexOf('async function refreshVaultDashboard'),
-      app.indexOf('async function resolveAthMasterProvider'),
-    );
     const activationSource = app.slice(
       app.indexOf('async function refreshVaultActivationStatus'),
-      app.indexOf('async function bootCrypto'),
+      app.indexOf('// ── Boot screen'),
     );
 
+    // The predicate outlived the Vault provider class it was named for: every clean-17 reader (KeyShard, PublicShard,
+    // RecordShard, the registries) raises the same degraded-transport conditions, and a degraded read must stay a
+    // quiet "RPC busy, retrying" rather than a console error.
     expect(app).toMatch(/function isExpectedVaultProviderUnavailable/);
-    expect(app).toMatch(/throw new VaultChainProviderUnavailableError\('Vault chain provider is not configured'\)/);
+    expect(app).not.toMatch(/VaultChainProviderUnavailableError/);
     expect(app).toMatch(/const VAULT_AUTO_REFRESH_MS = 60 \* 1000/);
     expect(app).toMatch(/const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 \* 1000/);
     expect(app).toMatch(/const TON_RPC_CONNECTING_STATUS = t\('common\.rpcBusyRetrying'\)/);
@@ -5869,19 +5792,23 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/includeActivation: pollActivation/);
     expect(app).toMatch(/queueVaultPostTransactionRefresh\(\{ pollActivation: true \}\)/);
     expect(app).toMatch(/function queueVaultRefreshAfterWalletChange\(\) \{[\s\S]*markNavVaultBalancePending\('wallet changed'/);
-    expect(app).toMatch(/async function sendVaultExternalBoc\(built, options = \{\}\) \{[\s\S]*markNavVaultBalancePending\('Vault action submitted'/);
+    // (sendVaultExternalBoc went with the Vault action externals — a direct-pay action is a plain wallet transfer,
+    // and the balance it moves is refreshed by queueVaultPostTransactionRefresh above.)
     expect(app).toMatch(/function markNavVaultBalanceRetryNeeded[\s\S]*markNavVaultBalancePending\(reason, \{ retry: true \}\)/);
     expect(app).toMatch(/if \(view === 'vault'\)/);
     expect(app).toMatch(/scheduleVaultAutoRefresh\(2_000\)/);
     expect(app).toMatch(/delayMs === VAULT_AUTO_REFRESH_MS && !isVaultViewActive\(\)/);
-    expect(app).toMatch(/dashboardUser \? \{ user: dashboardUser, skipGlobal: true \} : \{\}/);
     expect(app).toMatch(/document\.addEventListener\('visibilitychange'/);
     expect(app).toMatch(/window\.addEventListener\('focus'/);
-    expect(dashboardSource).toMatch(/resetVaultPocketState\(\)/);
+    // No wallet, no balance: the binding and the cached pocket are dropped rather than left showing the last one.
+    const navFn = app.slice(
+      app.indexOf('async function refreshVaultNavBalanceInBackground'),
+      app.indexOf('function walletFormattedBalance'),
+    );
+    expect(navFn).toMatch(/delete globalThis\.plathoVaultBinding;[\s\S]{0,40}?resetVaultPocketState\(\);/);
     expect(app).toMatch(/refreshVaultNavBalanceInBackground\(\)[\s\S]*\.finally\(\(\) => scheduleVaultAutoRefresh\(\)\)/);
-    expect(dashboardSource).toMatch(/isExpectedVaultProviderUnavailable\(userError\)/);
-    expect(dashboardSource).toMatch(/vaultProviderStatusForError\(userError\)/);
-    expect(activationSource).toMatch(/if \(!expectedUnavailable\) console\.error\(error\)/);
+    // A degraded read on the activation path stays quiet (no console error) and keeps the existing binding.
+    expect(activationSource).toMatch(/if \(!noteTonRpcRateLimit\(error\)\) console\.warn\('\[keyshard\] activation status read failed', error\)/);
     expect(activationSource).toMatch(/keyRecord: null/);
   });
 
@@ -6061,53 +5988,41 @@ describe('PWA runtime config guard', () => {
     // The healThreadWalletVariantConflict discriminator is raw-normalized too.
     const healTouch = app.slice(
       app.indexOf('function healThreadWalletVariantConflict('),
-      app.indexOf('async function threadForChainCapsule('),
+      app.indexOf('function ownerWalletFromThread('),
     );
     expect(healTouch).toMatch(/if \(threadPrimaryWalletRaw\(thread\) === own\) \{/);
     expect(healTouch).not.toMatch(/savedIds\.has\(thread\.id\)/);
-    // G. THE ONGOING ROOT: a RECEIVED (non-self) capsule's sender must never resolve to the OWN wallet (the entry
-    // publisher on the recipient index IS the own wallet, so resolvePrivateCapsuleSenderWallet's fallback filed peer
-    // messages into "My notes" by matching Saved's own-wallet variant — no graft needed). A self note is pinned to
-    // own (stays in Saved even when key resolution fails); a peer message resolved to own is UNRESOLVED (never own,
-    // and NEVER the unverified/spoofable payload.senderWallet — the verified sender is resolveKnown's job).
-    const chainCapsule = app.slice(
-      app.indexOf('async function threadForChainCapsule('),
-      app.indexOf('function ownerWalletFromThread('),
-    );
-    expect(chainCapsule).toMatch(/if \(isSelfOpenedCapsule\(opened\)\) \{[\s\S]{0,320}?senderWallet = plathoWallet\?\.address \?\? ownRaw;/);
-    expect(chainCapsule).toMatch(/if \(resolvedRaw === ownRaw\) senderWallet = null;/);
-    expect(chainCapsule).not.toMatch(/senderWallet = \(claimedRaw/); // never route by the unverified claimed wallet
-    const publisher = app.slice(
-      app.indexOf('function privateEntryPublisherWallet('),
-      app.indexOf('function privateWalletIdentityVariants('),
-    );
-    expect(publisher).toMatch(/if \(own && sameWalletAddress\(wallet, own\)\) return null;/);
+    // G. THE ONGOING ROOT, direct-pay form. The clean-15 shape of this bug was a RESOLUTION failure: the Hub gave
+    // only a publisher address, that publisher IS the own wallet on the recipient index, and the fallback therefore
+    // filed peer messages into "My notes". Direct pay removes the guess entirely — a shard capsule is addressed by a
+    // bucketKey derived from the conversation's K_root, so the (selfKeyId, peerKeyId) pair NAMES the dialog before
+    // anything is decrypted (recordConvRouteDebug records exactly that pair). What survives, and is pinned here, is
+    // the invariant the resolution bug violated: direction is decided CRYPTOGRAPHICALLY, never by position.
+    expect(app).toMatch(/function isSelfOpenedCapsule\(opened\)/);
+    expect(app).toMatch(/const isOutgoing = opened\?\.openedAs === 'sender' \|\| isSelfOpenedCapsule\(opened\)/);
+    expect(app).toMatch(/const isOutgoing = first\?\.openedAs === 'sender' \|\| isSelfOpenedCapsule\(first\)/);
+    // A self-note received on a 2nd device must be verified CRYPTOGRAPHICALLY (a spoofable claimed senderWallet
+    // alone would let a peer pin its message into "My notes" as our own).
+    expect(app).toMatch(/const ownSig = ownMessagingSignPubkeyValue\(\);\s*\n\s*if \(!ownSig \|\| senderSigningPublicKeyValue\(opened\) !== ownSig\) return false;/);
     // G2. ownRuntimeWalletRaw() must NOT return null mid-session when a background lock nulled both live wallet
-    // sources — that skips every own-guard above and a peer capsule resolves sender==own -> filed into Saved. It
-    // caches the last positively-known own raw and falls back to it (own identity never changes within a session).
+    // sources — that skips every own-guard above. It caches the last positively-known own raw and falls back to it
+    // (own identity never changes within a session).
     const ownRaw = app.slice(app.indexOf('function ownRuntimeWalletRaw('), app.indexOf('function isSelfOpenedCapsule('));
     expect(app).toMatch(/let lastKnownOwnWalletRaw = null;/);
     expect(ownRaw).toMatch(/if \(raw\) \{ lastKnownOwnWalletRaw = raw; return raw; \}\s*\n\s*return lastKnownOwnWalletRaw;/);
     expect(ownRaw).toMatch(/catch \{\s*\n\s*return lastKnownOwnWalletRaw;/);
-    // G3. knownPrivateWalletForSigningPubkey infers a peer's wallet from the dialog a message currently sits in; a
-    // peer 'in' message MISFILED into Saved (owner==own) must NOT teach us that the peer's sign key belongs to own
-    // (that poisons the session cache -> every future peer resolve returns own -> own-guard nulls it -> Anonymous
-    // forever). Accept own-ownership only from a GENUINE self-note (its sign key IS own's messaging key).
-    const knownForSign = app.slice(app.indexOf('function knownPrivateWalletForSigningPubkey('), app.indexOf('function resolveKnownPrivateSenderWallet('));
-    expect(knownForSign).toMatch(/if \(ownRaw && sameWalletAddress\(wallet, ownRaw\) && key !== ownMessagingSignPubkeyValue\(\)\) continue;/);
+    // (G3 removed with knownPrivateWalletForSigningPubkey — the session cache that inferred a peer's wallet from the
+    // dialog a message currently sits in. That inference was the "position decides identity" mistake in its purest
+    // form, and direct pay has no need of it: the peer wallet is a field of the conversation record, written when the
+    // INTRO was adopted and verified against the peer's KeyShard on every reply.)
     // G4. Add-contact must NOT let followContactPublicChannel (which rebuilds threads) drop the just-opened peer
     // dialog to Saved: the peer channel follow keeps the active PRIVATE selection (preserveActive:true), and the
     // handler re-pins activeThreadId to the peer + grafts the username onto the PEER thread (not "My notes").
     const setSub = app.slice(app.indexOf('function setPublicChannelSubscribed('), app.indexOf('function followContactPublicChannel('));
     expect(setSub).toMatch(/rebuildThreadsFromPublicSubscriptions\(\{ preserveActive: true \}\);/);
     expect(app).toMatch(/const openedThreadId = activeThreadId;\s*\n\s*followContactPublicChannel\(ownerWallet\);\s*\n\s*if \(openedThreadId && threads\.some\(\(item\) => item\.id === openedThreadId\)\) activeThreadId = openedThreadId;/);
-    // G5 (v729). HARD ROUTING INVARIANT: a non-self capsule may NEVER target the real Saved thread, no matter
-    // which stale variant matched it. The v728 iPhone dump proved a correctly-resolved peer message still routed
-    // to Saved through a grafted peer USERNAME variant (wallet strips alone don't cover named variants — routing
-    // matches ANY variant kind). Both routers purge the offending named variants off Saved and re-resolve among
-    // the OTHER dialogs; the heal strips ALL username/DNS variants from the real Saved thread.
-    // isRealSavedThread is STRICT: the immutable id `dm:wallet_address:<own>` (raw-normalized), NO identity fallback
-    // (a named identity grafted elsewhere must not be mistaken for Saved — adversarial-review low finding).
+    // G5. HARD ROUTING INVARIANT: isRealSavedThread is STRICT — the immutable id `dm:wallet_address:<own>`
+    // (raw-normalized), NO identity fallback (a named identity grafted elsewhere must not be mistaken for Saved).
     expect(app).toMatch(/function isRealSavedThread\(thread\) \{[\s\S]{0,260}?\/\^dm:wallet_address:\(\.\+\)\$\/\.exec\(String\(thread\.id \?\? ''\)\)/);
     // Saved hygiene is one IDEMPOTENT function: resets Saved to the canonical own-wallet identity (drops foreign
     // wallet + ALL username/DNS variants + a named displayIdentity), returns true ONLY when it actually changed —
@@ -6115,29 +6030,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function purgeNamedIdentityFromSavedThread\(savedThread\) \{/);
     expect(app).toMatch(/const changed = isNamed\(savedThread\.displayIdentity\) \|\| isNamed\(savedThread\.identity\) \|\| !variantsClean;/);
     expect(app).toMatch(/if \(!changed\) return false;/);
-    expect(app).toMatch(/function purgePeerVariantsFromSavedThread\(savedThread\) \{/);
-    expect(chainCapsule).toMatch(/if \(identityThread && !isSelfOpenedCapsule\(opened\) && isRealSavedThread\(identityThread\)\) \{\s*\n\s*purgePeerVariantsFromSavedThread\(identityThread\);\s*\n\s*identityThread = findThreadByIdentityVariants\(threads\.filter\(\(thread\) => !isRealSavedThread\(thread\)\), variants\);/);
-    const senderCapsule = app.slice(
-      app.indexOf('async function threadForOpenedSenderCapsule('),
-      app.indexOf('function findMessageByCapsuleId('),
-    );
-    expect(senderCapsule).toMatch(/if \(identityThread && own && recipientWallet !== own && isRealSavedThread\(identityThread\)\) \{\s*\n\s*purgePeerVariantsFromSavedThread\(identityThread\);/);
-    // The heal's real-Saved branch is keyed on isRealSavedThread and delegates to the idempotent purge.
-    expect(heal).toMatch(/if \(isRealSavedThread\(thread\)\) \{/);
-    expect(heal).toMatch(/if \(purgeNamedIdentityFromSavedThread\(thread\)\) \{ persistThreadDisplayPreference\(thread\); healed = true; \}/);
-    // A self-note received on a 2nd device must be verified CRYPTOGRAPHICALLY (spoofable claimed senderWallet alone
-    // would let a peer pin its message into "My notes" as our own).
-    expect(app).toMatch(/const ownSig = ownMessagingSignPubkeyValue\(\);\s*\n\s*if \(!ownSig \|\| senderSigningPublicKeyValue\(opened\) !== ownSig\) return false;/);
-    // A SELF note resolves variants WALLET-ONLY (symmetric to threadForOpenedSenderCapsule): a note-to-self carries
-    // the owner's OWN .ath in senderUsername, and grafting it onto Saved would make the now-strict per-sync heal
-    // strip + re-encrypt the WHOLE Saved history on every new self-note. Saved wears only the own wallet.
-    expect(chainCapsule).toMatch(/const variants = isSelfOpenedCapsule\(opened\)\s*\n\s*\? privateWalletIdentityVariants\(senderWallet\)\s*\n\s*: await privateWalletIdentityVariantsWithUsername\(senderWallet, senderUsername\);/);
-    // F2. Heal-on-touch at ROUTING time (covers the pre-restore race + any residual re-poisoning): both receive
-    // routers and the recipient-thread lookup resolve a Saved/peer conflict the moment they would hand back the
-    // wrong thread — never waiting for the next history restore.
+    // F2. Heal-on-touch at LOOKUP time (covers the pre-restore race + any residual re-poisoning): the recipient-thread
+    // lookup resolves a Saved/peer conflict the moment it would hand back the wrong thread — never waiting for the
+    // next history restore. (The two receive-router call sites went with the routers; the lookup one is the live path
+    // every direct-lane thread resolution goes through.)
     expect(app).toMatch(/function healThreadWalletVariantConflict\(thread, peerWalletRaw\) \{/);
-    expect(app).toMatch(/healThreadWalletVariantConflict\(identityThread, recipientWallet\)/);
-    expect(app).toMatch(/healThreadWalletVariantConflict\(identityThread, rawWalletAddress\(senderWallet\)\)/);
     const findExisting = app.slice(
       app.indexOf('function findExistingRecipientThread('),
       app.indexOf('function selectOrCreateRecipientThread('),
@@ -6237,7 +6134,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v875/);
+    expect(sw).toMatch(/platho-pwa-prototype-v876/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6257,7 +6154,6 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=105/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=59/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=19/);
@@ -6266,13 +6162,11 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=62/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=44/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=59/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=42/);
     expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=40/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
-    expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=8/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/ed25519\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/abstract\/edwards\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/hashes\/sha2\.js/);

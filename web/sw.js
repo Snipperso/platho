@@ -1,4 +1,4 @@
-const CACHE_NAME = 'platho-pwa-prototype-v875';
+const CACHE_NAME = 'platho-pwa-prototype-v876';
 const ASSETS = [
   './',
   './index.html',
@@ -23,14 +23,12 @@ const ASSETS = [
   './publish-batch-orchestration.mjs?v=7',
   './vault-ton-rpc-provider.mjs?v=62',
   './ton-dns-provider.mjs?v=40',
-  './capsulehub-ton-rpc-provider.mjs?v=59',
   './ath-ton-rpc-provider.mjs?v=42',
   './profile-registry-ton-rpc-provider.mjs?v=44',
   './username-ton-rpc-provider.mjs?v=47',
   './crypto/platho-crypto.mjs?v=12',
   './replay-store.mjs?v=1',
   './profile-avatar-media-store.mjs?v=1',
-  './vault-chain-provider.mjs?v=8',
   './webp-encoder.mjs?v=1',
   './qr-code.mjs?v=1',
   './vendor/@jsquash/webp/codec/enc/webp_enc.js',
