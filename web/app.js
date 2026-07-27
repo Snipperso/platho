@@ -366,7 +366,6 @@ const privateComposerCostStatus = document.querySelector('#privateComposerCostSt
 const privateComposerAddButton = document.querySelector('#privateComposerAddButton');
 const privateComposerAddMenu = document.querySelector('#privateComposerAddMenu');
 const privateAnonymousButton = document.querySelector('#privateAnonymousButton');
-const paymentCheckButton = document.querySelector('#paymentCheckButton');
 const privateImageButton = document.querySelector('#privateImageButton');
 const privateImageInput = document.querySelector('#privateImageInput');
 const privateImageModeSelect = document.querySelector('#privateImageModeSelect');
@@ -918,7 +917,6 @@ function publicPostCommentsCacheKey(item) {
 let publicPostDetailLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
 let publicPostDetailParentExists = null; // last clean read: true = post has a comment index, false = genuinely none
 let privateImageAttachments = [];
-let privatePaymentCheckDraft = null;
 // Swipe-to-reply drafts (v646): {refEntryId, author, snippet} | null — the quoted target for the NEXT send.
 // Composer block builders read these (default params) so the size plan, the optimistic echo and the wire agree.
 let privateReplyDraft = null;
@@ -3403,7 +3401,6 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // repopulate this; until then the UI shows unknown ("-"/pending), which is correct.
   vaultPocketState = { wallet: { ton_balance: null, ath_balance: null } };
   privateImageAttachments = [];
-  privatePaymentCheckDraft = null;
   privateFileAttachments = [];
   setPrivateReplyDraft(null);
   setPublicCommentReplyTo(null);
@@ -7303,7 +7300,6 @@ function replySnippetFromContent(item) {
   const text = String(item?.text ?? '').trim() || String(blocks.find((block) => block?.type === 'text' && String(block.text ?? '').trim())?.text ?? '').trim();
   if (text) return text;
   if (blocks.some((block) => block?.type === 'image') || item?.imageUrl || item?.attachment?.type === 'image') return 'Image';
-  if (blocks.some((block) => block?.type === 'payment') || item?.payment) return 'Payment check';
   if (blocks.some((block) => block?.type === 'file')) return 'File';
   if (blocks.some((block) => block?.type === 'share')) return 'Shared post';
   return 'Message';
@@ -9685,7 +9681,6 @@ function mergeOpenedPrivateMessage(existingMessage, incomingMessage) {
   }
   for (const field of [
     'text',
-    'payment',
     'attachment',
     'capsule',
     'capsules',
@@ -12301,9 +12296,6 @@ function shortUiErrorText(error, fallback = t('common.blockedCap')) {
 function privateSendPreflightStatusText(error) {
   const message = shortUiErrorText(error, 'Send blocked');
   if (/persistent encrypted local history/i.test(message)) return 'Local encrypted history unavailable; reload Platho before creating a check';
-  if (/payment check recovery record could not be saved|payment check pending ledger could not be saved/i.test(message)) {
-    return 'Payment check recovery could not be saved; reload Platho and try again';
-  }
   if (/activate platho account/i.test(message)) return 'Activate Platho account before sending';
   // A funds shortfall is DETERMINISTIC — retrying never helps (the balance won't appear). The raised message already
   // names the asset, the amount needed and the amount held, which is the most actionable text there is: pass it
@@ -12344,7 +12336,6 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
   // tooltip misattributed the block to balance ("Vault GRAM hold required") while the cost line said "split it".
   {
     const plan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachments, currentPrivateSenderOptions(), {
-      paymentCheck: privatePaymentCheckDraft,
     });
     const limitMessage = privateComposerPartLimitMessage(plan.length);
     if (limitMessage) return limitMessage;
@@ -12622,9 +12613,8 @@ function privateComposerSendPlan(text, attachments = privateImageAttachments, op
   const plan = [];
   // extras.replyDraft: undefined -> the LIVE composer draft (typing-time cost estimates); an explicit null/value
   // -> that exact state (retry contexts replay the CAPTURED draft — the live one is long cleared by then).
-  const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.paymentCheck ?? privatePaymentCheckDraft, {
-    allowMissingPaymentSecret: true,
-  }, extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft,
+  const documentBytes = messageDocumentBytesFromDraft(text, attachments, {},
+    extras.replyDraft === undefined ? privateReplyDraft : extras.replyDraft,
   extras.fileAttachments === undefined ? privateFileAttachments : extras.fileAttachments,
   extras.shareDraft === undefined ? privateShareDraft : extras.shareDraft);
   if (!documentBytes) return plan;
@@ -12880,7 +12870,6 @@ function composerKnownVaultTonShortfall(profile, parts = 1) {
 
 function privateComposerKnownVaultTonShortfall() {
   const plan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachments, currentPrivateSenderOptions(), {
-    paymentCheck: privatePaymentCheckDraft,
   });
   if (privateComposerPartLimitMessage(plan.length)) return true;
   return composerKnownVaultTonShortfall(privateComposerPublishProfilesForPlan(currentOutgoingPrivateSuite(), plan), 1);
@@ -12905,7 +12894,7 @@ function isPublishPriceChangeCancelled(error) {
 // gates ONLY the send button (below), never the whole composer, so the user can still attach to an empty field. Cheap:
 // builds block objects by reference (no byte encoding, unlike the full send plan).
 function privateComposerHasSendableContent() {
-  return composerBlocksFromDraft(messageInput?.value ?? '', privateImageAttachments, privatePaymentCheckDraft, privateReplyDraft, privateFileAttachments).length > 0;
+  return composerBlocksFromDraft(messageInput?.value ?? '', privateImageAttachments, privateReplyDraft, privateFileAttachments).length > 0;
 }
 
 function refreshPrivateSendButtonState() {
@@ -12931,7 +12920,6 @@ function refreshPrivateSendButtonState() {
     privateComposerAddButton.title = reason ?? t('composer.addImageOrCheck');
   }
   if (blocked) hidePrivateComposerAddMenu();
-  if (paymentCheckButton) paymentCheckButton.disabled = blocked;
   if (privateImageButton) privateImageButton.disabled = blocked;
   if (privateFileButton) privateFileButton.disabled = blocked;
   // The eye lives in the same funnel (else it goes stale in BOTH directions on cost-status-only refresh
@@ -13055,7 +13043,6 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
 function refreshComposerCostStatus() {
   if (privateComposerCostStatus) {
     const privatePlan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachments, currentPrivateSenderOptions(), {
-      paymentCheck: privatePaymentCheckDraft,
     });
     const limitMessage = privateComposerPartLimitMessage(privatePlan.length);
     const blockReason = privateSendBlockReason(activeThread(), { includeVaultShortfall: false });
@@ -13260,27 +13247,26 @@ function serializeComposerEditor(el, keepTrailingBr = false) {
 // Build the EDITABLE DOM for a composer editor from a markdown+marker string (draft restore / share insertion).
 // Inverse of serializeComposerEditor: **bold** -> <span class=fmt-bold>, [image N] -> chip, \n -> <br>. Uses the
 // SAME inline tokenizer family as the renderer but emits editor spans/chips (not the receive-side anchors).
-const EDITOR_INLINE_RE = /\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|(\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\]|\[(?:check|payment)\])(?!\()|\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)/g;
+const EDITOR_INLINE_RE = /\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|(\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\])(?!\()|\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)/g;
 
 function composerChipLabelForMarker(marker) {
   const m = String(marker);
   if (/^\[(?:image|img)\s+\d+\]$/i.test(m)) return t('composer.image');
   if (/^\[file\s+\d+\]$/i.test(m)) return t('composer.file');
   if (/^\[post\]$/i.test(m)) return t('public.sharedPost');
-  if (/^\[(?:check|payment)\]$/i.test(m)) return t('payment.paymentCheck');
   return m;
 }
 
 // v773: resolve a composer editor to the attachment arrays / drafts its markers point at, so the editor can
-// render each marker as its REAL content (image/file/payment/share) live — WYSIWYG, no separate preview.
+// render each marker as its REAL content (image/file/share) live — WYSIWYG, no separate preview.
 function composerBlockContextForEditor(el) {
   if (el === publicMessageInput) {
-    return { kind: 'public', images: publicImageAttachments, files: publicFileAttachments, payment: null, share: publicShareDraft };
+    return { kind: 'public', images: publicImageAttachments, files: publicFileAttachments, share: publicShareDraft };
   }
-  return { kind: 'private', images: privateImageAttachments, files: privateFileAttachments, payment: privatePaymentCheckDraft, share: privateShareDraft };
+  return { kind: 'private', images: privateImageAttachments, files: privateFileAttachments, share: privateShareDraft };
 }
 
-// The rich inner node a marker renders as (real image / file chip / payment card / shared-post embed), or null
+// The rich inner node a marker renders as (real image / file chip / shared-post embed), or null
 // when the attachment/draft can't be resolved (an orphan marker) so the caller falls back to a labeled pill.
 function composerBlockInner(marker, ctx) {
   let m;
@@ -13354,7 +13340,7 @@ function composerEditorLinkClick(el, event) {
 
 // Copy/cut: the native clipboard drops a contenteditable=false chip (so a copied link/image/etc. lost its marker and
 // vanished on paste). Serialize the SELECTED fragment to the SAME markdown+marker string the editor uses, so EVERY
-// atom the selection spans (link/image/file/payment/post) round-trips its marker. A LINK re-renders as a live chip on
+// atom the selection spans (link/image/file/post) round-trips its marker. A LINK re-renders as a live chip on
 // paste; attachment markers paste as LITERAL text (their bytes can't ride a text clipboard, and a live re-render would
 // phantom-bind the editor's own attachment — see composerEditorInsertPlainMultiline). text/plain only — no clipboard HTML.
 function composerEditorCopySelection(el, event, isCut) {
@@ -13830,7 +13816,6 @@ function reconcileComposerAttachments(el) {
   const fileArr = kind === 'public' ? publicFileAttachments : privateFileAttachments;
   const rf = reconcileMarkerArray(value, fileArr, /\[file\s+(\d+)\]/ig, (n) => `[file ${n}]`);
   if (rf.changed) { changed = true; value = rf.value; if (kind === 'public') publicFileAttachments = rf.arr; else privateFileAttachments = rf.arr; }
-  if (kind === 'private' && privatePaymentCheckDraft && !/\[(?:check|payment)\](?!\()/i.test(value)) { privatePaymentCheckDraft = null; changed = true; }
   const share = kind === 'public' ? publicShareDraft : privateShareDraft;
   if (share && !/\[post\](?!\()/i.test(value)) { if (kind === 'public') setPublicShareDraft(null); else setPrivateShareDraft(null); changed = true; }
   if (!changed) return false;
@@ -14198,7 +14183,7 @@ function composerEditorInsertPlainMultiline(el, text) {
   // on send). A zero-width space after `[` breaks the marker regex while staying invisible; the `(?!\()` mirrors
   // EDITOR_INLINE_RE so a link label like `[image 1](url)` is left intact.
   let raw = String(text ?? '').replace(/\r\n?/g, '\n');
-  raw = raw.replace(/\[((?:image|img)\s+\d+|file\s+\d+|post|check|payment)\](?!\()/gi, '[\u200b$1]');
+  raw = raw.replace(/\[((?:image|img)\s+\d+|file\s+\d+|post)\](?!\()/gi, '[\u200b$1]');
   composerEditorRange(el).deleteContents(); // collapse any selection at the paste point first
   // [25] Only ESCAPE the caret out of a trailing fmt span when the paste yields a LINK chip (a link chip trapped
   // inside **…**/*…*/`…` is a dead-wire link). Plain/marker text inserts at the REAL caret (mid-word, inheriting the
@@ -14456,9 +14441,6 @@ function refreshComposerPublishPolicy() {
       control.title = canPublish ? t('composer.attachImage') : t('composer.walletToAttachImages');
     }
   }
-  if (paymentCheckButton) {
-    paymentCheckButton.title = canPublish ? t('composer.attachPaymentCheck') : t('composer.walletToAttachPaymentCheck');
-  }
   if (privateImageModeSelect) {
     privateImageModeSelect.disabled = !canPublish;
   }
@@ -14509,7 +14491,7 @@ function togglePublicComposerAddMenu() {
   else showPublicComposerAddMenu();
 }
 
-function composerBlocksFromDraft(text, attachments = [], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft) {
+function composerBlocksFromDraft(text, attachments = [], replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft) {
   const source = String(text ?? '');
   const images = normalizePrivateImageAttachments(attachments);
   const usedImages = new Set();
@@ -14635,8 +14617,8 @@ function displayBlocksFromDocumentBlocks(blocks) {
   }).filter(Boolean);
 }
 
-function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = null, options = {}, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft) {
-  const blocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments, shareDraft);
+function messageDocumentBytesFromDraft(text, attachments = [], options = {}, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft) {
+  const blocks = composerBlocksFromDraft(text, attachments, replyDraft, fileAttachments, shareDraft);
   if (blocks.length <= 0) return null;
   return encodeMessageDocumentBlocks(blocks, options);
 }
@@ -14751,7 +14733,7 @@ function setupComposerToolbar(toolbar, textarea, hideButton) {
   textarea.addEventListener('click', () => showComposerToolbar(textarea));
 }
 
-// Composer preview removed in v773: the WYSIWYG editor renders the real content live (image/file/payment/share
+// Composer preview removed in v773: the WYSIWYG editor renders the real content live (image/file/share
 // blocks), so a separate preview modal is redundant.
 
 function insertImageMarkerForComposer(kind, index) {
@@ -15160,7 +15142,6 @@ function refreshMessagingControls() {
   // not show live-looking buttons); the eye + emoji live in the refreshPrivateSendButtonState funnel below.
   // Only the text INPUT stays on the draft predicate (drafting while funding/activating is allowed —
   // PWA-ACTIVATION-02).
-  if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
   if (privateImageButton) privateImageButton.disabled = !canSendPrivate;
   if (privateComposerAddButton) privateComposerAddButton.disabled = !canSendPrivate;
   if (privateSenderModeSelect) privateSenderModeSelect.disabled = !plathoWallet;
@@ -15525,7 +15506,7 @@ function applyConversationOpenScroll() {
 // message objects, same rows — only meta text / status changed), patch the existing rows in place. The
 // owner's rule: only the act of sending may move the dialog; a status change must never budge it — and a
 // full rebuild would kill an active scroll gesture even with a perfect position restore. Anything that can
-// change row STRUCTURE (meta node appearing/disappearing, payment action buttons, the manual Retry
+// change row STRUCTURE (meta node appearing/disappearing, the manual Retry
 // affordance — all derived from the status text) falls through to the full rebuild.
 function applyConversationStatusOnlyPatch(thread) {
   const snapshot = lastConversationRenderSnapshot;
@@ -15539,7 +15520,6 @@ function applyConversationStatusOnlyPatch(thread) {
     if (row.ref !== message) return false;
     const metaText = messageMetaText(message);
     if ((metaText !== '') !== row.hasMeta) return false;
-    if (message.payment && metaText !== row.metaText) return false;
     if (Boolean(privateMessageShouldShowManualActions(message)) !== row.showManual) return false;
   }
   for (let i = 0; i < messages.length; i += 1) {
@@ -15585,7 +15565,6 @@ function renderConversation() {
       messageInput.placeholder = plathoWallet ? t('chat.createOrChoosePrivateChat') : t('common.walletRequired');
     }
     if (sendButton) sendButton.disabled = true;
-    if (paymentCheckButton) paymentCheckButton.disabled = true;
     if (privateImageButton) privateImageButton.disabled = true;
     if (privateComposerAddButton) privateComposerAddButton.disabled = true;
     if (privateAnonymousButton) privateAnonymousButton.disabled = true;
@@ -15641,7 +15620,6 @@ function renderConversation() {
   if (sendButton) sendButton.disabled = !canSendPrivate;
   // Secondary buttons follow the send state (the eye is owned by updatePrivateSenderModeUi below); the input
   // above stays on the draft predicate — see refreshMessagingControls for the rationale.
-  if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
   if (privateImageButton) privateImageButton.disabled = !canSendPrivate;
   if (privateComposerAddButton) privateComposerAddButton.disabled = !canSendPrivate;
   if (privateImageModeSelect) privateImageModeSelect.disabled = isReadOnly || !plathoWallet;
@@ -15670,7 +15648,7 @@ function renderConversation() {
   lastConversationThreadId = thread.id;
   lastConversationMsgCount = conversationMsgCount;
   // Status tick with identical structure -> patch in place, scroller COMPLETELY untouched (no rebuild, no
-  // scroll writes, no rAF). Only a structural change (new message, payment/manual-action flip) rebuilds.
+  // scroll writes, no rAF). Only a structural change (new message, manual-action flip) rebuilds.
   if (!conversationThreadChanged && !conversationNewOutbound && applyConversationStatusOnlyPatch(thread)) return;
   const conversationRenderSnapshotRows = [];
   messageStrip.innerHTML = '';
@@ -16135,7 +16113,7 @@ attachSwipeToReply(publicPane, '.comment-item', beginPublicCommentReplyForRow);
 // ---- Long-press to copy (v651) ------------------------------------------------------------------------------------
 // Telegram-style: hold a message/comment (~0.5s, touch only) to copy its TEXT to the clipboard with a green
 // camera-flash confirmation on the bubble. Desktop gets a hover Copy button next to the Reply one. The full text
-// (not the reply-snippet cap) — text blocks joined, quote/payment/image blocks excluded.
+// (not the reply-snippet cap) — text blocks joined, quote/image blocks excluded.
 const LONG_PRESS_COPY_MS = 500;
 
 function copyTextFromContent(item) {
@@ -17138,7 +17116,6 @@ profileAvatarInput?.addEventListener('change', async () => {
 
 privateClearImageButton?.addEventListener('click', () => {
   privateImageAttachments = [];
-  privatePaymentCheckDraft = null;
   updateImageAttachmentUi('private');
   refreshComposerCostStatus();
 });
@@ -17244,12 +17221,11 @@ composer?.addEventListener('submit', async (event) => {
   enforceComposerByteLimit();
   const text = messageInput.value.trim();
   const attachments = normalizePrivateImageAttachments(privateImageAttachments);
-  const paymentDraft = privatePaymentCheckDraft;
   // v759: file attachments count as content — a file-only draft (its auto-inserted [file N] marker
   // hand-deleted, text empty) must reach the block-based send below, not dead-click here (the send
   // button IS enabled for it via privateComposerHasSendableContent; the public composer's equivalent
   // gate has been block-based all along).
-  if (!text && attachments.length === 0 && !paymentDraft && !privateShareDraft
+  if (!text && attachments.length === 0 && !privateShareDraft
     && normalizePrivateFileAttachments(privateFileAttachments).length === 0) {
     // Empty submit (e.g. an accidental Send click with nothing typed) — return focus to the input so the user can
     // just start typing, the same as after a real send. A share-only draft (v766) IS content — falls through.
@@ -17307,7 +17283,7 @@ composer?.addEventListener('submit', async (event) => {
 
   const selectedSuite = currentOutgoingPrivateSuite();
   const senderOptions = currentPrivateSenderOptions();
-  const sendPlan = privateComposerSendPlan(text, attachments, senderOptions, { paymentCheck: paymentDraft });
+  const sendPlan = privateComposerSendPlan(text, attachments, senderOptions);
   const limitMessage = privateComposerPartLimitMessage(sendPlan.length);
   if (limitMessage) {
     if (privateComposerCostStatus) {
@@ -17322,7 +17298,7 @@ composer?.addEventListener('submit', async (event) => {
   const replyDraft = privateReplyDraft ? { ...privateReplyDraft } : null;
   const shareDraft = privateShareDraft ? { ...privateShareDraft } : null;
   const fileAttachments = normalizePrivateFileAttachments(privateFileAttachments);
-  const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft, replyDraft, fileAttachments, shareDraft);
+  const draftBlocks = composerBlocksFromDraft(text, attachments, replyDraft, fileAttachments, shareDraft);
   if (draftBlocks.length === 0) {
     // Nothing real to send (an orphaned "[image N]" marker whose attachment was removed, or an otherwise-empty draft):
     // fail closed at the composer instead of inserting an empty bubble that dead-ends on "Capsule publish payload is
@@ -17344,7 +17320,6 @@ composer?.addEventListener('submit', async (event) => {
     privateDraft: {
       text,
       attachments,
-      paymentDraft,
       selectedSuite,
       senderOptions,
       replyDraft,
@@ -17362,7 +17337,6 @@ composer?.addEventListener('submit', async (event) => {
     message,
     text,
     attachments,
-    paymentDraft,
     selectedSuite,
     senderOptions,
     replyDraft,
@@ -17375,7 +17349,6 @@ composer?.addEventListener('submit', async (event) => {
   messageInput.value = '';
   exitComposerMaximize(); // a send finishes the message — collapse the full-screen composer back to the conversation
   privateImageAttachments = [];
-  privatePaymentCheckDraft = null;
   setPrivateReplyDraft(null);
   setPrivateShareDraft(null);
   privateFileAttachments = [];
@@ -18572,7 +18545,7 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
 // group 2 = file index; the `(?!\()` keeps labeled links ([file 1](url)) out, same as images.
 // v766: `[post]` marks where the shared-post block lands (positional like [image]/[file]; single like [check]).
 const COMPOSER_SHARE_MARKER_RE = /\[post\](?!\()/ig;
-const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[file\s+(\d+)\](?!\()|(\[post\])(?!\()|\[(?:check|payment)\](?!\()/ig;
+const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[file\s+(\d+)\](?!\()|(\[post\])(?!\()/ig;
 
 function concatUint8Arrays(parts) {
   const arrays = parts.map((part) => part instanceof Uint8Array ? part : new Uint8Array(part ?? []));
@@ -20856,8 +20829,7 @@ async function attemptIntroFirstContactDirect(context) {
     const peerKeyId = bundle.keyId;
 
     const firstMessageBytes = messageDocumentBytesFromDraft(
-      context.text, context.attachments,
-      context.payment ?? context.paymentDraft ?? null, {},
+      context.text, context.attachments, {},
       context.replyDraft === undefined ? privateReplyDraft : context.replyDraft,
       context.fileAttachments === undefined ? privateFileAttachments : context.fileAttachments,
       context.shareDraft === undefined ? privateShareDraft : context.shareDraft);
@@ -21126,8 +21098,7 @@ async function attemptConvMessagePublishDirect(context) {
   // Build the composer document + split into capsule-sized parts (the shared private-composer model).
   const senderOptions = context.senderOptions ?? currentPrivateSenderOptions();
   const documentBytes = messageDocumentBytesFromDraft(
-    context.text, context.attachments,
-    context.payment ?? context.paymentDraft ?? null, {},
+    context.text, context.attachments, {},
     context.replyDraft === undefined ? privateReplyDraft : context.replyDraft,
     context.fileAttachments === undefined ? privateFileAttachments : context.fileAttachments,
     context.shareDraft === undefined ? privateShareDraft : context.shareDraft);
@@ -21342,8 +21313,7 @@ async function runPrivateSendRetry(context) {
   try {
     await attemptPrivateComposerMessagePublish({
       ...context,
-      payment: context.payment ?? message.payment ?? null,
-      paymentDraft: null,
+
     });
   } catch (error) {
     await settlePrivateComposerSendError(context, error);
@@ -21547,8 +21517,7 @@ function imagePartsForSend(attachment, label = 'image') {
 function publicDocumentBlocksFromDraft(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments) {
   // Explicit replyDraft + shareDraft: the PUBLIC surface reads its OWN drafts (publicCommentReplyTo /
   // publicShareDraft) — never the private composer's (composerBlocksFromDraft defaults to the private ones).
-  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null, publicCommentReplyTo, normalizePrivateFileAttachments(fileAttachments), publicShareDraft)
-    .filter((block) => block.type !== 'payment');
+  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), publicCommentReplyTo, normalizePrivateFileAttachments(fileAttachments), publicShareDraft);
 }
 
 function publicDocumentBytesFromDraft(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments) {

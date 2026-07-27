@@ -2368,7 +2368,7 @@ describe('PWA runtime config guard', () => {
     expect(controls).toMatch(/const canEditPrivateDraft = canEditPrivateComposerDraft\(thread\)/);
     expect(controls).toMatch(/const canSendPrivate = canAttemptPrivateSend\(thread\)/);
     expect(controls).toMatch(/messageInput\.disabled = !canEditPrivateDraft/);
-    expect(controls).toMatch(/paymentCheckButton\.disabled = !canSendPrivate/);
+    // (The payment-check button went with the feature; the send-gate it shared is pinned on the buttons that remain.)
     // The secondary buttons ("+", image) follow the SEND state — an inactive composer (activation pending,
     // Vault reserve short) must not show live-looking buttons (owner, v696). Only the INPUT stays draft-gated.
     expect(controls).toMatch(/privateComposerAddButton\.disabled = !canSendPrivate/);
@@ -2392,7 +2392,7 @@ describe('PWA runtime config guard', () => {
     expect(privateFunnel).toMatch(/privateComposerAddButton\.disabled = blocked/);
     expect(privateFunnel).toMatch(/privateComposerAddButton\.title = reason \?\? t\('composer\.addImageOrCheck'\)/);
     expect(privateFunnel).toMatch(/if \(blocked\) hidePrivateComposerAddMenu\(\)/);
-    expect(privateFunnel).toMatch(/paymentCheckButton\.disabled = blocked/);
+    // (see above — the payment-check button is gone with the retired feature)
     expect(privateFunnel).toMatch(/privateImageButton\.disabled = blocked/);
     expect(privateFunnel).toMatch(/privateFileButton\.disabled = blocked/);
     // The eye rides in the SAME funnel (else it goes stale on cost-status-only refresh paths, and a
@@ -2737,7 +2737,7 @@ describe('PWA runtime config guard', () => {
     // clean-17: the anonymous flag (currentPrivateSenderOptions().includeSenderWalletMetadata) is asserted above; the
     // former createPrivateComposerCapsules internals (the senderMetadata ternary, senderUsername) were removed with the
     // Vault composer path.
-    expect(app).toMatch(/privateComposerSendPlan\(text, attachments, senderOptions, \{ paymentCheck: paymentDraft \}\)/);
+    expect(app).toMatch(/privateComposerSendPlan\(text, attachments, senderOptions\)/);
     // clean-17 honest payload invariant: the live direct-pay CONV send (attemptConvMessagePublishDirect) seals to the
     // peer's KeyShard bundle and NEVER embeds the sender wallet in the capsule payload — the identity is messaging-keys
     // only, so "omit sender wallet metadata" holds at the payload level regardless of the anonymous toggle. (The removed
@@ -2781,13 +2781,15 @@ describe('PWA runtime config guard', () => {
     );
 
     expect(app).toMatch(/let privateImageAttachments = \[\]/);
-    expect(app).toMatch(/let privatePaymentCheckDraft = null/);
+    // Payment checks are RETIRED (they were not anonymous — the codec keeps byte 3 reserved and never reuses it).
+    // Nothing in the composer carries a check draft any more; the marker is not even tokenized.
+    expect(app).not.toMatch(/privatePaymentCheckDraft/);
+    expect(app).not.toMatch(/paymentCheckButton/);
     expect(app).toMatch(/privateImageAttachments = \[\.\.\.privateImageAttachments, attachment\]/);
     expect(app).toMatch(/function composerBlocksFromDraft/);
     expect(app).toMatch(/function messageDocumentBytesFromDraft/);
     expect(submitSource).toMatch(/const attachments = normalizePrivateImageAttachments\(privateImageAttachments\)/);
-    expect(submitSource).toMatch(/const paymentDraft = privatePaymentCheckDraft/);
-    expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*paymentDraft,\s*replyDraft,\s*fileAttachments,\s*shareDraft\)/);
+    expect(submitSource).toMatch(/const draftBlocks = composerBlocksFromDraft\(text,\s*attachments,\s*replyDraft,\s*fileAttachments,\s*shareDraft\)/);
     expect(submitSource).toMatch(/blocks:\s*displayBlocks/);
   });
 
@@ -3593,10 +3595,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(block\.type === 'reply'\) \{\s*return \{ type: 'reply', refEntryId: block\.refEntryId/);
     // Composer threading: the PRIVATE builder defaults to the live draft; retry paths replay the CAPTURED one;
     // the PUBLIC builder pins its OWN draft (never the private one).
-    expect(app).toMatch(/function composerBlocksFromDraft\(text, attachments = \[\], paymentDraft = null, replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft\)/);
+    expect(app).toMatch(/function composerBlocksFromDraft\(text, attachments = \[\], replyDraft = privateReplyDraft, fileAttachments = privateFileAttachments, shareDraft = privateShareDraft\)/);
     // The public builder pins its OWN reply draft AND an explicit EMPTY file list — private file drafts must
     // never leak into a public post (v652).
-    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\), publicShareDraft\)/);
+    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\), publicShareDraft\)/);
     // clean-17: a retry replays the CAPTURED reply draft. The retry-context builder captures it from the message
     // draft, and BOTH live direct-pay send paths (CONV + INTRO first-contact) prefer the captured value over the live
     // composer draft. (The former Vault composer/retry copies of this were removed with the cutover.)
@@ -4108,7 +4110,7 @@ describe('PWA runtime config guard', () => {
     // Anything that changes row STRUCTURE falls through to the full rebuild: a meta node appearing or
     // disappearing, payment action buttons (derived from the meta text), the manual Retry affordance.
     expect(app).toMatch(/if \(\(metaText !== ''\) !== row\.hasMeta\) return false;/);
-    expect(app).toMatch(/if \(message\.payment && metaText !== row\.metaText\) return false;/);
+    // (the payment special-case in the incremental-render diff went with the block type it guarded)
     expect(app).toMatch(/privateMessageShouldShowManualActions\(message\)\) !== row\.showManual\) return false;/);
     // The scroll listener tracks the bottom-pin state immediately — no debounce timer to lag behind a gesture.
     const listenerSource = app.slice(app.indexOf('function rememberConversationScroll()'), app.indexOf('function applyConversationStatusOnlyPatch'));
@@ -4175,7 +4177,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/remove\.addEventListener\('click', \(\) => removeComposerImageAt\('private', index\)\)/);
     expect(app).toMatch(/function removeComposerImageAt\(kind, index\) \{[\s\S]*?filter\(\(_, i\) => i !== index\);[\s\S]*?removeImageMarkerForComposer\(kind, index\);/);
     // FAIL-CLOSED: the private send handler bails on zero resolved blocks instead of inserting an empty bubble.
-    expect(app).toMatch(/const draftBlocks = composerBlocksFromDraft\(text, attachments, paymentDraft, replyDraft, fileAttachments, shareDraft\);\s*\n\s*if \(draftBlocks\.length === 0\) \{[\s\S]*?t\('composer\.nothingToSend'\)[\s\S]*?return;/);
+    expect(app).toMatch(/const draftBlocks = composerBlocksFromDraft\(text, attachments, replyDraft, fileAttachments, shareDraft\);\s*\n\s*if \(draftBlocks\.length === 0\) \{[\s\S]*?t\('composer\.nothingToSend'\)[\s\S]*?return;/);
     // The send BUTTON (only, not the whole composer) is disabled when nothing real resolves to send — so a stray marker
     // can never be published, while the user can still attach to an empty field.
     expect(app).toMatch(/function privateComposerHasSendableContent\(\) \{[\s\S]*?composerBlocksFromDraft\(messageInput\?\.value \?\? ''[\s\S]*?\.length > 0;/);
@@ -4212,7 +4214,7 @@ describe('PWA runtime config guard', () => {
     // Review fixes (v759): (a) the private submit's empty-draft early-return counts FILE attachments as
     // content — a file-only draft (marker hand-deleted) must reach the block-based send, not dead-click;
     // (b) clearing files removes each marker LINE locally, never a global \n{3,} rewrite of the draft.
-    expect(app).toMatch(/if \(!text && attachments\.length === 0 && !paymentDraft && !privateShareDraft\s*\n\s*&& normalizePrivateFileAttachments\(privateFileAttachments\)\.length === 0\) \{/);
+    expect(app).toMatch(/if \(!text && attachments\.length === 0 && !privateShareDraft\s*\n\s*&& normalizePrivateFileAttachments\(privateFileAttachments\)\.length === 0\) \{/);
     const clearFileMarkersFn = app.slice(
       app.indexOf('function removeAllFileMarkersForComposer('),
       app.indexOf('function removeImageMarkerForComposer('),
@@ -4443,11 +4445,11 @@ describe('PWA runtime config guard', () => {
     // threaded through every plan/build/retry path, and the PUBLIC surface reads its OWN draft.
     expect(app).toMatch(/const shareDraft = privateShareDraft \? \{ \.\.\.privateShareDraft \} : null;/);
     expect(app).toMatch(/extras\.shareDraft === undefined \? privateShareDraft : extras\.shareDraft/);
-    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\), publicShareDraft\)/);
+    expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\), publicShareDraft\)/);
     // A share-only draft (no typed text) IS a sendable message: the block builder pushes it even alone, and the
     // private empty-submit early-return lets it through.
     expect(app).toMatch(/if \(shareDraft\?\.entryId && !usedShare\) \{\s*usedShare = true;\s*blocks\.unshift\(\{ type: 'share', \.\.\.shareDraft \}\);/);
-    expect(app).toMatch(/!text && attachments\.length === 0 && !paymentDraft && !privateShareDraft/);
+    expect(app).toMatch(/!text && attachments\.length === 0 && !privateShareDraft/);
     // The [post] marker is positional (like [image]/[file]); cancel strips it with the chip.
     expect(app).toMatch(/\(\\\[post\\\]\)/); // the marker alternative inside COMPOSER_MARKER_RE
     expect(app).toMatch(/function removeShareMarkerForComposer\(textarea\)/);
@@ -5208,7 +5210,7 @@ describe('PWA runtime config guard', () => {
     expect(cut).toContain('if (!hasAttachmentAtom) {');
     // [18] Pasted marker-like tokens are neutralized with a zero-width space (kept invisible, `(?!\\()` spares links)
     // so serialize->composerBlocksFromDraft can't re-bind a pasted [image 1] to the editor's own attachment on send.
-    expect(app).toContain("raw = raw.replace(/\\[((?:image|img)\\s+\\d+|file\\s+\\d+|post|check|payment)\\](?!\\()/gi, '[\\u200b$1]');");
+    expect(app).toContain("raw = raw.replace(/\\[((?:image|img)\\s+\\d+|file\\s+\\d+|post)\\](?!\\()/gi, '[\\u200b$1]');");
     // [25] The paste escape (which jumps the caret to the formatted word's end) fires ONLY when the paste yields a
     // LINK chip; plain/marker text inserts at the real caret (mid-word), so pasting into a bold word stays put.
     expect(app).toContain('const hasLink = /\\[[^\\]\\n]{1,200}\\]\\([^\\s()]{1,2000}\\)/.test(raw);');
