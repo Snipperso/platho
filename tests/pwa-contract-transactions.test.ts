@@ -513,19 +513,10 @@ describe('PWA contract transaction builders', () => {
     expect(direct).toContain('amount: PROFILE_AVATAR_PRICE_ATH');
   });
 
-  it('PWA-USERNAME-ROUTE-ATHMASTER-01: username route verifies official ATH wallet owner and ATHMaster', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const route = app.match(/async function requireUsernameRegistryVaultRoute[\s\S]*?async function requireUsernameRegistryVaultRouteForOwnVaultAction/);
-
-    expect(route?.[0]).toContain('provider.getAthWalletAddress(registry');
-    expect(route?.[0]).toContain('registryGlobal.official_ath_wallet_address');
-    expect(route?.[0]).toContain('createAthWalletTonRpcProvider({ athWalletAddress: officialWallet }).getWalletData');
-    expect(route?.[0]).toContain('if (!isAthWalletNotDeployedError(error)) throw error');
-    expect(route?.[0]).not.toContain('isMissingAthWalletOwnerError');
-    expect(route?.[0]).toContain('UsernameRegistry official ATH wallet is not the derived registry wallet');
-    expect(route?.[0]).toContain('UsernameRegistry official ATH wallet owner does not match registry');
-    expect(route?.[0]).toContain('UsernameRegistry official ATH wallet ATHMaster binding does not match this app config');
-  });
+  // PWA-USERNAME-ROUTE-ATHMASTER-01 removed with the Vault username route: it verified a VAULT-declared
+  // UsernameRegistry (its official ATH wallet, that wallet's owner, and its ATHMaster binding) before signing a
+  // Vault external. Direct pay signs no Vault external — the wallet pays the registry from the config+manifest
+  // pin — so there is no declared route to cross-check. The mint message itself stays byte-pinned above.
 
   it('PWA-TX-09: creates public post payload cells and signed Vault-balance public publish messages', async () => {
     const bodyText = 'p'.repeat(PUBLIC_POST_TEXT_MAX_BYTES);

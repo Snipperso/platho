@@ -803,11 +803,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/setUsernameMintStatus\(rateLimited \? TON_RPC_CONNECTING_STATUS : usernameMintStatusText\(error\), rateLimited \? 'busy' : 'error'\)/);
     expect(app).toMatch(/estimatedUsernameMintTonFeeNanotons/);
     expect(app).toMatch(/t\('username\.gramHoldValue', \{ amount: formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\) \}\)/);
-    expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');
-    expect(app).toMatch(/assertVaultUsernameMintCanStart/);
-    expect(app).toMatch(/submitVaultUsernameMint/);
-    expect(app).toMatch(/requireUsernameRegistryVaultRoute/);
-    expect(app).toMatch(/UsernameRegistry official ATH wallet is not the derived registry wallet/);
+    expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');   // copy string, retired with the Vault lane's UI
+    // (The "official ATH wallet is not the derived registry wallet" refusal belonged to the Vault route check —
+    // direct pay sends the ATH transfer to the registry address from the config+manifest pin, with no declared
+    // route to disagree with.)
     expect(enCopy).toMatch(/ATH; 50% goes to burn/);
     expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ GRAM fee/);
     expect(enCopy).toMatch(/Set profile avatar/);
@@ -1301,9 +1300,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function requireUsernameRegistryVaultRoute('),
       app.indexOf('function requireUsernameRegistryVaultRouteForOwnVaultAction('),
     );
-    expect(usernameRouteSource).not.toMatch(/Promise\.all\(/);
-    expect(usernameRouteSource).toMatch(/const registryGlobal = await provider\.getGlobal/);
-    expect(usernameRouteSource).toMatch(/const derivedOfficialWallet = await provider\.getAthWalletAddress/);
   });
 
   // PWA-CONFIG-01D2 removed with the Vault publish trunk (prepare -> sendPrepared -> publishCapsulesThroughVault).
@@ -2328,8 +2324,6 @@ describe('PWA runtime config guard', () => {
     expect(swSource).toMatch(/window\.location\.reload\(\)/);
     expect(swSource).toMatch(/reloadForPendingServiceWorkerAppShellUpdate\(\)/);
     expect(swSource).toMatch(/function schedulePendingServiceWorkerAppShellReload/);
-    expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
-    expect(submitSource).toMatch(/async function submitVaultMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).not.toMatch(/async function submitUsernameRegistryMessage/);
     // prepareCapsulesThroughVault (the Vault publish trunk's pre-sign gate) is gone; the direct-pay send surfaces
     // are gated by publicComposerSendBlocked / privateSendBlockReason above, both of which fail closed on a
@@ -2564,11 +2558,16 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function queueVaultRefreshAfterWalletChange'),
       app.indexOf('async function resolveUsernameRegistryProvider'),
     );
+    // The activation submitter is the KeyShard register now — the Vault external it used to sign is gone.
+    const submitActivation = app.slice(
+      app.indexOf('async function submitKeyShardRegisterDirect'),
+      app.indexOf('async function submitVaultRegisterMessagingKeys'),
+    );
 
     // A single in-flight lock declared at module scope.
     expect(app).toMatch(/let plathoAccountActivationPending = false;/);
     // The lock is raised the moment the activation external is broadcast.
-    expect(submit).toMatch(/plathoAccountActivationPending = true;[\s\S]*queueVaultPostTransactionRefresh\(\{ pollActivation: true \}\)/);
+    expect(submitActivation).toMatch(/plathoAccountActivationPending = true;[\s\S]*queueVaultPostTransactionRefresh\(\{ pollActivation: true \}\)/);
     // While pending and not yet active, the row stays disabled and shows progress
     // instead of reverting to the clickable "Activate / fee" resting state — the bug
     // where the button looked like it ignored the first press.
@@ -2650,7 +2649,6 @@ describe('PWA runtime config guard', () => {
     expect(recover).toMatch(/status !== BATCH_PUBLISH_RECEIPT_STATUS\.EVICTED\) \{\s*\n\s*continue/);
     // The ambiguous-broadcast nonce-floor ratchet is still shared by every remaining Vault external path (the
     // per-BATCH raise lived in the deleted publish trunk).
-    expect(app).toMatch(/raiseVaultPublishNonceFloor\(owner, clientNonce \+ 1n\)/);
   });
 
   it('PWA-SEND-RELIABILITY-01: burst-send hardening — no false-fail, no dual-broadcast, no read storm', () => {
@@ -2664,8 +2662,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function isAmbiguousTonRpcBroadcastError'),
       app.indexOf('function privateSendRetryDelayMs'),
     );
-    expect(ambiguous).toMatch(/\?\? 0\) < 500/);
-    expect(ambiguous).toMatch(/exit code\|not enough vault ton\|nonce\/i\.test\(message\)\) return false/);
 
     // #2: a pre-send FAILED part (nothing left the device) shows a neutral
     // "queued, retrying", never a red terminal "not sent".
@@ -3152,50 +3148,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function threadForOpenedSenderCapsule\(opened\)[\s\S]*label: 'Recovered sent'/);
   });
 
-  it('PWA-CONFIG-01D4C: service Vault externals handle ambiguous broadcast before downstream finality checks', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const helperSource = app.slice(
-      app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
-      app.indexOf('async function submitUsernameMintDirect'),
-    );
-    // The avatar registration external is gone (direct pay), so only the username mint external is left in this
-    // slice — it still has to handle an ambiguous broadcast before any finality read.
-    const profileSource = app.slice(
-      app.indexOf('async function submitVaultUsernameMint'),
-      app.indexOf('async function refreshWalletTonBalanceForProfile'),
-    );
-    const usernameFlow = app.slice(
-      app.indexOf('async function submitUsernameMint'),
-      app.indexOf('async function submitProfileAvatarUpdate'),
-    );
-    const keyRotateSource = app.slice(
-      app.indexOf('async function submitVaultReplaceMessagingKeys'),
-      app.indexOf('const VAULT_PUBLISH_STATUS_SUBMITTED'),
-    );
-
-    expect(helperSource).toMatch(/catch \(error\) \{[\s\S]*isAmbiguousTonRpcBroadcastError\(error\)/);
-    // v758: same definitive per-receiver nonce-reject throw as the receive-intent path (no floor
-    // ratchet, no false maybe-landed) — see PWA-CONFIG-01D4B's pin for the rationale.
-    expect(helperSource).toMatch(/if \(!isAmbiguousTonRpcBroadcastError\(error\) \|\| isDefinitiveVaultSingleExternalNonceReject\(error\)\) throw error;/);
-    expect(helperSource).toMatch(/ambiguousBroadcast = true/);
-    expect(helperSource).toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n/);
-    expect(helperSource).toMatch(/if \(ambiguousBroadcast \|\| result\) \{[\s\S]*nonceWaitError = error;[\s\S]*\} else \{[\s\S]*throw error;/);
-    expect(helperSource).toMatch(/confirmationPending: Boolean\(nonceWaitError\)/);
-    expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*submitVaultAuthExternalWithNonceConfirmation/);
-    expect(keyRotateSource).toMatch(/submitVaultAuthExternalWithNonceConfirmation/);
-    expect(keyRotateSource).toMatch(/submission\.confirmationPending \? t\('vault\.keyUpdateSubmittedConfirming'\) : t\('vault\.keyUpdateSent'\)/);
-    expect(EN_STRINGS['vault.keyUpdateSubmittedConfirming']).toBe('key update submitted, confirming');
-    expect(EN_STRINGS['vault.keyUpdateSent']).toBe('key update sent');
-    expect(usernameFlow).toMatch(/autoLinkMintedUsername\(username, owner,/);
-    // General single-external ambiguous-broadcast guards (shared by every signed Vault external — the
-    // definitive per-receiver nonce-reject codes + the provider's prior-delivery-ambiguous flag).
-    expect(app).toMatch(/const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES = Object\.freeze\(\[16037, 16135, 16233, 16249, 16262, 16611, 16711, 16808\]\)/);
-    expect(app).toMatch(/function isDefinitiveVaultSingleExternalNonceReject\(error\)[\s\S]{0,300}tonRpcPriorDeliveryAmbiguous === true\) return false;/);
-    expect(app).toMatch(/if \(!\/exit\\s\*_\?code\/i\.test\(text\)\) return false;/);
-    const vaultRpcProviderForSend = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
-    expect(vaultRpcProviderForSend).toMatch(/error\.tonRpcPriorDeliveryAmbiguous = true;/);
-    expect(vaultRpcProviderForSend).toMatch(/if \(status < 400 && String\(error\?\.code \?\? ''\) !== 'QUEUE_TIMEOUT'\) priorDeliveryAmbiguous = true;/);
-  });
+  // PWA-CONFIG-01D4C removed with submitVaultAuthExternalWithNonceConfirmation — the last Vault auth external is
+  // gone, so there is no publish-nonce ladder left to confirm after an ambiguous broadcast. The direct-pay
+  // counterpart (an ambiguous broadcast hands back the signed BOC and the retry re-broadcasts it VERBATIM under
+  // its original seqno) is pinned in PWA-SEND-02C.
 
   it('PWA-CONFIG-01D5: public submitted publish creates durable pending feed items', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -3230,86 +3186,10 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/cacheTtlMs:\s*0/);
   });
 
-  it('RT-PWA-VLT-002: own Vault pre-sign reads fail closed while post-broadcast nonce waits may fall back', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const userHelper = app.slice(
-      app.indexOf('async function readFreshConnectedVaultUserForOwnVaultAction'),
-      app.indexOf('async function callWithOwnVaultActionReadFallback'),
-    );
-    const globalHelper = app.slice(
-      app.indexOf('async function readConnectedVaultGlobalForOwnVaultAction'),
-      app.indexOf('function delay'),
-    );
-    // readCanonicalPublishChargeForOwnVaultAction (the pre-sign contract-price read) went with the Vault publish
-    // trunk — a direct-pay part carries a fixed message value, so nothing reads a canonical charge before signing.
-    const capsuleRoute = app.slice(
-      app.indexOf('async function requireCapsuleHubVaultRouteForPublish'),
-      app.indexOf('async function requireUsernameRegistryVaultRoute'),
-    );
-    // The ProfileRegistry Vault route is gone with the Vault avatar path (direct pay reads the registry address
-    // from config + manifest, never from the Vault global) — only the Hub and username routes remain.
-    const usernameRoute = app.slice(
-      app.indexOf('async function requireUsernameRegistryVaultRouteForOwnVaultAction'),
-      app.indexOf('async function assertVaultUsernameMintCanStart'),
-    );
-    const registerSource = app.slice(
-      app.indexOf('async function submitVaultRegisterMessagingKeys'),
-      app.indexOf('async function confirmPlathoAccountActivation'),
-    );
-    const nonceReadSource = app.slice(
-      app.indexOf('async function readVaultPublishNonceForOwnVaultAction'),
-      app.indexOf('async function waitForVaultPublishNonce'),
-    );
-    const sendSource = app.slice(
-      app.indexOf('async function sendPreparedCapsulesThroughVault'),
-      app.indexOf('async function publishCapsulesThroughVault'),
-    );
-    const clientNonceSource = sendSource.slice(
-      sendSource.indexOf('let clientNonce = options.allowOwnVaultActionReadFallback === true'),
-      sendSource.indexOf('if (clientNonce === null)'),
-    );
-    const authExternalSource = app.slice(
-      app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
-      app.indexOf('async function submitUsernameMintDirect'),
-    );
-
-    const degradedFallbackHelper = app.slice(
-      app.indexOf('async function callWithDegradedTransportReadFallback'),
-      app.indexOf('async function readConnectedVaultGlobalForOwnVaultAction'),
-    );
-
-    // Own-action pre-sign reads stay verified fail-closed while verification
-    // is actually possible. The unverified fallback opens only when the
-    // transport reports structural degradation: the primary gateway is
-    // parked OR every verifier transport is dead/blocked for this network.
-    expect(app).toMatch(/function tonRpcVerificationStructurallyDegraded\(\)[\s\S]*transport\.isDegraded\(\) === true[\s\S]*transport\.isVerificationDegraded\(\) === true/);
-    expect(degradedFallbackHelper).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) return readUnverified\(\)/);
-    expect(degradedFallbackHelper).toMatch(/isTonRpcVerificationUnavailableForOwnVaultActionError\(error\)\) throw error/);
-    expect(degradedFallbackHelper).toMatch(/if \(!tonRpcVerificationStructurallyDegraded\(\)\) throw error/);
-    // criticalChainReadOptions is the single degradation choke point for all
-    // critical reads (prepare, confirm, sync, avatars, key records).
-    expect(app).toMatch(/function criticalChainReadOptions\(\)[\s\S]*if \(tonRpcVerificationStructurallyDegraded\(\)\) return unverifiedCriticalChainReadOptions\(\)/);
-    expect(userHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
-    expect(userHelper).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
-    expect(userHelper).toMatch(/readFreshConnectedVaultUser\(provider, unverifiedCriticalChainReadOptions\(\)\)/);
-    expect(userHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
-    expect(globalHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
-    expect(globalHelper).toMatch(/loadConnectedVaultGlobal\(\{ provider, \.\.\.criticalChainReadOptions\(\) \}\)/);
-    expect(globalHelper).toMatch(/loadConnectedVaultGlobal\(\{ provider, \.\.\.unverifiedCriticalChainReadOptions\(\) \}\)/);
-    expect(globalHelper).not.toMatch(/isTonRpcSoftVaultGlobalReadError/);
-    expect(capsuleRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
-    expect(usernameRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
-    expect(registerSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
-    expect(nonceReadSource).toMatch(/callWithDegradedTransportReadFallback\(/);
-    expect(nonceReadSource).toMatch(/\(\) => readVaultPublishNonce\(provider, owner, options\)/);
-    expect(nonceReadSource).toMatch(/unverifiedCriticalChainReadOptions\(\)/);
-    expect(nonceReadSource).not.toMatch(/allowUnverifiedCriticalRead:|allowUnverifiedNonceRead|verify:\s*false/);
-    expect(clientNonceSource).not.toMatch(/allowUnverifiedCriticalRead|allowUnverifiedNonceRead|verify:/);
-    // Post-broadcast nonce waits are observational and always unverified;
-    // the publish outcome is re-authenticated by CapsuleHub confirmation.
-    expect(authExternalSource).toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n\)/);
-    expect(authExternalSource).not.toMatch(/allowUnverifiedNonceWait/);
-  });
+  // RT-PWA-VLT-002 removed with the Vault pre-sign read helpers: 'own-action reads fail closed while post-broadcast
+  // nonce waits may fall back' describes reading a VAULT before signing a Vault external. Both halves are gone.
+  // The degradation rule that survived — criticalChainReadOptions as the single choke point for every critical
+  // read — is pinned in PWA-CONFIG-01D4B.
 
   it('PWA-CONFIG-01E: public publishing uses the shared composer and explicit feed controls', () => {
     const html = readFileSync('web/index.html', 'utf8');
@@ -3800,7 +3680,7 @@ describe('PWA runtime config guard', () => {
     expect(dlg).toMatch(/estimatedChannelProfileHoldNanotons\(values\.description, values\.tags\)/);
     expect(dlg).toMatch(/label: t\('username\.gramHold'\), value: t\('username\.gramHoldValue', \{ amount: formatTonNanotons\(hold\) \}\)/);
     expect(EN_STRINGS['username.gramHold']).toBe('GRAM hold');
-    expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');
+    expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');   // copy string, retired with the Vault lane's UI
     // v792 (owner): the on-chain profile byte caps were raised (16 cyrillic chars/tag was too tight — long russian tags
     // cut mid-word; 256-char descriptions too short), and the edit dialog shows a LIVE utf-8 byte budget so nothing
     // truncates silently on save. Decode is unchanged (length fields carry any size) — backward-compatible.
@@ -6097,8 +5977,8 @@ describe('PWA runtime config guard', () => {
     );
     const priceIndex = submitSource.indexOf('readUsernameMintPriceForOwnVaultAction(provider, registry, username)');
     const availabilityIndex = submitSource.indexOf('readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username)');
-    const assertIndex = submitSource.indexOf('assertVaultUsernameMintCanStart(owner, username, priceAtomic)');
-    const signIndex = submitSource.indexOf('submitVaultUsernameMint({');
+    const assertIndex = submitSource.indexOf("assertConnectedAthAtLeast(priceAtomic, 'mint a name')");
+    const signIndex = submitSource.indexOf('sendPlathoWalletTransaction(requirePlathoWallet()');
 
     expect(app).toMatch(/computeUsernameNameHash,/);
     expect(helper).toMatch(/provider cannot verify username availability/);
@@ -6149,32 +6029,11 @@ describe('PWA runtime config guard', () => {
     expect(signIndex).toBeGreaterThan(assertIndex);
   });
 
-  it('RT-VUSER-002: username route verifies official ATH wallet owner and ATHMaster before minting', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const routeSource = app.slice(
-      app.indexOf('async function requireUsernameRegistryVaultRoute'),
-      app.indexOf('async function requireUsernameRegistryVaultRouteForOwnVaultAction'),
-    );
-
-    expect(routeSource).toMatch(/provider\.getAthWalletAddress\(registry/);
-    expect(routeSource).toMatch(/resolveAthMasterProvider\(\)/);
-    expect(routeSource).toMatch(/athMasterProvider\.getWalletAddress\(registry/);
-    expect(routeSource).toMatch(/officialWallet !== appDerivedWallet/);
-    expect(routeSource).toMatch(/createAthWalletTonRpcProvider\(\{ athWalletAddress: officialWallet \}\)\.getWalletData/);
-    expect(routeSource).toMatch(/if \(!isAthWalletNotDeployedError\(error\)\) throw error/);
-    expect(app).not.toMatch(/isMissingAthWalletOwnerError/);
-    expect(routeSource).toMatch(/if \(officialWalletData\) \{/);
-    expect(routeSource).toMatch(/officialWalletOwner !== registry/);
-    expect(routeSource).toMatch(/appConfig\.ath\?\.masterAddress/);
-    expect(routeSource).toMatch(/walletAthMaster !== expectedAthMaster/);
-    expect(routeSource).toMatch(/UsernameRegistry official ATH wallet ATHMaster binding does not match this app config/);
-    const ownRouteSource = app.slice(
-      app.indexOf('async function requireUsernameRegistryVaultRouteForOwnVaultAction'),
-      app.indexOf('async function assertVaultUsernameMintCanStart'),
-    );
-    expect(ownRouteSource).toMatch(/return requireUsernameRegistryVaultRoute\(global\)/);
-    expect(ownRouteSource).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
-  });
+  // RT-VUSER-002 removed with the Vault username lane: it verified the VAULT's registry route (Vault global ->
+  // UsernameRegistry -> derived official ATH wallet -> its ATHMaster binding) before a Vault-signed mint. Direct
+  // pay has no Vault global to route through — the wallet pays the registry directly, the registry address is a
+  // config+manifest pin, and the mint's own ATH-wallet request is pinned byte-exact in tests/ath-* plus
+  // USERNAME-ATH-DIRECT-01 (a full e2e against the live contract).
 
   it('RT-VUSER-003: username mint stays in background finalizing instead of offering a quick repeat', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -6222,7 +6081,6 @@ describe('PWA runtime config guard', () => {
     expect(helper).toMatch(/\.\.\.criticalChainReadOptions\(\)/);
     expect(helper).not.toMatch(/localUsernameMintPriceAtomic\(username\)|isTonRpcVerificationUnavailableForOwnVaultActionError\(error\)|allowUnverifiedCriticalRead/);
     expect(source).toMatch(/priceAtomic/);
-    expect(source).toMatch(/submitVaultUsernameMint/);
     expect(source).not.toMatch(/submitAthWalletMessage\(/);
     expect(source).not.toMatch(/amount: price,/);
   });
@@ -6262,7 +6120,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/queueVaultPostTransactionRefresh\(\{ pollActivation: true \}\)/);
     expect(app).toMatch(/function queueVaultRefreshAfterWalletChange\(\) \{[\s\S]*markNavVaultBalancePending\('wallet changed'/);
     expect(app).toMatch(/async function sendVaultExternalBoc\(built, options = \{\}\) \{[\s\S]*markNavVaultBalancePending\('Vault action submitted'/);
-    expect(app).toMatch(/async function submitVaultMessage\(type, params, options = \{\}\) \{[\s\S]*markNavVaultBalancePending\('wallet transaction submitted'/);
     expect(app).toMatch(/function markNavVaultBalanceRetryNeeded[\s\S]*markNavVaultBalancePending\(reason, \{ retry: true \}\)/);
     expect(app).toMatch(/if \(view === 'vault'\)/);
     expect(app).toMatch(/scheduleVaultAutoRefresh\(2_000\)/);
