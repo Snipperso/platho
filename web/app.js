@@ -24587,41 +24587,23 @@ async function attemptPrivateComposerMessagePublish(context) {
   return attemptConvMessagePublishDirect(context);
 }
 
+// clean-17 direct-pay: a send either broadcasts as ONE wallet transfer or throws. The Vault-era outcomes this
+// function used to fan out on — a PARTIAL publish (some capsule parts accepted, some not, carried on a
+// publishState) and a cancelled price-change dialog — cannot occur: nothing builds a publishState any more and
+// there is no pre-sign price dialog to cancel. What remains is the honest three-way split below.
 async function settlePrivateComposerSendError(context, error) {
   const { thread, message } = context;
-  const cancelled = isPublishPriceChangeCancelled(error);
-  const partial = isVaultPublishPartialError(error);
   const rateLimited = noteTonRpcRateLimit(error);
   globalThis.plathoLastPrivateComposerSendError = {
     message: String(error?.message ?? error ?? ''),
     code: error?.code ?? null,
     phase: message?.meta ?? null,
-    hasPublishAttempt: privateMessageHasPublishAttempt(message),
     hasLocalHistory: Boolean(message?.localHistoryId),
     at: new Date().toISOString(),
   };
-  if (partial) {
-    clearPrivateSendRetry(message);
-    message.vaultPublish = error.publishResult;
-    message.publishState = error.publishResult?.publishState ?? message.publishState;
-    message.meta = publishStateMeta(message.publishState);
-    thread.state = privateMessageHasPublishAttempt(message) ? 'pending' : 'blocked';
-    await updateMessageInEncryptedHistory(thread, message);
-    if (publishStateHasRetryableSendParts(message.publishState) && isRecoverablePrivateSendError(error.cause ?? error)) {
-      schedulePrivateSendRetry(context, error.cause ?? error);
-    } else {
-      schedulePrivatePublishConfirmationRetry(context, error);
-    }
-  } else if (cancelled) {
-    markPrivateMessageManualRecovery(context, error, 'not sent: cancelled');
-  } else if (isRecoverablePrivateSendError(error) && !privateMessageHasPublishAttempt(message)) {
+  if (isRecoverablePrivateSendError(error)) {
     schedulePrivateSendRetry(context, error);
-  } else if (isRecoverablePrivateSendError(error) && privateMessageHasPublishAttempt(message)) {
-    message.meta = publishStateMeta(message.publishState);
-    thread.state = 'pending';
-    await updateMessageInEncryptedHistory(thread, message);
-    schedulePrivatePublishConfirmationRetry(context, error);
-  } else if (!privateMessageHasPublishAttempt(message) && !message.localHistoryId) {
+  } else if (!message.localHistoryId) {
     markPrivateMessageManualRecovery(context, error, privateSendBlockedStatusText(error));
     if (privateComposerCostStatus) {
       privateComposerCostStatus.textContent = rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error);
@@ -24631,8 +24613,7 @@ async function settlePrivateComposerSendError(context, error) {
     markPrivateMessageManualRecovery(context, error, privateSendBlockedStatusText(error));
   }
   if (privateComposerCostStatus) {
-    const recoverable = isRecoverablePrivateSendError(error);
-    if (cancelled || recoverable || partial || privateMessageHasPublishAttempt(message)) {
+    if (isRecoverablePrivateSendError(error)) {
       refreshComposerCostStatus();
     } else {
       privateComposerCostStatus.textContent = rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error);
@@ -24640,7 +24621,7 @@ async function settlePrivateComposerSendError(context, error) {
     }
   }
   refreshMessagingControls();
-  if (!rateLimited && !cancelled && !partial && !isRecoverablePrivateSendError(error)) console.error(error);
+  if (!rateLimited && !isRecoverablePrivateSendError(error)) console.error(error);
 }
 
 async function runPrivateSendRetry(context) {
