@@ -1014,7 +1014,6 @@ let messageAutoSyncLastErrorLabel = null;
 let messageSyncManualInFlight = false;
 let messageAutoSyncLoadingFrame = 0;
 let messageAutoSyncStallStreak = 0;
-const privateScanUnknownErrorCounts = new Map();
 let privateOutboundWorkDepth = 0;
 // Deadline until which a background auto-lock is DEFERRED because a send is actively holding the key
 // (set once at first defer, never re-armed — so a wedged send cannot pin the wallet unlocked past the cap).
@@ -1173,62 +1172,8 @@ const PRIVATE_OUTBOUND_SYNC_PAUSE_MS = 5 * 1000;
 // 2.5s (was 6s): with client-direct keyed toncenter the send/sync interleave is cheap; 6s was a flat
 // pre-send tax on every send that raced a background sync pass.
 const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 2_500;
-const PRIVATE_CHAIN_INDEX_STORAGE_PREFIX = 'platho.private.chain.index.v1';
-const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.history.unavailable.v1';
-const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 200;
-const PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS = 3 * 60 * 1000;
-const PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT = 2;
-const PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT = 16;
-// A single entry that persistently fails with an unclassified error must not
-// freeze the index cursor into a forever-resyncing loop: after this many
-// failed passes the entry is skipped for the session and kept visible in the
-// debug surface instead.
-const PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER = 3;
-// A session-skipped unknown-error entry (above) is otherwise buried forever (the
-// cursor advances past it and the in-memory strike count dies on reload). Persist
-// it so later sessions re-scan it (via the retryEntryIds replay, never via cursor
-// manipulation — that would re-arm the perpetual catch-up loop). After this many
-// CROSS-session strikes it is promoted to a surfaced "undelivered" gap and stops
-// being re-fetched. Tuned to mirror the body-history retry store above.
-const PRIVATE_CHAIN_STUCK_ENTRY_STORAGE_PREFIX = 'platho.private.chain.stuck.entry.v1';
-const PRIVATE_CHAIN_STUCK_ENTRY_LIMIT = 200;
-const PRIVATE_CHAIN_STUCK_ENTRY_RETRY_AUTO_LIMIT = 2;
-const PRIVATE_CHAIN_STUCK_ENTRY_RETRY_MANUAL_LIMIT = 16;
-const PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP = 8;
-// A keyless body gap (no indexer; the keyless toncenter tx-scan can't reach an old/unrecoverable body) is more
-// deterministically permanent than a generic unknown error, and each retry pays a heavy 8-page CapsuleHub
-// tx-scan, so cap it sooner: after this many cross-session strikes the entry is surfaced 'undelivered' and
-// stops being re-fetched (its heavy body tx-scan is skipped, the 500 source).
-const PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP = 6;
-const PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX = 'platho.private.chain.head.repair.v1';
-const PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT = 8;
-// Straddle extension budget (v649): when the per-pass index walk hits its window limit mid-multipart-group, keep
-// walking deeper up to this many EXTRA entries until the group's remaining parts are found — the private analogue
-// of the public comment loader's boundary-straddle extension. Without it a group crossing the window boundary was
-// never assembled: FRESH it vetoed the cursor (head-restart livelock for ~10min), STALE the cursor advanced past
-// its head-side parts forever (invisible until a manual Sync). 32 covers the 8-part compose cap with a 4x
-// interleave margin; a group still open past the budget degrades exactly as before (honest veto, never a cursor
-// past a half-fetched message).
-const PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;
-const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.public.chain.history.unavailable.v1';
-const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 400;
 const LEGACY_MESSAGE_HISTORY_DB_NAME = 'platho-local-message-history-v1';
 const LEGACY_REPLAY_DB_NAME = 'platho-local-security-v1';
-const PUBLIC_CHAIN_READ_LIMIT = 128;
-// 'Long' history sync walks the full retained per-author chain the UI promises ("up to 1 year"), bounded by this
-// generous safety cap so a pathological high-volume author cannot wedge the client; past it the feed honestly
-// reports itself incomplete (symmetric to the private walk's catch-up signal).
-const PUBLIC_CHAIN_LONG_READ_LIMIT = 4096;
-// Feed-walk straddle extension budget (v650, mirrors PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT): extra entries
-// the per-author walk may read past its window cap to close a multipart post split by the boundary. Cheap: these
-// are header-only entry reads (no bodies); the 8-part compose cap bounds real groups far below this.
-const PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;
-// F1 (scale): max author-index reads a single public-feed sync cycle may issue. A heavy subscriber otherwise fired
-// one getPublicAuthorIndex per followed channel EVERY 30s cycle through the shared serial toncenter pump (O(subs) ~
-// 125ms each), overrunning the cycle past ~240 subs and starving send/receive. The reads are now round-robined at
-// this budget/cycle; a full sweep of N channels takes ceil(N/budget) cycles. Users with <= budget subscriptions are
-// unaffected (every channel is still read every cycle). 24*125ms = ~3s of pump/cycle leaves room for send/receive.
-const PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE = 24;
 // F2 (render scale): the public feed is newest-FIRST (newest at the TOP). Render only the NEWEST this-many items;
 // older ones sit behind a "show older" button at the BOTTOM that reveals another page. Bounds the live DOM node count
 // (and the per-render cost) regardless of how many posts the subscribed set has accumulated (short mode caches up to
@@ -1239,7 +1184,6 @@ const PUBLIC_FEED_RENDER_PAGE = 150;
 // public state; initializing it up there would forward-reference this const in its TDZ and crash boot).
 publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
 const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
-const PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT = 48;
 const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
 const PUBLIC_COMMENTS_DEFAULT_STORAGE_KEY = 'platho.publicCommentsDefault.v2';
 const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
@@ -8448,7 +8392,9 @@ async function loadPublicPostCommentsFromShards(item) {
     // shardEntryId is the RAW per-shard entry_id post_uid folds; item.entryId is the collision-safe composite.
     threadPosts = await lane.readThreadComments(item.authorWallet, BigInt(item.channelEpochTag), BigInt(item.shardEntryId ?? item.entryId), { channelShardSeq: item.channelShardSeq ?? 0 });
   } catch (error) {
-    console.warn('[public] thread comments read failed', item.entryId, error);
+    // Feed a 429 into the shared rate-limit tracker before degrading, or the app keeps hammering at the same
+    // cadence while every read fails (the Hub loader did this; the shard loader silently did not).
+    if (!noteTonRpcRateLimit(error)) console.warn('[public] thread comments read failed', item.entryId, error);
     return { comments: [], degraded: true };
   }
   const commentParts = [];
@@ -8491,192 +8437,10 @@ async function loadPublicPostCommentsFromShards(item) {
 }
 
 async function loadPublicPostComments(item, options = {}) {
-  if (publicLaneDirectPayEnabled()) return loadPublicPostCommentsFromShards(item);
-  const snapshot = options.snapshot && Array.isArray(options.snapshot.comments) ? options.snapshot : null;
-  const snapshotBoundary = (() => {
-    try { return BigInt(snapshot?.latestLink ?? 0n); } catch { return 0n; }
-  })();
-  const resolved = await resolveCapsuleHubProvider();
-  if (!resolved) return { comments: [], degraded: true };
-  const { provider, address } = resolved;
-  // 'critical' priority (same as the public sync, ABOVE the private message sync at 'messages') — already the
-  // highest practical tier without a wide module-version cascade. The user-waited comment read thus jumps ahead of
-  // the private sync (the bulk of any burst); a dedicated above-critical tier wasn't worth re-versioning 8 modules.
-  const readOptions = criticalCapsuleHubReadOptions(address);
-  let degraded = false;
-  let parentIndex;
-  try {
-    parentIndex = await provider.getPublicParentIndex(BigInt(item.entryId), readOptions);
-  } catch (error) {
-    if (noteTonRpcRateLimit(error)) return { comments: [], degraded: true };
-    throw error;
-  }
-  // No comment index for this post yet -> genuinely zero comments (a clean, non-degraded result).
-  if (!parentIndex || parentIndex.exists !== true) {
-    globalThis.plathoLastPublicCommentLoad = {
-      entryId: String(item.entryId), bodyHash: item.bodyHash ?? null,
-      parentExists: parentIndex?.exists ?? null,
-      latestLink: String(parentIndex?.latest_entry_link ?? ''), entryCount: String(parentIndex?.entry_count ?? ''),
-      walked: 0, resolved: 0, comments: 0, degraded: false,
-    };
-    // Clean read, no parent index → the post genuinely has no comments (the index is created on the first comment).
-    return { comments: [], degraded: false, parentExists: false, latestLink: '0' };
-  }
-  const latestLink = String(parentIndex.latest_entry_link ?? '0');
-  // UNCHANGED shortcut: the comment chain grows append-only, so an identical latest_entry_link means the
-  // snapshot already holds everything — return it with ZERO body reads (this is the whole point).
-  if (snapshot && snapshotBoundary > 0n && String(snapshotBoundary) === latestLink) {
-    globalThis.plathoLastPublicCommentLoad = {
-      entryId: String(item.entryId), bodyHash: item.bodyHash ?? null,
-      parentExists: true, latestLink, entryCount: String(parentIndex.entry_count ?? ''),
-      walked: 0, resolved: 0, comments: snapshot.comments.length, degraded: false, incremental: 'unchanged',
-    };
-    return { comments: snapshot.comments, degraded: false, parentExists: true, latestLink };
-  }
-
-  const ids = [];
-  const walkedEntries = new Map();
-  let link = BigInt(parentIndex.latest_entry_link ?? 0n);
-  try {
-    for (let n = 0; link > 0n; n += 1) {
-      if (n >= PUBLIC_CHAIN_LONG_READ_LIMIT) { degraded = true; break; }
-      // Snapshot boundary: everything at/below the last clean load's latest_entry_link is already assembled in
-      // the snapshot — stop fetching (only NEW entries above it are read).
-      if (snapshotBoundary > 0n && link <= snapshotBoundary) break;
-      const entryId = link - 1n;
-      const entry = await provider.getPublicEntry(entryId, readOptions);
-      walkedEntries.set(entryId.toString(), entry);
-      if (entry.exists !== true) break;
-      ids.push(entryId);
-      const prev = BigInt(entry.prev_link ?? 0n);
-      if (prev === link) break; // defensive: never spin on a self-referential link
-      link = prev;
-    }
-  } catch (error) {
-    if (noteTonRpcRateLimit(error)) return { comments: [], degraded: true };
-    throw error;
-  }
-
-  const commentParts = [];
-  const resolveEntryToCommentPart = async (entry) => {
-    // Body durability lives INSIDE resolvePublicEntryPayload (the per-entry BoC cache): a comment body that
-    // resolved once is served locally on every later walk, so this resolver stays a thin assembler.
-    let payload = null;
-    try {
-      payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
-    } catch (error) {
-      // An unreadable / history-unavailable comment must NOT be presented as "no such comment": mark degraded so
-      // the caller retries instead of caching a short list.
-      if (noteTonRpcRateLimit(error)) { degraded = true; return; }
-      degraded = true;
-      return;
-    }
-    if (!payload) { degraded = true; return; }
-    if (payload.type !== 'comment' && payload.type !== 'image_comment' && payload.type !== 'document_comment') return;
-    const createdAtSec = Number(payload.createdAtSec ?? payload.created_at_sec ?? 0);
-    const createdAt = createdAtSec > 0 ? new Date(createdAtSec * 1000).toISOString() : new Date().toISOString();
-    const authorWallet = rawWalletAddress(payload.authorWallet ?? entry.author_wallet) ?? String(payload.authorWallet ?? entry.author_wallet ?? '');
-    const part = {
-      id: `chain-${entry.entry_id.toString()}`,
-      entryId: entry.entry_id.toString(),
-      channelId: item.channelId ?? publicChannelIdForAuthorWallet(authorWallet),
-      type: payload.type,
-      text: payload.text ?? '',
-      imageBytes: payload.imageBytes ?? payload.image_bytes,
-      documentBytes: payload.documentBytes ?? payload.document_bytes,
-      createdAt,
-      author: publicAuthorLabel(authorWallet),
-      authorWallet,
-      bodyHash: payload.bodyHash ?? uint256Hex(entry.body_hash),
-      entryUid: payload.entryUid ?? entry.entry_uid.toString(16),
-      streamId: payload.stream_id,
-      partIndex: payload.partIndex ?? 0,
-      partCount: payload.partCount ?? 1,
-      profileVersion: payload.profileVersion ?? payload.profile_version ?? 0,
-      avatarHash: payload.avatarHash ?? payload.avatar_hash ?? zeroAvatarHashHex(),
-      chainVerified: true,
-      parentEntryId: payload.parentEntryId.toString(),
-      parentHash: payload.parentHash,
-    };
-    commentParts.push(part);
-  };
-  for (const entryId of ids) {
-    const entry = walkedEntries.get(entryId.toString());
-    if (!entry || entry.exists !== true) continue;
-    await resolveEntryToCommentPart(entry);
-  }
-
-  // Boundary-straddle extension: a multipart comment half-landed at snapshot time has parts BELOW the boundary
-  // that were never assembled (incomplete groups are dropped) — walk deeper until every multipart group among
-  // the fresh parts is complete (bounded by the same read limit).
-  try {
-    let walked = ids.length;
-    while (snapshotBoundary > 0n && link > 0n && walked < PUBLIC_CHAIN_LONG_READ_LIMIT
-      && publicCommentPartsHaveIncompleteGroup(commentParts)) {
-      const entryId = link - 1n;
-      const entry = await provider.getPublicEntry(entryId, readOptions);
-      walked += 1;
-      if (entry.exists !== true) break;
-      await resolveEntryToCommentPart(entry);
-      const prev = BigInt(entry.prev_link ?? 0n);
-      if (prev === link) break;
-      link = prev;
-    }
-    // LIMIT exit with a still-incomplete group MUST degrade (symmetric with the main walk): otherwise the
-    // result caches with the NEW cursor and the half-fetched comment falls below the boundary FOREVER. The
-    // evicted (exists!==true) and chain-start (link=0) exits stay clean — an evicted half-group would loop
-    // a retry forever if degraded here.
-    if (walked >= PUBLIC_CHAIN_LONG_READ_LIMIT && publicCommentPartsHaveIncompleteGroup(commentParts)) {
-      degraded = true;
-    }
-  } catch (error) {
-    noteTonRpcRateLimit(error);
-    degraded = true;
-  }
-
-  const assembled = assemblePublicParts(commentParts)
-    .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
-  // Bind exactly to THIS post: same filter the feed sync uses (drop only when both hashes present AND mismatch).
-  const fresh = assembled.filter((comment) => (
-    String(comment.parentEntryId) === String(item.entryId)
-    && (!item.bodyHash || !comment.parentHash || String(item.bodyHash).toLowerCase() === String(comment.parentHash).toLowerCase())
-  ));
-  // Incremental merge: fresh (new) entries win by entryId (mergePublicComments favors its SECOND argument);
-  // the snapshot supplies everything below the boundary.
-  const comments = snapshot
-    ? mergePublicComments(snapshot.comments, fresh)
-      .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime())
-    : fresh;
-  // Diagnostic snapshot (read via globalThis.plathoLastPublicCommentLoad) so an empty result is debuggable: it
-  // pinpoints whether the parent index was missing, the walk returned nothing, bodies failed to resolve, or the
-  // parent-binding filter dropped them.
-  globalThis.plathoLastPublicCommentLoad = {
-    entryId: String(item.entryId), bodyHash: item.bodyHash ?? null,
-    parentExists: true, latestLink: String(parentIndex.latest_entry_link ?? ''), entryCount: String(parentIndex.entry_count ?? ''),
-    walked: ids.length, resolved: commentParts.length, assembled: assembled.length, comments: comments.length, degraded,
-    incremental: snapshot ? `boundary=${String(snapshotBoundary)}` : 'full',
-    sampleParents: assembled.slice(0, 5).map((c) => ({ parentEntryId: String(c.parentEntryId ?? ''), parentHash: c.parentHash ?? null, type: c.type })),
-  };
-  return { comments, degraded, parentExists: true, latestLink };
-}
-
-// TRUE when a multipart comment group among the freshly-fetched parts is still missing parts (used to extend
-// the incremental walk past the snapshot boundary for a group that straddles it).
-function publicCommentPartsHaveIncompleteGroup(parts) {
-  const groups = new Map();
-  for (const part of parts) {
-    const expected = Number(part.partCount ?? 1);
-    if (expected <= 1) continue;
-    const key = `${part.channelId}:${part.streamId}:${part.parentEntryId ?? ''}:${part.parentHash ?? ''}`;
-    const group = groups.get(key) ?? { expected, seen: new Set() };
-    group.expected = Math.max(group.expected, expected);
-    group.seen.add(Number(part.partIndex ?? 0));
-    groups.set(key, group);
-  }
-  for (const group of groups.values()) {
-    if (group.seen.size < group.expected) return true;
-  }
-  return false;
+  // clean-17 direct-pay: a post's comments live in its THREAD shard, derived from the parent's coordinates
+  // (loadPublicPostCommentsFromShards). The removed CapsuleHub walk read a shared entry log with a snapshot
+  // boundary and an incremental cursor; a thread shard is per-post, so there is no shared log to walk.
+  return loadPublicPostCommentsFromShards(item);
 }
 
 // Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
@@ -8892,13 +8656,6 @@ function configuredCapsuleHubAddress() {
     ?? null;
 }
 
-function configuredFeeAccumulatorAddress() {
-  return appConfig.feeAccumulator?.address
-    ?? globalThis.plathoFeeAccumulatorAddress
-    ?? globalThis.PLATHO_FEE_ACCUMULATOR_ADDRESS
-    ?? null;
-}
-
 function configuredProfileRegistryAddress() {
   return appConfig.profileRegistry?.address
     ?? globalThis.plathoProfileRegistryAddress
@@ -8973,18 +8730,6 @@ async function resolvePublicEntryPayload(provider, entry, address, options = {})
     }
   }
   return payload;
-}
-
-async function resolvePrivateEntryBody(provider, entry, address, options = {}) {
-  if (entry?.body_boc || !provider?.resolvePrivateEntryBody) return entry;
-  return provider.resolvePrivateEntryBody(entry, {
-    capsuleHubAddress: address,
-    vaultAddress: appConfig.vault?.address ?? null,
-    messageCacheTtlMs: options.messageCacheTtlMs ?? 0,
-    priority: options.priority ?? 'critical',
-    verify: options.verify,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead,
-  });
 }
 
 async function resolveProfileRegistryProvider() {
@@ -9813,56 +9558,9 @@ async function resolveChannelProfile(authorWallet, options = {}) {
 // for distinct recent authors (entry views only, NO body reads), then resolves at most CANDIDATES profiles with a
 // shallow per-author walk. Recency-scoped by design (the owner's "show what's found, no deep scans"): a channel
 // that has been silent longer than the window, or whose profile sits deeper than MAXSCAN posts, won't surface.
-const PUBLIC_DISCOVERY_WINDOW = 64;
-const PUBLIC_DISCOVERY_MAX_CANDIDATES = 16;
-const PUBLIC_DISCOVERY_PROFILE_MAXSCAN = 6;
 const PUBLIC_DISCOVERY_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let publicDiscoveryCache = null; // { at, results: [{ authorWallet, description, tags, name }] }
-
-// clean-11 COMPLETE discovery: walk the GLOBAL profile chain newest-first (get_public_profile_head -> follow each
-// entry's profile_prev_link), surfacing EVERY described channel — not recency-scoped like the clean-10 window sample.
-// Bounded by a distinct-author cap + a scan cap (edit-churn safety: repeated profile edits by a few authors inflate
-// the chain, so we dedupe by author, latest wins). Strict-FIFO eviction means the first evicted node ends the live
-// prefix (stop). Returns null on a head-read failure so the caller falls back to the clean-10 window scan.
-async function discoverChannelsViaProfileChain(provider, address, readOptions, ownWallet, subscribedAuthors) {
-  let head;
-  try { head = BigInt((await provider.getPublicProfileHead(readOptions)) ?? 0n); }
-  catch (error) { noteTonRpcRateLimit(error); return null; }
-  if (head <= 0n) return [];
-  const results = [];
-  const seen = new Set();
-  let link = head;
-  for (let scanned = 0; link > 0n && scanned < PUBLIC_DISCOVERY_WINDOW && results.length < PUBLIC_DISCOVERY_MAX_CANDIDATES; scanned += 1) {
-    const entryId = link - 1n;
-    let entry;
-    try { entry = await provider.getPublicEntry(entryId, readOptions); } catch (error) { noteTonRpcRateLimit(error); break; }
-    if (entry.exists !== true) break; // strict-FIFO: first evicted node ends the live prefix
-    const nextLink = BigInt(entry.profile_prev_link ?? 0n);
-    const wallet = rawWalletAddress(entry.author_wallet);
-    if (wallet && !seen.has(wallet)) {
-      seen.add(wallet); // dedupe: a channel's older profile-edit nodes are ignored (latest wins, newest-first)
-      const skip = (ownWallet && sameWalletAddress(wallet, ownWallet)) || subscribedAuthors.has(wallet);
-      if (!skip) {
-        let payload = null;
-        try { payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES }); } catch { payload = null; }
-        const profileDoc = payload ? readProfileDocument(payload.documentBytes ?? payload.document_bytes) : null;
-        if (profileDoc?.profileBlock) {
-          const description = typeof profileDoc.profileBlock.description === 'string' ? profileDoc.profileBlock.description.trim() : '';
-          const tags = (profileDoc.profileBlock.tags ?? []).filter(Boolean);
-          if (description || tags.length > 0) {
-            const createdAtSec = Number(payload?.createdAtSec ?? payload?.created_at_sec ?? 0) || 0;
-            setChannelProfileFromWalk(wallet, profileDoc.profileBlock, entryId, createdAtSec); // warm the per-author cache
-            results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
-          }
-        }
-      }
-    }
-    if (nextLink === link) break; // defensive: never spin on a self-referential link
-    link = nextLink;
-  }
-  return results;
-}
 
 // clean-17 Discover: sweep the BEACON directory (public-lane ranks live buckets by entry_count, NOT lt) and adapt
 // each announcement to the 4-field shape renderPublicDiscovery consumes. The beacon card body is the raw profile
@@ -9906,64 +9604,9 @@ async function discoverChannels(options = {}) {
   if (options.force !== true && publicDiscoveryCache && (Date.now() - publicDiscoveryCache.at) < PUBLIC_DISCOVERY_CACHE_TTL_MS) {
     return publicDiscoveryCache.results;
   }
-  if (publicLaneDirectPayEnabled()) return discoverChannelsFromBeacon();
-  const resolved = await resolveCapsuleHubProvider();
-  if (!resolved) return publicDiscoveryCache?.results ?? [];
-  const { provider, address } = resolved;
-  const readOptions = criticalCapsuleHubReadOptions(address);
-  const ownWalletEarly = rawWalletAddress(plathoWallet?.address);
-  const subscribedAuthorsEarly = new Set(
-    subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
-      .map((channel) => rawWalletAddress(channel.authorWallet))
-      .filter(Boolean),
-  );
-  // clean-11: prefer the COMPLETE global-profile-chain walk; fall through to the clean-10 recency window on failure.
-  if (profilePointerEnabled()) {
-    const chainResults = await discoverChannelsViaProfileChain(provider, address, readOptions, ownWalletEarly, subscribedAuthorsEarly);
-    if (chainResults) { publicDiscoveryCache = { at: Date.now(), results: chainResults }; return chainResults; }
-  }
-  const state = await provider.getState(readOptions);
-  const latestId = BigInt(state.public_latest_id ?? 0n);
-  if (latestId <= 0n) { publicDiscoveryCache = { at: Date.now(), results: [] }; return []; }
-  // Phase 1 — distinct recent authors from the head window (entry views only, no body reads). Skip own wallet and
-  // channels already subscribed (discovery is for finding NEW channels).
-  const ownWallet = rawWalletAddress(plathoWallet?.address);
-  const subscribedAuthors = new Set(
-    subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
-      .map((channel) => rawWalletAddress(channel.authorWallet))
-      .filter(Boolean),
-  );
-  const seen = new Set();
-  const candidates = [];
-  for (let i = 0; i < PUBLIC_DISCOVERY_WINDOW && candidates.length < PUBLIC_DISCOVERY_MAX_CANDIDATES; i += 1) {
-    const entryId = latestId - 1n - BigInt(i);
-    if (entryId < 0n) break;
-    let entry;
-    try { entry = await provider.getPublicEntry(entryId, readOptions); } catch (error) { noteTonRpcRateLimit(error); break; }
-    if (entry.exists !== true) continue;
-    const wallet = rawWalletAddress(entry.author_wallet);
-    if (!wallet || seen.has(wallet)) continue;
-    seen.add(wallet);
-    if (ownWallet && sameWalletAddress(wallet, ownWallet)) continue;
-    if (subscribedAuthors.has(wallet)) continue;
-    candidates.push(wallet);
-  }
-  // Phase 2 — resolve each candidate's profile (cache-first, shallow walk). Keep only channels that HAVE a
-  // description or tags — discovery suggests DESCRIBED channels.
-  const results = [];
-  for (const wallet of candidates) {
-    let profile = null;
-    try { profile = await resolveChannelProfile(wallet, { maxScan: PUBLIC_DISCOVERY_PROFILE_MAXSCAN }); } catch { profile = cachedChannelProfile(wallet); }
-    const description = typeof profile?.description === 'string' ? profile.description.trim() : '';
-    const tags = (profile?.tags ?? []).filter(Boolean);
-    if (!description && tags.length === 0) continue;
-    // Verify the channel's declared username (queued/deduped) — a cache-first profile resolve skips the walk (and
-    // thus setChannelProfileFromWalk's verify kick), so trigger it here too. The label refreshes on the next render.
-    verifyChannelUsernameClaim(wallet, profile?.ownerUsername);
-    results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
-  }
-  publicDiscoveryCache = { at: Date.now(), results };
-  return results;
+  // clean-17 direct-pay: discovery sweeps the BEACON directory buckets (discoverChannelsFromBeacon), ranked by
+  // entry_count. The removed CapsuleHub scan walked the one shared public log looking for distinct authors.
+  return discoverChannelsFromBeacon();
 }
 
 // clean-17 read lane: a public-lane reader over the app's shared RPC pump. endpoint/apiKey are OMITTED on purpose —
@@ -10081,6 +9724,11 @@ async function syncPublicChannelFromShards() {
   if (!lane) return false;
   const feedChannels = feedSourcePublicChannels();
   const updatedAt = new Date().toISOString();
+  // A sync pass builds its result from a SNAPSHOT of the cache and writes it back at the end, so anything that
+  // invalidates the feed mid-pass (unsubscribing a channel, switching wallets) would be silently resurrected by
+  // that write. The invalidation epoch is bumped by every such event; capture it here and refuse the write if it
+  // moved. The CapsuleHub sync had this guard — it is the cache-coherency half of the walk, not Hub machinery.
+  const invalidationEpochAtStart = publicSyncInvalidationEpoch;
   const nextFeedCache = { ...publicChannelFeedCache };
   const touched = [];
   for (const channel of feedChannels) {
@@ -10149,465 +9797,20 @@ async function syncPublicChannelFromShards() {
     nextFeedCache[channel.id] = { feed: { version: 1, channelId: channel.id, updatedAt, posts: withPending }, syncedAt: updatedAt };
     touched.push(channel.id);
   }
+  if (publicSyncInvalidationEpoch !== invalidationEpochAtStart) {
+    globalThis.plathoLastPublicSync = { mode: 'shard', channels: touched, at: updatedAt, discarded: 'invalidated' };
+    return false;   // the feed changed under this pass — its snapshot is stale, drop it rather than resurrect it
+  }
   publicChannelFeedCache = nextFeedCache;
   globalThis.plathoLastPublicSync = { mode: 'shard', channels: touched, at: updatedAt };
   return true;
 }
 
 async function syncPublicChannelFromChain() {
-  if (publicLaneDirectPayEnabled()) return syncPublicChannelFromShards();
-  const resolved = await resolveCapsuleHubProvider();
-  if (!resolved) return false;
-  const { provider, address } = resolved;
-  const readOptions = criticalCapsuleHubReadOptions(address);
-  const state = await provider.getState(readOptions);
-  const latestId = BigInt(state.public_latest_id ?? 0n);
-  const latest = Number(latestId);
-  // Eviction floor (Phase 3), derived FOR FREE from get_state (already read): clean-10 public eviction is strictly
-  // bottom-FIFO and gapless (PruneCapsuleEntry was removed → no mid-chain deletes), and entryIds are 0-INDEXED with
-  // public_latest_id the NEXT id (highest live id = latest - 1; total ever = latest). So the live id range is
-  // [latest - live_count, latest - 1] and the oldest-live id is EXACTLY latest - live_count (= the contract's
-  // public_oldest_live_id). Cached posts/comments with entryId STRICTLY BELOW this floor are evicted on-chain —
-  // pruned from the cache in the merge below (no rotating re-walk, zero extra reads, scales to any subscription
-  // count). live_count 0 → nothing live (floor = latest → every id 0..latest-1 pruned).
-  const publicLiveCount = BigInt(state.public_live_count ?? 0n);
-  const publicOldestLiveId = publicEvictionFloor(latestId, publicLiveCount);
-  const configuredLimit = Number(appConfig.capsuleHub?.publicReadLimit ?? PUBLIC_CHAIN_READ_LIMIT);
-  const readLimit = Number.isFinite(configuredLimit)
-    ? Math.max(1, Math.floor(configuredLimit))
-    : PUBLIC_CHAIN_READ_LIMIT;
-  const syncWindow = readPublicSyncWindow();
-  const minEntryId = syncWindow === 'long' ? 0 : Math.max(0, latest - readLimit);
-  const retryEntryIds = publicBodyHistoryRetryEntryIds(address, latestId, BigInt(minEntryId));
-  const retryEntryIdSet = new Set(retryEntryIds.map((id) => id.toString()));
-  // Incremental fast-path (mirrors the private cursor's "head unchanged -> zero reads"): if no new public entry
-  // has appeared globally since the last CLEAN walk in the SAME history window, and no body-gap retries are
-  // pending, the cached feed is already current — skip the entire author/parent index walk + body re-resolution.
-  // This is what stops re-reading every post and every comment every ~30s. lastSyncedPublicLatestId only advances
-  // after a non-degraded walk (the commit-gate below), so a rate-limited cycle re-walks next time and never
-  // strands a post that a rate limit made it miss behind a skipped head.
-  if (lastSyncedPublicLatestId !== null
-    && latestId === lastSyncedPublicLatestId
-    && syncWindow === lastSyncedPublicSyncWindow
-    && retryEntryIds.length === 0) {
-    return true;
-  }
-  // Set when a transient read failure (rate limit) was swallowed mid-walk, so the walk produced a PARTIAL result.
-  // A degraded walk must not advance the cursor (commit-gate) and must not be trusted to prune the cache.
-  let walkDegraded = false;
-  // Captured AFTER the fast-path: if an invalidation (follow / channel-view preview) lands while THIS walk is in
-  // flight, its source list may predate the newly-interesting channel — the commit-gate below must then leave the
-  // cursor null so the invalidation's own walk actually runs instead of fast-pathing out.
-  const invalidationEpochAtStart = publicSyncInvalidationEpoch;
-  // Per-subscribed-author walk (replaces the old global scan): fetch only posts by channels the user is
-  // subscribed to, plus the comments on those posts, via the on-chain author/parent indexes. Cost scales with
-  // the user's subscriptions, NOT the global feed size — the scalability fix. The walk caches each fetched
-  // entry so the body-resolution loop below does not re-fetch it.
-  const entryIdsToScan = [];
-  const scanSet = new Set();
-  const walkedEntries = new Map();
-  const pushScanId = (id) => { const k = id.toString(); if (!scanSet.has(k)) { scanSet.add(k); entryIdsToScan.push(id); } };
-  // Walk a backward-linked index chain (an author's posts, or a post's comments). Returns the walked entry ids
-  // plus whether the cap truncated the walk (the chain still had older entries) — the honest-incomplete signal,
-  // symmetric to the private walk's catch-up. The chain ends naturally at link==0 (entryLink == id+1, 0 = none);
-  // a missing/evicted entry (exists!==true) terminates gracefully without counting it.
-  const walkPublicChainIds = async (latestLink, max) => {
-    const ids = [];
-    let link = BigInt(latestLink ?? 0n);
-    let truncated = false;
-    // Header-only multipart tracking (v650): streamId/partIndex/partCount live at fixed header offsets, so the
-    // walker can tell a window-split multipart POST apart without any ~32KB body read.
-    const partStreams = new Map(); // streamId -> { partCount, seen:Set<partIndex> }
-    const noteWalkedHeader = (entry) => {
-      const info = readPublicPartHeaderInfo(entry?.header_boc ?? entry?.headerBoc);
-      if (!info || info.partCount <= 1) return;
-      const group = partStreams.get(info.streamId) ?? { partCount: info.partCount, seen: new Set() };
-      group.partCount = Math.max(group.partCount, info.partCount);
-      group.seen.add(info.partIndex);
-      partStreams.set(info.streamId, group);
-    };
-    const hasSplitPartStream = () => {
-      for (const group of partStreams.values()) {
-        if (group.seen.size < group.partCount) return true;
-      }
-      return false;
-    };
-    const walkOne = async () => {
-      const entryId = link - 1n;
-      const entry = await provider.getPublicEntry(entryId, readOptions);
-      walkedEntries.set(entryId.toString(), entry);
-      if (entry.exists !== true) return false;
-      noteWalkedHeader(entry);
-      ids.push(entryId);
-      pushScanId(entryId);
-      const prev = BigInt(entry.prev_link ?? 0n);
-      if (prev === link) return false; // defensive: never spin on a self-referential link
-      link = prev;
-      return true;
-    };
-    for (let n = 0; link > 0n; n += 1) {
-      if (n >= max) { truncated = true; break; }
-      if (!(await walkOne())) return { ids, truncated };
-    }
-    // Boundary-straddle extension (v650, the v649 private-walk rule applied to the feed's per-author walk): a
-    // window cap landing in the MIDDLE of a multipart post left the group incomplete forever — assemblePublicParts
-    // drops half groups, the ids never enter the cached set, and an unchanged author head never re-walks them.
-    // Keep walking (bounded) until every split stream seen by THIS walk closes; the ids then resolve+assemble
-    // normally in this same cycle.
-    if (truncated && hasSplitPartStream()) {
-      let extendedScans = 0;
-      while (link > 0n && extendedScans < PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT && hasSplitPartStream()) {
-        extendedScans += 1;
-        if (!(await walkOne())) return { ids, truncated };
-      }
-    }
-    return { ids, truncated };
-  };
-  // 'short' = newest readLimit per author (cheap default). 'long' = the full retained per-author history the UI
-  // promises ("up to 1 year"), bounded by a generous safety cap. entry_count (kept exact by the contract's
-  // tail-first FIFO eviction) is the false-positive-free truncation detector.
-  const allTime = syncWindow === 'long';
-  const authorWalkMax = allTime ? PUBLIC_CHAIN_LONG_READ_LIMIT : readLimit;
-  const incompleteChannels = [];
-  // Walk the FEED source (subscribed + own) so the user's own confirmed posts are fetched from chain, not just
-  // the subscribed authors. Adds at most one author index (the user's own).
-  const pendingAuthorHeadWrites = [];
-  const pendingAuthorTruncatedWrites = [];
-  // F1 (scale): pick this cycle's bounded read set. Author keys are a LOCAL cell-hash (computePublicAuthorKeyId, no
-  // RPC), so compute them for every channel up front. ALWAYS read the own channel and any channel with no cached
-  // head yet (a fresh subscription must be walked once); round-robin the rest at PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE
-  // over a stable (id-sorted) order. A subscriber with <= budget readable channels reads them ALL every cycle
-  // (behavior unchanged); only heavy subscribers get the rotation, so no small-account latency is added.
-  const feedChannels = feedSourcePublicChannels();
-  const ownChannelId = ownPublicChannel()?.id ?? null;
-  const channelAuthorKeys = new Map();
-  for (const channel of feedChannels) {
-    if (!channel.authorWallet) continue;
-    try { channelAuthorKeys.set(channel.id, await computePublicAuthorKeyId(channel.authorWallet)); } catch { /* unresolvable key -> treated as not-readable this cycle */ }
-  }
-  const readableChannels = feedChannels.filter((c) => channelAuthorKeys.has(c.id));
-  // roundStartHead is captured at the START of a round (covered set empty). The commit-gate advances the global
-  // fast-path cursor only TO this head, and only once every readable channel is covered -- so a channel skipped by
-  // the budget can never let the gate advance past that channel's not-yet-re-read new posts.
-  // Self-heal a wedged round: a wallet switch racing an in-flight walk can leave covered NON-empty while
-  // roundStartHead is null (the switch cleared both, the stale walk then re-added covered keys). roundStartHead is
-  // only ever set here (covered empty) and covered only cleared in the commit (roundStartHead non-null) — without
-  // this reset the gate deadlocks and every cycle re-reads the full budget for the rest of the session.
-  if (publicAuthorRoundStartHead === null && publicAuthorRoundCovered.size > 0) publicAuthorRoundCovered.clear();
-  if (publicAuthorRoundCovered.size === 0) publicAuthorRoundStartHead = latestId;
-  // Selection, HARD-capped at the per-cycle budget regardless of how many channels are headless -- so a cold-start /
-  // account-switch / sustained-rate-limit cycle (where NO per-author head is cached yet) still cannot fan out to
-  // O(subscriptions) reads and re-open the send/receive starvation F1 targets. Priority WITHIN the budget:
-  //   (1) the own channel (own posts must confirm fast),
-  //   (2) never-read (headless) channels, id-sorted -- so a fresh subscription / cold feed surfaces within a cycle
-  //       or two instead of waiting a full rotation,
-  //   (3) a stable round-robin over the already-headed channels for whatever budget remains.
-  // The round gate guarantees no strand for a channel deferred to a later cycle (every channel is covered within
-  // ceil(N/budget) cycles, and the global head advances only to roundStartHead on roundComplete).
-  const idSorted = [...readableChannels].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const isHeadless = (c) => !publicAuthorIndexHeads.has(channelAuthorKeys.get(c.id).toString());
-  const readThisCycle = new Set();
-  if (ownChannelId !== null && readableChannels.some((c) => c.id === ownChannelId)) readThisCycle.add(ownChannelId);
-  // The channel-view preview channel is what the user is LOOKING AT right now — always read it this cycle. On a
-  // cold head cache (reload/account switch) with more headless channels than the budget, the id-sort could
-  // otherwise defer it for cycles and the open view would sit on a false "No posts yet".
-  if (publicChannelPreviewChannelId !== null && readableChannels.some((c) => c.id === publicChannelPreviewChannelId)) {
-    readThisCycle.add(publicChannelPreviewChannelId);
-  }
-  let budget = PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE - readThisCycle.size;
-  for (const c of idSorted) {
-    if (budget <= 0) break;
-    // has() (not just own): the pre-seeded preview channel is ALREADY charged against the budget above — a no-op
-    // re-add here would decrement the budget a second time and waste a read slot every cycle it is open.
-    if (readThisCycle.has(c.id) || !isHeadless(c)) continue;
-    readThisCycle.add(c.id);
-    budget -= 1;
-  }
-  const withHeads = idSorted.filter((c) => !readThisCycle.has(c.id) && !isHeadless(c));
-  if (withHeads.length > 0 && budget > 0) {
-    if (publicAuthorRoundCursor >= withHeads.length) publicAuthorRoundCursor = 0;
-    const take = Math.min(budget, withHeads.length);
-    for (let i = 0; i < take; i += 1) readThisCycle.add(withHeads[(publicAuthorRoundCursor + i) % withHeads.length].id);
-    publicAuthorRoundCursor = (publicAuthorRoundCursor + take) % withHeads.length;
-  }
-  for (const channel of feedChannels) {
-    const channelAuthor = channel.authorWallet;
-    if (!channelAuthor) continue;
-    const authorKeyId = channelAuthorKeys.get(channel.id);
-    if (authorKeyId === undefined) continue;
-    const authorHeadKey = authorKeyId.toString();
-    if (!readThisCycle.has(channel.id)) {
-      // Skipped by the per-cycle budget: reuse this channel's cached posts (the append-merge below preserves them)
-      // + its remembered truncation. No RPC. NOT added to publicAuthorRoundCovered, so the gate stays at
-      // roundStartHead until a later cycle re-reads this channel (strand-safe).
-      if (publicAuthorIndexTruncated.get(authorHeadKey) === true) incompleteChannels.push(channel.id);
-      continue;
-    }
-    let authorIndex;
-    try {
-      authorIndex = await provider.getPublicAuthorIndex(authorKeyId, readOptions);
-    } catch (error) {
-      // A transient rate-limit degrades the whole cycle (gate held, retried next cycle). A NON-transient read error
-      // for one channel marks it covered so a permanent single-channel failure cannot wedge the round gate forever
-      // -- it degrades to the pre-F1 behavior (that channel is skipped, the rest of the feed still advances).
-      if (noteTonRpcRateLimit(error)) walkDegraded = true;
-      else publicAuthorRoundCovered.add(authorHeadKey);
-      console.warn('Skipping public author index read', channel.id, error);
-      continue;
-    }
-    // A successful read (even an empty/no-posts index) marks this channel covered for the current round.
-    publicAuthorRoundCovered.add(authorHeadKey);
-    if (authorIndex.exists !== true) continue;
-    const authorHead = String(authorIndex.latest_entry_link ?? 0n);
-    const cachedPostIds = cachedChainPostEntryIds(channel.id);
-    // Per-author POST cursor: an unchanged author-index head means no new posts — reuse the cached post ids
-    // without re-reading every post body. A changed head re-walks the window and unions with the cached ids.
-    let postIds;
-    let postsTruncated = false;
-    if (publicAuthorIndexHeads.get(authorHeadKey) === authorHead) {
-      postIds = cachedPostIds;
-      postsTruncated = publicAuthorIndexTruncated.get(authorHeadKey) === true; // remembered from the walk that built this head
-    } else {
-      const walked = await walkPublicChainIds(authorIndex.latest_entry_link, authorWalkMax);
-      postsTruncated = walked.truncated;
-      const postIdSet = new Map();
-      for (const id of walked.ids) postIdSet.set(id.toString(), id);
-      for (const id of cachedPostIds) if (!postIdSet.has(id.toString())) postIdSet.set(id.toString(), id);
-      postIds = [...postIdSet.values()];
-      pendingAuthorHeadWrites.push([authorHeadKey, authorHead]);
-      pendingAuthorTruncatedWrites.push([authorHeadKey, walked.truncated]);
-    }
-    // Comments are no longer walked during the feed sync — they load on demand on the post detail screen
-    // (loadPublicPostComments). The feed resolves posts only now: no per-post parent-index reads and no comment
-    // body resolution for every subscribed channel on every cycle (the scalability fix the owner asked for).
-    // Honest incomplete = the author's chain was TRUNCATED by the read window (more retained than we could walk).
-    // Do NOT compare postIds.length against entry_count: entry_count counts EVERY author entry — INCLUDING the
-    // profile-pointer entry (walked, then dropped as a profile not a post) and comment entries — so `posts <
-    // entry_count` was true forever for any channel that ever set a profile or got a comment (the '[public] older
-    // posts available' console spam). Truncation is the false-positive-free signal, remembered across cached cycles.
-    if (postsTruncated) {
-      incompleteChannels.push(channel.id);
-    }
-  }
-  for (const id of retryEntryIds) pushScanId(id);
-  const cutoffMs = publicSyncCutoffMs();
-  const postParts = [];
-  const commentParts = [];
-  const avatarParts = [];
-  const unavailableEntries = [];
-  let scanned = 0;
-  for (const entryIdValue of entryIdsToScan) {
-    const retryOnly = retryEntryIdSet.has(entryIdValue.toString());
-    scanned += 1;
-    const entry = walkedEntries.get(entryIdValue.toString()) ?? await provider.getPublicEntry(entryIdValue, readOptions);
-    if (entry.exists !== true) {
-      if (retryOnly) clearPublicBodyHistoryUnavailable(address, entryIdValue);
-      continue;
-    }
-    let payload = null;
-    try {
-      payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
-    } catch (error) {
-      if (isBodyHistoryUnavailableError(error)) {
-        rememberPublicBodyHistoryUnavailable(address, entry, entryIdValue);
-        unavailableEntries.push({
-          entryId: String(entry.entry_id ?? entryIdValue),
-          bodyHash: entryBodyHashHex(entry),
-        });
-        // An in-window post/comment that failed to materialize must NOT let the commit-gate advance this author's
-        // cursor: Phase 2 would then skip re-walking it (postIds = cached, and the body-gap retry set excludes
-        // in-window ids), so the gap would never self-heal. Marking the walk degraded keeps the cursor put so the
-        // next cycle re-attempts — restoring the pre-Phase-2 unconditional-re-walk self-heal. (Out-of-window
-        // retryOnly ids are < minEntryId, so they keep self-healing via the retry set without degrading the walk.)
-        if (entryIdValue >= BigInt(minEntryId)) walkDegraded = true;
-        continue;
-      }
-      if (retryOnly) clearPublicBodyHistoryUnavailable(address, entryIdValue);
-      if (noteTonRpcRateLimit(error) || entryIdValue >= BigInt(minEntryId)) walkDegraded = true;
-      console.warn('Skipping unreadable public CapsuleHub entry', entry.entry_id?.toString?.() ?? entryIdValue.toString(), error);
-      continue;
-    }
-    if (!payload) {
-      if (retryOnly) clearPublicBodyHistoryUnavailable(address, entryIdValue);
-      if (entryIdValue >= BigInt(minEntryId)) walkDegraded = true;
-      continue;
-    }
-    clearPublicBodyHistoryUnavailable(address, entryIdValue);
-    const createdAtSec = Number(payload.createdAtSec ?? payload.created_at_sec ?? 0);
-    const createdAt = createdAtSec > 0
-      ? new Date(createdAtSec * 1000).toISOString()
-      : new Date().toISOString();
-    const createdMs = new Date(createdAt).getTime();
-    if (!retryOnly && cutoffMs !== null && createdAtSec > 0 && !Number.isNaN(createdMs) && createdMs < cutoffMs) continue;
-    const authorWallet = rawWalletAddress(payload.authorWallet ?? entry.author_wallet) ?? String(payload.authorWallet ?? entry.author_wallet ?? '');
-    // Channel PROFILE divert (v-profile): a single-part document post carrying ONLY a profile block is channel
-    // metadata, not a visible post — capture it into the per-author profile cache (free, the body was just read)
-    // and DROP it from the feed so it never renders as a blank post. Latest-wins by created_at/entryId.
-    if (payload.type === 'document' && Number(payload.partCount ?? 1) <= 1) {
-      const profileDoc = readProfileDocument(payload.documentBytes ?? payload.document_bytes);
-      if (profileDoc?.isProfileOnly) {
-        setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, entry.entry_id, createdAtSec);
-        continue;
-      }
-    }
-    const base = {
-      id: `chain-${entry.entry_id.toString()}`,
-      entryId: entry.entry_id.toString(),
-      channelId: publicChannelIdForAuthorWallet(authorWallet),
-      type: payload.type,
-      text: payload.text ?? '',
-      imageBytes: payload.imageBytes ?? payload.image_bytes,
-      documentBytes: payload.documentBytes ?? payload.document_bytes,
-      createdAt,
-      author: publicAuthorLabel(authorWallet),
-      authorWallet,
-      bodyHash: payload.bodyHash ?? uint256Hex(entry.body_hash),
-      entryUid: payload.entryUid ?? entry.entry_uid.toString(16),
-      streamId: payload.stream_id,
-      partIndex: payload.partIndex ?? 0,
-      partCount: payload.partCount ?? 1,
-      profileVersion: payload.profileVersion ?? payload.profile_version ?? 0,
-      avatarHash: payload.avatarHash ?? payload.avatar_hash ?? zeroAvatarHashHex(),
-      chainVerified: true,
-    };
-    if (payload.type === 'avatar') {
-      avatarParts.push({
-        ...base,
-        imageBytes: payload.imageBytes ?? payload.image_bytes,
-      });
-    } else if (payload.type === 'comment' || payload.type === 'image_comment' || payload.type === 'document_comment') {
-      commentParts.push({
-        ...base,
-        parentEntryId: payload.parentEntryId.toString(),
-        parentHash: payload.parentHash,
-      });
-    } else {
-      postParts.push({
-        ...base,
-        commentsAllowed: payload.commentsAllowed !== false,
-      });
-    }
-  }
-  // assemblePublicParts is hoisted to module scope (reused by the on-demand comment loader, loadPublicPostComments).
-  const avatarGroups = new Map();
-  for (const part of avatarParts) {
-    const pointer = avatarPointerFromFields(part.profileVersion, part.avatarHash);
-    if (!pointer) continue;
-    const key = `${part.authorWallet}:${pointer.profileVersion}:${pointer.avatarHash}:${part.streamId}`;
-    const group = avatarGroups.get(key) ?? {
-      ownerWallet: part.authorWallet,
-      pointer: { ...pointer, avatarPartCount: Number(part.partCount ?? 1) },
-      parts: [],
-    };
-    group.parts.push(part);
-    avatarGroups.set(key, group);
-  }
-  for (const group of avatarGroups.values()) {
-    await cacheAssembledAvatarParts(group.parts, group.pointer);
-  }
-  const posts = assemblePublicParts(postParts);
-  const comments = assemblePublicParts(commentParts);
-  posts.reverse();
-  comments.reverse();
-  const postsByEntry = new Map(posts.map((post) => [String(post.entryId), post]));
-  for (const comment of comments) {
-    const parent = postsByEntry.get(String(comment.parentEntryId));
-    if (!parent) continue;
-    if (parent.commentsAllowed === false) continue;
-    if (parent.bodyHash && comment.parentHash && parent.bodyHash.toLowerCase() !== comment.parentHash.toLowerCase()) continue;
-    parent.comments = [...(parent.comments ?? []), comment];
-  }
-  // Group this cycle's new comments by parent entryId so the merge can attach them to a parent that is a CACHED
-  // post (Phase 2 skips re-resolving unchanged posts, so such a parent is absent from `posts`/postsByEntry above).
-  const newCommentsByParent = new Map();
-  for (const comment of comments) {
-    const key = String(comment.parentEntryId);
-    if (!newCommentsByParent.has(key)) newCommentsByParent.set(key, []);
-    newCommentsByParent.get(key).push(comment);
-  }
-  const updatedAt = new Date().toISOString();
-  const postsByChannel = new Map();
-  for (const post of posts) {
-    const channelId = post.channelId ?? publicChannelSubscriptions?.activeChannelId ?? publicChannelRegistry[0]?.id ?? 'platho.app';
-    const list = postsByChannel.get(channelId) ?? [];
-    list.push(post);
-    postsByChannel.set(channelId, list);
-  }
-  const channelIdsToRefresh = new Set([
-    ...publicChannelRegistry.map((channel) => channel.id),
-    ...Object.keys(publicChannelFeedCache ?? {}),
-    ...postsByChannel.keys(),
-  ]);
-  const nextFeedCache = { ...publicChannelFeedCache };
-  for (const channelId of channelIdsToRefresh) {
-    const newChainPosts = postsByChannel.get(channelId) ?? [];
-    // Append-merge (NOT a wholesale rebuild from this one walk): upsert this cycle's chain posts into the
-    // channel's EXISTING cached chain posts by entryId, unioning comments. A degraded/rate-limited cycle that
-    // returned fewer (or zero) posts for a channel therefore LEAVES the already-cached posts in place instead of
-    // wiping them to the "Waiting for public feed" placeholder — that wholesale swap was the flicker. (Genuinely
-    // evicted posts persist until the history window hides them or a future rotating self-heal prunes them.)
-    const cachedFeed = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId];
-    const existingChainPosts = (cachedFeed?.posts ?? []).filter(publicFeedPostHasChainAnchor);
-    // Upsert this cycle's walked posts into the cached posts, THEN attach this cycle's new comments — including
-    // comments whose parent is a cached post that was not re-walked (the Phase 2 comment-on-old-post path).
-    const mergedChainPosts = prunePublicPostsBelowFloor(
-      attachNewPublicComments(
-        upsertPublicChainPosts(existingChainPosts, newChainPosts),
-        newCommentsByParent,
-      ),
-      publicOldestLiveId,
-    );
-    const postsWithLocalPending = mergeLocalPendingPublicFeed(channelId, mergedChainPosts);
-    nextFeedCache[channelId] = {
-      feed: {
-        version: 1,
-        channelId,
-        updatedAt,
-        posts: postsWithLocalPending,
-      },
-      syncedAt: updatedAt,
-    };
-  }
-  publicChannelFeedCache = nextFeedCache;
-  // Commit-gate (mirrors the private cursor advance at app.js ~8163): only remember this global head as
-  // "fully synced" after a CLEAN walk. A degraded (rate-limited) cycle leaves lastSyncedPublicLatestId unchanged
-  // so the next cycle re-walks and picks up whatever the rate limit made it miss, instead of the fast-path
-  // skipping past it forever.
-  if (!walkDegraded) {
-    // Advance the per-index cursors only now — after the merge committed — so a head is never recorded as "seen"
-    // before its (new) entries actually reached the cache. A degraded cycle skips this entirely and re-walks next.
-    // These commit for the channels READ THIS CYCLE (pendingAuthorHeadWrites), independent of the global round gate.
-    for (const [key, head] of pendingAuthorHeadWrites) publicAuthorIndexHeads.set(key, head);
-    for (const [key, truncated] of pendingAuthorTruncatedWrites) publicAuthorIndexTruncated.set(key, truncated);
-    // F1 round gate: the global fast-path cursor advances only to the head that was current when this round BEGAN,
-    // and only once every readable channel has been covered (read) since then. So a channel the budget skipped this
-    // cycle can never let the fast-path advance past its not-yet-re-read posts. If new posts appeared during the
-    // round (latestId > roundStartHead) the fast-path will not fire next cycle and a fresh round re-reads everyone;
-    // once the feed goes quiet and a round completes, roundStartHead == latestId and the fast-path returns to zero
-    // reads. A subscriber with <= budget channels covers all every cycle, so this reduces to the old per-cycle gate.
-    const roundComplete = readableChannels.every((c) => publicAuthorRoundCovered.has(channelAuthorKeys.get(c.id).toString()));
-    // Epoch guard: an invalidation that landed mid-walk means a channel THIS walk never read is now interesting —
-    // committing the cursor here would let the NEXT walk fast-path past it forever (false "No posts yet").
-    if (roundComplete && publicAuthorRoundStartHead !== null && publicSyncInvalidationEpoch === invalidationEpochAtStart) {
-      lastSyncedPublicLatestId = publicAuthorRoundStartHead;
-      lastSyncedPublicSyncWindow = syncWindow;
-      publicAuthorRoundCovered.clear();
-    }
-  }
-  globalThis.plathoLastPublicSync = {
-    capsuleHub: address,
-    latest: String(latest),
-    minEntryId: String(minEntryId),
-    scanned,
-    readLimit,
-    allTime: syncWindow === 'long',
-    retryEntryCount: retryEntryIds.length,
-    historyUnavailableCount: unavailableEntries.length,
-    unavailableEntries,
-    incompleteChannelCount: incompleteChannels.length,
-    incompleteChannels,
-  };
-  return true;
+  // clean-17 direct-pay: the feed is assembled from each subscribed channel's own CHANNEL shards
+  // (syncPublicChannelFromShards). The removed CapsuleHub walk paged one shared log with cursors, a
+  // body-history-unavailable ledger and a straddle extension — all properties of that shared log.
+  return syncPublicChannelFromShards();
 }
 
 function publicFeedPostHasChainAnchor(post) {
@@ -10661,34 +9864,6 @@ function upsertPublicChainPosts(existing = [], fresh = []) {
   return order
     .map((key) => byKey.get(key))
     .sort((a, b) => new Date(a?.createdAt ?? 0).getTime() - new Date(b?.createdAt ?? 0).getTime());
-}
-
-// Chain-anchored post entryIds (BigInt) already cached for a channel. Phase 2 reuses these to check a cached
-// post's parent (comment) index for NEW comments even when the post itself was not re-walked this cycle.
-function cachedChainPostEntryIds(channelId) {
-  const cachedFeed = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId];
-  const ids = [];
-  for (const post of cachedFeed?.posts ?? []) {
-    if (!publicFeedPostHasChainAnchor(post)) continue;
-    try { ids.push(BigInt(post.entryId)); } catch { /* skip non-numeric entryId */ }
-  }
-  return ids;
-}
-
-// Attach this cycle's NEW comments to their parent post even when the parent is a CACHED post that Phase 2 did
-// not re-resolve (the parent is absent from the freshly-walked `posts`, so the in-place attach above would drop
-// it). Comments are validated (commentsAllowed + parentHash match, mirroring the in-place attach) and unioned
-// idempotently, so a comment already present is not duplicated.
-function attachNewPublicComments(posts, newCommentsByParent) {
-  if (!newCommentsByParent || newCommentsByParent.size === 0) return posts;
-  return posts.map((post) => {
-    const fresh = newCommentsByParent.get(String(post.entryId));
-    if (!fresh || fresh.length === 0) return post;
-    const valid = fresh.filter((comment) => post.commentsAllowed !== false
-      && (!post.bodyHash || !comment.parentHash || post.bodyHash.toLowerCase() === comment.parentHash.toLowerCase()));
-    if (valid.length === 0) return post;
-    return { ...post, comments: mergePublicComments(post.comments ?? [], valid) };
-  });
 }
 
 function chainBackedPublicFeedOnly(feed) {
@@ -10889,128 +10064,6 @@ function privateKeyIdIndexValue(keyId) {
   return bytesToBigIntValue(bytes);
 }
 
-function privateChainIndexStorageKey(address = configuredCapsuleHubAddress(), role = 'recipient') {
-  const hub = address ?? 'no-capsulehub';
-  const keyId = localRecipientKeyPair?.keyId ?? 'no-key';
-  return `${PRIVATE_CHAIN_INDEX_STORAGE_PREFIX}:${hub}:${keyId}:${role}`;
-}
-
-function normalizePrivateChainIndexCursor(cursor) {
-  const normalized = {
-    processedHeadLink: 0n,
-    targetHeadLink: 0n,
-    resumeLink: 0n,
-  };
-  if (!cursor || typeof cursor !== 'object') return normalized;
-  for (const field of Object.keys(normalized)) {
-    const raw = cursor[field];
-    try {
-      if (raw !== null && raw !== undefined && /^[0-9]+$/.test(String(raw))) normalized[field] = BigInt(raw);
-    } catch {
-      normalized[field] = 0n;
-    }
-  }
-  return normalized;
-}
-
-function readPrivateChainIndexCursor(address, role) {
-  try {
-    const raw = localStorageOrNull()?.getItem(privateChainIndexStorageKey(address, role));
-    if (!raw) return normalizePrivateChainIndexCursor(null);
-    return normalizePrivateChainIndexCursor(JSON.parse(raw));
-  } catch {
-    // Non-persistent mode starts from the current indexed head.
-  }
-  return normalizePrivateChainIndexCursor(null);
-}
-
-function writePrivateChainIndexCursor(address, role, cursor) {
-  try {
-    const normalized = normalizePrivateChainIndexCursor(cursor);
-    localStorageOrNull()?.setItem(privateChainIndexStorageKey(address, role), JSON.stringify({
-      processedHeadLink: normalized.processedHeadLink.toString(),
-      targetHeadLink: normalized.targetHeadLink.toString(),
-      resumeLink: normalized.resumeLink.toString(),
-    }));
-  } catch {
-    // Encrypted history still dedupes by capsule id when local storage is unavailable.
-  }
-}
-
-function privateChainHeadRepairStorageKey(address = configuredCapsuleHubAddress(), role = 'recipient') {
-  const hub = address ?? 'no-capsulehub';
-  const keyId = localRecipientKeyPair?.keyId ?? 'no-key';
-  return `${PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX}:${hub}:${keyId}:${role}`;
-}
-
-function readPrivateChainHeadRepairLink(address, role) {
-  try {
-    const raw = localStorageOrNull()?.getItem(privateChainHeadRepairStorageKey(address, role));
-    if (!/^[0-9]+$/.test(String(raw ?? ''))) return 0n;
-    return BigInt(raw);
-  } catch {
-    return 0n;
-  }
-}
-
-function writePrivateChainHeadRepairLink(address, role, link) {
-  try {
-    const normalized = privateIndexLinkValue(link);
-    localStorageOrNull()?.setItem(privateChainHeadRepairStorageKey(address, role), normalized.toString());
-  } catch {
-    // Repair scans are opportunistic; normal chain cursors still gate steady-state sync.
-  }
-}
-
-function privateChainHistoryUnavailableStorageKey(address = configuredCapsuleHubAddress()) {
-  const hub = address ?? 'no-capsulehub';
-  const keyId = localRecipientKeyPair?.keyId ?? 'no-key';
-  return `${PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX}:${hub}:${keyId}`;
-}
-
-function normalizePrivateBodyHistoryUnavailableRecord(record) {
-  const entryId = record?.entryId ?? record?.entry_id ?? record;
-  if (!/^[0-9]+$/.test(String(entryId ?? ''))) return null;
-  return {
-    entryId: String(entryId),
-    bodyHash: /^0x[0-9a-fA-F]{64}$/.test(String(record?.bodyHash ?? '')) ? String(record.bodyHash).toLowerCase() : null,
-    createdAt: record?.createdAt ? String(record.createdAt) : null,
-    strikes: Math.max(0, Math.floor(Number(record?.strikes ?? 0)) || 0),
-    firstSeenAt: record?.firstSeenAt ? String(record.firstSeenAt) : (record?.lastSeenAt ? String(record.lastSeenAt) : new Date().toISOString()),
-    lastSeenAt: record?.lastSeenAt ? String(record.lastSeenAt) : new Date().toISOString(),
-  };
-}
-
-function readPrivateBodyHistoryUnavailable(address) {
-  try {
-    const raw = localStorageOrNull()?.getItem(privateChainHistoryUnavailableStorageKey(address));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizePrivateBodyHistoryUnavailableRecord)
-      .filter(Boolean)
-      .slice(-PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT);
-  } catch {
-    return [];
-  }
-}
-
-function writePrivateBodyHistoryUnavailable(address, records) {
-  try {
-    const normalized = (records ?? [])
-      .map(normalizePrivateBodyHistoryUnavailableRecord)
-      .filter(Boolean)
-      .slice(-PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT);
-    const storage = localStorageOrNull();
-    if (!storage) return;
-    if (normalized.length === 0) storage.removeItem(privateChainHistoryUnavailableStorageKey(address));
-    else storage.setItem(privateChainHistoryUnavailableStorageKey(address), JSON.stringify(normalized));
-  } catch {
-    // Non-persistent mode retries unavailable entries only within the current session.
-  }
-}
-
 function entryBodyHashHex(entry) {
   try {
     if (entry?.body_hash === undefined || entry?.body_hash === null) return null;
@@ -11018,281 +10071,6 @@ function entryBodyHashHex(entry) {
   } catch {
     return null;
   }
-}
-
-function publicChainHistoryUnavailableStorageKey(address = configuredCapsuleHubAddress()) {
-  const hub = address ?? 'no-capsulehub';
-  return `${PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX}:${hub}`;
-}
-
-function normalizePublicBodyHistoryUnavailableRecord(record) {
-  const entryId = record?.entryId ?? record?.entry_id ?? record;
-  if (!/^[0-9]+$/.test(String(entryId ?? ''))) return null;
-  return {
-    entryId: String(entryId),
-    bodyHash: /^0x[0-9a-fA-F]{64}$/.test(String(record?.bodyHash ?? '')) ? String(record.bodyHash).toLowerCase() : null,
-    createdAt: record?.createdAt ? String(record.createdAt) : null,
-    lastSeenAt: record?.lastSeenAt ? String(record.lastSeenAt) : new Date().toISOString(),
-  };
-}
-
-function readPublicBodyHistoryUnavailable(address) {
-  try {
-    const raw = localStorageOrNull()?.getItem(publicChainHistoryUnavailableStorageKey(address));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizePublicBodyHistoryUnavailableRecord)
-      .filter(Boolean)
-      .slice(-PUBLIC_CHAIN_HISTORY_UNAVAILABLE_LIMIT);
-  } catch {
-    return [];
-  }
-}
-
-function writePublicBodyHistoryUnavailable(address, records) {
-  try {
-    const normalized = (records ?? [])
-      .map(normalizePublicBodyHistoryUnavailableRecord)
-      .filter(Boolean)
-      .slice(-PUBLIC_CHAIN_HISTORY_UNAVAILABLE_LIMIT);
-    const storage = localStorageOrNull();
-    if (!storage) return;
-    if (normalized.length === 0) storage.removeItem(publicChainHistoryUnavailableStorageKey(address));
-    else storage.setItem(publicChainHistoryUnavailableStorageKey(address), JSON.stringify(normalized));
-  } catch {
-    // Non-persistent mode retries unavailable public entries only within the current session.
-  }
-}
-
-function rememberPublicBodyHistoryUnavailable(address, entry, entryId) {
-  const id = String(entryId ?? entry?.entry_id ?? entry?.entryId ?? '');
-  if (!/^[0-9]+$/.test(id)) return [];
-  const existing = readPublicBodyHistoryUnavailable(address)
-    .filter((record) => record.entryId !== id);
-  existing.push({
-    entryId: id,
-    bodyHash: entryBodyHashHex(entry),
-    createdAt: entry?.created_at !== undefined && entry?.created_at !== null ? String(entry.created_at) : null,
-    lastSeenAt: new Date().toISOString(),
-  });
-  writePublicBodyHistoryUnavailable(address, existing);
-  return existing;
-}
-
-function clearPublicBodyHistoryUnavailable(address, entryId) {
-  const id = String(entryId ?? '');
-  if (!/^[0-9]+$/.test(id)) return;
-  const remaining = readPublicBodyHistoryUnavailable(address)
-    .filter((record) => record.entryId !== id);
-  writePublicBodyHistoryUnavailable(address, remaining);
-}
-
-function publicBodyHistoryRetryEntryIds(address, latest, minEntryId) {
-  const ids = [];
-  const latestId = BigInt(latest);
-  const windowStart = BigInt(minEntryId);
-  for (const record of readPublicBodyHistoryUnavailable(address)) {
-    try {
-      const id = BigInt(record.entryId);
-      if (id < 0n || id >= latestId) continue;
-      if (id >= windowStart && id < latestId) continue;
-      ids.push(id);
-    } catch {
-      // Ignore corrupt local retry records.
-    }
-  }
-  return ids;
-}
-
-function rememberPrivateBodyHistoryUnavailable(address, entry, entryId) {
-  const id = String(entryId ?? privateEntryIdText(entry) ?? '');
-  if (!/^[0-9]+$/.test(id)) return 0;
-  const records = readPrivateBodyHistoryUnavailable(address);
-  const prior = records.find((record) => record.entryId === id);
-  const strikes = (Number(prior?.strikes ?? 0) || 0) + 1;
-  const existing = records.filter((record) => record.entryId !== id);
-  existing.push({
-    entryId: id,
-    bodyHash: entryBodyHashHex(entry),
-    createdAt: entry?.created_at !== undefined && entry?.created_at !== null ? String(entry.created_at) : null,
-    strikes,
-    firstSeenAt: prior?.firstSeenAt ?? new Date().toISOString(),
-    lastSeenAt: new Date().toISOString(),
-  });
-  writePrivateBodyHistoryUnavailable(address, existing);
-  return strikes;
-}
-
-function clearPrivateBodyHistoryUnavailable(address, entryId) {
-  const id = String(entryId ?? '');
-  if (!/^[0-9]+$/.test(id)) return;
-  const remaining = readPrivateBodyHistoryUnavailable(address)
-    .filter((record) => record.entryId !== id);
-  writePrivateBodyHistoryUnavailable(address, remaining);
-}
-
-function privateBodyHistoryRetryEntryIds(address, options = {}) {
-  const ids = [];
-  const records = readPrivateBodyHistoryUnavailable(address);
-  const force = options.forceHistoryRetry === true;
-  const retryLimit = force ? PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT : PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT;
-  const now = Date.now();
-  for (const record of records) {
-    // Terminally-capped body gaps (surfaced 'undelivered') stop consuming the auto-retry budget —
-    // filtered BEFORE the cooldown, exactly like the stuck-entry store. The manual "Sync messages"
-    // (force) path still re-attempts them so a no-key owner can retry without losing the option.
-    if (!force && (Number(record.strikes ?? 0) || 0) >= PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP) continue;
-    if (!force) {
-      const lastSeenMs = Date.parse(record.lastSeenAt ?? '');
-      if (Number.isFinite(lastSeenMs) && now - lastSeenMs < PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS) continue;
-    }
-    try {
-      const id = BigInt(record.entryId);
-      if (id < 0n) continue;
-      ids.push(id);
-    } catch {
-      // Ignore corrupt local retry records.
-    }
-    if (ids.length >= retryLimit) break;
-  }
-  return ids;
-}
-
-// Count body gaps promoted past the cross-session cap — a surfaced "undelivered" body, fed into the
-// sync's undeliveredCount so "Synced" stays honest after the cursor/early-skip stops re-fetching them.
-function privateBodyHistorySurfacedCount(address) {
-  return readPrivateBodyHistoryUnavailable(address)
-    .filter((record) => (Number(record.strikes ?? 0) || 0) >= PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP)
-    .length;
-}
-
-// Is this entry's body terminally unrecoverable (capped)? Used to SKIP the heavy/500-prone body tx-scan
-// on the per-cycle index walk while still reading the cheap entry metadata the walk needs.
-function privateBodyHistoryEntryCapped(address, entryId) {
-  const id = String(entryId ?? '');
-  if (!/^[0-9]+$/.test(id)) return false;
-  return readPrivateBodyHistoryUnavailable(address)
-    .some((record) => record.entryId === id && (Number(record.strikes ?? 0) || 0) >= PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP);
-}
-
-// Cross-session "stuck entry" store (#9): a private index entry that the per-session
-// 3-strikes unknown-error skip would otherwise bury forever (cursor advances past it,
-// in-memory counter dies on reload). Persisted here so later sessions re-scan it via
-// the retryEntryIds replay (NOT via cursor manipulation), bounded by a cooldown +
-// auto-limit + a cross-session strike cap; once capped it becomes a surfaced
-// "undelivered" gap and stops being re-fetched. Mirrors the body-history store above.
-function privateChainStuckEntryStorageKey(address = configuredCapsuleHubAddress()) {
-  const hub = address ?? 'no-capsulehub';
-  const keyId = localRecipientKeyPair?.keyId ?? 'no-key';
-  return `${PRIVATE_CHAIN_STUCK_ENTRY_STORAGE_PREFIX}:${hub}:${keyId}`;
-}
-
-function normalizePrivateStuckEntryRecord(record) {
-  const entryId = record?.entryId ?? record?.entry_id ?? record;
-  if (!/^[0-9]+$/.test(String(entryId ?? ''))) return null;
-  const strikes = Math.max(1, Math.floor(Number(record?.strikes ?? 1)) || 1);
-  return {
-    entryId: String(entryId),
-    strikes,
-    lastError: record?.lastError ? String(record.lastError).slice(0, 200) : null,
-    firstSeenAt: record?.firstSeenAt ? String(record.firstSeenAt) : new Date().toISOString(),
-    lastSeenAt: record?.lastSeenAt ? String(record.lastSeenAt) : new Date().toISOString(),
-  };
-}
-
-function readPrivateStuckEntries(address) {
-  try {
-    const raw = localStorageOrNull()?.getItem(privateChainStuckEntryStorageKey(address));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizePrivateStuckEntryRecord)
-      .filter(Boolean)
-      .slice(-PRIVATE_CHAIN_STUCK_ENTRY_LIMIT);
-  } catch {
-    return [];
-  }
-}
-
-function writePrivateStuckEntries(address, records) {
-  try {
-    const normalized = (records ?? [])
-      .map(normalizePrivateStuckEntryRecord)
-      .filter(Boolean)
-      .slice(-PRIVATE_CHAIN_STUCK_ENTRY_LIMIT);
-    const storage = localStorageOrNull();
-    if (!storage) return;
-    if (normalized.length === 0) storage.removeItem(privateChainStuckEntryStorageKey(address));
-    else storage.setItem(privateChainStuckEntryStorageKey(address), JSON.stringify(normalized));
-  } catch {
-    // Non-persistent mode retries stuck entries only within the current session.
-  }
-}
-
-function hasPrivateStuckEntry(address, entryId) {
-  const id = String(entryId ?? '');
-  if (!/^[0-9]+$/.test(id)) return false;
-  return readPrivateStuckEntries(address).some((record) => record.entryId === id);
-}
-
-function rememberPrivateStuckEntry(address, entryId, message) {
-  const id = String(entryId ?? '');
-  if (!/^[0-9]+$/.test(id)) return 0;
-  const records = readPrivateStuckEntries(address);
-  const prior = records.find((record) => record.entryId === id);
-  const strikes = (Number(prior?.strikes ?? 0) || 0) + 1;
-  const remaining = records.filter((record) => record.entryId !== id);
-  remaining.push({
-    entryId: id,
-    strikes,
-    lastError: message ? String(message).slice(0, 200) : (prior?.lastError ?? null),
-    firstSeenAt: prior?.firstSeenAt ?? new Date().toISOString(),
-    lastSeenAt: new Date().toISOString(),
-  });
-  writePrivateStuckEntries(address, remaining);
-  return strikes;
-}
-
-function clearPrivateStuckEntry(address, entryId) {
-  const id = String(entryId ?? '');
-  if (!/^[0-9]+$/.test(id)) return;
-  const remaining = readPrivateStuckEntries(address).filter((record) => record.entryId !== id);
-  writePrivateStuckEntries(address, remaining);
-}
-
-function privateStuckEntryRetryEntryIds(address, options = {}) {
-  const ids = [];
-  const records = readPrivateStuckEntries(address);
-  const force = options.forceStuckRetry === true;
-  const retryLimit = force ? PRIVATE_CHAIN_STUCK_ENTRY_RETRY_MANUAL_LIMIT : PRIVATE_CHAIN_STUCK_ENTRY_RETRY_AUTO_LIMIT;
-  const now = Date.now();
-  for (const record of records) {
-    // Promoted-undelivered entries (strikes at the cap) stop being re-fetched —
-    // filtered BEFORE the cooldown so they never consume the auto-retry budget.
-    if ((Number(record.strikes ?? 0) || 0) >= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP) continue;
-    if (!force) {
-      const lastSeenMs = Date.parse(record.lastSeenAt ?? '');
-      if (Number.isFinite(lastSeenMs) && now - lastSeenMs < PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS) continue;
-    }
-    try {
-      const id = BigInt(record.entryId);
-      if (id < 0n) continue;
-      ids.push(id);
-    } catch {
-      // Ignore corrupt local retry records.
-    }
-    if (ids.length >= retryLimit) break;
-  }
-  return ids;
-}
-
-function privateStuckEntrySurfacedCount(address) {
-  return readPrivateStuckEntries(address)
-    .filter((record) => (Number(record.strikes ?? 0) || 0) >= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP)
-    .length;
 }
 
 function base64UrlToBytes(value) {
@@ -12272,11 +11050,6 @@ async function readCurrentProfileAvatarPointerResultFromChain(ownerWallet, optio
   }
 }
 
-async function readCurrentProfileAvatarPointerFromChain(ownerWallet, options = {}) {
-  const result = await readCurrentProfileAvatarPointerResultFromChain(ownerWallet, options);
-  return result.pointer;
-}
-
 function privateEntryIdValue(entry) {
   const value = entry?.entry_id ?? entry?.entryId;
   if (value === null || value === undefined) return null;
@@ -12434,18 +11207,6 @@ function privateChainMessageMeta(entry, parts = 1) {
   if (entry?.openedAs === 'self') return parts > 1 ? `saved (${parts} parts)` : 'saved';
   if (entry?.openedAs === 'sender') return parts > 1 ? `published (${parts} parts)` : 'published';
   return parts > 1 ? `received (${parts} parts)` : 'received';
-}
-
-function privatePartKey(opened, entry) {
-  const streamId = opened?.payload?.stream_id ?? 'single';
-  const peer = opened?.openedAs === 'sender'
-    ? rawWalletAddress(opened?.payload?.recipientWallet ?? opened?.payload?.recipient_wallet)
-    : rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
-  const identity = peer
-    ?? privateEntryPublisherWallet(entry)
-    ?? opened?.capsule?.header0?.senderKeyId
-    ?? 'unknown';
-  return `${opened?.openedAs ?? 'unknown'}:${identity}:${streamId}`;
 }
 
 function messageFromOpenedPrivateParts(parts, meta) {
@@ -12761,12 +11522,6 @@ async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
   return true;
 }
 
-function isBodyHistoryUnavailableError(error) {
-  return isCapsuleHubBodyHistoryUnavailable(error)
-    || String(error?.code ?? '') === 'BODY_HISTORY_UNAVAILABLE'
-    || /body was not found in message history|cannot read CapsuleHub message history/i.test(String(error?.message ?? error ?? ''));
-}
-
 function isPrivateOpenKeyMismatchError(error) {
   // NOTE: keep ONLY deterministic key/decrypt-mismatch tokens here. A message
   // matching this regex is treated as a PERMANENTLY unreadable capsule (the cursor
@@ -12827,43 +11582,6 @@ function privateIndexPreviousLink(entry, role) {
 function privateIndexEntryIdFromLink(link) {
   const normalized = privateIndexLinkValue(link);
   return normalized > 0n ? normalized - 1n : null;
-}
-
-function privateIndexCursorDebug(cursor) {
-  const normalized = normalizePrivateChainIndexCursor(cursor);
-  return {
-    processedHeadLink: normalized.processedHeadLink.toString(),
-    targetHeadLink: normalized.targetHeadLink.toString(),
-    resumeLink: normalized.resumeLink.toString(),
-  };
-}
-
-function privateIndexSyncReadLimit(options = {}) {
-  const configured = Number(
-    options.readLimit
-      ?? appConfig.capsuleHub?.privateIndexReadLimit
-      ?? (options.mode === 'auto' || options.fast === true
-        ? PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT
-        : PRIVATE_CHAIN_INDEX_READ_LIMIT),
-  );
-  return Number.isFinite(configured)
-    ? Math.max(1, Math.floor(configured))
-    : PRIVATE_CHAIN_INDEX_READ_LIMIT;
-}
-
-function privateIndexCursorPersistenceMode(readOptions = {}) {
-  if (readOptions.verify === true && readOptions.allowUnverifiedCriticalRead !== true) return 'verified';
-  // Client-direct keyless model: verify:false single-source (toncenter) reads are the trusted norm
-  // (verifyCriticalReads:false; the gateway the 'verified' mode required is decommissioned). The private
-  // index is an APPEND-ONLY backward-linked list, so a node cannot fabricate a future head; the cursor
-  // advances only AFTER a complete walk (every entry head->stopLink processed), a lagging head simply
-  // self-corrects next cycle (the cursor stays below the real head, so the next walk catches up), and the
-  // head-repair window re-scans the recent entries every cycle. So persisting the keyless cursor is safe,
-  // and it stops the per-cycle full re-walk (head->frozen-cursor, ~15 getPrivateEntry reads) that burned
-  // the keyless RPC budget. The conservative non-persist mode stays for any read that opts OUT of the
-  // unverified path (no allowUnverifiedCriticalRead).
-  if (readOptions.allowUnverifiedCriticalRead === true) return 'keyless_unverified';
-  return 'disabled_unverified';
 }
 
 function privateSyncImported(result) {
@@ -12965,6 +11683,10 @@ async function appendConvOpenedCapsules(collected, targetThread) {
 // long-offline catch-up to a finite read fan while still covering the whole live retention window. [conv-receive review]
 const CONV_SCAN_CATCHUP_CAP_EPOCHS = 366;
 
+// A REAL macrotask yield (setTimeout 0), not `await Promise.resolve()`: only a macrotask lets the browser paint,
+// which is the whole point on a slow single-thread device. Used between synchronous-crypto iterations.
+const cooperativeYield = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 async function syncConvCapsulesFromShards() {
   if (!localRecipientKeyPair || !convKeyStore) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
   const transport = globalThis.plathoTonRpcTransport;
@@ -12972,6 +11694,12 @@ async function syncConvCapsulesFromShards() {
   const selfKeyId = localRecipientKeyPair.keyId;
   const lane = createConvReadLane({ readMessagesWithSource: createShardMessagesWithSourceReader() });
   const epochNow = epochFromCreatedAtSeconds(Math.floor(Date.now() / 1000));
+  // Per-tick cheap heal (Saved-only form, no args): a session whose thread routing was poisoned MID-flight
+  // self-corrects on the next sync instead of needing a full re-unlock. This ran on every CapsuleHub sync tick
+  // and would otherwise have been lost with it — the boot-time form (requeueAnonymous + clearOwnContactDisplay)
+  // only runs on restore. See the cross-wallet identity-bleed class: a message must never be shown under the
+  // wrong identity, and "wait for a re-unlock" is not a fix a user can discover.
+  healCrossWalletIdentityBleed();
   let imported = 0;
   let skipped = 0;
   let conversations = 0;
@@ -13018,6 +11746,12 @@ async function syncConvCapsulesFromShards() {
           continue;
         }
         collected.push({ opened, entry: { entry_id: found.seq } });
+        // Cooperative yield after EVERY opened capsule: ML-KEM-768 decapsulation is SYNCHRONOUS CPU, and a burst
+        // of them in a tight loop starves the main thread on a slow single-thread device (the measured iPhone SE2
+        // freeze). An `await` on an already-resolved promise only drains microtasks — the browser cannot paint
+        // between those — so the yield has to be a real macrotask. The CapsuleHub sync had this; it was lost with
+        // it, and the shard sync opens capsules in exactly the same tight loop.
+        await cooperativeYield();
       }
     }
     imported += await appendConvOpenedCapsules(collected, targetThread);
@@ -13032,649 +11766,11 @@ async function syncConvCapsulesFromShards() {
 }
 
 async function syncPrivateCapsulesFromChain(options = {}) {
-  // clean-17 direct-pay: the CapsuleHub recipient/sender index walk below is a clean-15 concept. Private receive now
-  // reads the conversation's RecordShards by bucketKey (K_root → addresses, no index) and decrypts into the same
-  // thread seam. Mirrors syncPublicChannelFromChain's top branch.
-  if (privateLaneDirectPayEnabled()) return syncConvCapsulesFromShards(options);
-  if (!localRecipientKeyPair) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
-  const resolved = await resolveCapsuleHubProvider();
-  if (!resolved) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
-  const { provider, address } = resolved;
-  if (!provider?.getPrivateRecipientIndex || !provider?.getPrivateSenderIndex || !provider?.getPrivateEntry) {
-    const result = privateSyncResult({ ok: false, reason: 'private_index_unavailable', scanComplete: false });
-    globalThis.plathoLastPrivateSync = {
-      capsuleHub: address,
-      keyId: localRecipientKeyPair?.keyId ?? null,
-      imported: 0,
-      skipped: 0,
-      scanComplete: false,
-      reason: result.reason,
-      mode: options.mode === 'auto' || options.fast === true ? 'auto' : 'recovery',
-      scanLog: ['index-unavailable'],
-    };
-    return result;
-  }
-  const quickSync = options.mode === 'auto' || options.fast === true;
-  let allowUnverifiedPrivateIndexRead = options.allowUnverifiedPrivateIndexRead === true;
-  const allowUnverifiedPrivateIndexFallback = quickSync && options.allowUnverifiedPrivateIndexRead !== false;
-  let readOptions = allowUnverifiedPrivateIndexRead
-    ? capsuleHubMessageSyncReadOptions(address)
-    : criticalCapsuleHubReadOptions(address);
-  const forceIndexRescan = options.forceIndexRescan === true;
-  const keyIdIndex = privateKeyIdIndexValue(localRecipientKeyPair.keyId);
-  let recipientIndex = null;
-  let senderIndex = null;
-  let indexReadFallback = null;
-  // Sequential, not Promise.all: the recipient + sender index reads are 2 concurrent toncenter reads that stall
-  // the iOS run loop (v509 class) — and this runs on every sync tick, boot and unlock. Two independent read-only
-  // index reads; sequential returns the same [recipient, sender] heads (the walk is eventually-consistent, so a
-  // one-block skew between the two heads just resolves on the next cycle — no entry is lost).
-  const readPrivateIndexes = async () => {
-    const recipient = await provider.getPrivateRecipientIndex(keyIdIndex, readOptions);
-    const sender = await provider.getPrivateSenderIndex(keyIdIndex, readOptions);
-    return [recipient, sender];
-  };
-  const privateIndexReadFailure = (error) => {
-    const rateLimited = noteTonRpcRateLimit(error);
-    const rpcDelayed = !rateLimited && isTonRpcTransientError(error);
-    const result = privateSyncResult({
-      ok: false,
-      reason: 'private_index_read_failed',
-      scanComplete: false,
-      rateLimited,
-      rpcDelayed,
-    });
-    const indexReadError = shortUiErrorText(error, 'private index read failed');
-    globalThis.plathoLastPrivateSync = {
-      capsuleHub: address,
-      keyId: localRecipientKeyPair?.keyId ?? null,
-      indexKeyId: keyIdIndex.toString(),
-      imported: 0,
-      skipped: 0,
-      scanComplete: false,
-      pageComplete: false,
-      reason: result.reason,
-      mode: quickSync ? 'auto' : 'recovery',
-      indexReadError,
-      indexReadFallback,
-      rateLimited,
-      rpcDelayed,
-      scanLog: ['index-read-error'],
-    };
-    if (rpcDelayed) return result;
-    throw error;
-  };
-  try {
-    [recipientIndex, senderIndex] = await readPrivateIndexes();
-  } catch (error) {
-    if (!allowUnverifiedPrivateIndexRead && allowUnverifiedPrivateIndexFallback && isTonRpcVerificationSoftReadError(error)) {
-      indexReadFallback = shortUiErrorText(error, 'verified private index unavailable');
-      allowUnverifiedPrivateIndexRead = true;
-      readOptions = capsuleHubMessageSyncReadOptions(address);
-      try {
-        [recipientIndex, senderIndex] = await readPrivateIndexes();
-      } catch (fallbackError) {
-        return privateIndexReadFailure(fallbackError);
-      }
-    } else {
-      return privateIndexReadFailure(error);
-    }
-  }
-  // Cursor persistence is a local performance cache, but advancing it can hide
-  // older index entries. It only moves after a verified indexed walk; unverified
-  // fallback may import self-authenticated entries but leaves the active cursor
-  // untouched.
-  const cursorPersistence = privateIndexCursorPersistenceMode(readOptions);
-  const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified';
-  const recipientHead = privateIndexLatestLink(recipientIndex);
-  const senderHead = privateIndexLatestLink(senderIndex);
-  // Re-heal on EVERY sync, not just boot: a session poisoned mid-flight (a peer capsule filed into "My notes" while
-  // the wallet was transiently locked, or a variant grafted onto Saved) must self-correct WITHOUT waiting for a full
-  // re-unlock. This is the cheap Saved-only pass (strip foreign variants + queue Saved-stuck messages for relocation);
-  // the anonymous re-queue + own-contact-display write stay boot-only. Runs BEFORE the retry snapshot below so the
-  // queued ids are consumed in THIS pass.
-  healCrossWalletIdentityBleed();
-  // Replay set: body-history gaps + cross-session stuck entries (#9), re-scanned
-  // regardless of the advanced cursor. De-duped by value (an id can sit in both
-  // stores). Manual "Sync messages" (forceHistoryRetry) uses the manual limits for
-  // both. The stuck ids are made safe for the {ok:false}-break replay loop by the
-  // fast-path in scanPrivateEntryId (a persisted stuck entry returns {ok:true}).
-  const retryEntryIds = [...new Set([
-    ...privateBodyHistoryRetryEntryIds(address, { forceHistoryRetry: options.forceHistoryRetry === true }),
-    ...privateStuckEntryRetryEntryIds(address, { forceStuckRetry: options.forceHistoryRetry === true }),
-    // One-time relocation of messages the identity-bleed heal found stuck inside "My notes" (re-open -> route to
-    // the true sender -> relocate out of Saved). Snapshot + clear now so the loop below consumes them once.
-    ...(() => { const ids = [...pendingSavedRelocateEntryIds]; pendingSavedRelocateEntryIds = new Set(); return ids; })(),
-  ].map((id) => id.toString()))].map((id) => BigInt(id));
-  const baseLimit = privateIndexSyncReadLimit(options);
-  const limit = !canPersistPrivateIndexCursor && quickSync
-    ? Math.max(baseLimit, PRIVATE_CHAIN_INDEX_READ_LIMIT)
-    : baseLimit;
-  let imported = 0;
-  let skipped = 0;
-  let scanComplete = true;
-  let rateLimitError = null;
-  let bodyHistoryError = null;
-  let privateKeyOpenError = null;
-  let blockedEntryId = null;
-  const historyUnavailableEntries = [];
-  let incompletePrivateStreamCount = 0;
-  const privatePartGroups = new Map();
-  const scannedPrivateEntryIds = new Set();
-  const privateEntryCache = new Map();
-  const cursorWrites = [];
-  const headRepairWrites = [];
-  const scanLog = [];
-  const rememberPrivateScanLog = (entryId, status) => {
-    const item = `${entryId.toString()}:${String(status ?? 'seen')}`;
-    scanLog.push(item);
-    if (scanLog.length > 14) scanLog.shift();
-  };
-  const readPrivateEntryCached = async (entryId) => {
-    const entryIdKey = entryId.toString();
-    if (privateEntryCache.has(entryIdKey)) return privateEntryCache.get(entryIdKey);
-    const entry = await provider.getPrivateEntry(entryId, readOptions);
-    privateEntryCache.set(entryIdKey, entry);
-    return entry;
-  };
-  const scanPrivateEntryId = async (entryId, { source = 'index' } = {}) => {
-    const entryIdKey = entryId.toString();
-    if (scannedPrivateEntryIds.has(entryIdKey)) return { ok: true, entry: privateEntryCache.get(entryIdKey) ?? null };
-    let entry = null;
-    try {
-      entry = await readPrivateEntryCached(entryId);
-      // Terminally-capped body gap (surfaced 'undelivered'): the body is unrecoverable keyless, so SKIP
-      // the heavy, 500-prone open+body tx-scan and keep only the cheap entry-metadata read the walk needs
-      // for the previousLink. The manual "Sync messages" (source 'history-retry') path still re-attempts.
-      if (source !== 'history-retry' && privateBodyHistoryEntryCapped(address, entryId)) {
-        scannedPrivateEntryIds.add(entryIdKey);
-        rememberPrivateScanLog(entryId, 'body-undelivered');
-        skipped += 1;
-        return { ok: true, entry };
-      }
-      if (entry.exists !== true) {
-        scannedPrivateEntryIds.add(entryIdKey);
-        rememberPrivateScanLog(entryId, 'empty');
-        clearPrivateBodyHistoryUnavailable(address, entryId);
-        clearPrivateStuckEntry(address, entryId);
-        return { ok: true, entry };
-      }
-      entry = await resolvePrivateEntryBody(provider, entry, address, readOptions);
-      privateEntryCache.set(entryIdKey, entry);
-      scannedPrivateEntryIds.add(entryIdKey);
-      privateScanUnknownErrorCounts.delete(`${address}:${entryIdKey}`);
-      clearPrivateBodyHistoryUnavailable(address, entryId);
-      const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair, {
-        now: Date.now(),
-      });
-      // Divert a self-addressed subscription snapshot BEFORE thread resolution, so it never spawns a "chat with
-      // yourself" thread. Collected here; applied (restore) when the sync pass drains them.
-      const prefsBytes = prefsBytesFromOpenedCapsule(opened);
-      if (prefsBytes) {
-        collectRestoredPrefsSnapshot(prefsBytes);
-        rememberPrivateScanLog(entryId, 'prefs');
-        clearPrivateStuckEntry(address, entryId);
-        return { ok: true, entry };
-      }
-      const targetThread = await threadForChainCapsule(opened, entry);
-      const partCount = Number(opened.payload?.partCount ?? 1);
-      if (partCount > 1) {
-        const key = privatePartKey(opened, entry);
-        const existing = privatePartGroups.get(key) ?? {
-          targetThread,
-          parts: [],
-          partCount,
-          maxCreatedAtMs: 0,
-          hasIndexedPart: false,
-        };
-        if (isPendingIdentityResolutionThread(existing.targetThread) && !isPendingIdentityResolutionThread(targetThread)) {
-          existing.targetThread = targetThread;
-        }
-        existing.parts.push({ opened, entry, entryId, targetThread });
-        existing.partCount = Math.max(existing.partCount, partCount);
-        existing.hasIndexedPart = existing.hasIndexedPart || source !== 'history-retry';
-        existing.maxCreatedAtMs = Math.max(existing.maxCreatedAtMs, privateEntryCreatedAtMs(entry) ?? 0);
-        privatePartGroups.set(key, existing);
-      } else {
-        const added = await appendOpenedCapsuleMessage(
-          opened,
-          targetThread,
-          privateChainMessageMeta({ ...entry, openedAs: isSelfOpenedCapsule(opened) ? 'self' : opened.openedAs }),
-          entry,
-        );
-        if (added) imported += 1;
-      }
-      rememberPrivateScanLog(entryId, `open-${opened.openedAs ?? 'ok'}`);
-      // Genuine success (the entry opened): it is no longer a stuck/undelivered
-      // candidate. (Clear here, NOT before the open at the body-history clear, so a
-      // resolve-ok-but-open-fails entry keeps accumulating its cross-session strike.)
-      clearPrivateStuckEntry(address, entryId);
-      return { ok: true, entry };
-    } catch (error) {
-      const message = String(error?.message ?? error);
-      if (noteTonRpcRateLimit(error)) {
-        rateLimitError = error;
-        scanComplete = false;
-        return { ok: false, entry };
-      } else if (isBodyHistoryUnavailableError(error)) {
-        scannedPrivateEntryIds.add(entryIdKey);
-        const bodyStrikes = rememberPrivateBodyHistoryUnavailable(address, entry, entryId);
-        if (bodyStrikes < PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP) {
-          // Still retrying: pin the cursor (the gap may be transient/recoverable) so it re-walks next cycle.
-          rememberPrivateScanLog(entryId, 'body-gap');
-          bodyHistoryError = error;
-          blockedEntryId = entryId;
-          historyUnavailableEntries.push({
-            entryId: entryId.toString(),
-            bodyHash: entryBodyHashHex(entry),
-          });
-        } else {
-          // Terminal: surfaced 'undelivered' (folded into undeliveredCount). Do NOT set bodyHistoryError,
-          // so it stops vetoing cursor/head-repair persistence; the next cycle the entry is early-skipped
-          // (no heavy body tx-scan, the 500 source).
-          rememberPrivateScanLog(entryId, 'body-undelivered');
-        }
-        skipped += 1;
-        return { ok: true, entry };
-      } else if (isTonRpcVerificationSoftReadError(error) || isTonRpcTransientError(error)) {
-        // A transient RPC failure (verification-unavailable, 5xx, timeout, network,
-        // disagreement) is NOT a permanently-unreadable capsule. Pin the cursor like
-        // the rate-limit branch so this entry is re-walked on the next cycle once the
-        // RPC recovers, instead of being dropped forever while the header still says
-        // "Synced" (the historical /unavailable/i landmine). Genuine deterministic
-        // crypto/structural mismatches still fall through to the unreadable branch.
-        rememberPrivateScanLog(entryId, 'transient');
-        scanComplete = false;
-        return { ok: false, entry };
-      } else if (isPrivateUnreadableCapsuleError(error)) {
-        scannedPrivateEntryIds.add(entryIdKey);
-        clearPrivateBodyHistoryUnavailable(address, entryId);
-        privateKeyOpenError = error;
-        blockedEntryId = entryId;
-        rememberPrivateScanLog(entryId, 'unreadable');
-        skipped += 1;
-        globalThis.plathoLastPrivateSyncKeyOpenError = {
-          entryId: entryId.toString(),
-          localKeyId: localRecipientKeyPair?.keyId ?? null,
-          type: 'unreadable_capsule',
-          message,
-          at: new Date().toISOString(),
-        };
-        return { ok: true, entry };
-      } else {
-        const failureKey = `${address}:${entryIdKey}`;
-        const failures = (privateScanUnknownErrorCounts.get(failureKey) ?? 0) + 1;
-        privateScanUnknownErrorCounts.set(failureKey, failures);
-        // A persisted stuck entry (or ANY replay of one — source 'history-retry')
-        // must NEVER return {ok:false}: the retryEntryIds replay loop breaks on the
-        // first !ok, which would stall the whole pass + the cursor every session
-        // (a worse loop than v419-v421). Mirror body-history's non-blocking
-        // {ok:true} contract — bump the CROSS-session strike and session-skip at
-        // once (one read, never scanComplete=false). A FRESH unknown error reached
-        // by the index walk keeps the per-session 3-strikes ramp so a one-off blip
-        // does not pin the page before the entry is persisted.
-        const alreadyStuck = source === 'history-retry' || hasPrivateStuckEntry(address, entryId);
-        if (alreadyStuck || failures >= PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER) {
-          const crossStrikes = rememberPrivateStuckEntry(address, entryId, message);
-          scannedPrivateEntryIds.add(entryIdKey);
-          rememberPrivateScanLog(entryId, crossStrikes >= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP ? 'undelivered' : 'error-skip');
-          globalThis.plathoLastPrivateSyncBlockedEntry = {
-            entryId: entryIdKey,
-            message,
-            failures,
-            crossStrikes,
-            at: new Date().toISOString(),
-          };
-          skipped += 1;
-          return { ok: true, entry };
-        }
-        rememberPrivateScanLog(entryId, 'error');
-        console.error(error);
-        scanComplete = false;
-        return { ok: false, entry };
-      }
-    }
-  };
-
-  let indexEntriesScanned = 0;
-  let headRepairScanned = 0;
-  let historyRetryScanned = 0;
-  let catchUpRemaining = 0;
-  let indexLimitReachedWithoutCursor = false;
-  // Each scanned private entry runs a SYNCHRONOUS ML-KEM-768 decapsulate (the dominant CPU cost). On a
-  // slow single-thread device (e.g. iPhone SE2) dozens of these back-to-back in this await chain starve
-  // the main thread — tab clicks and renders queue behind the burst and the UI "freezes" for ~10s. Yield
-  // to the event loop after EVERY entry so at most ONE decapsulate ever runs between event-loop turns:
-  // input/paint get processed between decapsulations and the UI stays responsive. The sync is single-
-  // flight (privateChainSyncPromise guards syncPrivateCapsulesFromChainOnce), so yielding mid-walk cannot
-  // let a second pass interleave. Background sync takes marginally longer wall-clock; the UI never blocks.
-  const cooperativeYield = () => new Promise((resolve) => setTimeout(resolve, 0));
-  // TRUE while this role's walk has collected a multipart group that is still missing parts (unique partIndex
-  // count below partCount). Group keys start with the openedAs role (privatePartKey), which matches the walked
-  // index: the recipient index only yields recipient-opened parts and vice versa — so extending THIS role's walk
-  // is exactly what can close them. history-retry-only groups (hasIndexedPart false) never trigger an extension.
-  const rolePartGroupsIncomplete = (role) => {
-    const ownRaw = ownRuntimeWalletRaw();
-    for (const [key, group] of privatePartGroups) {
-      // Self (Saved) groups live in BOTH index chains — either role's walk can close them, so the role filter
-      // admits any group whose peer identity is the own wallet (v652; without this a straddled multipart self
-      // message only closed on the recipient walk's later pass).
-      const selfGroup = ownRaw ? key.includes(`:${ownRaw}:`) : false;
-      if (!key.startsWith(`${role}:`) && !selfGroup) continue;
-      if (group.hasIndexedPart !== true) continue;
-      const unique = new Set();
-      for (const part of group.parts) unique.add(Number(part.opened?.payload?.partIndex ?? 0));
-      if (unique.size < group.partCount) return true;
-    }
-    return false;
-  };
-
-  const walkIndexedRole = async (role, latestHeadLink) => {
-    const cursor = forceIndexRescan
-      ? normalizePrivateChainIndexCursor(null)
-      : readPrivateChainIndexCursor(address, role);
-    const hasResume = cursor.resumeLink > 0n;
-    const targetHeadLink = hasResume ? cursor.targetHeadLink : latestHeadLink;
-    const stopLink = cursor.processedHeadLink;
-    let currentLink = hasResume ? cursor.resumeLink : latestHeadLink;
-    if (latestHeadLink === 0n) {
-      if (cursor.processedHeadLink !== 0n || cursor.targetHeadLink !== 0n || cursor.resumeLink !== 0n) {
-        cursorWrites.push({ role, cursor: normalizePrivateChainIndexCursor(null) });
-      }
-      return;
-    }
-    if (!hasResume && latestHeadLink === stopLink) return;
-    let scannedForRole = 0;
-    let nextLink = currentLink;
-    while (currentLink > 0n && currentLink !== stopLink && scannedForRole < limit) {
-      const entryId = privateIndexEntryIdFromLink(currentLink);
-      if (entryId === null) {
-        nextLink = 0n;
-        break;
-      }
-      const result = await scanPrivateEntryId(entryId, { source: role });
-      if (!result.ok) {
-        scanComplete = false;
-        return;
-      }
-      indexEntriesScanned += 1;
-      scannedForRole += 1;
-      await cooperativeYield();
-      const previousLink = privateIndexPreviousLink(result.entry, role);
-      nextLink = previousLink;
-      if (previousLink === currentLink) {
-        scanComplete = false;
-        return;
-      }
-      currentLink = previousLink;
-    }
-    // Boundary-straddle extension (v649, the public comment loader's rule applied here): a window-limit exit in
-    // the MIDDLE of a multipart group would either veto the cursor while fresh (head-restart livelock) or —
-    // once stale — advance the cursor past the group's head-side parts forever. Keep walking (bounded) until
-    // every group this role collected is closed; the exit branches below then see the EXTENDED position, so a
-    // completed group flows into normal assembly and the catch-up cursor resumes below it.
-    if (currentLink > 0n && currentLink !== stopLink && rolePartGroupsIncomplete(role)) {
-      let extendedScans = 0;
-      while (currentLink > 0n && currentLink !== stopLink
-        && extendedScans < PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT
-        && rolePartGroupsIncomplete(role)) {
-        const entryId = privateIndexEntryIdFromLink(currentLink);
-        if (entryId === null) {
-          nextLink = 0n;
-          break;
-        }
-        const result = await scanPrivateEntryId(entryId, { source: role });
-        if (!result.ok) {
-          scanComplete = false;
-          return;
-        }
-        indexEntriesScanned += 1;
-        extendedScans += 1;
-        await cooperativeYield();
-        const previousLink = privateIndexPreviousLink(result.entry, role);
-        nextLink = previousLink;
-        if (previousLink === currentLink) {
-          scanComplete = false;
-          return;
-        }
-        currentLink = previousLink;
-      }
-    }
-    if (currentLink > 0n && currentLink !== stopLink) {
-      if (canPersistPrivateIndexCursor) {
-        catchUpRemaining += 1;
-        cursorWrites.push({
-          role,
-          cursor: {
-            processedHeadLink: stopLink,
-            targetHeadLink,
-            resumeLink: nextLink,
-          },
-        });
-      } else {
-        indexLimitReachedWithoutCursor = true;
-      }
-      return;
-    }
-    cursorWrites.push({
-      role,
-      cursor: {
-        processedHeadLink: targetHeadLink,
-        targetHeadLink: 0n,
-        resumeLink: 0n,
-      },
-    });
-  };
-
-  const walkRecentIndexedRoleForRepair = async (role, latestHeadLink) => {
-    const latestLink = privateIndexLinkValue(latestHeadLink);
-    if (latestLink === 0n) return;
-    if (readPrivateChainHeadRepairLink(address, role) === latestLink) return;
-    let currentLink = latestLink;
-    let scannedForRole = 0;
-    while (currentLink > 0n && scannedForRole < PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT) {
-      const entryId = privateIndexEntryIdFromLink(currentLink);
-      if (entryId === null) break;
-      const result = await scanPrivateEntryId(entryId, { source: `${role}-head-repair` });
-      if (!result.ok) {
-        scanComplete = false;
-        return;
-      }
-      headRepairScanned += 1;
-      scannedForRole += 1;
-      await cooperativeYield();
-      const previousLink = privateIndexPreviousLink(result.entry, role);
-      if (previousLink === currentLink) {
-        scanComplete = false;
-        return;
-      }
-      currentLink = previousLink;
-    }
-    headRepairWrites.push({ role, link: latestLink });
-  };
-
-  for (const entryId of retryEntryIds) {
-    const result = await scanPrivateEntryId(entryId, { source: 'history-retry' });
-    historyRetryScanned += 1;
-    if (!result.ok) break;
-    await cooperativeYield();
-  }
-  if (!rateLimitError && scanComplete) {
-    await walkIndexedRole('recipient', recipientHead);
-  }
-  if (!rateLimitError && scanComplete) {
-    await walkIndexedRole('sender', senderHead);
-  }
-  if (!rateLimitError && scanComplete) {
-    await walkRecentIndexedRoleForRepair('recipient', recipientHead);
-  }
-  if (!rateLimitError && scanComplete) {
-    await walkRecentIndexedRoleForRepair('sender', senderHead);
-  }
-
-  const incompletePrivatePartGroups = [...privatePartGroups.values()].filter((group) => {
-    const uniqueParts = new Set();
-    for (const part of group.parts) {
-      uniqueParts.add(Number(part.opened?.payload?.partIndex ?? 0));
-    }
-    if (uniqueParts.size === group.partCount) return false;
-    return group.hasIndexedPart === true;
-  });
-
-  for (const group of privatePartGroups.values()) {
-    const uniqueParts = new Map();
-    for (const part of group.parts) {
-      uniqueParts.set(Number(part.opened?.payload?.partIndex ?? 0), part);
-    }
-    if (uniqueParts.size !== group.partCount) {
-      if (bodyHistoryError) {
-        for (const part of uniqueParts.values()) {
-          rememberPrivateBodyHistoryUnavailable(address, part.entry, part.entryId);
-        }
-        continue;
-      }
-      const ageMs = group.maxCreatedAtMs > 0 ? Date.now() - group.maxCreatedAtMs : Number.POSITIVE_INFINITY;
-      if (ageMs <= PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS) {
-        scanComplete = false;
-      }
-      incompletePrivateStreamCount += 1;
-      skipped += uniqueParts.size;
-      continue;
-    }
-    const ordered = [...uniqueParts.values()].sort((a, b) => {
-      const entryA = privateEntryIdValue({ entry_id: a.entryId });
-      const entryB = privateEntryIdValue({ entry_id: b.entryId });
-      if (entryA === null || entryB === null || entryA === entryB) return 0;
-      return entryA < entryB ? -1 : 1;
-    });
-    const firstEntry = ordered[0]?.entry;
-    const firstOpened = ordered[0]?.opened;
-    try {
-      const added = await appendOpenedPrivatePartsMessage(
-        ordered,
-        group.targetThread,
-        privateChainMessageMeta({ ...firstEntry, openedAs: isSelfOpenedCapsule(firstOpened) ? 'self' : firstOpened?.openedAs }, ordered.length),
-      );
-      pruneEmptyAnonymousPeerThreads();
-      if (added) imported += 1;
-    } catch (error) {
-      skipped += ordered.length;
-      globalThis.plathoLastPrivateSyncGroupError = {
-        message: String(error?.message ?? error ?? 'private multipart blocked'),
-        entryId: privateEntryIdText(firstEntry),
-        partCount: ordered.length,
-        at: new Date().toISOString(),
-      };
-      console.error(error);
-    }
-  }
-  const publishConfirmations = await confirmPendingPrivatePublishMessagesFromEntries(
-    [...privateEntryCache.values()],
-    'private_sync_index',
-  );
-  const hasFreshPartial = incompletePrivatePartGroups.some((group) => {
-    const ageMs = group.maxCreatedAtMs > 0 ? Date.now() - group.maxCreatedAtMs : Number.POSITIVE_INFINITY;
-    return ageMs <= PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS;
-  });
-  if (canPersistPrivateIndexCursor && !rateLimitError && scanComplete && !hasFreshPartial && bodyHistoryError === null) {
-    for (const write of cursorWrites) writePrivateChainIndexCursor(address, write.role, write.cursor);
-    for (const write of headRepairWrites) writePrivateChainHeadRepairLink(address, write.role, write.link);
-  } else if (canPersistPrivateIndexCursor && !rateLimitError && !hasFreshPartial && catchUpRemaining > 0 && bodyHistoryError === null) {
-    for (const write of cursorWrites) writePrivateChainIndexCursor(address, write.role, write.cursor);
-    for (const write of headRepairWrites) writePrivateChainHeadRepairLink(address, write.role, write.link);
-  }
-  // Entries promoted past the cross-session strike cap (#9): a permanently surfaced
-  // "undelivered" gap. Read from the STORE (not the per-run skipped counter) so it
-  // survives reload, when skipped resets to 0 while the cursor sits past the entry —
-  // exactly the false "Synced" this guards against.
-  const undeliveredCount = privateStuckEntrySurfacedCount(address) + privateBodyHistorySurfacedCount(address);
-  const reason = bodyHistoryError
-    ? 'body_history_unavailable'
-    : privateKeyOpenError
-      ? 'private_key_open_failed'
-      : hasFreshPartial
-        ? 'partial_stream_pending'
-        : indexLimitReachedWithoutCursor
-          ? 'index_limit_without_cursor'
-          : undeliveredCount > 0
-            ? 'private_entry_undelivered'
-            : (catchUpRemaining > 0 ? 'catch_up_pending' : null);
-  const fullScanComplete = scanComplete
-    && catchUpRemaining === 0
-    && !hasFreshPartial
-    && !indexLimitReachedWithoutCursor;
-  const recipientCursor = readPrivateChainIndexCursor(address, 'recipient');
-  const senderCursor = readPrivateChainIndexCursor(address, 'sender');
-  globalThis.plathoLastPrivateSync = {
-    capsuleHub: address,
-    keyId: localRecipientKeyPair?.keyId ?? null,
-    indexKeyId: keyIdIndex.toString(),
-    recipientHead: recipientHead.toString(),
-    senderHead: senderHead.toString(),
-    recipientCursor: privateIndexCursorDebug(recipientCursor),
-    senderCursor: privateIndexCursorDebug(senderCursor),
-    cursorPersistence,
-    imported,
-    skipped,
-    scanComplete: fullScanComplete,
-    pageComplete: scanComplete,
-    indexEntriesScanned,
-    headRepairScanned,
-    historyRetryScanned,
-    publishConfirmations,
-    readLimit: limit,
-    forceIndexRescan,
-    indexReadFallback,
-    rateLimited: rateLimitError !== null,
-    bodyHistoryUnavailable: bodyHistoryError !== null,
-    privateKeyOpenFailed: privateKeyOpenError !== null,
-    blockedEntryId: blockedEntryId?.toString?.() ?? null,
-    historyUnavailableCount: historyUnavailableEntries.length,
-    historyUnavailableEntries,
-    incompletePrivateStreamCount,
-    undeliveredCount,
-    catchUpRemaining,
-    indexLimitReachedWithoutCursor,
-    reason,
-    mode: quickSync ? 'auto' : 'recovery',
-    scanLog,
-  };
-  const result = privateSyncResult({
-    imported,
-    skipped,
-    scanComplete: fullScanComplete,
-    reason,
-    blockedEntryId: blockedEntryId?.toString?.() ?? null,
-    historyUnavailableCount: historyUnavailableEntries.length,
-    historyUnavailableEntries,
-    incompletePrivateStreamCount,
-    undeliveredCount,
-    catchUpRemaining,
-    indexLimitReachedWithoutCursor,
-    indexReadFallback,
-    rateLimited: rateLimitError !== null,
-    ok: rateLimitError === null,
-  });
-  if (imported > 0) {
-    refreshMessagingControls();
-    renderThreads();
-    renderConversation();
-    resumePendingPrivatePublishConfirmations();
-  resumePendingPublicPublishConfirmations();
-    resumePendingPrivateSendRetries();
-    return result;
-  }
-  if (!scanComplete) {
-    refreshMessagingControls();
-    resumePendingPrivateSendRetries();
-    if (rateLimitError) throw rateLimitError;
-    return result;
-  }
-  refreshMessagingControls();
-  resumePendingPrivatePublishConfirmations();
-  resumePendingPublicPublishConfirmations();
-  resumePendingPrivateSendRetries();
-  return result;
+  // clean-17 direct-pay: private receive reads the conversation's RecordShards by bucketKey (K_root ->
+  // addresses, no index) and decrypts into the same thread seam (syncConvCapsulesFromShards). The removed
+  // CapsuleHub walk read the recipient/sender INDEXES of one shared hub, a clean-15 concept with no
+  // equivalent here: there is no index to walk and no shared account to page.
+  return syncConvCapsulesFromShards(options);
 }
 
 async function syncPrivateCapsulesFromChainOnce(options = {}) {
@@ -14220,7 +12316,7 @@ async function restoreEncryptedMessageHistory() {
       renderThreads();
       renderConversation();
       resumePendingPrivatePublishConfirmations();
-  resumePendingPublicPublishConfirmations();
+      resumePendingPublicPublishConfirmations();
       resumePendingPrivateSendRetries();
     }
     // Re-arm CONV delivery confirms for sends still unresolved when the page reloaded — the setTimeout chain does not
@@ -22318,17 +20414,6 @@ function criticalCapsuleHubReadOptions(address) {
   return { capsuleHubAddress: address, ...criticalChainReadOptions() };
 }
 
-function capsuleHubMessageSyncReadOptions(address) {
-  return {
-    capsuleHubAddress: address,
-    verify: false,
-    allowUnverifiedCriticalRead: true,
-    priority: 'messages',
-    cacheTtlMs: 0,
-    messageCacheTtlMs: 0,
-  };
-}
-
 function requireManifestHashMatch(value, label) {
   const expectedManifest = uint256ConfigValue(requireVaultDeploymentManifestHash(), 'Vault deployment manifest hash');
   if (BigInt(value ?? 0n) !== expectedManifest) {
@@ -24096,12 +22181,6 @@ function publishPartKind(part) {
   }
 }
 
-function publishPartHasPayloadHashes(part) {
-  if (!part) return false;
-  if (!publishPartBodyHash(part) || !publishPartHeader0Hash(part)) return false;
-  return publishPartKind(part) === 'public' || Boolean(publishPartHeader1Hash(part));
-}
-
 function publishIdForPart(part) {
   return publishHashPlain(part?.publishId ?? part?.publish_id);
 }
@@ -24276,70 +22355,6 @@ function publishEntryMatchesPart(entry, part, options = {}) {
     return Boolean(expectedPublishId && entryPublishId && entryPublishId === expectedPublishId);
   }
   return options.allowPublishIdMismatch === true;
-}
-
-async function confirmPendingPrivatePublishMessagesFromEntries(entries, confirmedBy = 'private_entry') {
-  const candidates = (entries ?? []).filter((entry) => entry?.exists === true);
-  if (candidates.length === 0) return 0;
-  const updates = [];
-  let changedMessages = 0;
-  let matchedParts = 0;
-  let checkedParts = 0;
-  for (const thread of threads) {
-    let threadChanged = false;
-    for (const message of thread.messages ?? []) {
-      const publishState = message?.publishState;
-      if (!publishState?.parts?.length || publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) continue;
-      // A publish whose send/confirm retries are terminally stopped (durable red 'not sent'/'not confirmed')
-      // never flips to sealed via this in-memory re-match, so skip it — stops the per-cycle sweep re-deriving
-      // match work for permanently-dead messages. Read/CPU-only; no send/re-sign path is touched.
-      if (message.privatePublishConfirmStopped === true || message.privateSendRetryStopped === true) continue;
-      let messageChanged = false;
-      for (const part of publishState.parts ?? []) {
-        if (publishPartKind(part) !== 'private') continue;
-        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-        if (!publishPartHasPayloadHashes(part)) continue;
-        checkedParts += 1;
-        const entry = candidates.find((candidate) => publishEntryMatchesPart(candidate, part, {
-          allowPublishIdMismatch: true,
-        }));
-        if (!entry) continue;
-        matchedParts += 1;
-        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
-          entryId: String(entry.entry_id ?? ''),
-          confirmedBy,
-        });
-        messageChanged = true;
-      }
-      if (!messageChanged) continue;
-      changedMessages += 1;
-      threadChanged = true;
-      message.meta = publishStateMeta(publishState);
-      thread.state = publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
-      if (publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-        message.privatePublishConfirmAttempt = 0;
-        message.privatePublishConfirmStopped = false;
-        message.privatePublishConfirmStoppedAt = null;
-        clearPrivatePublishConfirmRetry(message);
-      }
-      updates.push(updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error)));
-    }
-    if (threadChanged) refreshThreadAfterMessageChange(thread);
-  }
-  globalThis.plathoLastPrivatePublishSyncRepair = {
-    confirmedBy,
-    candidates: candidates.length,
-    checkedParts,
-    matchedParts,
-    changedMessages,
-    at: new Date().toISOString(),
-  };
-  if (changedMessages > 0) {
-    renderThreads();
-    renderConversation();
-    await Promise.all(updates);
-  }
-  return changedMessages;
 }
 
 function publishConfirmSearchState(publishState, kind, latest) {
@@ -27534,16 +25549,6 @@ function refreshPrefsSyncUi() {
   else if (prefsLastSyncedAt) label = t('sync.savedAt', { date: prefsSyncedDateLabel(prefsLastSyncedAt) });
   else label = t('sync.notSaved');
   setText(savePrefsStatus, label);
-}
-
-// ── clean-17 DIRECT-PAY public lane (gated) ─────────────────────────────────────────────────────────────────
-// When appConfig.publicLane.directPay is true, public POSTS are published straight from the user's wallet to the
-// author's CHANNEL PublicShard (PPH2, StateInit-lazy-deploy), NOT batched into a Vault external for CapsuleHub.
-// DEFAULT OFF: clean-15 is the live genesis and PublicShard is not deployed yet, so the flag flips at clean-17
-// genesis. On-chain correctness (the wallet transfer actually lands N entries) is validated by a live run — the
-// sandbox proves the message (tests/public-publish-browser PUB-02) but not the app's wallet/broadcast path.
-function publicLaneDirectPayEnabled() {
-  return appConfig.publicLane?.directPay === true;
 }
 
 // When appConfig.privateLane.directPay is true, PRIVATE messaging runs on the clean-17 direct-pay shards: CONV

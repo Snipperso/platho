@@ -47,8 +47,13 @@ describe('public publish heal driver guard', () => {
     // terminal to 'failed' past the no-progress deadline. The driver stays defined for any publishState record.
     expect(app).toMatch(/return \{ channelId, localId \};/);
     expect(app).toMatch(/return \{ channelId, localId: commentLocalId \};/);
-    // Resume-on-reload is wired at every private resume hook.
-    expect(app.match(/resumePendingPublicPublishConfirmations\(\);/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    // Resume-on-reload is wired at every private resume hook — asserted as PARITY, not as a magic count: the two
+    // hooks that lived inside the deleted CapsuleHub sync functions took the old count (>=5) with them, and a
+    // number would have to be re-tuned on every such removal while saying nothing about the invariant.
+    const publicResumes = app.match(/resumePendingPublicPublishConfirmations\(\);/g)?.length ?? 0;
+    const privateResumes = app.match(/resumePendingPrivatePublishConfirmations\(\);/g)?.length ?? 0;
+    expect(publicResumes).toBe(privateResumes);
+    expect(publicResumes).toBeGreaterThanOrEqual(3);
     expect(app).toMatch(/function resumePendingPublicPublishConfirmations\(\)/);
   });
 

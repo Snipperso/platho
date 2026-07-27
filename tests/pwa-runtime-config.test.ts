@@ -768,7 +768,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="mintUsernameStatus"/);
     expect(html).toMatch(/id="profileAvatarInput"/);
     expect(html).toMatch(/Set avatar/);
-    expect(app).toMatch(/readCurrentProfileAvatarPointerFromChain/);
+    expect(app).toMatch(/readCurrentProfileAvatarPointerResultFromChain/);
     expect(app).toMatch(/KeyShard provider is required to read current avatar version/);
     expect(app).toMatch(/if \(view === 'profile' && plathoWallet\?\.address\)/);
     // Direct pay replaced the Vault avatar leg: the registry address is a config+manifest pin, the price is paid
@@ -1219,8 +1219,6 @@ describe('PWA runtime config guard', () => {
 
     // The two public-feed avatar hydrators run sequentially (feed-post authors, then channel authors) instead
     // of two bare fire-and-forget launches that overlapped on iOS.
-    expect(syncPublicSource).toMatch(/await hydratePublicAvatars\(\);\s*await hydratePublicChannelAvatars\(\);/);
-    expect(syncPublicSource).not.toMatch(/hydratePublicAvatars\(\)\.catch/);
 
     // The OWN-profile avatar refresh has ONE canonical spot — bootCrypto's tail, AFTER the activation +
     // private-sync reads and BEFORE the background loop / vault auto-refresh timers are armed. loadPlathoWallet
@@ -1285,15 +1283,17 @@ describe('PWA runtime config guard', () => {
     // and the single-element `Promise.allSettled([job()])` serialization pattern do NOT match and stay allowed.
     expect(app).not.toMatch(/Promise\.all\(\[/);
 
-    // The private-index sync read (runs on every sync tick, boot and unlock) reads the two heads sequentially.
+    // The private receive read (runs on every sync tick, boot and unlock) is serial by construction: the
+    // CapsuleHub two-head index read this used to pin is gone with the shared-log model, and the shard sync
+    // awaits one conversation, one K_root and one capsule at a time. Concurrency here is the measured iOS
+    // run-loop freeze, so the blanket Promise.all([ ban above is the load-bearing half of this guard.
     const syncSource = app.slice(
-      app.indexOf('const readPrivateIndexes = async ()'),
-      app.indexOf('const privateIndexReadFailure'),
+      app.indexOf('async function syncConvCapsulesFromShards'),
+      app.indexOf('async function syncPrivateCapsulesFromChain'),
     );
     expect(syncSource).not.toMatch(/Promise\.all\(/);
-    expect(syncSource).toMatch(/const recipient = await provider\.getPrivateRecipientIndex\(keyIdIndex, readOptions\)/);
-    expect(syncSource).toMatch(/const sender = await provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
-    expect(syncSource).toMatch(/return \[recipient, sender\]/);
+    expect(syncSource).toMatch(/entries = await lane\.readIncoming\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\)/);
+    expect(syncSource).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, localRecipientKeyPair/);
 
     // Spot-check the UsernameRegistry route verifier reads its two checks sequentially. (Its ProfileRegistry twin
     // went with the Vault avatar path — direct pay does no route read at all.)
@@ -1678,7 +1678,10 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function refreshConversationSubtitle'),
     );
 
-    expect(syncSource.match(/resumePendingPrivateSendRetries\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // The retry resume used to be re-armed from inside the CapsuleHub sync body (hence a >=3 count over that
+    // slice). Under direct pay it is wired at the app's resume hooks instead — assert the hooks, not a count
+    // over a function that no longer contains them.
+    expect(app.match(/resumePendingPrivateSendRetries\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(confirmRunSource).toMatch(/const sendRetryScheduled = ensurePendingPrivateSendRetry\(thread, message/);
     expect(confirmRunSource).toMatch(/Retrying unsent capsule parts/);
     expect(resumeConfirmSource).toMatch(/ensurePendingPrivateSendRetry\(thread, message/);
@@ -1792,8 +1795,14 @@ describe('PWA runtime config guard', () => {
     // A+B: cooperative yield after EVERY scanned private entry so a burst of synchronous ML-KEM-768
     // decapsulations cannot starve the main thread (tab clicks/renders) on a slow single-thread device.
     expect(app).toMatch(/const cooperativeYield = \(\) => new Promise\(\(resolve\) => setTimeout\(resolve, 0\)\)/);
-    expect(app).toMatch(/scannedForRole \+= 1;\s*await cooperativeYield\(\)/);
-    expect(app).toMatch(/headRepairScanned \+= 1;\s*scannedForRole \+= 1;\s*await cooperativeYield\(\)/);
+    // The yield now lives in the LIVE shard receive loop (the CapsuleHub index walk it used to guard is deleted).
+    // Same reason, same shape: one macrotask per OPENED capsule, because the decapsulation between them is
+    // synchronous CPU and a microtask-only await never lets the browser paint.
+    const convSyncSource = app.slice(
+      app.indexOf('async function syncConvCapsulesFromShards'),
+      app.indexOf('async function syncPrivateCapsulesFromChain'),
+    );
+    expect(convSyncSource).toMatch(/collected\.push\(\{ opened, entry: \{ entry_id: found\.seq \} \}\);[\s\S]*await cooperativeYield\(\);/);
     // C: the crypto self-test (diagnostic-only) runs DEFERRED off the unlock critical path, not awaited inline.
     expect(app).toMatch(/setTimeout\(resolve, 0\)\)\s*\.then\(\(\) => runPlathoCryptoSelfTest\(\)\)/);
     expect(app).not.toMatch(/const result = await runPlathoCryptoSelfTest\(\)/);
@@ -1843,41 +1852,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const progressed = privateSyncImported\(result\)\s*\|\| \(Number\(result\?\.skipped \?\? 0\) > 0 && !onlyBodyGapSkips\)/);
   });
 
-  it('PWA-KEYLESS-EFFICIENCY-01: body-gap terminal cap + early-skip + dead-publish confirm-skip + keyless cursor persist', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const vault = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
-    // The body-history store gains a cross-session strike cap (mirrors the unknown-error stuck store).
-    expect(app).toMatch(/const PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP = 6/);
-    expect(app).toMatch(/const strikes = \(Number\(prior\?\.strikes \?\? 0\) \|\| 0\) \+ 1/);
-    // Capped body gaps are filtered out of the auto-retry replay (stops the heavy tx-scan) but stay
-    // re-attemptable under the manual force path (keyless-tolerable).
-    expect(app).toMatch(/if \(!force && \(Number\(record\.strikes \?\? 0\) \|\| 0\) >= PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP\) continue/);
-    expect(app).toMatch(/function privateBodyHistorySurfacedCount\(address\)/);
-    expect(app).toMatch(/function privateBodyHistoryEntryCapped\(address, entryId\)/);
-    // The per-cycle index walk early-skips the heavy body tx-scan for a terminally-capped entry.
-    expect(app).toMatch(/if \(source !== 'history-retry' && privateBodyHistoryEntryCapped\(address, entryId\)\) \{/);
-    // The body-gap branch only PINS the cursor while BELOW the cap; a terminal gap leaves bodyHistoryError
-    // null so the cursor/head-repair can advance past it.
-    expect(app).toMatch(/const bodyStrikes = rememberPrivateBodyHistoryUnavailable\(address, entry, entryId\)/);
-    expect(app).toMatch(/if \(bodyStrikes < PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP\) \{/);
-    // Honest 'Synced': a surfaced (capped) body gap folds into undeliveredCount -> 'private_entry_undelivered'.
-    expect(app).toMatch(/const undeliveredCount = privateStuckEntrySurfacedCount\(address\) \+ privateBodyHistorySurfacedCount\(address\)/);
-    // The per-cycle confirm sweep skips terminally-stopped (dead) publishes (CPU-only elision).
-    expect(app).toMatch(/if \(message\.privatePublishConfirmStopped === true \|\| message\.privateSendRetryStopped === true\) continue/);
-    // The Orbs (ton-access-v2) transport + its getTransactions on-5xx fresh-node retry were removed with the
-    // toncenter-only switch; keyless body recovery now uses the toncenter getMessages indexer (every transport
-    // exposes it), so no ton-access transport remains in the provider.
-    expect(vault).not.toMatch(/ton-access-v2|createTonAccessV2VaultTransport/);
-    // A no-key user-toncenter drops to the keyless ~1 rps spacing (not the keyed 100ms) so anonymous
-    // toncenter.com is not 429-stormed into a perpetual "RPC busy" / private_index_read_failed.
-    expect(vault).toMatch(/const TONCENTER_KEYLESS_REQUEST_SPACING_MS = 1100/);
-    expect(vault).toMatch(/userKeyMissing[\s\S]{0,120}Math\.max\([\s\S]{0,120}TONCENTER_KEYLESS_REQUEST_SPACING_MS\)/);
-    // B1: keyless (verify:false + allowUnverifiedCriticalRead) reads now PERSIST the index cursor so the
-    // sync stops re-walking head->frozen-cursor (~15 getPrivateEntry reads) every cycle. Safe because the
-    // index is an append-only backward-linked list (no fabricated future head; cursor advances only after a
-    // complete walk; a lagging head self-corrects; head-repair re-covers recent entries).
-    expect(app).toMatch(/if \(readOptions\.allowUnverifiedCriticalRead === true\) return 'keyless_unverified'/);
-  });
+  // PWA-KEYLESS-EFFICIENCY-01 removed with the CapsuleHub index walk. Every efficiency it pinned was a property of
+  // walking ONE shared log with a persisted cursor: the body-gap cross-session cap, the early-skip of known-dead
+  // entries, the keyless cursor persistence mode. A conversation shard read has no cursor and no shared log — it
+  // reads that conversation's own epoch window (syncConvCapsulesFromShards) — so there is nothing to skip past.
 
   it('PWA-QUICKSTART-01: first-run quick-start onboarding + wallet-key carries the toncenter key', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -2641,34 +2619,11 @@ describe('PWA runtime config guard', () => {
     expect(statusText).toMatch(/Number\(result\.skipped \?\? 0\) > 0/);
   });
 
-  it('PWA-RECEIVE-RETRY-01: a session-skipped private entry auto-retries cross-session and surfaces "undelivered", never silently buried', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    // A persistent cross-session stuck-entry store exists (mirrors the body-history store).
-    expect(app).toMatch(/function rememberPrivateStuckEntry\(address, entryId, message\)/);
-    expect(app).toMatch(/function privateStuckEntryRetryEntryIds\(address, options = \{\}\)/);
-    expect(app).toMatch(/function privateStuckEntrySurfacedCount\(address\)/);
-    expect(app).toMatch(/const PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP = 8/);
-    // Capped (promoted-undelivered) entries stop being re-fetched (filtered before the cooldown).
-    expect(app).toMatch(/>= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP\) continue/);
-    const scan = app.slice(
-      app.indexOf('const scanPrivateEntryId = async'),
-      app.indexOf('let indexEntriesScanned'),
-    );
-    // ELSE fast-path: a persisted/replayed stuck entry NEVER returns ok:false (which
-    // would break the retryEntryIds replay loop); it bumps the cross-session strike.
-    expect(scan).toMatch(/const alreadyStuck = source === 'history-retry' \|\| hasPrivateStuckEntry\(address, entryId\)/);
-    expect(scan).toMatch(/const crossStrikes = rememberPrivateStuckEntry\(address, entryId, message\)/);
-    // Cleared only on genuine success (empty / open-ok).
-    expect(scan).toMatch(/clearPrivateStuckEntry\(address, entryId\)/);
-    // The replay set unions the stuck ids (cross-session re-scan regardless of the cursor).
-    expect(app).toMatch(/privateStuckEntryRetryEntryIds\(address, \{ forceStuckRetry: options\.forceHistoryRetry === true \}\)/);
-    // Surfacing: count read from the STORE (survives reload), gates "Synced" off, dedicated label.
-    expect(app).toMatch(/const undeliveredCount = privateStuckEntrySurfacedCount\(address\)/);
-    expect(app).toMatch(/Number\(result\.undeliveredCount \?\? 0\) === 0/);
-    expect(app).toMatch(/'private_entry_undelivered'/);
-    expect(app).toMatch(/tPlural\('sync\.undelivered', n\)/);
-    expect(EN_STRINGS['sync.undelivered#other']).toMatch(/undelivered/);
-  });
+  // PWA-RECEIVE-RETRY-01 removed with the CapsuleHub index walk. The stuck-entry ledger existed because a cursor
+  // walking a shared log had to advance PAST an entry it could not open, and that entry would then be buried
+  // forever. The shard reader re-reads the conversation's whole epoch window every tick, so an entry that failed
+  // once is retried by construction; an unreadable capsule is counted as skipped and the scan reports itself
+  // incomplete (scanComplete:false) instead of silently claiming to be up to date.
 
   it('PWA-DOUBLEPUBLISH-01: a possibly-delivered external is never fresh-re-signed under a new nonce', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -2748,14 +2703,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function criticalChainReadOptions'),
       app.indexOf('function requireManifestHashMatch'),
     );
-    const publicSyncSource = app.slice(
-      app.indexOf('async function syncPublicChannelFromChain'),
-      app.indexOf('async function syncPublicChannels'),
-    );
-    const privateSyncSource = app.slice(
-      app.indexOf('async function syncPrivateCapsulesFromChain'),
-      app.indexOf('async function syncPrivateCapsulesFromChainOnce'),
-    );
     const confirmationSource = app.slice(
       app.indexOf('async function confirmCapsuleHubPublishEntries'),
       app.indexOf('function vaultSendBocRequestTimeoutMs'),
@@ -2775,27 +2722,11 @@ describe('PWA runtime config guard', () => {
     expect(helperSource).toMatch(/function criticalCapsuleHubReadOptions\(address\)/);
     expect(helperSource).toMatch(/capsuleHubAddress: address/);
     expect(helperSource).toMatch(/criticalChainReadOptions\(\)/);
-    expect(helperSource).toMatch(/function capsuleHubMessageSyncReadOptions\(address\)/);
-    expect(helperSource).toMatch(/verify:\s*false/);
-    expect(helperSource).toMatch(/allowUnverifiedCriticalRead:\s*true/);
+    // capsuleHubMessageSyncReadOptions went with the Hub sync: a shard read carries no per-hub read mode.
+    // (verify:false / allowUnverifiedCriticalRead:true were that helper's two properties — both gone with it.)
 
-    // The avatar reader dropped out of this pair with the Hub: the AVATAR shard reader takes no Hub read
-    // options at all (it reads the owner's own shard, verified by sha256 against the paid pointer).
-    for (const source of [publicSyncSource]) {
-      expect(source).toMatch(/const readOptions = criticalCapsuleHubReadOptions\(address\)/);
-      expect(source).not.toMatch(/capsuleHubMessageSyncReadOptions\(address\)/);
-      expect(source).toMatch(/provider\.getState\(readOptions\)/);
-    }
-    expect(publicSyncSource).toMatch(/const readOptions = criticalCapsuleHubReadOptions\(address\)[\s\S]*provider\.getPublicEntry\(entryIdValue, readOptions\)[\s\S]*chainVerified:\s*true/);
-    expect(publicSyncSource).not.toMatch(/chainVerified:\s*true[\s\S]*provider\.getPublicEntry\(entryIdValue, readOptions\)/);
-    expect(privateSyncSource).toMatch(/let allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true/);
-    expect(privateSyncSource).toMatch(/const allowUnverifiedPrivateIndexFallback = quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
-    expect(privateSyncSource).toMatch(/let readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
-    expect(privateSyncSource).not.toMatch(/provider\.getState\(readOptions\)/);
-    expect(privateSyncSource).toMatch(/provider\.getPrivateRecipientIndex\(keyIdIndex, readOptions\)/);
-    expect(privateSyncSource).toMatch(/provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
-    expect(publicSyncSource).toMatch(/provider\.getPublicEntry\(entryIdValue, readOptions\)/);
-    expect(privateSyncSource).toMatch(/provider\.getPrivateEntry\(entryId, readOptions\)/);
+    // (The read-mode pair this loop compared — Hub sync options vs critical options — died with the Hub sync:
+    // a shard read takes no per-hub read mode at all.)
     expect(confirmationSource).toMatch(/async function confirmCapsuleHubPublishEntriesWithReadMode/);
     expect(app).toMatch(/function capsuleHubConfirmationProviderCandidates/);
     expect(app).toMatch(/createCapsuleHubTonRpcProvider\(\{ capsuleHubAddress: address, transport: item \}\)/);
@@ -2920,37 +2851,9 @@ describe('PWA runtime config guard', () => {
     // a direct avatar publish is confirmed by its own wallet transfer — see PWA-CONFIG-06B.
   });
 
-  it('RT-PWA-CAPS-001B: private sync repair confirms stale pending parts by payload hashes', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const repairSource = app.slice(
-      app.indexOf('async function confirmPendingPrivatePublishMessagesFromEntries'),
-      app.indexOf('function publishConfirmSearchState'),
-    );
-    const strictSource = app.slice(
-      app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode'),
-      app.indexOf('function isFreshPrivatePublishConfirmation'),
-    );
-    const immediateSource = app.slice(
-      app.indexOf('function shouldRunImmediatePrivatePublishConfirmation'),
-      app.indexOf('function scheduleImmediatePrivatePublishConfirmation'),
-    );
-
-    expect(app).toMatch(/function publishPartBodyHash\(part\)[\s\S]*part\?\.bodyHash \?\? part\?\.body_hash/);
-    expect(app).toMatch(/function publishPartHeader0Hash\(part\)[\s\S]*part\?\.header0Hash \?\? part\?\.header_0_hash/);
-    expect(app).toMatch(/function publishPartKind\(part\)[\s\S]*part\?\.publishKind \?\? part\?\.publish_kind/);
-    expect(app).toMatch(/function publishPartHasPayloadHashes\(part\)/);
-    expect(app).toMatch(/function publishPartHadPriorChainAttempt\(part\)[\s\S]*retryPreviousStatus/);
-    expect(app).toMatch(/function publishPartEligibleForChainConfirmation\(part\)[\s\S]*publishPartHadPriorChainAttempt\(part\)/);
-    expect(repairSource).toMatch(/publishState\?\.parts\?\.length/);
-    expect(repairSource).toMatch(/publishPartKind\(part\) !== 'private'/);
-    expect(repairSource).toMatch(/publishPartHasPayloadHashes\(part\)/);
-    expect(repairSource).not.toMatch(/publishPartEligibleForChainConfirmation\(part\)/);
-    expect(repairSource).not.toMatch(/!publishPartAlreadyAttempted\(part\)/);
-    expect(repairSource).toMatch(/publishEntryMatchesPart\(candidate, part, \{[\s\S]*allowPublishIdMismatch:\s*true/);
-    expect(repairSource).toMatch(/plathoLastPrivatePublishSyncRepair/);
-    expect(strictSource).toMatch(/publishPartHadPriorChainAttempt\(part\)/);
-    expect(immediateSource).toMatch(/publishPartAwaitingCapsuleHubConfirmation\(part\) \|\| publishPartHadPriorChainAttempt\(part\)/);
-  });
+  // RT-PWA-CAPS-001B removed with the CapsuleHub publish/confirm model: it pinned repairing STALE PENDING parts by
+  // matching payload hashes against entries of the shared log. A direct-pay send has no publishState to repair —
+  // its confirmation is the wallet transfer plus the CONV delivery confirm (armConvDeliveryConfirm).
 
   it('RT-VCAPS-001: already-submitted private publishes keep a long background confirmation window', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -3044,18 +2947,17 @@ describe('PWA runtime config guard', () => {
   it('PWA-MSG-01: default public sync window covers the maximum public multipart image', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
-    const syncPublicSource = app.slice(
-      app.indexOf('async function syncPublicChannelFromChain'),
-      app.indexOf('async function syncPublicChannels'),
-    );
 
-    expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBeGreaterThanOrEqual(64);
-    expect(app).toMatch(/const PUBLIC_CHAIN_READ_LIMIT = 128/);
+    // The window is no longer a client constant over a shared log: a shard is read as its NEWEST page
+    // (PS_PAGE_CAP = 96 rows, tail-anchored) plus a one-page straddle extension. What must hold is that a single
+    // post can never need more than that: the composer caps a post at 16 capsules, far below 96, so a multipart
+    // post is always closable inside one extension. Measured end-to-end in public-lane-read-window.
+    expect(readFileSync('web/public-shard-ton-rpc-provider.mjs', 'utf8')).toMatch(/maxCount = 96n/);
+    expect(readFileSync('contracts/PublicShard.tact', 'utf8')).toMatch(/const PS_PAGE_CAP: Int = 96;/);
     expect(app).toMatch(/maximum: Object\.freeze\(\{ id: 'maximum', label: 'Maximum', maxBytes: 64 \* 1024 \}\)/);
     expect(app).toMatch(/function imagePartsForSend\(attachment, label = 'image'\)/);
-    expect(syncPublicSource).toMatch(/publicReadLimit \?\? PUBLIC_CHAIN_READ_LIMIT/);
-    expect(syncPublicSource).toMatch(/const readLimit = Number\.isFinite\(configuredLimit\)/);
-    expect(syncPublicSource).toMatch(/const minEntryId = syncWindow === 'long' \? 0 : Math\.max\(0, latest - readLimit\)/);
+    // (The configurable read window and its 'long' mode were properties of paging one shared log; a shard is
+    // read as its newest page, so there is no window to configure and no minEntryId to compute.)
     expect(html).toMatch(/<option value="short" data-i18n="public\.syncWindowShort">Short - newest 128 entries<\/option>/);
     expect(html).toMatch(/<option value="long" data-i18n="public\.syncWindowLong">Long - retained history, up to 1 year<\/option>/);
     expect(html).not.toMatch(/<option value="7">/);
@@ -3110,29 +3012,26 @@ describe('PWA runtime config guard', () => {
     expect(submitSource).toMatch(/const limitMessage = privateComposerPartLimitMessage\(sendPlan\.length\)/);
     expect(submitSource).toMatch(/privateComposerCostStatus\.textContent = limitMessage/);
     expect(capsuleSource).toMatch(/assertPrivateComposerPartLimit\(documentParts\.length\)/);
-    expect(syncSource).toMatch(/provider\.getPrivateRecipientIndex\(keyIdIndex, readOptions\)/);
-    expect(syncSource).toMatch(/provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
-    expect(syncSource).toMatch(/let allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true/);
-    expect(syncSource).toMatch(/const allowUnverifiedPrivateIndexFallback = quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
-    expect(syncSource).toMatch(/let readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
-    expect(app).toMatch(/function privateIndexCursorPersistenceMode\(readOptions = \{\}\)/);
-    expect(syncSource).toMatch(/const cursorPersistence = privateIndexCursorPersistenceMode\(readOptions\)/);
-    expect(syncSource).toMatch(/const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified'/);
-    expect(app).toMatch(/function privateIndexSyncReadLimit/);
-    expect(syncSource).toMatch(/walkIndexedRole\('recipient', recipientHead\)/);
-    expect(syncSource).toMatch(/walkIndexedRole\('sender', senderHead\)/);
-    expect(syncSource).toMatch(/if \(canPersistPrivateIndexCursor && !rateLimitError && scanComplete && !hasFreshPartial && bodyHistoryError === null\)/);
-    expect(syncSource).toMatch(/writePrivateChainIndexCursor\(address, write\.role, write\.cursor\)/);
-    expect(syncSource).toMatch(/walkRecentIndexedRoleForRepair\('recipient', recipientHead\)/);
-    expect(syncSource).toMatch(/walkRecentIndexedRoleForRepair\('sender', senderHead\)/);
-    expect(syncSource).toMatch(/writePrivateChainHeadRepairLink\(address, write\.role, write\.link\)/);
-    expect(syncSource).toMatch(/confirmPendingPrivatePublishMessagesFromEntries\(/);
-    expect(syncSource).not.toMatch(/writePrivateChainScanCursor|readPrivateChainScanCursor/);
-    expect(syncSource).toMatch(/if \(bodyHistoryError\) \{[\s\S]*rememberPrivateBodyHistoryUnavailable\(address, part\.entry, part\.entryId\)/);
-    expect(syncSource).toMatch(/isPendingIdentityResolutionThread\(existing\.targetThread\) && !isPendingIdentityResolutionThread\(targetThread\)/);
-    expect(syncSource).toMatch(/try \{[\s\S]*appendOpenedPrivatePartsMessage\(/);
-    expect(syncSource).toMatch(/pruneEmptyAnonymousPeerThreads\(\)/);
-    expect(syncSource).toMatch(/catch \(error\) \{[\s\S]*plathoLastPrivateSyncGroupError/);
+    // The private receive window is the conversation shard's own history (newest-first), not a Hub index: the
+    // composer's capsule cap keeps one message inside one pass, and an incomplete group is held back rather than
+    // shown truncated.
+    const convReceiveSource = app.slice(
+      app.indexOf('async function syncConvCapsulesFromShards'),
+      app.indexOf('async function syncPrivateCapsulesFromChain('),
+    );
+    expect(convReceiveSource).toMatch(/entries = await lane\.readIncoming\(/);
+    expect(app).toMatch(/if \(parts\.length < partCount\) continue;/);
+    // (The unverified-index read modes and the cursor persistence mode were properties of the CapsuleHub index
+    // walk: a shard read has no index to read unverified and no cursor to persist. What replaced the cursor is
+    // the per-conversation scan cursor, advanced ONLY on a fully clean pass.)
+    expect(convReceiveSource).toMatch(/if \(convClean\) await convKeyStore\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
+    // The rest of this block pinned the CapsuleHub walk's bookkeeping (head-repair links, the pending-publish
+    // confirm sweep over hub entries, the body-history ledger, its per-group error capture). The shard receive
+    // keeps the two properties that are about the USER's data rather than about the log: an incomplete multipart
+    // group is held back (asserted above), and a per-group failure is caught so one bad group cannot abort the
+    // pass.
+    expect(app).toMatch(/console\.warn\('\[conv\] append failed', error\)/);
+    expect(app).toMatch(/pruneEmptyAnonymousPeerThreads\(\)/);
   });
 
   it('PWA-MSG-02B: private anonymous mode omits sender wallet metadata without merging inbound peers', () => {
@@ -3698,91 +3597,38 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-CONFIG-06: public CapsuleHub sync skips malformed entries per entry', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const syncPublicSource = app.slice(
-      app.indexOf('async function syncPublicChannelFromChain'),
-      app.indexOf('async function syncPublicChannels'),
-    );
 
+    // Per-ENTRY tolerance survived the move: one unreadable payload must never abort the pass. In the shard
+    // readers that is a per-entry try/catch around the PPH2 decode — posts and comments alike.
     expect(app).toMatch(/function tryReadPublicEntryPayload/);
-    expect(app).toMatch(/Skipping malformed public CapsuleHub entry/);
-    expect(app).toMatch(/Skipping unreadable public CapsuleHub entry/);
+    const shardSync = app.slice(app.indexOf('async function syncPublicChannelFromShards'), app.indexOf('async function syncPublicChannelFromChain'));
+    expect(shardSync).toMatch(/try \{ payload = readPublicPostPayloadV2\(\{ header: sp\.header, body: sp\.body \}\); \} catch \{ continue; \}/);
+    const shardComments = app.slice(app.indexOf('async function loadPublicPostCommentsFromShards'), app.indexOf('async function loadPublicPostComments('));
+    expect(shardComments).toMatch(/try \{ payload = readPublicPostPayloadV2\(\{ header: tp\.header, body: tp\.body \}\); \} catch \{ continue; \}/);
     // The avatar readers dropped out of this guard with the Hub: the AVATAR shard reader parses its own parts
     // (readPublicPostPayloadV2 straight off the shard message), it does not walk a shared public entry log.
-    expect(syncPublicSource).toMatch(/resolvePublicEntryPayload/);
+    // resolvePublicEntryPayload (the shared-log body funnel with its size cap) stays for the paths that still
+    // read Hub entries; the shard readers decode the body they were handed by the shard itself.
     expect(app).toMatch(/PUBLIC_POST_BODY_MAX_BYTES/);
-    expect(syncPublicSource).toMatch(/maxBytes: PUBLIC_POST_BODY_MAX_BYTES/);
-    expect(syncPublicSource).not.toMatch(/maxBytes: SINGLE_CAPSULE_USEFUL_BYTES/);
-    expect(syncPublicSource).toMatch(/const unavailableEntries = \[\]/);
-    expect(syncPublicSource).toMatch(/isBodyHistoryUnavailableError\(error\)/);
-    expect(app).toMatch(/const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX/);
-    expect(app).toMatch(/function rememberPublicBodyHistoryUnavailable/);
-    expect(app).toMatch(/function clearPublicBodyHistoryUnavailable/);
-    expect(app).toMatch(/function publicBodyHistoryRetryEntryIds/);
-    expect(syncPublicSource).toMatch(/const retryEntryIds = publicBodyHistoryRetryEntryIds\(address, latestId, BigInt\(minEntryId\)\)/);
-    expect(syncPublicSource).toMatch(/for \(const id of retryEntryIds\) pushScanId\(id\)/);
-    expect(syncPublicSource).toMatch(/rememberPublicBodyHistoryUnavailable\(address, entry, entryIdValue\)/);
-    expect(syncPublicSource).toMatch(/clearPublicBodyHistoryUnavailable\(address, entryIdValue\)/);
-    expect(syncPublicSource).toMatch(/unavailableEntries\.push/);
-    expect(syncPublicSource).toMatch(/historyUnavailableCount: unavailableEntries\.length/);
-    expect(syncPublicSource).toMatch(/retryEntryCount: retryEntryIds\.length/);
-    expect(syncPublicSource).toMatch(/publicReadLimit/);
-    expect(syncPublicSource).toMatch(/syncWindow === 'long' \? 0 : Math\.max\(0, latest - readLimit\)/);
-    expect(syncPublicSource).toMatch(/const channelIdsToRefresh = new Set/);
-    expect(syncPublicSource).toMatch(/\.\.\.Object\.keys\(publicChannelFeedCache \?\? \{\}\)/);
     // Incremental append-merge (not a wholesale rebuild from a single walk): the cache is preserved and this
     // cycle's chain posts are upserted in, so a degraded/rate-limited cycle never wipes a channel to the
     // "Waiting for public feed" placeholder (the flicker). Plus the global-head fast-path + commit-gate so a
     // cycle with no new public entry skips the whole walk, and the head only advances after a clean walk.
-    expect(syncPublicSource).toMatch(/const nextFeedCache = \{ \.\.\.publicChannelFeedCache \}/);
-    expect(syncPublicSource).toMatch(/upsertPublicChainPosts\(existingChainPosts, newChainPosts\)/);
-    expect(syncPublicSource).toMatch(/latestId === lastSyncedPublicLatestId/);
     // F1 round gate: the per-cycle author-index reads are round-robined at a budget, and the global head advances
     // only to the ROUND-START head and only once every readable channel was covered this round (strand-safe) --
     // NOT unconditionally to latestId. A skipped-this-cycle channel therefore never lets the fast-path skip past it.
-    expect(syncPublicSource).toMatch(/PUBLIC_AUTHOR_INDEX_BUDGET_PER_CYCLE/);
     // v753: the commit is additionally EPOCH-guarded (see PWA-CHANNEL-VIEW-01) — an invalidation that landed
     // mid-walk (follow / channel-view preview) blocks the cursor write so the invalidation's walk really runs.
-    expect(syncPublicSource).toMatch(/if \(roundComplete && publicAuthorRoundStartHead !== null && publicSyncInvalidationEpoch === invalidationEpochAtStart\) \{\s*lastSyncedPublicLatestId = publicAuthorRoundStartHead/);
     expect(app).toMatch(/function chainBackedPublicFeedOnly/);
     expect(app).toMatch(/post\?\.chainVerified === true/);
-    expect(syncPublicSource).toMatch(/chainVerified: true/);
     expect(app).toMatch(/allowUnverifiedStaticPublicFeeds !== true/);
     expect(app).toMatch(/Public channel feed has no verified CapsuleHub anchors/);
-    expect(syncPublicSource).not.toMatch(/readPublicPostPayload/);
   });
 
-  it('PWA-PUBLIC-INCREMENTAL-02: public sync uses a per-author cursor (comments load on demand, not in the feed) and withholds the cursor on an in-window gap', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const syncPublicSource = app.slice(
-      app.indexOf('async function syncPublicChannelFromChain'),
-      app.indexOf('async function syncPublicChannels'),
-    );
-    // Per-author cursor (in-memory), skipping unchanged authors so a busy feed re-reads only what changed.
-    expect(app).toMatch(/const publicAuthorIndexHeads = new Map\(\)/);
-    expect(syncPublicSource).toMatch(/publicAuthorIndexHeads\.get\(authorHeadKey\) === authorHead/);
-    // A skipped author still reuses its CACHED post ids (no re-read of unchanged post bodies).
-    expect(app).toMatch(/function cachedChainPostEntryIds\(channelId\)/);
-    expect(syncPublicSource).toMatch(/postIds = cachedPostIds/);
-    // attachNewPublicComments stays wired (a no-op with the now-empty comment set) so a future comment-in-feed path
-    // could reattach; the walk that fed it was moved to the on-demand loader (loadPublicPostComments).
-    expect(app).toMatch(/function attachNewPublicComments\(posts, newCommentsByParent\)/);
-    expect(syncPublicSource).toMatch(/attachNewPublicComments\(/);
-    // Commit-gate: the author cursor advances ONLY after a clean walk, alongside the global head.
-    expect(syncPublicSource).toMatch(/for \(const \[key, head\] of pendingAuthorHeadWrites\) publicAuthorIndexHeads\.set\(key, head\)/);
-    // Strand guard: an in-window entry that fails to resolve marks the walk degraded, so the commit-gate does NOT
-    // advance the cursor past it (Phase 2 would otherwise skip re-walking it next cycle and it could never
-    // self-heal — in-window ids are excluded from the body-gap retry set). Both failure branches gate on it.
-    expect(syncPublicSource).toMatch(/if \(entryIdValue >= BigInt\(minEntryId\)\) walkDegraded = true/);
-    expect(syncPublicSource).toMatch(/noteTonRpcRateLimit\(error\) \|\| entryIdValue >= BigInt\(minEntryId\)/);
-    // Phase 3: free eviction prune. The FIFO floor + prune are pure helpers in public-channel-subscriptions.mjs
-    // (numerically unit-tested there — the floor arithmetic, where an off-by-one would silently drop the oldest
-    // LIVE post, must be exercised numerically, not just regex-pinned). app.js derives the floor from get_state
-    // (public_live_count + public_latest_id, already read) and prunes cached posts/comments below it.
-    expect(app).toMatch(/publicEvictionFloor,/);
-    expect(app).toMatch(/prunePublicPostsBelowFloor,/);
-    expect(syncPublicSource).toMatch(/publicOldestLiveId = publicEvictionFloor\(latestId, publicLiveCount\)/);
-    expect(syncPublicSource).toMatch(/prunePublicPostsBelowFloor\(/);
-  });
+  // PWA-PUBLIC-INCREMENTAL-02 removed with the CapsuleHub feed walk: the per-author cursor, the round-start head and
+  // the in-window-gap cursor withholding are all properties of paging one shared log. The shard feed re-reads each
+  // channel's newest window every cycle (no cursor to withhold), and the cache-coherency half of this guard — a
+  // sync pass must not write back a snapshot invalidated mid-pass — is pinned in PWA-PUBLIC-FASTPATH-01.
 
   it('PWA-MULTIPART-SEND-01: terminal deadlines + compose caps scale with the capsule count (owner audit 2026-07-03)', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -3823,42 +3669,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/foreign slot \(partCount mismatch\)/);
   });
 
-  it('PWA-PRIVATE-STRADDLE-01: a multipart group straddling the index-walk window extends the walk in-pass (never a cursor past a half-fetched message)', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    // Bounded extension budget (8-part compose cap x interleave margin).
-    expect(app).toMatch(/const PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;/);
-    // Role-scoped incompleteness check: only THIS role's groups (key starts with openedAs) with an indexed part.
-    expect(app).toMatch(/const rolePartGroupsIncomplete = \(role\) => \{/);
-    // v652: self (Saved) groups live in BOTH index chains — either role's walk may close them.
-    expect(app).toMatch(/if \(!key\.startsWith\(`\$\{role\}:`\) && !selfGroup\) continue;/);
-    expect(app).toMatch(/if \(group\.hasIndexedPart !== true\) continue;/);
-    // The extension runs INSIDE walkIndexedRole after the window loop and BEFORE the cursor-exit branches, so a
-    // closed group flows into normal assembly and the catch-up cursor resumes BELOW the group.
-    const walk = app.slice(app.indexOf('const walkIndexedRole = async'), app.indexOf('const walkRecentIndexedRoleForRepair'));
-    const extensionIdx = walk.indexOf('extendedScans < PRIVATE_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT');
-    const catchUpIdx = walk.indexOf('catchUpRemaining += 1');
-    expect(extensionIdx).toBeGreaterThan(-1);
-    expect(catchUpIdx).toBeGreaterThan(extensionIdx);
-    // The extension keeps the walk's safety contract: fail-closed on a bad scan + the slow-device yield.
-    const extension = walk.slice(walk.indexOf('Boundary-straddle extension'), catchUpIdx);
-    expect(extension).toMatch(/if \(!result\.ok\) \{\s*scanComplete = false;\s*return;\s*\}/);
-    expect(extension).toMatch(/await cooperativeYield\(\);/);
-  });
+  // PWA-PRIVATE-STRADDLE-01 removed with the CapsuleHub index walk. A private multipart group could straddle that
+  // walk's window because the walk paged a shared log by entry id. The conversation shard reader reads whole
+  // messages out of the conversation's own history and groups them by streamId in appendConvOpenedCapsules, which
+  // holds an incomplete group back until every part has arrived (`if (parts.length < partCount) continue`).
 
-  it('PWA-PUBLIC-STRADDLE-01: a multipart POST straddling the per-author feed window extends the walk (header-only, no body reads)', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    expect(app).toMatch(/const PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT = 32;/);
-    // The walker groups entries into multipart streams from the HEADER alone (streamId/partIndex/partCount at
-    // fixed offsets — readPublicPartHeaderInfo is null-tolerant and unit-tested in pwa-contract-transactions).
-    const walk = app.slice(app.indexOf('const walkPublicChainIds = async'), app.indexOf("const allTime = syncWindow === 'long'"));
-    expect(walk).toMatch(/const info = readPublicPartHeaderInfo\(entry\?\.header_boc \?\? entry\?\.headerBoc\);/);
-    expect(walk).toMatch(/if \(!info \|\| info\.partCount <= 1\) return;/);
-    // The extension runs ONLY on a truncated exit with a split stream, bounded, and reuses the SAME walk step
-    // (so extended entries land in ids/entryIdsToScan and resolve+assemble normally this cycle).
-    expect(walk).toMatch(/if \(truncated && hasSplitPartStream\(\)\) \{/);
-    expect(walk).toMatch(/extendedScans < PUBLIC_CHAIN_STRADDLE_EXTENSION_SCAN_LIMIT && hasSplitPartStream\(\)/);
-    expect(walk).toMatch(/if \(!\(await walkOne\(\)\)\) return \{ ids, truncated \};/);
-  });
+  // PWA-PUBLIC-STRADDLE-01 removed as a SOURCE-GREP guard — the invariant it protected is now covered twice, and
+  // behaviourally: tests/public-lane-read-window.test.ts PL-WINDOW-02 publishes a 3-part post across the read
+  // window boundary against a REAL PublicShard and requires it back whole, and tests/straddle-walk-tracking.test.ts
+  // exercises the predicate (hasIncompletePublicStream) that drives the extension. Both go red if the extension is
+  // inverted; a grep for the old walk's literals would not.
 
   it('PWA-FILE-01: file attachments — FILE block wire, compose capture, download chip, TG fallback, no public leak', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -4030,15 +3850,13 @@ describe('PWA runtime config guard', () => {
   it('PWA-DISCOVERY-01: newcomer discovery — bounded head-of-log scan, described-channel cards, follow flow', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
-    // Scale: fixed-constant bounds (corpus-independent) — WINDOW authors, CANDIDATES profiles, shallow per-author walk.
-    expect(app).toMatch(/const PUBLIC_DISCOVERY_WINDOW = 64;/);
-    expect(app).toMatch(/const PUBLIC_DISCOVERY_MAX_CANDIDATES = 16;/);
-    expect(app).toMatch(/const PUBLIC_DISCOVERY_PROFILE_MAXSCAN = 6;/);
+    // Scale: discovery is bounded by CONSTRUCTION now, not by scan constants over a shared log — it sweeps the
+    // BEACON directory (a fixed bucket space), ranks live buckets by entry_count and reads the top K.
     expect(app).toMatch(/async function discoverChannels\(/);
-    // Phase 1 loop is hard-bounded by both the window AND the candidate cap (never enumerates the corpus).
-    expect(app).toMatch(/i < PUBLIC_DISCOVERY_WINDOW && candidates\.length < PUBLIC_DISCOVERY_MAX_CANDIDATES/);
+    expect(app).toMatch(/async function discoverChannelsFromBeacon\(/);
+    expect(readFileSync('web/public-lane.mjs', 'utf8')).toMatch(/sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = 16 \} = \{\}\)/);
+    // (The phase-1 head-of-log loop was the Hub scan itself; the beacon sweep's bounds are asserted above.)
     // Phase 2 resolves each candidate with the shallow discovery maxScan (cache-first, bounded).
-    expect(app).toMatch(/resolveChannelProfile\(wallet, \{ maxScan: PUBLIC_DISCOVERY_PROFILE_MAXSCAN \}\)/);
     // Follow registers the previously-unknown channel THEN subscribes it (ensure rebuilds the registry first).
     expect(app).toMatch(/const channelId = ensurePublicChannelForAuthorWallet\(authorWallet, \{ activate: false \}\);\s*setPublicChannelSubscribed\(channelId, true\);/);
     // UI: header entry button + discovery panel + the feed-top channels plate.
@@ -4185,16 +4003,11 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-PUBLIC-COMMENTS-BACKGROUND-FREE: comments load ONLY on thread open — no background walker exists (owner scalability requirement 2026-07-02)', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const syncPublicSource = app.slice(
-      app.indexOf('async function syncPublicChannelFromChain'),
-      app.indexOf('async function syncPublicChannels'),
-    );
     // The background feed sync must never touch the parent (comment) index or the on-demand loader. (The name
     // appears in an explanatory comment inside the sync — forbid the CALL form, not the mention.)
-    expect(syncPublicSource).not.toMatch(/getPublicParentIndex\(/);
-    expect(syncPublicSource).not.toMatch(/loadPublicPostComments\(/);
-    // The parent-index walk has exactly ONE entry point (the on-demand loader)...
-    expect(app.match(/\.getPublicParentIndex\(/g)?.length ?? 0).toBe(1);
+    // The THREAD read has exactly ONE entry point (the on-demand loader) — the shard twin of the old
+    // parent-index rule, and the actual scalability requirement: no background walker may read comments.
+    expect(app.match(/lane\.readThreadComments\(/g)?.length ?? 0).toBe(1);
     // ...and the loader itself is invoked from exactly ONE place: refreshPublicPostDetailComments.
     expect(app.match(/await loadPublicPostComments\(/g)?.length ?? 0).toBe(1);
     // refreshPublicPostDetailComments fires only on user actions: opening the post detail + the retry button.
@@ -4384,18 +4197,24 @@ describe('PWA runtime config guard', () => {
   it('PWA-PUBLIC-COMMENTS-ONDEMAND-DEGRADE: the on-demand comment loader fails closed (no partial list as complete) and binds comments to the parent', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const loaderSource = app.slice(
-      app.indexOf('async function loadPublicPostComments(item, options = {})'),
-      app.indexOf('async function refreshPublicPostDetailComments('),
+      app.indexOf('async function loadPublicPostCommentsFromShards'),
+      app.indexOf('async function loadPublicPostComments('),
     );
-    // Empty / missing parent index -> genuinely zero comments (clean, not degraded).
-    expect(loaderSource).toMatch(/if \(!parentIndex \|\| parentIndex\.exists !== true\) \{/);
+    // Missing parent coordinates -> genuinely zero comments (clean, not degraded).
+    expect(loaderSource).toMatch(/if \(item\?\.channelEpochTag == null \|\| item\?\.entryId == null \|\| !item\?\.authorWallet\) \{/);
     expect(loaderSource).toMatch(/return \{ comments: \[\], degraded: false, parentExists: false, latestLink: '0' \};/);
     // The post-detail empties honestly: genuinely-empty (clean read, no index) vs not-loaded (failed read).
     expect(app).toMatch(/publicPostDetailParentExists === false/);
     // A rate-limited read returns degraded:true (the caller keeps "Loading" and retries; never caches a partial).
-    expect(loaderSource).toMatch(/if \(noteTonRpcRateLimit\(error\)\) return \{ comments: \[\], degraded: true \};/);
+    // A failed read (rate limit included) degrades AND feeds the shared limiter — never a partial list cached
+    // as complete, and never a silent hammering loop.
+    expect(loaderSource).toMatch(/if \(!noteTonRpcRateLimit\(error\)\) console\.warn/);
+    expect(loaderSource).toMatch(/return \{ comments: \[\], degraded: true \};/);
     // Parent binding identical to the feed sync: drop only when BOTH hashes present AND mismatch (lowercased).
-    expect(loaderSource).toMatch(/String\(item\.bodyHash\)\.toLowerCase\(\) === String\(comment\.parentHash\)\.toLowerCase\(\)/);
+    // Parent binding is STRUCTURAL in the shard model: a thread shard IS the parent's, so every comment read
+    // there carries that parent's id and hash.
+    expect(loaderSource).toMatch(/parentEntryId: String\(item\.entryId\),/);
+    expect(loaderSource).toMatch(/parentHash: item\.bodyHash,/);
     // The retry orchestrator keeps the partial OUT of the authoritative list on a degraded walk.
     const refreshSource = app.slice(
       app.indexOf('async function refreshPublicPostDetailComments('),
@@ -4429,11 +4248,12 @@ describe('PWA runtime config guard', () => {
     expect(detect).toMatch(/const ownSig = ownMessagingSignPubkeyValue\(\);\s*\n\s*if \(!ownSig \|\| senderSigningPublicKeyValue\(opened\) !== ownSig\) return null;/);
     expect(app).toMatch(/function ownMessagingSignPubkeyValue\(\) \{[\s\S]*?bytesToBigIntValue\(key\)\.toString\(\)/);
     // Scan diverts AFTER opening the capsule and BEFORE resolving a thread.
-    const scanIdx = app.indexOf('const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair');
-    const scanSlice = app.slice(scanIdx, scanIdx + 800);
-    expect(scanSlice).toMatch(/const prefsBytes = prefsBytesFromOpenedCapsule\(opened\);/);
-    expect(scanSlice).toMatch(/collectRestoredPrefsSnapshot\(prefsBytes\)/);
-    expect(scanSlice.indexOf('collectRestoredPrefsSnapshot')).toBeLessThan(scanSlice.indexOf('threadForChainCapsule'));
+    // The shard receive path opens the capsule and hands it to appendOpenedCapsuleMessage, whose defensive
+    // divert (asserted below) runs BEFORE the message reaches any thread — so a prefs capsule still never becomes
+    // a chat message. The pre-thread divert inside the CapsuleHub walk went with that walk.
+    const convScan = app.slice(app.indexOf('async function syncConvCapsulesFromShards'), app.indexOf('async function syncPrivateCapsulesFromChain('));
+    expect(convScan).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, localRecipientKeyPair/);
+    expect(app).toMatch(/appendOpenedCapsuleMessage\(parts\[0\]\.opened, targetThread, 'received', parts\[0\]\.entry\)/);
     // Defensive divert at the top of the append path too.
     const appendSrc = app.slice(app.indexOf('async function appendOpenedCapsuleMessage('), app.indexOf('async function appendOpenedPrivatePartsMessage('));
     expect(appendSrc).toMatch(/const prefsBytes = prefsBytesFromOpenedCapsule\(opened\);\s*if \(prefsBytes\) \{ collectRestoredPrefsSnapshot\(prefsBytes\); return true; \}/);
@@ -5195,7 +5015,9 @@ describe('PWA runtime config guard', () => {
     // fast-paths out and the view shows a permanent false "No posts yet")...
     expect(app).toMatch(/function invalidatePublicSyncFastPath\(\)/);
     expect(app).toMatch(/const invalidationEpochAtStart = publicSyncInvalidationEpoch;/);
-    expect(app).toMatch(/&& publicSyncInvalidationEpoch === invalidationEpochAtStart\) \{\s*lastSyncedPublicLatestId = publicAuthorRoundStartHead;/);
+    // The shard sync has no cursor to commit; what it must not do is write back a snapshot the user invalidated
+    // mid-pass (unfollow / wallet switch), which would resurrect the removed channel's posts.
+    expect(app).toMatch(/if \(publicSyncInvalidationEpoch !== invalidationEpochAtStart\) \{/);
     // ...(2) the preview sync's finally is TOKEN-guarded (a previous channel's slow sync must not clear the
     // current channel's loading state)...
     expect(openFn).toMatch(/if \(syncToken !== publicChannelViewOpenToken\) return;/);
@@ -5218,10 +5040,13 @@ describe('PWA runtime config guard', () => {
     expect(openFn).toMatch(/publicChannelViewSyncPending = !followed;[\s\S]{0,220}renderPublicChannelView\(\);/);
     // ...(8) the sync walk always reads the preview channel THIS cycle (the F1 budget id-sort could otherwise defer
     // it for cycles on a cold head cache)...
-    expect(app).toMatch(/readThisCycle\.add\(publicChannelPreviewChannelId\);/);
+    // The preview channel rides along as a TRANSIENT feed source, and the LIVE shard sync reads exactly that
+    // source list — so an unfollowed channel's posts are fetched by the same walk, with no per-cycle read budget
+    // to special-case (that budget was a property of the Hub's per-author index round-robin).
+    expect(app).toMatch(/const feedChannels = feedSourcePublicChannels\(\);/);
+    expect(app).toMatch(/if \(publicChannelPreviewChannelId && !channels\.some\(\(channel\) => channel\.id === publicChannelPreviewChannelId\)\)/);
     // ...(9) a wedged F1 round (wallet switch racing an in-flight walk) self-heals instead of re-reading the full
     // budget every cycle for the rest of the session...
-    expect(app).toMatch(/if \(publicAuthorRoundStartHead === null && publicAuthorRoundCovered\.size > 0\) publicAuthorRoundCovered\.clear\(\);/);
     // ...(10) the FEED's own mark-read is also overlay-guarded (posts arriving while an overlay covers the feed
     // stay unread until actually seen).
     expect(app).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen\s*&& markVisiblePublicFeedRead\(windowItems\)/);
@@ -5232,8 +5057,6 @@ describe('PWA runtime config guard', () => {
     expect(openFn.indexOf('hideIdentityPopover();')).toBeLessThan(openFn.indexOf('renderPublicChannelView(); return;'));
     // ...(12) the pre-seeded preview channel is charged against the walk budget exactly ONCE (has(), not own-only,
     // in the headless loop + withHeads).
-    expect(app).toMatch(/if \(readThisCycle\.has\(c\.id\) \|\| !isHeadless\(c\)\) continue;/);
-    expect(app).toMatch(/const withHeads = idSorted\.filter\(\(c\) => !readThisCycle\.has\(c\.id\) && !isHeadless\(c\)\);/);
     // Entry points: feed author NAME/meta block, discovery card NAME + an "Open channel" action, about popover.
     // v754 (owner): the AVATAR is NOT wired — it keeps its v651 tap-to-view lightbox meaning on both surfaces.
     expect(app).toMatch(/openPublicChannelView\(\{ channelId: item\.channelId, authorWallet: item\.authorWallet \}\)/);
@@ -6512,227 +6335,17 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/supply <= baseline - amount/);
   });
 
-  it('PWA-CONFIG-07B: private chain sync uses key indexes without global tail scan fallback', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const capsuleHubProvider = readFileSync('web/capsulehub-ton-rpc-provider.mjs', 'utf8');
-    const syncSource = app.slice(
-      app.indexOf('async function syncPrivateCapsulesFromChain'),
-      app.indexOf('async function bootReplayStore'),
-    );
-    const syncButtonSource = app.slice(
-      app.indexOf('async function runManualPrivateMessageSync()'),
-      app.indexOf('publicChannelSearch?.addEventListener'),
-    );
+  // PWA-CONFIG-07B removed with the CapsuleHub index walk. "Uses the key indexes, never a global tail scan" was the
+  // central scalability rule of reading ONE shared log: without the per-key indexes a client would have had to scan
+  // the whole hub. A conversation's messages live in ITS OWN shards, addressed from K_root — there is no global log
+  // to scan and no index to prefer, so the rule has no subject left. The replacement bound (a conversation is read
+  // over its epoch window, cursor advanced only on a clean pass) is pinned in PWA-MSG-02.
 
-    expect(app).toMatch(/const MESSAGE_AUTO_SYNC_MS = 60 \* 1000/);
-    // Foreground IDLE fast tier: a fully-synced ("nothing new") pass re-arms at ~12s (a cheap 2-read pass)
-    // instead of the 60s cap, so a no-push recipient picks up a waiting message in ~12s. The degraded floor,
-    // send-pause and 429-backoff still override it when they apply.
-    expect(app).toMatch(/const MESSAGE_AUTO_SYNC_IDLE_MS = 12 \* 1000/);
-    expect(app).toMatch(/nextSyncDelayMs = MESSAGE_AUTO_SYNC_IDLE_MS/);
-    // The degraded-transport floor still wins over the fast idle tier (primary RPC dead -> back off to 180s).
-    expect(app).toMatch(/const effectiveDelayMs = degradedTransport \? Math\.max\(requestedDelayMs, MESSAGE_AUTO_SYNC_DEGRADED_MS\) : requestedDelayMs/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_INDEX_STORAGE_PREFIX = 'platho\.private\.chain\.index\.v1'/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT = 48/);
-    expect(app).toMatch(/let messageAutoSyncAt = 0/);
-    expect(app).toMatch(/let messageAutoSyncPhase = 'idle'/);
-    expect(app).toMatch(/const MESSAGE_SYNC_LOADING_FRAMES = Object\.freeze/);
-    expect(app).toMatch(/function messageAutoSyncCountdownText/);
-    // State-only sync label: the "next sync in Ns" countdown was removed (owner: drop the next-sync timer).
-    expect(app).not.toMatch(/next sync in \$\{seconds\}s/);
-    expect(app).toMatch(/if \(messageAutoSyncPhase === 'synced'\) return t\('sync\.syncedCheck'\)/);
-    expect(EN_STRINGS['sync.syncedCheck']).toBe('✓ Synced');
-    expect(app).toMatch(/if \(messageAutoSyncPhase === 'delayed'\) return messageAutoSyncLastErrorLabel/);
-    expect(app).toMatch(/function beginMessageSyncUi/);
-    expect(app).toMatch(/function completeMessageSyncUi/);
-    expect(app).toMatch(/function failMessageSyncUi/);
-    expect(app).toMatch(/messageAutoSyncAt = Date\.now\(\) \+ effectiveDelayMs/);
-    expect(app).toMatch(/scheduleMessageAutoSyncCountdownUi\(\)/);
-    expect(app).toMatch(/activeSubtitle\.textContent = conversationSubtitleText\(thread\)/);
-    expect(app).toMatch(/function capsuleHubMessageSyncReadOptions\(address\)/);
-    expect(app).toMatch(/allowUnverifiedCriticalRead:\s*true/);
-    expect(capsuleHubProvider).toMatch(/allowUnverifiedCriticalRead/);
-    expect(capsuleHubProvider).toMatch(/get_private_recipient_index/);
-    expect(capsuleHubProvider).toMatch(/get_private_sender_index/);
-    expect(syncSource).toMatch(/let allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true/);
-    expect(syncSource).toMatch(/const allowUnverifiedPrivateIndexFallback = quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
-    expect(syncSource).toMatch(/let readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
-    expect(app).toMatch(/function privateIndexCursorPersistenceMode\(readOptions = \{\}\)/);
-    expect(app).not.toMatch(/message_index_unverified/);
-    expect(syncSource).toMatch(/const cursorPersistence = privateIndexCursorPersistenceMode\(readOptions\)/);
-    expect(syncSource).toMatch(/const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified'/);
-    expect(syncSource).toMatch(/if \(!allowUnverifiedPrivateIndexRead && allowUnverifiedPrivateIndexFallback && isTonRpcVerificationSoftReadError\(error\)\)/);
-    expect(syncSource).toMatch(/indexReadFallback = shortUiErrorText\(error, 'verified private index unavailable'\)/);
-    expect(syncSource).not.toMatch(/provider\.getState\(readOptions\)/);
-    expect(syncSource).not.toMatch(/private_latest_id/);
-    expect(syncSource).not.toMatch(/readPrivateChainScanCursor|writePrivateChainScanCursor/);
-    expect(syncSource).toMatch(/privateKeyIdIndexValue\(localRecipientKeyPair\.keyId\)/);
-    expect(syncSource).toMatch(/provider\.getPrivateRecipientIndex\(keyIdIndex, readOptions\)/);
-    expect(syncSource).toMatch(/provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
-    expect(syncSource).toMatch(/reason: 'private_index_read_failed'/);
-    expect(syncSource).toMatch(/indexReadError/);
-    expect(app).toMatch(/idxErr=\$\{debugTiny\(sync\.indexReadError, '-'\)\}/);
-    expect(syncSource).toMatch(/readPrivateChainIndexCursor\(address, role\)/);
-    expect(syncSource).toMatch(/if \(canPersistPrivateIndexCursor && !rateLimitError && scanComplete && !hasFreshPartial && bodyHistoryError === null\)/);
-    expect(syncSource).toMatch(/writePrivateChainIndexCursor\(address, write\.role, write\.cursor\)/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX = 'platho\.private\.chain\.head\.repair\.v1'/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT = 8/);
-    expect(app).toMatch(/function readPrivateChainHeadRepairLink/);
-    expect(app).toMatch(/function writePrivateChainHeadRepairLink/);
-    expect(syncSource).toMatch(/walkRecentIndexedRoleForRepair\('recipient', recipientHead\)/);
-    expect(syncSource).toMatch(/walkRecentIndexedRoleForRepair\('sender', senderHead\)/);
-    expect(syncSource).toMatch(/scanPrivateEntryId\(entryId, \{ source: `\$\{role\}-head-repair` \}\)/);
-    expect(syncSource).toMatch(/writePrivateChainHeadRepairLink\(address, write\.role, write\.link\)/);
-    expect(syncSource).toMatch(/confirmPendingPrivatePublishMessagesFromEntries\(/);
-    expect(syncSource).toMatch(/'private_sync_index'/);
-    expect(syncSource).toMatch(/publishConfirmations/);
-    expect(syncSource).toMatch(/privateIndexEntryIdFromLink\(currentLink\)/);
-    expect(syncSource).toMatch(/privateIndexPreviousLink\(result\.entry, role\)/);
-    expect(app).toMatch(/function isBodyHistoryUnavailableError/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX/);
-    expect(app).toMatch(/function rememberPrivateBodyHistoryUnavailable/);
-    expect(app).toMatch(/function clearPrivateBodyHistoryUnavailable/);
-    expect(app).toMatch(/function privateBodyHistoryRetryEntryIds/);
-    expect(app).toMatch(/function privateSyncStatusText/);
-    expect(app).toMatch(/body_history_unavailable/);
-    expect(app).toMatch(/history unavailable/);
-    expect(app).toMatch(/history gaps/);
-    expect(app).toMatch(/catch_up_pending/);
-    expect(app).toMatch(/partial_stream_pending/);
-    expect(app).toMatch(/index_limit_without_cursor/);
-    expect(enCopy).toMatch(/index scan limited/);
-    expect(app).toMatch(/catch-up/);
-    expect(app).toMatch(/function privateIndexSyncReadLimit\(options = \{\}\)/);
-    expect(app).toMatch(/options\.readLimit/);
-    expect(syncSource).toMatch(/const quickSync = options\.mode === 'auto' \|\| options\.fast === true/);
-    expect(app).toMatch(/PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT/);
-    expect(syncSource).toMatch(/const baseLimit = privateIndexSyncReadLimit\(options\)/);
-    expect(syncSource).toMatch(/const limit = !canPersistPrivateIndexCursor && quickSync[\s\S]*PRIVATE_CHAIN_INDEX_READ_LIMIT[\s\S]*: baseLimit/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS = 3 \* 60 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT = 2/);
-    expect(app).toMatch(/const PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT = 16/);
-    expect(app).toMatch(/function privateBodyHistoryRetryEntryIds\(address, options = \{\}\)/);
-    expect(app).toMatch(/const force = options\.forceHistoryRetry === true/);
-    expect(app).toMatch(/const retryLimit = force \? PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT : PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT/);
-    expect(syncSource).toMatch(/const retryEntryIds = \[\.\.\.new Set\(\[/);
-    expect(syncSource).toMatch(/\.\.\.privateBodyHistoryRetryEntryIds\(address, \{ forceHistoryRetry: options\.forceHistoryRetry === true \}\)/);
-    expect(syncSource).toMatch(/\.\.\.privateStuckEntryRetryEntryIds\(address, \{ forceStuckRetry: options\.forceHistoryRetry === true \}\)/);
-    expect(syncSource).toMatch(/for \(const entryId of retryEntryIds\)/);
-    expect(syncSource).toMatch(/rememberPrivateBodyHistoryUnavailable\(address, entry, entryId\)/);
-    expect(syncSource).toMatch(/clearPrivateBodyHistoryUnavailable\(address, entryId\)/);
-    expect(syncSource).toMatch(/historyUnavailableEntries\.push/);
-    expect(syncSource).not.toMatch(/isBodyHistoryUnavailableError\(error\)[\s\S]{0,200}break/);
-    expect(syncSource).toMatch(/catchUpRemaining/);
-    expect(syncSource).toMatch(/let indexLimitReachedWithoutCursor = false/);
-    expect(syncSource).toMatch(/if \(canPersistPrivateIndexCursor\) \{[\s\S]*catchUpRemaining \+= 1[\s\S]*\} else \{[\s\S]*indexLimitReachedWithoutCursor = true/);
-    expect(syncSource).toMatch(/indexLimitReachedWithoutCursor/);
-    expect(syncSource).toMatch(/const fullScanComplete = scanComplete[\s\S]*&& !indexLimitReachedWithoutCursor/);
-    expect(syncSource).not.toMatch(/windowStart/);
-    expect(app).toMatch(/privateEntryPublisherWallet/);
-    expect(app).toMatch(/resolveKnownPrivateSenderWallet/);
-    expect(app).toMatch(/relocateExistingCapsuleMessage/);
-    expect(syncSource).toMatch(/globalThis\.plathoLastPrivateSync/);
-    expect(syncSource).toMatch(/recipientHead: recipientHead\.toString\(\)/);
-    expect(syncSource).toMatch(/senderHead: senderHead\.toString\(\)/);
-    // Cursor persistence only advances after verified index reads. Unverified
-    // fallback can import self-authenticated entries, but it cannot poison the
-    // active cursor or hide older index history.
-    expect(app).toMatch(/if \(readOptions\.verify === true && readOptions\.allowUnverifiedCriticalRead !== true\) return 'verified'/);
-    expect(app).toMatch(/return 'disabled_unverified'/);
-    expect(app).not.toMatch(/degraded_unverified/);
-    expect(app).not.toMatch(/return 'message_index_unverified'/);
-    expect(syncSource).toMatch(/cursorPersistence,/);
-    expect(syncSource).toMatch(/indexReadFallback/);
-    expect(syncSource).toMatch(/forceIndexRescan/);
-    expect(syncSource).toMatch(/indexEntriesScanned/);
-    expect(syncSource).toMatch(/incompletePrivateStreamCount/);
-    expect(syncSource).toMatch(/mode: quickSync \? 'auto' : 'recovery'/);
-    expect(syncSource).toMatch(/rateLimited: rateLimitError !== null/);
-    // A persistently failing entry is skipped after three passes instead of
-    // freezing the cursor into a forever-resyncing loop.
-    expect(syncSource).toMatch(/PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER/);
-    expect(syncSource).toMatch(/crossStrikes >= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP \? 'undelivered' : 'error-skip'/);
-    expect(syncSource).toMatch(/function scheduleMessageAutoSync/);
-    expect(syncSource).toMatch(/beginMessageSyncUi\(\)/);
-    expect(syncSource).toMatch(/syncPrivateCapsulesFromChainOnce\(\{ mode: 'auto' \}\)/);
-    expect(syncSource).toMatch(/completeMessageSyncUi\(result\)/);
-    expect(syncSource).toMatch(/result\?\.scanComplete === false && result\?\.reason !== 'index_limit_without_cursor'/);
-    expect(syncSource).toMatch(/failMessageSyncUi\(label\)/);
-    expect(syncSource).toMatch(/resumePendingPrivateSendRetries\(\)/);
-    expect(syncSource).toMatch(/resumePendingPrivatePublishConfirmations\(\)/);
-    expect(syncButtonSource).toMatch(/mode: 'manual'/);
-    expect(syncButtonSource).toMatch(/readLimit: PRIVATE_CHAIN_INDEX_READ_LIMIT/);
-    expect(syncButtonSource).toMatch(/forceHistoryRetry: true/);
-    expect(syncButtonSource).toMatch(/forceIndexRescan: true/);
-    expect(syncButtonSource).not.toMatch(/allowUnverifiedPrivateIndexRead|verifyPrivateIndex/);
-    expect(syncButtonSource).toMatch(/beginMessageSyncUi\(\)/);
-    expect(syncButtonSource).toMatch(/completeMessageSyncUi\(result\)/);
-    expect(syncButtonSource).not.toMatch(/syncPublicChannels/);
-    expect(app).toMatch(/function sortThreadMessages/);
-    expect(app).toMatch(/function insertThreadMessage/);
-    expect(app).toMatch(/function privateChainMessageOrderFields/);
-    expect(app).toMatch(/createdAtMs/);
-    expect(app).toMatch(/chainEntryId/);
-    expect(syncSource).toMatch(/privateChainMessageMeta\(\{\s*\.\.\.entry,\s*openedAs:\s*isSelfOpenedCapsule\(opened\) \? 'self' : opened\.openedAs\s*\}\),\s*entry/);
-    expect(syncSource).toMatch(/appendOpenedPrivatePartsMessage/);
-    expect(syncSource).toMatch(/incompletePrivateStreamCount \+= 1/);
-    expect(syncSource).toMatch(/skipped \+= uniqueParts\.size/);
-    expect(syncSource).not.toMatch(/partial_private_stream/);
-    expect(app).not.toMatch(/autoSyncBudgetExceeded/);
-  });
-
-  it('PWA-CONFIG-07D: private chain sync skips unreadable private entries without aborting the index walk', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const syncStart = app.indexOf('async function syncPrivateCapsulesFromChain');
-    const syncEnd = app.indexOf('async function bootReplayStore');
-    const keyMismatchStart = app.indexOf('function isPrivateOpenKeyMismatchError');
-    const unreadableStart = app.indexOf('function isPrivateUnreadableCapsuleError');
-    const helperEnd = app.indexOf('function privateSyncResult');
-    expect(syncStart).toBeGreaterThanOrEqual(0);
-    expect(syncEnd).toBeGreaterThan(syncStart);
-    expect(keyMismatchStart).toBeGreaterThanOrEqual(0);
-    expect(unreadableStart).toBeGreaterThanOrEqual(0);
-    expect(unreadableStart).toBeGreaterThan(keyMismatchStart);
-    expect(helperEnd).toBeGreaterThan(unreadableStart);
-    const syncSource = app.slice(syncStart, syncEnd);
-    const keyMismatchHelperSource = app.slice(keyMismatchStart, unreadableStart);
-    const unreadableHelperSource = app.slice(unreadableStart, helperEnd);
-    const bodyHistoryBranchIndex = syncSource.indexOf('isBodyHistoryUnavailableError(error)');
-    const unreadableBranchIndex = syncSource.indexOf('isPrivateUnreadableCapsuleError(error)');
-    expect(bodyHistoryBranchIndex).toBeGreaterThanOrEqual(0);
-    expect(unreadableBranchIndex).toBeGreaterThan(bodyHistoryBranchIndex);
-    const unreadableBranchEnd = syncSource.indexOf('} else {', unreadableBranchIndex);
-    expect(unreadableBranchEnd).toBeGreaterThan(unreadableBranchIndex);
-    const unreadableBranchSource = syncSource.slice(unreadableBranchIndex, unreadableBranchEnd);
-
-    expect(unreadableHelperSource).toMatch(/if \(isPrivateOpenKeyMismatchError\(error\)\) return true/);
-    expect(keyMismatchHelperSource).toMatch(/key mismatch\|expired\|operation-specific/);
-    // The transient-RPC token "unavailable" must NOT be in the permanent-unreadable
-    // classifier — a transient RPC error (e.g. "TON RPC verification unavailable")
-    // must re-walk, not be dropped forever while the header still says "Synced".
-    expect(keyMismatchHelperSource).not.toMatch(/unavailable/);
-    // The transient guard sits BEFORE the unreadable branch so transient failures
-    // pin the cursor (re-walk) instead of falling into the permanent drop.
-    const transientGuardIndex = syncSource.indexOf('isTonRpcVerificationSoftReadError(error) || isTonRpcTransientError(error)');
-    expect(transientGuardIndex).toBeGreaterThanOrEqual(0);
-    expect(transientGuardIndex).toBeLessThan(unreadableBranchIndex);
-    expect(unreadableHelperSource).toMatch(/private capsule\|platho private capsule\|capsulehub private entry\|compact body/);
-    expect(unreadableHelperSource).toMatch(/header0\|header1\|sender signature\|magic mismatch\|body size mismatch/);
-    expect(unreadableHelperSource).toMatch(/suite mismatch\|hash mismatch\|invalid platho private capsule/);
-    expect(unreadableBranchSource).toMatch(/scannedPrivateEntryIds\.add\(entryIdKey\)/);
-    expect(unreadableBranchSource).toMatch(/clearPrivateBodyHistoryUnavailable\(address, entryId\)/);
-    expect(unreadableBranchSource).toMatch(/privateKeyOpenError = error/);
-    expect(unreadableBranchSource).toMatch(/rememberPrivateScanLog\(entryId, 'unreadable'\)/);
-    expect(unreadableBranchSource).toMatch(/skipped \+= 1/);
-    expect(unreadableBranchSource).toMatch(/type: 'unreadable_capsule'/);
-    expect(unreadableBranchSource).toMatch(/return \{ ok: true, entry \}/);
-    expect(unreadableBranchSource).not.toMatch(/rememberPrivateBodyHistoryUnavailable/);
-    expect(unreadableBranchSource).not.toMatch(/historyUnavailableEntries\.push/);
-    expect(syncSource).toMatch(/if \(!result\.ok\) \{[\s\S]*scanComplete = false[\s\S]*return[\s\S]*\}[\s\S]*const previousLink = privateIndexPreviousLink\(result\.entry, role\)/);
-    expect(syncSource).toMatch(/for \(const entryId of retryEntryIds\)[\s\S]*scanPrivateEntryId\(entryId, \{ source: 'history-retry' \}\)/);
-    expect(syncSource).toMatch(/isBodyHistoryUnavailableError\(error\)[\s\S]*rememberPrivateBodyHistoryUnavailable\(address, entry, entryId\)/);
-  });
+  // PWA-CONFIG-07D removed with the CapsuleHub index walk: "skips unreadable entries WITHOUT ABORTING THE INDEX
+  // WALK" is a property of a cursor-driven walk over a shared log. The live receive keeps the invariant that
+  // matters — one unreadable capsule is counted as skipped and the pass continues, and the pass reports itself
+  // incomplete rather than claiming to be up to date — and that is asserted in PWA-CONFIG-07C's transient-vs-
+  // unreadable split plus the scanComplete contract in PWA-MSG-02.
 
   it('PWA-IDENTITY-BLEED-01: cross-wallet identity bleed guards — Saved thread never lends/borrows identity, sends never fall back to it', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -6809,7 +6422,9 @@ describe('PWA runtime config guard', () => {
     // The BOOT heal (restore) passes requeueAnonymous+clearOwnContactDisplay; the per-tick auto-sync heal calls the
     // cheap Saved-only form (no args) so a session poisoned MID-flight self-corrects without a full re-unlock (F3).
     expect(app).toMatch(/if \(healCrossWalletIdentityBleed\(\{ requeueAnonymous: true, clearOwnContactDisplay: true \}\)\) changed = true;/);
-    const sync = app.slice(app.indexOf('async function syncPrivateCapsulesFromChain('), app.indexOf('async function syncPrivateCapsulesFromChainOnce('));
+    // The per-tick cheap heal moved with the receive path: it ran on every CapsuleHub sync tick and now runs on
+    // every SHARD sync tick. Losing it would mean a mid-flight poisoned session only self-corrects on re-unlock.
+    const sync = app.slice(app.indexOf('async function syncConvCapsulesFromShards'), app.indexOf('async function syncPrivateCapsulesFromChain('));
     expect(sync).toMatch(/healCrossWalletIdentityBleed\(\);/);
     // The anonymous/pending re-queue (boot-only) relocates messages stuck in an Anonymous peer thread once their
     // sender resolves — the flip side of the own-guard keeping a peer message OUT of Saved.
@@ -6836,7 +6451,6 @@ describe('PWA runtime config guard', () => {
     const walletTeardown = app.slice(app.indexOf('function clearWalletScopedRuntimeState('), app.indexOf('function lockPlathoWallet('));
     expect(walletTeardown).toMatch(/lastKnownOwnWalletRaw = null;/);
     expect(app).toMatch(/let pendingSavedRelocateEntryIds = new Set\(\)/);
-    expect(app).toMatch(/const ids = \[\.\.\.pendingSavedRelocateEntryIds\]; pendingSavedRelocateEntryIds = new Set\(\); return ids;/);
     // The healThreadWalletVariantConflict discriminator is raw-normalized too.
     const healTouch = app.slice(
       app.indexOf('function healThreadWalletVariantConflict('),

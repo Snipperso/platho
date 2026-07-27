@@ -38,21 +38,11 @@ describe('vault tab gate + durable comment cache guard', () => {
     expect(app).not.toMatch(/function persistLoadedPublicPostComments/);
   });
 
-  it('VAULT-GATE-03: the comment loader is INCREMENTAL like the private sync — no body re-downloads', () => {
-    // Unchanged latest_entry_link => the snapshot is returned with ZERO body reads.
-    expect(app).toMatch(/if \(snapshot && snapshotBoundary > 0n && String\(snapshotBoundary\) === latestLink\) \{/);
-    // The walk stops at the snapshot boundary — only NEW entries above it are fetched.
-    expect(app).toMatch(/if \(snapshotBoundary > 0n && link <= snapshotBoundary\) break;/);
-    // A multipart group straddling the boundary extends the walk until complete (bounded).
-    expect(app).toMatch(/function publicCommentPartsHaveIncompleteGroup\(parts\)/);
-    expect(app).toMatch(/publicCommentPartsHaveIncompleteGroup\(commentParts\)\) \{/);
-    // Fresh entries merge OVER the snapshot (mergePublicComments favors its SECOND argument on an entryId
-    // collision), preserving everything below the boundary.
-    expect(app).toMatch(/\? mergePublicComments\(snapshot\.comments, fresh\)/);
-    // A LIMIT exit of the straddle extension with a still-incomplete group DEGRADES the result (never cache a
-    // cursor that jumped over a half-fetched comment); evicted/chain-start exits stay clean.
-    expect(app).toMatch(/if \(walked >= PUBLIC_CHAIN_LONG_READ_LIMIT && publicCommentPartsHaveIncompleteGroup\(commentParts\)\) \{\s*degraded = true;/);
-    // The refresh passes the cursor snapshot (memory first, IndexedDB after a reload).
-    expect(app).toMatch(/result = await loadPublicPostComments\(item, \{ snapshot: snapshot\?\.latestLink \? snapshot : null \}\);/);
-  });
+  // VAULT-GATE-03 removed with the CapsuleHub comment walk. It pinned INCREMENTAL comment loading over the shared
+  // log: a snapshot boundary (latest_entry_link) let an unchanged thread return from cache with ZERO body reads,
+  // and the walk stopped at that boundary instead of re-reading everything below it. That machinery went with the
+  // log. The shard loader reads the post's THREAD shard window on each open instead — two RPC calls (a
+  // tail-anchored get_page + one /messages) against a per-post shard rather than a global log. HONEST GAP, logged
+  // in the roadmap: an unchanged thread is still re-read where the Hub path could skip it; the cheap fix is an
+  // entry_count-keyed snapshot (the reader already probes entry_count), not a rewrite.
 });

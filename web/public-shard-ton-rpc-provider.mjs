@@ -327,7 +327,7 @@ export function createPublicShardTonRpcProvider(options = {}) {
 
 // Does the window hold a multipart stream whose parts are not all present? Single-part entries (the common
 // case: text posts, comments, beacon cards) can never be incomplete, so they cost nothing here.
-function hasIncompletePublicStream(posts) {
+export function hasIncompletePublicStream(posts) {
   const groups = new Map();
   for (const post of posts) {
     const info = readPublicPartHeaderInfo(post.header);
