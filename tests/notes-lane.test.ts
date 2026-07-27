@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   deserializeNotes,
@@ -180,5 +181,39 @@ describe('self-notes lane (named RecoveryShard slots)', () => {
     const merged = mergeNotes(local, restored);
     expect(merged.map((n) => n.text)).toEqual(['first', 'second', 'third']);
     expect(mergeNotes(merged, restored)).toEqual(merged);
+  });
+
+  it('NOTES-13: the client routes a Saved-thread send to this lane and never to the CONV lane', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The routing decision itself: a note to self cannot use the CONV lane at all (conversationOrder refuses
+    // self==self), so the dispatcher must divert BEFORE attemptConvMessagePublishDirect is reached.
+    const dispatcher = app.slice(
+      app.indexOf('async function attemptPrivateComposerMessagePublish'),
+      app.indexOf('async function publishSelfNoteSnapshot'),
+    );
+    const divertIdx = dispatcher.indexOf('if (isRealSavedThread(context?.thread)) return publishSelfNoteSnapshot(context);');
+    const convIdx = dispatcher.indexOf('return attemptConvMessagePublishDirect(context);');
+    expect(divertIdx).toBeGreaterThan(-1);
+    expect(convIdx).toBeGreaterThan(-1);
+    expect(divertIdx).toBeLessThan(convIdx);
+
+    // A save on top of an INCOMPLETE restore would overwrite the chunks that restore could not read. Held, not warned.
+    expect(app).toMatch(/let selfNotesRestoreIncomplete = false;/);
+    expect(app).toMatch(/if \(selfNotesRestoreIncomplete\) \{[\s\S]{0,240}?code = 'PLATHO_NOTES_RESTORE_INCOMPLETE'/);
+    expect(app).toMatch(/selfNotesRestoreIncomplete = !clean;/);
+
+    // Both notes failures are DETERMINISTIC — an auto-retry loop cannot fix a full notepad or a partial read.
+    const fatal = app.slice(app.indexOf('function isFatalPrivateSendError'), app.indexOf('function isRecoverablePrivateSendError'));
+    expect(fatal).toMatch(/code === 'PLATHO_NOTES_FULL'/);
+    expect(fatal).toMatch(/code === 'PLATHO_NOTES_RESTORE_INCOMPLETE'/);
+
+    // Funds are checked against the number of slots this save actually writes, before signing.
+    expect(app).toMatch(/RECOVERY_PUBLISH_VALUE \* BigInt\(built\.publishes\.length\) \+ WALLET_FEE_HEADROOM_NANOTONS/);
+    // A snapshot identical to what is already stored writes nothing and still reports the note delivered.
+    expect(app).toMatch(/if \(built\.publishes\.length === 0\) \{ markDirectSendPublished\(thread, message\); return \{ selfNote: true, wrote: 0 \}; \}/);
+    // Every user-facing notes string is localized (no developer text reaching the composer status).
+    for (const key of ['notes.walletLocked', 'notes.rpcUnavailable', 'notes.full', 'notes.restoreIncomplete']) {
+      expect(app.includes(`t('${key}')`), `${key} must be surfaced through the localizer`).toBe(true);
+    }
   });
 });
