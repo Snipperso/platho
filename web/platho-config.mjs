@@ -9,21 +9,14 @@ const VALID_MODES = new Set(Object.values(PLATHO_APP_MODES));
 
 export const REQUIRED_TON_RPC_CRITICAL_METHODS = Object.freeze([
   'get_global',
-  'get_user',
-  'get_key_record',
-  'get_canonical_publish_charge',
   'get_state',
-  'get_private_entry',
-  'get_private_recipient_index',
-  'get_private_sender_index',
-  'get_private_page',
-  'get_public_entry',
-  'get_public_page',
-  // get_name_record (retired 2026-07-20 with UsernameRegistry.name_records) and get_avatar / get_avatar_version
-  // (retired 2026-07-21 with ProfileRegistry's per-profile maps) are deliberately ABSENT. Both registries now
-  // answer WHERE the per-user contract is, and the record itself is read from that contract — get_view on the
-  // wallet's KeyShard for the avatar, the NFT item for a name. Leaving a retired method here would silently
-  // demand verification of a call nothing makes.
+  // Retired methods are deliberately ABSENT — leaving one here would silently demand verification of a call
+  // nothing makes. Gone with their contracts: get_user / get_key_record / get_user_receipts /
+  // get_canonical_publish_charge / get_ath_withdrawal_id / get_pending_ath_withdrawal_for (Vault),
+  // get_private_entry / get_private_recipient_index / get_private_sender_index / get_private_page /
+  // get_public_entry / get_public_page (CapsuleHub), get_name_record (UsernameRegistry.name_records),
+  // get_avatar / get_avatar_version (ProfileRegistry's per-profile maps). Both registries now answer WHERE the
+  // per-user contract is, and the record itself is read from that contract — get_view on the wallet's KeyShard.
   'get_username_item_address',
   'get_key_shard_address',
   'get_view',

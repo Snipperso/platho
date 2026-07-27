@@ -168,21 +168,23 @@ describe('PWA runtime config guard', () => {
     // central-proxy/gateway finding — there is no single bespoke host to block or DoS.
     expect(validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => finding.id))
       .not.toContain('PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN');
-    // verifyCriticalReads stays false: message bodies self-verify against CapsuleHub hashes, so a single
-    // (even untrusted) provider read cannot poison them, and routine cross-verification would only burn the
+    // verifyCriticalReads stays false: a shard message body self-verifies against the hashes in its own header, so a
+    // single (even untrusted) provider read cannot poison it, and routine cross-verification would only burn the
     // per-user budget. Keyless toncenter stays strictly an emergency primary/send/history fallback, never
     // an "on equal footing" verifier.
     expect(PLATHO_APP_CONFIG.network.tonRpc.verifyCriticalReads).toBe(false);
-    for (const method of [
-      'get_state',
-      'get_private_entry',
-      'get_private_recipient_index',
-      'get_private_sender_index',
-      'get_private_page',
-      'get_public_entry',
-      'get_public_page',
-    ]) {
+    // The clean-17 shard reads. The CapsuleHub entry/index getters that used to be listed here died with the
+    // contract — see the not.toContain block below, which is the half that matters: a RETIRED method left pinned
+    // as critical silently demands verification of a call nothing makes.
+    for (const method of ['get_state', 'get_global']) {
       expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain(method);
+    }
+    for (const retired of [
+      'get_user', 'get_key_record', 'get_user_receipts', 'get_canonical_publish_charge',
+      'get_private_entry', 'get_private_recipient_index', 'get_private_sender_index', 'get_private_page',
+      'get_public_entry', 'get_public_page',
+    ]) {
+      expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods, `${retired} died with its contract`).not.toContain(retired);
     }
     // The two per-user record reads: a name resolves through its NFT item, an avatar through the wallet's
     // KeyShard get_view. Both replaced registry getters that had to die with the maps behind them.
@@ -3057,7 +3059,7 @@ describe('PWA runtime config guard', () => {
         tonRpc: {
           ...productionConfig.network.tonRpc,
           criticalMethods: REQUIRED_TON_RPC_CRITICAL_METHODS.filter(
-            (method) => !['dnsresolve', 'get_wallet_address', 'get_canonical_publish_charge'].includes(method),
+            (method) => !['dnsresolve', 'get_wallet_address', 'get_view'].includes(method),
           ),
         },
       },
@@ -3069,7 +3071,7 @@ describe('PWA runtime config guard', () => {
       expect.arrayContaining([
         expect.stringContaining('dnsresolve'),
         expect.stringContaining('get_wallet_address'),
-        expect.stringContaining('get_canonical_publish_charge'),
+        expect.stringContaining('get_view'),
       ]),
     );
   });
