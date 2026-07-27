@@ -10,102 +10,22 @@ describe('public publish heal driver guard', () => {
   const app = readFileSync('web/app.js', 'utf8');
   const css = readFileSync('web/styles.css', 'utf8');
 
-  it('PWA-PUBLIC-HEAL-01: the public confirm driver exists and reuses the private core', () => {
-    expect(app).toMatch(/const publicPublishConfirmJobs = new Map\(\)/);
-    expect(app).toMatch(/function startPublicPublishConfirmation\(record\)/);
-    expect(app).toMatch(/async function runPublicPublishConfirmationPass\(job\)/);
-    // The pass reuses the SAME idempotent core as private sends: the fresh-variant heal ladder (<=1 sendBoc
-    // per pass — the v630 serial-pump lesson reused as code) and the CapsuleHub confirm.
-    const pass = app.slice(app.indexOf('async function runPublicPublishConfirmationPass'), app.indexOf('function resumePendingPublicPublishConfirmations'));
-    expect(pass).toMatch(/retryUnconfirmedVaultPublishBroadcasts\(publishState, \{/);
-    expect(pass).toMatch(/confirmCapsuleHubPublishEntries\(publishState, \{/);
-    expect(pass).toMatch(/owner: resolvePublishOwner\(publishState\)/);
-    // Same cadence engine as private (settle/active/unlanded/stretch + 429 backoff) via the shim.
-    expect(pass).toMatch(/privatePublishConfirmDelayMs\(\{ publishState, createdAtMs: job\.createdAt \}, passError\)/);
-  });
-
-  it('PWA-PUBLIC-HEAL-02: age terminals fire before the RPC, gated on one healing pass per session', () => {
-    const pass = app.slice(app.indexOf('async function runPublicPublishConfirmationPass'), app.indexOf('function resumePendingPublicPublishConfirmations'));
-    // v648: the no-progress terminal is the part-count-scaled helper (shared with the private drivers).
-    // v760: both terminals require ONE completed pass this session (publicPublishConfirmPassRanThisSession)
-    // so a reload attempts healing before it may bury a record; the post-offline RPC cost stays bounded
-    // (exactly one pass per stale record before its terminal may fire).
-    const terminalIndex = pass.indexOf('publishConfirmNoProgressDeadlineMs(publishState)');
-    const rpcIndex = pass.indexOf('retryUnconfirmedVaultPublishBroadcasts');
-    expect(terminalIndex).toBeGreaterThan(-1);
-    expect(rpcIndex).toBeGreaterThan(terminalIndex);
-    expect(pass).toMatch(/publicPublishConfirmPassRanThisSession\.has\(passKey\)\s*\n\s*&& publishState\?\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED/);
-    expect(pass).toMatch(/PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS/);
-    expect(pass).toMatch(/publishStateBroadcastIsFailing\(publishState\)/);
-    expect(pass).toMatch(/publishStatus: 'public publish failed'/);
-  });
-
-  it('PWA-PUBLIC-HEAL-03: resume-on-reload heals pending public records alongside the private driver', () => {
-    // clean-17 direct-pay: public post/comment publish SYNCHRONOUSLY (no Vault PARTIAL/SUBMITTED intermediate), so the
-    // submit path does NOT arm startPublicPublishConfirmation. A mid-flight record (publishStatus 'sending', no
-    // publishState) is healed on reload by the shared resume machinery — merge with the on-chain twin (bodyHash) or
-    // terminal to 'failed' past the no-progress deadline. The driver stays defined for any publishState record.
-    expect(app).toMatch(/return \{ channelId, localId \};/);
-    expect(app).toMatch(/return \{ channelId, localId: commentLocalId \};/);
-    // Resume-on-reload is wired at every private resume hook — asserted as PARITY, not as a magic count: the two
-    // hooks that lived inside the deleted CapsuleHub sync functions took the old count (>=5) with them, and a
-    // number would have to be re-tuned on every such removal while saying nothing about the invariant.
-    const publicResumes = app.match(/resumePendingPublicPublishConfirmations\(\);/g)?.length ?? 0;
-    const privateResumes = app.match(/resumePendingPrivatePublishConfirmations\(\);/g)?.length ?? 0;
-    expect(publicResumes).toBe(privateResumes);
-    expect(publicResumes).toBeGreaterThanOrEqual(3);
-    expect(app).toMatch(/function resumePendingPublicPublishConfirmations\(\)/);
-  });
-
-  it('PWA-PUBLIC-HEAL-04: driver state is persisted back into the feed cache and stops on merge', () => {
-    // Each pass write-backs the LIVE publishState (feed syncs rebuild the cache via safeClone, detaching refs).
-    expect(app).toMatch(/function persistPublicPublishProgress\(job, patch = \{\}\)/);
-    // Persist always writes the cache; the repaint is the status-only fast path (patch the badge in place,
-    // scroller untouched) with the full renderPublicSurface as the structural fallback (see PWA-CHAT-SCROLL-01).
-    expect(app).toMatch(/writePublicChannelFeedCache\(publicChannelStorage\(\), publicChannelFeedCache\);/);
-    expect(app).toMatch(/if \(!patchPublicPublishBadgesInPlace\(job, patchedItem\)\) renderPublicSurface\(\{ anchorUnread: false \}\);\s*return located;/);
-    // A record that merged with its on-chain twin (or vanished) stops the driver quietly.
-    expect(app).toMatch(/if \(!located \|\| !isPendingPublicFeedItem\(located\.item\)\) \{\s*stopPublicPublishConfirmation\(job\);/);
-    // Account switch clears public jobs like private ones.
-    expect(app).toMatch(/publicPublishConfirmJobs\.clear\(\);/);
-  });
-
-  it('PWA-PUBLIC-DIRECT-01: a direct publish pre-checks the wallet and stays PENDING until the chain twin lands', () => {
-    const postSource = app.slice(
-      app.indexOf('async function submitPublicPostDirect'),
-      app.indexOf('async function publishChannelProfileDirect'),
+  // PWA-PUBLIC-HEAL-01/02/03/04 removed with the public Vault confirm driver. Every one of them pinned a
+  // machine that only ran for a record carrying a publishState: the fresh-variant re-broadcast ladder, the
+  // per-batch receipt confirm, the driver's persistence back into the feed cache. A direct-pay public record
+  // never has a publishState (its publish IS one wallet transfer), so the driver could not start — it is gone.
+  // What survives, and is pinned below, is the honest end state: a record stuck optimistic past the no-progress
+  // deadline is TERMINALED on resume instead of showing 'sending' forever, and the badge is CSS-class based.
+  it('PWA-PUBLIC-HEAL-03B: resume terminals a stuck optimistic public record instead of leaving it sending', () => {
+    const resume = app.slice(
+      app.indexOf('function resumePendingPublicPublishConfirmations'),
+      app.indexOf('function rememberLocalPublicPost'),
     );
-    const commentSource = app.slice(
-      app.indexOf('async function submitPublicCommentDirect'),
-      app.indexOf('globalThis.plathoVaultTransactions'),
-    );
-
-    // 1. AFFORDABILITY BEFORE SIGNING. The wallet stamps SendIgnoreErrors on every action
-    // (platho-wallet.mjs `sendMode | 2`), so an action it cannot fund is skipped SILENTLY: the transaction
-    // still commits, seqno still advances, sendBoc still returns 200, nothing throws. For a multipart post
-    // that means the fundable prefix lands, the rest is dropped, and the reader discards the incomplete
-    // stream — the user is told "public published" for a post that does not exist.
-    const wallet = readFileSync('web/platho-wallet.mjs', 'utf8');
-    expect(wallet).toMatch(/const safeSendMode = sendMode \| 2;/);
-    for (const source of [postSource, commentSource]) {
-      expect(source).toMatch(/await assertWalletGramAtLeast\(value \* BigInt\(parts\.length\) \+ WALLET_FEE_HEADROOM_NANOTONS/);
-    }
-    // The private lane carries the same rule, and there it is worse: a CONV part burns a monotonic seq, so a
-    // silently dropped tail cannot be re-sent under the same seq.
-    expect(app).toMatch(/await assertWalletGramAtLeast\(CONV_PUBLISH_VALUE \* BigInt\(parts\.length\) \+ WALLET_FEE_HEADROOM_NANOTONS/);
-
-    // 2. THE RECORD STAYS PENDING AFTER BROADCAST. publishStatus is what marks a local record pending
-    // (isPendingPublicFeedItem), and only a pending record survives the sync merge — a chain-anchored one
-    // needs chainVerified + entryId, which a just-broadcast post does not have yet. Under Vault,
-    // publishStatus:null meant CHAIN CONFIRMED (set together with entryId); reusing it for "broadcast" made
-    // the record neither pending nor anchored, so the next background sync dropped the fresh post from the
-    // feed. The pending copy retires by itself when the chain twin with the same bodyHash appears.
-    expect(app).toMatch(/function isPendingPublicFeedItem\(item\) \{\s*return Boolean\(item\?\.publishStatus &&/);
-    expect(postSource).toMatch(/\{ publishStatus: 'public published, confirming' \}/);
-    expect(commentSource).toMatch(/\{ publishStatus: 'comment published, confirming' \}/);
-    for (const source of [postSource, commentSource]) {
-      expect(source).not.toMatch(/\{ publishStatus: null \}/);
-    }
+    expect(resume).toMatch(/if \(!isPendingPublicFeedItem\(item\)\) continue;/);
+    expect(resume).toMatch(/Date\.now\(\) - createdAt >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
+    expect(resume).toMatch(/publishStatus: 'public publish failed'/);
+    // Resume is wired at the same hooks as the private side (parity, not a magic count).
+    expect(app.match(/resumePendingPublicPublishConfirmations\(\);/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 
   it('PWA-PUBLIC-HEAL-05: pending badge is CSS-class based (prod CSP bans inline styles) and the dead option is gone', () => {
@@ -192,110 +112,7 @@ describe('public publish heal driver guard', () => {
   });
 });
 
-describe('public publish manual retry', () => {
-  const app = readFileSync('web/app.js', 'utf8');
-  const css = readFileSync('web/styles.css', 'utf8');
+// PWA-PUBLIC-HEAL-10 removed with retryPublicPublishFromUi: the badge could only re-arm a publishState-driven
+// driver, and a direct publish parks no signed external to re-broadcast. Restoring a public retry means giving the
+// direct path a captured BOC first (roadmap: ACK-without-delivery) — the private lane already has one.
 
-  it('PWA-PUBLIC-HEAL-10: a terminaled public publish retries from its badge (nonce-floor escape without reload)', () => {
-    // The FAILED badge itself is the affordance (owner rule: no extra Retry/Dismiss buttons) — clickable +
-    // keyboard-accessible, and inert when nothing was ever signed (no publishState = nothing to re-broadcast).
-    expect(app).toMatch(/function retryPublicPublishFromUi\(item, kind\)/);
-    expect(app).toMatch(/function wirePublicPublishRetryBadge\(statusBadge, item, kind\)/);
-    expect(app).toMatch(/if \(!String\(item\?\.publishStatus \?\? ''\)\.endsWith\('failed'\) \|\| !item\?\.publishState\) return;/);
-    // Both badge render sites (feed post + comment) wire it.
-    expect(app).toMatch(/wirePublicPublishRetryBadge\(statusBadge, item, 'post'\);/);
-    expect(app).toMatch(/wirePublicPublishRetryBadge\(statusBadge, comment, 'comment'\);/);
-    // The retry mirrors the private already-signed branch: re-arm the broadcast budget on the SAME persisted
-    // publishState (same-nonce re-broadcast is idempotent) + a FRESH driver job so the scaled age terminal
-    // opens a new window.
-    const retry = app.slice(app.indexOf('function retryPublicPublishFromUi'), app.indexOf('function wirePublicPublishRetryBadge'));
-    expect(retry).toMatch(/resetPublishBroadcastBudgetForManualRetry\(item\.publishState\);/);
-    expect(retry).toMatch(/startPublicPublishConfirmation\(\{ channelId, localId, kind, createdAt: Date\.now\(\), publishState: item\.publishState \}\);/);
-    // Visual affordance is a CSS class (prod CSP bans inline styles).
-    expect(css).toMatch(/\.public-publish-status--retryable \{/);
-  });
-});
-
-describe('public comment parent_link publish wiring', () => {
-  // Chain forensics (2026-07-02, mainnet probe): EVERY public entry since genesis had parent_link=0 and
-  // get_public_parent_index(entryId) returned exists=false for all posts — comments were silently published as
-  // top-level posts because publishItemToBatchPart DROPPED parent_entry_id from the public part mapping. These
-  // tests pin the full client pipeline: draft -> batch part -> part cell bits the contract actually reads.
-  it('PWA-PUBLIC-PARENT-01: publishItemToBatchPart carries the comment parent and the part cell encodes parent_link=parentEntryId+1', async () => {
-    const [{ buildBatchPublishPartCell, tonCell }, { publishItemToBatchPart }, { Cell }] = await Promise.all([
-      import('../web/pwa-contract-transactions.mjs'),
-      import('../web/publish-batch-orchestration.mjs'),
-      import('@ton/core'),
-    ]);
-    const headerCell = tonCell.snakeCellFromBytes(new Uint8Array([1, 2, 3]), 'header');
-    const bodyCell = tonCell.snakeCellFromBytes(new Uint8Array([4, 5, 6]), 'body');
-    const asPayload = (cell) => ({ boc: tonCell.bytesToBase64(tonCell.serializeBoc(cell)) });
-    const draft = (parentEntryId) => ({
-      publish: {
-        publish_kind: 1n,
-        size_class: 1n,
-        header_hash: '0x' + '11'.repeat(32),
-        body_hash: '0x' + '22'.repeat(32),
-        header_cell: asPayload(headerCell),
-        body_cell: asPayload(bodyCell),
-        ...(parentEntryId === undefined ? {} : { parent_entry_id: parentEntryId }),
-      },
-    });
-    const parentLinkOf = (item) => {
-      const part = publishItemToBatchPart(item, 'public');
-      const cell = Cell.fromBoc(Buffer.from(tonCell.serializeBoc(buildBatchPublishPartCell(part))))[0];
-      const s = cell.beginParse();
-      s.loadUint(8); s.loadUint(8); // size_class, reserved
-      return s.loadUintBig(64); // parent_link — the exact field CapsuleHub loads at part.loadUint(64)
-    };
-    // A comment on entry 3 -> parent_link 4 (entryLink convention, parent indexed on-chain).
-    expect(parentLinkOf(draft(3n))).toBe(4n);
-    // Entry 0 stays unambiguous: a comment on entry 0 -> parent_link 1.
-    expect(parentLinkOf(draft(0n))).toBe(1n);
-    // A post (no parent) -> parent_link 0 (author-indexed).
-    expect(parentLinkOf(draft(undefined))).toBe(0n);
-  });
-
-  it('PWA-PUBLIC-PROFILE-01: the publish draft->part->cell pipeline carries is_profile into reserved bit0 (clean-11), default 0', async () => {
-    // Exercise the REAL mapper publishItemToBatchPart (NOT buildBatchPublishPartCell in isolation): the is_profile
-    // bit was dropped here (same field-drop class as parent_entry_id in PWA-PUBLIC-PARENT-01), so the profile-pointer
-    // reserved byte silently stayed 0. This pins the mapper end-to-end into the exact cell bits the contract reads.
-    const [{ buildBatchPublishPartCell, tonCell }, { publishItemToBatchPart }, { Cell }] = await Promise.all([
-      import('../web/pwa-contract-transactions.mjs'),
-      import('../web/publish-batch-orchestration.mjs'),
-      import('@ton/core'),
-    ]);
-    const headerCell = tonCell.snakeCellFromBytes(new Uint8Array([1, 2, 3]), 'header');
-    const bodyCell = tonCell.snakeCellFromBytes(new Uint8Array([4, 5, 6]), 'body');
-    const asPayload = (cell) => ({ boc: tonCell.bytesToBase64(tonCell.serializeBoc(cell)) });
-    const draft = (isProfile) => ({
-      publish: {
-        publish_kind: 1n,
-        size_class: 1n,
-        header_hash: '0x' + '11'.repeat(32),
-        body_hash: '0x' + '22'.repeat(32),
-        header_cell: asPayload(headerCell),
-        body_cell: asPayload(bodyCell),
-        ...(isProfile === undefined ? {} : { is_profile: isProfile }),
-      },
-    });
-    const reservedOf = (item) => {
-      const part = publishItemToBatchPart(item, 'public');
-      const cell = Cell.fromBoc(Buffer.from(tonCell.serializeBoc(buildBatchPublishPartCell(part))))[0];
-      const s = cell.beginParse();
-      s.loadUint(8); // size_class
-      return s.loadUint(8); // reserved — the exact byte CapsuleHub/Vault load at part.loadUint(8)
-    };
-    expect(reservedOf(draft(true))).toBe(1);       // is_profile survives the mapper -> bit0 set (clean-11 profile-chain thread)
-    expect(reservedOf(draft(false))).toBe(0);
-    expect(reservedOf(draft(undefined))).toBe(0);   // normal post — byte-identical to clean-10, no accidental flag
-  });
-
-  it('PWA-PUBLIC-PARENT-02: the mapping survives the field-name variants the app draft uses', async () => {
-    const { publishItemToBatchPart } = await import('../web/publish-batch-orchestration.mjs');
-    const base = { size_class: 1n, header_hash: '0x11', body_hash: '0x22', header_cell: { boc: 'x' }, body_cell: { boc: 'x' } };
-    expect(publishItemToBatchPart({ publish: { ...base, parent_entry_id: 7n } }, 'public').parent_entry_id).toBe(7n);
-    expect(publishItemToBatchPart({ publish: { ...base, parentEntryId: 7n } }, 'public').parent_entry_id).toBe(7n);
-    expect(publishItemToBatchPart({ publish: { ...base } }, 'public').parent_entry_id).toBeUndefined();
-  });
-});
