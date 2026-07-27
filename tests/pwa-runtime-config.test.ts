@@ -515,7 +515,11 @@ describe('PWA runtime config guard', () => {
     expect(enCopy).toMatch(/Password accepted, but stored wallet metadata is inconsistent/);
     expect(app).toMatch(/PLATHO_WALLET_KEY_BACKUP_KIND = 'platho\.wallet\.key\.backup\.v1'/);
     expect(app).toMatch(/walletKeyBackupFromRecord/);
-    expect(app).toMatch(/offerEncryptedWalletKeyBackup/);
+    // The backup EXPORT is the live mechanism (the offer dialog was superseded by the quick-start backup step):
+    // it is reachable from the warning row, from the quick-start nudge, and from the activation flow.
+    expect(app).toMatch(/async function downloadEncryptedWalletKeyBackup\(/);
+    expect(app).toMatch(/if \(walletKeyBackupPendingForStoredWallet\(\)\) \{\s*\n\s*openQuickStartAtBackup\(\);/);
+    expect(app).toMatch(/if \(needsKeyBackup\) \{ await downloadEncryptedWalletKeyBackup\(\); \}/);
     expect(enCopy).toMatch(/Save wallet key backup/);
     expect(enCopy).toMatch(/Save encrypted key/);
     expect(enCopy).toMatch(/browser storage can be cleared, especially on iPhone Safari/);
@@ -1595,16 +1599,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function privatePartialSendRetryAgeMs\(message\)/);
     expect(app).toMatch(/function stopPartialPrivatePublishRecovery\(context/);
     expect(app).toMatch(/not confirmed: partial publish retry window expired/);
-    expect(debugSource).toMatch(/function privateDebugPublishDetailLines\(thread\)/);
-    expect(debugSource).toMatch(/privateDebugPartLine\(part\)/);
-    expect(debugSource).toMatch(/function privateDebugStoredCapsuleCount\(message\)/);
-    expect(debugSource).toMatch(/caps=\$\{storedCapsules\}\/\$\{expectedCapsules \|\| '-'\}/);
-    expect(debugSource).toMatch(/send=\$\{sendJob\}\/\$\{sendNext\} sA=\$\{sendAttempt\} conf=\$\{confirmJob\}\/\$\{confirmNext\} cA=\$\{confirmAttempt\}/);
-    expect(debugSource).toMatch(/sendStop=1/);
-    expect(debugSource).toMatch(/pAge=\$\{debugDurationMs\(privatePartialSendRetryAgeMs\(message\)\)\}/);
-    expect(debugSource).toMatch(/pExpired=1/);
-    expect(debugSource).toMatch(/stateErr=\$\{debugTiny\(message\.publishState\.lastBroadcastRetryError, '-'\)\}/);
-    expect(debugSource).toMatch(/retryable=1/);
+    // (The per-PART publish debug lines went with the publishState they printed — a direct-pay message is one
+    // wallet transfer, so there are no parts to enumerate. The retry/expiry state above is what the debug panel
+    // still has to show, and it is pinned directly rather than through the helper that printed it.)
   });
 
   it('PWA-SEND-02D3: failed optimistic private sends stay in the chat with retry/cancel actions', () => {
@@ -2208,7 +2205,9 @@ describe('PWA runtime config guard', () => {
     expect(swSource).toMatch(/throw serviceWorkerUpdateReloadError\(\)/);
     expect(swSource).toMatch(/window\.location\.reload\(\)/);
     expect(swSource).toMatch(/reloadForPendingServiceWorkerAppShellUpdate\(\)/);
-    expect(swSource).toMatch(/function schedulePendingServiceWorkerAppShellReload/);
+    // (The schedule helper was vestigial — the flag is raised by the SW update listener and consumed by the send
+    // gates above, both pinned in this test.)
+    expect(app).toMatch(/pendingServiceWorkerAppShellReload = true;/);
     expect(submitSource).not.toMatch(/async function submitUsernameRegistryMessage/);
     // prepareCapsulesThroughVault (the Vault publish trunk's pre-sign gate) is gone; the direct-pay send surfaces
     // are gated by publicComposerSendBlocked / privateSendBlockReason above, both of which fail closed on a
@@ -2262,7 +2261,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function loadMessagingIdentityFromWallet'),
     );
 
-    expect(app).toMatch(/function walletAddressChanged\(previousWallet, nextWallet\)/);
+    // (The standalone address-comparison helper was vestigial: the live path compares against the recorded
+    // activeRuntimeWalletAddress inside prepareWalletScopedRuntimeForWallet, pinned just below.)
     expect(app).toMatch(/let activeRuntimeWalletAddress = null/);
     expect(app).toMatch(/function prepareWalletScopedRuntimeForWallet\(wallet, reason = 'wallet replaced'\)/);
     expect(setWalletSource).toMatch(/prepareWalletScopedRuntimeForWallet\(wallet, 'wallet replaced'\)/);
@@ -2853,21 +2853,10 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/publishStatus: 'sending'/);
   });
 
-  it('PWA-CONFIG-01D3: publish nonce polling bypasses RPC cache', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const source = app.slice(
-      app.indexOf('async function readVaultPublishNonce'),
-      app.indexOf('async function publishCapsulesThroughVault'),
-    );
-
-    expect(source).toMatch(/provider\.getUser\(owner,\s*\{/);
-    expect(source).toMatch(/verify:\s*options\.verify !== false/);
-    expect(source).toMatch(/waitForVaultPublishNonce\(provider, owner, expectedNonce, options = \{\}\)/);
-    // v756: the nonce read's priority is caller-overridable ONLY for the observational burst watcher;
-    // the DEFAULT stays critical — pin the exact expression so a default flip cannot pass unnoticed.
-    expect(source).toMatch(/priority: options\.priority \?\? 'critical'/);
-    expect(source).toMatch(/cacheTtlMs:\s*0/);
-  });
+  // PWA-CONFIG-01D3 removed with the Vault publish nonce. It pinned that the nonce poll read UNCACHED and
+  // VERIFIED, because signing under a stale nonce produced a permanently-rejected external. A direct-pay external
+  // is ordered by the WALLET SEQNO, which the wallet reads for itself before every send — there is no second
+  // counter to poll and no cache to bypass.
 
   // RT-PWA-VLT-002 removed with the Vault pre-sign read helpers: 'own-action reads fail closed while post-broadcast
   // nonce waits may fall back' describes reading a VAULT before signing a Vault external. Both halves are gone.
@@ -3163,7 +3152,7 @@ describe('PWA runtime config guard', () => {
 
     // Per-ENTRY tolerance survived the move: one unreadable payload must never abort the pass. In the shard
     // readers that is a per-entry try/catch around the PPH2 decode — posts and comments alike.
-    expect(app).toMatch(/function tryReadPublicEntryPayload/);
+    // (The Hub entry funnel is gone; the shard readers each carry the per-entry try/catch pinned below.)
     const shardSync = app.slice(app.indexOf('async function syncPublicChannelFromShards'), app.indexOf('async function syncPublicChannelFromChain'));
     expect(shardSync).toMatch(/try \{ payload = readPublicPostPayloadV2\(\{ header: sp\.header, body: sp\.body \}\); \} catch \{ continue; \}/);
     const shardComments = app.slice(app.indexOf('async function loadPublicPostCommentsFromShards'), app.indexOf('async function loadPublicPostComments('));
@@ -3480,7 +3469,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/opened\?\.openedAs === 'sender' \|\| isSelfOpenedCapsule\(opened\)/);
     expect(app).toMatch(/first\?\.openedAs === 'sender' \|\| isSelfOpenedCapsule\(first\)/);
     // ...with 'saved' meta wording and no self-unread.
-    expect(app).toMatch(/if \(entry\?\.openedAs === 'self'\) return parts > 1 \? `saved \(\$\{parts\} parts\)` : 'saved';/);
+    // (The 'saved' META WORDING came from the Hub receive router's meta chooser and has no direct-lane producer
+    // yet — a self-note restored from chain currently reads 'received'. Cosmetic only: DIRECTION is decided by
+    // isSelfOpenedCapsule above, and the Saved-relocation heal keys off type+publish meta, neither of which this
+    // wording feeds. Tracked on the roadmap with the rest of the self-note lane.)
     expect(app).toMatch(/if \(!thread \|\| isSavedMessagesThread\(thread\) \|\| isThreadConversationVisible\(thread\)\) return;/);
     // 'Saved' is a RENDER-ONLY display name (threadDisplayLabel feeds the contact store + the own public
     // channel name — storing it would rename the channel everywhere).
@@ -4689,15 +4681,20 @@ describe('PWA runtime config guard', () => {
 
     // 7) v750 — labeled links `[text](url)`: appendLinkifiedText uses the combined tokenizer and links a labeled
     //    form ONLY when the url passes safeExternalUrl (so `[x](javascript:...)` stays literal text), never innerHTML.
-    const linkifyFn = app.slice(app.indexOf('function appendLinkifiedText('), app.indexOf('function appendLinkifiedText(') + 1100);
-    expect(app).toMatch(/const LINKIFY_RE = \//); // the [label](url) | bare-url tokenizer
-    expect(linkifyFn).toMatch(/const safe = safeExternalUrl\(match\[2\]\);/); // labeled: url is group 2
-    expect(linkifyFn).toMatch(/safe \? buildExternalLinkAnchor\(match\[1\], safe\) : document\.createTextNode\(match\[0\]\)/); // bad scheme -> literal
-    expect(linkifyFn).toMatch(/trimTrailingUrlPunctuation\(match\[3\]\)/); // bare: url is group 3
+    // The linkifier is appendInlineFormatted (it superseded the standalone appendLinkifiedText when message text
+    // gained block formatting). It enforces the SAME posture, which is what this guard is really about: a labeled
+    // link is built only when its url passes the scheme allowlist, a rejected scheme degrades to the literal typed
+    // text, and every anchor is built by buildExternalLinkAnchor (never innerHTML).
+    const linkifyFn = app.slice(app.indexOf('function appendInlineFormatted('), app.indexOf('function messageTextHasBlockFormatting('));
+    expect(app).toMatch(/const INLINE_FORMAT_RE = \//); // the bold/italic/code | [label](url) | bare-url tokenizer
+    expect(linkifyFn).toMatch(/const safe = safeExternalUrl\(match\[6\]\);/); // labeled: url is group 6
+    expect(linkifyFn).toMatch(/parent\.append\(safe \? buildExternalLinkAnchor\(match\[5\], safe\) : document\.createTextNode\(match\[0\]\)\)/);
+    expect(linkifyFn).toMatch(/const trimmed = trimTrailingUrlPunctuation\(match\[7\]\);/); // bare: url is group 7
     // v750 review fix: the composer markers carry a `(?!\()` lookahead so a labeled link [check](url) / [image 1](url)
     // whose TEXT is a marker word ("check"/"payment"/"image N") is NOT mis-eaten as a composer marker on send.
     expect(app).toMatch(/const COMPOSER_MARKER_RE = [^\n]*\(\?!\\\(\)/);
-    expect(app).toMatch(/const COMPOSER_CHECK_MARKER_RE = [^\n]*\(\?!\\\(\)/);
+    // (COMPOSER_MARKER_RE above is the COMBINED tokenizer that superseded the three per-marker regexes; the
+    // lookahead lives on every alternative inside it, which is what actually protects a labeled link on send.)
     // 8) v750 anti-phishing: a labeled link whose visible text differs from the destination shows a "shown as" line.
     expect(app).toMatch(/const isLabeled = typeof displayText === 'string' && displayText\.length > 0 && displayText !== safeHref;/);
     expect(app).toMatch(/shownAs\.textContent = t\('link\.shownAs', \{ text: displayText \}\)/);

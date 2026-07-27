@@ -82,25 +82,24 @@ describe('public publish heal driver guard', () => {
     expect(app).toMatch(/publicPostCommentsCache\.clear\(\);/);
   });
 
-  it('PWA-PUBLIC-HEAL-09: public entry BODIES persist per-entry + unconditionally (the private-message model — no body re-download on reload)', () => {
-    // A per-ENTRY durable BoC store hooked into resolvePublicEntryPayload — the single funnel every public body
-    // reader (feed sync, post detail, avatar payloads) goes through. Hash-pinned: a hit is accepted only when the
-    // stored body_hash matches the entry's on-chain hash (bodies are immutable, so a match is authoritative).
-    expect(app).toMatch(/const publicEntryBodyStorePromise = \(\(\) => \{/);
-    expect(app).toMatch(/scopedIndexedDbName\('platho-public-entry-bodies-v1'\)/);
-    expect(app).toMatch(/async function readCachedPublicEntryBody\(entryId\)/);
-    expect(app).toMatch(/async function writeCachedPublicEntryBody\(entryId, bodyBoc, bodyHashHex\)/);
-    const funnel = app.slice(app.indexOf('async function resolvePublicEntryPayload'), app.indexOf('async function resolvePrivateEntryBody'));
-    const readIdx = funnel.indexOf('const cachedBody = await readCachedPublicEntryBody(entry?.entry_id);');
-    const chainIdx = funnel.indexOf('await provider.resolvePublicEntryBody(entry, {');
-    const writeIdx = funnel.indexOf('writeCachedPublicEntryBody(entry.entry_id, hydrated.body_boc, entryBodyHashHex);');
-    expect(readIdx).toBeGreaterThan(-1);
-    expect(chainIdx).toBeGreaterThan(-1);
-    expect(readIdx).toBeLessThan(chainIdx); // durable read precedes the ~32KB live body read
-    expect(writeIdx).toBeGreaterThan(chainIdx); // live resolve persists unconditionally (fire-and-forget)
-    expect(funnel).toMatch(/cachedBody\.body_hash === entryBodyHashHex/); // hash-pinned hit
-    // The cached path re-parses through the SAME pipeline as a live read (zero decode drift).
-    expect(funnel).toMatch(/hydrated = \{ \.\.\.entry, body_boc: cachedBody\.body_boc \};/);
+  it('PWA-PUBLIC-HEAL-09: public post media persists across a reload (no image re-download from the chain)', () => {
+    // The owner-flagged defect was "images re-download from the blockchain on every reload". Under the Hub that was
+    // fixed with a per-ENTRY raw-BoC cache, because the shared entry log returned body_boc:null and every body was a
+    // SEPARATE ~32KB getMessages read. A shard read returns the body WITH the message, so that cache has no
+    // equivalent and is gone; the invariant now rests on the DECODED media store plus the feed cache.
+    expect(app).toMatch(/const publicPostMediaStorePromise = \(\(\) => \{/);
+    expect(app).toMatch(/scopedIndexedDbName\('platho-public-post-media-v1'\)/);
+    // Warmed BEFORE the first render, so a reloaded post shows its image in ms without waiting for the chain walk.
+    expect(app).toMatch(/async function warmPublicPostImagesFromCache\(\)/);
+    const warm = app.slice(app.indexOf('async function warmPublicPostImagesFromCache('), app.indexOf('async function persistPublicPostImageMedia('));
+    expect(warm).toMatch(/if \(publicPostRenderableImageMedia\(post\)\) return;/); // already carries its image — skip
+    expect(warm).toMatch(/const raws = await store\.getMany\(pending\.map\(\(entry\) => entry\.key\)\);/);
+    expect(warm).toMatch(/if \(applyPublicPostMediaRecord\(post, media\)\) changed = true;/);
+    // Written after a sync for every cached post that has an image, once per key (persistedPublicPostMediaKeys).
+    const persist = app.slice(app.indexOf('async function persistPublicPostImageMedia('), app.indexOf('async function persistPublicPostImageMedia(') + 1400);
+    expect(persist).toMatch(/if \(!key \|\| persistedPublicPostMediaKeys\.has\(key\)\) return;/);
+    expect(persist).toMatch(/if \(!media\) return; \/\/ no image yet — leave the key unmarked so a later sync persists it/);
+    expect(persist).toMatch(/await store\.put\(key, JSON\.stringify\(media\)\);/);
     // A degraded detail load still persists the assembled snapshot (accumulate-never-wipe) with latestLink=null.
     const refresh = app.slice(app.indexOf('async function refreshPublicPostDetailComments'), app.indexOf('async function refreshPublicPostDetailComments') + 3600);
     expect(refresh).toMatch(/writeCachedPublicComments\(cacheKey, durablePartial, publicPostDetailParentExists === true, null\)/);
