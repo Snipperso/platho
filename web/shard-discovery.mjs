@@ -71,6 +71,21 @@ export const RECOVERY_NAMED_SLOTS = 16;
 export const PREFS_NAMED_SLOT_INDEX = RECOVERY_MAX_SLOTS;
 
 /**
+ * The named-slot RANGE that carries self-notes ("My notes").
+ *
+ * Notes cannot ride the CONV lane at all: a conversation with yourself has no direction to derive
+ * (conversationOrder refuses self==self by construction and points here), which is why they get the self lane the
+ * crypto layer already reserved for self-data. They need a RANGE rather than one slot because a slot holds a
+ * MEASURED ~7.4 KB of plaintext (RS_MAX_BLOB_CELLS=79 cells of base64-in-JSON around AES-GCM ciphertext) — about
+ * two dozen tweet-length notes, which is not a notepad. Eight slots give ~59 KB.
+ *
+ * The range stops at 8 on purpose: [265, 272) stays free for the next durable-self type (block lists, settings),
+ * exactly as prefs left room for notes.
+ */
+export const NOTES_NAMED_SLOT_BASE = RECOVERY_MAX_SLOTS + 1;
+export const NOTES_NAMED_SLOT_COUNT = 8;
+
+/**
  * The RecoveryShard self_bucket_key for one of an owner's slots: H(RS_SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index) as a
  * uint256, mirroring RecoveryShard.slotKeyForOwner. Binding the slot to the key is what closes the post-eviction
  * squat (gate 13575) — only the seed-holder who derived owner_pubkey can name any of these addresses.

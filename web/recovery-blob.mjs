@@ -31,6 +31,14 @@ const PREFS_BLOB_INFO = 'PLATHO.PREFS.BLOB.KEY.V1';
 const PREFS_BLOB_H0_DOMAIN = 'PLATHO.PREFS.BLOB.V1';
 const PREFS_BLOB_SEAL_DOMAIN = 'PLATHO.PREFS.BLOB.SEAL.V1';
 const PREFS_SEAL_VERSION = 1;
+// Self-notes ("My notes") live in their OWN named-slot range, sealed under the seed with a THIRD domain: the same
+// salt, a distinct HKDF info string. A note blob and a prefs blob can therefore never be cross-decrypted even under
+// the same seed, and a wrong seed still fails on the GCM tag. The blob is per-CHUNK — see notes-lane.
+const NOTES_BLOB_INFO = 'PLATHO.NOTES.BLOB.KEY.V1';
+const NOTES_BLOB_H0_DOMAIN = 'PLATHO.NOTES.BLOB.V1';
+const NOTES_BLOB_SEAL_DOMAIN = 'PLATHO.NOTES.BLOB.SEAL.V1';
+const NOTES_BLOB_NONCE_INFO = 'PLATHO.NOTES.BLOB.NONCE.V1';
+const NOTES_SEAL_VERSION = 1;
 const AES_GCM_NONCE_BYTES = 12;
 const SEAL_VERSION = 2;   // v2 = compact record form (v1 was the full conv record)
 
@@ -179,5 +187,79 @@ export async function openPrefsBlob(seed, body) {
     return new Uint8Array(plaintext);
   } catch {
     return null;   // wrong seed (GCM tag fail) or a malformed body — never throw into the restore path
+  }
+}
+
+// ── notes blob (the self-notes chunks: raw notes bytes, sealed under the seed) ─────────────────────────────────────
+// AAD binds the chunk INDEX as well as the domain: a chunk lifted from slot k and replayed into slot j fails to open,
+// so a reordering attack on the slot range cannot silently permute the note history.
+const notesSealAad = (chunkIndex) => utf8(JSON.stringify({
+  domain: NOTES_BLOB_SEAL_DOMAIN, version: NOTES_SEAL_VERSION, chunk: Number(chunkIndex),
+}));
+
+/** The AES-GCM notes blob key from the seed — domain-separated from the recovery and prefs keys by its HKDF info. */
+async function notesBlobKey(seed) {
+  const ikm = seed instanceof Uint8Array ? seed : Uint8Array.from(seed);
+  const material = await cryptoApi().subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  const bits = await cryptoApi().subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: utf8(RECOVERY_BLOB_SALT), info: utf8(NOTES_BLOB_INFO) }, material, 256);
+  return cryptoApi().subtle.importKey('raw', bits, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+/**
+ * The notes nonce is SYNTHETIC (derived from the content), not random — a deliberate deviation from the prefs and
+ * recovery blobs, and the reason the notes lane can tell an unchanged chunk from a changed one for free.
+ *
+ * With a random nonce, sealing the same notes twice yields different bytes and therefore a different content hash
+ * (h1), so "has this chunk changed?" could only be answered by DOWNLOADING and decrypting every chunk on every
+ * backup — eight extra chain reads per note written. With nonce = HKDF(seed; chunk ‖ plaintext) the blob is a pure
+ * function of the content, so a re-backup of unchanged notes reproduces the stored h1 exactly and costs nothing.
+ *
+ * This is safe precisely because it is content-derived: AES-GCM breaks when one key+nonce encrypts DIFFERENT
+ * plaintexts, and here an identical nonce implies an identical plaintext by construction (the SIV rule). What it
+ * reveals — that a chunk's content is unchanged — is exactly what the skip already announces by not writing.
+ */
+async function notesBlobNonce(seed, chunkIndex, plain) {
+  const ikm = seed instanceof Uint8Array ? seed : Uint8Array.from(seed);
+  const material = await cryptoApi().subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  // The plaintext goes in as its DIGEST: HKDF caps `info` at 1024 bytes and a chunk is kilobytes. A digest binds the
+  // content just as tightly for this purpose — the nonce still changes whenever the content does.
+  const digest = new Uint8Array(await cryptoApi().subtle.digest('SHA-256', plain));
+  const info = new Uint8Array([...utf8(`${NOTES_BLOB_NONCE_INFO}:${Number(chunkIndex)}:`), ...digest]);
+  const bits = await cryptoApi().subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: utf8(RECOVERY_BLOB_SALT), info }, material, AES_GCM_NONCE_BYTES * 8);
+  return new Uint8Array(bits);
+}
+
+/** Seal one notes CHUNK for its named slot. Returns { body, h0, h1 } shaped for buildRecoveryPublish. */
+export async function sealNotesBlob(seed, notesBytes, chunkIndex) {
+  const key = await notesBlobKey(seed);
+  const plainForNonce = notesBytes instanceof Uint8Array ? notesBytes : Uint8Array.from(notesBytes ?? []);
+  const nonce = await notesBlobNonce(seed, chunkIndex, plainForNonce);
+  const plain = notesBytes instanceof Uint8Array ? notesBytes : Uint8Array.from(notesBytes ?? []);
+  const ciphertext = await cryptoApi().subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce, additionalData: notesSealAad(chunkIndex), tagLength: 128 }, key, plain);
+  const record = { version: NOTES_SEAL_VERSION, alg: 'AES-256-GCM', nonce: b64(nonce), ciphertext: b64(new Uint8Array(ciphertext)) };
+  const bytes = utf8(JSON.stringify(record));
+  return {
+    body: tonCell.snakeCellFromBytes(bytes, 'notes blob'),
+    h0: await sha256Big(utf8(NOTES_BLOB_H0_DOMAIN)),   // fixed notes version-domain marker (non-zero, distinct)
+    h1: await sha256Big(bytes),                        // blob content hash (non-zero)
+  };
+}
+
+/** Open a notes CHUNK body. Returns null for a wrong seed / foreign / unsupported record / wrong chunk index — the
+ *  caller then keeps its local notes untouched rather than treating an unreadable chunk as an empty one. */
+export async function openNotesBlob(seed, body, chunkIndex) {
+  try {
+    const bytes = tonCell.readSnakeCellBytes(body, { name: 'notes blob' });
+    const record = JSON.parse(fromUtf8(bytes));
+    if (record?.version !== NOTES_SEAL_VERSION || record.alg !== 'AES-256-GCM' || !record.ciphertext) return null;
+    const key = await notesBlobKey(seed);
+    const plaintext = await cryptoApi().subtle.decrypt(
+      { name: 'AES-GCM', iv: unb64(record.nonce), additionalData: notesSealAad(chunkIndex), tagLength: 128 }, key, unb64(record.ciphertext));
+    return new Uint8Array(plaintext);
+  } catch {
+    return null;   // wrong seed (GCM tag fail), wrong chunk (AAD mismatch) or a malformed body — never throw
   }
 }
