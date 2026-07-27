@@ -1,6 +1,6 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
 import { beginCell, tonCell } from './pwa-contract-transactions.mjs?v=33';
-import { createTonCenterV3VaultTransport } from './vault-ton-rpc-provider.mjs?v=62';
+import { createTonCenterV3Transport } from './ton-rpc-transport.mjs?v=63';
 
 export class TonDnsProviderError extends Error {
   constructor(message) {
@@ -233,7 +233,7 @@ function resolveTransport(options) {
     ?? globalThis.plathoTonRpcEndpoint
     ?? globalThis.PLATHO_TON_RPC_ENDPOINT;
   if (endpoint) {
-    return createTonCenterV3VaultTransport({
+    return createTonCenterV3Transport({
       endpoint,
       apiKey: options.apiKey ?? globalThis.plathoTonDnsRpcApiKey ?? globalThis.plathoTonRpcApiKey ?? globalThis.PLATHO_TON_RPC_API_KEY,
       headers: options.headers,

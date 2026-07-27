@@ -3,12 +3,12 @@ import {
   clearToncenterMessagesCache,
   clearToncenterRunGetMethodCache,
   createFallbackTonRpcTransport,
-  createTonCenterV3VaultTransport,
+  createTonCenterV3Transport,
   createTonRpcTransport,
   decodeTonAddressSliceBoc,
   encodeTonAddressSliceBoc,
   parseStackBigIntValue,
-} from '../web/vault-ton-rpc-provider.mjs';
+} from '../web/ton-rpc-transport.mjs';
 
 const NOW = Date.UTC(2026, 0, 3, 10, 0, 0);
 const OWNER = `0:${'11'.repeat(32)}`;
@@ -43,7 +43,7 @@ describe('Vault TON RPC provider', () => {
 
   it('VAULT-RPC-04: wraps TON Center v3 runGetMethod with explicit endpoint and API key', async () => {
     const requests: any[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       apiKey: 'test-api-key',
       fetch: async (url: string, init: any) => {
@@ -76,7 +76,7 @@ describe('Vault TON RPC provider', () => {
 
   it('VAULT-RPC-04B: wraps configured sendBoc endpoint for embedded wallet broadcasts', async () => {
     const requests: any[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       sendBocEndpoint: 'https://toncenter.example/api/v3/message',
       apiKey: 'test-api-key',
@@ -101,7 +101,7 @@ describe('Vault TON RPC provider', () => {
   });
 
   it('VAULT-RPC-04B1: preserves upstream sendBoc error details for diagnostics', async () => {
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       sendBocEndpoint: 'https://toncenter.example/api/v3/message',
       requestSpacingMs: 0,
@@ -137,7 +137,7 @@ describe('Vault TON RPC provider', () => {
 
   it('VAULT-RPC-04B1A: prefers gateway upstream_error over generic gateway error', async () => {
     const upstreamDetail = 'LITE_SERVER_UNKNOWN: cannot apply external message to current state: External message was not accepted: cannot run message on account: exitcode=16483';
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       sendBocEndpoint: 'https://toncenter.example/api/v3/message',
       requestSpacingMs: 0,
@@ -180,7 +180,7 @@ describe('Vault TON RPC provider', () => {
   it('VAULT-RPC-04B2: wraps TON Center v3 messages endpoint through the shared limiter', async () => {
     clearToncenterMessagesCache();
     const requests: any[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       apiKey: 'test-api-key',
       requestSpacingMs: 0,
@@ -220,7 +220,7 @@ describe('Vault TON RPC provider', () => {
   });
 
   it('VAULT-RPC-04C: surfaces TON Center 429 as a typed rate-limit error', async () => {
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       requestSpacingMs: 0,
       rateLimitBackoffMs: 0,
@@ -241,7 +241,7 @@ describe('Vault TON RPC provider', () => {
       method: 'get_user',
       stack: [],
     })).rejects.toMatchObject({
-      name: 'VaultTonRpcProviderError',
+      name: 'TonRpcTransportError',
       status: 429,
       code: 'RATE_LIMITED',
     });
@@ -252,7 +252,7 @@ describe('Vault TON RPC provider', () => {
     // propagated up to the app-level limiter + the higher retry loops, making them sleep a full minute per
     // 429 — a keyless image send idled ~10 min issuing almost no requests. It must now carry the transport's
     // configured rateLimitBackoffMs so the loops retry at the intended ~7s cadence.
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       requestSpacingMs: 0,
       rateLimitBackoffMs: 7000,
@@ -281,7 +281,7 @@ describe('Vault TON RPC provider', () => {
 
   it('VAULT-RPC-04D: retries TON Center 429 once before surfacing success', async () => {
     const requests: any[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       requestSpacingMs: 0,
       rateLimitBackoffMs: 0,
@@ -319,7 +319,7 @@ describe('Vault TON RPC provider', () => {
 
   it('VAULT-RPC-04E: suppresses background get-method fetches during rate-limit cooldown', async () => {
     const requests: any[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       requestSpacingMs: 0,
       rateLimitBackoffMs: 30_000,
@@ -343,7 +343,7 @@ describe('Vault TON RPC provider', () => {
       method: 'get_user',
       stack: [],
     })).rejects.toMatchObject({
-      name: 'VaultTonRpcProviderError',
+      name: 'TonRpcTransportError',
       status: 429,
       code: 'RATE_LIMITED',
     });
@@ -352,7 +352,7 @@ describe('Vault TON RPC provider', () => {
       method: 'get_global',
       stack: [],
     })).rejects.toMatchObject({
-      name: 'VaultTonRpcProviderError',
+      name: 'TonRpcTransportError',
       status: 429,
       code: 'RATE_LIMITED',
     });
@@ -367,7 +367,7 @@ describe('Vault TON RPC provider', () => {
     const fetchGate = new Promise((resolve) => {
       releaseFetch = resolve;
     });
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       requestSpacingMs: 0,
       rateLimitKey: `dedupe-${Math.random()}`,
@@ -406,7 +406,7 @@ describe('Vault TON RPC provider', () => {
   it('VAULT-RPC-04G: serves repeated get-method calls from the TTL cache', async () => {
     clearToncenterRunGetMethodCache();
     const requests: any[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       requestSpacingMs: 0,
       rateLimitKey: `cache-${Math.random()}`,
@@ -434,7 +434,7 @@ describe('Vault TON RPC provider', () => {
     clearToncenterRunGetMethodCache();
     clearToncenterMessagesCache();
     const requests: any[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       sendBocEndpoint: 'https://toncenter.example/api/v3/message',
       messagesEndpoint: 'https://toncenter.example/api/v3/messages',
@@ -496,7 +496,7 @@ describe('Vault TON RPC provider', () => {
     clearToncenterRunGetMethodCache();
     clearToncenterMessagesCache();
     const requests: any[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       messagesEndpoint: 'https://toncenter.example/api/v3/messages',
       requestSpacingMs: 0,
@@ -554,7 +554,7 @@ describe('Vault TON RPC provider', () => {
     const fetchGate = new Promise((resolve) => {
       releaseFetch = resolve;
     });
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       requestSpacingMs: 0,
       rateLimitKey: `fresh-flight-${Math.random()}`,
@@ -590,7 +590,7 @@ describe('Vault TON RPC provider', () => {
     const fetchGate = new Promise((resolve) => {
       releaseFetch = resolve;
     });
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       requestSpacingMs: 0,
       rateLimitKey: `fresh-critical-flight-${Math.random()}`,
@@ -1337,7 +1337,7 @@ describe('Vault TON RPC provider', () => {
   });
 
   it('VAULT-RPC-04J2: falls back after RPC request timeouts', async () => {
-    const primary = createTonCenterV3VaultTransport({
+    const primary = createTonCenterV3Transport({
       endpoint: 'https://primary.example/api/v3/runGetMethod',
       sendBocEndpoint: 'https://primary.example/api/v3/message',
       requestSpacingMs: 0,
@@ -1440,7 +1440,7 @@ describe('Vault TON RPC provider', () => {
     });
 
     await expect(transport?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).rejects.toMatchObject({
-      name: 'VaultTonRpcProviderError',
+      name: 'TonRpcTransportError',
       code: 'RPC_DISAGREEMENT',
     });
   });
@@ -1575,7 +1575,7 @@ describe('Vault TON RPC provider', () => {
       criticalMethods: ['get_global'],
     });
     await expect(verifiedPair?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).rejects.toMatchObject({
-      name: 'VaultTonRpcProviderError',
+      name: 'TonRpcTransportError',
       code: 'RPC_VERIFICATION_UNAVAILABLE',
     });
   });
@@ -1716,7 +1716,7 @@ describe('Vault TON RPC provider', () => {
       });
 
       await expect(transport?.runGetMethod({ address: VAULT, method: 'get_user', stack: [] }), label).rejects.toMatchObject({
-        name: 'VaultTonRpcProviderError',
+        name: 'TonRpcTransportError',
         code: 'RPC_DISAGREEMENT',
       });
     }
@@ -1844,14 +1844,14 @@ describe('Vault TON RPC provider', () => {
     });
 
     await expect(transport?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).rejects.toMatchObject({
-      name: 'VaultTonRpcProviderError',
+      name: 'TonRpcTransportError',
       code: 'RPC_DISAGREEMENT',
     });
   });
 
   it('VAULT-RPC-04L: reads account balance through the configured provider instead of app hardcoding Toncenter v2', async () => {
     const requests: string[] = [];
-    const transport = createTonCenterV3VaultTransport({
+    const transport = createTonCenterV3Transport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
       walletBalanceEndpoint: 'https://toncenter.example/api/v2/getAddressInformation',
       requestSpacingMs: 0,

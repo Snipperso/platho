@@ -353,7 +353,7 @@ body_hash || header_0_hash || header_1_hash
 
 如果没有配置提供方，Vault 绑定将保持不可用，而不是接受本地草案或 UI 占位符。生产/静态部署可以在 `globalThis.plathoVaultChainProvider` 上安装一个提供方，通过 TON API 镜像或轻客户端兼容的传输来读取已部署的 Vault。
 
-静态运行时包含 `web/vault-ton-rpc-provider.mjs` 作为生产提供方的骨架。它可以封装 TON Center v3 兼容端点，或由宿主捆绑包安装的自定义 `globalThis.plathoTonRpcTransport`。当前 PWA 不暴露内置的用户 RPC 设置界面。该提供方：
+静态运行时包含 `web/ton-rpc-transport.mjs` 作为生产提供方的骨架。它可以封装 TON Center v3 兼容端点，或由宿主捆绑包安装的自定义 `globalThis.plathoTonRpcTransport`。当前 PWA 不暴露内置的用户 RPC 设置界面。该提供方：
 
 - 将 `get_user(owner)` 的 owner 地址编码为 `slice` BoC 栈项；
 - 用一个数值栈项调用 `get_key_record(current_key_id)`；

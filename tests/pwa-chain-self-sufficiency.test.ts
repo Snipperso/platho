@@ -68,7 +68,7 @@ describe('PWA on-chain self-sufficiency', () => {
 
   it('PWA-CHAIN-03: TON RPC is configured as replaceable transport with fallback and critical-read compare', () => {
     const app = read('web/app.js');
-    const transport = read('web/vault-ton-rpc-provider.mjs');
+    const transport = read('web/ton-rpc-transport.mjs');
 
     expect(app).toMatch(/createTonRpcTransport\(rpc\)/);
     expect(app).not.toMatch(/scheduleToncenterHttpRequest/);
@@ -98,7 +98,7 @@ describe('PWA on-chain self-sufficiency', () => {
 
   it('PWA-CHAIN-04: a per-user toncenter key is loaded at boot, re-resolves the transport, and has a settings entry', () => {
     const app = read('web/app.js');
-    const transport = read('web/vault-ton-rpc-provider.mjs');
+    const transport = read('web/ton-rpc-transport.mjs');
     const html = read('web/index.html');
 
     // Boot: the saved key is injected into globalThis BEFORE the transport is built (so it is captured).

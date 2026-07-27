@@ -37,7 +37,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'publish-batch-orchestration.mjs',
   'platho-wallet.mjs',
   'ton-mnemonic-wordlist.mjs',
-  'vault-ton-rpc-provider.mjs',
+  'ton-rpc-transport.mjs',
   'ton-dns-provider.mjs',
   'ath-ton-rpc-provider.mjs',
   'profile-registry-ton-rpc-provider.mjs',

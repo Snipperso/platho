@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createProfileRegistryTonRpcProvider } from '../web/profile-registry-ton-rpc-provider.mjs';
-import { encodeTonAddressSliceBoc } from '../web/vault-ton-rpc-provider.mjs';
+import { encodeTonAddressSliceBoc } from '../web/ton-rpc-transport.mjs';
 
 // The avatar getters that used to live here RETIRED 2026-07-21 along with the maps behind them: the pointer is in
 // the buyer's own KeyShard now, and its provider is covered by tests/key-shard-ton-rpc-provider.test.ts. What this

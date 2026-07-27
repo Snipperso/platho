@@ -352,7 +352,7 @@ body_hash || header_0_hash || header_1_hash
 
 プロバイダーが設定されていない場合、Vault のバインディングは、ローカルのドラフトや UI のプレースホルダーを受け入れるのではなく、利用不可のままとなります。本番/静的デプロイメントは、TON API ミラーまたはライトクライアント互換のトランスポートを通じてデプロイされた Vault を読み取るプロバイダーを `globalThis.plathoVaultChainProvider` にインストールできます。
 
-静的ランタイムには、本番プロバイダーのスケルトンとして `web/vault-ton-rpc-provider.mjs` が含まれています。これは、TON Center v3 互換のエンドポイント、またはホストバンドルによってインストールされたカスタムの `globalThis.plathoTonRpcTransport` をラップできます。現在の PWA は、組み込みのユーザー RPC 設定画面を公開していません。プロバイダーは次のことを行います。
+静的ランタイムには、本番プロバイダーのスケルトンとして `web/ton-rpc-transport.mjs` が含まれています。これは、TON Center v3 互換のエンドポイント、またはホストバンドルによってインストールされたカスタムの `globalThis.plathoTonRpcTransport` をラップできます。現在の PWA は、組み込みのユーザー RPC 設定画面を公開していません。プロバイダーは次のことを行います。
 
 - `get_user(owner)` のオーナーアドレスを `slice` BoC スタックアイテムとしてエンコードする;
 - `get_key_record(current_key_id)` を数値スタックアイテムで呼び出す;

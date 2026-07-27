@@ -355,7 +355,7 @@ Después de que la billetera haya registrado las claves on-chain, el cliente deb
 
 Si no hay ningún proveedor configurado, la vinculación del Vault permanece no disponible en lugar de aceptar un borrador local o un marcador de posición de la interfaz. Un despliegue de producción/estático puede instalar un proveedor en `globalThis.plathoVaultChainProvider` que lea el Vault desplegado a través de un mirror de la API de TON o un transporte compatible con cliente ligero.
 
-El runtime estático incluye `web/vault-ton-rpc-provider.mjs` como el esqueleto del proveedor de producción. Puede envolver endpoints compatibles con TON Center v3 o un `globalThis.plathoTonRpcTransport` personalizado instalado por el bundle anfitrión. La PWA actual no expone una pantalla de configuración de RPC de usuario integrada. El proveedor:
+El runtime estático incluye `web/ton-rpc-transport.mjs` como el esqueleto del proveedor de producción. Puede envolver endpoints compatibles con TON Center v3 o un `globalThis.plathoTonRpcTransport` personalizado instalado por el bundle anfitrión. La PWA actual no expone una pantalla de configuración de RPC de usuario integrada. El proveedor:
 
 - codifica las direcciones de propietario de `get_user(owner)` como elementos de pila BoC `slice`;
 - llama a `get_key_record(current_key_id)` con un elemento de pila numérico;

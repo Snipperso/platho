@@ -355,7 +355,7 @@ Nachdem die Wallet Schlüssel On-Chain registriert hat, muss der Client Folgende
 
 Wenn kein Provider konfiguriert ist, bleibt die Vault-Bindung nicht verfügbar, anstatt einen lokalen Entwurf oder einen UI-Platzhalter zu akzeptieren. Eine Produktions-/statische Bereitstellung kann einen Provider auf `globalThis.plathoVaultChainProvider` installieren, der den bereitgestellten Vault über einen TON-API-Mirror oder einen Light-Client-kompatiblen Transport liest.
 
-Die statische Laufzeit enthält `web/vault-ton-rpc-provider.mjs` als das Produktions-Provider-Grundgerüst. Es kann TON-Center-v3-kompatible Endpunkte oder einen benutzerdefinierten `globalThis.plathoTonRpcTransport` umschließen, der vom Host-Bundle installiert wird. Die aktuelle PWA legt keinen integrierten RPC-Einstellungsbildschirm für Benutzer offen. Der Provider:
+Die statische Laufzeit enthält `web/ton-rpc-transport.mjs` als das Produktions-Provider-Grundgerüst. Es kann TON-Center-v3-kompatible Endpunkte oder einen benutzerdefinierten `globalThis.plathoTonRpcTransport` umschließen, der vom Host-Bundle installiert wird. Die aktuelle PWA legt keinen integrierten RPC-Einstellungsbildschirm für Benutzer offen. Der Provider:
 
 - kodiert `get_user(owner)`-Eigentümeradressen als `slice`-BoC-Stack-Items;
 - ruft `get_key_record(current_key_id)` mit einem numerischen Stack-Item auf;

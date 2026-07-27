@@ -41,7 +41,7 @@ import {
   isTonRpcTransportDead,
   TON_RPC_REQUEST_TIMEOUT_MS,
   decodeTonAddressSliceBoc,
-} from './vault-ton-rpc-provider.mjs?v=62';
+} from './ton-rpc-transport.mjs?v=63';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,

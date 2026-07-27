@@ -53,7 +53,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       //                       globalThis.plathoToncenterApiKey. PRIMARY for ALL reads/account/sendBoc +
       //                       the message-history indexer. When the key is absent the transport runs
       //                       anonymous (~1 rps, 429-prone) but STAYS a non-emergency primary — it is
-      //                       NOT demoted to verifierOnly (see vault-ton-rpc-provider.mjs userKeyMissing);
+      //                       NOT demoted to verifierOnly (see ton-rpc-transport.mjs userKeyMissing);
       //                       demoting it would leave zero live primaries once Orbs is gone -> perpetual
       //                       "syncing". Onboarding nudges the user to add a key.
       //  - keyless-toncenter: anonymous toncenter, EMERGENCY/last-resort only (weak/throttled, ~1 rps).

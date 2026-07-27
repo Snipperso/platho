@@ -355,7 +355,7 @@ Depois que a carteira registrou as chaves on-chain, o cliente deve buscar:
 
 Se nenhum provedor estiver configurado, a vinculação do Vault permanece indisponível em vez de aceitar um rascunho local ou espaço reservado de interface. Uma implantação de produção/estática pode instalar um provedor em `globalThis.plathoVaultChainProvider` que lê o Vault implantado por meio de um espelho da API do TON ou de um transporte compatível com light-client.
 
-O runtime estático inclui `web/vault-ton-rpc-provider.mjs` como o esqueleto do provedor de produção. Ele pode envolver endpoints compatíveis com TON Center v3 ou um `globalThis.plathoTonRpcTransport` personalizado instalado pelo bundle host. O PWA atual não expõe uma tela integrada de configurações de RPC do usuário. O provedor:
+O runtime estático inclui `web/ton-rpc-transport.mjs` como o esqueleto do provedor de produção. Ele pode envolver endpoints compatíveis com TON Center v3 ou um `globalThis.plathoTonRpcTransport` personalizado instalado pelo bundle host. O PWA atual não expõe uma tela integrada de configurações de RPC do usuário. O provedor:
 
 - codifica os endereços de proprietário de `get_user(owner)` como itens de pilha `slice` BoC;
 - chama `get_key_record(current_key_id)` com um item de pilha numérico;
