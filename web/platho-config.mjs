@@ -116,17 +116,6 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       runGetMethodCacheMaxEntries: 512,
     },
   },
-  vault: {
-    address: 'UQAFsNc952nbwLMDfHqXExkgn1lipVzNndbNQKBfHEIEe5Zy',
-    deploymentManifestHash: 'd9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16',
-    provider: {
-      globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=62',
-      exportName: 'default',
-      unavailableStatus: 'provider required',
-      requiredInProduction: true,
-    },
-  },
   tonDns: {
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
@@ -136,15 +125,6 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
     },
-  },
-  capsuleHub: {
-    address: 'UQD1Qj4S3F4IAMku5M_xc5IFBPhHR7DeakWZDGURjDtCGrx9',
-    publicReadLimit: 128,
-    // clean-11 capability gate. false = clean-10 (current live): channel profiles ride as normal public posts,
-    // discovery walks the recency author-index. Flip to true ONLY at the clean-11 cutover (in lockstep with the
-    // new addresses): the publish path sets the is_profile reserved bit (clean-10 Vault would bounce reserved!=0),
-    // and discovery/resolve use the on-chain global profile chain (get_public_profile_head / get_public_profile_index).
-    profilePointer: true,
   },
   // clean-17 public/avatar lane. DIRECT-PAY is the shipping path: public posts publish straight from the wallet into
   // the author's CHANNEL PublicShard (PPH2, StateInit-lazy-deploy) and the feed reads those shards via public-lane.
@@ -159,6 +139,13 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   // the pairwise K_root is adopted into the local conv key store. [CUTOVER 2026-07-24] see publicLane — Vault path removed.
   privateLane: {
     directPay: true,
+  },
+  // The genesis this client build claims. It is the DOMAIN SEPARATOR for signed publishes and the value the release
+  // guard binds to the verified-genesis evidence (artifacts/mainnet_genesis_verify_input.json): a production bundle
+  // that names a different genesis than the one that was verified must not ship. It used to live under `vault` —
+  // the contract is gone, the release property is not, so it moved to its own block.
+  genesis: {
+    deploymentManifestHash: 'd9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16',
   },
   feeAccumulator: {
     address: 'UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr',
@@ -292,7 +279,6 @@ function tonRpcProviderEndpointHosts(provider) {
 export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
   const findings = [];
   const mode = config?.mode;
-  const provider = config?.vault?.provider ?? {};
 
   if (!VALID_MODES.has(mode)) {
     addFinding(findings, 'PWA_MODE_INVALID', `PWA mode must be one of ${[...VALID_MODES].join(', ')}.`);
@@ -312,13 +298,9 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         `Production config still contains non-production markers: ${markerPaths.join(', ')}.`,
       );
     }
-    if (provider.requiredInProduction !== false && !provider.moduleUrl) {
-      addFinding(
-        findings,
-        'PWA_VAULT_CHAIN_PROVIDER_REQUIRED',
-        'Production PWA config must name a static Vault chain provider module.',
-      );
-    }
+    // (The "name a static chain provider module" requirement went with the Vault's runtime-injected provider
+    // bridge. Every clean-17 reader — KeyShard, ProfileRegistry, username, ATH, PublicShard — is a STATIC import
+    // in app.js, so there is no provider to configure and none that can be silently missing in a production bundle.)
     const tonRpcProviders = config?.network?.tonRpc?.providers;
     if (!Array.isArray(tonRpcProviders) || tonRpcProviders.length < 2) {
       addFinding(
@@ -422,18 +404,18 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         'Production PWA config must set ProfileRegistry address for paid wallet avatar updates.',
       );
     }
-    if (!config?.vault?.deploymentManifestHash) {
+    if (!config?.genesis?.deploymentManifestHash) {
       addFinding(
         findings,
-        'PWA_VAULT_DEPLOYMENT_MANIFEST_HASH_REQUIRED',
-        'Production PWA config must set Vault deploymentManifestHash for domain-separated signed publishes.',
+        'PWA_GENESIS_DEPLOYMENT_MANIFEST_HASH_REQUIRED',
+        'Production PWA config must set genesis deploymentManifestHash for domain-separated signed publishes.',
       );
     }
     if (!config?.feeAccumulator?.address) {
       addFinding(
         findings,
         'PWA_FEE_ACCUMULATOR_ADDRESS_REQUIRED',
-        'Production PWA config must set FeeAccumulator address for CapsuleHub preflight verification.',
+        'Production PWA config must set FeeAccumulator address — every direct-pay publish routes its fee through it.',
       );
     }
     const pricing = config?.messaging?.pricing ?? {};
@@ -442,13 +424,6 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         findings,
         'PWA_NETWORK_SURCHARGE_GUARD_REQUIRED',
         'Production PWA config must set a hard max network fee surcharge.',
-      );
-    }
-    if (config?.capsuleHub?.allowUnverifiedStaticPublicFeeds === true) {
-      addFinding(
-        findings,
-        'PWA_STATIC_PUBLIC_FEED_FALLBACK_FORBIDDEN',
-        'Production PWA config must not enable unverified static public feed fallback.',
       );
     }
   }

@@ -146,7 +146,7 @@ describe('release truth single-source guard', () => {
     const input = readJson('artifacts/mainnet_genesis_verify_input.json');
 
     if (PLATHO_APP_CONFIG.mode === PLATHO_APP_MODES.PRODUCTION && verified === 'true') {
-      expect(normalizeHash(PLATHO_APP_CONFIG.vault?.deploymentManifestHash)).toBe(
+      expect(normalizeHash(PLATHO_APP_CONFIG.genesis?.deploymentManifestHash)).toBe(
         normalizeHash(input.manifest?.manifest_hash_hex),
       );
     } else if (PLATHO_APP_CONFIG.mode === PLATHO_APP_MODES.PRODUCTION) {

@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-27T15:30:30.404Z",
+  "generatedAt": "2026-07-27T16:07:18.852Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 216,
-    "totalBytes": 5587503,
-    "bundleSha256": "fce9e84058df9864b58ec71fdb5e84d57a1dd2a5d839382b68e613211abe4d54",
+    "totalBytes": 5562285,
+    "bundleSha256": "cfd40764308424c32777816c5e016df6d87e1d0ef43824fcd986779dcf26eabe",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1142791,
-        "sha256": "0af2ec3399edaa80428b57087056dd11851efe7ec4d3267ef4183a8d89b38bf5"
+        "bytes": 1141554,
+        "sha256": "f2a554ca7cfe85faf3e93386cba8dce46192861afc53c07566e98052dde10476"
       },
       {
         "path": "assets/icons/about.svg",
@@ -579,8 +579,8 @@
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 19994,
-        "sha256": "c7368fb21513b053ab8a00d3088503b32505ce5854c3591e2a6672ea8d4295a9"
+        "bytes": 19337,
+        "sha256": "d8913aeb1e016e700790d4ff2cd9cd6ef77e3fc052438573d25274aab72a5ed1"
       },
       {
         "path": "platho-wallet.mjs",
@@ -724,8 +724,8 @@
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
-        "bytes": 100714,
-        "sha256": "da23b10f66f1085077a858d855f75dc2253ff6a2faf17c6bf4adad037986174d"
+        "bytes": 77390,
+        "sha256": "b81b1b08fbb5f611210c8b973ec148885d52c4c9520514b6473bf14051d8b6d8"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",
@@ -1353,13 +1353,19 @@
   "blockers": [],
   "warnings": [
     "STATIC_PACKAGE_IS_NON_PRODUCTION",
-    "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH"
+    "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH",
+    "PWA_FINAL_MANIFEST_HASH_MISMATCH"
   ],
   "productionFindings": [
     {
       "id": "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH",
       "file": "artifacts/mainnet_genesis_verify_input.json",
       "message": "MAINNET_GENESIS_VERIFIED=true must match current build code hashes: ath_master, ath_vesting, ath_wallet, buyback_burn, market_stability_seller, fee_accumulator, profile_registry, username_nft_item, username_registry."
+    },
+    {
+      "id": "PWA_FINAL_MANIFEST_HASH_MISMATCH",
+      "file": "web/platho-config.mjs",
+      "message": "PWA vault.deploymentManifestHash must match the verified final genesis manifest hash."
     }
   ]
 }
