@@ -3929,11 +3929,6 @@ function setProfileAvatarStatus(text, state = 'busy') {
   setProfileActionStatus(setAvatarStatus, text, state);
 }
 
-// Greppable, stable-English console marker that brackets an avatar set. An avatar rides the SHARED VPB2
-// '[platho] send timeline' for its image capsules (Stage 1) and adds a SECOND Vault->ProfileRegistry
-// pointer-registration message (Stage 2) that a normal image send never has — which is why the console reads
-// differently. These phase markers let avatar activity be told apart from a plain image send without touching
-// the shared publish path. phase is a fixed English token; the localized UI status stays on setProfileAvatarStatus.
 function setUsernameMintStatus(text, state = 'busy') {
   setProfileActionStatus(mintUsernameStatus, text, state);
 }
@@ -27188,8 +27183,11 @@ function retryPublicPublishFromUi(item, kind) {
   startPublicPublishConfirmation({ channelId, localId, kind, createdAt: Date.now(), publishState: item.publishState });
 }
 
-// A FAILED badge becomes clickable (role/button semantics; a record with no publishState never signed anything —
-// there is nothing to re-broadcast, so it stays inert).
+// A FAILED badge becomes clickable (role/button semantics). It requires a publishState, so under direct pay —
+// where publishState is always null — the badge is inert: a direct publish has no signed external parked for
+// re-broadcast, and its failure is already terminal at the call site. Re-arming this badge is what the public
+// re-broadcast follow-up (roadmap: ACK-без-доставки) has to solve; do not read the inertness as "nothing was
+// signed", which was the Vault-era meaning of a missing publishState.
 function wirePublicPublishRetryBadge(statusBadge, item, kind) {
   if (!String(item?.publishStatus ?? '').endsWith('failed') || !item?.publishState) return;
   statusBadge.classList.add('public-publish-status--retryable');
