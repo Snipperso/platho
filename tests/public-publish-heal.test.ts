@@ -65,6 +65,44 @@ describe('public publish heal driver guard', () => {
     expect(app).toMatch(/publicPublishConfirmJobs\.clear\(\);/);
   });
 
+  it('PWA-PUBLIC-DIRECT-01: a direct publish pre-checks the wallet and stays PENDING until the chain twin lands', () => {
+    const postSource = app.slice(
+      app.indexOf('async function submitPublicPostDirect'),
+      app.indexOf('async function publishChannelProfileDirect'),
+    );
+    const commentSource = app.slice(
+      app.indexOf('async function submitPublicCommentDirect'),
+      app.indexOf('globalThis.plathoVaultTransactions'),
+    );
+
+    // 1. AFFORDABILITY BEFORE SIGNING. The wallet stamps SendIgnoreErrors on every action
+    // (platho-wallet.mjs `sendMode | 2`), so an action it cannot fund is skipped SILENTLY: the transaction
+    // still commits, seqno still advances, sendBoc still returns 200, nothing throws. For a multipart post
+    // that means the fundable prefix lands, the rest is dropped, and the reader discards the incomplete
+    // stream — the user is told "public published" for a post that does not exist.
+    const wallet = readFileSync('web/platho-wallet.mjs', 'utf8');
+    expect(wallet).toMatch(/const safeSendMode = sendMode \| 2;/);
+    for (const source of [postSource, commentSource]) {
+      expect(source).toMatch(/await assertWalletGramAtLeast\(value \* BigInt\(parts\.length\) \+ WALLET_FEE_HEADROOM_NANOTONS/);
+    }
+    // The private lane carries the same rule, and there it is worse: a CONV part burns a monotonic seq, so a
+    // silently dropped tail cannot be re-sent under the same seq.
+    expect(app).toMatch(/await assertWalletGramAtLeast\(CONV_PUBLISH_VALUE \* BigInt\(parts\.length\) \+ WALLET_FEE_HEADROOM_NANOTONS/);
+
+    // 2. THE RECORD STAYS PENDING AFTER BROADCAST. publishStatus is what marks a local record pending
+    // (isPendingPublicFeedItem), and only a pending record survives the sync merge — a chain-anchored one
+    // needs chainVerified + entryId, which a just-broadcast post does not have yet. Under Vault,
+    // publishStatus:null meant CHAIN CONFIRMED (set together with entryId); reusing it for "broadcast" made
+    // the record neither pending nor anchored, so the next background sync dropped the fresh post from the
+    // feed. The pending copy retires by itself when the chain twin with the same bodyHash appears.
+    expect(app).toMatch(/function isPendingPublicFeedItem\(item\) \{\s*return Boolean\(item\?\.publishStatus &&/);
+    expect(postSource).toMatch(/\{ publishStatus: 'public published, confirming' \}/);
+    expect(commentSource).toMatch(/\{ publishStatus: 'comment published, confirming' \}/);
+    for (const source of [postSource, commentSource]) {
+      expect(source).not.toMatch(/\{ publishStatus: null \}/);
+    }
+  });
+
   it('PWA-PUBLIC-HEAL-05: pending badge is CSS-class based (prod CSP bans inline styles) and the dead option is gone', () => {
     expect(app).toMatch(/public-publish-status--failed/);
     expect(css).toMatch(/\.public-publish-status \{/);

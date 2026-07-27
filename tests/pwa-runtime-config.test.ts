@@ -1332,7 +1332,13 @@ describe('PWA runtime config guard', () => {
     );
     expect(handlerSource).toMatch(/refreshMessagingControls\(\);/);
     expect(handlerSource).not.toMatch(/setAvatarButton\?\.toggleAttribute\('disabled', false\)/);
-    expect(handlerSource).toMatch(/setProfileAvatarStatus\('avatar needs retry', 'error'\)/);
+    // Terminal statuses are LOCALIZED (the owner's users read ru/zh/es/…): a hardcoded English terminal was
+    // the last untranslated string on this row. The three actionable classes are distinguished: unreadable
+    // pre-check (nothing spent -> retry), insufficient funds (verbatim shortfall), everything else.
+    expect(handlerSource).toMatch(/setProfileAvatarStatus\(t\('avatar\.needsRetry'\), 'error'\)/);
+    expect(handlerSource).toMatch(/error\?\.code === 'PLATHO_AVATAR_PRECHECK_UNREADABLE'/);
+    expect(handlerSource).toMatch(/error\?\.code === 'PLATHO_ATH_REQUIRED' \|\| error\?\.code === 'PLATHO_WALLET_GRAM_REQUIRED'/);
+    expect(EN_STRINGS['avatar.needsRetry']).toBe('avatar needs retry');
     // The direct-pay publish holds the lock across the ONE wallet transfer; the rate-limited pre-publish
     // preflight (and its in-flight retry table) belonged to the deleted Vault submit phase.
     expect(app).toMatch(/setProfileAvatarPending\(true\)/);
@@ -6094,9 +6100,51 @@ describe('PWA runtime config guard', () => {
     );
 
     // Idempotence BEFORE paying: re-picking the image already on-chain must not spend a second 100 ATH.
-    expect(directSource).toMatch(/readCurrentProfileAvatarPointerFromChain\(owner, \{ required: false \}\)/);
+    // FAIL-CLOSED: the *Result* reader distinguishes "read failed" (ok:false) from "no avatar" (pointer:null).
+    // The old `.catch(() => null)` collapsed both into "go ahead and pay" — one flaky read = 100 ATH.
+    expect(directSource).toMatch(/const currentRead = await readCurrentProfileAvatarPointerResultFromChain\(owner, \{ required: false \}\)/);
+    expect(directSource).toMatch(/if \(!currentRead\.ok\) \{[\s\S]*PLATHO_AVATAR_PRECHECK_UNREADABLE/);
+    expect(directSource).not.toMatch(/readCurrentProfileAvatarPointerFromChain\(owner, \{ required: false \}\)\.catch/);
     expect(directSource).toMatch(/if \(currentPointer\?\.avatarHash\?\.toLowerCase\?\.\(\) === normalizeAvatarHashHex\(avatarHash\)\.toLowerCase\(\)\)/);
     expect(directSource).toMatch(/return \{ status: 'active', registryPointer: currentPointer \}/);
+    // AFFORDABILITY before signing. Without it the wallet signs a transfer whose ATH leg cannot settle and
+    // SendIgnoreErrors (platho-wallet `sendMode | 2`) drops that leg SILENTLY — bytes land, paid for, no
+    // pointer, no error. ATH is fail-closed, GRAM fail-open; the asymmetry is asserted on the helpers.
+    expect(directSource).toMatch(/await assertConnectedAthAtLeast\(PROFILE_AVATAR_PRICE_ATH, 'set an avatar'\)/);
+    expect(directSource).toMatch(/await assertWalletGramAtLeast\(\s*avatarValue \* BigInt\(shardParts\.length\) \+ PROFILE_AVATAR_DIRECT_REQUEST_VALUE/);
+    const athGuardSource = app.slice(
+      app.indexOf('async function assertConnectedAthAtLeast'),
+      app.indexOf('async function loadConnectedAthWalletBalance'),
+    );
+    expect(athGuardSource).toMatch(/const balance = await loadConnectedAthWalletBalance\(\);/);   // no .catch: fail-closed
+    expect(athGuardSource).not.toMatch(/loadConnectedAthWalletBalance\(\)\.catch/);
+    expect(athGuardSource).toMatch(/const balance = await loadConnectedTonWalletBalance\(\)\.catch\(\(\) => null\);\s*\n\s*if \(balance === null\) return;/);
+    // AMBIGUOUS broadcast is not a failure: error.builtBoc means the external may have landed, and reporting
+    // "failed" is what makes the user re-pick and pay a second 100 ATH. Fall through to the confirm loop.
+    expect(directSource).toMatch(/if \(!error\?\.builtBoc\) throw error;/);
+    expect(directSource).toMatch(/result = \{ ambiguousBroadcast: true/);
+    // CONFIRM the paid pointer: a broadcast is not an outcome (the ATH ride a two-phase registry->KeyShard
+    // write that can bounce). Green only on a confirmed pointer; the timeout is RED and retryable.
+    expect(directSource).toMatch(/const registryPointer = await confirmProfileAvatarPointer\(owner, avatarHash\)/);
+    expect(directSource).toMatch(/setProfileAvatarStatus\(t\('avatar\.active'\), ''\)/);
+    expect(directSource).toMatch(/setProfileAvatarStatus\(t\('avatar\.notActiveYet'\), 'error'\)/);
+    expect(directSource).not.toMatch(/'avatar submitted'/);
+    expect(EN_STRINGS['avatar.active']).toBe('avatar active');
+    expect(EN_STRINGS['avatar.notActiveYet']).toBe('avatar not active yet');
+    const confirmSource = app.slice(
+      app.indexOf('async function confirmProfileAvatarPointer'),
+      app.indexOf('async function submitProfileAvatarUpdate'),
+    );
+    expect(confirmSource).toMatch(/enqueueAvatarChainRead\(\(\) => readCurrentProfileAvatarPointerResultFromChain\(owner, \{ required: false \}\)\)/);
+    expect(confirmSource).toMatch(/if \(!read\.ok\) continue;/);
+    expect(confirmSource).toMatch(/setAvatarNode\(profileAvatar, 'P', imageUrl\)/);
+    expect(app).toMatch(/const PROFILE_AVATAR_POINTER_CONFIRM_DEADLINE_MS = 120 \* 1000/);
+    // DETERMINISTIC streamId: a retry of the same image in the same era merges with the parts already on the
+    // shard instead of orphaning them. The era is in the preimage so a re-upload after retention can still
+    // produce a NEW pointer (KeyShard gate 22205 rejects an identical one).
+    expect(directSource).toMatch(/const streamId = await deriveProfileAvatarStreamId\(owner, avatarHash, publicEraOf\(3, createdAtSec\)\)/);
+    expect(directSource).not.toMatch(/const streamId = randomBytes\(16\)/);
+    expect(app).toMatch(/'PLATHO-AVATAR-STREAM-V1'/);
     // Part cap is enforced before the transfer is built (an over-long image must fail loud, not half-publish).
     expect(directSource).toMatch(/if \(parts\.length > 16\) throw new Error\('Avatar must fit 16 public capsules'\)/);
     // Bytes go to the owner's AVATAR PublicShard (kind 3), addressed by the avatar partition key + era tag.
