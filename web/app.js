@@ -20688,6 +20688,18 @@ function privateMessageShouldShowManualActions(message) {
 }
 
 function privateMessageManualActionsElement(thread, message) {
+  // "My notes" is a notepad, not a conversation: deleting is a primary action there, and it is the ONLY way out of a
+  // full notepad (the lane refuses to save rather than dropping the oldest note). Offered on every note.
+  if (isRealSavedThread(thread)) {
+    const noteActions = document.createElement('div');
+    noteActions.className = 'message-actions';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = t('notes.delete');
+    remove.addEventListener('click', () => { void deleteSelfNoteFromUi(thread, message, remove); });
+    noteActions.append(remove);
+    return noteActions;
+  }
   if (!privateMessageShouldShowManualActions(message)) return null;
   const actions = document.createElement('div');
   actions.className = 'message-actions';
@@ -20712,6 +20724,52 @@ function privateMessageManualActionsElement(thread, message) {
     actions.append(cancel);
   }
   return actions.children.length > 0 ? actions : null;
+}
+
+/**
+ * Delete one note: confirm, remove it locally, then republish the snapshot.
+ *
+ * The republish is NOT optional. The chunks on chain are the durable copy, so a note removed only locally comes
+ * straight back on the next restore — and the freed space, which is the entire reason the user is deleting, would
+ * never materialise. If the republish fails the note is put BACK, so the local view never diverges from the chain
+ * silently: the user sees the same notepad they had, plus a reason.
+ */
+async function deleteSelfNoteFromUi(thread, message, button) {
+  if (!thread?.messages?.includes(message)) return;
+  // A save on top of an incomplete read would overwrite chunks we could not see — deleting has exactly the same
+  // hazard as writing, so it is held by the same guard rather than being allowed through as "just a removal".
+  if (selfNotesRestoreIncomplete) { flashWalletIdentityStatus(t('notes.restoreIncomplete')); return; }
+  const confirmed = await openActionDialog({
+    title: t('notes.deleteTitle'),
+    hint: t('notes.deleteHint'),
+    submitLabel: t('notes.delete'),
+    fields: [],
+    summary: [{ label: t('notes.deleteRowNote'), value: String(message.text ?? '').slice(0, 120) }],
+  });
+  if (!confirmed) return;
+
+  const index = thread.messages.indexOf(message);
+  if (index < 0) return;
+  if (button) button.disabled = true;
+  thread.messages.splice(index, 1);
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  try {
+    await publishSelfNotesSnapshotForThread(thread);
+    // Durable history too: a record left behind here is merged back on the next restore, silently undoing the delete.
+    if (message.localHistoryId) await encryptedMessageStore?.deleteMessage?.(message.localHistoryId);
+  } catch (error) {
+    // Put it back: the chain still holds it, and a local view that quietly disagrees with the durable copy is worse
+    // than a failed delete.
+    insertThreadMessage(thread, message);
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
+    if (button) button.disabled = false;
+    flashWalletIdentityStatus(shortUiErrorText(error, t('notes.deleteFailed')));
+    if (!noteTonRpcRateLimit(error)) console.warn('[notes] delete failed', error);
+  }
 }
 
 async function retryPrivateMessageFromUi(thread, message) {
@@ -21179,6 +21237,24 @@ async function publishSelfNoteSnapshot(context) {
     error.code = 'PLATHO_NOTES_RESTORE_INCOMPLETE';
     throw error;
   }
+  const wrote = await publishSelfNotesSnapshotForThread(thread);
+  markDirectSendPublished(thread, message);
+  return { selfNote: true, wrote };
+}
+
+/**
+ * Pack the thread's notes and publish every chunk whose content changed. Shared by the send path and the delete
+ * path — both do the same thing to the same snapshot, and duplicating the packing, the funds check and the transport
+ * resolution is how the two would drift apart.
+ *
+ * Returns the number of slots written (0 when the on-chain copy already matches, which is a success, not a no-op to
+ * be retried).
+ */
+async function publishSelfNotesSnapshotForThread(thread) {
+  const seed = plathoWallet?.seed;
+  if (!seed) throw new Error(t('notes.walletLocked'));
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) throw new Error(t('notes.rpcUnavailable'));
   const notes = selfNotesFromThread(thread);
   const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
   let built;
@@ -21190,10 +21266,7 @@ async function publishSelfNoteSnapshot(context) {
     full.code = 'PLATHO_NOTES_FULL';
     throw full;
   }
-  // Nothing changed on chain (the note was empty, or an identical snapshot is already stored): the local insert IS
-  // the save, so report it delivered rather than leaving the message spinning forever.
-  if (built.publishes.length === 0) { markDirectSendPublished(thread, message); return { selfNote: true, wrote: 0 }; }
-
+  if (built.publishes.length === 0) return 0;
   await assertWalletGramAtLeast(
     RECOVERY_PUBLISH_VALUE * BigInt(built.publishes.length) + WALLET_FEE_HEADROOM_NANOTONS, 'save a note');
   await sendPlathoWalletTransaction(plathoWallet, {
@@ -21202,8 +21275,7 @@ async function publishSelfNoteSnapshot(context) {
       payload: tonCell.bytesToBase64(tonCell.serializeBoc(publish.body)), stateInit: publish.init,
     })),
   }, { transport });
-  markDirectSendPublished(thread, message);
-  return { selfNote: true, wrote: built.publishes.length };
+  return built.publishes.length;
 }
 
 /** The note list a thread carries, oldest first: its own text messages, without the ones that carry no text. */
