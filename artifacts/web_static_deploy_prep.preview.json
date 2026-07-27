@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-27T16:16:09.229Z",
+  "generatedAt": "2026-07-27T16:41:24.333Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 216,
-    "totalBytes": 5562107,
-    "bundleSha256": "beb7b653fb8ebc949caa5d6be552d30ab28fa4a35623835aebabd7a3a23cb9cd",
+    "totalBytes": 5568288,
+    "bundleSha256": "91184d9849e81d841aa3ab48c50c7d71c135809f0824cd54d4e9d4b59f886e66",
     "files": [
       {
         "path": "app.js",
@@ -649,8 +649,8 @@
       },
       {
         "path": "recovery-blob.mjs",
-        "bytes": 11110,
-        "sha256": "94e82d4abb35d85efb2608b3fa0b13f18f63004254efc4fc2c6bf5f337e3e087"
+        "bytes": 16787,
+        "sha256": "147f978ac6c5027cb41a4c93cd28e647c1e3e2584afc8c24cfd2fc1b2dec7771"
       },
       {
         "path": "recovery-lane.mjs",
@@ -684,8 +684,8 @@
       },
       {
         "path": "shard-discovery.mjs",
-        "bytes": 19850,
-        "sha256": "3da353ae6048c439e41152e379841c06eb70bd3ff561dbe9c530ad98528f3fdf"
+        "bytes": 20354,
+        "sha256": "657a2dc5bb7059fb010f29f3a3428b29ab70c2057458bd8e2f04448ccc990ec1"
       },
       {
         "path": "shard-reader.mjs",
@@ -1096,6 +1096,7 @@
     "excludedWebFiles": [
       "CRYPTO_PROTOCOL.md",
       "NO_BACKEND_ARCHITECTURE.md",
+      "notes-lane.mjs",
       "preview-desktop.png",
       "preview-mobile.png",
       "publish-builder.mjs",
