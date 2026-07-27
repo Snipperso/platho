@@ -32,7 +32,7 @@ platho.app {
   @manifest path /manifest.webmanifest
   header @manifest Cache-Control "no-cache"
 
-  @runtime path /app.js /styles.css /platho-config.mjs /capsule-part-policy.mjs /message-pricing-policy.mjs /public-channel-subscriptions.mjs /recipient-identities.mjs /encrypted-message-store.mjs /platho-wallet.mjs /ton-mnemonic-wordlist.mjs /pwa-contract-transactions.mjs /vault-ton-rpc-provider.mjs /ton-dns-provider.mjs /capsulehub-ton-rpc-provider.mjs /ath-ton-rpc-provider.mjs /profile-registry-ton-rpc-provider.mjs /username-ton-rpc-provider.mjs /replay-store.mjs /vault-chain-provider.mjs /webp-encoder.mjs /qr-code.mjs /crypto/*
+  @runtime path /app.js /styles.css /platho-config.mjs /capsule-part-policy.mjs /message-pricing-policy.mjs /public-channel-subscriptions.mjs /recipient-identities.mjs /encrypted-message-store.mjs /platho-wallet.mjs /ton-mnemonic-wordlist.mjs /pwa-contract-transactions.mjs /vault-ton-rpc-provider.mjs /ton-dns-provider.mjs /ath-ton-rpc-provider.mjs /profile-registry-ton-rpc-provider.mjs /username-ton-rpc-provider.mjs /replay-store.mjs /webp-encoder.mjs /qr-code.mjs /crypto/*
   header @runtime Cache-Control "public, max-age=3600"
 
   @static path /assets/* /vendor/*

@@ -344,7 +344,7 @@ Depois que a carteira registrou as chaves on-chain, o cliente deve buscar:
 - para a própria carteira desbloqueada do usuário, o `UserState.auth_pubkey` correspondente à chave pública de autenticação do Vault derivada localmente;
 - o `VaultKeyRecordView` para aquele id de chave.
 
-O PWA expõe isso como uma ponte de provedor de falha fechada em `web/vault-chain-provider.mjs`. A ponte espera um provedor com:
+> **clean-17.** O contrato Vault descrito neste capítulo pertence ao clean-15. No clean-17 o mesmo vínculo é lido do contrato KeyShard PRÓPRIO da carteira (`web/key-shard-ton-rpc-provider.mjs`), cujo endereço é derivado da carteira — portanto um registro só pode conter chaves que aquela carteira registrou. A ponte de provedor `web/vault-chain-provider.mjs` foi removida junto com o Vault.
 
 ```js
 {

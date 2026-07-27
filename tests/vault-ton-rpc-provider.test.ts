@@ -5,7 +5,6 @@ import {
   exportSignedPublicKeyBundle,
   verifySignedPublicKeyBundle,
 } from '../web/crypto/platho-crypto.mjs';
-import { bindVaultRecordFromChain } from '../web/vault-chain-provider.mjs';
 import {
   clearToncenterMessagesCache,
   clearToncenterRunGetMethodCache,
@@ -65,63 +64,11 @@ describe('Vault TON RPC provider', () => {
     expect(decodeTonAddressSliceBoc(boc)).toBe(OWNER);
   });
 
-  it('VAULT-RPC-02: calls get_user/get_key_record and binds a signed bundle to Vault record', async () => {
-    const { signedBundle, draft, keyId } = await keyFixture();
-    const calls: Array<{ method: string; address: string; stack: any[] }> = [];
-    const transport = {
-      kind: 'mock-ton-rpc',
-      async runGetMethod(call: { method: string; address: string; stack: any[] }) {
-        calls.push(call);
-        if (call.method === 'get_user') {
-          expect(decodeTonAddressSliceBoc(call.stack[0].value)).toBe(OWNER);
-          return {
-            stack: [
-              num(-1n),
-              num(0n),
-              num(0n),
-              num(keyId),
-              num(0x99n),
-              num(3n),
-            ],
-          };
-        }
-        if (call.method === 'get_key_record') {
-          expect(call.stack).toEqual([{ type: 'num', value: `0x${keyId.toString(16)}` }]);
-          return {
-            stack: [
-              num(-1n),
-              { type: 'slice', value: encodeTonAddressSliceBoc(OWNER) },
-              num(0n),
-              num(draft.message.enc_pubkey),
-              num(draft.message.sign_pubkey),
-              num(draft.message.pq_kem_pubkey_hash),
-              num(draft.message.pq_kem_pubkey_len),
-              { type: 'cell', value: snakeBoc(draft.message.pq_kem_pubkey) },
-              num(draft.message.crypto_suite_mask),
-              num(1_700_000_000n),
-              num(10n),
-              num(0n),
-              num(0n),
-            ],
-          };
-        }
-        throw new Error(`unexpected method ${call.method}`);
-      },
-    };
-    const provider = createVaultTonRpcProvider({ vaultAddress: VAULT, transport });
-
-    const binding = await bindVaultRecordFromChain(
-      signedBundle,
-      { walletAddress: OWNER },
-      { provider, vaultAddress: VAULT, now: NOW + 1 },
-    );
-
-    expect(binding.active).toBe(true);
-    expect(binding.providerKind).toBe('mock-ton-rpc');
-    expect(binding.currentKeyId).toBe(keyId);
-    expect(calls.map((call) => call.method)).toEqual(['get_user', 'get_key_record']);
-    expect(calls.every((call) => call.address === VAULT)).toBe(true);
-  });
+  // VAULT-RPC-02 removed with web/vault-chain-provider.mjs: it bound a signed key bundle to a Vault get_user +
+  // get_key_record pair, and clean-17 has neither contract nor bridge. The identity binding it proved now runs
+  // against the wallet's OWN KeyShard, whose ADDRESS is derived from the wallet — see the key-shard suite and
+  // PWA-IOS-ACT-KEYSHARD-SINGLE-READ-01. What stays exercised in THIS file is the transport underneath, which
+  // every clean-17 reader still shares.
 
   it('VAULT-RPC-03: stays fail-closed without transport or Vault address', async () => {
     const provider = createVaultTonRpcProvider({ transport: null });

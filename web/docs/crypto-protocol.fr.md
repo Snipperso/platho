@@ -344,7 +344,7 @@ Après que le portefeuille a enregistré des clés on-chain, le client doit réc
 - pour le propre portefeuille déverrouillé de l'utilisateur, `UserState.auth_pubkey` correspondant à la clé publique d'authentification Vault dérivée localement ;
 - le `VaultKeyRecordView` pour cet identifiant de clé.
 
-La PWA expose cela comme un pont fournisseur en mode fermé dans `web/vault-chain-provider.mjs`. Le pont attend un fournisseur doté de :
+> **clean-17.** Le contrat Vault décrit dans ce chapitre relève de clean-15. Sous clean-17, le même lien est lu depuis le contrat KeyShard PROPRE au portefeuille (`web/key-shard-ton-rpc-provider.mjs`), dont l'adresse est dérivée du portefeuille — un enregistrement ne peut donc contenir que des clés enregistrées par ce portefeuille. Le pont fournisseur `web/vault-chain-provider.mjs` a été supprimé avec le Vault.
 
 ```js
 {

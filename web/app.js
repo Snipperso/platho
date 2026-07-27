@@ -35,9 +35,6 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import {
-  VaultChainProviderUnavailableError,
-} from './vault-chain-provider.mjs?v=8';
 import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=105';
 import {
   createTonRpcTransport,
@@ -150,10 +147,6 @@ import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=7';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=42';
-import {
-  createCapsuleHubTonRpcProvider,
-  isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=59';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=45';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=1';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
@@ -746,17 +739,30 @@ const profileVersionLabel = document.querySelector('#profileVersionLabel');
 // --- Private-routing on-device diagnostic (support tool) ---------------------------------------------------------
 // A Telegram Mini App / iOS webview has no console. Tapping the build badge copies a compact JSON snapshot of the
 // private-routing state to the clipboard so the owner can paste it back when a message lands in the wrong dialog.
-// Read-only. `plathoSenderResolveDebug` is a small ring of the most recent per-capsule sender-resolution outcomes
-// (why each incoming message routed where it did); `lastClaimedSenderResolveDebug` records the claimed-sender
-// crypto-verification result. Kept while the private-routing edge cases are still being confirmed on the device
-// fleet — this is the instrument that nails them; do not strip it again until the owner confirms the fleet is clean.
+// Read-only. `plathoSenderResolveDebug` is a small ring of the most recent per-conversation receive routings (why
+// each incoming message landed in the dialog it did). Kept while the private-routing edge cases are still being
+// confirmed on the device fleet — this is the instrument that nails them; do not strip it again until the owner
+// confirms the fleet is clean.
+const SENDER_RESOLVE_DEBUG_RING = 24;
 let plathoSenderResolveDebug = [];
-let lastClaimedSenderResolveDebug = null;
-function recordSenderResolveDebug(record) {
+
+// clean-17 direct-pay routing record. The clean-15 form logged a per-capsule sender GUESS (candidate wallets, claimed
+// vs cryptographic sender, own-guard nulls) because the Hub gave only a publisher address. A shard capsule arrives
+// already bound to a conversation — its bucketKey is derived from the (selfKeyId, peerKeyId) K_root — so what is
+// worth recording is that binding and the thread it selected.
+function recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected, appended }) {
   try {
-    plathoSenderResolveDebug.push(record);
-    if (plathoSenderResolveDebug.length > 24) plathoSenderResolveDebug.shift();
-  } catch { /* diagnostic must never break routing */ }
+    plathoSenderResolveDebug.push({
+      at: new Date().toISOString(),
+      self: introKeyIdString(selfKeyId).slice(0, 12),
+      peer: introKeyIdString(peerKeyId).slice(0, 12),
+      thread: targetThread?.id ?? null,
+      saved: isSavedMessagesThread(targetThread),
+      collected,
+      appended,
+    });
+    if (plathoSenderResolveDebug.length > SENDER_RESOLVE_DEBUG_RING) plathoSenderResolveDebug.shift();
+  } catch { /* a diagnostic must never break a receive pass */ }
 }
 function copyPrivateThreadDiagnostic() {
   try {
@@ -1273,9 +1279,9 @@ const WALLET_DISPLAY_MODE_LABELS = Object.freeze({
   [WALLET_DISPLAY_MODES.ADDRESS]: t('wallet.displayModeAddress'),
   [WALLET_DISPLAY_MODES.PLATHO_NFT]: t('wallet.displayModePlathoName'),
 });
+// clean-17 direct-pay: only the WALLET pocket exists. The custodial `vault` pocket was removed with the Vault.
 let vaultPocketState = {
   wallet: { ton_balance: null, ath_balance: null },
-  vault: { ton_balance: null, ath_balance: null },
 };
 let navVaultBalanceState = {
   status: 'idle',
@@ -3542,15 +3548,12 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // mid-confirm would leave the Save button disabled and the global sync spinner stuck forever.
   prefsConfirmGeneration += 1;
   prefsSyncInFlight = false;
-  // The monotonic-activation guard is per-wallet: forget the previous wallet's activated state so the NEW wallet's
-  // first not-activated read is honoured (never masked by the old wallet's cache). Drop the external-balance retry
-  // for the same reason (it was chasing the old wallet's balance).
-  lastKnownActivatedVaultWalletRaw = null;
+  // Drop the external-balance retry: it was chasing the OLD wallet's balance.
   clearWalletTonProfileBalanceRetry();
-  // Drop the previous wallet's cached pocket balances so the NEW wallet never inherits them — neither the vault
-  // pocket nor (with the v739 carry-forward) a failed external read may surface wallet A's funds under wallet B. The
-  // new wallet's own reads repopulate this; until then the UI shows unknown ("-"/pending), which is correct.
-  vaultPocketState = { wallet: { ton_balance: null, ath_balance: null }, vault: { ton_balance: null, ath_balance: null } };
+  // Drop the previous wallet's cached balances so the NEW wallet never inherits them — the carry-forward that keeps a
+  // known balance across a failed read must not surface wallet A's funds under wallet B. The new wallet's own reads
+  // repopulate this; until then the UI shows unknown ("-"/pending), which is correct.
+  vaultPocketState = { wallet: { ton_balance: null, ath_balance: null } };
   privateImageAttachments = [];
   privatePaymentCheckDraft = null;
   privateFileAttachments = [];
@@ -8646,29 +8649,11 @@ function rebuildThreadsFromPublicSubscriptions(options = {}) {
   renderPaneHeaders();
 }
 
-function configuredCapsuleHubAddress() {
-  return appConfig.capsuleHub?.address
-    ?? globalThis.plathoCapsuleHubAddress
-    ?? globalThis.PLATHO_CAPSULEHUB_ADDRESS
-    ?? null;
-}
-
 function configuredProfileRegistryAddress() {
   return appConfig.profileRegistry?.address
     ?? globalThis.plathoProfileRegistryAddress
     ?? globalThis.PLATHO_PROFILE_REGISTRY_ADDRESS
     ?? null;
-}
-
-async function resolveCapsuleHubProvider() {
-  const address = configuredCapsuleHubAddress();
-  if (!address) return null;
-  const provider = globalThis.plathoCapsuleHubProvider
-    ?? createCapsuleHubTonRpcProvider({ capsuleHubAddress: address });
-  if (!provider?.getState || !provider?.getPublicEntry || !provider?.getPrivateEntry) {
-    throw new Error('CapsuleHub provider cannot read entries');
-  }
-  return { provider, address };
 }
 
 function tryReadPublicEntryPayload(entry, options = {}) {
@@ -10015,12 +10000,6 @@ async function hydratePublicChannelAvatars() {
   return changed;
 }
 
-function privateKeyIdIndexValue(keyId) {
-  const bytes = base64UrlToBytes(keyId);
-  if (bytes.length !== 32) throw new Error('Private messaging key id must be 32 bytes');
-  return bytesToBigIntValue(bytes);
-}
-
 function entryBodyHashHex(entry) {
   try {
     if (entry?.body_hash === undefined || entry?.body_hash === null) return null;
@@ -10058,28 +10037,6 @@ function ownMessagingSignPubkeyValue() {
   } catch {
     return null;
   }
-}
-
-function rememberKnownVaultKeyOwner(walletAddress, keyRecord) {
-  const raw = rawWalletAddress(walletAddress);
-  if (!raw || !keyRecord?.sign_pubkey) return null;
-  const signPubkey = BigInt(keyRecord.sign_pubkey).toString();
-  knownVaultKeyOwnerBySignPubkey.set(signPubkey, raw);
-  knownVaultKeyRecordByWallet.set(raw, keyRecord);
-  return raw;
-}
-
-function privateEntryPublisherWallet(entry) {
-  const wallet = entry?.author_wallet ?? null;
-  if (!wallet) return null;
-  const vault = appConfig.vault?.address ?? null;
-  if (vault && sameWalletAddress(wallet, vault)) return null;
-  // On the RECIPIENT index the entry publisher is the OWN wallet, which is NEVER the sender of a received message —
-  // returning it made peer messages resolve sender==own and file into "My notes". The own wallet is only a valid
-  // "publisher-as-sender" for the SENDER-side path, which does not use this function.
-  const own = ownRuntimeWalletRaw();
-  if (own && sameWalletAddress(wallet, own)) return null;
-  return wallet;
 }
 
 function privateWalletIdentityVariants(walletAddress) {
@@ -10121,233 +10078,6 @@ async function verifiedPlathoUsernameIdentityForWallet(label, walletAddress) {
     }
     return null;
   }
-}
-
-async function privateWalletIdentityVariantsWithUsername(walletAddress, usernameLabel) {
-  const base = privateWalletIdentityVariants(walletAddress);
-  const username = await verifiedPlathoUsernameIdentityForWallet(usernameLabel, walletAddress);
-  return normalizeIdentityVariants([username, ...base]);
-}
-
-function knownPrivateWalletCandidates() {
-  const wallets = new Map();
-  for (const thread of threads) {
-    for (const identity of threadIdentityVariants(thread)) {
-      if (identity.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) continue;
-      const raw = rawWalletAddress(identity.value);
-      if (!raw) continue;
-      if (appConfig.vault?.address && sameWalletAddress(raw, appConfig.vault.address)) continue;
-      wallets.set(raw, raw);
-    }
-  }
-  return [...wallets.values()];
-}
-
-function knownPrivateWalletForSigningPubkey(signPubkey) {
-  let key = null;
-  try {
-    key = signPubkey ? BigInt(signPubkey).toString() : null;
-  } catch {
-    return null;
-  }
-  if (!key) return null;
-  const remembered = knownVaultKeyOwnerBySignPubkey.get(key);
-  if (remembered) return remembered;
-  const ownRaw = ownRuntimeWalletRaw();
-  for (const thread of threads) {
-    const wallet = rawWalletAddress(ownerWalletFromThread(thread));
-    if (!wallet) continue;
-    for (const message of thread.messages ?? []) {
-      if (message?.type !== 'in') continue;
-      const capsules = [
-        message.capsule,
-        ...(message.capsules ?? []),
-      ].filter(Boolean);
-      if (capsules.some((capsule) => senderSigningPublicKeyValue({ capsule }) === key)) {
-        // A PEER's received message MISFILED into the Saved thread (its owner == own) must NOT teach us that the
-        // peer's signing key belongs to own. This heuristic reads "which dialog does a message with this sign key
-        // currently sit in" — but a poisoned Saved placement (stale-build era, or a transient mis-route) then caches
-        // peerSignKey -> own PERMANENTLY (the map is only cleared on lock), so resolveKnownPrivateSenderWallet returns
-        // own for every future peer message, the v723 own-guard nulls it, and it is diverted to an Anonymous thread
-        // forever — the migration "runs but never heals". Accept own-ownership ONLY from a GENUINE self-note (its sign
-        // key IS own's messaging key — e.g. a note received on a 2nd device); otherwise skip this misplaced message so
-        // the cryptographic resolveClaimedPrivateSenderWallet can bind the key to the real peer wallet.
-        if (ownRaw && sameWalletAddress(wallet, ownRaw) && key !== ownMessagingSignPubkeyValue()) continue;
-        knownVaultKeyOwnerBySignPubkey.set(key, wallet);
-        return wallet;
-      }
-    }
-  }
-  return null;
-}
-
-async function resolveCurrentKnownVaultKeyRecord(walletAddress, provider, options = {}) {
-  const raw = rawWalletAddress(walletAddress);
-  if (!raw) return null;
-  const cached = knownVaultKeyRecordByWallet.get(raw);
-  if (cached && options.allowCached !== false) return cached;
-  // Key trust prefers dual-provider verification. When verification is
-  // structurally impossible (no reachable verifier on this network), the
-  // record is still bound to the on-chain key id by hash recomputation in
-  // assertVaultKeyRecordMatchesOwner, and availability wins by policy.
-  const readPair = async (chainReadOptions) => {
-    const readOptions = { vaultAddress: requireVaultAddress(), ...chainReadOptions };
-    const user = await provider.getUser(raw, readOptions);
-    const currentKeyId = BigInt(user.current_key_id ?? 0n);
-    if (user.exists !== true || currentKeyId === 0n) return null;
-    const keyRecord = await provider.getKeyRecord(currentKeyId, {
-      ownerWallet: raw,
-      ...readOptions,
-    });
-    await assertVaultKeyRecordMatchesOwner(raw, keyRecord, currentKeyId);
-    rememberKnownVaultKeyOwner(raw, keyRecord);
-    return keyRecord;
-  };
-  return callWithDegradedTransportReadFallback(
-    () => readPair(criticalChainReadOptions()),
-    () => readPair(unverifiedCriticalChainReadOptions()),
-  );
-}
-
-async function assertVaultKeyRecordMatchesOwner(walletAddress, keyRecord, expectedKeyId) {
-  const expected = BigInt(expectedKeyId ?? 0n);
-  if (expected === 0n) throw new Error('Vault key id is required');
-  const computedKeyId = await computeVaultMessagingKeyId({
-    owner_wallet: requireBasechainAddress(walletAddress, 'Vault key owner'),
-    key_generation: keyRecord?.key_generation ?? keyRecord?.keyGeneration,
-    enc_pubkey: keyRecord?.enc_pubkey ?? keyRecord?.encPubkey,
-    sign_pubkey: keyRecord?.sign_pubkey ?? keyRecord?.signPubkey,
-    pq_kem_pubkey_hash: keyRecord?.pq_kem_pubkey_hash ?? keyRecord?.pqKemPubkeyHash,
-    pq_kem_pubkey_len: keyRecord?.pq_kem_pubkey_len ?? keyRecord?.pqKemPubkeyLen,
-    crypto_suite_mask: keyRecord?.crypto_suite_mask ?? keyRecord?.cryptoSuiteMask,
-  });
-  if (computedKeyId !== expected) {
-    throw new Error('Vault key record does not belong to this wallet');
-  }
-  return computedKeyId;
-}
-
-async function resolveVaultKeyRecordForSenderWallet(walletAddress, vaultKeyId, provider) {
-  const raw = rawWalletAddress(walletAddress);
-  if (!raw) return null;
-  if (vaultKeyId !== null && vaultKeyId !== undefined && BigInt(vaultKeyId) > 0n) {
-    const readRecord = async (chainReadOptions) => {
-      const keyRecord = await provider.getKeyRecord(BigInt(vaultKeyId), {
-        ownerWallet: raw,
-        vaultAddress: requireVaultAddress(),
-        ...chainReadOptions,
-      });
-      await assertVaultKeyRecordMatchesOwner(raw, keyRecord, BigInt(vaultKeyId));
-      rememberKnownVaultKeyOwner(raw, keyRecord);
-      return keyRecord;
-    };
-    return callWithDegradedTransportReadFallback(
-      () => readRecord(criticalChainReadOptions()),
-      () => readRecord(unverifiedCriticalChainReadOptions()),
-    );
-  }
-  return resolveCurrentKnownVaultKeyRecord(raw, provider, { allowCached: false });
-}
-
-async function resolveClaimedPrivateSenderWallet(opened, provider, signPubkey) {
-  const claimedWallet = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
-  if (!claimedWallet) return null;
-  const senderVaultKeyId = opened?.payload?.senderVaultKeyId ?? opened?.payload?.sender_vault_key_id ?? null;
-  try {
-    const keyRecord = await resolveVaultKeyRecordForSenderWallet(claimedWallet, senderVaultKeyId, provider);
-    if (keyRecord?.sign_pubkey && BigInt(keyRecord.sign_pubkey).toString() === signPubkey) {
-      lastClaimedSenderResolveDebug = { claimed: claimedWallet, outcome: 'matched' };
-      return rememberKnownVaultKeyOwner(claimedWallet, keyRecord);
-    }
-    lastClaimedSenderResolveDebug = { claimed: claimedWallet, outcome: 'mismatch', hadKeyRecord: Boolean(keyRecord?.sign_pubkey) };
-    console.warn('Private sender wallet claim did not match Vault signing key', claimedWallet);
-  } catch (error) {
-    if (noteTonRpcRateLimit(error)) { lastClaimedSenderResolveDebug = { claimed: claimedWallet, outcome: 'ratelimited' }; return null; }
-    lastClaimedSenderResolveDebug = { claimed: claimedWallet, outcome: 'error', message: String(error?.message ?? error).slice(0, 80) };
-    console.warn('Unable to verify private sender wallet claim', claimedWallet, error);
-  }
-  return null;
-}
-
-async function resolveKnownPrivateSenderWallet(opened, options = {}) {
-  const signPubkey = senderSigningPublicKeyValue(opened);
-  if (!signPubkey) return null;
-  const localMatch = knownPrivateWalletForSigningPubkey(signPubkey);
-  if (localMatch) return localMatch;
-  const remembered = knownVaultKeyOwnerBySignPubkey.get(signPubkey);
-  const candidates = [...new Set([
-    remembered,
-    ...knownPrivateWalletCandidates(),
-  ].filter(Boolean))];
-  let resolved = null;
-  try {
-    resolved = await resolveVaultChainProvider();
-  } catch {
-    return null;
-  }
-  if (!resolved?.getUser || !resolved?.getKeyRecord) return null;
-  if (options.allowClaimedSenderWallet !== false) {
-    const claimed = await resolveClaimedPrivateSenderWallet(opened, resolved, signPubkey);
-    if (claimed) return claimed;
-  }
-  for (const wallet of candidates) {
-    try {
-      const keyRecord = await resolveCurrentKnownVaultKeyRecord(wallet, resolved, { allowCached: false });
-      if (keyRecord?.sign_pubkey && BigInt(keyRecord.sign_pubkey).toString() === signPubkey) {
-        return rememberKnownVaultKeyOwner(wallet, keyRecord);
-      }
-    } catch (error) {
-      if (noteTonRpcRateLimit(error)) return null;
-      console.warn('Unable to match private sender wallet', wallet, error);
-    }
-  }
-  return null;
-}
-
-async function resolvePrivateCapsuleSenderWallet(opened, entry) {
-  return await resolveKnownPrivateSenderWallet(opened) ?? privateEntryPublisherWallet(entry);
-}
-
-async function threadForOpenedSenderCapsule(opened) {
-  const recipientWallet = rawWalletAddress(opened?.payload?.recipientWallet ?? opened?.payload?.recipient_wallet);
-  if (recipientWallet) {
-    const variants = privateWalletIdentityVariants(recipientWallet);
-    // Heal-on-touch: never route a peer-addressed sent capsule into the Saved self-thread (see
-    // healThreadWalletVariantConflict); after a strip, re-find — the real peer dialog (if any) now matches.
-    let identityThread = findThreadByIdentityVariants(threads, variants);
-    if (identityThread) {
-      identityThread = healThreadWalletVariantConflict(identityThread, recipientWallet)
-        ?? findThreadByIdentityVariants(threads, variants);
-    }
-    // HARD INVARIANT (mirror of the receive path): a sent capsule addressed to a PEER may never target Saved —
-    // purge whatever stale named variant matched it there and re-resolve among the OTHER dialogs. A self note
-    // (recipient == own) still routes to Saved as always.
-    {
-      const own = ownRuntimeWalletRaw();
-      if (identityThread && own && recipientWallet !== own && isRealSavedThread(identityThread)) {
-        purgePeerVariantsFromSavedThread(identityThread);
-        identityThread = findThreadByIdentityVariants(threads.filter((thread) => !isRealSavedThread(thread)), variants);
-      }
-    }
-    if (identityThread) return refreshThreadIdentityFromVariants(identityThread, variants);
-    const created = createRecipientThread(recipientWallet);
-    if (created?.ok && created.thread) {
-      const existingById = threads.find((thread) => thread.id === created.thread.id);
-      if (existingById) return refreshThreadIdentityFromVariants(existingById, variants);
-      threads.push(created.thread);
-      return refreshThreadIdentityFromVariants(created.thread, variants);
-    }
-  }
-  const recipientKeyId = opened?.capsule?.header0?.recipientKeyId ?? opened?.payload?.recipientKeyId ?? opened?.payload?.recipient_key_id;
-  const fallback = createInboundPeerThread({
-    senderKeyId: recipientKeyId,
-    keyId: recipientKeyId,
-    label: 'Recovered sent',
-  });
-  const existingById = threads.find((thread) => thread.id === fallback.id);
-  if (existingById) return existingById;
-  threads.push(fallback);
-  return fallback;
 }
 
 function findMessageByCapsuleId(capsuleId) {
@@ -10780,128 +10510,6 @@ function purgeNamedIdentityFromSavedThread(savedThread) {
   savedThread.identityVariants = canonical;
   applyThreadDisplayFields(savedThread);
   return true;
-}
-
-// Routing-time entry point: a NON-self capsule matched the real Saved thread through a stale variant — restore
-// Saved to canonical (drops ALL named + foreign variants, not only the incoming one, so a sibling graft can't be
-// promoted to Saved's name) and persist only when it changed.
-function purgePeerVariantsFromSavedThread(savedThread) {
-  if (purgeNamedIdentityFromSavedThread(savedThread)) { persistThreadDisplayPreference(savedThread); return true; }
-  return false;
-}
-
-async function threadForChainCapsule(opened, entry) {
-  if (opened?.openedAs === 'sender') {
-    const target = await threadForOpenedSenderCapsule(opened);
-    if (target) return target;
-  }
-  const senderKeyId = opened?.capsule?.header0?.senderKeyId;
-  let senderWallet = await resolvePrivateCapsuleSenderWallet(opened, entry);
-  // Diagnostic: snapshot the cryptographically-resolved sender BEFORE the own-guard can null it (see badge diag).
-  const resolvedSenderBeforeGuard = (() => { try { return senderWallet ? rawWalletAddress(senderWallet) : null; } catch { return null; } })();
-  // Sender-wallet sanity for routing (the real, ongoing root of "peer messages land in My notes"):
-  // resolvePrivateCapsuleSenderWallet falls back to the chain entry publisher when the CRYPTOGRAPHIC sender can't be
-  // resolved — and on the RECIPIENT index that publisher is the OWN wallet, so a peer's message resolved sender==own
-  // and matched the Saved thread by the own-wallet variant (no graft needed).
-  {
-    const ownRaw = ownRuntimeWalletRaw();
-    if (ownRaw) {
-      if (isSelfOpenedCapsule(opened)) {
-        // A self note (own->own) ALWAYS belongs in Saved — pin the sender to the own wallet so it routes there even
-        // when key resolution fails on a degraded chain (publisher no longer supplies own).
-        senderWallet = plathoWallet?.address ?? ownRaw;
-      } else {
-        // A received PEER message can NEVER have the own wallet as its sender. The VERIFIED sender is already returned
-        // inside resolveKnown (resolveClaimedPrivateSenderWallet cryptographically binds the claimed wallet to the
-        // capsule signing key); so an own/unresolved result here is the FAILED-verification case — do NOT trust the
-        // raw, spoofable payload.senderWallet. Leave it unresolved: the message lands in an inbound peer thread keyed
-        // by the sender key id (pendingIdentityResolution, re-bound when resolution recovers), never Saved.
-        let resolvedRaw = null; try { resolvedRaw = senderWallet ? rawWalletAddress(senderWallet) : null; } catch { resolvedRaw = null; }
-        if (resolvedRaw === ownRaw) senderWallet = null;
-      }
-    }
-  }
-  // Diagnostic: one record per routed capsule — why it landed where it did (badge diag reads plathoSenderResolveDebug).
-  let claimedRawForDbg = null; try { claimedRawForDbg = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet); } catch { claimedRawForDbg = null; }
-  const resolveDbg = {
-    as: opened?.openedAs ?? null,
-    self: isSelfOpenedCapsule(opened),
-    claimed: claimedRawForDbg,
-    resolvedPre: resolvedSenderBeforeGuard,
-    own: ownRuntimeWalletRaw(),
-    final: (() => { try { return senderWallet ? rawWalletAddress(senderWallet) : null; } catch { return null; } })(),
-    claimVerify: lastClaimedSenderResolveDebug,
-  };
-  const finishSenderResolve = (thread) => {
-    resolveDbg.target = thread?.id ?? null;
-    resolveDbg.targetSaved = thread ? isSavedMessagesThread(thread) : null;
-    resolveDbg.targetPending = thread?.pendingIdentityResolution === true;
-    recordSenderResolveDebug(resolveDbg);
-    return thread;
-  };
-  const senderUsername = opened?.payload?.senderUsername ?? opened?.payload?.sender_username;
-  // A SELF note (own->own) resolves WALLET-ONLY, exactly like threadForOpenedSenderCapsule: a note-to-self carries
-  // the owner's OWN .ath in senderUsername, and grafting that PLATHO_NFT variant onto the real Saved thread would
-  // then be stripped by the (now strict) per-sync heal on every scan — re-encrypting the WHOLE Saved history once
-  // per new self-note. Saved wears only the own wallet; the own username is never a variant on "My notes".
-  const variants = isSelfOpenedCapsule(opened)
-    ? privateWalletIdentityVariants(senderWallet)
-    : await privateWalletIdentityVariantsWithUsername(senderWallet, senderUsername);
-  // Heal-on-touch: an incoming peer message must never land in the Saved self-thread (see
-  // healThreadWalletVariantConflict); after a strip, re-find — the real peer dialog (if any) now matches.
-  let identityThread = findThreadByIdentityVariants(threads, variants);
-  if (identityThread) {
-    identityThread = healThreadWalletVariantConflict(identityThread, rawWalletAddress(senderWallet))
-      ?? findThreadByIdentityVariants(threads, variants);
-  }
-  // HARD INVARIANT: a NON-self capsule may NEVER target the real Saved thread, no matter WHICH stale variant
-  // matched it. Wallet grafts are stripped above, but a grafted peer USERNAME also matches (the v728 iPhone dump
-  // showed correctly-resolved peer messages still routed to Saved through exactly that) — purge the offending
-  // named variants off Saved and re-resolve among the OTHER dialogs. A self capsule still routes to Saved as always.
-  if (identityThread && !isSelfOpenedCapsule(opened) && isRealSavedThread(identityThread)) {
-    purgePeerVariantsFromSavedThread(identityThread);
-    identityThread = findThreadByIdentityVariants(threads.filter((thread) => !isRealSavedThread(thread)), variants);
-  }
-  if (identityThread) {
-    // The sender may have TRANSFERRED away a .ath this dialog still wears. The fresh `variants` already exclude an
-    // unowned name (verifiedPlathoUsernameIdentityForWallet drops it), but refreshThreadIdentityFromVariants is
-    // sticky and never strips a previously-latched one — so re-check + relabel here. Throttled per-dialog (5-min)
-    // and routed through the shared username-hygiene queue so a catch-up sync across many dialogs never fires N
-    // concurrent chain reads (v509 iOS freeze); the private-scan loop never awaits it.
-    queueUsernameHygiene(() => revalidateThreadUsernameVariants(identityThread));
-    return finishSenderResolve(refreshThreadIdentityFromVariants(identityThread, variants));
-  }
-  const created = createInboundPeerThread({
-    senderKeyId,
-    keyId: senderKeyId,
-    label: senderWallet ? displayWalletAddress(senderWallet) : null,
-    ownerWallet: senderWallet ?? null,
-    identity: preferredInboundIdentity(variants),
-    identityVariants: variants,
-  });
-  // A CLAIMED-but-unverified sender (share mode + transient verification failure) is a resolution we should retry
-  // and keep hidden meanwhile; a genuinely anonymous sender (no claim) is shown as-is.
-  const hadClaimedSender = Boolean(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
-  if (!senderWallet) {
-    created.pendingIdentityResolution = true;
-    created.pendingIdentityResolutionAt = new Date().toISOString();
-    created.pendingClaimedSenderResolution = hadClaimedSender;
-    if (hadClaimedSender) queuePendingSenderRescan(entry, created);
-  }
-  const existingById = threads.find((thread) => thread.id === created.id);
-  if (existingById) {
-    if (!senderWallet && isAnonymousPeerThread(existingById)) {
-      existingById.pendingIdentityResolution = true;
-      existingById.pendingIdentityResolutionAt = existingById.pendingIdentityResolutionAt ?? new Date().toISOString();
-      if (hadClaimedSender) {
-        existingById.pendingClaimedSenderResolution = true;
-        queuePendingSenderRescan(entry, existingById);
-      }
-    }
-    return finishSenderResolve(refreshThreadIdentityFromVariants(existingById, variants));
-  }
-  threads.push(created);
-  return finishSenderResolve(created);
 }
 
 function ownerWalletFromThread(thread) {
@@ -11361,14 +10969,6 @@ function isTransientPendingResolutionThread(thread) {
     && pendingResolutionWithinGrace(thread);
 }
 
-function queuePendingSenderRescan(entry, thread) {
-  if (!pendingResolutionWithinGrace(thread)) return;
-  try {
-    const id = privateEntryIdText(entry);
-    if (id !== null && id !== undefined) queueSavedRelocateEntryId(id);
-  } catch { /* best-effort re-scan queue */ }
-}
-
 function pruneEmptyAnonymousPeerThreads() {
   let changed = false;
   for (let index = threads.length - 1; index >= 0; index -= 1) {
@@ -11515,32 +11115,6 @@ function privateSyncResult(fields = {}) {
   };
 }
 
-function privateIndexLinkValue(value) {
-  try {
-    const link = BigInt(value ?? 0n);
-    return link > 0n ? link : 0n;
-  } catch {
-    return 0n;
-  }
-}
-
-function privateIndexLatestLink(index) {
-  return privateIndexLinkValue(index?.latest_entry_link ?? 0n);
-}
-
-function privateIndexPreviousLink(entry, role) {
-  return privateIndexLinkValue(
-    role === 'sender'
-      ? entry?.sender_prev_link
-      : entry?.recipient_prev_link,
-  );
-}
-
-function privateIndexEntryIdFromLink(link) {
-  const normalized = privateIndexLinkValue(link);
-  return normalized > 0n ? normalized - 1n : null;
-}
-
 function privateSyncImported(result) {
   if (typeof result === 'boolean') return result;
   return Number(result?.imported ?? 0) > 0;
@@ -11593,7 +11167,14 @@ function privateSyncStatusText(result) {
 // thread does (defensive — the K_root is adopted from that INTRO, so normally the thread already exists).
 function resolveConvReceiveThread(peerKeyIdB64) {
   let thread = threads.find((item) => item.convPeerKeyId === peerKeyIdB64);
-  if (thread) return thread;
+  if (thread) {
+    // ON-RECEIPT username hygiene. A .ath is a MOVABLE alias: a peer who transferred their name away must stop being
+    // labelled by it, and the dialog that inherited it must stop claiming it. The receive routers that carried this
+    // went with the Hub, and receiving a message is exactly when a stale label is most visible. Serialized through
+    // the shared hygiene queue so N conversations never fan out N concurrent resolves (the v509 iOS freeze).
+    queueUsernameHygiene(() => revalidateThreadUsernameVariants(thread));
+    return thread;
+  }
   const created = createInboundPeerThread({ senderKeyId: peerKeyIdB64, keyId: peerKeyIdB64, label: null });
   thread = threads.find((item) => item.id === created.id) ?? created;
   if (!threads.includes(thread)) threads.push(thread);
@@ -11711,7 +11292,12 @@ async function syncConvCapsulesFromShards() {
         await cooperativeYield();
       }
     }
-    imported += await appendConvOpenedCapsules(collected, targetThread);
+    const appendedNow = await appendConvOpenedCapsules(collected, targetThread);
+    imported += appendedNow;
+    // Feed the on-device routing diagnostic (copyPrivateThreadDiagnostic). Under direct pay routing is no longer a
+    // guess: the conversation record's keyId PAIR selects the thread, so the useful record is which pair mapped to
+    // which thread and how much it carried. Same instrument, the fact it captures just got simpler.
+    if (collected.length > 0) recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected: collected.length, appended: appendedNow });
     // Advance the cursor ONLY on a fully clean scan — a failed read must leave the cursor so those epochs are retried,
     // never silently skipped past.
     if (convClean) await convKeyStore.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
@@ -12951,80 +12537,12 @@ function currentVaultUserSource() {
     ?? null;
 }
 
-// Activation is MONOTONIC on-chain: once a wallet's Vault user exists with current_key_id>0 it never reverts. So a
-// read that comes back NOT-activated for a wallet we have ALREADY observed activated is a transient bad read (a
-// lagging RPC replica / a pre-registration block height / a reorg), never a real downgrade. Accepting one tore the
-// whole UI down to "activate your account" (Vault tab locked, profile "Activate" row, nav vault balance gone) for a
-// few seconds until the next good read healed it. Remember the last wallet seen activated; reject a not-activated
-// read for that same wallet. Cleared on a wallet change (clearWalletScopedRuntimeState). Sibling to
-// lastKnownOwnWalletRaw (the v728 messaging-identity guard) — same "never infer state from one bad read" rule.
-let lastKnownActivatedVaultWalletRaw = null;
-// A get_user read is STAMPED (in loadConnectedVaultUser) with the wallet it was ISSUED for. A read that resolves
-// AFTER an in-app wallet switch carries the OLD wallet's stamp, so it must never be attributed to the NEW wallet.
-// Without this, a stale activated read for wallet A, landing after a switch to a fresh wallet B, marked B activated
-// and the guard then masked B's genuine not-activated reads all session (the v739 review's cross-wallet poison).
-const VAULT_USER_READ_WALLET = Symbol('vaultUserReadWallet');
-
-function vaultUserReadWalletRaw(user) {
-  return (user && typeof user === 'object' && user[VAULT_USER_READ_WALLET]) || null;
-}
-
-// True when `user` came from a read ISSUED for a wallet OTHER than the one connected now (the wallet switched while
-// the read was in flight). Display callers discard such a read; note/guard never attribute it to the current wallet.
-function vaultUserReadIsStale(user) {
-  const readWallet = vaultUserReadWalletRaw(user);
-  if (!readWallet) return false; // unstamped (in-context caller) -> treated as current
-  const current = rawWalletAddress(plathoWallet?.address);
-  return Boolean(current && !sameWalletAddress(readWallet, current));
-}
-
-function vaultUserIsActivated(user) {
-  if (user?.exists !== true) return false;
-  try { return BigInt(user.current_key_id ?? 0n) > 0n; } catch { return false; }
-}
-
-function noteVaultUserActivationObserved(user) {
-  if (!vaultUserIsActivated(user)) return;
-  const current = rawWalletAddress(plathoWallet?.address);
-  // Only trust the observation if the read was issued for the CURRENTLY connected wallet — a stale cross-wallet read
-  // must never stamp the new wallet as activated (an unstamped in-context read is attributed to the current wallet).
-  if (!current || vaultUserReadIsStale(user)) return;
-  lastKnownActivatedVaultWalletRaw = current;
-}
-
-// True when `user` reports NOT-activated but we have already seen THIS wallet activated -> a transient bad read the
-// caller must not act on (don't clobber the binding / flip the UI; a display caller keeps last-known + retries, a
-// pre-sign caller still fails closed on the raw read it holds). A read issued for a DIFFERENT wallet is never
-// classified against this wallet's guard.
-function isTransientVaultActivationDowngrade(user) {
-  if (!user || typeof user !== 'object' || vaultUserIsActivated(user) || vaultUserReadIsStale(user)) return false;
-  const raw = rawWalletAddress(plathoWallet?.address);
-  return Boolean(raw && lastKnownActivatedVaultWalletRaw && sameWalletAddress(raw, lastKnownActivatedVaultWalletRaw));
-}
-
-function rememberConnectedVaultUser(user) {
-  if (!user || typeof user !== 'object') return user;
-  // Suspect not-activated read for a wallet we know is activated: keep the good binding + nav balance untouched.
-  // Return the RAW read so a PRE-SIGN caller (readFreshConnectedVaultUserForOwnVaultAction) still fails closed on it
-  // instead of signing against a bad read — while the display never flips to "not activated".
-  if (isTransientVaultActivationDowngrade(user)) return user;
-  noteVaultUserActivationObserved(user);
-  globalThis.plathoVaultBinding = {
-    ...(globalThis.plathoVaultBinding ?? {}),
-    walletAddress: plathoWallet?.address ?? globalThis.plathoVaultBinding?.walletAddress ?? null,
-    user,
-  };
-  vaultPocketState = {
-    wallet: vaultPocketState.wallet ?? { ton_balance: null, ath_balance: null },
-    vault: {
-      ton_balance: user.exists === true ? nonNegativeBigInt(user.ton_balance) : 0n,
-      ath_balance: user.exists === true ? nonNegativeBigInt(user.ath_balance) : 0n,
-    },
-  };
-  markNavVaultBalanceReady();
-  return user;
-}
-
+// Activation is MONOTONIC on-chain: once a wallet's keys are registered they never un-register. So a read that comes
+// back NOT-registered for a wallet already observed registered is a transient bad read (a lagging RPC replica / a
+// pre-registration block height / a reorg), never a real downgrade — accepting one tore the whole UI down to
+// "activate your account". Under clean-17 that rule is enforced at the source: refreshVaultActivationStatus treats
+// ONLY a definitive uninit shard as "not registered" and rethrows every other read failure to a catch that PRESERVES
+// the existing binding, so a bad read can no longer reach this predicate at all.
 function hasActiveVaultMessagingKeys() {
   const user = currentVaultUserSource();
   if (user?.exists !== true) return false;
@@ -13036,13 +12554,6 @@ function hasActiveVaultMessagingKeys() {
 }
 
 function hasActivePlathoAccount() {
-  return hasActiveVaultMessagingKeys();
-}
-
-function hasCurrentWalletVaultBinding() {
-  const binding = globalThis.plathoVaultBinding;
-  if (!binding || !plathoWallet?.address) return false;
-  if (binding.walletAddress && !sameWalletAddress(binding.walletAddress, plathoWallet.address)) return false;
   return hasActiveVaultMessagingKeys();
 }
 
@@ -13205,20 +12716,17 @@ function shortUiErrorText(error, fallback = t('common.blockedCap')) {
 
 function privateSendPreflightStatusText(error) {
   const message = shortUiErrorText(error, 'Send blocked');
-  if (/not enough vault ton/i.test(message)) return message;
   if (/persistent encrypted local history/i.test(message)) return 'Local encrypted history unavailable; reload Platho before creating a check';
   if (/payment check recovery record could not be saved|payment check pending ledger could not be saved/i.test(message)) {
     return 'Payment check recovery could not be saved; reload Platho and try again';
   }
-  if (/activate platho account before publishing/i.test(message)) return 'Activate Platho account before sending';
-  // Insufficient Vault balance is DETERMINISTIC — retrying never helps (the balance won't appear). Surface a
-  // clear, actionable terminal status (the message is stopped + manual-retry-available via isFatalPrivateSendError);
-  // the user tops up the Vault, then retries.
-  if (/ath balance is too low/i.test(message)) return 'Insufficient Vault ATH — top up in Vault, then retry';
-  if (/gram balance is too low/i.test(message)) return 'Insufficient Vault GRAM — top up in Vault, then retry';
-  if (/network surcharge .* exceeds the production cap/i.test(message)) return message;
+  if (/activate platho account/i.test(message)) return 'Activate Platho account before sending';
+  // A funds shortfall is DETERMINISTIC — retrying never helps (the balance won't appear). The raised message already
+  // names the asset, the amount needed and the amount held, which is the most actionable text there is: pass it
+  // through verbatim. isFatalPrivateSendError stops the retry loop on the same two codes.
+  if (error?.code === 'PLATHO_ATH_REQUIRED' || error?.code === 'PLATHO_WALLET_GRAM_REQUIRED') return message;
   if (isTonRpcVerificationSoftReadError(error)) return 'RPC verification pending';
-  if (/Vault chain provider|TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
+  if (/TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
   return message;
 }
 
@@ -13295,23 +12803,17 @@ function isTonRpcVerificationUnavailableError(error) {
 function isFatalPrivateSendError(error) {
   const message = String(error?.message ?? error ?? '');
   return isPublishPriceChangeCancelled(error)
+    // A funds shortfall is DETERMINISTIC: the balance will not appear by retrying, and an auto-retry loop against it
+    // burns RPC budget and leaves the message churning instead of showing the user what to do. Direct pay raises the
+    // two shortfalls by CODE (assertConnectedAthAtLeast / assertWalletGramAtLeast) — match those, not their prose.
+    || error?.code === 'PLATHO_ATH_REQUIRED'
+    || error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
     || isVaultPublishPartialError(error)
-    || /not enough vault ton|vault (?:ton|gram|ath) balance is too low|activate platho account|recipient .*not activated|is not registered|ownership is not authoritative|network surcharge .*exceeds the production cap|local platho signing key is not ready|wallet required|provider is not configured|cannot price publish|deployment manifest/i.test(message);
+    || /not enough ath to|wallet needs ~.* gram to|activate platho account|recipient .*not activated|is not registered|ownership is not authoritative|local platho signing key is not ready|wallet required|provider is not configured|cannot price publish|deployment manifest/i.test(message);
 }
 
 function isRecoverablePrivateSendError(error) {
   return isTonRpcTransientError(error) && !isFatalPrivateSendError(error);
-}
-
-// Vault exit code 16453 = the publish path's throwUnless(clientNonce == publish_nonce) (contracts/Vault.tact).
-// AMBIGUOUS even on a re-broadcast sent right after reading currentNonce === clientNonce: toncenter is a
-// FLEET — POST /message is emulated against the SEND node's own state, which can lag the read pool by a
-// block, so its 16453 can mean "too early" (publish_nonce still below clientNonce there) just as well as
-// "the nonce advanced past this external". NEVER treat this error alone as proof the external landed; the
-// only sound landing evidence is a fresh nonce READ showing currentNonce > clientNonce (monotonic counter —
-// replicas lag, never run ahead). Callers use this match only to route to the quiet short-cooldown retry.
-function isVaultPublishNonceConsumedError(error) {
-  return /\b16453\b/.test(String(error?.responseBody ?? error?.message ?? ''));
 }
 
 // Per-receiver Vault pre-accept nonce-reject exit codes (throwUnless(code, clientNonce == user.publish_nonce)
@@ -13322,15 +12824,6 @@ function isVaultPublishNonceConsumedError(error) {
 // and can never genuinely appear on these paths.
 const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES = Object.freeze([16037, 16135, 16233, 16249, 16262, 16611, 16711, 16808]);
 const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_RE = new RegExp(`\\b(?:${VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES.join('|')})\\b`);
-
-// toncenter "cannot send external message : duplicate message" = the SAME BoC is already queued in its
-// mempool (an earlier broadcast of this exact external is still being processed). The external IS in flight,
-// so a re-broadcast attempt that hits this is effectively a SUCCESSFUL relay, not a failure: without treating
-// it as such, the tight (~1s) confirm cadence + the zero first-heal cooldown re-POST the same BoC every pass
-// and toncenter answers 500 "duplicate" each time — the red-500-spam loop the owner saw.
-function isTonBroadcastDuplicateMessageError(error) {
-  return /duplicate message/i.test(String(error?.responseBody ?? error?.message ?? ''));
-}
 
 function privateSendRetryDelayMs(error = null, attempt = 0) {
   if (isTonRpcRateLimitError(error)) return tonRpcLimitBackoffMs(error);
@@ -13917,22 +13410,6 @@ function refreshPublicSendButtonState() {
   if (blocked) hidePublicComposerAddMenu();
   if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = blocked;
   publicPostCommentsToggle?.classList.toggle('is-disabled', blocked);
-}
-
-async function assertVaultHasPrivatePublishHold(suite, plan, options = {}) {
-  const provider = await resolveVaultChainProvider();
-  const user = rememberConnectedVaultUser(options.allowOwnVaultActionReadFallback === false
-    ? await loadConnectedVaultUser({ provider, ...criticalChainReadOptions() })
-    : await readFreshConnectedVaultUserForOwnVaultAction(provider));
-  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate Platho account before publishing');
-  }
-  const hold = composerEstimatedMaxChargeNanotons(privateComposerPublishProfilesForPlan(suite, plan), 1);
-  const balance = vaultTonBalanceNanotons(user);
-  if (balance < hold) {
-    throw new Error(`Not enough Vault GRAM: need ${formatTonNanotons(hold)} GRAM hold, have ${formatTonNanotons(balance)} GRAM`);
-  }
-  return { user, hold, balance };
 }
 
 function estimatedUsernameMintTonFeeNanotons() {
@@ -18385,21 +17862,11 @@ composer?.addEventListener('submit', async (event) => {
   renderThreads();
   renderConversation();
 
-  try {
-    // clean-17 direct-pay pays the RecordShard straight from the wallet — there is no Vault hold to reserve. Skip the
-    // Vault preflight; the direct publish path (attemptConvMessagePublishDirect) does its own wallet-GRAM check.
-    if (!privateLaneDirectPayEnabled()) {
-      await assertVaultHasPrivatePublishHold(selectedSuite, sendPlan, {
-        allowOwnVaultActionReadFallback: false,
-      });
-    }
-  } catch (error) {
-    await settlePrivateComposerSendError(sendContext, error);
-    refreshThreadAfterMessageChange(thread);
-    renderThreads();
-    renderConversation();
-    return;
-  }
+  // clean-17 direct-pay pays the RecordShard straight from the wallet — there is no Vault hold to reserve, so the
+  // Vault preflight (assertVaultHasPrivatePublishHold) is gone. Its two guarantees are covered where they belong:
+  // "account activated" by canAttemptPrivateSend (the send button is disabled while the KeyShard read says not
+  // registered), and "enough GRAM" by attemptConvMessagePublishDirect's own assertWalletGramAtLeast, which measures
+  // the ACTUAL per-part transfer cost instead of a custodial hold estimate.
 
   const keylessBudget = usingKeylessTonRpc();
   const endPrivateOutboundWork = keylessBudget ? beginPrivateOutboundWork() : null;
@@ -18714,20 +18181,6 @@ function requireVaultAddress() {
   return address;
 }
 
-function requireVaultDeploymentManifestHash() {
-  const hash = appConfig.vault?.deploymentManifestHash ?? globalThis.plathoVaultDeploymentManifestHash;
-  if (!hash) throw new Error('Vault deployment manifest hash is not configured');
-  return hash;
-}
-
-function uint256ConfigValue(value, label) {
-  const text = String(value ?? '').trim();
-  if (/^0x[0-9a-fA-F]{64}$/.test(text)) return BigInt(text);
-  if (/^[0-9a-fA-F]{64}$/.test(text)) return BigInt(`0x${text}`);
-  if (/^[0-9]+$/.test(text)) return BigInt(text);
-  throw new Error(`${label} must be a uint256 hex or decimal value`);
-}
-
 function requireAthMasterAddress() {
   const address = appConfig.ath?.masterAddress ?? globalThis.plathoAthMasterAddress;
   if (!address) throw new Error('ATHMaster contract address is not configured');
@@ -18750,39 +18203,6 @@ function requireBasechainAddress(address, label) {
   const parsed = parseTonAddress(address);
   if (parsed.workchain !== 0) throw new Error(`${label} must be a basechain address`);
   return parsed.raw;
-}
-
-function assertVaultGlobalMatchesConfig(global) {
-  if (!global) throw new Error('Vault global state is missing');
-  if (global.sealed !== true) {
-    throw new Error('Vault is not sealed on this network');
-  }
-  if (global.capsule_hub_bound !== true) {
-    throw new Error('Vault CapsuleHub route is not bound on this network');
-  }
-  const expectedManifest = uint256ConfigValue(requireVaultDeploymentManifestHash(), 'Vault deployment manifest hash');
-  if (BigInt(global.deployment_manifest_hash ?? 0n) !== expectedManifest) {
-    throw new Error('Vault deployment manifest hash does not match this app config');
-  }
-  const expectedCapsuleHub = appConfig.capsuleHub?.address
-    ? requireBasechainAddress(appConfig.capsuleHub.address, 'CapsuleHub')
-    : null;
-  const boundCapsuleHub = global.capsule_hub_address
-    ? requireBasechainAddress(global.capsule_hub_address, 'Vault CapsuleHub')
-    : null;
-  if (expectedCapsuleHub && boundCapsuleHub !== expectedCapsuleHub) {
-    throw new Error('Vault CapsuleHub binding does not match this app config');
-  }
-  const expectedAthMaster = appConfig.ath?.masterAddress
-    ? requireBasechainAddress(appConfig.ath.masterAddress, 'ATHMaster')
-    : null;
-  const boundAthMaster = global.ath_master_address
-    ? requireBasechainAddress(global.ath_master_address, 'Vault ATHMaster')
-    : null;
-  if (expectedAthMaster && boundAthMaster !== expectedAthMaster) {
-    throw new Error('Vault ATHMaster binding does not match this app config');
-  }
-  return global;
 }
 
 function requirePlathoWallet() {
@@ -18943,6 +18363,11 @@ function renderAthProfileStats() {
     vaultProtocolState?.airdrop_total_allocation_ath,
     VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
   );
+  // clean-17: the "issued" figure has NO client source yet. It used to come from the Vault global, and the Vault is
+  // gone; under clean-17 the undistributed remainder lives in AirdropPool, for which the client has neither a reader
+  // nor a configured address (the address only exists after the genesis ceremony). Until that reader is built this
+  // renders "-" — a dash is honest, a number read off the superseded clean-15 Vault would not be.
+  // [roadmap: AirdropPool client reader]
   const remainingRaw = vaultProtocolState?.airdrop_remaining_ath;
   if (remainingRaw === null || remainingRaw === undefined || total <= 0n) {
     setText(athDropIssuedStatus, '-');
@@ -19905,35 +19330,6 @@ function isTonRpcRecoverableReadError(error) {
   return isTonRpcVerificationSoftReadError(error) || isTonRpcTransientError(error);
 }
 
-async function readFreshConnectedVaultUser(provider, options = {}) {
-  // Signed vault actions derive their client nonce from this read; wait for
-  // any in-flight publish nonce to land so the next signature stays valid.
-  await awaitVaultPublishNonceBarrier();
-  return loadConnectedVaultUser({
-    provider,
-    verify: options.verify !== false,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
-}
-
-async function readFreshConnectedVaultUserForOwnVaultAction(provider) {
-  return callWithDegradedTransportReadFallback(
-    () => readFreshConnectedVaultUser(provider),
-    () => readFreshConnectedVaultUser(provider, unverifiedCriticalChainReadOptions()),
-  );
-}
-
-async function callWithOwnVaultActionReadFallback(readStrict, readUnverified) {
-  try {
-    return await readStrict();
-  } catch (error) {
-    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
-    return readUnverified();
-  }
-}
-
 function tonRpcVerificationStructurallyDegraded() {
   const transport = globalThis.plathoTonRpcTransport;
   if (typeof transport?.isDegraded === 'function' && transport.isDegraded() === true) return true;
@@ -20031,57 +19427,14 @@ function noteTonRpcRateLimit(error) {
   return true;
 }
 
+// "This read failed for a reason that is not a bug" — a degraded/rate-limited/unverifiable chain read, as opposed to
+// a real fault worth a console.error. The Vault provider class it was named for is gone; the predicate stays because
+// every clean-17 reader (KeyShard, PublicShard, RecordShard, registries) raises exactly these transport conditions.
 function isExpectedVaultProviderUnavailable(error) {
   const message = String(error?.message ?? error ?? '');
-  return error instanceof VaultChainProviderUnavailableError
-    || error?.name === 'VaultChainProviderUnavailableError'
-    || isTonRpcRateLimitError(error)
+  return isTonRpcRateLimitError(error)
     || isTonRpcVerificationUnavailableError(error)
-    || /Vault chain provider is not configured|Vault provider unavailable|verification unavailable/i.test(message);
-}
-
-function vaultProviderStatusForError(error) {
-  if (noteTonRpcRateLimit(error)) return t('vault.rpcBusyRetrying');
-  return appConfig.vault?.provider?.unavailableStatus ?? t('vault.providerRequired');
-}
-
-async function loadConnectedVaultUser(options = {}) {
-  const provider = options.provider ?? await resolveVaultChainProvider();
-  if (!provider?.getUser) throw new VaultChainProviderUnavailableError('Vault chain provider is not configured');
-  return withVaultReadLock(async () => {
-    // Stamp the read with the wallet it is ISSUED for (captured before the network await). A get_user that resolves
-    // AFTER an in-app wallet switch must never be attributed to the NEW wallet (the cross-wallet activation poison the
-    // v739 review found). This is the single choke point for EVERY vault-user read (display + pre-sign via
-    // readFreshConnectedVaultUser), so every consumer's user object carries its origin wallet.
-    const forWallet = requirePlathoWalletAddress();
-    const forWalletRaw = rawWalletAddress(forWallet);
-    const user = await provider.getUser(forWallet, {
-      vaultAddress: requireVaultAddress(),
-      verify: options.verify === true,
-      allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-      priority: options.priority,
-      cacheTtlMs: options.cacheTtlMs,
-    });
-    if (user && typeof user === 'object' && forWalletRaw) {
-      try {
-        Object.defineProperty(user, VAULT_USER_READ_WALLET, { value: forWalletRaw, enumerable: false, configurable: true, writable: true });
-      } catch { /* non-extensible decode: guard falls back to ambient-wallet attribution, still fail-closed */ }
-    }
-    return user;
-  });
-}
-
-async function loadConnectedVaultGlobal(options = {}) {
-  const provider = options.provider ?? await resolveVaultChainProvider();
-  if (!provider?.getGlobal) throw new VaultChainProviderUnavailableError('Vault chain provider is not configured');
-  const global = await withVaultReadLock(() => provider.getGlobal({
-    vaultAddress: requireVaultAddress(),
-    verify: options.verify === true,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    priority: options.priority,
-    cacheTtlMs: options.cacheTtlMs,
-  }));
-  return assertVaultGlobalMatchesConfig(global);
+    || /verification unavailable/i.test(message);
 }
 
 // Max time a critical read may WAIT in the transport's request queue before it is abandoned. The keyless
@@ -20301,15 +19654,10 @@ function criticalChainReadOptions() {
   return { verify: true, priority: 'critical', cacheTtlMs: 0, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS };
 }
 
-function criticalCapsuleHubReadOptions(address) {
-  return { capsuleHubAddress: address, ...criticalChainReadOptions() };
-}
-
 async function refreshWalletTonBalanceForProfile() {
   if (!plathoWallet?.address) {
     vaultPocketState = {
       wallet: { ton_balance: null, ath_balance: vaultPocketState.wallet?.ath_balance ?? null },
-      vault: vaultPocketState.vault ?? { ton_balance: null, ath_balance: null },
     };
     refreshWalletTonProfileStatus();
     return null;
@@ -20330,7 +19678,6 @@ async function refreshWalletTonBalanceForProfile() {
       ton_balance: balance,
       ath_balance: vaultPocketState.wallet?.ath_balance ?? null,
     },
-    vault: vaultPocketState.vault ?? { ton_balance: null, ath_balance: null },
   };
   refreshWalletTonProfileStatus();
   return balance;
@@ -20368,107 +19715,58 @@ function scheduleWalletTonProfileBalanceRetry() {
   }, WALLET_TON_PROFILE_BALANCE_RETRY_DELAYS_MS[attempt]);
 }
 
-function renderVaultPocketCards(walletBalances, vaultUser) {
-  vaultPocketState = {
-    wallet: {
-      // Carry forward last-known on a FAILED read (null/undefined) instead of wiping to "-": a deferred external
-      // balance read that momentarily returns null must not flicker a known balance to a dash. A real 0 balance is
-      // still a bigint (0n) so it is preserved; only a failed read (null) falls through. Wallet change resets
-      // separately via resetVaultPocketState.
-      ton_balance: walletBalances?.ton_balance ?? vaultPocketState.wallet?.ton_balance ?? null,
-      ath_balance: walletBalances?.ath_balance ?? vaultPocketState.wallet?.ath_balance ?? null,
-    },
-    vault: {
-      ton_balance: vaultUser && vaultUser.exists !== true ? 0n : vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ton_balance) : null,
-      ath_balance: vaultUser && vaultUser.exists !== true ? 0n : vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ath_balance) : null,
-    },
-  };
-  renderVaultCards([]);
-  refreshWalletTonProfileStatus();
-  refreshVaultMoveWidget();
-  if (vaultUser && typeof vaultUser === 'object') {
-    markNavVaultBalanceReady();
-  } else {
-    markNavVaultBalancePending('vault user unavailable', { retry: true });
-  }
-}
-
 function resetVaultPocketState() {
   vaultPocketState = {
     wallet: { ton_balance: null, ath_balance: null },
-    vault: { ton_balance: null, ath_balance: null },
   };
   markNavVaultBalanceIdle();
   refreshWalletTonProfileStatus();
   refreshVaultMoveWidget();
 }
 
-function applyVaultUserPocketState(user) {
-  // Monotonic-activation guard: a not-activated read for a wallet we've already seen activated is transient — keep
-  // the last-known binding + nav balance (do NOT zero the vault pocket / flip "activated") and re-read shortly.
-  if (isTransientVaultActivationDowngrade(user)) {
-    markNavVaultBalanceRetryNeeded('vault user read inconsistent');
-    return;
-  }
-  noteVaultUserActivationObserved(user);
-  vaultPocketState = {
-    wallet: vaultPocketState.wallet ?? { ton_balance: null, ath_balance: null },
-    vault: {
-      ton_balance: user?.exists === true ? nonNegativeBigInt(user.ton_balance) : 0n,
-      ath_balance: user?.exists === true ? nonNegativeBigInt(user.ath_balance) : 0n,
-    },
-  };
-  if (user) {
-    globalThis.plathoVaultBinding = {
-      ...(globalThis.plathoVaultBinding ?? {}),
-      user,
-      walletAddress: plathoWallet?.address ?? globalThis.plathoVaultBinding?.walletAddress ?? null,
-    };
-  }
-  refreshWalletTonProfileStatus();
-  refreshVaultMoveWidget();
-  markNavVaultBalanceReady();
-  refreshComposerCostStatus();
-  refreshComposerPublishPolicy();
-  refreshMessageActionStatuses({ keepSyncStatus: true });
-}
-
+// The nav-corner balance. Under clean-17 direct-pay the money IS the wallet balance — there is no custodial Vault
+// pocket to read, so this refreshes the external GRAM + ATH balances of the connected wallet. (The cutover gate that
+// used to sit here skipped the Vault get_user and returned null, which left the corner permanently `is-pending`: the
+// only writers of a "known" balance were the three Vault-pocket paths, and every one of them was behind that gate.)
 async function refreshVaultNavBalanceInBackground(options = {}) {
   if (!plathoWallet?.address) {
     delete globalThis.plathoVaultBinding;
     resetVaultPocketState();
     return null;
   }
-  // clean-17: no Vault CUSTODY under direct-pay (funds live in the wallet, not the Vault). This background refresh reads
-  // the real Vault get_user, which for a clean-17 user returns exists:false and would OVERWRITE the synthesized KeyShard
-  // activation binding → silently disable messaging. Skip it. [deletion scout: Vault-refresh clobbers KeyShard binding]
-  if (privateLaneDirectPayEnabled()) return null;
   if (navVaultBalanceRefreshPromise) return navVaultBalanceRefreshPromise;
   // iOS WebKit/JSC HARD-FREEZES the run loop on 2+ CONCURRENT app-level chain-read CALLS (the documented
-  // v509/v515/v516 class — force-reload required). A full vault refresh (refreshVaultNow -> refreshVaultDashboard)
-  // is already reading get_user under vaultRefreshPromise (lock A) and updates the nav balance itself via
-  // applyVaultUserPocketState -> markNavVaultBalanceReady. So while THAT read is in flight, do NOT fire a SECOND,
-  // concurrent get_user here. This cross-lock nav-vs-dashboard overlap on the activation POST-TRANSACTION path
-  // (queueVaultPostTransactionRefresh fires refreshVaultNow at T=0 AND arms a +2s nav read) was the permanent
-  // "Activate Platho account" iPhone freeze. Defer + re-arm so the nav balance still settles after the refresh
-  // frees the lock (and it is already kept current by the refresh's own read meanwhile).
-  if (vaultRefreshPromise) {
-    markNavVaultBalanceRetryNeeded('vault refresh in progress');
-    return vaultRefreshPromise.catch(() => null);
-  }
+  // v509/v515/v516 class — force-reload required). Both balance reads below therefore run STRICTLY one at a time,
+  // and this single-flight promise keeps overlapping refreshes (auto-refresh + post-transaction + retry) from
+  // stacking a second pair on top.
   markNavVaultBalancePending(options.fromRetry ? 'retrying' : 'refreshing');
   navVaultBalanceRefreshPromise = (async () => {
-    try {
-      const user = await loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS });
-      // The wallet may have switched while this read was in flight: a stale cross-wallet read must never render / stamp
-      // the new wallet's state (the wallet-change refresh reads the new wallet itself).
-      if (vaultUserReadIsStale(user)) return null;
-      applyVaultUserPocketState(user);
-      return user;
-    } catch (error) {
+    const forWalletRaw = rawWalletAddress(plathoWallet.address);
+    // GRAM first, then ATH — never concurrently. loadConnectedTonWalletBalance resolves null on a failed read (it
+    // does not throw); loadConnectedAthWalletBalance maps "jetton wallet not deployed" to 0n and throws only on a
+    // genuinely unknown balance, so its failure is caught here and treated as unknown rather than as zero.
+    const ton = await loadConnectedTonWalletBalance();
+    const ath = await loadConnectedAthWalletBalance().catch(() => null);
+    // The wallet may have switched while these reads were in flight: a stale cross-wallet balance must never be
+    // rendered as the new wallet's (the wallet-change refresh reads the new wallet itself).
+    if (!plathoWallet?.address || rawWalletAddress(plathoWallet.address) !== forWalletRaw) return null;
+    if (ton === null && ath === null) {
       markNavVaultBalanceRetryNeeded('balance unavailable');
-      throw error;
+      return null;
     }
+    // Carry forward last-known on a partial failure instead of wiping to "-": a momentary null must not flicker a
+    // known balance to a dash. A real zero balance is a bigint (0n) and is preserved.
+    vaultPocketState = {
+      wallet: {
+        ton_balance: ton ?? vaultPocketState.wallet?.ton_balance ?? null,
+        ath_balance: ath ?? vaultPocketState.wallet?.ath_balance ?? null,
+      },
+    };
+    refreshWalletTonProfileStatus();
+    refreshVaultMoveWidget();
+    markNavVaultBalanceReady();
+    refreshComposerCostStatus();
+    return vaultPocketState.wallet;
   })();
   try {
     return await navVaultBalanceRefreshPromise;
@@ -20477,24 +19775,20 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
   }
 }
 
-function vaultMoveBalance(pocket, asset) {
-  return asset === 'ATH'
-    ? vaultPocketState[pocket]?.ath_balance
-    : vaultPocketState[pocket]?.ton_balance;
-}
-
-function vaultMoveFormattedBalance(pocket, asset) {
-  const balance = vaultMoveBalance(pocket, asset) ?? 0n;
+function walletFormattedBalance(asset) {
+  const balance = (asset === 'ATH'
+    ? vaultPocketState.wallet?.ath_balance
+    : vaultPocketState.wallet?.ton_balance) ?? 0n;
   return asset === 'ATH'
     ? formatAthAtomic(balance)
     : formatTonNanotons(balance);
 }
 
 function navVaultBalanceHasKnownValue() {
-  return vaultPocketState.vault?.ton_balance !== null
-    && vaultPocketState.vault?.ton_balance !== undefined
-    && vaultPocketState.vault?.ath_balance !== null
-    && vaultPocketState.vault?.ath_balance !== undefined;
+  return vaultPocketState.wallet?.ton_balance !== null
+    && vaultPocketState.wallet?.ton_balance !== undefined
+    && vaultPocketState.wallet?.ath_balance !== null
+    && vaultPocketState.wallet?.ath_balance !== undefined;
 }
 
 function refreshNavVaultBalance() {
@@ -20518,8 +19812,8 @@ function refreshNavVaultBalance() {
     }
     container.removeAttribute('aria-hidden');
   }
-  const tonBalance = `${vaultMoveFormattedBalance('vault', 'TON')} GRAM`;
-  const athBalance = `${vaultMoveFormattedBalance('vault', 'ATH')} ATH`;
+  const tonBalance = `${walletFormattedBalance('TON')} GRAM`;
+  const athBalance = `${walletFormattedBalance('ATH')} ATH`;
   for (const node of navVaultTonBalances) {
     setText(node, tonBalance);
   }
@@ -20534,103 +19828,6 @@ function refreshVaultMoveWidget() {
   refreshNavVaultBalance();
 }
 
-async function refreshVaultDashboard() {
-  // clean-17: the Vault custodial dashboard (deposit/withdraw + protocol stats) is meaningless under direct-pay and its
-  // get_user read would clobber the synthesized KeyShard activation binding. Skip it. [deletion scout: clobber]
-  if (privateLaneDirectPayEnabled()) return null;
-  if (!plathoWallet?.address) {
-    vaultProtocolState = {
-      airdrop_remaining_ath: null,
-      airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
-      profile_registry_bound: false,
-      profile_registry_address: null,
-      username_registry_bound: false,
-      username_registry_address: null,
-    };
-    renderAthProfileStats();
-    renderVaultCards(appConfig.ui?.vaultCards ?? []);
-    resetVaultPocketState();
-    refreshComposerCostStatus();
-    setVaultStatus('wallet required');
-    return null;
-  }
-  let user = null;
-  let userError = null;
-  // v509 — the Apple-only Vault freeze is the CONCURRENT read burst itself, not any single read. v508 removed
-  // the external balances from the burst, which only MOVED the freeze onto get_global (the new last read of
-  // the concurrent get_user+get_global burst -> prev=vaultr:protocol-armed). The WORKING nav-corner balance
-  // (refreshVaultNavBalanceInBackground) reads get_user ALONE and NEVER freezes. So on iOS WebKit a single
-  // read is fine but 2+ concurrent reads stall the run loop. FIX: the critical path reads get_user ALONE
-  // (== the proven nav read) and renders immediately; get_global (stats/registry) + the external GRAM/ATH
-  // balances load deferred and STRICTLY SEQUENTIALLY (one read at a time), off the render path.
-  const vaultUserTimedOut = Symbol('vault-open-user-timeout');
-  const settledUser = await Promise.race([
-    loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS })
-      .then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason })),
-    delay(VAULT_OPEN_READ_DEADLINE_MS).then(() => vaultUserTimedOut),
-  ]);
-  if (settledUser === vaultUserTimedOut) {
-    renderAthProfileStats();
-    refreshComposerCostStatus();
-    setVaultStatus('RPC busy, retrying');
-    markNavVaultBalancePending('RPC busy', { retry: true });
-    refreshComposerPublishPolicy();
-    if (isVaultViewActive()) scheduleVaultAutoRefresh(1_000);
-    return null;
-  }
-  if (settledUser.status === 'fulfilled') {
-    user = settledUser.value;
-  } else {
-    userError = settledUser.reason;
-  }
-  // The wallet may have switched while this dashboard read was in flight: discard a stale cross-wallet read entirely
-  // (never render it / write the binding / stamp activation under the new wallet). The wallet-change refresh, queued
-  // AFTER this read on the shared mutex, renders the new wallet.
-  if (user && vaultUserReadIsStale(user)) return null;
-  // Monotonic-activation guard: a not-activated read for a wallet we've already seen activated is a transient bad
-  // read — keep the activated UI intact (never flip to "Vault setup required" / clobber the binding / hide the nav
-  // balance) and re-read shortly. Intercept BEFORE renderVaultPocketCards, which would render the vault pocket as 0.
-  if (user && isTransientVaultActivationDowngrade(user)) {
-    renderAthProfileStats();
-    refreshComposerCostStatus();
-    setVaultStatus('RPC busy, retrying');
-    markNavVaultBalanceRetryNeeded('vault user read inconsistent');
-    refreshComposerPublishPolicy();
-    if (isVaultViewActive()) scheduleVaultAutoRefresh(1_000);
-    return null;
-  }
-  noteVaultUserActivationObserved(user);
-  // Render the Vault from get_user ONLY. get_global (airdrop/registry display) is NOT awaited here — its
-  // last-known value persists in vaultProtocolState and is refreshed by the deferred sequential reader.
-  renderAthProfileStats();
-  // Carry-forward external wallet balances (never wipe last-known to "-" — that would flicker every refresh).
-  renderVaultPocketCards({
-    ton_balance: vaultPocketState.wallet?.ton_balance ?? null,
-    ath_balance: vaultPocketState.wallet?.ath_balance ?? null,
-  }, user);
-  refreshComposerCostStatus();
-  // Everything beyond get_user loads deferred + STRICTLY SEQUENTIALLY (one read at a time), off the render
-  // path: get_global (stats/registry), then external GRAM, then external ATH. Single-flight guarded.
-  scheduleVaultDeferredReads(user);
-  if (user) {
-    setVaultStatus(user.exists === true ? 'synced' : 'Vault setup required');
-    globalThis.plathoVaultBinding = {
-      ...(globalThis.plathoVaultBinding ?? {}),
-      user,
-      walletAddress: plathoWallet.address,
-    };
-    refreshComposerPublishPolicy();
-    return user;
-  }
-  if (isExpectedVaultProviderUnavailable(userError)) {
-    setVaultStatus(vaultProviderStatusForError(userError));
-    return null;
-  }
-  setVaultStatus('sync blocked');
-  if (userError) console.error(userError);
-  return null;
-}
-
 // Hard ceiling per deferred Vault read, so a hung read (e.g. the iOS v2-GET GRAM read) can never latch the
 // single-flight guard and starve later refreshes. Resolves to null on timeout.
 const VAULT_DEFERRED_READ_TIMEOUT_MS = 10_000;
@@ -20639,63 +19836,6 @@ const VAULT_DEFERRED_READ_TIMEOUT_MS = 10_000;
 // overlapping reads (re-introducing the concurrency we are removing). Cleared in finally so a thrown/timed-
 // out read never latches it (the deferred values would then never reload until a page reload).
 let vaultDeferredReadInFlight = false;
-function scheduleVaultDeferredReads(vaultUser) {
-  // Defer to a macrotask so the Vault paints from get_user BEFORE any further read runs.
-  setTimeout(() => { void refreshVaultDeferredReadsInBackground(vaultUser); }, 0);
-}
-async function refreshVaultDeferredReadsInBackground(vaultUser) {
-  if (vaultDeferredReadInFlight) return;
-  if (!plathoWallet?.address || !isVaultViewActive()) return;
-  vaultDeferredReadInFlight = true;
-  try {
-    // 1) get_global (airdrop / registry display) — unverified display read, on its own connection. Never
-    //    concurrent with get_user (that 2-read burst was the iOS freeze). assertVaultGlobalMatchesConfig
-    //    (inside loadConnectedVaultGlobal) still validates the config binding regardless of verify.
-    let global = null;
-    try {
-      global = await Promise.race([
-        loadConnectedVaultGlobal({ verify: false, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
-        delay(VAULT_DEFERRED_READ_TIMEOUT_MS).then(() => null),
-      ]);
-    } catch (error) { noteTonRpcRateLimit(error); }
-    if (!isVaultViewActive()) return;
-    if (global) {
-      vaultProtocolState = {
-        airdrop_remaining_ath: global.airdrop_remaining_ath ?? null,
-        airdrop_total_allocation_ath: global.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
-        profile_registry_bound: global.profile_registry_bound === true,
-        profile_registry_address: global.profile_registry_address ?? null,
-        username_registry_bound: global.username_registry_bound === true,
-        username_registry_address: global.username_registry_address ?? null,
-      };
-      renderAthProfileStats();
-      refreshComposerPublishPolicy();
-    }
-    // 2) external GRAM (TON) balance — its own connection.
-    let ton = null;
-    try {
-      ton = await Promise.race([
-        loadConnectedTonWalletBalance(),
-        delay(VAULT_DEFERRED_READ_TIMEOUT_MS).then(() => null),
-      ]);
-    } catch (error) { noteTonRpcRateLimit(error); }
-    if (!isVaultViewActive()) return;
-    renderVaultPocketCards({ ton_balance: ton, ath_balance: vaultPocketState.wallet?.ath_balance ?? null }, vaultUser);
-    // 3) external ATH jetton balance — its own connection (this was the original freeze site).
-    let ath = null;
-    try {
-      ath = await Promise.race([
-        loadConnectedAthWalletBalance(),
-        delay(VAULT_DEFERRED_READ_TIMEOUT_MS).then(() => null),
-      ]);
-    } catch (error) { noteTonRpcRateLimit(error); }
-    if (!isVaultViewActive()) return;
-    renderVaultPocketCards({ ton_balance: ton, ath_balance: ath }, vaultUser);
-  } finally {
-    vaultDeferredReadInFlight = false;
-  }
-}
-
 async function resolveAthMasterProvider() {
   const provider = globalThis.plathoAthMasterProvider
     ?? createAthMasterTonRpcProvider({ athMasterAddress: requireAthMasterAddress() });
@@ -20759,32 +19899,13 @@ async function refreshAthFlushState() {
   }
 }
 
-// Refresh the activity-airdrop "issued" figure from the Vault global (it does NOT live in the
-// ATHMaster jetton data, so the Profile stat was only ever current right after a Vault-tab refresh).
-// Uses the verified->unverified degraded fallback so a flaky/region-blocked gateway still yields a value.
-async function refreshAthAirdropState() {
-  if (!plathoWallet?.address) return;
-  const global = await callWithDegradedTransportReadFallback(
-    () => loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS }),
-    () => loadConnectedVaultGlobal(unverifiedCriticalChainReadOptions()),
-  ).catch(() => null);
-  if (!global) return;
-  vaultProtocolState = {
-    ...vaultProtocolState,
-    airdrop_remaining_ath: global.airdrop_remaining_ath ?? vaultProtocolState.airdrop_remaining_ath ?? null,
-    airdrop_total_allocation_ath: global.airdrop_total_allocation_ath ?? vaultProtocolState.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
-  };
-  renderAthProfileStats();
-}
-
 async function refreshAthProtocolStats() {
   return await refreshAthProtocolStatsRun();
 }
 async function refreshAthProtocolStatsRun() {
   renderAthProfileStats();
-  // Serialize the ATH-stats reads (airdrop -> jetton -> flush), one at a time. The airdrop read was
-  // fire-and-forget, overlapping the jetton read + the flush burst — the iOS run-loop-stall pattern (v509).
-  await refreshAthAirdropState().catch(() => {});
+  // Serialize the ATH-stats reads (jetton -> flush), one at a time. Reads that overlap are the iOS
+  // run-loop-stall pattern (v509).
   try {
     const provider = await resolveAthMasterProvider();
     if (!provider?.getJettonData) {
@@ -20833,7 +19954,6 @@ function clearVaultAutoRefreshTimer() {
 
 function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
   clearVaultAutoRefreshTimer();
-  if (privateLaneDirectPayEnabled()) return;   // clean-17: no Vault custody refresh under direct-pay [deletion scout: clobber]
   if (document.hidden || !plathoWallet?.address) return;
   const effectiveDelayMs = delayMs === VAULT_AUTO_REFRESH_MS && !isVaultViewActive()
     ? VAULT_NAV_BACKGROUND_REFRESH_MS
@@ -20861,20 +19981,14 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
   if (vaultRefreshPromise) return vaultRefreshPromise;
   const vaultWork = (async () => {
     const results = [];
-    const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
-    results.push(...dashboardResult);
-    const dashboardUser = dashboardResult[0]?.status === 'fulfilled'
-      ? dashboardResult[0].value
-      : null;
-    // Run the post-dashboard jobs SEQUENTIALLY (one at a time), not concurrently: on iOS WebKit, activation +
+    // clean-17 direct-pay: the custodial dashboard read (Vault get_user + get_global) is gone. What the tab shows is
+    // the WALLET balance, so the balance refresh takes its place as the first job.
+    results.push(...await Promise.allSettled([refreshVaultNavBalanceInBackground()]));
+    // Run the remaining jobs SEQUENTIALLY (one at a time), not concurrently: on iOS WebKit, activation +
     // ATH-stats firing together (and each fanning out) is the run-loop-stall pattern fixed for the Vault in
     // v509. Build thunks so each job is INVOKED only when the previous has settled.
     const jobThunks = [];
-    if (includeActivation) {
-      jobThunks.push(() => refreshVaultActivationStatus(
-        dashboardUser ? { user: dashboardUser, skipGlobal: true } : {},
-      ));
-    }
+    if (includeActivation) jobThunks.push(() => refreshVaultActivationStatus());
     if (includeStats) jobThunks.push(() => refreshAthProtocolStats());
     for (const job of jobThunks) {
       results.push(...await Promise.allSettled([job()]));
@@ -21578,7 +20692,7 @@ async function submitKeyShardRegisterDirect() {
   const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
   let view = null;
   try {
-    view = await provider.getView(ownerWallet, criticalChainReadOptions());
+    view = await withVaultReadLock(() => provider.getView(ownerWallet, criticalChainReadOptions()));
   } catch (error) {
     if (!isKeyShardUninitError(error)) throw error;   // transient — abort rather than write on a bad read
     view = { exists: false };
@@ -21749,91 +20863,8 @@ function publishHashPlain(value) {
   }
 }
 
-function publishPartBodyHash(part) {
-  return publishHashPlain(part?.bodyHash ?? part?.body_hash);
-}
-
-function publishPartHeader0Hash(part) {
-  return publishHashPlain(part?.header0Hash ?? part?.header_0_hash ?? part?.headerHash ?? part?.header_hash);
-}
-
-function publishPartHeader1Hash(part) {
-  return publishHashPlain(part?.header1Hash ?? part?.header_1_hash);
-}
-
-function publishPartKind(part) {
-  const kind = part?.publishKind ?? part?.publish_kind ?? part?.kind;
-  if (kind === 'public' || kind === 'private') return kind;
-  try {
-    return BigInt(kind ?? 0n) === VAULT_PUBLISH_KIND.PUBLIC ? 'public' : 'private';
-  } catch {
-    return 'private';
-  }
-}
-
 function publishIdForPart(part) {
   return publishHashPlain(part?.publishId ?? part?.publish_id);
-}
-
-function setPublishPartStatus(publishState, index, status, extra = {}) {
-  const part = publishState?.parts?.[index];
-  if (!part) return null;
-  const previousStatus = part.status;
-  Object.assign(part, extra, { status });
-  // Visible send timeline (console.info, NOT verbose debug): one line per REAL transition so a slow send
-  // self-localizes (landed on-chain / confirmed / failed) without a diagnostic build.
-  if (status !== previousStatus && (
-    status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
-    || status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
-    || status === PUBLISH_PART_STATUS_FAILED
-  )) {
-    console.info('[platho] send timeline', {
-      part: index,
-      from: previousStatus ?? null,
-      to: status,
-      nonce: part.clientNonce ?? null,
-      by: extra.confirmedBy ?? null,
-      at: new Date().toISOString(),
-    });
-    // OWN forward progress (a part landed or confirmed) refreshes the queue-progress anchor too —
-    // symmetric with the chain-nonce-advance stamp in the heal loop (see privatePublishNoProgressAgeMs).
-    if (status !== PUBLISH_PART_STATUS_FAILED) publishState.queueProgressAt = Date.now();
-  }
-  if (
-    status === PUBLISH_PART_STATUS_SENT
-    || status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
-    || status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
-  ) {
-    part.error = null;
-    part.retryReason = null;
-    if (status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) {
-      part.lastBroadcastRetryError = null;
-      part.lastBroadcastRetryErrorAt = null;
-    }
-    // A landed part is never re-broadcast (publishPartNeedsBroadcastRetry excludes these statuses) — drop the
-    // pre-signed variant BoCs (~16 x 47KB) so the persisted encrypted history is not bloated past the in-flight
-    // window. The single externalBoc stays for the existing recovery/debug paths.
-    if (status !== PUBLISH_PART_STATUS_SENT && part.externalBocVariants) {
-      delete part.externalBocVariants;
-    }
-  }
-  publishState.submittedCount = publishState.parts.filter((item) => (
-    item.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
-    || item.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
-  )).length;
-  publishState.confirmedCount = publishState.parts.filter((item) => item.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED).length;
-  publishState.displaySubmittedCount = publishStateVisibleSubmittedCount(publishState);
-  if (publishState.confirmedCount === publishState.partCount) {
-    publishState.status = CAPSULEHUB_PUBLISH_STATUS_CONFIRMED;
-  } else if (publishState.submittedCount > 0 || publishState.parts.some((item) => item.status === PUBLISH_PART_STATUS_SENT || item.status === PUBLISH_PART_STATUS_UNKNOWN)) {
-    publishState.status = VAULT_PUBLISH_STATUS_SUBMITTED;
-  } else if (publishState.parts.some((item) => item.status === PUBLISH_PART_STATUS_FAILED)) {
-    publishState.status = 'failed';
-  } else {
-    publishState.status = 'built';
-  }
-  publishState.updatedAt = new Date().toISOString();
-  return part;
 }
 
 function publishStatePendingCount(publishState) {
@@ -21922,502 +20953,6 @@ function isVaultPublishPartialError(error) {
   return error?.code === VAULT_PUBLISH_PARTIAL_ERROR_CODE;
 }
 
-function publishEntryMatchesPartPayload(entry, part) {
-  if (!entry?.exists || !part) return false;
-  if (publishHashPlain(entry.body_hash ?? entry.bodyHash) !== publishPartBodyHash(part)) return false;
-  const expectedAuthorWallet = part.authorWallet ?? part.author_wallet ?? null;
-  if (expectedAuthorWallet) {
-    const entryAuthorWallet = entry.author_wallet ?? entry.authorWallet ?? null;
-    if (!entryAuthorWallet || !sameWalletAddress(entryAuthorWallet, expectedAuthorWallet)) return false;
-  }
-  if (publishPartKind(part) === 'public') {
-    return publishHashPlain(entry.header_hash ?? entry.headerHash) === publishPartHeader0Hash(part);
-  }
-  return publishHashPlain(entry.header_0_hash ?? entry.header0Hash) === publishPartHeader0Hash(part)
-    && publishHashPlain(entry.header_1_hash ?? entry.header1Hash) === publishPartHeader1Hash(part);
-}
-
-function publishEntryMatchesPart(entry, part, options = {}) {
-  if (!publishEntryMatchesPartPayload(entry, part)) return false;
-  const expectedPublishId = publishIdForPart(part);
-  const entryPublishId = publishHashPlain(entry.publish_id);
-  if (options.requirePublishIdMatch === true || expectedPublishId) {
-    return Boolean(expectedPublishId && entryPublishId && entryPublishId === expectedPublishId);
-  }
-  return options.allowPublishIdMismatch === true;
-}
-
-function publishConfirmSearchState(publishState, kind, latest) {
-  if (!publishState.confirmSearch || typeof publishState.confirmSearch !== 'object') {
-    publishState.confirmSearch = {};
-  }
-  const key = kind === 'public' ? 'public' : 'private';
-  const existing = publishState.confirmSearch[key] && typeof publishState.confirmSearch[key] === 'object'
-    ? publishState.confirmSearch[key]
-    : {};
-  const latestSeen = (() => {
-    try {
-      return BigInt(existing.latestSeen ?? 0n);
-    } catch {
-      return 0n;
-    }
-  })();
-  if (existing.exhausted === true && latest > latestSeen) {
-    delete existing.nextEntryId;
-    existing.exhausted = false;
-  }
-  if (latest > latestSeen) {
-    existing.latestSeen = String(latest);
-    existing.nextEntryId = latest > 0n ? String(latest - 1n) : null;
-    existing.exhausted = false;
-  }
-  if (existing.nextEntryId === undefined || existing.nextEntryId === null) {
-    existing.nextEntryId = latest > 0n ? String(latest - 1n) : null;
-  }
-  publishState.confirmSearch[key] = existing;
-  return existing;
-}
-
-function publishConfirmScanBounds(publishState, kind, latest, scanLimit = CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT) {
-  const search = publishConfirmSearchState(publishState, kind, latest);
-  if (search.exhausted === true || latest <= 0n) return null;
-  let start;
-  try {
-    start = BigInt(search.nextEntryId ?? (latest - 1n));
-  } catch {
-    start = latest - 1n;
-  }
-  if (start >= latest) start = latest - 1n;
-  if (start < 0n) {
-    search.exhausted = true;
-    search.nextEntryId = null;
-    return null;
-  }
-  const numericLimit = Number(scanLimit);
-  const chunk = BigInt(Number.isFinite(numericLimit) && numericLimit > 0
-    ? Math.floor(numericLimit)
-    : CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT);
-  const minEntryId = start >= chunk ? start - chunk + 1n : 0n;
-  search.lastScan = {
-    latest: String(latest),
-    from: String(start),
-    to: String(minEntryId),
-    at: new Date().toISOString(),
-  };
-  return { start, minEntryId };
-}
-
-function publishConfirmCommitScan(publishState, kind, minEntryId) {
-  const search = publishConfirmSearchState(publishState, kind, 0n);
-  if (minEntryId > 0n) {
-    search.nextEntryId = String(minEntryId - 1n);
-  } else {
-    search.nextEntryId = null;
-    search.exhausted = true;
-  }
-}
-
-function publishConfirmDeadlineAt(options = {}) {
-  const deadlineMs = Number(options.deadlineMs ?? 0);
-  return Number.isFinite(deadlineMs) && deadlineMs > 0 ? Date.now() + Math.floor(deadlineMs) : 0;
-}
-
-function publishConfirmDeadlineExpired(deadlineAt) {
-  return Number.isFinite(deadlineAt) && deadlineAt > 0 && Date.now() >= deadlineAt;
-}
-
-function publishConfirmReadOptions(address, options = {}) {
-  const out = criticalCapsuleHubReadOptions(address);
-  const timeoutMs = Number(options.requestTimeoutMs ?? options.timeoutMs ?? 0);
-  if (Number.isFinite(timeoutMs) && timeoutMs > 0) out.requestTimeoutMs = Math.floor(timeoutMs);
-  const queueTimeoutMs = Number(options.queueTimeoutMs ?? 0);
-  if (Number.isFinite(queueTimeoutMs) && queueTimeoutMs > 0) out.queueTimeoutMs = Math.floor(queueTimeoutMs);
-  return out;
-}
-
-function capsuleHubConfirmationProviderCandidates(baseProvider, address, options = {}) {
-  const providers = [baseProvider];
-  if (options.scanAvailableTransports !== true) return providers;
-  const transport = globalThis.plathoCapsuleHubRpcTransport ?? globalThis.plathoTonRpcTransport;
-  const transports = Array.isArray(transport?.transports) ? transport.transports : [];
-  const primary = [];
-  const emergency = [];
-  for (const item of transports) {
-    if (!item?.runGetMethod) continue;
-    (item.verifierOnly === true ? emergency : primary).push(item);
-  }
-  const alivePrimary = primary.filter((item) => !isTonRpcTransportDead(item));
-  const candidates = alivePrimary.length > 0
-    ? alivePrimary
-    : (emergency.filter((item) => !isTonRpcTransportDead(item)).length > 0
-      ? emergency.filter((item) => !isTonRpcTransportDead(item))
-      : (primary.length > 0 ? primary : emergency));
-  for (const item of candidates) {
-    providers.push(createCapsuleHubTonRpcProvider({ capsuleHubAddress: address, transport: item }));
-  }
-  return providers;
-}
-
-async function confirmPrivatePublishEntriesFromSenderIndex(publishState, pendingParts, providerCandidates, readOptions, options = {}) {
-  const privateParts = pendingParts.filter((part) => publishPartKind(part) === 'private');
-  if (privateParts.length === 0 || !localRecipientKeyPair?.keyId) return;
-  const keyIdIndex = privateKeyIdIndexValue(localRecipientKeyPair.keyId);
-  const scanLimit = Number.isFinite(Number(options.scanLimit)) && Number(options.scanLimit) > 0
-    ? Math.floor(Number(options.scanLimit))
-    : CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT;
-  const deadlineAt = Number(options.deadlineAt ?? 0) || 0;
-  for (const candidateProvider of providerCandidates) {
-    if (publishConfirmDeadlineExpired(deadlineAt)) return;
-    if (privateParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
-    let senderIndex = null;
-    try {
-      senderIndex = await candidateProvider.getPrivateSenderIndex(keyIdIndex, readOptions);
-    } catch (error) {
-      if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) continue;
-      continue;
-    }
-    let currentLink = privateIndexLatestLink(senderIndex);
-    let scanned = 0;
-    while (currentLink > 0n && scanned < scanLimit) {
-      if (publishConfirmDeadlineExpired(deadlineAt)) return;
-      const entryId = privateIndexEntryIdFromLink(currentLink);
-      if (entryId === null) break;
-      let entry = null;
-      try {
-        entry = await candidateProvider.getPrivateEntry(entryId, readOptions);
-      } catch (error) {
-        if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) break;
-      }
-      if (!entry?.exists) break;
-      for (const part of privateParts) {
-        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-        if (!publishEntryMatchesPart(entry, part, { allowPublishIdMismatch: true })) continue;
-        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
-          entryId: String(entry.entry_id ?? entryId),
-          confirmedBy: 'private_sender_index',
-        });
-      }
-      if (privateParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
-      const previousLink = privateIndexPreviousLink(entry, 'sender');
-      if (previousLink === currentLink) break;
-      currentLink = previousLink;
-      scanned += 1;
-    }
-  }
-}
-
-// Group the still-pending parts of a publishState back into their VPB2 batches. Every part of a batch was
-// stamped at send time with the SHARED batch nonce (part.clientNonce) and batch id (part.batchPublishId), plus
-// its position within the batch (part.batchPartIndex). The receipt ring is keyed by nonce, so a batch is the
-// set of pending parts that share a (clientNonce) — confirming a batch is a SINGLE receipt read.
-function pendingPublishBatchesFromState(publishState) {
-  const groups = new Map();
-  for (const part of publishState?.parts ?? []) {
-    if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-    if (part.clientNonce === undefined || part.clientNonce === null) continue;
-    let nonce = null;
-    try {
-      nonce = BigInt(part.clientNonce);
-    } catch {
-      continue;
-    }
-    const key = nonce.toString();
-    let group = groups.get(key);
-    if (!group) {
-      group = { nonce, parts: [] };
-      groups.set(key, group);
-    }
-    group.parts.push(part);
-  }
-  return [...groups.values()];
-}
-
-// PRIMARY confirm: read the Vault receipt ring once per in-flight batch and map the outcome onto the per-part
-// publishState statuses. The receipt is the authoritative, single-read answer for a batch's fate:
-//   confirmed  -> the Hub stored entries first_entry_id .. +partCount-1; derive each part's entry id from its
-//                 batchPartIndex (= EPI1 order) and mark it CAPSULEHUB_CONFIRMED.
-//   rejected   -> post-accept atomic reject WITH refund; surface the reject code, mark the batch FAILED.
-//   bounced    -> the Hub bounced, the call value was refunded; mark FAILED so the UI re-sends.
-//   processing -> accepted, awaiting the Hub ACK; leave pending (entry-scan / a later receipt read settle it).
-//   tombstoned -> a stale pending was pruned, but a late ACK can still confirm it; leave pending.
-//   evicted    -> the slot no longer reports our nonce (a newer action overwrote it); leave to the entry scan.
-async function confirmVaultBatchReceiptsFromPublishState(publishState, options = {}) {
-  const batches = pendingPublishBatchesFromState(publishState);
-  if (batches.length === 0) return 0;
-  let provider = null;
-  try {
-    provider = await resolveVaultChainProvider(options.provider);
-  } catch {
-    return 0;
-  }
-  if (typeof provider?.getUserReceipts !== 'function') return 0;
-  const owner = options.owner ?? plathoWallet?.address ?? null;
-  if (!owner) return 0;
-  const vaultAddress = requireVaultAddress();
-  const deadlineAt = Number(options.deadlineAt ?? 0) || 0;
-  // The receipt ring confirmation is authoritative, so it reads VERIFIED (dual-provider) fail-closed — a
-  // CAPSULEHUB_CONFIRMED transition must never rest on a single unverified replica. Transient verification
-  // failures simply leave the batch pending for the entry-scan recovery / a later receipt read.
-  const readOptions = {
-    verify: true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  };
-  if (options.requestTimeoutMs) readOptions.requestTimeoutMs = options.requestTimeoutMs;
-  if (options.queueTimeoutMs) readOptions.queueTimeoutMs = options.queueTimeoutMs;
-  // A receipt slot for nonce N is written only AFTER the Vault consumed N. Under a FRESH successful heal
-  // nonce read (which also stamps the read VALUE), every batch with nonce >= that value is PROVEN unlanded
-  // and its verified (dual-HTTP) receipt read is guaranteed empty — skip those this pass. Mirrors the
-  // entry-scan skip in confirmCapsuleHubPublishEntriesWithReadMode; skipping only DEFERS reads (a read pool
-  // lagging the send node costs at most the proof window in latency), it can never confirm anything wrong.
-  // Two backstops keep the gate honest: (1) the proof EXPIRY is re-checked per batch (the loop's verified
-  // reads run up to ~8s each, so late batches must not skip on a stale proof); (2) a PROBE pass every 30s
-  // runs the receipt reads anyway — the heal's nonce read can degrade to a single unverified replica, and a
-  // replica persistently serving a stale-low nonce would otherwise renew the proof every pass and starve
-  // the verified receipt backstop all the way to the no-progress terminal.
-  let provenUnlandedFloorNonce = null;
-  let nonceProofExpiresAt = 0;
-  try {
-    const nonceReadOkAt = Number(publishState.lastBroadcastRetryNonceReadOkAt) || 0;
-    const nonceProofAgeMs = Date.now() - nonceReadOkAt;
-    if (
-      nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000
-      && publishState.lastBroadcastRetryNonceReadValue !== undefined
-      && publishState.lastBroadcastRetryNonceReadValue !== null
-    ) {
-      const probeAgeMs = Date.now() - (Number(publishState.lastReceiptGateProbeAt) || 0);
-      if (probeAgeMs >= 0 && probeAgeMs < 30_000) {
-        provenUnlandedFloorNonce = BigInt(publishState.lastBroadcastRetryNonceReadValue);
-        nonceProofExpiresAt = nonceReadOkAt + 10_000;
-      } else {
-        publishState.lastReceiptGateProbeAt = Date.now();
-      }
-    }
-  } catch {
-    provenUnlandedFloorNonce = null;
-  }
-  let changed = 0;
-  for (const batch of batches) {
-    if (publishConfirmDeadlineExpired(deadlineAt)) break;
-    if (provenUnlandedFloorNonce !== null && Date.now() < nonceProofExpiresAt && batch.nonce >= provenUnlandedFloorNonce) continue;
-    let interp = null;
-    try {
-      interp = await readBatchPublishReceipt(provider, vaultAddress, owner, batch.nonce, readOptions);
-    } catch (error) {
-      // Surface a FAILING receipt read (e.g. a slow/timed-out get_user_receipts during a toncenter spike). This
-      // path is otherwise SILENT, so a send that LANDED but whose receipt won't confirm (the "submitted N/N,
-      // confirming ... still checking" drag) looked like a mystery — now the toncenter reason is visible.
-      console.warn('[platho] vault publish receipt read failed', {
-        status: error?.status ?? null,
-        code: error?.code ?? null,
-        detail: error?.responseBody ?? shortUiErrorText(error, 'receipt read failed'),
-        nonce: String(batch.nonce),
-      });
-      // Rate limits propagate so the caller can fall back to SUBMITTED; a soft verification miss (RPC
-      // disagreement / verifier unavailable) just leaves this batch pending for the entry-scan recovery.
-      if (noteTonRpcRateLimit(error)) throw error;
-      if (isTonRpcVerificationSoftReadError(error) || isTonRpcRecoverableReadError(error)) continue;
-      continue;
-    }
-    if (!interp) continue;
-    // Foreign-slot guard (v648): the receipt ring is keyed by nonce ALONE, and a nonce can be consumed by a
-    // DIFFERENT external than ours (a prior send's orphaned external landing a race after this session re-signed
-    // the nonce). The contract writes the landed batch's OWN part_count into the slot (Vault.tact:2103, parsed
-    // from the signed root) — a mismatch proves the slot is not our batch: never confirm/fail OUR parts off it
-    // (the content-addressed entry-scan fallback below decides truthfully). Compare against ALL parts signed
-    // under this nonce — batch.parts holds only the still-PENDING ones, and a partially-confirmed batch must
-    // not make our own receipt look foreign.
-    const nonceTotalParts = (publishState.parts ?? []).filter((statePart) => {
-      if (statePart?.clientNonce === undefined || statePart?.clientNonce === null) return false;
-      try { return BigInt(statePart.clientNonce) === batch.nonce; } catch { return false; }
-    }).length;
-    if (interp.partCount !== undefined
-      && interp.status !== BATCH_PUBLISH_RECEIPT_STATUS.EVICTED
-      && Number(interp.partCount) !== nonceTotalParts) {
-      console.warn('[platho] vault publish receipt: foreign slot (partCount mismatch)', {
-        nonce: String(batch.nonce), ours: nonceTotalParts, slot: Number(interp.partCount), status: interp.status,
-      });
-      continue;
-    }
-    if (interp.status === BATCH_PUBLISH_RECEIPT_STATUS.CONFIRMED) {
-      const firstEntryId = interp.firstEntryId === undefined || interp.firstEntryId === null
-        ? null
-        : BigInt(interp.firstEntryId);
-      for (const part of batch.parts) {
-        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-        const batchPartIndex = Number(part.batchPartIndex ?? 0) || 0;
-        const entryId = firstEntryId === null ? null : firstEntryId + BigInt(batchPartIndex);
-        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
-          entryId: entryId === null ? (part.entryId ?? null) : String(entryId),
-          confirmedBy: 'vault_batch_receipt',
-          error: null,
-        });
-        changed += 1;
-      }
-    } else if (interp.status === BATCH_PUBLISH_RECEIPT_STATUS.REJECTED) {
-      const rejectCode = interp.rejectCode === undefined || interp.rejectCode === null
-        ? null
-        : `0x${Number(interp.rejectCode).toString(16)}`;
-      const failPartIndex = interp.failPartIndex === undefined || interp.failPartIndex === null
-        ? null
-        : interp.failPartIndex.toString();
-      const reason = `Vault rejected the batch publish${rejectCode ? ` (reject ${rejectCode}${failPartIndex !== null ? `, part ${failPartIndex}` : ''})` : ''}`;
-      for (const part of batch.parts) {
-        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_FAILED, {
-          error: reason,
-          batchRejectCode: rejectCode,
-          batchFailPartIndex: failPartIndex,
-        });
-        changed += 1;
-      }
-    } else if (interp.status === BATCH_PUBLISH_RECEIPT_STATUS.BOUNCED) {
-      for (const part of batch.parts) {
-        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_FAILED, {
-          error: 'CapsuleHub bounced the batch publish; the charge was refunded',
-        });
-        changed += 1;
-      }
-    }
-    // processing / tombstoned / evicted: leave the parts pending for the entry-scan fallback below.
-  }
-  return changed;
-}
-
-async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options = {}) {
-  const pendingParts = (publishState?.parts ?? []).filter((part) => (
-    part.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
-    || part.status === PUBLISH_PART_STATUS_SENT
-    || part.status === PUBLISH_PART_STATUS_UNKNOWN
-    || publishPartHadPriorChainAttempt(part)
-  ));
-  if (pendingParts.length === 0) return publishState;
-  const deadlineAt = publishConfirmDeadlineAt(options);
-  // VPB2 PRIMARY confirm: the Vault receipt ring is the authoritative, single-read answer for each in-flight
-  // batch (confirmed/rejected/bounced/processing/tombstoned). It supersedes the obsolete VPB1 per-message
-  // PublishAck history scan; the CapsuleHub entry-scan strategies below remain the recovery fallback when the
-  // receipt is still processing or has been evicted from the ring.
-  if (options.skipBatchReceipt !== true) {
-    try {
-      await confirmVaultBatchReceiptsFromPublishState(publishState, {
-        owner: options.owner,
-        provider: options.vaultProvider,
-        deadlineAt,
-        requestTimeoutMs: options.requestTimeoutMs ?? options.timeoutMs,
-        queueTimeoutMs: options.queueTimeoutMs,
-      });
-    } catch (error) {
-      if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
-    }
-  }
-  if (pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) return publishState;
-  if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
-  // receiptOnly: do ONLY the fast, authoritative Vault-receipt confirm above and stop — skip the CapsuleHub
-  // entry-scan recovery (the sender-index walk + per-entry scan below). That scan searches the chain for the
-  // just-broadcast entry, which right after a send is NOT on chain yet, so it scans to the deadline and (on the
-  // INLINE send path) hangs the sender until it times out — while the message itself landed fine. The background
-  // confirmation retry (schedulePrivatePublishConfirmationRetry) runs the FULL confirm later, once the entry IS on
-  // chain, and flips the status to published without blocking the send. See slow-device-freeze-iphone-se2.
-  if (options.receiptOnly === true) return publishState;
-  // A part that is merely SENT (signed external in flight, nonce not yet consumed) CANNOT have a CapsuleHub
-  // entry — but ONLY a fresh SUCCESSFUL heal nonce read proves that (a failed get_user read leaves landed parts
-  // stuck at SENT; suppressing the scan then would starve the ONLY working confirm path until the 10-min
-  // terminal). Skip the heavy scan (sender-index walk + up to 8 possibly-32KB entry reads) only under that
-  // fresh proof; the authoritative receipt read above still runs every pass.
-  const nonceProofAgeMs = Date.now() - (Number(publishState.lastBroadcastRetryNonceReadOkAt) || 0);
-  if (
-    nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000
-    && pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_SENT && !publishPartHadPriorChainAttempt(part))
-  ) {
-    return publishState;
-  }
-  const resolved = await resolveCapsuleHubProvider();
-  if (!resolved) return publishState;
-  const { provider, address } = resolved;
-  const readOptions = publishConfirmReadOptions(address, options);
-  const providerCandidates = capsuleHubConfirmationProviderCandidates(provider, address, {
-    scanAvailableTransports: options.scanAvailableTransports,
-  });
-  const scanLimit = options.scanLimit ?? CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT;
-  if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
-  await confirmPrivatePublishEntriesFromSenderIndex(publishState, pendingParts, providerCandidates, readOptions, {
-    scanLimit,
-    deadlineAt,
-  });
-  for (const candidateProvider of providerCandidates) {
-    if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
-    if (pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
-    try {
-      const state = await candidateProvider.getState(readOptions);
-      const groups = [
-        {
-          kind: 'private',
-          latest: BigInt(state.private_latest_id ?? 0n),
-          parts: pendingParts.filter((part) => publishPartKind(part) === 'private'),
-          read: (entryId) => candidateProvider.getPrivateEntry(entryId, readOptions),
-        },
-        {
-          kind: 'public',
-          latest: BigInt(state.public_latest_id ?? 0n),
-          parts: pendingParts.filter((part) => publishPartKind(part) === 'public'),
-          read: (entryId) => candidateProvider.getPublicEntry(entryId, readOptions),
-        },
-      ];
-      for (const group of groups) {
-        if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
-        if (group.parts.length === 0 || group.latest <= 0n) continue;
-        const scan = publishConfirmScanBounds(publishState, group.kind, group.latest, scanLimit);
-        if (!scan) continue;
-        for (let entryId = scan.start; entryId >= scan.minEntryId; entryId -= 1n) {
-          if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
-          let entry = null;
-          try {
-            entry = await group.read(entryId);
-          } catch (error) {
-            if (isTonRpcRecoverableReadError(error)) throw error;
-            if (noteTonRpcRateLimit(error)) throw error;
-            continue;
-          }
-          for (const part of group.parts) {
-            if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-            const requirePublishIdMatch = group.kind === 'public';
-            const allowPublishIdMismatch = group.kind === 'private';
-            // Public sends must confirm the current Vault BOC by publish_id; payload-only
-            // public recovery is reserved for explicit already-published lookup paths.
-            if (!publishEntryMatchesPart(entry, part, { allowPublishIdMismatch, requirePublishIdMatch })) continue;
-            setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
-              entryId: String(entry.entry_id ?? entryId),
-              confirmedBy: requirePublishIdMatch ? 'confirmed_by_publish_id' : 'entry_payload_recovery',
-            });
-          }
-          if (group.parts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
-          if (entryId === 0n) break;
-        }
-        publishConfirmCommitScan(publishState, group.kind, scan.minEntryId);
-      }
-    } catch (error) {
-      if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) {
-        continue;
-      }
-      throw error;
-    }
-  }
-  return publishState;
-}
-
-async function confirmCapsuleHubPublishEntries(publishState, options = {}) {
-  return confirmCapsuleHubPublishEntriesWithReadMode(publishState, options.hot === true
-    ? {
-      ...options,
-      scanLimit: options.scanLimit ?? CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT,
-      deadlineMs: options.deadlineMs ?? PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS,
-      requestTimeoutMs: options.requestTimeoutMs ?? PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS,
-      queueTimeoutMs: options.queueTimeoutMs ?? PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS,
-    }
-    : options);
-}
-
 // Physics-scaled ceiling for a sendBoc POST. The flat tiers (8s heal / 15s transport default) are
 // calibrated for ~1-2KB text externals; a multi-part media batch external is a 35-88KB base64 JSON
 // upload plus a proportionally heavier toncenter-side pre-accept emulation, and during a toncenter
@@ -22438,36 +20973,6 @@ const VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS = 1_000;
 // hold the serial pump indefinitely).
 const VAULT_SEND_BOC_TIMEOUT_BASE_MS = TON_RPC_REQUEST_TIMEOUT_MS;
 
-function vaultSendBocRequestTimeoutMs(bocBase64, callerTimeoutMs) {
-  const caller = Number(callerTimeoutMs);
-  const baseMs = Number.isFinite(caller) && caller > 0 ? caller : VAULT_SEND_BOC_TIMEOUT_BASE_MS;
-  const wireChars = typeof bocBase64 === 'string' ? bocBase64.length : 0;
-  const scaledMs = Math.min(
-    VAULT_SEND_BOC_TIMEOUT_MAX_MS,
-    baseMs + Math.ceil(wireChars / 4096) * VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS,
-  );
-  // An explicit caller ceiling larger than the cap is never lowered (no current caller passes one —
-  // defensive; such a caller opts out of the size scaling entirely).
-  return Math.max(baseMs, scaledMs);
-}
-
-async function sendVaultExternalBoc(built, options = {}) {
-  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
-  if (!transport?.sendBoc) throw new Error('TON RPC sendBoc transport is not configured');
-  const request = { boc: built.boc, walletAddress: requireVaultAddress() };
-  request.requestTimeoutMs = vaultSendBocRequestTimeoutMs(built.boc, options.requestTimeoutMs ?? options.timeoutMs);
-  if (options.queueTimeoutMs !== undefined) request.queueTimeoutMs = options.queueTimeoutMs;
-  if (options.skipIfRateLimited !== undefined) request.skipIfRateLimited = options.skipIfRateLimited;
-  if (options.priority !== undefined) request.priority = options.priority;
-  const result = await transport.sendBoc(request);
-  markNavVaultBalancePending('Vault action submitted', {
-    resetRetry: true,
-    retry: true,
-    retryDelayMs: 2_000,
-  });
-  return { ...built, result };
-}
-
 async function readVaultPublishNonce(provider, owner, options = {}) {
   if (!provider?.getUser) return null;
   if (options.ignoreNonceBarrier !== true) await awaitVaultPublishNonceBarrier();
@@ -22485,17 +20990,6 @@ async function readVaultPublishNonce(provider, owner, options = {}) {
   const nonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
   raiseVaultPublishNonceFloor(owner, nonce);
   return nonce;
-}
-
-async function readVaultPublishNonceForOwnVaultAction(provider, owner, options = {}) {
-  // Pre-sign nonce reads stay verified fail-closed in normal operation; the
-  // unverified path opens only in degraded survival mode, where the primary
-  // gateway is parked and dual-provider verification is structurally
-  // impossible. A wrong nonce can only produce a cleanly rejected external.
-  return callWithDegradedTransportReadFallback(
-    () => readVaultPublishNonce(provider, owner, options),
-    () => readVaultPublishNonce(provider, owner, { ...options, ...unverifiedCriticalChainReadOptions() }),
-  );
 }
 
 async function waitForVaultPublishNonce(provider, owner, expectedNonce, options = {}) {
@@ -22543,33 +21037,6 @@ async function waitForVaultPublishNonce(provider, owner, expectedNonce, options 
   error.code = 'NETWORK_ERROR';
   if (lastError) error.cause = lastError;
   throw error;
-}
-
-// ONE shared nonce watcher per send burst (v756). The old design installed a SEPARATE background
-// poller per non-final batch (waitForVaultPublishNonce, ~1s cadence, critical-priority reads,
-// 90s x batch-position ceiling) — a 7-batch file send ran SIX concurrent pollers, and together with
-// receipt confirms and sync they kept the strict-priority serial pump's high lane non-empty for
-// minutes, STARVING the heal driver's send POST in the queue (the owner's QUEUE_TIMEOUT-every-pass
-// loop; pre-v755 the coupled operation timer cut the same starvation off at 8s and mislabeled it
-// 'TIMEOUT'). One watcher serves every batch of the burst with a single ~1s read stream at
-// 'messages' priority: it flips each batch's parts SENT -> VAULT_SUBMITTED as the chain nonce
-// passes that batch, and its completion is the publish nonce barrier for subsequent unrelated vault
-// actions — identical gating to the old code, where each install REPLACED the pending barrier so
-// only the last (highest-nonce, longest-wait) task ever gated anything.
-async function readVaultPublishNonceForBroadcastRetry(provider, owner, options = {}) {
-  // OBSERVATIONAL-only read on the keyless re-broadcast path: it decides whether an already-signed,
-  // fixed-nonce external must be re-sent or has already landed. It MUST NOT await the publish-nonce
-  // barrier. The barrier a prior batch of THIS same burst installed waits for the nonce AFTER the last
-  // back-to-back external — the very external this retry exists to re-broadcast. Awaiting it here
-  // dead-locked the healing behind the barrier's own 90s timeout (the healer blocked on the wait it was
-  // supposed to end), which is the dominant multi-minute latency of a 2-capsule / 64KB image send.
-  // Ignoring it is double-spend-safe: nothing is freshly signed here, and re-broadcasting a fixed-nonce
-  // external is idempotent (the contract rejects a replayed nonce; a landed one is detected as nonce-moved).
-  const readOptions = { ...options, ignoreNonceBarrier: true };
-  return callWithOwnVaultActionReadFallback(
-    () => readVaultPublishNonceForOwnVaultAction(provider, owner, readOptions),
-    () => readVaultPublishNonce(provider, owner, { ...readOptions, verify: false, allowUnverifiedCriticalRead: true }),
-  );
 }
 
 function privateMessageHasPublishAttempt(message) {
@@ -22686,11 +21153,6 @@ function publishPartNeedsBroadcastRetry(part) {
     && part.clientNonce !== null;
 }
 
-function publishPartBroadcastRetryCount(part) {
-  const count = Number(part?.broadcastRetryCount ?? 0);
-  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
-}
-
 // The broadcast is provably FAILING (not merely slow-to-confirm) when there is at least one in-flight
 // external still awaiting broadcast AND every such part currently carries a broadcast error. part.error is
 // set when a (re-)broadcast throws/5xx-es and is cleared to null the moment a (re-)broadcast SUCCEEDS
@@ -22699,344 +21161,6 @@ function publishPartBroadcastRetryCount(part) {
 function publishStateBroadcastIsFailing(publishState) {
   const pending = (publishState?.parts ?? []).filter((part) => publishPartNeedsBroadcastRetry(part));
   return pending.length > 0 && pending.every((part) => Boolean(part.error));
-}
-
-function publishPartLastBroadcastAgeMs(part) {
-  const parsed = Date.parse(part?.lastBroadcastAt ?? '');
-  return Number.isFinite(parsed) ? Math.max(0, Date.now() - parsed) : Infinity;
-}
-
-// The owner address for a KEYLESS resume (idempotent re-broadcast + receipt confirm) of an already-signed
-// publish. Prefer the live unlocked wallet; fall back to the address persisted on publishState (a public
-// address, stamped at sign time) so these read/idempotent paths run after a background lock. Returns null
-// if a DIFFERENT account is now unlocked (never act under the wrong owner) — callers skip gracefully.
-function resolvePublishOwner(publishState) {
-  const live = plathoWallet?.address ?? null;
-  const stored = publishState?.ownerWallet ?? null;
-  if (live && stored && rawWalletAddress(live) !== rawWalletAddress(stored)) return null;
-  return live ?? stored ?? null;
-}
-
-async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}) {
-  const retryableParts = (publishState?.parts ?? []).filter((part) => publishPartNeedsBroadcastRetry(part));
-  if (retryableParts.length === 0) return 0;
-  const provider = await resolveVaultChainProvider();
-  // Keyless re-broadcast: an already-signed, fixed-nonce external is idempotent (the contract rejects a
-  // re-used nonce), so it does not need the wallet key — only the (public) owner address. Skip gracefully
-  // if no owner is resolvable (locked + no stored address, or a different account unlocked).
-  const owner = options.owner ?? resolvePublishOwner(publishState);
-  if (!owner) return 0;
-  const deadlineAt = publishConfirmDeadlineAt({
-    deadlineMs: options.deadlineMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
-  });
-  const readTimeoutMs = options.readTimeoutMs ?? options.requestTimeoutMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS;
-  const sendTimeoutMs = options.sendTimeoutMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS;
-  const queueTimeoutMs = options.queueTimeoutMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS;
-  let changed = 0;
-  let currentNonce = null;
-  try {
-    currentNonce = await readVaultPublishNonceForBroadcastRetry(provider, owner, {
-      requestTimeoutMs: readTimeoutMs,
-      queueTimeoutMs,
-    });
-  } catch (error) {
-    publishState.lastBroadcastRetryError = shortUiErrorText(error, 'broadcast retry read failed');
-    publishState.lastBroadcastRetryErrorAt = new Date().toISOString();
-    console.warn('[platho] vault publish broadcast-retry nonce read failed', {
-      status: error?.status ?? null,
-      code: error?.code ?? null,
-      detail: error?.responseBody ?? shortUiErrorText(error, 'broadcast retry read failed'),
-    });
-    if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) return 0;
-    throw error;
-  }
-  // Fresh SUCCESSFUL nonce read: any landed batch is flipped VAULT_SUBMITTED in the loop below, so parts still
-  // SENT after this pass are PROVEN not-landed. The confirm entry-scan skip keys off this timestamp — a FAILED
-  // read (the catch above returns 0 without setting it) must never suppress the scan (degraded-reads mode).
-  // The VALUE is stamped too: the receipt confirm skips the (verified, dual-HTTP) receipt read for batches
-  // whose nonce is >= this proven floor — their receipt slot cannot exist yet.
-  publishState.lastBroadcastRetryNonceReadOkAt = Date.now();
-  publishState.lastBroadcastRetryNonceReadValue = String(currentNonce);
-  // QUEUE-PROGRESS anchor (v763): when the observed chain nonce ADVANCES between passes, the serial
-  // queue in front of this message is MOVING — stamp the progress time. The age give-up terminals
-  // measure staleness from this anchor (see privatePublishNoProgressAgeMs), not from message creation:
-  // creation-anchored age buried messages deep in a moving queue (their age exceeded the deadline long
-  // before their turn) and made a manual Retry oscillate back to red within seconds. A genuinely
-  // stalled queue stops advancing, the anchor decays, and the terminals fire as before.
-  // MONOTONIC floor (review fix): the stored observation only ever RISES — a lagging keyless-fallback
-  // replica returning a lower nonce must neither regress the floor nor let the next higher read count
-  // as fresh "progress" (that alternation would re-stamp the anchor every ~2 passes under exactly the
-  // congested conditions that cause read fallbacks, and a wedged message would never terminal).
-  if (currentNonce !== null) {
-    let previousMax = null;
-    try {
-      previousMax = publishState.lastObservedChainNonce === undefined || publishState.lastObservedChainNonce === null
-        ? null
-        : BigInt(publishState.lastObservedChainNonce);
-    } catch { previousMax = null; /* malformed persisted value -> repair below as first observation */ }
-    if (previousMax === null || currentNonce > previousMax) {
-      publishState.lastObservedChainNonce = currentNonce.toString();
-      publishState.queueProgressAt = Date.now();
-    }
-  }
-  // VPB2: every part of a batch shares ONE externalBoc + nonce. Group the retryable parts by that shared nonce
-  // so each distinct in-flight external is re-broadcast at most ONCE per pass; all parts of the batch then move
-  // together (the contract accepts or rejects the single external atomically).
-  const retryBatches = new Map();
-  for (const part of retryableParts) {
-    let clientNonce = null;
-    try {
-      clientNonce = BigInt(part.clientNonce);
-    } catch {
-      continue;
-    }
-    const key = clientNonce.toString();
-    let group = retryBatches.get(key);
-    if (!group) {
-      group = { clientNonce, parts: [] };
-      retryBatches.set(key, group);
-    }
-    group.parts.push(part);
-  }
-  for (const group of retryBatches.values()) {
-    if (publishConfirmDeadlineExpired(deadlineAt)) break;
-    const { clientNonce, parts } = group;
-    if (currentNonce !== null && currentNonce > clientNonce) {
-      // The chain consumed this batch's nonce: the external landed. Every part of the batch is on-chain.
-      // Re-check each part's LIVE status at flip time: the group snapshot was taken at pass start, and a
-      // CONCURRENT receipt/entry confirm can flip a part CAPSULEHUB_CONFIRMED while this pass's nonce
-      // read is in flight — the nonce-derived flip must only ever LIFT a not-yet-confirmed part, never
-      // DOWNGRADE a confirmed one (observed 2026-07-11: confirmed -> vault_submitted -> re-confirmed
-      // churn in the owner's send timeline, one wasted receipt read per occurrence).
-      for (const part of parts) {
-        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
-          confirmedBy: 'vault_nonce',
-          error: null,
-        });
-        changed += 1;
-      }
-      continue;
-    }
-    if (currentNonce !== null && currentNonce < clientNonce) {
-      // WAITING IN LINE: a fresh nonce read proves this batch's turn has not come yet — expected for
-      // every message queued behind an in-flight burst (back-to-back pipelining signs ahead of the
-      // chain; the initial POST bounces pre-accept "too early" and stamps part.error). Clear that
-      // STALE error here, else the 2-minute broadcast-failing terminal (publishStateBroadcastIsFailing:
-      // all pending parts carry errors + nothing landed) fires a false red "RPC broadcast unavailable"
-      // for a message that is merely queued (the owner's 9 quick sends behind an 8-cap file). A REAL
-      // broadcast outage still terminates: once the turn comes, failing heal POSTs stamp fresh errors,
-      // and a dead READ path never reaches this branch at all.
-      let clearedStaleError = false;
-      for (const part of parts) {
-        if (part.error) {
-          part.error = null;
-          part.retryReason = null;
-          clearedStaleError = true;
-        }
-      }
-      if (clearedStaleError) changed += 1;
-      continue;
-    }
-    // Per-part retry budget/cooldown is identical across a batch (shared lastBroadcastAt/count); read it off the head.
-    const head = parts[0];
-    const retryCount = publishPartBroadcastRetryCount(head);
-    // Past the fast budget healing does NOT stop (the old silent `continue` here left a dropped external with
-    // zero re-POSTs from ~3min to the 10-min terminal): it degrades to the 30s slow poke below, with a
-    // one-time visible warn so the owner sees the transition.
-    const pastFastBudget = retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT;
-    if (pastFastBudget && head.broadcastBudgetExhaustedWarned !== true) {
-      head.broadcastBudgetExhaustedWarned = true;
-      console.warn('[platho] send timeline: fast re-broadcast budget exhausted, continuing slow 30s re-pokes to the age terminal', {
-        clientNonce: String(clientNonce),
-        retryCount,
-      });
-    }
-    const nonceRaceCount = Number(head.broadcastNonceRaceCount ?? 0) || 0;
-    const duplicateRelayCount = Number(head.broadcastDuplicateRelayCount ?? 0) || 0;
-    const timeoutAbortCount = Number(head.broadcastTimeoutAbortCount ?? 0) || 0;
-    // FIRST heal of a proven-not-landed external re-broadcasts with NO cooldown. Reaching here with
-    // currentNonce === clientNonce means the chain's next-expected nonce is EXACTLY this batch's nonce, so
-    // its back-to-back external never landed (a landed one would have advanced the nonce past it — that is
-    // the branch above). The 35s cooldown only guards against HAMMERING on repeat attempts; on the first
-    // heal it is pure added latency — the residual second-capsule delay after the barrier fix. A 16453
-    // fleet-race bounce (send node lagging the read pool) retries on the SHORT race cooldown while fresh,
-    // then falls back to 35s; a "duplicate message" answer (BoC already queued at toncenter) and repeat
-    // real relays (retryCount >= 1) keep the full cooldown. Idempotent + double-spend-safe throughout: a
-    // stale-replica false "not landed" costs at most one wasted (contract-rejected) re-broadcast of the
-    // fixed-nonce boc.
-    let rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS;
-    if (pastFastBudget) {
-      rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS;
-    } else if (retryCount === 0 && duplicateRelayCount === 0 && currentNonce !== null && currentNonce === clientNonce) {
-      if (nonceRaceCount === 0 && timeoutAbortCount === 0) rebroadcastCooldownMs = 0;
-      else if (nonceRaceCount < PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT
-        && timeoutAbortCount < PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT) rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS;
-    } else if (duplicateRelayCount > 0
-      && duplicateRelayCount < PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT
-      && currentNonce !== null && currentNonce === clientNonce) {
-      // Early duplicates re-poke at ~4 block-times (see the constant): the queued copy either lands within
-      // ~1-3s or is stalled, and the fresh-nonce gate (currentNonce === clientNonce) guarantees it has NOT
-      // landed yet, so a quick idempotent re-poke is the fastest safe heal for toncenter's queued-not-delivered
-      // mode. Past the fast limit the conservative 35s tail takes over.
-      rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS;
-    } else if (duplicateRelayCount >= PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT
-      || nonceRaceCount >= PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT
-      || timeoutAbortCount >= PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT) {
-      // Past the duplicate/nonce-race/timeout-abort fast windows each answer is a native red error — keep the
-      // sparse 35s tail so the console is not painted every 10s by a wedged queue or a persistently slow node.
-      rebroadcastCooldownMs = PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS;
-    }
-    if (publishPartLastBroadcastAgeMs(head) < rebroadcastCooldownMs) continue;
-    let result = null;
-    try {
-      // Rotate the pre-signed variants (same nonce, differing max_charge => different root hash) so this
-      // retry is a REAL broadcast, not a ~60s-dedup no-op. Falls back to the single boc for pre-variant
-      // publish states persisted by older builds. Keyless-compatible: only ready bytes are rotated.
-      const variantBocs = Array.isArray(head.externalBocVariants) && head.externalBocVariants.length > 0
-        ? head.externalBocVariants
-        : null;
-      const sendOptions = {
-        requestTimeoutMs: sendTimeoutMs,
-        queueTimeoutMs,
-        skipIfRateLimited: true,
-        // CRITICAL, not background (v756): during an active send the (re-)broadcast POST is the single
-        // most important request in the system — mobilization philosophy. At 'background' (the LOWEST
-        // class) it STARVED in the strict-priority serial pump behind the continuous critical/messages
-        // read stream of a multi-batch send (nonce watch + receipt confirms + sync): the owner's 8-part
-        // file send burned its whole 30s queue budget every pass (QUEUE_TIMEOUT loop, zero wire time).
-        // Still ONE send per pass (the v630/v631 lesson) — this changes WHO wins the queue, not volume.
-        priority: 'critical',
-      };
-      // ONE send per pass. (v630 tried a 3-variant burst per pass; measured on-device it REGRESSED ~50s→~100s:
-      // the unified per-IP request pump is SERIAL, so two extra ~47KB uploads per pass queued AHEAD of the next
-      // pass's main send and nonce/receipt reads — main sends hit the 8s timeout, and post-landing stragglers
-      // bounced 16453 as unexplained red 500s. Parallel lottery tickets need parallel channels, which the
-      // single-pump transport intentionally does not have.) The variant window still advances on the SUM of ALL
-      // per-pass counters, because the 16453-race, "duplicate" and timeout-abort branches do NOT increment
-      // retryCount — keying on retryCount alone would re-fire the SAME variant (a dedup no-op) every such pass.
-      const broadcastPassIndex = retryCount + duplicateRelayCount + nonceRaceCount + timeoutAbortCount;
-      const primaryIndex = variantBocs ? (1 + broadcastPassIndex) % variantBocs.length : 0;
-      const retryBoc = variantBocs ? variantBocs[primaryIndex] : head.externalBoc;
-      result = await sendVaultExternalBoc({ boc: retryBoc }, sendOptions);
-    } catch (error) {
-      // Vault exit code 16453 on a re-broadcast is AMBIGUOUS across the toncenter fleet: the READ pool said
-      // publish_nonce === clientNonce (not landed), but POST /message is emulated against the SEND node's
-      // OWN state, which can lag the read pool by a block — its 16453 then means "too early", NOT "landed".
-      // With the deferred first POST of the 2nd+ batch this is that batch's FIRST-ever POST, where "landed"
-      // is IMPOSSIBLE (only its own acceptance advances the nonce past it); trusting the bounce as landing
-      // proof permanently orphaned the 2nd capsule (the v621 regression). NEVER conclude "landed" from the
-      // error alone: keep the part SENT and let the NEXT pass's fresh nonce READ decide — a genuinely landed
-      // external flips VAULT_SUBMITTED via the currentNonce > clientNonce branch above within one ~1s pass.
-      // Pace repeats with the short race cooldown (the send node catches up within seconds), do NOT burn the
-      // relay budget (the reject is pre-accept — the BoC never entered the mempool, nothing was relayed),
-      // and no scary warn (an expected fleet-lag condition, not a failure).
-      if (currentNonce !== null && isVaultPublishNonceConsumedError(error)) {
-        console.debug('[platho] vault re-broadcast 16453 nonce race (send node lagging read pool), retrying shortly', {
-          clientNonce: String(clientNonce),
-          nonceRaceCount: nonceRaceCount + 1,
-        });
-        const raceAt = new Date().toISOString();
-        for (const part of parts) {
-          setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
-            broadcastNonceRaceCount: nonceRaceCount + 1,
-            lastBroadcastAt: raceAt,
-            error: null,
-          });
-          changed += 1;
-        }
-        continue;
-      }
-      // "duplicate message" = this exact BoC is ALREADY queued at toncenter. Stop the every-pass duplicate
-      // re-POST spam by stamping lastBroadcastAt (arms the full 35s cooldown via broadcastDuplicateRelayCount),
-      // keep the part SENT, and skip the scary failure warn. But do NOT burn a broadcastRetryCount slot: a
-      // duplicate proves only "queued at toncenter", not "relayed to the network" — toncenter has been observed
-      // to ACK/queue without delivering, and burning the 6-slot budget on duplicates left such a send with NO
-      // further re-POSTs after ~3.5min (the multi-minute stall). Un-counted, the 35s-paced idempotent re-POST
-      // keeps healing until the nonce/receipt confirm flips the part or the no-progress age terminal fires
-      // (bounded: ~17 POSTs max).
-      if (isTonBroadcastDuplicateMessageError(error)) {
-        console.debug('[platho] vault re-broadcast: BoC already queued at toncenter (duplicate), waiting for it to land', {
-          clientNonce: String(clientNonce),
-          duplicateRelayCount: duplicateRelayCount + 1,
-        });
-        const duplicateAt = new Date().toISOString();
-        for (const part of parts) {
-          setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
-            broadcastDuplicateRelayCount: duplicateRelayCount + 1,
-            lastBroadcastAt: duplicateAt,
-            error: null,
-          });
-          changed += 1;
-        }
-        continue;
-      }
-      // A client-aborted (TIMEOUT) POST held the pump for its whole ceiling and may STILL have delivered
-      // the body (the abort races the response; an aborted upload has been observed to land later). Stamp
-      // lastBroadcastAt + the dedicated counter so the next pass paces on the short race-tier cooldown
-      // instead of zero-cooldown hammering, and so broadcastPassIndex rotates to a FRESH variant (a
-      // same-bytes re-POST of a possibly-delivered body is a ~60s-dedup no-op). QUEUE_TIMEOUT is excluded:
-      // a queue-expired POST never started uploading, so an immediate retry is safe and productive.
-      if (String(error?.code ?? '') === 'TIMEOUT') {
-        const timeoutAt = new Date().toISOString();
-        for (const part of parts) {
-          setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
-            broadcastTimeoutAbortCount: timeoutAbortCount + 1,
-            lastBroadcastAt: timeoutAt,
-          });
-          changed += 1;
-        }
-      }
-      const retryError = shortUiErrorText(error, 'broadcast retry failed');
-      const retryErrorAt = new Date().toISOString();
-      for (const part of parts) {
-        part.lastBroadcastRetryError = retryError;
-        part.lastBroadcastRetryErrorAt = retryErrorAt;
-      }
-      // Surface WHY toncenter rejected the (re-)broadcast: the raw, un-truncated upstream detail the provider
-      // already parsed into error.responseBody (toncenterHttpErrorWithBody) — reorder / "cannot apply external" /
-      // insufficient balance / flakiness — instead of the bare native "500 (Internal Server Error)" the browser
-      // logs. Makes an intermittent broadcast drag diagnosable without a throwaway diagnostic build.
-      console.warn('[platho] vault publish re-broadcast failed', {
-        status: error?.status ?? null,
-        code: error?.code ?? null,
-        detail: error?.responseBody ?? retryError,
-        clientNonce: String(clientNonce),
-      });
-      // Surface the toncenter/validator REASON inline in the send timeline (same prefix the owner screenshots), so
-      // a POST-200-but-never-lands image self-reports WHY on the next attempt instead of only in a collapsed warn.
-      console.info('[platho] send timeline', {
-        event: 'broadcast POST failed',
-        nonce: String(clientNonce),
-        status: error?.status ?? null,
-        detail: String(error?.responseBody ?? retryError ?? '').slice(0, 200),
-        externalBytes: Math.floor(((head.externalBoc?.length ?? 0) * 3) / 4),
-      });
-      if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) continue;
-      throw error;
-    }
-    const broadcastAt = new Date().toISOString();
-    // retryCount === 0 here also covers a deferred batch's FIRST-ever POST (the send loop does not POST it) —
-    // the nonce field disambiguates which batch this is.
-    console.info('[platho] send timeline', {
-      event: retryCount === 0 ? 'first heal POST (200)' : 'external re-POSTed (200)',
-      nonce: String(clientNonce),
-      retryCount: retryCount + 1,
-    });
-    for (const part of parts) {
-      part.lastBroadcastResult = result?.result ?? null;
-      setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
-        broadcastRetryCount: retryCount + 1,
-        // A real 200 relay restores the timeout-abort fast window: an intermittently-slow spell keeps
-        // pacing on the short cooldown instead of decaying to the sparse tail after 6 lifetime aborts.
-        broadcastTimeoutAbortCount: 0,
-        lastBroadcastAt: broadcastAt,
-        error: null,
-      });
-      changed += 1;
-    }
-  }
-  return changed;
 }
 
 function privateSendRetryKey(message) {
@@ -24463,23 +22587,6 @@ globalThis.plathoVaultTransactions = {
   syncPrivateCapsulesFromChain,
 };
 
-async function resolveVaultChainProvider(explicitProvider) {
-  if (explicitProvider) return explicitProvider;
-  const providerConfig = appConfig.vault?.provider ?? {};
-  if (providerConfig.globalName && globalThis[providerConfig.globalName]) {
-    return globalThis[providerConfig.globalName];
-  }
-  if (!providerConfig.moduleUrl) return undefined;
-  if (!vaultProviderLoadPromise) {
-    const moduleUrl = new URL(providerConfig.moduleUrl, window.location.href).href;
-    vaultProviderLoadPromise = import(moduleUrl).then((module) => {
-      const exportName = providerConfig.exportName ?? 'default';
-      return module[exportName] ?? module.default ?? module.provider;
-    });
-  }
-  return vaultProviderLoadPromise;
-}
-
 async function refreshVaultActivationStatus(options = {}) {
   if (!plathoWallet?.address || !localVaultDraft?.message) {
     setText(vaultRecordStatus, plathoWallet ? t('vault.keysPending') : t('common.walletRequiredStatus'));
@@ -24490,166 +22597,64 @@ async function refreshVaultActivationStatus(options = {}) {
   // clean-17 DIRECT-PAY activation: the "am I registered" signal comes from the user's OWN KeyShard (address-bound to
   // this wallet — it can only hold keys this wallet registered), NOT a Vault get_user. Synthesize the plathoVaultBinding
   // .user shape the ~15 activation consumers read ({ exists, current_key_id, auth_pubkey } — existence gates, never the
-  // Vault key-id formula, which lives only in the Vault paths below). auth_pubkey is the LOCAL auth key: KeyShard omits
-  // it by privacy invariant, and for one's OWN identity the local key IS it. Gated so the Vault path below is untouched.
-  if (privateLaneDirectPayEnabled()) {
-    try {
-      const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
-      const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
-      // A never-deployed shard (uninit) is a DEFINITIVE "not registered" → {exists:false}. Any OTHER read failure is
-      // TRANSIENT and must NOT flip a registered user to "activate" (KeyShard registration is monotonic): rethrow to the
-      // outer catch, which PRESERVES the existing binding. [activation review: transient read flips activated→activate]
-      let view;
-      try {
-        view = await provider.getView(plathoWallet.address, { verify: true, priority: 'critical', cacheTtlMs: 0 });
-      } catch (readError) {
-        if (!isKeyShardUninitError(readError)) throw readError;
-        view = { exists: false };
-      }
-      const localAuthPubkey = localVaultAuthKeyPair?.publicKey ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey) : 0n;
-      // Registered AND the stored keys are the CURRENT local ones (a local key rotation without re-register shows as
-      // "activate", prompting the re-publish that updates the shard) — the address-binding already guarantees it is mine.
-      const registeredMine = view?.exists === true
-        && BigInt(view.enc_pubkey ?? 0n) === BigInt(localVaultDraft.message.enc_pubkey ?? 0n)
-        && BigInt(view.sign_pubkey ?? 0n) === BigInt(localVaultDraft.message.sign_pubkey ?? 0n);
-      if (!registeredMine) {
-        globalThis.plathoVaultBinding = { walletAddress: plathoWallet.address, user: { exists: view?.exists === true, current_key_id: 0n }, keyRecord: null };
-        setText(vaultRecordStatus, t('vault.activationRequired'));
-        refreshMessageActionStatuses();
-        refreshMessagingControls();
-        refreshComposerPublishPolicy();
-        return null;
-      }
-      const user = {
-        exists: true,
-        current_key_id: BigInt(view.key_id),
-        auth_pubkey: localAuthPubkey,
-        key_generation: BigInt(view.key_generation ?? 0n),
-        enc_pubkey: BigInt(view.enc_pubkey),
-        sign_pubkey: BigInt(view.sign_pubkey),
-        scan_pubkey: BigInt(view.scan_pubkey ?? 0n),
-      };
-      globalThis.plathoVaultBinding = { walletAddress: plathoWallet.address, user, keyRecord: null };
-      setText(vaultRecordStatus, t('vault.activated'));
-      refreshMessageActionStatuses();
-      refreshMessagingControls();
-      refreshComposerPublishPolicy();
-      return globalThis.plathoVaultBinding;
-    } catch (error) {
-      // A transient read must NOT flip a registered user to "activate" — leave the binding untouched and show pending.
-      if (!noteTonRpcRateLimit(error)) console.warn('[keyshard] activation status read failed', error);
-      setText(vaultRecordStatus, t('vault.keysPending'));
-      refreshMessageActionStatuses();
-      refreshComposerPublishPolicy();
-      return globalThis.plathoVaultBinding ?? null;
-    }
-  }
+  // Vault key-id formula, which is gone with the Vault). auth_pubkey is the LOCAL auth key: KeyShard omits it by
+  // privacy invariant, and for one's OWN identity the local key IS it.
   try {
-    const provider = await resolveVaultChainProvider(options.provider);
-    if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
-    const user = options.user ?? await withVaultReadLock(() => provider.getUser(plathoWallet.address, {
-      vaultAddress: requireVaultAddress(),
-      verify: true,
-      priority: 'critical',
-      cacheTtlMs: 0,
-    }));
-    const global = options.skipGlobal === true
-      ? null
-      : provider.getGlobal
-        ? await loadConnectedVaultGlobal({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 }).catch(() => null)
-        : null;
-    if (global) {
-      vaultProtocolState = {
-        airdrop_remaining_ath: global.airdrop_remaining_ath ?? vaultProtocolState.airdrop_remaining_ath ?? null,
-        airdrop_total_allocation_ath: global.airdrop_total_allocation_ath ?? vaultProtocolState.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
-        profile_registry_bound: global.profile_registry_bound === true,
-        profile_registry_address: global.profile_registry_address ?? vaultProtocolState.profile_registry_address ?? null,
-        username_registry_bound: global.username_registry_bound === true,
-        username_registry_address: global.username_registry_address ?? vaultProtocolState.username_registry_address ?? null,
-      };
-      renderAthProfileStats();
+    const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
+    const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
+    // CROSS-WALLET STAMP (the v739 class, carried over from the removed Vault get_user path): capture the wallet this
+    // read is ISSUED for BEFORE the network await. A read for wallet A that resolves AFTER an in-app switch to B must
+    // never be attributed to B — B's own refresh, queued behind this one, reads B.
+    const forWallet = plathoWallet.address;
+    const forWalletRaw = rawWalletAddress(forWallet);
+    // A never-deployed shard (uninit) is a DEFINITIVE "not registered" → {exists:false}. Any OTHER read failure is
+    // TRANSIENT and must NOT flip a registered user to "activate" (KeyShard registration is monotonic): rethrow to the
+    // outer catch, which PRESERVES the existing binding. [activation review: transient read flips activated→activate]
+    let view;
+    try {
+      view = await withVaultReadLock(() => provider.getView(forWallet, { verify: true, priority: 'critical', cacheTtlMs: 0 }));
+    } catch (readError) {
+      if (!isKeyShardUninitError(readError)) throw readError;
+      view = { exists: false };
     }
-    if (!user?.current_key_id || BigInt(user.current_key_id) === 0n) {
-      globalThis.plathoVaultBinding = {
-        walletAddress: plathoWallet.address,
-        user,
-        keyRecord: null,
-      };
+    // Stale cross-wallet read: drop it whole rather than write a binding that names B and holds A's registration.
+    if (!plathoWallet?.address || rawWalletAddress(plathoWallet.address) !== forWalletRaw) return globalThis.plathoVaultBinding ?? null;
+    const localAuthPubkey = localVaultAuthKeyPair?.publicKey ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey) : 0n;
+    // Registered AND the stored keys are the CURRENT local ones (a local key rotation without re-register shows as
+    // "activate", prompting the re-publish that updates the shard) — the address-binding already guarantees it is mine.
+    const registeredMine = view?.exists === true
+      && BigInt(view.enc_pubkey ?? 0n) === BigInt(localVaultDraft.message.enc_pubkey ?? 0n)
+      && BigInt(view.sign_pubkey ?? 0n) === BigInt(localVaultDraft.message.sign_pubkey ?? 0n);
+    if (!registeredMine) {
+      globalThis.plathoVaultBinding = { walletAddress: forWallet, user: { exists: view?.exists === true, current_key_id: 0n }, keyRecord: null };
       setText(vaultRecordStatus, t('vault.activationRequired'));
       refreshMessageActionStatuses();
       refreshMessagingControls();
       refreshComposerPublishPolicy();
       return null;
     }
-    // FAST PATH — avoid the get_key_record read that HARD-FREEZES iOS WebKit (the localized permanent freeze, crumb
-    // act:getkeyrecord; see slow-device-freeze-iphone-se2). current_key_id IS the contract's collision-resistant
-    // binding hash of (owner + our key fields + key_generation): if it equals the key id computed from OUR local
-    // draft at generation 0 (the keys we registered), the account is provably bound to OUR current keys — no need to
-    // read + verify the full key record from chain. auth_pubkey is checked from get_user (no extra read). Only fall
-    // back to the heavy on-chain key-record read on a MISMATCH (key rotation / generation > 0 / unexpected) — rare.
-    const fastLocalAuthPubkey = localVaultAuthKeyPair?.publicKey ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey) : 0n;
-    if (localVaultDraft?.message && fastLocalAuthPubkey !== 0n && BigInt(user.auth_pubkey ?? 0n) === fastLocalAuthPubkey) {
-      try {
-        const expectedKeyId = await computeVaultMessagingKeyId({
-          owner_wallet: plathoWallet.address,
-          key_generation: 0n,
-          enc_pubkey: localVaultDraft.message.enc_pubkey,
-          sign_pubkey: localVaultDraft.message.sign_pubkey,
-          pq_kem_pubkey_hash: localVaultDraft.message.pq_kem_pubkey_hash,
-          pq_kem_pubkey_len: localVaultDraft.message.pq_kem_pubkey_len,
-          crypto_suite_mask: localVaultDraft.message.crypto_suite_mask,
-        });
-        if (BigInt(user.current_key_id) === expectedKeyId) {
-          globalThis.plathoVaultBinding = { walletAddress: plathoWallet.address, user, keyRecord: null };
-          setText(vaultRecordStatus, t('vault.activated'));
-          refreshMessageActionStatuses();
-          refreshMessagingControls();
-          refreshComposerPublishPolicy();
-          return globalThis.plathoVaultBinding;
-        }
-      } catch { /* fall back to the on-chain key-record read below */ }
-    }
-    const record = await withVaultReadLock(() => provider.getKeyRecord(user.current_key_id, {
-      vaultAddress: requireVaultAddress(),
-      verify: true,
-      priority: 'critical',
-      cacheTtlMs: 0,
-    }));
-    await assertVaultKeyRecordMatchesOwner(plathoWallet.address, record, user.current_key_id);
-    // The synchronous ed25519.verify of the signed-bundle binding runs inside here (wallet-only, every
-    // vault open).
-    const binding = await verifyVaultKeyRecordBinding(localSignedPublicBundle, record, {
-      ownerWallet: plathoWallet.address,
-      currentKeyId: user.current_key_id,
-      recordKeyId: user.current_key_id,
-    });
-    const localAuthPubkey = localVaultAuthKeyPair?.publicKey
-      ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey)
-      : 0n;
-    if (localAuthPubkey === 0n || BigInt(user.auth_pubkey ?? 0n) !== localAuthPubkey) {
-      throw new Error('Vault auth key does not match this wallet');
-    }
-    const active = binding.active === true;
-    globalThis.plathoVaultBinding = active ? { walletAddress: plathoWallet.address, user, keyRecord: record } : null;
-    setText(vaultRecordStatus, active ? t('vault.activated') : t('vault.recordMismatch'));
+    const user = {
+      exists: true,
+      current_key_id: BigInt(view.key_id),
+      auth_pubkey: localAuthPubkey,
+      key_generation: BigInt(view.key_generation ?? 0n),
+      enc_pubkey: BigInt(view.enc_pubkey),
+      sign_pubkey: BigInt(view.sign_pubkey),
+      scan_pubkey: BigInt(view.scan_pubkey ?? 0n),
+    };
+    globalThis.plathoVaultBinding = { walletAddress: forWallet, user, keyRecord: null };
+    setText(vaultRecordStatus, t('vault.activated'));
     refreshMessageActionStatuses();
     refreshMessagingControls();
     refreshComposerPublishPolicy();
     return globalThis.plathoVaultBinding;
   } catch (error) {
-    const expectedUnavailable = isExpectedVaultProviderUnavailable(error);
-    const keepCurrentBinding = expectedUnavailable && hasCurrentWalletVaultBinding();
-    if (!keepCurrentBinding) delete globalThis.plathoVaultBinding;
-    setText(vaultRecordStatus, keepCurrentBinding
-      ? t('vault.activated')
-      : expectedUnavailable
-        ? vaultProviderStatusForError(error)
-        : t('vault.recordBlocked'));
-    refreshMessagingControls();
-    setText(vaultRotateStatus, keepCurrentBinding ? t('vault.ready') : t('vault.notAvailable'));
+    // A transient read must NOT flip a registered user to "activate" — leave the binding untouched and show pending.
+    if (!noteTonRpcRateLimit(error)) console.warn('[keyshard] activation status read failed', error);
+    setText(vaultRecordStatus, t('vault.keysPending'));
+    refreshMessageActionStatuses();
     refreshComposerPublishPolicy();
-    if (!expectedUnavailable) console.error(error);
-    return null;
+    return globalThis.plathoVaultBinding ?? null;
   }
 }
 
@@ -25237,7 +23242,6 @@ async function quickStartRefreshWalletBalanceRaw() {
     const balance = await loadConnectedTonWalletBalance(address);
     vaultPocketState = {
       wallet: { ton_balance: balance, ath_balance: vaultPocketState.wallet?.ath_balance ?? null },
-      vault: vaultPocketState.vault ?? { ton_balance: null, ath_balance: null },
     };
   } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
 }

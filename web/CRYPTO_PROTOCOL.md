@@ -348,7 +348,7 @@ After the wallet has registered keys on-chain, the client must fetch:
 - for the user's own unlocked wallet, `UserState.auth_pubkey` matching the locally derived Vault auth public key;
 - the `VaultKeyRecordView` for that key id.
 
-The PWA exposes this as a fail-closed provider bridge in `web/vault-chain-provider.mjs`. The bridge expects a provider with:
+> **clean-17.** The Vault contract this chapter describes is clean-15. Under clean-17 the same binding is read from the wallet's OWN KeyShard contract (`web/key-shard-ton-rpc-provider.mjs`), whose address is derived from the wallet — so a record can only ever hold keys that wallet registered. The provider bridge `web/vault-chain-provider.mjs` was removed with the Vault.
 
 ```js
 {

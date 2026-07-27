@@ -40,8 +40,6 @@ describe('PWA on-chain self-sufficiency', () => {
 
   it('PWA-CHAIN-02: PWA reads protocol-critical values through contract providers, not static business config', () => {
     const app = read('web/app.js');
-    const vaultProvider = read('web/vault-ton-rpc-provider.mjs');
-    const capsuleProvider = read('web/capsulehub-ton-rpc-provider.mjs');
     const profileProvider = read('web/profile-registry-ton-rpc-provider.mjs');
     const usernameProvider = read('web/username-ton-rpc-provider.mjs');
     const athProvider = read('web/ath-ton-rpc-provider.mjs');
@@ -52,15 +50,11 @@ describe('PWA on-chain self-sufficiency', () => {
     // an INTRO first contact, both through createKeyShardTonRpcProvider. The KeyShard get_view read is pinned below.
     expect(app).toMatch(/resolvePeerReplyBundle\(\{ provider, peerWallet/);
     expect(app).toMatch(/resolveRecipientBundleByWallet\(\{ provider, wallet/);
-    expect(app).toMatch(/provider\.getKeyRecord\(currentKeyId/);
     expect(app).toMatch(/readCurrentProfileAvatarPointerResultFromChain/);
-
-    for (const method of ['get_global', 'get_user', 'get_key_record']) {
-      expect(vaultProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
-    }
-    for (const method of ['get_state', 'get_private_entry', 'get_public_entry', 'get_private_page', 'get_public_page']) {
-      expect(capsuleProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
-    }
+    // The Vault and CapsuleHub providers went with their contracts. The lanes that replaced them read their own
+    // shards, each through its own provider module — same rule, one provider per contract.
+    expect(read('web/public-shard-ton-rpc-provider.mjs')).toMatch(/method:\s*'get_page'/);
+    expect(read('web/intro-transport.mjs')).toMatch(/method:\s*'get_entry'/);
     for (const method of ['get_global', 'get_key_shard_address']) {
       expect(profileProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
     }

@@ -344,7 +344,7 @@ Después de que la billetera haya registrado las claves on-chain, el cliente deb
 - para la propia billetera desbloqueada del usuario, el `UserState.auth_pubkey` que coincida con la clave pública de autorización del Vault derivada localmente;
 - el `VaultKeyRecordView` para ese id de clave.
 
-La PWA expone esto como un puente de proveedor de fallo cerrado en `web/vault-chain-provider.mjs`. El puente espera un proveedor con:
+> **clean-17.** El contrato Vault descrito en este capítulo pertenece a clean-15. En clean-17 el mismo vínculo se lee del contrato KeyShard PROPIO de la billetera (`web/key-shard-ton-rpc-provider.mjs`), cuya dirección se deriva de la billetera, por lo que un registro solo puede contener claves que esa billetera registró. El puente de proveedor `web/vault-chain-provider.mjs` se eliminó junto con el Vault.
 
 ```js
 {

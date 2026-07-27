@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-27T13:34:45.933Z",
+  "generatedAt": "2026-07-27T15:03:11.508Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -8,14 +8,14 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 218,
-    "totalBytes": 5800989,
-    "bundleSha256": "edbe848c7072e6beee1ea1b9ef15c0b48a6e228dc68fa3f45ba528e54ae3bdd6",
+    "fileCount": 216,
+    "totalBytes": 5635585,
+    "bundleSha256": "b979d8979ae777ec8a0ae49b57d73199ad89c27958b8260025ed1f05d1ddfac3",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1295008,
-        "sha256": "6fcf1101b36eb97bf9c69037c458073323b10a76c603812222028479c7e00ee7"
+        "bytes": 1190873,
+        "sha256": "28353409ddd3338b37ae491988c7569aa3c2822d89962176e530ba1640f1f3a8"
       },
       {
         "path": "assets/icons/about.svg",
@@ -258,11 +258,6 @@
         "sha256": "ba675a8b10e9f0894fdd6c4be3647233a9b51df850000097b9a982b7ae8489bf"
       },
       {
-        "path": "capsulehub-ton-rpc-provider.mjs",
-        "bytes": 56413,
-        "sha256": "aa1fe7f1e9ae3b21b5767a95901d5976029933f0d23054630f2a699955a0af9a"
-      },
-      {
         "path": "channels/platho.app/feed.json",
         "bytes": 443,
         "sha256": "d2bc6e1635eb3da69e1fcb838bc83363952a218853bc51c018c4dddac5030c4d"
@@ -424,53 +419,53 @@
       },
       {
         "path": "docs/crypto-protocol.de.md",
-        "bytes": 30213,
-        "sha256": "f517137a0d63dcb6c50aa40af83507a1e14bae401dc481c612ad75d139198f6e"
+        "bytes": 30503,
+        "sha256": "e687a8a79e2ee9e24f70c670b135a23d9f04f9a002370a94f3c65e76d1026874"
       },
       {
         "path": "docs/crypto-protocol.es.md",
-        "bytes": 30202,
-        "sha256": "9e0afae5126d276ec74a0d089dc23061f59169856adfa6a0a73c2c863a2c29f2"
+        "bytes": 30481,
+        "sha256": "ceb8b12068316731edb35dc4713322b8fe0036d80d76d6d3d56f5c878548e0d4"
       },
       {
         "path": "docs/crypto-protocol.fr.md",
-        "bytes": 31614,
-        "sha256": "34d125bd7182cf773f7b73e595d18e262bd18afabf3909208a106e8a4384da4c"
+        "bytes": 31903,
+        "sha256": "d935602e9e3e5cb08015d5df7fc16429ccf422b52498ac24eb54ce2b47e647b4"
       },
       {
         "path": "docs/crypto-protocol.hi.md",
-        "bytes": 53709,
-        "sha256": "1e1f5e1ec71f8126979d258b2c63a9744a14d12f47462c3fd6dc75b00466ba59"
+        "bytes": 54171,
+        "sha256": "3d78a86fbebd2d0bf123fa835aa2cf83ec8e23d7ca22f21de23cf5b3e839a91a"
       },
       {
         "path": "docs/crypto-protocol.id.md",
-        "bytes": 27606,
-        "sha256": "d7afe1ffc64a66153ef87184bd2433519a72d39908801d855ba48f935d8d56ae"
+        "bytes": 27847,
+        "sha256": "971513f8dc81fb5a0f32553798a61b863abc0b95bebe63ee6c6ff95a55294bc4"
       },
       {
         "path": "docs/crypto-protocol.ja.md",
-        "bytes": 36235,
-        "sha256": "8e6993bf953197765814d6e666f248fa6dc62fb9649db330026ce3efb3e3ce0e"
+        "bytes": 36545,
+        "sha256": "1ce4a87413176778d3b3a1884d3cc9ca7e2c3a4ccbde15d901a5c5bc5879997f"
       },
       {
         "path": "docs/crypto-protocol.md",
-        "bytes": 25046,
-        "sha256": "2096ce3aa16c4b9bd2a04f32a7eeee17ab354056819e775d93a0e135525f080f"
+        "bytes": 25296,
+        "sha256": "f7e39bcd95a604cfb2dca3b9283bc72cdcbcbb71ff765cc872869a5cde63d4d7"
       },
       {
         "path": "docs/crypto-protocol.pt.md",
-        "bytes": 29597,
-        "sha256": "d22877f2d6febe883e645fe9cf58b70e5315550ef6fe262458f2f63eb0a95a77"
+        "bytes": 29868,
+        "sha256": "a820a29103f8e199fe2ab83f22840a3140f90cb5de356e1da2c858b18855a749"
       },
       {
         "path": "docs/crypto-protocol.ru.md",
-        "bytes": 44963,
-        "sha256": "04e87e4618362b9bd758369ea71dd83d4468375a473927420d66e07b90e14040"
+        "bytes": 45403,
+        "sha256": "7ed1a8f624fef2506bc13fa713857339381dd87009b8454f77750ebade22180a"
       },
       {
         "path": "docs/crypto-protocol.zh.md",
-        "bytes": 24278,
-        "sha256": "5bee4b6161d70f7ef32c58cab27efcc8e3b4f9857cbb6b4e05988c152834be33"
+        "bytes": 24485,
+        "sha256": "86ef65f4ba21d02874e6b86375c32fe44908873d8f7bf71cbd640f544fa0d3af"
       },
       {
         "path": "encrypted-message-store.mjs",
@@ -709,8 +704,8 @@
       },
       {
         "path": "sw.js",
-        "bytes": 7793,
-        "sha256": "32580e9eeba723a7314acabab98d91c8097e36ec16f291c7ab4d191a75f5c5b5"
+        "bytes": 7713,
+        "sha256": "cffb62bbc87ae95b296f85972acef94aadb258c6215eb924cbc09bb0f6bf966a"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -726,11 +721,6 @@
         "path": "username-ton-rpc-provider.mjs",
         "bytes": 17357,
         "sha256": "5ba1c849ac74a35d7a8e77818558f098f16ba0a24194e54dbe8681a71eb3fe7b"
-      },
-      {
-        "path": "vault-chain-provider.mjs",
-        "bytes": 7815,
-        "sha256": "122356865aece5b33fa6ee3a8522a3ee2df01ab76d4928af53ca8662bb056eb8"
       },
       {
         "path": "vault-ton-rpc-provider.mjs",

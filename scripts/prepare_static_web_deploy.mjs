@@ -39,7 +39,6 @@ const ROOT_RUNTIME_FILES = new Set([
   'ton-mnemonic-wordlist.mjs',
   'vault-ton-rpc-provider.mjs',
   'ton-dns-provider.mjs',
-  'capsulehub-ton-rpc-provider.mjs',
   'ath-ton-rpc-provider.mjs',
   'profile-registry-ton-rpc-provider.mjs',
   // The avatar pointer moved into the per-wallet KeyShard on 2026-07-21, so the browser now DERIVES a contract
@@ -54,7 +53,6 @@ const ROOT_RUNTIME_FILES = new Set([
   'manifest.webmanifest',
   'replay-store.mjs',
   'profile-avatar-media-store.mjs',
-  'vault-chain-provider.mjs',
   'webp-encoder.mjs',
   'qr-code.mjs',
   // clean-17 direct-pay lanes. These modules are imported (transitively) by app.js and MUST ship in the bundle —
