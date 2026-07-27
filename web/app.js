@@ -128,7 +128,6 @@ import {
   buildVaultWithdrawAthExternalBoc,
   buildVaultWithdrawTonExternalBoc,
   buildVaultUsernameMintExternalBoc,
-  computePublicAuthorKeyId,
   computeVaultMessagingKeyId,
   createVaultWalletMessage,
   estimateVaultAttachedValueNanotons,
@@ -9296,7 +9295,6 @@ function assemblePublicParts(items) {
 // wants "recent, no deep scans"): a channel that publishes more than this many posts AFTER editing its description
 // sinks the profile out of the cold-read window until re-published (subscribed readers still get it warm from the
 // wider feed walk). A deeper structural fix (a profile pointer on the on-chain author index) needs a contract change.
-const PUBLIC_CHANNEL_PROFILE_WALK_LIMIT = 24;
 // A cached "no profile found" (absent) result is re-checked after this long, so a channel that ADDS a description
 // later resurfaces (in the popover and in discovery) instead of being permanently cached as description-less. A
 // cached profile WITH content stays cache-first (descriptions change rarely; the feed walk refreshes subscribed ones).
@@ -9468,85 +9466,46 @@ function readProfileDocument(documentBytes) {
   };
 }
 
-// clean-11 capability gate: true only when the deployed genesis exposes the on-chain profile-pointer (config flag,
-// flipped at the clean-11 cutover in lockstep with the new addresses). Gates the is_profile publish bit (clean-10
-// Vault/Hub reject reserved != 0) and the global-profile-chain discovery/resolve fast-paths. false on clean-10.
-function profilePointerEnabled() {
-  return appConfig.capsuleHub?.profilePointer === true;
-}
-
 // Cold read of a channel's current profile: walk ONLY this author's on-chain post chain newest-first (no global
 // scan), bounded by maxScan, and return the first (newest) PROFILE block. Cache-first: a warm cache (populated by
 // the feed walk for subscribed channels) returns instantly with zero reads. Bounded body reads on a cold miss.
+// Read a channel's description/tags ON DEMAND (the "about" button, a discovery card, a channel view opened
+// before any sync). Cache-first, then the author's own CHANNEL shards — the same read the feed sync uses, with
+// the same profile divert, so both paths agree by construction. The clean-15 version walked the CapsuleHub
+// per-author profile index; clean-17 has no hub to walk, and a channel's profile is simply the newest
+// profile-only post in its own shard.
 async function resolveChannelProfile(authorWallet, options = {}) {
-  const maxScan = Number.isFinite(options.maxScan) ? Math.max(1, Math.floor(options.maxScan)) : PUBLIC_CHANNEL_PROFILE_WALK_LIMIT;
   const key = channelProfileCacheKey(authorWallet);
   if (!key) return null;
   if (options.force !== true) {
     const cached = cachedChannelProfile(key);
     if (cached && cached.fetchedAt) {
-      // Cache-first for a profile WITH content; an ABSENT result is only trusted until its TTL, then re-walked so a
+      // Cache-first for a profile WITH content; an ABSENT result is only trusted until its TTL, then re-read so a
       // newly-added description can surface.
       if (channelProfileHasContent(cached)) return cached;
       if ((Date.now() / 1000 - cached.fetchedAt) < PUBLIC_CHANNEL_PROFILE_ABSENT_TTL_SEC) return cached;
     }
   }
-  const resolved = await resolveCapsuleHubProvider();
-  if (!resolved) return cachedChannelProfile(key);
-  const { provider, address } = resolved;
-  const readOptions = criticalCapsuleHubReadOptions(address);
-  let authorIndex;
+  const lane = directPublicLaneReader();
+  if (!lane) return cachedChannelProfile(key);
+  let posts;
   try {
-    const authorKeyId = await computePublicAuthorKeyId(authorWallet);
-    // clean-11 fast-path: the per-author profile index points DIRECTLY at this channel's latest profile post (O(1),
-    // no chain walk). Dangling-tolerant — if the pointer's entry was evicted or carries no profile block, fall
-    // through to the clean-10 author-walk. Its own try so a fast-path miss/error never aborts the fallback.
-    if (profilePointerEnabled()) {
-      try {
-        const profileIndex = await provider.getPublicProfileIndex(authorKeyId, readOptions);
-        const profileLink = BigInt(profileIndex?.latest_entry_link ?? 0n);
-        if (profileIndex?.exists === true && profileLink > 0n) {
-          const profileEntry = await provider.getPublicEntry(profileLink - 1n, readOptions);
-          if (profileEntry.exists === true) {
-            let payload = null;
-            try { payload = await resolvePublicEntryPayload(provider, profileEntry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES }); } catch { payload = null; }
-            const profileDoc = payload ? readProfileDocument(payload.documentBytes ?? payload.document_bytes) : null;
-            if (profileDoc?.profileBlock) {
-              const createdAtSec = Number(payload?.createdAtSec ?? payload?.created_at_sec ?? 0) || 0;
-              setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, profileLink - 1n, createdAtSec);
-              return cachedChannelProfile(key);
-            }
-          }
-        }
-      } catch (fastPathError) { noteTonRpcRateLimit(fastPathError); }
-    }
-    authorIndex = await provider.getPublicAuthorIndex(authorKeyId, readOptions);
+    posts = await lane.readChannelPosts(authorWallet);
   } catch (error) {
-    noteTonRpcRateLimit(error);
+    // A failed read must NOT be recorded as "this channel has no description" — leave the cache as it is so the
+    // next open retries, exactly like the absent-TTL path above.
+    if (!noteTonRpcRateLimit(error)) console.warn('[public] channel profile shard read failed', error);
     return cachedChannelProfile(key);
   }
-  if (authorIndex.exists !== true) { markChannelProfileAbsent(key); return cachedChannelProfile(key); }
-  let link = BigInt(authorIndex.latest_entry_link ?? 0n);
-  for (let scanned = 0; link > 0n && scanned < maxScan; scanned += 1) {
-    const entryId = link - 1n;
-    let entry;
-    try { entry = await provider.getPublicEntry(entryId, readOptions); } catch (error) { noteTonRpcRateLimit(error); break; }
-    if (entry.exists !== true) break;
-    const prev = BigInt(entry.prev_link ?? 0n);
-    // A profile is always single-part; skip multipart entries WITHOUT a body read (header-only check).
-    const headerInfo = readPublicPartHeaderInfo(entry?.header_boc ?? entry?.headerBoc);
-    if (!headerInfo || headerInfo.partCount <= 1) {
-      let payload = null;
-      try { payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES }); } catch { payload = null; }
-      const profileDoc = payload ? readProfileDocument(payload.documentBytes ?? payload.document_bytes) : null;
-      if (profileDoc?.profileBlock) {
-        const createdAtSec = Number(payload?.createdAtSec ?? payload?.created_at_sec ?? 0) || 0;
-        setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, entryId, createdAtSec);
-        return cachedChannelProfile(key);
-      }
-    }
-    if (prev === link) break; // defensive: never spin on a self-referential link
-    link = prev;
+  // readChannelPosts returns newest-first, so the FIRST profile-only document is the current profile.
+  for (const sp of posts) {
+    let payload;
+    try { payload = readPublicPostPayloadV2({ header: sp.header, body: sp.body }); } catch { continue; }
+    if (Number(payload.partCount ?? 1) > 1) continue;   // a profile is always single-part
+    const profileDoc = readProfileDocument(payload.documentBytes ?? payload.document_bytes);
+    if (!profileDoc?.isProfileOnly || !profileDoc?.profileBlock) continue;
+    setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, sp.entry_id, Number(sp.created_at ?? 0n));
+    return cachedChannelProfile(key);
   }
   markChannelProfileAbsent(key);
   return cachedChannelProfile(key);
