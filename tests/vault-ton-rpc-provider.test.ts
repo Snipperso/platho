@@ -1,23 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createMessagingIdentity,
-  createVaultMessagingKeyDraft,
-  exportSignedPublicKeyBundle,
-  verifySignedPublicKeyBundle,
-} from '../web/crypto/platho-crypto.mjs';
-import {
   clearToncenterMessagesCache,
   clearToncenterRunGetMethodCache,
   createFallbackTonRpcTransport,
   createTonCenterV3VaultTransport,
   createTonRpcTransport,
-  createVaultTonRpcProvider,
   decodeTonAddressSliceBoc,
-  decodeVaultGlobalViewStack,
   encodeTonAddressSliceBoc,
   parseStackBigIntValue,
 } from '../web/vault-ton-rpc-provider.mjs';
-import { computeVaultMessagingKeyId, tonCell } from '../web/pwa-contract-transactions.mjs';
 
 const NOW = Date.UTC(2026, 0, 3, 10, 0, 0);
 const OWNER = `0:${'11'.repeat(32)}`;
@@ -29,31 +20,6 @@ function num(value: bigint | number | string) {
     type: 'num',
     value: bigint < 0n ? `-0x${(-bigint).toString(16)}` : `0x${bigint.toString(16)}`,
   };
-}
-
-function snakeBoc(bytes: Uint8Array) {
-  return tonCell.bytesToBase64(tonCell.serializeBoc(tonCell.snakeCellFromBytes(bytes)));
-}
-
-async function keyFixture() {
-  const identity = await createMessagingIdentity();
-  const signedBundle = await exportSignedPublicKeyBundle(identity, {
-    issuedAt: NOW,
-    ownerWallet: OWNER,
-    purpose: 'vault-ton-rpc-provider-test',
-  });
-  const verified = await verifySignedPublicKeyBundle(signedBundle, { now: NOW + 1 });
-  const draft = await createVaultMessagingKeyDraft(verified.bundle, verified.signingPublicKey);
-  const keyId = await computeVaultMessagingKeyId({
-    owner_wallet: OWNER,
-    key_generation: 0n,
-    enc_pubkey: draft.message.enc_pubkey,
-    sign_pubkey: draft.message.sign_pubkey,
-    pq_kem_pubkey_hash: draft.message.pq_kem_pubkey_hash,
-    pq_kem_pubkey_len: draft.message.pq_kem_pubkey_len,
-    crypto_suite_mask: draft.message.crypto_suite_mask,
-  });
-  return { signedBundle, draft, keyId };
 }
 
 describe('Vault TON RPC provider', () => {
@@ -70,18 +36,10 @@ describe('Vault TON RPC provider', () => {
   // PWA-IOS-ACT-KEYSHARD-SINGLE-READ-01. What stays exercised in THIS file is the transport underneath, which
   // every clean-17 reader still shares.
 
-  it('VAULT-RPC-03: stays fail-closed without transport or Vault address', async () => {
-    const provider = createVaultTonRpcProvider({ transport: null });
-
-    await expect(provider.getUser(OWNER, { vaultAddress: VAULT })).rejects.toThrow(/transport/i);
-    await expect(createVaultTonRpcProvider({
-      transport: {
-        async runGetMethod() {
-          return { stack: [] };
-        },
-      },
-    }).getUser(OWNER)).rejects.toThrow(/Vault contract address/i);
-  });
+  // VAULT-RPC-03 removed with createVaultTonRpcProvider: "fail closed without a transport or a Vault address"
+  // was a property of the Vault get-method wrapper. The clean-17 providers (KeyShard, ProfileRegistry, username,
+  // ATH, PublicShard) each carry the same fail-closed check against their OWN address, tested in their own suites;
+  // the shared transport's own "no transport configured" path is exercised throughout this file.
 
   it('VAULT-RPC-04: wraps TON Center v3 runGetMethod with explicit endpoint and API key', async () => {
     const requests: any[] = [];
@@ -1915,122 +1873,13 @@ describe('Vault TON RPC provider', () => {
     expect(requests[0]).toContain(`address=${encodeURIComponent(OWNER)}`);
   });
 
-  it('VAULT-RPC-05: exposes typed Vault getters needed by the PWA', async () => {
-    const calls: Array<{ method: string; address: string; stack: any[] }> = [];
-    const transport = {
-      async runGetMethod(call: { method: string; address: string; stack: any[] }) {
-        calls.push(call);
-        if (call.method === 'get_ath_withdrawal_id') return { stack: [num(0x3030n)] };
-        if (call.method === 'get_pending_ath_withdrawal_for') {
-          return {
-            stack: [
-              num(-1n),
-              { type: 'slice', value: encodeTonAddressSliceBoc(OWNER) },
-              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'44'.repeat(32)}`) },
-              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'55'.repeat(32)}`) },
-              num(500n),
-              num(1_700_000_001n),
-            ],
-          };
-        }
-        if (call.method === 'get_global') {
-          return {
-            stack: [
-              num(-1n),
-              num(-1n),
-              num(-1n),
-              num(-1n),
-              num(0x9999n),
-              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'66'.repeat(32)}`) },
-              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'77'.repeat(32)}`) },
-              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'78'.repeat(32)}`) },
-              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'88'.repeat(32)}`) },
-              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'99'.repeat(32)}`) },
-              num(1n),
-              num(2n),
-              num(4n),
-              num(5n),
-              num(6n),
-              num(7n),
-              num(8n),
-              num(86_400n),
-              num(8n),
-              num(9n),
-              num(1n),
-              num(10n),
-            ],
-          };
-        }
-        throw new Error(`unexpected method ${call.method}`);
-      },
-    };
-    const provider = createVaultTonRpcProvider({ vaultAddress: VAULT, transport });
+  // VAULT-RPC-05 removed with the typed Vault getters (get_user / get_user_receipts / get_key_record /
+  // get_ath_withdrawal_id / get_pending_ath_withdrawal_for / get_global). The contract is gone; the identity read
+  // that replaced get_user is KeyShard get_view, typed and tested in tests/key-shard-ton-rpc-provider.
 
-    await expect(provider.getAthWithdrawalId(OWNER, 12n)).resolves.toBe(0x3030n);
-    await expect(provider.getPendingAthWithdrawalFor(OWNER, 12n)).resolves.toMatchObject({
-      exists: true,
-      owner_wallet: OWNER,
-      amount: 500n,
-    });
-    // VPB2: getCanonicalPublishCharge is now a pure client computation (SHARED_BASE + per-part marginal == a
-    // 1-part batch canonical_total) — the per-message contract getter get_canonical_publish_charge was removed
-    // with the batch redeploy, so this makes NO RPC call and is absent from the calls list below.
-    await expect(provider.getCanonicalPublishCharge(OWNER, 1n, 1n, 2n)).resolves.toBe(162_600_000n);
-    await expect(provider.getCanonicalPublishCharge(OWNER, 2n, 1n, 0n)).resolves.toBe(169_800_000n);
-    await expect(provider.getGlobal()).resolves.toMatchObject({
-      sealed: true,
-      capsule_hub_bound: true,
-      user_count: 1n,
-      airdrop_total_allocation_ath: 10n,
-    });
-
-    expect(calls.map((call) => call.method)).toEqual([
-      'get_ath_withdrawal_id',
-      'get_pending_ath_withdrawal_for',
-      'get_global',
-    ]);
-    // get_pending_ath_withdrawal_for passes the owner address as its first stack arg.
-    expect(decodeTonAddressSliceBoc(calls[1].stack[0].value)).toBe(OWNER);
-  });
-
-  it('VAULT-RPC-06: decodes the Vault registry binding fields from new get_global stacks', () => {
-    const profileRegistry = `0:${'99'.repeat(32)}`;
-    const usernameRegistry = `0:${'aa'.repeat(32)}`;
-    const view = decodeVaultGlobalViewStack({
-      stack: [
-        num(-1n),
-        num(-1n),
-        num(-1n),
-        num(-1n),
-        num(0x9999n),
-        { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'66'.repeat(32)}`) },
-        { type: 'slice', value: encodeTonAddressSliceBoc(profileRegistry) },
-        { type: 'slice', value: encodeTonAddressSliceBoc(usernameRegistry) },
-        { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'77'.repeat(32)}`) },
-        { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'88'.repeat(32)}`) },
-        num(1n),
-        num(2n),
-        num(4n),
-        num(5n),
-        num(6n),
-        num(7n),
-        num(8n),
-        num(86_400n),
-        num(9n),
-        num(10n),
-        num(11n),
-        num(12n),
-      ],
-    });
-
-    expect(view.profile_registry_bound).toBe(true);
-    expect(view.username_registry_bound).toBe(true);
-    expect(view.profile_registry_address).toBe(profileRegistry);
-    expect(view.username_registry_address).toBe(usernameRegistry);
-    expect(view.pending_profile_avatar_payment_count).toBe(6n);
-    expect(view.pending_username_mint_payment_count).toBe(7n);
-    expect(view.airdrop_total_allocation_ath).toBe(12n);
-  });
+  // VAULT-RPC-06 removed with decodeVaultGlobalViewStack. It pinned the 22-field get_global layout — the exact
+  // kind of arity guard that catches a silent decode drift — but the getter, its stack and its registry-binding
+  // fields are all gone with the Vault. KeyShard's own 24-item arity is pinned in its suite.
 });
 
 describe('parseStackBigIntValue non-numeric string does not self-recurse (PWA-IOS-BIGINT-NO-TOSTRING-RECURSION-01)', () => {

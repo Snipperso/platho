@@ -9,8 +9,8 @@ Output: C:\platho\artifacts\platho-web-static-production
 
 ```text
 fileCount=216
-totalBytes=5587503
-bundleSha256=fce9e84058df9864b58ec71fdb5e84d57a1dd2a5d839382b68e613211abe4d54
+totalBytes=5562285
+bundleSha256=cfd40764308424c32777816c5e016df6d87e1d0ef43824fcd986779dcf26eabe
 noBackendRuntime=true
 ```
 
@@ -26,6 +26,7 @@ noBackendRuntime=true
 ## Blockers
 
 - MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH
+- PWA_FINAL_MANIFEST_HASH_MISMATCH
 
 ## Warnings
 
@@ -34,3 +35,4 @@ None
 ## Production Findings
 
 - MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH: MAINNET_GENESIS_VERIFIED=true must match current build code hashes: ath_master, ath_vesting, ath_wallet, buyback_burn, market_stability_seller, fee_accumulator, profile_registry, username_nft_item, username_registry. (artifacts/mainnet_genesis_verify_input.json)
+- PWA_FINAL_MANIFEST_HASH_MISMATCH: PWA vault.deploymentManifestHash must match the verified final genesis manifest hash. (web/platho-config.mjs)

@@ -55,15 +55,8 @@ const productionConfig = {
       requestTimeoutMs: 15000,
     },
   },
-  vault: {
-    address: '0:1111111111111111111111111111111111111111111111111111111111111111',
+  genesis: {
     deploymentManifestHash: `0x${'66'.repeat(32)}`,
-    provider: {
-      globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs',
-      exportName: 'default',
-      requiredInProduction: true,
-    },
   },
   tonDns: {
     rootAddress: '-1:2222222222222222222222222222222222222222222222222222222222222222',
@@ -199,12 +192,13 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods, 'a retired getter must not stay pinned as critical')
       .not.toContain('get_avatar');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).not.toContain('get_name_record');
-    expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBe(128);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQAFsNc952nbwLMDfHqXExkgn1lipVzNndbNQKBfHEIEe5Zy');
-    expect(PLATHO_APP_CONFIG.vault.deploymentManifestHash).toBe(
+    // The Vault and CapsuleHub blocks are gone with their contracts. The genesis binding they carried is a
+    // RELEASE property, not a contract one, so it moved to its own block and stays pinned here.
+    expect(PLATHO_APP_CONFIG.vault).toBeUndefined();
+    expect(PLATHO_APP_CONFIG.capsuleHub).toBeUndefined();
+    expect(PLATHO_APP_CONFIG.genesis.deploymentManifestHash).toBe(
       'd9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16',
     );
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQD1Qj4S3F4IAMku5M_xc5IFBPhHR7DeakWZDGURjDtCGrx9');
     expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr');
     expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcF6b');
     expect(PLATHO_APP_CONFIG.tonDns.rootAddress).toBe(
@@ -655,8 +649,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoTonRpcTransport/);
     expect(app).toMatch(/plathoTonRpcEndpoint/);
     expect(app).toMatch(/plathoTonSendBocEndpoint/);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQAFsNc952nbwLMDfHqXExkgn1lipVzNndbNQKBfHEIEe5Zy');
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQD1Qj4S3F4IAMku5M_xc5IFBPhHR7DeakWZDGURjDtCGrx9');
+    expect(PLATHO_APP_CONFIG.profileRegistry.address).toBe('UQAkt_x_FRJxT0TevI5KTcExz1wTp412Hq47h4F3F1z2u3Jr');
     expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcF6b');
     expect(app).not.toMatch(/https:\/\/testnet\.toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).not.toMatch(/https:\/\/toncenter\.com\/api\/v2\/getAddressInformation/);
@@ -2675,7 +2668,8 @@ describe('PWA runtime config guard', () => {
     );
 
     expect(app).toMatch(/const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120/);
-    expect(helperSource).toMatch(/appConfig\.capsuleHub\?\.privateIndexReadLimit \?\? PRIVATE_CHAIN_INDEX_READ_LIMIT/);
+    // (The per-hub override went with the Hub config; the limit is the constant, which is what the composer caps on.)
+    expect(helperSource).toMatch(/return PRIVATE_CHAIN_INDEX_READ_LIMIT;/);
     // Localized (v697): the part-limit message is a CLDR plural key in all 10 locales, selected by the part
     // count, with the limit as a plain param — no hardcoded-English status/tooltip text.
     expect(helperSource).toMatch(/return tPlural\('composer\.privatePartLimit', parts, \{ limit \}\);/);
@@ -2966,18 +2960,10 @@ describe('PWA runtime config guard', () => {
     expect(report.ok).toBe(true);
   });
 
-  it('PWA-CONFIG-03E: production config rejects unverified static public feed fallback', () => {
-    const report = validatePlathoAppConfig({
-      ...productionConfig,
-      capsuleHub: {
-        address: '0:4444444444444444444444444444444444444444444444444444444444444444',
-        allowUnverifiedStaticPublicFeeds: true,
-      },
-    });
-
-    expect(report.ok).toBe(false);
-    expect(report.findings.map((finding) => finding.id)).toContain('PWA_STATIC_PUBLIC_FEED_FALLBACK_FORBIDDEN');
-  });
+  // PWA-CONFIG-03E removed with the fallback it banned. The clean-15 escape hatch fetched a STATIC JSON feed from
+  // channel.sourceUrl when a config flag allowed it; production always refused, nothing ever set the flag, and the
+  // path is now deleted outright — fetching the feed from a URL is exactly the external dependency this project
+  // forbids. A config ban on a code path that does not exist is worse than no ban: it reads as protection.
 
   it('PWA-CONFIG-03F: production config requires FeeAccumulator address for CapsuleHub preflight', () => {
     const report = validatePlathoAppConfig({
@@ -2989,22 +2975,9 @@ describe('PWA runtime config guard', () => {
     expect(report.findings.map((finding) => finding.id)).toContain('PWA_FEE_ACCUMULATOR_ADDRESS_REQUIRED');
   });
 
-  it('PWA-CONFIG-04: production config requires a Vault provider entry', () => {
-    const report = validatePlathoAppConfig({
-      ...productionConfig,
-      vault: {
-        ...productionConfig.vault,
-        provider: {
-          globalName: null,
-          moduleUrl: null,
-          requiredInProduction: true,
-        },
-      },
-    });
-
-    expect(report.ok).toBe(false);
-    expect(report.findings.map((finding) => finding.id)).toContain('PWA_VAULT_CHAIN_PROVIDER_REQUIRED');
-  });
+  // PWA-CONFIG-04 removed with the Vault's runtime-injected provider bridge. It required a production bundle to NAME
+  // a static chain-provider module, because the Vault provider was resolved at runtime off globalThis and could be
+  // absent. Every clean-17 reader is a STATIC import in app.js — nothing to configure, nothing that can go missing.
 
   it('PWA-CONFIG-04A: production config requires replaceable TON RPC providers', () => {
     const report = validatePlathoAppConfig({
@@ -3130,17 +3103,17 @@ describe('PWA runtime config guard', () => {
     expect(report.findings.map((finding) => finding.id)).toContain('PWA_PROFILE_REGISTRY_ADDRESS_REQUIRED');
   });
 
-  it('PWA-CONFIG-04D: production config requires Vault deployment manifest hash for signed publish domain', () => {
+  it('PWA-CONFIG-04D: production config requires the genesis deployment manifest hash for signed publish domain', () => {
     const report = validatePlathoAppConfig({
       ...productionConfig,
-      vault: {
-        ...productionConfig.vault,
+      genesis: {
+        ...productionConfig.genesis,
         deploymentManifestHash: null,
       },
     });
 
     expect(report.ok).toBe(false);
-    expect(report.findings.map((finding) => finding.id)).toContain('PWA_VAULT_DEPLOYMENT_MANIFEST_HASH_REQUIRED');
+    expect(report.findings.map((finding) => finding.id)).toContain('PWA_GENESIS_DEPLOYMENT_MANIFEST_HASH_REQUIRED');
   });
 
   it('PWA-CONFIG-05: production config does not carry external wallet connector settings', () => {
@@ -3171,10 +3144,8 @@ describe('PWA runtime config guard', () => {
     // NOT unconditionally to latestId. A skipped-this-cycle channel therefore never lets the fast-path skip past it.
     // v753: the commit is additionally EPOCH-guarded (see PWA-CHANNEL-VIEW-01) — an invalidation that landed
     // mid-walk (follow / channel-view preview) blocks the cursor write so the invalidation's walk really runs.
-    expect(app).toMatch(/function chainBackedPublicFeedOnly/);
-    expect(app).toMatch(/post\?\.chainVerified === true/);
-    expect(app).toMatch(/allowUnverifiedStaticPublicFeeds !== true/);
-    expect(app).toMatch(/Public channel feed has no verified CapsuleHub anchors/);
+    // (chainBackedPublicFeedOnly filtered a STATIC feed down to chain-anchored posts. With that fallback deleted,
+    // every post in the feed comes from a shard read — there is no unverified source left to filter.)
   });
 
   // PWA-PUBLIC-INCREMENTAL-02 removed with the CapsuleHub feed walk: the per-author cursor, the round-start head and
@@ -4021,19 +3992,11 @@ describe('PWA runtime config guard', () => {
   // check is a single deferred read (armConvDeliveryConfirm, pinned in PWA-CONV-DELIVERY-01). There is no longer an
   // inline scan to keep off the critical path.
 
-  it('PWA-IOS-LOADUINT-CHUNKED-01: cell bit reader builds ints in chunks, not one BigInt op per bit (iOS JSC receipt-decode freeze)', () => {
-    const rpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
-    // ROOT FIX for the iPhone-only "freeze on confirming": tonCellBitReader.loadUint used to fold ONE BigInt op per
-    // bit (out = (out << 1n) | BigInt(bit)); decoding the 20-slot get_user_receipts ring is ~13k such ops, which on
-    // iOS JavaScriptCore (BigInt ~10-50x slower + GC-heavy vs V8) took ~0.4s and stalled the sender on every confirm.
-    // The fix accumulates 24-bit chunks in a plain Number and folds ONE BigInt op per chunk.
-    const fn = rpc.slice(rpc.indexOf('function tonCellBitReader'), rpc.indexOf('function loadTonHashmapDirect'));
-    // No per-bit BigInt fold left.
-    expect(fn).not.toMatch(/out = \(out << 1n\) \| BigInt\(this\.loadBit\(\)\)/);
-    // Chunked accumulation in a plain Number, folded per chunk.
-    expect(fn).toMatch(/acc = \(acc \* 2\) \+ this\.loadBit\(\)/);
-    expect(fn).toMatch(/out = \(out << BigInt\(chunk\)\) \| BigInt\(acc\)/);
-  });
+  // PWA-IOS-LOADUINT-CHUNKED-01 removed with the receipt-ring decoder it made fast. The iPhone-only "freeze on
+  // confirming" was tonCellBitReader.loadUint folding ONE BigInt op per bit while decoding the 20-slot Vault
+  // get_user_receipts ring (~13k ops, ~0.4s on iOS JavaScriptCore). The ring, the reader and the hashmap walk are
+  // all gone with the Vault: a direct-pay confirmation reads a single get-method result, so there is no bulk cell
+  // decode left on the confirm path to make fast.
 
   it('PWA-IOS-PUMP-YIELD-01: the shared RPC pump yields a macrotask before rejecting a backoff-skipped read (no microtask-starvation freeze)', () => {
     const rpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');

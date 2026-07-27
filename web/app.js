@@ -39,9 +39,6 @@ import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=105';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
-  readBatchPublishReceipt,
-  interpretBatchPublishReceipt,
-  BATCH_PUBLISH_RECEIPT_STATUS,
   TON_RPC_REQUEST_TIMEOUT_MS,
   decodeTonAddressSliceBoc,
 } from './vault-ton-rpc-provider.mjs?v=62';
@@ -269,15 +266,6 @@ function installConfiguredTonRuntime(config = appConfig) {
     if (transport) globalThis.plathoTonRpcTransport = transport;
   }
 
-  if (config?.vault?.address) {
-    globalThis.plathoVaultAddress = config.vault.address;
-  }
-  if (config?.vault?.deploymentManifestHash) {
-    globalThis.plathoVaultDeploymentManifestHash = config.vault.deploymentManifestHash;
-  }
-  if (config?.capsuleHub?.address) {
-    globalThis.plathoCapsuleHubAddress = config.capsuleHub.address;
-  }
   if (config?.feeAccumulator?.address) {
     globalThis.plathoFeeAccumulatorAddress = config.feeAccumulator.address;
   }
@@ -1281,11 +1269,13 @@ function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
 }
 
+// Scopes EVERY local key to the deployment, so a redeploy never serves the previous generation's cached state
+// under the new contracts. clean-15 anchored on the Vault manifest hash; clean-17 anchors on the ProfileRegistry
+// address, which is the contract the deployment is defined by — every KeyShard address derives from it, so two
+// deployments cannot share it and a wrong one would already be a total identity mismatch, not a subtle cache bug.
 function deploymentStorageSuffix() {
-  const manifestHash = String(appConfig.vault?.deploymentManifestHash ?? '').replace(/^0x/i, '').toLowerCase();
-  if (/^[0-9a-f]{64}$/.test(manifestHash)) return manifestHash.slice(0, 16);
-  const vaultAddress = String(appConfig.vault?.address ?? '').replace(/[^a-z0-9_-]/gi, '');
-  return vaultAddress.slice(-16) || 'no-deployment';
+  const registry = String(appConfig.profileRegistry?.address ?? '').replace(/[^a-z0-9_-]/gi, '');
+  return registry.slice(-16) || 'no-deployment';
 }
 
 function scopedStorageKey(baseKey) {
@@ -9431,18 +9421,6 @@ function upsertPublicChainPosts(existing = [], fresh = []) {
     .sort((a, b) => new Date(a?.createdAt ?? 0).getTime() - new Date(b?.createdAt ?? 0).getTime());
 }
 
-function chainBackedPublicFeedOnly(feed) {
-  return {
-    ...feed,
-    posts: (feed?.posts ?? [])
-      .filter(publicFeedPostHasChainAnchor)
-      .map((post) => ({
-        ...post,
-        comments: (post.comments ?? []).filter(publicFeedPostHasChainAnchor),
-      })),
-  };
-}
-
 async function syncPublicChannels() {
   return await syncPublicChannelsRun();
 }
@@ -9492,44 +9470,12 @@ async function syncPublicChannelsRun() {
     }
   }
 
-  if (appConfig.capsuleHub?.allowUnverifiedStaticPublicFeeds !== true) {
-    setPublicSyncPhase('delayed');
-    setPublicStatus(chainSyncError ? 'chain sync unavailable' : 'chain provider unavailable');
-    return;
-  }
-
-  const channels = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry);
-  let changed = false;
-  for (const channel of channels) {
-    if (!channel.sourceUrl) continue;
-    try {
-      const response = await fetch(channel.sourceUrl, { cache: 'no-cache' });
-      if (!response.ok) throw new Error(`Public channel feed unavailable: ${channel.id}`);
-      const feed = chainBackedPublicFeedOnly(normalizePublicChannelFeed(await response.json(), channel.id));
-      if ((feed.posts ?? []).length === 0) {
-        throw new Error(`Public channel feed has no verified CapsuleHub anchors: ${channel.id}`);
-      }
-      publicChannelFeedCache = {
-        ...publicChannelFeedCache,
-        [channel.id]: {
-          feed,
-          syncedAt: new Date().toISOString(),
-        },
-      };
-      changed = true;
-    } catch (error) {
-      console.error(error);
-    }
-  }
-  if (!changed) return;
-  commitPublicChannelFeedCache();
-  rebuildThreadsFromPublicSubscriptions();
-  renderThreads();
-  renderConversation();
-  void (async () => {
-    await hydratePublicAvatars();
-    await hydratePublicChannelAvatars();
-  })().catch((error) => console.error(error));
+  // No chain answer, no feed. The clean-15 escape hatch here fetched a STATIC JSON feed from channel.sourceUrl when
+  // capsuleHub.allowUnverifiedStaticPublicFeeds was set — a config key production always refused and that nothing
+  // ever set, so the path was unreachable. It is removed outright rather than re-homed: fetching the feed from a URL
+  // is exactly the external dependency this project forbids, and an unverified feed is worse than an honest gap.
+  setPublicSyncPhase('delayed');
+  setPublicStatus(chainSyncError ? 'chain sync unavailable' : 'chain provider unavailable');
 }
 
 function collectPublicAvatarRequests() {
@@ -12568,10 +12514,7 @@ function privateImageCapsulePartsForSend(attachment, options = {}) {
 }
 
 function privateComposerRetrievalPartLimit() {
-  const configuredLimit = Number(appConfig.capsuleHub?.privateIndexReadLimit ?? PRIVATE_CHAIN_INDEX_READ_LIMIT);
-  return Number.isFinite(configuredLimit)
-    ? Math.max(1, Math.floor(configuredLimit))
-    : PRIVATE_CHAIN_INDEX_READ_LIMIT;
+  return PRIVATE_CHAIN_INDEX_READ_LIMIT;
 }
 
 // v648 (owner): ONE message is capped at 8 capsules on BOTH surfaces. Before this the private cap was the
@@ -17266,7 +17209,7 @@ composer?.addEventListener('submit', async (event) => {
     renderConversation();
     return;
   }
-  if (!plathoWallet?.address || !appConfig.vault?.address) {
+  if (!plathoWallet?.address) {
     refreshMessagingControls();
     return;
   }
@@ -22002,7 +21945,9 @@ async function bootCrypto() {
     localSignedPublicBundle = await exportSignedPublicKeyBundle(localIdentity, {
       purpose: appConfig.crypto?.signedBundlePurpose ?? 'pwa-runtime',
       ownerWallet: plathoWallet.address,
-      vaultAddress: appConfig.vault?.address ?? null,
+      // The deployment this identity belongs to. Under clean-17 that is the ProfileRegistry (the KeyShard register
+      // path already binds to it), so the bundle cannot be replayed into a different generation of the contracts.
+      vaultAddress: appConfig.profileRegistry?.address ?? null,
     });
     const verifiedBundle = await verifySignedPublicKeyBundle(localSignedPublicBundle);
     localVaultDraft = await createVaultMessagingKeyDraft(verifiedBundle.bundle, verifiedBundle.signingPublicKey, {
