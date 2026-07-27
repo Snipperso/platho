@@ -1366,8 +1366,9 @@ const ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS = 5 * 60 * 1000;
 // the button honestly re-arms). Protocol-level counters, not wallet-scoped.
 let athFlushOptimisticFlush = null;
 const ATH_FLUSH_OPTIMISTIC_FLUSH_TTL_MS = 5 * 60 * 1000;
-// External-message fee headroom on top of the per-message flush values when pre-checking the WALLET balance.
-const ATH_FLUSH_WALLET_FEE_HEADROOM_NANOTONS = 10_000_000n;
+// External-message fee headroom on top of the summed message values when pre-checking the WALLET balance.
+// Shared by every direct-pay pre-flight (ATH flush, avatar, public post/comment) — one number, one meaning.
+const WALLET_FEE_HEADROOM_NANOTONS = 10_000_000n;
 let athFlushState = {
   username_burn_due_ath: null,
   profile_burn_due_ath: null,
@@ -15801,8 +15802,10 @@ function composerEstimatedNetCostNanotons(profile, parts = 1) {
 // estimate net from the observed-settled fraction of a 1-part hold. Used only for the price-change confirm
 // dialog's "new cost" line; if profiles are available, composerEstimatedNetCostNanotons is exact.
 function composerKnownVaultTonShortfall(profile, parts = 1) {
-  // clean-17 direct-pay has NO Vault hold — a CONV/public send is funded from the wallet and the affordability check
-  // runs at send time (attemptConvMessagePublishDirect / the public direct path do their own wallet-GRAM check). The
+  // clean-17 direct-pay has NO Vault hold — a CONV/public send is funded from the wallet, and the affordability
+  // check runs at SEND time via assertWalletGramAtLeast (attemptConvMessagePublishDirect, submitPublicPostDirect,
+  // submitPublicCommentDirect, submitProfileAvatarDirect). This comment previously claimed those checks existed
+  // when they did not — they were only built on 2026-07-25; keep claim and code together. The
   // synthesized KeyShard activation user carries no ton_balance, so reading it here would be a permanent false shortfall
   // that disables every registered user's send button at cutover. Skip the Vault-balance gate; keep the part-cap gate
   // (checked in the wrappers before this call). [keyshard activation review: ton_balance false-shortfall]
@@ -20095,22 +20098,24 @@ profileAvatarInput?.addEventListener('change', async () => {
     await submitProfileAvatarUpdate(avatar);
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
-    if (rateLimited || isTonRpcRecoverableReadError(error)) {
-      // A rate-limited read on the direct-pay path (the pre-pay pointer check, or the ATH wallet
-      // address read) reaches HERE unretried: the publish itself is ONE wallet transfer, so there is
-      // no in-flight ladder to hide behind. Surface a truthful, retryable terminal state (releases
-      // the pending lock so the button is clickable) instead of a "retrying" status that never does.
-      setProfileAvatarStatus('avatar needs retry', 'error');
+    if (rateLimited || isTonRpcRecoverableReadError(error) || error?.code === 'PLATHO_AVATAR_PRECHECK_UNREADABLE') {
+      // A rate-limited or otherwise unreadable pre-pay check reaches HERE unretried: the publish is ONE wallet
+      // transfer, so there is no in-flight ladder to hide behind. Nothing was spent (the check runs before any
+      // signing), so a truthful retryable terminal is the whole story.
+      setProfileAvatarStatus(t('avatar.needsRetry'), 'error');
+    } else if (error?.code === 'PLATHO_ATH_REQUIRED' || error?.code === 'PLATHO_WALLET_GRAM_REQUIRED') {
+      // Actionable and already worded with the exact shortfall — show it verbatim rather than "blocked".
+      setProfileAvatarStatus(String(error.message), 'error');
     } else {
-      const message = String(error?.avatarDiagnosticStatus ?? error?.message ?? 'avatar blocked');
+      const message = String(error?.avatarDiagnosticStatus ?? error?.message ?? t('avatar.blocked'));
       setProfileAvatarStatus(message, 'error');
       console.error(error);
     }
   } finally {
     if (profileAvatarInput) profileAvatarInput.value = '';
-    // Reflect the in-flight lock rather than unconditionally re-enabling: while a background avatar
-    // recovery is still running plathoProfileAvatarPending stays true and the button remains disabled;
-    // it re-enables only once the update reaches a terminal state.
+    // Reflect the in-flight lock rather than unconditionally re-enabling: the lock is held across the pointer
+    // confirmation (confirmProfileAvatarPointer), so the button re-enables only on a terminal outcome —
+    // 'avatar active', an error, or the "not active yet" timeout.
     refreshMessagingControls();
   }
 });
@@ -22236,6 +22241,42 @@ async function loadConnectedTonWalletBalance(address = requirePlathoWalletAddres
   });
 }
 
+// Shared direct-pay affordability pre-flight. Under Vault the CONTRACT refused an underfunded action before
+// anything was spent; direct pay has no such gate — the wallet signs whatever it is handed, and
+// storeOutList stamps SendIgnoreErrors (platho-wallet.mjs `sendMode | 2`), so an action the wallet cannot
+// fund is SKIPPED SILENTLY: the transaction still commits, seqno still advances, sendBoc still returns 200.
+// Nothing throws. That is why the check has to happen HERE, before signing.
+//
+// The two rules are deliberately asymmetric:
+//  - ATH is FAIL-CLOSED. loadConnectedAthWalletBalance already maps "jetton wallet not deployed" to 0n, so a
+//    thrown error means the balance is genuinely unknown — and publishing bytes for a payment that cannot
+//    settle leaves paid-for garbage on chain (the avatar case: bytes land, the 100 ATH leg bounces, the
+//    pointer is never written, and nothing on chain will ever fix it).
+//  - GRAM is FAIL-OPEN. That balance is a plain account read that flaps; blocking a funded wallet on a flaky
+//    read is worse than letting the send itself be the authority. Same rule the ATH flush already uses.
+async function assertConnectedAthAtLeast(requiredAtomic, action) {
+  const required = nonNegativeBigInt(requiredAtomic);
+  if (required <= 0n) return;
+  const balance = await loadConnectedAthWalletBalance();
+  if (balance < required) {
+    const error = new Error(`Not enough ATH to ${action}: need ${formatAthAtomic(required)} ATH, have ${formatAthAtomic(balance)} ATH`);
+    error.code = 'PLATHO_ATH_REQUIRED';
+    throw error;
+  }
+}
+
+async function assertWalletGramAtLeast(requiredNanotons, action) {
+  const required = nonNegativeBigInt(requiredNanotons);
+  if (required <= 0n) return;
+  const balance = await loadConnectedTonWalletBalance().catch(() => null);
+  if (balance === null) return;   // fail-open: unreadable balance must not block a funded wallet
+  if (nonNegativeBigInt(balance) < required) {
+    const error = new Error(`Wallet needs ~${formatTonNanotons(required)} GRAM to ${action}`);
+    error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
+    throw error;
+  }
+}
+
 async function loadConnectedAthWalletBalance() {
   const athWalletAddress = await loadConnectedAthWalletAddress();
   const provider = createAthWalletTonRpcProvider({ athWalletAddress });
@@ -23570,7 +23611,7 @@ async function submitAthDueFlush() {
   // sending into the void. Fail-open on an unreadable balance (null): a flaky read must not block a funded
   // wallet — the send itself remains the authority.
   const requiredNanotons = BigInt(messages.length) * REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS
-    + ATH_FLUSH_WALLET_FEE_HEADROOM_NANOTONS;
+    + WALLET_FEE_HEADROOM_NANOTONS;
   const walletBalanceNanotons = await loadConnectedTonWalletBalance().catch(() => null);
   if (walletBalanceNanotons !== null && nonNegativeBigInt(walletBalanceNanotons) < requiredNanotons) {
     const error = new Error(`Wallet needs ~${formatTonNanotons(requiredNanotons)} GRAM to flush`);
@@ -23627,17 +23668,33 @@ async function submitProfileAvatarDirect(avatar) {
   const avatarHash = await sha256Hex(avatar.bytes);
   setProfileAvatarPending(true);
   setProfileAvatarStatus(t('avatar.checkingCurrent'));
-  const currentPointer = await readCurrentProfileAvatarPointerFromChain(owner, { required: false }).catch(() => null);
+  // FAIL-CLOSED idempotence. The pre-pay read is the ONLY thing standing between a re-pick of the same image
+  // and a second 100 ATH payment, so "the RPC flapped" must not be silently equal to "no avatar on chain".
+  // readCurrentProfileAvatarPointerResultFromChain reports ok:false for a read failure and ok:true/pointer:null
+  // for a genuine absence — the old `.catch(() => null)` collapsed both into "go ahead and pay".
+  const currentRead = await readCurrentProfileAvatarPointerResultFromChain(owner, { required: false });
+  if (!currentRead.ok) {
+    const error = new Error('Cannot verify the current avatar right now — try again');
+    error.code = 'PLATHO_AVATAR_PRECHECK_UNREADABLE';
+    error.cause = currentRead.error;
+    throw error;
+  }
+  const currentPointer = currentRead.pointer;
   if (currentPointer?.avatarHash?.toLowerCase?.() === normalizeAvatarHashHex(avatarHash).toLowerCase()) {
     await writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
-    setProfileAvatarStatus('avatar active', '');
+    setProfileAvatarStatus(t('avatar.active'), '');
     return { status: 'active', registryPointer: currentPointer };
   }
   const parts = imagePartsForSend(avatar, 'profile avatar');
   if (parts.length <= 0) throw new Error('Avatar image is empty');
   if (parts.length > 16) throw new Error('Avatar must fit 16 public capsules');
-  const streamId = randomBytes(16);
   const createdAtSec = Math.floor(Date.now() / 1000);
+  // DETERMINISTIC streamId: a retry of the SAME image in the SAME era rebuilds byte-identical parts, so the
+  // reader (which groups by streamId and authenticates the assembled bytes against the paid pointer) merges
+  // them by partIndex instead of accumulating a second orphan stream in the shard. The era is part of the
+  // preimage on purpose: after the avatar retention window a re-upload of the same image MUST produce a
+  // different pointer, otherwise KeyShard gate 22205 (identical pointer rejected) would make it unrecoverable.
+  const streamId = await deriveProfileAvatarStreamId(owner, avatarHash, publicEraOf(3, createdAtSec));
   const payloads = [];
   for (let index = 0; index < parts.length; index += 1) {
     payloads.push(await createPublicPostPayloadV2({
@@ -23669,13 +23726,98 @@ async function submitProfileAvatarDirect(avatar) {
     media_format: BigInt(PUBLIC_BODY_MEDIA_FORMATS.WEBP),
   }, { athWalletAddress, valueNanotons: PROFILE_AVATAR_DIRECT_REQUEST_VALUE });
 
+  // AFFORDABILITY, before anything is signed. Order matters: ATH first (fail-closed, and the expensive leg),
+  // then GRAM (fail-open). Without these the wallet happily signs a transfer whose ATH leg cannot settle —
+  // SendIgnoreErrors drops that leg silently, the image bytes still land and are still paid for, and the
+  // pointer is never written. See assertConnectedAthAtLeast for why the two rules differ.
+  await assertConnectedAthAtLeast(PROFILE_AVATAR_PRICE_ATH, 'set an avatar');
+  await assertWalletGramAtLeast(
+    avatarValue * BigInt(shardParts.length) + PROFILE_AVATAR_DIRECT_REQUEST_VALUE + WALLET_FEE_HEADROOM_NANOTONS,
+    'set an avatar',
+  );
+
   setProfileAvatarStatus(t('avatar.publishing'));
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
-  const result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, shardParts, { extraMessages: [athRequest] });
+  let result = null;
+  try {
+    result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, shardParts, { extraMessages: [athRequest] });
+  } catch (error) {
+    // A CLEAR pre-broadcast failure spent nothing — surface it. An AMBIGUOUS one (platho-wallet attaches
+    // error.builtBoc when the external may already have landed) must NOT be reported as a failure: re-picking
+    // the image after a false "failed" is what pays a second 100 ATH. The chain is the authority, so fall
+    // through to the confirm loop below and let the pointer decide.
+    if (!error?.builtBoc) throw error;
+    setProfileAvatarStatus(t('avatar.broadcastUncertainConfirming'));
+    result = { ambiguousBroadcast: true, builtSeqno: error.builtSeqno ?? null };
+  }
   await writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
-  setProfileAvatarStatus('avatar submitted', '');
   globalThis.plathoLastProfileAvatarDirect = { avatarHash, streamId: bytesToHex(streamId), partCount: parts.length, result };
+  // CONFIRM the paid pointer write. A broadcast is not an outcome: the 100 ATH ride a two-phase
+  // ProfileRegistry -> KeyShard write that can bounce (and refund) without the client noticing. The button
+  // stays locked while this runs — an unlocked button on an unconfirmed avatar is exactly what makes an
+  // impatient user pay twice.
+  const registryPointer = await confirmProfileAvatarPointer(owner, avatarHash);
+  if (registryPointer) {
+    setProfileAvatarStatus(t('avatar.active'), '');
+    return { status: 'active', result, avatarHash, registryPointer };
+  }
+  // Truthful terminal: the bytes are published and paid, but the pointer is not visible yet. Red + retryable,
+  // never a green "submitted" that the user reads as done.
+  setProfileAvatarStatus(t('avatar.notActiveYet'), 'error');
   return { status: 'submitted', result, avatarHash };
+}
+
+// streamId = first 16 bytes of sha256("PLATHO-AVATAR-STREAM-V1" ‖ owner ‖ avatarHash ‖ era). Domain-separated so
+// it can never collide with another derivation, and 16 bytes because the pointer field is a uint128. It is NOT
+// a secret: the same image published by the same wallet is meant to be recognisable as the same stream — that
+// is what lets a retry merge with the parts already on the shard instead of orphaning them. Deliberately NOT
+// generalised to posts/comments: there, re-posting identical text must stay a separate entry.
+async function deriveProfileAvatarStreamId(ownerWallet, avatarHash, era) {
+  const owner = requireBasechainAddress(ownerWallet, 'Avatar owner');
+  const hashBytes = hexToBytes(normalizeAvatarHashHex(avatarHash).replace(/^0x/i, ''));
+  const ownerBytes = new TextEncoder().encode(owner);
+  const domain = new TextEncoder().encode('PLATHO-AVATAR-STREAM-V1');
+  const eraBytes = new Uint8Array(4);
+  new DataView(eraBytes.buffer).setUint32(0, Number(era) >>> 0, false);
+  const preimage = new Uint8Array(domain.length + ownerBytes.length + hashBytes.length + eraBytes.length);
+  preimage.set(domain, 0);
+  preimage.set(ownerBytes, domain.length);
+  preimage.set(hashBytes, domain.length + ownerBytes.length);
+  preimage.set(eraBytes, domain.length + ownerBytes.length + hashBytes.length);
+  const digest = await sha256Hex(preimage);
+  return hexToBytes(digest.replace(/^0x/i, '').slice(0, 32));
+}
+
+// The paid pointer lands via ProfileRegistry -> KeyShard (two-phase, ack/bounce), so it appears some blocks
+// AFTER the wallet transfer. Poll the owner's KeyShard until it carries this avatarHash. Reads go through
+// enqueueAvatarChainRead: the avatar lane is serial by construction (two concurrent chain reads are the
+// documented iOS run-loop freeze), and the ladder is coarse enough that a 2-minute wait costs ~15 reads.
+const PROFILE_AVATAR_POINTER_CONFIRM_DELAYS_MS = [3_000, 3_000, 5_000, 5_000, 8_000, 8_000, 12_000, 12_000, 15_000];
+const PROFILE_AVATAR_POINTER_CONFIRM_DEADLINE_MS = 120 * 1000;
+
+async function confirmProfileAvatarPointer(owner, avatarHash) {
+  const expected = normalizeAvatarHashHex(avatarHash).toLowerCase();
+  const startedAt = Date.now();
+  setProfileAvatarStatus(t('avatar.confirmingRegistry'));
+  for (let attempt = 0; Date.now() - startedAt < PROFILE_AVATAR_POINTER_CONFIRM_DEADLINE_MS; attempt += 1) {
+    const delayMs = PROFILE_AVATAR_POINTER_CONFIRM_DELAYS_MS[
+      Math.min(attempt, PROFILE_AVATAR_POINTER_CONFIRM_DELAYS_MS.length - 1)
+    ];
+    await delay(delayMs);
+    const read = await enqueueAvatarChainRead(() => readCurrentProfileAvatarPointerResultFromChain(owner, { required: false }));
+    if (!read.ok) continue;   // transient read failure: keep waiting, the deadline is the bound
+    if (read.pointer?.avatarHash?.toLowerCase?.() !== expected) continue;
+    // Paint the new avatar immediately from the sha256-verified media cache written just above, so the tile
+    // stops showing the previous image the moment the pointer is real (the profile pane only re-reads on a
+    // tab change, and the Set-avatar button lives ON that pane — there is no tab change to ride).
+    const imageUrl = await readProfileAvatarMediaCache(read.pointer.avatarHash).catch(() => null);
+    if (imageUrl) {
+      setAvatarNode(profileAvatar, 'P', imageUrl);
+      setOwnPublicFeedAvatar(owner, imageUrl);
+    }
+    return read.pointer;
+  }
+  return null;
 }
 
 // clean-17 direct-pay: the avatar rides ONE wallet transfer (AVATAR PublicShard parts + the 100 ATH request that
@@ -26798,6 +26940,12 @@ async function attemptConvMessagePublishDirect(context) {
     parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE });
   }
 
+  // Affordability before signing. This matters MORE here than on the public lane: the wallet stamps
+  // SendIgnoreErrors on every action, so an underfunded multi-part message loses its tail SILENTLY — and a
+  // conversation part carries a CONSUMED seq (nextOutgoingSeq already advanced), so the dropped tail cannot be
+  // re-sent under the same seq. Fail-open on an unreadable balance; the send stays the authority.
+  await assertWalletGramAtLeast(CONV_PUBLISH_VALUE * BigInt(parts.length) + WALLET_FEE_HEADROOM_NANOTONS, 'send');
+
   let result;
   try {
     result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
@@ -27476,6 +27624,12 @@ async function submitPublicPostDirect(draft = null) {
   }));
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
 
+  // Affordability before signing: the wallet stamps SendIgnoreErrors on every action (platho-wallet
+  // `sendMode | 2`), so an underfunded MULTIPART post does not fail — the fundable prefix lands and the rest
+  // is dropped silently, which the reader then discards as an incomplete stream (assemblePublicParts). The
+  // user would see "public published" for a post that does not exist. Fail-open on an unreadable balance.
+  await assertWalletGramAtLeast(value * BigInt(parts.length) + WALLET_FEE_HEADROOM_NANOTONS, 'publish');
+
   let result;
   try {
     result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, parts);
@@ -27484,7 +27638,13 @@ async function submitPublicPostDirect(draft = null) {
     setPublicStatus('public publish failed');
     throw error;
   }
-  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: null });
+  // Keep a TRUTHFY publishStatus: it is what marks the record pending (isPendingPublicFeedItem), and a pending
+  // record is the only local copy the sync merge carries over. Under Vault, publishStatus:null meant CHAIN
+  // CONFIRMED and was set together with entryId; setting it here on a mere broadcast made the record neither
+  // pending nor chain-anchored (publicFeedPostHasChainAnchor), so the next background sync silently dropped
+  // the just-published post from the feed. The pending copy retires by itself: the merge drops it once the
+  // chain twin with the same bodyHash appears.
+  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'public published, confirming' });
   setPublicStatus('public published');
   globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, blocks, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result, direct: true };
   return result;
@@ -27567,6 +27727,10 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
   }));
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
 
+  // Same two rules as the post path: pre-check the wallet (SendIgnoreErrors drops unfundable actions silently)
+  // and keep the record pending after broadcast until the chain twin appears.
+  await assertWalletGramAtLeast(value * BigInt(parts.length) + WALLET_FEE_HEADROOM_NANOTONS, 'comment');
+
   let result;
   try {
     result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, parts);
@@ -27575,7 +27739,7 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
     setPublicStatus('comment failed');
     throw error;
   }
-  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: null });
+  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'comment published, confirming' });
   setPublicStatus('comment published');
   return result;
 }
