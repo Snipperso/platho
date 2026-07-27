@@ -1024,7 +1024,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/updateMessageInEncryptedHistory/);
     expect(app).toMatch(/isPublishPriceChangeCancelled/);
     expect(app).toMatch(/publish cancelled/);
-    expect(app).toMatch(/not sent: cancelled/);
     expect(app).toMatch(/assertVaultHasPrivatePublishHold/);
     expect(app).toMatch(/Not enough Vault GRAM/);
     expect(app).not.toMatch(/Checking Vault balance/);
@@ -1609,8 +1608,9 @@ describe('PWA runtime config guard', () => {
     // attemptPrivateComposerMessagePublish no longer carries the Vault capsule-reuse/publishState body, so the
     // former attemptSource assertions (capsule reuse, createCapsulePublishState) were dropped. The orphaned Vault
     // retry machinery pinned above stays until its follow-up removal batch.
-    expect(settleSource).toMatch(/publishStateHasRetryableSendParts\(message\.publishState\) && isRecoverablePrivateSendError\(error\.cause \?\? error\)/);
-    expect(settleSource).toMatch(/schedulePrivateSendRetry\(context, error\.cause \?\? error\)/);
+    // The PARTIAL-publish fan-out (a Vault publishState with some parts landed) is gone with the publishState
+    // itself; a direct send either broadcasts whole or throws, so a recoverable error simply re-schedules.
+    expect(settleSource).toMatch(/if \(isRecoverablePrivateSendError\(error\)\) \{[\s\S]*schedulePrivateSendRetry\(context, error\);/);
   });
 
   it('PWA-SEND-02D: reload/focus resumes pending private send retries, not only confirmation polling', () => {
@@ -1750,7 +1750,6 @@ describe('PWA runtime config guard', () => {
     expect(manualSource).toMatch(/thread\.messages = \(thread\.messages \?\? \[\]\)\.filter/);
     expect(scheduleSource).toMatch(/markPrivateMessageManualRecovery\(context, error, privateSendRetryExhaustedStatusText\(error\)\)/);
     expect(scheduleSource).toMatch(/clearPrivateMessageManualRecovery\(message\)/);
-    expect(settleSource).toMatch(/markPrivateMessageManualRecovery\(context, error, 'not sent: cancelled'\)/);
     expect(settleSource).toMatch(/markPrivateMessageManualRecovery\(context, error, privateSendBlockedStatusText\(error\)\)/);
     expect(css).toMatch(/\.message-actions \{[\s\S]*display: flex;/);
     expect(css).toMatch(/\.message\.out \.message-actions \{[\s\S]*justify-self: end;/);
@@ -1774,9 +1773,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/PRIVATE_SEND_RPC_RETRY_MAX_ATTEMPTS = 90/);
     expect(retrySource).toMatch(/attempt >= privateSendRetryMaxAttempts\(error, message\)/);
     expect(app).toMatch(/checking RPC, retrying/);
-    expect(settleSource).toMatch(/isRecoverablePrivateSendError\(error\) && privateMessageHasPublishAttempt\(message\)/);
-    expect(settleSource).toMatch(/schedulePrivatePublishConfirmationRetry\(context, error\)/);
-    expect(settleSource).toMatch(/cancelled \|\| recoverable \|\| partial \|\| privateMessageHasPublishAttempt\(message\)/);
+    // The composer status now branches on ONE question — is the error recoverable — because the other three
+    // (cancelled price dialog, partial publish, prior publish attempt) were publishState-era outcomes.
+    expect(settleSource).toMatch(/if \(isRecoverablePrivateSendError\(error\)\) \{[\s\S]*refreshComposerCostStatus\(\);/);
     expect(settleSource).toMatch(/refreshComposerCostStatus\(\)/);
     expect(settleSource).not.toMatch(/recoverable \? privateSendRetryMeta\(error\)/);
   });
