@@ -7,6 +7,7 @@ import {
   exportSignedPublicKeyBundle,
   openPrivateCapsuleChainEntry,
   privateCapsuleFromChainEntry,
+  PLATHO_COMPACT_IDENTITY_BYTES,
   PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES,
   PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
   PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES,
@@ -12548,8 +12549,18 @@ function normalizePrivateFileAttachments(attachments = privateFileAttachments) {
   return attachments.filter((file) => file?.bytes?.length);
 }
 
+// Everything the sealed plaintext carries BESIDES the user's bytes, so the splitter can plan a part that really fits
+// ONE payload block.
+//
+// PLATHO_COMPACT_IDENTITY_BYTES is here because clean-16 PH0C moved the sender identity (sign pubkey + profile
+// pointer) OUT of the public header0 and INTO the encrypted body — a privacy win that also spends 68 bytes of every
+// part's budget. Omitting it was invisible while the sender wallet metadata (69 B) was present, because that made
+// the budget conservative by accident; in ANONYMOUS mode those 69 bytes go away and the omission surfaced.
+// MEASURED: one payload block holds 892 bytes of plaintext, and anonymous mode was budgeting 923 — a part planned
+// as one block sealed into two, so the body grew by 1024 bytes that the cost estimate never counted.
 function privateCompactPayloadOverhead(options = {}) {
-  return PLATHO_COMPACT_SENDER_RECOVERY_BYTES
+  return PLATHO_COMPACT_IDENTITY_BYTES
+    + PLATHO_COMPACT_SENDER_RECOVERY_BYTES
     + PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES
     + (options.includeSenderWalletMetadata === false ? 0 : PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES)
     + privateSenderUsernameMetadataBytes(options);

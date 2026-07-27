@@ -5,6 +5,7 @@ import {
   PLATHO_BINARY_HEADER0_BYTES,
   PLATHO_BINARY_HEADER1_BYTES,
   PLATHO_COMPACT_BODY_LAYOUT,
+  PLATHO_COMPACT_IDENTITY_BYTES,
   PLATHO_COMPACT_IMAGE_FORMATS,
   PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES,
   PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES,
@@ -69,7 +70,10 @@ describe('Platho compact byte layout v1', () => {
     const hybrid = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
     const hybrid32 = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1, { sizeClass: 32 });
 
-    expect(PLATHO_BINARY_HEADER0_BYTES).toBe(140);
+    // 140 -> 74: clean-16 PH0C moved the sender identity (ed25519 sign pubkey + profile pointer, 68 B) OUT of the
+    // PUBLIC header0 and into the ENCRYPTED body. The header no longer tells an observer who sent a capsule or which
+    // avatar they wear — and the 68 bytes are now spent inside every part's payload budget instead.
+    expect(PLATHO_BINARY_HEADER0_BYTES).toBe(74);
     expect(PLATHO_BINARY_HEADER1_BYTES).toBe(30);
     expect(hybrid).toMatchObject({
       sizeClass: 1,
@@ -86,8 +90,9 @@ describe('Platho compact byte layout v1', () => {
       maxUsefulPayloadBytes: 1024,
       maxTextBytes: 1024,
       maxImageBytes: 1024,
-      maxPaymentBytes: 82,
     });
+    // Payment checks are retired (they were not anonymous), so the capacity model no longer quotes a payment budget.
+    expect(hybrid).not.toHaveProperty('maxPaymentBytes');
     expect(PLATHO_COMPACT_SENDER_RECOVERY_BYTES).toBe(64);
     expect(PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES).toBe(37);
     expect(hybrid32).toMatchObject({
@@ -114,12 +119,32 @@ describe('Platho compact byte layout v1', () => {
     expect(decodeCompactPayload(tiny)).toMatchObject({ type: 'text', text: 'Привет' });
   });
 
+  // The capacity model quotes maxTextBytes = 1024, but that is the PAYLOAD BLOCK size, not the text budget: the
+  // sealed plaintext also carries the identity block (68) and the payload prefix (32). MEASURED: 892 bytes of text
+  // is the largest that still seals into ONE block; 893 spills into a second and the body grows by 1024. This is the
+  // number the composer's per-part overhead has to respect — it under-counted it in anonymous mode until the
+  // identity block was added to privateCompactPayloadOverhead.
+  const ONE_BLOCK_TEXT_BYTES = 892;
+
+  it('COMPACT-BOUNDARY-01: 892 bytes of text seal into one payload block, 893 into two', async () => {
+    const one = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, ONE_BLOCK_TEXT_BYTES);
+    const two = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, ONE_BLOCK_TEXT_BYTES + 1);
+    expect(one.capsule.body.byteLength).toBe(2228);
+    expect(one.capsule.header0.sizeClass).toBe(1);
+    expect(two.capsule.body.byteLength).toBe(3252);
+    expect(two.capsule.header0.sizeClass).toBe(2);
+    // The composer must never plan a part bigger than what one block holds — in EITHER sender mode.
+    const named = 1024 - (PLATHO_COMPACT_IDENTITY_BYTES + PLATHO_COMPACT_SENDER_RECOVERY_BYTES
+      + PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES + PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES);
+    const anonymous = 1024 - (PLATHO_COMPACT_IDENTITY_BYTES + PLATHO_COMPACT_SENDER_RECOVERY_BYTES
+      + PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES);
+    expect(named).toBeLessThanOrEqual(ONE_BLOCK_TEXT_BYTES);
+    expect(anonymous, 'anonymous mode drops the sender wallet metadata — the budget must still fit one block')
+      .toBeLessThanOrEqual(ONE_BLOCK_TEXT_BYTES);
+  });
+
   it('COMPACT-03: roundtrips max-size postquantum text inside the on-chain body cap', async () => {
-    const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
-    const { capsule, opened, text } = await compactRoundtrip(
-      CRYPTO_SUITES.HYBRID_V1,
-      capacity.maxTextBytes - PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
-    );
+    const { capsule, opened, text } = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, ONE_BLOCK_TEXT_BYTES);
 
     expect(capsule.body.layout).toBe(PLATHO_COMPACT_BODY_LAYOUT);
     expect(capsule.body.envelope).toBeUndefined();
@@ -128,8 +153,9 @@ describe('Platho compact byte layout v1', () => {
     expect(capsule.body.chunks).toBeUndefined();
     expect(capsule.publish.body_cell.layout).toBe(PLATHO_ONCHAIN_CELL_LAYOUT);
     expect(capsule.publish.header_0_cell.bytes).toBe(PLATHO_BINARY_HEADER0_BYTES);
-    expect(capsule.header0.profileVersion).toBe(0);
-    expect(capsule.header0.avatarHash).toBe(`0x${'00'.repeat(32)}`);
+    // The profile pointer is NOT in header0 any more (PH0C moved it into the encrypted body) — pinned in COMPACT-04B.
+    expect(capsule.header0.profileVersion).toBeUndefined();
+    expect(capsule.header0.avatarHash).toBeUndefined();
     expect(capsule.publish.header_1_cell.bytes).toBe(PLATHO_BINARY_HEADER1_BYTES);
     expect(capsule.publish.body_cell.bytes).toBe(capsule.body.byteLength);
     expect(bocHashHex(capsule.publish.body_cell.boc)).toBe(capsule.publish.body_hash);
@@ -137,11 +163,7 @@ describe('Platho compact byte layout v1', () => {
   });
 
   it('COMPACT-04: roundtrips max-size postquantum text inside the same useful cap', async () => {
-    const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
-    const { capsule, opened, text } = await compactRoundtrip(
-      CRYPTO_SUITES.HYBRID_V1,
-      capacity.maxTextBytes - PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
-    );
+    const { capsule, opened, text } = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, ONE_BLOCK_TEXT_BYTES);
 
     expect(capsule.body.layout).toBe(PLATHO_COMPACT_BODY_LAYOUT);
     expect(capsule.body.envelope).toBeUndefined();
@@ -157,9 +179,8 @@ describe('Platho compact byte layout v1', () => {
   });
 
   it('COMPACT-04A: sender recovery reserves payload bytes without changing exact body size', async () => {
-    const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
-    const oneK = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, capacity.maxTextBytes - PLATHO_COMPACT_SENDER_RECOVERY_BYTES);
-    const twoK = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, capacity.maxTextBytes);
+    const oneK = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, ONE_BLOCK_TEXT_BYTES);
+    const twoK = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, ONE_BLOCK_TEXT_BYTES + 1);
 
     expect(oneK.capsule.header0.sizeClass).toBe(1);
     expect(oneK.capsule.body.byteLength).toBe(2228);
@@ -167,7 +188,7 @@ describe('Platho compact byte layout v1', () => {
     expect(twoK.capsule.body.byteLength).toBe(3252);
   });
 
-  it('COMPACT-04B: private header0 carries signed wallet avatar pointer', async () => {
+  it('COMPACT-04B: the avatar pointer rides the ENCRYPTED identity block, never the public header0', async () => {
     const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
     const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
     const avatarHash = `0x${'51'.repeat(32)}`;
@@ -181,8 +202,13 @@ describe('Platho compact byte layout v1', () => {
     const verified = await verifyEncryptedPrivateCapsule(capsule, { now: NOW + 1 });
 
     expect(capsule.publish.header_0_cell.bytes).toBe(PLATHO_BINARY_HEADER0_BYTES);
-    expect(verified.capsule.header0.profileVersion).toBe(9);
-    expect(verified.capsule.header0.avatarHash).toBe(avatarHash);
+    // PH0C: the pointer is NOT in the public header — an observer of the chain learns neither the sender's profile
+    // version nor their avatar. It travels inside the encrypted body and is readable only by the recipient.
+    expect(verified.capsule.header0.profileVersion).toBeUndefined();
+    expect(verified.capsule.header0.avatarHash).toBeUndefined();
+    const opened = await openEncryptedPrivateCapsule(capsule, bob.identity.encryptionKeyPair, { now: NOW + 1 });
+    expect(opened.profileVersion).toBe(9);
+    expect(opened.avatarHash).toBe(avatarHash);
   });
 
   it('COMPACT-04C: encrypted compact payload can carry sender wallet metadata without changing header0', async () => {
