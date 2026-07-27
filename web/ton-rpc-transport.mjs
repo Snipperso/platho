@@ -54,39 +54,15 @@ const TON_RPC_CRITICAL_METHODS = Object.freeze([
 const TONCENTER_RUN_GET_METHOD_CACHE_TTLS_MS = Object.freeze({
   get_global: 10_000,
   get_state: 10_000,
-  get_user: 10_000,
-  // Receipt-ring confirmation polling is on the hot publish path; a stale read
-  // can re-confirm a slot the user just learned about, so keep the TTL short.
-  get_user_receipts: 5_000,
   get_wallet_data: 10_000,
-  get_key_record: 300_000,
-  get_ath_withdrawal_id: 120_000,
-  get_pending_ath_withdrawal_for: 10_000,
-  get_canonical_publish_charge: 60_000,
-  get_private_entry: 300_000,
-  get_private_recipient_index: 300_000,
-  get_private_sender_index: 300_000,
-  get_public_entry: 300_000,
   get_jetton_data: 300_000,
   get_wallet_address: 300_000,
   get_username_price: 300_000,
-  get_name_record: 120_000,
-  get_avatar: 120_000,
 });
 const TONCENTER_RUN_GET_METHOD_PRIORITIES = Object.freeze({
-  get_private_entry: 'messages',
-  get_private_recipient_index: 'messages',
-  get_private_sender_index: 'messages',
-  get_public_entry: 'messages',
   get_global: 'messages',
   get_state: 'messages',
-  get_user: 'wallet',
-  get_user_receipts: 'wallet',
   get_wallet_data: 'wallet',
-  get_pending_ath_withdrawal_for: 'wallet',
-  get_key_record: 'profile',
-  get_name_record: 'profile',
-  get_avatar: 'profile',
 });
 const TONCENTER_REQUEST_PRIORITY_WEIGHTS = Object.freeze({
   critical: 0,
