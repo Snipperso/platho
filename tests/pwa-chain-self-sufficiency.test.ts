@@ -53,7 +53,7 @@ describe('PWA on-chain self-sufficiency', () => {
     expect(app).toMatch(/resolvePeerReplyBundle\(\{ provider, peerWallet/);
     expect(app).toMatch(/resolveRecipientBundleByWallet\(\{ provider, wallet/);
     expect(app).toMatch(/provider\.getKeyRecord\(currentKeyId/);
-    expect(app).toMatch(/readCurrentProfileAvatarPointerFromChain/);
+    expect(app).toMatch(/readCurrentProfileAvatarPointerResultFromChain/);
 
     for (const method of ['get_global', 'get_user', 'get_key_record']) {
       expect(vaultProvider).toMatch(new RegExp(`method:\\s*'${method}'`));

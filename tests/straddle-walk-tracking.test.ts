@@ -1,154 +1,64 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
+import { hasIncompletePublicStream } from '../web/public-shard-ton-rpc-provider.mjs';
 
-// Ф5 — BEHAVIORAL coverage for the multipart-straddle detection that keeps a feed/index walk from silently
-// dropping the tail of a multipart message.
+// Ф5 — BEHAVIORAL coverage for the multipart-straddle detection that keeps a shard read from silently dropping
+// the tail of a multipart post.
 //
-// The audit flagged that the v649/v650 straddle fix (a walk whose window cap lands in the MIDDLE of a k-part group
-// must keep extending until the group closes, and must NOT advance its catch-up cursor past an unclosed group) was
-// guarded ONLY by source-string greps: a refactor that keeps the grepped literals but inverts the "is this group
-// still incomplete?" test would drop the straddling message's tail parts on every heavy user whose chats/feeds
-// exceed one walk window — silent, permanent message/media loss — while all straddle greps stay green.
+// The audit's original point still stands and is the reason this file exists at all: a straddle fix guarded ONLY
+// by source-string greps can be inverted (keep the literals, flip the "is this group still incomplete?" test) and
+// every grep stays green while heavy users lose the tail of every message that crosses a read window.
 //
-// The load-bearing primitive is the incomplete-group predicate the walk loops on:
-//   PUBLIC  walkPublicChainIds: noteWalkedHeader(entry) + hasSplitPartStream()   (partStreams Map<streamId,…>)
-//   PRIVATE walkIndexedRole:    rolePartGroupsIncomplete(role)                    (privatePartGroups Map<key,…>)
-// Both are closures inside the async walk (not importable), so this test EXTRACTS their real source from web/app.js
-// and runs it with injected state. It exercises the SHIPPED detection logic — invert the "< partCount" comparison
-// (or drop the hasIndexedPart gate) in app.js and the relevant assertion below goes red, unlike a grep.
+// WHAT CHANGED (clean-17): the predicate no longer lives in a CapsuleHub index walk. The Hub walk is gone with
+// the whole shared-log model; the shard reader (web/public-shard-ton-rpc-provider readPosts) now anchors its
+// window at the shard's TAIL and extends one page backwards while a stream in the window is incomplete. The
+// load-bearing predicate is `hasIncompletePublicStream`, exported for exactly this test — no source extraction
+// needed any more, so the coverage got stronger, not weaker.
+//
+// The END-TO-END proof that the extension actually fires against a REAL PublicShard is
+// tests/public-lane-read-window.test.ts (PL-WINDOW-02): a 3-part post cut by the window boundary comes back whole.
+// This file covers the predicate's edges, which an e2e test cannot enumerate cheaply.
 
-const appJsPath = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'web', 'app.js');
-const source = readFileSync(appJsPath, 'utf8');
-
-// Extract a `const NAME = (args) => { ... }` closure from source with balanced-brace matching over the arrow body.
-function extractArrowConst(name: string): string {
-  const marker = `const ${name} =`;
-  const start = source.indexOf(marker);
-  if (start < 0) throw new Error(`app.js: const ${name} not found`);
-  const arrow = source.indexOf('=>', start);
-  if (arrow < 0) throw new Error(`app.js: const ${name} is not an arrow function`);
-  let i = source.indexOf('{', arrow);
-  if (i < 0) throw new Error(`app.js: const ${name} has no body brace`);
-  let depth = 0;
-  for (; i < source.length; i += 1) {
-    const ch = source[i];
-    if (ch === '{') depth += 1;
-    else if (ch === '}') {
-      depth -= 1;
-      if (depth === 0) return `${source.slice(start, i + 1)};`;
-    }
-  }
-  throw new Error(`app.js: const ${name} braces unbalanced`);
+/** A post as readPosts holds it: only the header matters here, and readPublicPartHeaderInfo parses it. */
+function post(streamIdByte: string, partIndex: number, partCount: number) {
+  // PPH2 header layout the parser walks: magic(4) 'PPH2' | version(1) | kind(1) | reserved(2) | streamId(16) |
+  // part_index(2) | part_count(2) ... — build the smallest header that parses.
+  const header = new Uint8Array(28);
+  header.set(new TextEncoder().encode('PPH2'), 0);
+  header[4] = 2;            // PUBLIC_HEADER_VERSION_V2
+  header[5] = 0;            // kind: post
+  header.fill(Number.parseInt(streamIdByte, 16), 8, 24);
+  header[24] = (partIndex >> 8) & 0xff;
+  header[25] = partIndex & 0xff;
+  header[26] = (partCount >> 8) & 0xff;
+  header[27] = partCount & 0xff;
+  return { header: { data: header, bitLength: header.length * 8, refs: [] } };
 }
 
-describe('PUBLIC feed walk — multipart straddle detection (hasSplitPartStream / noteWalkedHeader)', () => {
-  // Assemble the two real closures over an injected partStreams Map and a controllable header parser.
-  const factory = new Function(
-    'partStreams',
-    'readPublicPartHeaderInfo',
-    `${extractArrowConst('noteWalkedHeader')}
-     ${extractArrowConst('hasSplitPartStream')}
-     return { noteWalkedHeader, hasSplitPartStream };`,
-  );
-
-  function makeWalk() {
-    const partStreams = new Map();
-    // The real noteWalkedHeader calls readPublicPartHeaderInfo(entry.header_boc); the test puts the {streamId,
-    // partIndex, partCount} info object directly on header_boc, so the stub is identity.
-    const api = factory(partStreams, (x: any) => x ?? null);
-    return { partStreams, ...(api as { noteWalkedHeader: (e: any) => void; hasSplitPartStream: () => boolean }) };
-  }
-  const part = (streamId: number, partIndex: number, partCount: number) => ({ header_boc: { streamId, partIndex, partCount } });
-
+describe('PUBLIC shard read — multipart straddle detection (hasIncompletePublicStream)', () => {
   it('reports a split stream while a k-part group is missing parts, and clears once every part is seen', () => {
-    const w = makeWalk();
-    // A window that walked only parts 0 and 1 of a 3-part post straddles the boundary — MUST report incomplete.
-    w.noteWalkedHeader(part(42, 0, 3));
-    w.noteWalkedHeader(part(42, 1, 3));
-    expect(w.hasSplitPartStream()).toBe(true);
-    // The extension walk reaches part 2 — the group closes and the walk may stop extending.
-    w.noteWalkedHeader(part(42, 2, 3));
-    expect(w.hasSplitPartStream()).toBe(false);
+    expect(hasIncompletePublicStream([post('aa', 0, 3)])).toBe(true);
+    expect(hasIncompletePublicStream([post('aa', 0, 3), post('aa', 1, 3)])).toBe(true);
+    expect(hasIncompletePublicStream([post('aa', 0, 3), post('aa', 1, 3), post('aa', 2, 3)])).toBe(false);
   });
 
   it('ignores single-part posts (never forces a straddle extension for a normal post)', () => {
-    const w = makeWalk();
-    w.noteWalkedHeader(part(7, 0, 1));
-    expect(w.hasSplitPartStream()).toBe(false);
-    expect(w.partStreams.size).toBe(0); // partCount<=1 is not tracked at all
+    expect(hasIncompletePublicStream([post('bb', 0, 1), post('cc', 0, 1)])).toBe(false);
   });
 
   it('deduplicates a repeated partIndex — a re-seen part does not falsely close the group', () => {
-    const w = makeWalk();
-    w.noteWalkedHeader(part(9, 0, 3));
-    w.noteWalkedHeader(part(9, 0, 3)); // same part index twice
-    w.noteWalkedHeader(part(9, 1, 3));
-    // Two DISTINCT indices of three -> still incomplete (a Set-based seen count, not a raw counter).
-    expect(w.hasSplitPartStream()).toBe(true);
+    // Pages OVERLAP when the extension clamps to entry 0, so the same part can arrive twice. Counting raw
+    // arrivals instead of distinct indices would call a 2-of-3 group complete and drop the missing part.
+    expect(hasIncompletePublicStream([post('dd', 0, 3), post('dd', 0, 3), post('dd', 1, 3)])).toBe(true);
   });
 
   it('tracks several independent streams and reports incomplete if ANY one is open', () => {
-    const w = makeWalk();
-    w.noteWalkedHeader(part(1, 0, 2));
-    w.noteWalkedHeader(part(1, 1, 2)); // stream 1 complete
-    w.noteWalkedHeader(part(2, 0, 2)); // stream 2 still open
-    expect(w.hasSplitPartStream()).toBe(true);
-  });
-});
-
-describe('PRIVATE index walk — multipart straddle detection (rolePartGroupsIncomplete)', () => {
-  const factory = new Function(
-    'privatePartGroups',
-    'ownRuntimeWalletRaw',
-    `${extractArrowConst('rolePartGroupsIncomplete')}
-     return rolePartGroupsIncomplete;`,
-  );
-
-  function makeDetector(groups: Map<string, any>, ownRaw: string | null = null) {
-    return factory(groups, () => ownRaw) as (role: string) => boolean;
-  }
-  const group = (partIndices: number[], partCount: number, hasIndexedPart = true) => ({
-    partCount,
-    hasIndexedPart,
-    parts: partIndices.map((partIndex) => ({ opened: { payload: { partIndex } } })),
+    const complete = [post('ee', 0, 2), post('ee', 1, 2)];
+    const open = [post('ff', 1, 2)];
+    expect(hasIncompletePublicStream(complete)).toBe(false);
+    expect(hasIncompletePublicStream([...complete, ...open])).toBe(true);
   });
 
-  it('reports this role incomplete while its group is missing parts, and clears once all parts arrive', () => {
-    const groups = new Map<string, any>([['recipient:peerX:s1', group([0, 1], 3)]]);
-    const detect = makeDetector(groups);
-    expect(detect('recipient')).toBe(true);
-    groups.set('recipient:peerX:s1', group([0, 1, 2], 3));
-    expect(detect('recipient')).toBe(false);
-  });
-
-  it('only extends the walk of the role that owns the group (a sender-role group does not extend the recipient walk)', () => {
-    const groups = new Map<string, any>([['sender:peerX:s1', group([0], 2)]]);
-    const detect = makeDetector(groups);
-    expect(detect('recipient')).toBe(false); // wrong role -> not this walk's job
-    expect(detect('sender')).toBe(true);
-  });
-
-  it('a self (Saved-messages) group is closable from EITHER role walk (v652 self-group fix)', () => {
-    const own = 'ownwalletraw';
-    const groups = new Map<string, any>([[`sender:${own}:s1`, group([0], 2)]]);
-    const detect = makeDetector(groups, own);
-    // The group key is sender-role, but its peer identity is the own wallet -> either walk admits it.
-    expect(detect('recipient')).toBe(true);
-    expect(detect('sender')).toBe(true);
-  });
-
-  it('never triggers a straddle extension for a history-retry-only group (hasIndexedPart false)', () => {
-    const groups = new Map<string, any>([['recipient:peerX:s1', group([0], 3, false)]]);
-    const detect = makeDetector(groups);
-    // hasIndexedPart false: extending the index walk cannot close it, so it must NOT report incomplete.
-    expect(detect('recipient')).toBe(false);
-  });
-
-  it('deduplicates repeated part indices in a private group (Set-based unique count, not raw length)', () => {
-    const groups = new Map<string, any>([['recipient:peerX:s1', group([0, 0, 1], 3)]]);
-    const detect = makeDetector(groups);
-    expect(detect('recipient')).toBe(true); // 2 distinct of 3, despite 3 part entries
+  it('treats an unparseable header as single-part (a foreign body can never force an endless extension)', () => {
+    expect(hasIncompletePublicStream([{ header: null }, { header: { data: new Uint8Array(4), bitLength: 32, refs: [] } }])).toBe(false);
   });
 });
