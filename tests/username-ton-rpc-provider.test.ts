@@ -6,7 +6,7 @@ import {
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
 } from '../web/username-ton-rpc-provider.mjs';
-import { encodeTonAddressSliceBoc } from '../web/vault-ton-rpc-provider.mjs';
+import { encodeTonAddressSliceBoc } from '../web/ton-rpc-transport.mjs';
 
 const REGISTRY = `0:${'11'.repeat(32)}`;
 const OWNER = `0:${'22'.repeat(32)}`;

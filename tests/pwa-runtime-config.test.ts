@@ -2512,7 +2512,7 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-SEND-RELIABILITY-01: burst-send hardening — no false-fail, no dual-broadcast, no read storm', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    const vaultRpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    const vaultRpc = readFileSync('web/ton-rpc-transport.mjs', 'utf8');
 
     // #6: the keyword hard-fail guard only fires for definitive client-side <500
     // rejections, so a 5xx (possibly-delivered) broadcast is never marked rejected.
@@ -2546,7 +2546,7 @@ describe('PWA runtime config guard', () => {
     // transports, closing the direct toncenter /messages 429 leak.
     expect(vaultRpc).toMatch(/export function noteTonRpcReadTransportRateLimited\(transport, error\)/);
     // (The CapsuleHub half of this guard went with capsulehub-ton-rpc-provider.mjs; the parking mechanism itself
-    // lives in vault-ton-rpc-provider.mjs — the shared RPC pump every clean-17 reader goes through — and is pinned
+    // lives in ton-rpc-transport.mjs — the shared RPC pump every clean-17 reader goes through — and is pinned
     // by the assertion above.)
   });
 
@@ -3999,7 +3999,7 @@ describe('PWA runtime config guard', () => {
   // decode left on the confirm path to make fast.
 
   it('PWA-IOS-PUMP-YIELD-01: the shared RPC pump yields a macrotask before rejecting a backoff-skipped read (no microtask-starvation freeze)', () => {
-    const rpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    const rpc = readFileSync('web/ton-rpc-transport.mjs', 'utf8');
     // ROOT FIX for the iOS dead-freeze that moved between Vault/activation/send: drainToncenterRequestQueue is the one
     // shared pump every read flows through. During a 429 backoff it rejects every skipIfRateLimited read with NO
     // macrotask yield (the only `await delay(waitMs)` is skipped because waitMs<=0), so the microtask queue never
@@ -6094,7 +6094,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v876/);
+    expect(sw).toMatch(/platho-pwa-prototype-v877/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6120,7 +6120,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=62/);
+    expect(sw).toMatch(/\.\/ton-rpc-transport\.mjs\?v=63/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=44/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=42/);
     expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=40/);

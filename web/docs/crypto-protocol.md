@@ -355,7 +355,7 @@ After the wallet has registered keys on-chain, the client must fetch:
 
 If no provider is configured, Vault binding stays unavailable rather than accepting a local draft or UI placeholder. A production/static deployment can install a provider on `globalThis.plathoVaultChainProvider` that reads the deployed Vault through a TON API mirror or light-client compatible transport.
 
-The static runtime includes `web/vault-ton-rpc-provider.mjs` as the production-provider skeleton. It can wrap TON Center v3 compatible endpoints or a custom `globalThis.plathoTonRpcTransport` installed by the host bundle. The current PWA does not expose a built-in user RPC settings screen. The provider:
+The static runtime includes `web/ton-rpc-transport.mjs` as the production-provider skeleton. It can wrap TON Center v3 compatible endpoints or a custom `globalThis.plathoTonRpcTransport` installed by the host bundle. The current PWA does not expose a built-in user RPC settings screen. The provider:
 
 - encodes `get_user(owner)` owner addresses as `slice` BoC stack items;
 - calls `get_key_record(current_key_id)` with a numeric stack item;

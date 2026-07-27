@@ -4,7 +4,7 @@ import {
   createAthMasterTonRpcProvider,
   createAthWalletTonRpcProvider,
 } from '../web/ath-ton-rpc-provider.mjs';
-import { encodeTonAddressSliceBoc } from '../web/vault-ton-rpc-provider.mjs';
+import { encodeTonAddressSliceBoc } from '../web/ton-rpc-transport.mjs';
 
 const MASTER = `0:${'10'.repeat(32)}`;
 const OWNER = `0:${'20'.repeat(32)}`;

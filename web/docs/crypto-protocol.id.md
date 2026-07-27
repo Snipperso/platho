@@ -355,7 +355,7 @@ Setelah wallet mendaftarkan kunci on-chain, klien harus mengambil:
 
 Jika tidak ada penyedia yang dikonfigurasi, pengikatan Vault tetap tidak tersedia alih-alih menerima draf lokal atau placeholder UI. Deployment produksi/statis dapat memasang penyedia pada `globalThis.plathoVaultChainProvider` yang membaca Vault yang telah di-deploy melalui mirror TON API atau transport yang kompatibel dengan light-client.
 
-Runtime statis menyertakan `web/vault-ton-rpc-provider.mjs` sebagai kerangka penyedia-produksi. Ia dapat membungkus endpoint yang kompatibel dengan TON Center v3 atau `globalThis.plathoTonRpcTransport` kustom yang dipasang oleh bundel host. PWA saat ini tidak memaparkan layar pengaturan RPC pengguna bawaan. Penyedia tersebut:
+Runtime statis menyertakan `web/ton-rpc-transport.mjs` sebagai kerangka penyedia-produksi. Ia dapat membungkus endpoint yang kompatibel dengan TON Center v3 atau `globalThis.plathoTonRpcTransport` kustom yang dipasang oleh bundel host. PWA saat ini tidak memaparkan layar pengaturan RPC pengguna bawaan. Penyedia tersebut:
 
 - mengodekan alamat pemilik `get_user(owner)` sebagai item stack BoC `slice`;
 - memanggil `get_key_record(current_key_id)` dengan item stack numerik;

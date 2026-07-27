@@ -7,7 +7,7 @@ import {
   avatarRecordFromKeyShardView,
   deriveKeyShardRawAddress,
 } from '../web/key-shard-ton-rpc-provider.mjs';
-import { encodeTonAddressSliceBoc, decodeTonAddressSliceBoc } from '../web/vault-ton-rpc-provider.mjs';
+import { encodeTonAddressSliceBoc, decodeTonAddressSliceBoc } from '../web/ton-rpc-transport.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // KEY-SHARD RPC PROVIDER — the read side of the 2026-07-21 pointer move.

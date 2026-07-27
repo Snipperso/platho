@@ -355,7 +355,7 @@ Après que le portefeuille a enregistré des clés on-chain, le client doit réc
 
 Si aucun fournisseur n'est configuré, la liaison du Vault reste indisponible plutôt que d'accepter un brouillon local ou un emplacement réservé de l'interface. Un déploiement de production/statique peut installer un fournisseur sur `globalThis.plathoVaultChainProvider` qui lit le Vault déployé via un miroir d'API TON ou un transport compatible client léger.
 
-Le runtime statique inclut `web/vault-ton-rpc-provider.mjs` comme squelette de fournisseur de production. Il peut envelopper des points de terminaison compatibles TON Center v3 ou un `globalThis.plathoTonRpcTransport` personnalisé installé par le bundle hôte. La PWA actuelle n'expose pas d'écran de paramètres RPC utilisateur intégré. Le fournisseur :
+Le runtime statique inclut `web/ton-rpc-transport.mjs` comme squelette de fournisseur de production. Il peut envelopper des points de terminaison compatibles TON Center v3 ou un `globalThis.plathoTonRpcTransport` personnalisé installé par le bundle hôte. La PWA actuelle n'expose pas d'écran de paramètres RPC utilisateur intégré. Le fournisseur :
 
 - encode les adresses de propriétaire de `get_user(owner)` comme éléments de pile BoC `slice` ;
 - appelle `get_key_record(current_key_id)` avec un élément de pile numérique ;

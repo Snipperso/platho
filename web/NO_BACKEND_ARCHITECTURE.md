@@ -51,7 +51,7 @@ The clear IndexedDB record keeps only query metadata such as record id, thread i
 
 ## Vault chain reads
 
-Production key trust must be anchored to Vault contract state, not to a local UI claim. The static runtime includes `vault-ton-rpc-provider.mjs`, a backend-free provider skeleton for TON `runGetMethod` transports:
+Production key trust must be anchored to Vault contract state, not to a local UI claim. The static runtime includes `ton-rpc-transport.mjs`, a backend-free provider skeleton for TON `runGetMethod` transports:
 
 - `get_user(owner)` is called with the owner wallet encoded as a TON address slice BoC.
 - `get_key_record(current_key_id)` is called with the current key id returned by Vault.

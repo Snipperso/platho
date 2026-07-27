@@ -1,10 +1,10 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
 
 
-export class VaultTonRpcProviderError extends Error {
+export class TonRpcTransportError extends Error {
   constructor(message, options = {}) {
     super(message);
-    this.name = 'VaultTonRpcProviderError';
+    this.name = 'TonRpcTransportError';
     if (options.status !== undefined) this.status = options.status;
     if (options.code !== undefined) this.code = options.code;
     if (options.retryAfterMs !== undefined) this.retryAfterMs = options.retryAfterMs;
@@ -266,13 +266,13 @@ function retryAfterMs(response) {
 }
 
 function tonRpcTimeoutError(timeoutMs) {
-  return new VaultTonRpcProviderError(`TON RPC request timed out after ${timeoutMs} ms`, {
+  return new TonRpcTransportError(`TON RPC request timed out after ${timeoutMs} ms`, {
     code: 'TIMEOUT',
   });
 }
 
 function tonRpcQueueTimeoutError(timeoutMs) {
-  return new VaultTonRpcProviderError(`TON RPC queue wait timed out after ${timeoutMs} ms`, {
+  return new TonRpcTransportError(`TON RPC queue wait timed out after ${timeoutMs} ms`, {
     code: 'QUEUE_TIMEOUT',
   });
 }
@@ -704,7 +704,7 @@ async function scheduleToncenterRequest(key, request, options = {}) {
 }
 
 function toncenterBackoffError(retryAfterMs) {
-  return new VaultTonRpcProviderError('TON RPC rate limit backoff active', {
+  return new TonRpcTransportError('TON RPC rate limit backoff active', {
     status: 429,
     code: 'RATE_LIMITED',
     retryAfterMs,
@@ -717,7 +717,7 @@ function toncenterHttpError(label, response, fallbackBackoffMs = TONCENTER_RATE_
   // the higher retry loops; the old hardcode made them sleep a full minute per 429, so a keyless send idled
   // for ~10 min issuing almost no requests. A real Retry-After header still wins.
   const retryMs = response?.status === 429 ? retryAfterMs(response) ?? fallbackBackoffMs : undefined;
-  return new VaultTonRpcProviderError(`${label} HTTP ${response.status}`, {
+  return new TonRpcTransportError(`${label} HTTP ${response.status}`, {
     status: response.status,
     code: response.status === 429 ? 'RATE_LIMITED' : 'HTTP_ERROR',
     retryAfterMs: retryMs,
@@ -972,7 +972,7 @@ function stackItemType(item) {
 
 export const RJ_UNDERPRICED = 0x16;
 
-export function createTonCenterV3VaultTransport(options = {}) {
+export function createTonCenterV3Transport(options = {}) {
   const endpoint = assertString(options.endpoint, 'TON RPC endpoint');
   const messagesEndpoint = options.messagesEndpoint === false
     ? null
@@ -990,7 +990,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
     ?? globalThis.PLATHO_TON_SEND_BOC_ENDPOINT
     ?? null;
   const fetchImpl = options.fetch ?? globalThis.fetch;
-  if (typeof fetchImpl !== 'function') throw new VaultTonRpcProviderError('fetch is unavailable');
+  if (typeof fetchImpl !== 'function') throw new TonRpcTransportError('fetch is unavailable');
   // The per-user toncenter key is injected at runtime (no key ever ships in the bundle): a provider
   // marked useUserApiKey reads the key the app stored from local storage into globalThis. Captured at
   // build (the app re-resolves the transport when the user adds/changes a key); anonymous until then.
@@ -1070,7 +1070,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
           const json = await response.json();
           const exitCode = json.exit_code ?? json.exitCode ?? json.result?.exit_code ?? json.result?.exitCode ?? 0;
           if (Number(exitCode) !== 0) {
-            throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`, { exitCode: Number(exitCode) });
+            throw new TonRpcTransportError(`TON RPC get-method exit code ${exitCode}`, { exitCode: Number(exitCode) });
           }
           writeRunGetMethodCache(cacheKey, json, resolvedCacheTtlMs, runGetMethodCacheMaxEntries);
           return json;
@@ -1092,7 +1092,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
       } = input;
       const endpointForSend = sendBocEndpoint;
       if (!endpointForSend) {
-        throw new VaultTonRpcProviderError('TON sendBoc endpoint is not configured');
+        throw new TonRpcTransportError('TON sendBoc endpoint is not configured');
       }
       const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
       if (apiKey) headers['X-API-Key'] = apiKey;
@@ -1123,14 +1123,14 @@ export function createTonCenterV3VaultTransport(options = {}) {
       }
       const json = await response.json();
       const ok = json.ok ?? json.result?.ok ?? true;
-      if (ok === false) throw new VaultTonRpcProviderError('TON RPC sendBoc rejected message');
+      if (ok === false) throw new TonRpcTransportError('TON RPC sendBoc rejected message');
       clearToncenterRunGetMethodCache({ endpoint, apiKey, rateLimitKey: options.rateLimitKey });
       clearToncenterMessagesCache();
       return json;
     },
     async getAccountState(input, requestOptions = {}) {
       if (!accountEndpoint) {
-        throw new VaultTonRpcProviderError('TON account state endpoint is not configured');
+        throw new TonRpcTransportError('TON account state endpoint is not configured');
       }
       const address = typeof input === 'string' ? input : input?.address;
       const url = appendQueryParams(accountEndpoint, { address: assertString(address, 'TON account address') });
@@ -1167,7 +1167,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
         ?? state?.account?.balance
         ?? state?.result?.account?.balance;
       if (value === undefined || value === null) {
-        throw new VaultTonRpcProviderError('TON account state did not include a balance');
+        throw new TonRpcTransportError('TON account state did not include a balance');
       }
       return value;
     },
@@ -1352,7 +1352,7 @@ function normalizeTonRpcResultForCompare(result, method = null) {
 }
 
 function tonRpcDisagreementError(method, primaryKind, verifierKind) {
-  return new VaultTonRpcProviderError(`TON RPC disagreement for ${method}`, {
+  return new TonRpcTransportError(`TON RPC disagreement for ${method}`, {
     code: 'RPC_DISAGREEMENT',
     primaryKind,
     verifierKind,
@@ -1434,7 +1434,7 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
     ?? defaults.endpoint;
   if (!endpoint) return null;
   if (!['toncenter-v3', 'toncenter', 'platho-rpc', 'json-rpc-compatible'].includes(kind)) {
-    throw new VaultTonRpcProviderError(`Unsupported TON RPC provider kind: ${kind}`);
+    throw new TonRpcTransportError(`Unsupported TON RPC provider kind: ${kind}`);
   }
   // A no-key user-toncenter MUST use the keyless ~1 rps spacing, NOT the keyed 100ms (10 rps): anonymous
   // toncenter.com rate-limits at ~1 rps, so 100ms would 429-storm it into a perpetual "RPC busy" /
@@ -1447,7 +1447,7 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
   const effectiveRequestSpacingMs = userKeyMissing
     ? Math.max(Number(configuredSpacingMs ?? 0) || 0, TONCENTER_KEYLESS_REQUEST_SPACING_MS)
     : configuredSpacingMs;
-  const transport = createTonCenterV3VaultTransport({
+  const transport = createTonCenterV3Transport({
     endpoint,
     messagesEndpoint: provider?.messagesEndpoint ?? defaults.messagesEndpoint,
     sendBocEndpoint: provider?.sendBocEndpoint ?? defaults.sendBocEndpoint,
@@ -1563,7 +1563,7 @@ export function createFallbackTonRpcTransport(options = {}) {
         noteTonRpcTransportFailure(transport, error, transportDeadRetryMs);
       }
     }
-    if (!primaryTransport) throw lastError ?? new VaultTonRpcProviderError(`TON RPC ${methodName} transport is not configured`);
+    if (!primaryTransport) throw lastError ?? new TonRpcTransportError(`TON RPC ${methodName} transport is not configured`);
     const method = call?.method ?? methodName;
     const allowUnverifiedCriticalRead = requestOptions.allowUnverifiedCriticalRead === true
       || call?.allowUnverifiedCriticalRead === true;
@@ -1620,7 +1620,7 @@ export function createFallbackTonRpcTransport(options = {}) {
       // invariant. We fail closed ONLY when an eligible verifier WAS tried but could not confirm — a genuinely
       // inconclusive cross-read.
       if (!eligibleVerifierTried) return primaryResult;
-      throw new VaultTonRpcProviderError(`TON RPC verification unavailable for ${method}`, {
+      throw new TonRpcTransportError(`TON RPC verification unavailable for ${method}`, {
         code: 'RPC_VERIFICATION_UNAVAILABLE',
         cause: verifyError,
       });
@@ -1694,7 +1694,7 @@ export function createFallbackTonRpcTransport(options = {}) {
         if (!isRetryableTonRpcError(error) && !isTonRpcHardTransportError(error)) throw error;
       }
     }
-    throw lastError ?? new VaultTonRpcProviderError(`TON RPC ${methodName} transport is not configured`);
+    throw lastError ?? new TonRpcTransportError(`TON RPC ${methodName} transport is not configured`);
   }
 
   return {
