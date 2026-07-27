@@ -92,10 +92,10 @@ describe('PWA capsule part policy', () => {
 
   it('PWA-CAPSULE-PART-07: private composer text path cannot fall back to legacy 1 KiB splitting', () => {
     const appSource = readFileSync(join(process.cwd(), 'web', 'app.js'), 'utf8');
-    expect(appSource.match(/function privateTextCapsulePartsForSend\s*\(/g) ?? []).toHaveLength(1);
+    // (privateTextCapsulePartsForSend was the Vault composer's text splitter — the direct lane always sends a
+    // DOCUMENT, so the plain-text splitter has no caller left. The legacy 1 KiB fallback it guarded against is
+    // pinned as absent on the live path below.)
     expect(appSource).not.toMatch(/function privateTextPartsForSend\s*\(/);
-    expect(appSource).toMatch(/function privateTextCapsulePartsForSend\s*\([^)]*\)[\s\S]*return splitUtf8ToCapsuleParts\(text, MAX_CAPSULE_USEFUL_BYTES,\s*\{/);
-    expect(appSource).toMatch(/perPartOverheadBytes: privateCompactPayloadOverhead\(options\)/);
     // clean-17: the live private send is attemptConvMessagePublishDirect (the Vault composer createPrivateComposerCapsules
     // was removed) — it builds the document via messageDocumentBytesFromDraft and splits on MAX_CAPSULE_USEFUL_BYTES with
     // the per-part overhead, never the legacy 1 KiB splitUtf8ToParts fallback.

@@ -894,7 +894,6 @@ let isResolvingNewChat = false;
 let activeRuntimeWalletAddress = null;
 let localReplayStore = createMemoryReplayStore();
 let encryptedMessageStore = null;
-let vaultProviderLoadPromise = null;
 let tonDnsProviderLoadPromise = null;
 let identityPopover = null;
 // The button that opened the shared "Display as" popover (Private conversation header OR a Public
@@ -1023,16 +1022,6 @@ let privateOutboundWorkDepth = 0;
 // Deadline until which a background auto-lock is DEFERRED because a send is actively holding the key
 // (set once at first defer, never re-armed — so a wedged send cannot pin the wallet unlocked past the cap).
 let vaultSendInFlightUntil = 0;
-// Resolves when the most recently broadcast vault external is reflected in
-// the on-chain publish nonce. Pre-sign user/nonce reads await it so that
-// back-to-back signed actions cannot race the strictly sequential contract
-// nonce while the previous external is still propagating.
-let pendingVaultPublishNonceBarrier = null;
-// Monotonic per-owner floor over every nonce this client has observed on
-// chain or consumed by broadcasting a signed external. A lagging RPC replica
-// can serve an older nonce; signing below the floor can only produce a
-// permanently rejected external racing one of our own in-flight messages.
-const vaultPublishNonceFloorByOwner = new Map();
 let tonRpcLimitedUntil = 0;
 let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
@@ -1060,7 +1049,6 @@ const PLATHO_WALLET_LEGACY_STORAGE_KIND = 'platho.wallet.mnemonic.v1';
 const PLATHO_WALLET_ENCRYPTED_PAYLOAD_KIND = 'platho.wallet.mnemonic.payload.v1';
 const PLATHO_WALLET_KEY_BACKUP_KIND = 'platho.wallet.key.backup.v1';
 const PLATHO_STORAGE_PERSISTENCE_KEY = 'platho.storage.persistence.v1';
-const PAYMENT_CHECK_PENDING_LEDGER_KIND = 'platho.paymentCheck.pendingIntent.v1';
 const PLATHO_WALLET_PASSWORD_MANAGER_USERNAME = 'platho-local-wallet';
 const PLATHO_WALLET_KDF_NAME = 'PBKDF2-SHA256';
 const PLATHO_WALLET_CIPHER_NAME = 'AES-GCM-256';
@@ -1101,7 +1089,6 @@ const TON_WALLET_BALANCE_FETCH_TIMEOUT_MS = 10 * 1000;
 const TON_RPC_CONNECTING_STATUS = t('common.rpcBusyRetrying');
 const TON_RPC_LIMIT_FALLBACK_BACKOFF_MS = 60 * 1000;
 const TON_RPC_LIMIT_MIN_BACKOFF_MS = 5 * 1000;
-const MESSAGE_SYNC_COUNTDOWN_TICK_MS = 1_000;
 const PRIVATE_SEND_RETRY_DELAYS_MS = [8_000, 20_000, 45_000, 60_000];
 const PRIVATE_SEND_RETRY_MAX_ATTEMPTS = 8;
 const PRIVATE_SEND_PARTIAL_RETRY_MAX_ATTEMPTS = 16;
@@ -1116,10 +1103,6 @@ const PRIVATE_PUBLISH_CONFIRM_SETTLE_MS = 1_500;            // first check: don'
 const PRIVATE_PUBLISH_CONFIRM_ACTIVE_POLL_MS = 1_000;       // active poll while a part is in-flight and the send is young — catches a fast confirm / healed re-broadcast within ~1s
 const PRIVATE_PUBLISH_CONFIRM_ACTIVE_WINDOW_MS = 60 * 1000; // active window; past it a still-unconfirmed send is anomalously slow -> stretch (below)
 const PRIVATE_PUBLISH_CONFIRM_STRETCH_POLL_MS = 15 * 1000;  // stretch cadence once the send is anomalously slow (toncenter slow / partial stuck)
-// A part still awaiting its LANDING (status SENT, nonce unmoved) past the active window is the dropped-external
-// heal case, not the landed-but-slow-index case: the confirm pass is its ONLY re-poke opportunity, and a 15s
-// stretch quantized the re-poke cooldown to ~45s effective spacing. Keep a middle cadence while un-landed.
-const PRIVATE_PUBLISH_CONFIRM_UNLANDED_POLL_MS = 5 * 1000;
 const PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS = 10 * 60 * 1000;
 const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 // If NOTHING fully confirms within this window (measured from the message's STABLE creation time, which —
@@ -1145,32 +1128,6 @@ function publishConfirmNoProgressDeadlineMs(publishState) {
   const parts = Math.max(1, Number(publishState?.partCount ?? 1) || 1);
   return PUBLISH_CONFIRM_NO_PROGRESS_BASE_MS + parts * PUBLISH_CONFIRM_NO_PROGRESS_PER_PART_MS;
 }
-// Surface the actionable "RPC broadcast unavailable, retry" terminal EARLY (long before the no-progress
-// deadline) when the broadcast is provably erroring: nothing landed AND every in-flight external is failing to
-// relay for this long. A send whose broadcast SUCCEEDED but is just slow to confirm keeps the patient path —
-// its parts carry no error, so publishStateBroadcastIsFailing() is false and this never fires. AGE-based.
-const PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS = 2 * 60 * 1000;
-const PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS = 30 * 1000;
-const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 * 60 * 1000;
-// Publish + CapsuleHub ACK realistically spans 2-3 basechain blocks; the hot
-// window must cover that plus the read round-trips or every send degrades
-// into the slow recovery/retry path.
-const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 25 * 1000;
-// 8s (was 4s): the hot receipt read is get_user_receipts, HEAVIER than get_user, so it hits the same toncenter
-// load-spike latency that timed out the 4s nonce read. Matching the recovery tier lets a slow-but-alive receipt
-// read confirm instead of timing out and churning; a healthy read still returns in <1s.
-const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 8 * 1000;
-const PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS = 30 * 1000;
-const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 * 1000;
-const PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS = 2 * 60 * 1000;
-// A signed publish external whose nonce the chain has already moved past can
-// never be accepted again. After this age, if the entry is provably absent
-// from the sender index back beyond the broadcast moment, the part is reset
-// and re-signed with a fresh nonce instead of staying wedged forever.
-const PRIVATE_PUBLISH_DROPPED_RECOVERY_AFTER_MS = 150 * 1000;
-const PRIVATE_PUBLISH_DROPPED_RECOVERY_SCAN_LIMIT = 48;
-const PRIVATE_PUBLISH_DROPPED_RECOVERY_MAX_RESIGNS = 3;
-const PRIVATE_PUBLISH_DROPPED_RECOVERY_BROADCAST_MARGIN_S = 180;
 const PRIVATE_OUTBOUND_SYNC_PAUSE_MS = 5 * 1000;
 // A send yields to an in-flight sync pass for at most this long (so the two never fight the keyless ~1 rps
 // budget) — capped so a long/stuck sync can never block a send.
@@ -1211,7 +1168,6 @@ const USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS = 240;
 const USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS = 15_000;
 const USERNAME_MINT_LOCAL_PENDING_MS = USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS * USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS;
 const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
-const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 15_000_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 0n;
 const USERNAME_PRICE_4_CHARS_ATOMIC = 10_000_000_000_000n;
@@ -1233,15 +1189,9 @@ const VAULT_PUBLISH_PRIVATE_HYBRID_LOCAL_EXEC_RESERVE_NANOTONS = Object.freeze({
   16: 38_900_000n,
   32: 67_600_000n,
 });
-const VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS = 90_000;
-const VAULT_PUBLISH_NONCE_POLL_MS = 1_000;
-const PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS = 90_000;
-const PAYMENT_CHECK_CLAIM_POLL_MS = 1_500;
 const PLATO_PRIVATE_LONG_TERM_FEE_NANOTONS = 10_000_000n;
 const PLATO_PUBLIC_POST_FEE_NANOTONS = 10_000_000n;
-const PLATO_MIN_PROTOCOL_FEE_NANOTONS = 0n;
 const CAPSULEHUB_ACK_FORWARD_RESERVE_NANOTONS = 30_000_000n;
-const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE_NANOTONS = 4_200_000n;
 const CAPSULEHUB_PRIVATE_HYBRID_EXEC_RESERVE_NANOTONS = Object.freeze({
   1: 4_200_000n,
   2: 4_300_000n,
@@ -1398,50 +1348,6 @@ async function writeCachedPublicComments(cacheKey, comments, parentExists, lates
       // unchanged link on the next open means ZERO body re-reads.
       latestLink: latestLink === undefined || latestLink === null ? null : String(latestLink),
     }));
-  } catch {
-    /* ignore (quota / unavailable) */
-  }
-}
-
-// PER-ENTRY durable cache of resolved PUBLIC ENTRY BODIES (raw base64 BoC + hash) — the faithful private-message
-// model applied at the RIGHT level. Private message bodies persist UNCONDITIONALLY + INDIVIDUALLY the moment they
-// resolve and are restored from IndexedDB, so a private image NEVER re-downloads. Public bodies (posts, comments,
-// every multipart image part) previously lived only in the provider's in-memory publishBodyCache: getPublicEntry
-// returns body_boc:null, so after a reload EVERY body was a live ~32KB getMessages read again (cache-bypassed by
-// messageCacheTtlMs:0) — the owner-flagged "images re-download from the blockchain on every reload", for the FEED
-// SYNC as much as the post detail. This store sits inside resolvePublicEntryPayload — the single funnel all 7
-// public body readers go through — keyed by entry_id with the entry's body_hash pinned: bodies are immutable +
-// content-addressed, so a hash-matched hit is authoritative and never stale. Caching the raw BoC (a base64
-// string, JSON-safe by construction) means the cached path re-parses through the EXACT same
-// tryReadPublicEntryPayload pipeline as a live read — zero decode drift. Deployment-scoped (public content,
-// readable before unlock), never wallet-scoped. LRU-capped; eviction just re-downloads.
-const publicEntryBodyStorePromise = (() => {
-  try {
-    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-public-entry-bodies-v1'), cap: 500 }).catch(() => null);
-  } catch {
-    return Promise.resolve(null);
-  }
-})();
-
-async function readCachedPublicEntryBody(entryId) {
-  if (entryId === undefined || entryId === null) return null;
-  try {
-    const store = await publicEntryBodyStorePromise;
-    const record = await store?.get(`entry:${entryId}`);
-    if (typeof record?.url !== 'string' || record.url.length === 0) return null;
-    const parsed = JSON.parse(record.url);
-    if (typeof parsed?.body_boc !== 'string' || parsed.body_boc.length === 0) return null;
-    return parsed; // { body_boc, body_hash }
-  } catch {
-    return null;
-  }
-}
-
-async function writeCachedPublicEntryBody(entryId, bodyBoc, bodyHashHex) {
-  if (entryId === undefined || entryId === null || typeof bodyBoc !== 'string' || bodyBoc.length === 0) return;
-  try {
-    const store = await publicEntryBodyStorePromise;
-    await store?.put(`entry:${entryId}`, JSON.stringify({ body_boc: bodyBoc, body_hash: bodyHashHex ?? null }));
   } catch {
     /* ignore (quota / unavailable) */
   }
@@ -2046,25 +1952,6 @@ function openTelegramDeepLink(href) {
   return openExternalLinkInTelegram(href);
 }
 
-// ── Safe auto-linking of URLs in user text (v749) ──────────────────────────────────────────
-// User message / public-post text is rendered with appendLinkifiedText (below) instead of a raw textContent
-// assignment: literal http(s) URLs become clickable, EVERYTHING ELSE stays a plain text node. Three layers keep
-// this from re-opening the XSS-clean posture:
-//   1. Scheme allowlist (safeExternalUrl): only http:/https: ever become an <a href>. javascript:/data:/blob:/
-//      vbscript:/file:/tg:/intent: never match the autolink regex AND would be rejected here anyway, so a linkified
-//      token can never execute. (The strict live CSP with no 'unsafe-inline' is a second backstop against href JS.)
-//   2. No innerHTML anywhere — the anchor is built with createElement + textContent for the VISIBLE text.
-//   3. We autolink the LITERAL url only (visible text === destination), so there is no [label](url) mismatch a
-//      phisher could exploit — that markdown form stays limited to the owner's own Docs.
-// Clicking does NOT navigate directly: it routes through an interstitial that shows the real destination and warns
-// the external site will see the reader's IP (a real deanonymization vector for a privacy messenger — a unique
-// per-recipient link is a read-receipt + IP beacon). A per-domain "don't ask again" suppresses the prompt.
-// Matches EITHER a labeled link `[text](url)` (groups 1=label, 2=url) OR a bare http(s) URL (group 3). The labeled
-// form is tried first at each position, so a bare-URL match never eats the url inside `(...)`. Only the composer's
-// Link button produces `[text](url)`; a hand-typed one is fine too. Safety is identical for both: the url is
-// scheme-checked (safeExternalUrl) and the visible text is textContent — a mismatched label is surfaced by the
-// interstitial (which shows the REAL destination), never silently followed.
-const LINKIFY_RE = /\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)|(https?:\/\/[^\s<>"']+)/gi;
 
 function safeExternalUrl(raw) {
   if (typeof raw !== 'string' || raw.length === 0) return null;
@@ -2082,31 +1969,6 @@ function trimTrailingUrlPunctuation(url) {
     out = out.slice(0, -1);
   }
   return out;
-}
-
-function appendLinkifiedText(parent, text) {
-  const str = String(text ?? '');
-  if (!str) return;
-  LINKIFY_RE.lastIndex = 0;
-  let lastIndex = 0;
-  let match;
-  while ((match = LINKIFY_RE.exec(str)) !== null) {
-    if (match.index > lastIndex) parent.append(document.createTextNode(str.slice(lastIndex, match.index)));
-    if (match[1] !== undefined) {
-      // [label](url) — link ONLY if the url passes the scheme allowlist; otherwise emit the literal typed text.
-      const safe = safeExternalUrl(match[2]);
-      parent.append(safe ? buildExternalLinkAnchor(match[1], safe) : document.createTextNode(match[0]));
-      lastIndex = match.index + match[0].length;
-    } else {
-      // bare url
-      const trimmed = trimTrailingUrlPunctuation(match[3]);
-      const safe = safeExternalUrl(trimmed);
-      parent.append(safe ? buildExternalLinkAnchor(trimmed, safe) : document.createTextNode(trimmed));
-      lastIndex = match.index + trimmed.length; // leave any trailing punctuation for the next text node
-    }
-    if (LINKIFY_RE.lastIndex <= match.index) LINKIFY_RE.lastIndex = match.index + match[0].length; // no zero-advance loop
-  }
-  if (lastIndex < str.length) parent.append(document.createTextNode(str.slice(lastIndex)));
 }
 
 // --- Safe message formatting renderer (v769) ---------------------------------------------------------------
@@ -3455,11 +3317,6 @@ function rawWalletAddress(address) {
   }
 }
 
-function walletAddressChanged(previousWallet, nextWallet) {
-  if (!previousWallet?.address || !nextWallet?.address) return false;
-  return !sameWalletAddress(previousWallet.address, nextWallet.address);
-}
-
 function activeWalletRuntimeAddress() {
   return activeRuntimeWalletAddress ?? plathoWallet?.address ?? null;
 }
@@ -3949,12 +3806,6 @@ function requireNoPendingServiceWorkerAppShellReload() {
 function reloadForPendingServiceWorkerAppShellUpdate() {
   if (!pendingServiceWorkerAppShellReload) return false;
   window.location.reload();
-  return true;
-}
-
-function schedulePendingServiceWorkerAppShellReload(delayMs = 250) {
-  if (!pendingServiceWorkerAppShellReload) return false;
-  setTimeout(() => reloadForPendingServiceWorkerAppShellUpdate(), delayMs);
   return true;
 }
 
@@ -4985,17 +4836,6 @@ function renderConversationIdentity(thread) {
 
 const MESSAGE_SYNC_LOADING_FRAMES = Object.freeze(['Syncing', 'Syncing.', 'Syncing..', 'Syncing...']);
 
-function messageAutoSyncCountdownText() {
-  if (!isChatsViewActive() || !plathoWallet || !localRecipientKeyPair) return null;
-  // State-only sync status — auto-sync runs in the background, so there is no "next sync in Ns" countdown.
-  if (messageAutoSyncPhase === 'syncing') {
-    return MESSAGE_SYNC_LOADING_FRAMES[messageAutoSyncLoadingFrame % MESSAGE_SYNC_LOADING_FRAMES.length];
-  }
-  if (messageAutoSyncPhase === 'synced') return t('sync.syncedCheck');
-  if (messageAutoSyncPhase === 'delayed') return messageAutoSyncLastErrorLabel ?? t('sync.delayed');
-  return null;
-}
-
 function conversationSubtitleText() {
   // The sync status moved to the GLOBAL header sync indicator (spinner/check, visible on every tab), so the dialog
   // subtitle no longer carries it. Kept empty — the name above already identifies the conversation.
@@ -5063,152 +4903,6 @@ function setPublicSyncPhase(phase) {
   publicSyncPhase = phase;
   refreshGlobalSyncIndicator();
   if (isPublicViewActive()) renderPublicSurface({ anchorUnread: false });
-}
-
-function debugTiny(value, fallback = '-') {
-  const text = String(value ?? '').trim();
-  if (!text) return fallback;
-  return text.length > 18 ? `${text.slice(0, 8)}...${text.slice(-6)}` : text;
-}
-
-function debugCountdown(isoValue) {
-  const parsed = Date.parse(isoValue ?? '');
-  if (!Number.isFinite(parsed)) return '-';
-  const delta = parsed - Date.now();
-  return delta > 0 ? `${Math.ceil(delta / 1000)}s` : 'due';
-}
-
-function debugDurationMs(value) {
-  const ms = Number(value);
-  if (!Number.isFinite(ms) || ms < 0) return '-';
-  if (ms < 60_000) return `${Math.ceil(ms / 1000)}s`;
-  return `${Math.ceil(ms / 60_000)}m`;
-}
-
-function privateDebugPublishMessages(thread) {
-  const withPublish = (thread?.messages ?? []).filter((message) => message?.publishState);
-  const pending = withPublish.filter((message) => (
-    message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-  ));
-  const source = pending.length > 0 ? pending : withPublish;
-  return source.slice(-5);
-}
-
-function privateDebugMessageLabel(thread, message) {
-  const index = Math.max(0, (thread?.messages ?? []).indexOf(message));
-  const text = String(message?.text ?? '').trim();
-  const shortText = text ? debugTiny(text.replace(/\s+/g, ' '), '') : (message?.attachment ? 'image' : 'msg');
-  return `m${index}${shortText ? `:${shortText}` : ''}`;
-}
-
-function privateDebugPartStatus(part) {
-  const status = String(part?.status ?? '-');
-  if (status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) return 'ok';
-  if (status === PUBLISH_PART_STATUS_VAULT_SUBMITTED) return 'vault';
-  if (status === PUBLISH_PART_STATUS_SENDING) return 'send';
-  if (status === PUBLISH_PART_STATUS_SENT) return 'sent';
-  if (status === PUBLISH_PART_STATUS_UNKNOWN) return 'unk';
-  if (status === PUBLISH_PART_STATUS_FAILED) return 'fail';
-  if (status === PUBLISH_PART_STATUS_BUILT) return 'built';
-  return debugTiny(status, '-');
-}
-
-function privateDebugPartLine(part) {
-  const index = Number(part?.index ?? 0);
-  const nonce = part?.clientNonce !== undefined && part?.clientNonce !== null ? ` n=${part.clientNonce}` : '';
-  const boc = typeof part?.externalBoc === 'string' && part.externalBoc.length > 0 ? ' boc=y' : '';
-  const pid = publishIdForPart(part) ? ` pid=${debugTiny(publishIdForPart(part), '-')}` : '';
-  const previous = part?.retryPreviousStatus ? ` prev=${privateDebugPartStatus({ status: part.retryPreviousStatus })}` : '';
-  const retry = Number(part?.broadcastRetryCount ?? 0) || 0;
-  const retryText = retry > 0 ? ` br=${retry}` : '';
-  const error = part?.error ?? part?.lastBroadcastRetryError ?? part?.retryReason;
-  const err = error ? ` err=${debugTiny(error, '-')}` : '';
-  return `p${index}:${privateDebugPartStatus(part)}${previous}${nonce}${boc}${pid}${retryText}${err}`;
-}
-
-function privateDebugStoredCapsuleCount(message) {
-  if (Array.isArray(message?.capsules)) return message.capsules.filter(Boolean).length;
-  return message?.capsule ? 1 : 0;
-}
-
-function privateDebugPublishDetailLines(thread) {
-  return privateDebugPublishMessages(thread).map((message) => {
-    const sendKey = message.privateSendRetryKey;
-    const confirmKey = message.privatePublishConfirmRetryKey;
-    const sendJob = sendKey && privateSendRetryJobs.has(sendKey) ? 'job' : 'idle';
-    const confirmJob = confirmKey && privatePublishConfirmJobs.has(confirmKey) ? 'job' : 'idle';
-    const sendNext = debugCountdown(message.privateSendRetryNextAt);
-    const confirmNext = debugCountdown(message.privatePublishConfirmNextAt);
-    const expectedCapsules = Number(message.publishState?.partCount ?? message.publishState?.parts?.length ?? 0) || 0;
-    const storedCapsules = privateDebugStoredCapsuleCount(message);
-    const sendAttempt = Number(message.privateSendRetryAttempt ?? 0) || 0;
-    const confirmAttempt = Number(message.privatePublishConfirmAttempt ?? 0) || 0;
-    const stopped = `${message.privateSendRetryStopped === true ? ' sendStop=1' : ''}${message.privatePublishConfirmStopped === true ? ' confStop=1' : ''}`;
-    const parts = (message.publishState?.parts ?? []).map((part) => privateDebugPartLine(part)).join(' ');
-    const retryable = publishStateHasRetryableSendParts(message.publishState) ? ' retryable=1' : '';
-    const partialAge = privateMessageHasPartialRetryablePublish(message)
-      ? ` pAge=${debugDurationMs(privatePartialSendRetryAgeMs(message))}`
-      : '';
-    const partialExpired = privatePartialSendRetryExpired(message) ? ' pExpired=1' : '';
-    const stateError = message.publishState?.lastBroadcastRetryError
-      ? ` stateErr=${debugTiny(message.publishState.lastBroadcastRetryError, '-')}`
-      : '';
-    return `${privateDebugMessageLabel(thread, message)} caps=${storedCapsules}/${expectedCapsules || '-'} send=${sendJob}/${sendNext} sA=${sendAttempt} conf=${confirmJob}/${confirmNext} cA=${confirmAttempt}${stopped}${retryable}${partialAge}${partialExpired}${stateError} ${parts || 'parts=-'}`;
-  });
-}
-
-function privateDebugPublishLine(thread) {
-  const items = privateDebugPublishMessages(thread)
-    .map((message) => {
-      const state = message.publishState ?? {};
-      const status = publishStateMeta(state);
-      const total = Math.max(1, Number(state.partCount) || 1);
-      const counts = total > 1
-        ? ` c${Number(state.confirmedCount ?? 0)}/${total} s${Number(state.submittedCount ?? 0)}/${total}`
-        : '';
-      const updated = state.updatedAt ? new Date(state.updatedAt).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }) : '-';
-      const attempt = Number(message.privatePublishConfirmAttempt ?? 0) || 0;
-      const nextAt = Date.parse(message.privatePublishConfirmNextAt ?? '');
-      const next = Number.isFinite(nextAt) && nextAt > Date.now()
-        ? `${Math.ceil((nextAt - Date.now()) / 1000)}s`
-        : '-';
-      const last = debugTiny(message.privatePublishConfirmLastResult ?? message.privatePublishConfirmLastError, '-');
-      const retry = Number((state.parts ?? []).reduce((sum, part) => sum + (Number(part?.broadcastRetryCount ?? 0) || 0), 0));
-      const confirm = attempt > 0 || next !== '-' || last !== '-' || retry > 0
-        ? ` a${attempt} next=${next} last=${last} br=${retry}`
-        : '';
-      return `${privateDebugMessageLabel(thread, message)} ${status}${counts}@${updated}${confirm}`;
-    });
-  return items.length > 0 ? items.join(' | ') : '-';
-}
-
-function privateDebugLines(thread = activeThread()) {
-  if (!thread) return [];
-  const sync = globalThis.plathoLastPrivateSync ?? {};
-  const reason = sync.reason ?? (sync.unchanged ? 'unchanged' : 'ok');
-  const phase = messageAutoSyncPhase || 'idle';
-  const error = messageAutoSyncLastErrorLabel ? ` err=${debugTiny(messageAutoSyncLastErrorLabel, '-')}` : '';
-  const scanLog = Array.isArray(sync.scanLog) && sync.scanLog.length > 0
-    ? sync.scanLog.join(' ')
-    : '-';
-  const recipientCursor = sync.recipientCursor ?? {};
-  const senderCursor = sync.senderCursor ?? {};
-  const indexError = sync.indexReadError ? ` idxErr=${debugTiny(sync.indexReadError, '-')}` : '';
-  const indexFallback = sync.indexReadFallback ? ` idxFallback=${debugTiny(sync.indexReadFallback, '-')}` : '';
-  return [
-    `${PLATHO_APP_RUNTIME_VERSION} key=${shortKeyId(localRecipientKeyPair?.keyId)} phase=${phase}${error}`,
-    `idx=${sync.indexKeyId ?? '-'} rh=${sync.recipientHead ?? '-'} sh=${sync.senderHead ?? '-'} mode=${sync.mode ?? '-'}`,
-    `rc=${recipientCursor.processedHeadLink ?? '-'}:${recipientCursor.resumeLink ?? '-'} sc=${senderCursor.processedHeadLink ?? '-'}:${senderCursor.resumeLink ?? '-'}`,
-    `imp=${sync.imported ?? 0} skip=${sync.skipped ?? 0} inc=${sync.incompletePrivateStreamCount ?? 0} catch=${sync.catchUpRemaining ?? 0}`,
-    `reason=${reason}${indexError}${indexFallback} block=${sync.blockedEntryId ?? '-'} body=${sync.historyUnavailableCount ?? 0} scanned=${sync.indexEntriesScanned ?? 0} repair=${sync.headRepairScanned ?? 0} retry=${sync.historyRetryScanned ?? 0}`,
-    `entries ${scanLog}`,
-    `publish ${privateDebugPublishLine(thread)}`,
-    ...privateDebugPublishDetailLines(thread),
-  ];
 }
 
 function refreshConversationSubtitle() {
@@ -6324,15 +6018,6 @@ function isUnreadPublicItem(item) {
 
 function publicFeedItemsChronological() {
   return publicChannelThreadsToFeedItems(publicChannelThreads).slice().reverse();
-}
-
-function publicUnreadCount(channelId) {
-  let count = 0;
-  for (const item of publicFeedItemsChronological()) {
-    if (item.channelId !== channelId) continue;
-    if (isUnreadPublicItem(item)) count += 1;
-  }
-  return count;
 }
 
 function markVisiblePublicFeedRead(items = publicFeedItemsChronological()) {
@@ -8656,64 +8341,6 @@ function configuredProfileRegistryAddress() {
     ?? null;
 }
 
-function tryReadPublicEntryPayload(entry, options = {}) {
-  try {
-    return readPublicPostPayload({
-      header_boc: entry.header_boc,
-      body_boc: entry.body_boc,
-    }, options);
-  } catch (error) {
-    console.warn('Skipping malformed public CapsuleHub entry', entry?.entry_id?.toString?.() ?? 'unknown', error);
-    return null;
-  }
-}
-
-async function resolvePublicEntryPayload(provider, entry, address, options = {}) {
-  let hydrated = entry;
-  if (!entry?.body_boc && provider?.resolvePublicEntryBody) {
-    // Durable per-entry body cache FIRST (the private model: local body before the chain). The hit is accepted
-    // ONLY when the stored hash matches the entry's on-chain body_hash — bodies are immutable, so a match is
-    // authoritative; a mismatch/corrupt record silently falls through to the live read (which then re-writes it).
-    const entryBodyHashHex = entry?.body_hash !== undefined && entry?.body_hash !== null ? uint256Hex(entry.body_hash) : null;
-    const cachedBody = await readCachedPublicEntryBody(entry?.entry_id);
-    if (cachedBody && entryBodyHashHex && cachedBody.body_hash === entryBodyHashHex) {
-      hydrated = { ...entry, body_boc: cachedBody.body_boc };
-    } else {
-      hydrated = await provider.resolvePublicEntryBody(entry, {
-        capsuleHubAddress: address,
-        vaultAddress: appConfig.vault?.address ?? null,
-        messageCacheTtlMs: 0,
-        priority: 'critical',
-      });
-      // Persist the resolved body UNCONDITIONALLY (fire-and-forget) — per-entry, never gated on the caller's
-      // overall walk succeeding. A body that resolved once never re-downloads; every reader (feed sync, post
-      // detail, avatars-via-payload) shares the hit.
-      if (typeof hydrated?.body_boc === 'string' && hydrated.body_boc.length > 0 && entryBodyHashHex) {
-        writeCachedPublicEntryBody(entry.entry_id, hydrated.body_boc, entryBodyHashHex);
-      }
-    }
-  }
-  const payload = tryReadPublicEntryPayload(hydrated, options);
-  if (!payload) return null;
-  const authorWallet = hydrated?.author_wallet ?? hydrated?.authorWallet;
-  if (authorWallet) payload.authorWallet = String(authorWallet);
-  if (hydrated?.body_hash !== undefined && hydrated?.body_hash !== null) payload.bodyHash = uint256Hex(hydrated.body_hash);
-  if (hydrated?.entry_uid !== undefined && hydrated?.entry_uid !== null) payload.entryUid = BigInt(hydrated.entry_uid).toString(16);
-  const entryCreatedAt = hydrated?.created_at ?? hydrated?.createdAt;
-  if (entryCreatedAt !== undefined && entryCreatedAt !== null) {
-    try {
-      const sec = Number(BigInt(entryCreatedAt));
-      if (Number.isFinite(sec) && sec > 0) {
-        payload.createdAtSec = sec;
-        payload.created_at_sec = sec;
-      }
-    } catch {
-      // Keep the parsed header timestamp when chain metadata is malformed.
-    }
-  }
-  return payload;
-}
-
 async function resolveProfileRegistryProvider() {
   const address = configuredProfileRegistryAddress();
   if (!address) return null;
@@ -8741,10 +8368,6 @@ async function resolveProfileAvatarProvider() {
     throw new Error('KeyShard provider cannot read avatars');
   }
   return { provider, address };
-}
-
-function uint256Hex(value) {
-  return `0x${BigInt(value).toString(16).padStart(64, '0')}`;
 }
 
 function profileAvatarPointerFromRecord(record) {
@@ -10000,15 +9623,6 @@ async function hydratePublicChannelAvatars() {
   return changed;
 }
 
-function entryBodyHashHex(entry) {
-  try {
-    if (entry?.body_hash === undefined || entry?.body_hash === null) return null;
-    return uint256Hex(entry.body_hash).toLowerCase();
-  } catch {
-    return null;
-  }
-}
-
 function base64UrlToBytes(value) {
   const text = String(value ?? '');
   if (!/^[A-Za-z0-9_-]*$/.test(text)) throw new Error('Invalid base64url value');
@@ -10768,12 +10382,6 @@ function messageFromOpenedCapsule(opened, meta, entry) {
   return message;
 }
 
-function privateChainMessageMeta(entry, parts = 1) {
-  if (entry?.openedAs === 'self') return parts > 1 ? `saved (${parts} parts)` : 'saved';
-  if (entry?.openedAs === 'sender') return parts > 1 ? `published (${parts} parts)` : 'published';
-  return parts > 1 ? `received (${parts} parts)` : 'received';
-}
-
 function messageFromOpenedPrivateParts(parts, meta) {
   const ordered = [...parts].sort((a, b) => (
     Number(a.opened?.payload?.partIndex ?? 0) - Number(b.opened?.payload?.partIndex ?? 0)
@@ -11395,21 +11003,6 @@ function usingKeylessTonRpc() {
     || globalThis.plathoTonRpcApiKey
     || globalThis.PLATHO_TON_RPC_API_KEY
     || appConfig.network?.tonRpc?.apiKey);
-}
-
-async function awaitVaultPublishNonceBarrier() {
-  while (pendingVaultPublishNonceBarrier) {
-    const barrier = pendingVaultPublishNonceBarrier;
-    await barrier.catch(() => {});
-    if (pendingVaultPublishNonceBarrier === barrier) pendingVaultPublishNonceBarrier = null;
-  }
-}
-
-function raiseVaultPublishNonceFloor(owner, nonce) {
-  if (nonce === null || nonce === undefined) return;
-  const key = rawWalletAddress(owner) ?? String(owner ?? '');
-  const current = vaultPublishNonceFloorByOwner.get(key) ?? 0n;
-  if (nonce > current) vaultPublishNonceFloorByOwner.set(key, nonce);
 }
 
 // The public feed shares the unified background sync loop but at a gentler cadence than the private fast-idle
@@ -12557,15 +12150,6 @@ function hasActivePlathoAccount() {
   return hasActiveVaultMessagingKeys();
 }
 
-function currentVaultMessagingKeyId() {
-  try {
-    const keyId = BigInt(currentVaultUserSource()?.current_key_id ?? 0n);
-    return keyId > 0n ? keyId : null;
-  } catch {
-    return null;
-  }
-}
-
 function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
   // clean-17 direct-pay: a KeyShard register is a fixed wallet send of KEYSHARD_REGISTER_VALUE (the shard reserves its
   // rent and refunds the surplus), NOT a Vault-estimated external. Gate so every fee-display site is correct at cutover.
@@ -12816,14 +12400,6 @@ function isRecoverablePrivateSendError(error) {
   return isTonRpcTransientError(error) && !isFatalPrivateSendError(error);
 }
 
-// Per-receiver Vault pre-accept nonce-reject exit codes (throwUnless(code, clientNonce == user.publish_nonce)
-// in contracts/Vault.tact) for every SINGLE-EXTERNAL action the no-retained-boc submit helpers send:
-// WithdrawTon 16808 (:1402), WithdrawAth 16037 (:1471), ReplaceMessagingKeys 16135 (:1755),
-// CreateReceiveIntent 16233 (:1871), ClaimReceiveIntent 16249 (:1998), CancelReceiveIntent 16262 (:2050),
-// SetProfileAvatar 16611 (:2345), MintUsername 16711 (:2457). 16453 is the BATCH-publish receiver's code
-// and can never genuinely appear on these paths.
-const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES = Object.freeze([16037, 16135, 16233, 16249, 16262, 16611, 16711, 16808]);
-const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_RE = new RegExp(`\\b(?:${VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES.join('|')})\\b`);
 
 function privateSendRetryDelayMs(error = null, attempt = 0) {
   if (isTonRpcRateLimitError(error)) return tonRpcLimitBackoffMs(error);
@@ -12882,17 +12458,6 @@ function formatAthDiscountLabel() {
     return t('composer.athDiscountFull');
   }
   return t('composer.athDiscountPartial', { percent: formatDiscountPercent(bps) });
-}
-
-function discountedProtocolFeeNanotons(fullFee) {
-  const fee = nonNegativeBigInt(fullFee);
-  if (!messageDiscountUnlocked()) return fee;
-  const minFee = fee < PLATO_MIN_PROTOCOL_FEE_NANOTONS ? fee : PLATO_MIN_PROTOCOL_FEE_NANOTONS;
-  const athBalance = currentAthBalanceAtomic();
-  if (athBalance >= ATH_FULL_DISCOUNT_AMOUNT_ATOMIC) return minFee;
-  const remaining = ATH_FULL_DISCOUNT_AMOUNT_ATOMIC - athBalance;
-  const discounted = ((fee * remaining) + ATH_FULL_DISCOUNT_AMOUNT_ATOMIC - 1n) / ATH_FULL_DISCOUNT_AMOUNT_ATOMIC;
-  return discounted < minFee ? minFee : discounted;
 }
 
 function normalizePrivateSizeClass(sizeClass = 1) {
@@ -12993,12 +12558,6 @@ function privateCompactPayloadOverhead(options = {}) {
     + PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES
     + (options.includeSenderWalletMetadata === false ? 0 : PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES)
     + privateSenderUsernameMetadataBytes(options);
-}
-
-function privateTextCapsulePartsForSend(text, options = {}) {
-  return splitUtf8ToCapsuleParts(text, MAX_CAPSULE_USEFUL_BYTES, {
-    perPartOverheadBytes: privateCompactPayloadOverhead(options),
-  });
 }
 
 function privateImageCapsulePartsForSend(attachment, options = {}) {
@@ -15405,37 +14964,6 @@ async function downloadEncryptedWalletKeyBackup(record = readEncryptedPlathoWall
   await downloadJsonFile(safeWalletKeyFilename(record), await walletKeyBackupFromRecord(record, unlockedWallet));
   // The key file (or the Telegram manual-copy dialog) is now saved/acknowledged — clear the backup nudge.
   markWalletKeyBackupDone(storedWalletAddressForCopy(record) || record?.address || null);
-}
-
-async function offerEncryptedWalletKeyBackup(reason = t('wallet.backupReasonDefault')) {
-  const record = readEncryptedPlathoWalletRecord();
-  if (!record) return false;
-  const result = await openActionDialog({
-    title: t('wallet.saveKeyBackupTitle'),
-    hint: reason,
-    submitLabel: t('wallet.saveEncryptedKey'),
-    dismissOnBackdrop: false,
-    fields: [],
-    summary: [
-      { label: t('wallet.backupRowFile'), value: t('wallet.backupRowFileValue') },
-      { label: t('wallet.backupRowPassword'), value: t('wallet.backupRowPasswordValue') },
-      { label: t('wallet.backupRowUse'), value: t('wallet.backupRowUseValue') },
-      { label: t('wallet.backupRowWhy'), value: t('wallet.backupRowWhyValue') },
-    ],
-  });
-  if (!result) return false;
-  // If a toncenter key is set but the wallet is locked, unlock so it can be encrypted into the backup
-  // (never written in the clear). If the user cancels, the file still saves — just without the RPC key.
-  let unlockedWallet = plathoWallet;
-  if (!unlockedWallet && readStoredToncenterApiKey()) {
-    unlockedWallet = await requestAndDecryptEncryptedWallet(record, {
-      title: t('wallet.protectRpcKeyTitle'),
-      hint: t('wallet.protectRpcKeyHint'),
-      submitLabel: t('wallet.saveEncryptedKey'),
-    });
-  }
-  await downloadEncryptedWalletKeyBackup(record, unlockedWallet);
-  return true;
 }
 
 function encryptedWalletRecordFromBackup(value) {
@@ -18171,16 +17699,6 @@ function shortAddress(address) {
   return `${text.slice(0, 6)}...${text.slice(-6)}`;
 }
 
-function walletDisplayAddress(wallet) {
-  return wallet?.friendlyAddress ?? wallet?.address ?? wallet;
-}
-
-function requireVaultAddress() {
-  const address = appConfig.vault?.address;
-  if (!address) throw new Error('Vault contract address is not configured');
-  return address;
-}
-
 function requireAthMasterAddress() {
   const address = appConfig.ath?.masterAddress ?? globalThis.plathoAthMasterAddress;
   if (!address) throw new Error('ATHMaster contract address is not configured');
@@ -18227,10 +17745,6 @@ function parseDecimalAmount(input, decimals, symbol) {
 
 function parseTonAmountNanotons(input) {
   return parseDecimalAmount(input, 9, 'GRAM');
-}
-
-function parseAthAmountAtomic(input) {
-  return parseDecimalAmount(input, 9, 'ATH');
 }
 
 function formatDecimalAmount(units, decimals, fractionDigits = 4) {
@@ -18462,58 +17976,6 @@ function usernameMintStatusText(error) {
   if (/verification unavailable/i.test(message)) return t('username.rpcVerificationUnavailable');
   if (/provider is not configured|username.*provider|ton rpc|sendboc/i.test(message)) return message;
   return t('username.blockedWithDetail', { message });
-}
-
-async function requestAmountNanotons({ title, hint, symbol, parser, placeholder = t('dialog.amountPlaceholder') }) {
-  let feedback = hint;
-  let tone = 'muted';
-  let amountValue = '';
-  while (true) {
-    const result = await openActionDialog({
-      title,
-      hint: feedback,
-      tone,
-      submitLabel: t('dialog.reviewTransaction'),
-      fields: [{
-        id: 'amount',
-        label: t('dialog.symbolAmount', { symbol }),
-        inputMode: 'decimal',
-        placeholder,
-        autocomplete: 'off',
-        value: amountValue,
-      }],
-      summary: (values) => [
-        { label: t('common.asset'), value: symbol },
-        { label: t('common.amount'), value: values.amount?.trim() || t('common.notSet') },
-      ],
-    });
-    if (!result) return null;
-    amountValue = result.amount;
-    try {
-      return parser(result.amount);
-    } catch (error) {
-      feedback = error.message;
-      tone = 'error';
-    }
-  }
-}
-
-function requestTonAmountNanotons(title, hint) {
-  return requestAmountNanotons({
-    title,
-    hint,
-    symbol: 'GRAM',
-    parser: parseTonAmountNanotons,
-  });
-}
-
-function requestAthAmountAtomic(title, hint) {
-  return requestAmountNanotons({
-    title,
-    hint,
-    symbol: 'ATH',
-    parser: parseAthAmountAtomic,
-  });
 }
 
 async function showReceiveWalletTonDialog() {
@@ -19077,31 +18539,6 @@ function uint256HexToBigInt(value, name = 'uint256') {
   return bigint;
 }
 
-function bigIntToFixedBytes(value, length, name = 'value') {
-  const bigint = typeof value === 'bigint' ? value : BigInt(value);
-  if (bigint < 0n) throw new Error(`${name} must be unsigned`);
-  const hex = bigint.toString(16).padStart(length * 2, '0');
-  if (hex.length > length * 2) throw new Error(`${name} does not fit ${length} bytes`);
-  return hexToBytes(hex);
-}
-
-function formatAtomicAmount(amount, decimals = 9) {
-  const value = typeof amount === 'bigint' ? amount : BigInt(amount ?? 0);
-  const scale = 10n ** BigInt(decimals);
-  const whole = value / scale;
-  const fraction = value % scale;
-  if (fraction === 0n) return whole.toString();
-  return `${whole}.${fraction.toString().padStart(decimals, '0').replace(/0+$/, '')}`;
-}
-
-function fixedHexBytes(value, length, name = 'hex bytes') {
-  const text = String(value ?? '').trim().replace(/^0x/i, '');
-  if (!/^[0-9a-fA-F]+$/.test(text) || text.length !== length * 2) {
-    throw new Error(`${name} must be ${length} bytes`);
-  }
-  return hexToBytes(text);
-}
-
 const PLATHO_DOCUMENT_MAGIC = new Uint8Array([0x50, 0x44, 0x43, 0x31]); // "PDC1"
 const PLATHO_DOCUMENT_VERSION = 1;
 const PLATHO_DOCUMENT_HEADER_BYTES = 8;
@@ -19129,22 +18566,12 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   // decode on BOTH surfaces (the private DISPLAY decode has been tolerant since v646).
   SHARE: 8,
 });
-const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
-// The `(?!\()` on every marker keeps a labeled LINK `[check](url)` / `[image 1](url)` (v750) from being mis-read as
-// a composer marker: a real marker is inserted standalone (newline-wrapped), NEVER immediately followed by '(',
-// whereas a labeled link always is. Without this, a link whose text happened to be "check"/"payment"/"image N" had
-// its label + brackets eaten on send (and could attach a stray payment/image block).
-const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\](?!\()/ig;
 // v759: `[file N]` joins `[image N]` as a positional composer marker — a file attachment lands at the
 // cursor like an image does, instead of silently appending after the body. Group 1 = image index,
 // group 2 = file index; the `(?!\()` keeps labeled links ([file 1](url)) out, same as images.
 // v766: `[post]` marks where the shared-post block lands (positional like [image]/[file]; single like [check]).
 const COMPOSER_SHARE_MARKER_RE = /\[post\](?!\()/ig;
 const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\](?!\()|\[file\s+(\d+)\](?!\()|(\[post\])(?!\()|\[(?:check|payment)\](?!\()/ig;
-// A line that is ONLY a composer attachment marker (v769): the formatting toolbar must NEVER prepend a
-// block-format prefix (# / > / - / ::center) to such a line — the prefix would ride into the sent text and
-// composerBlocksFromDraft would leave an orphan "- "/"# " fragment beside the extracted attachment block.
-const COMPOSER_MARKER_ONLY_LINE_RE = /^\s*(?:\[(?:image|img)\s+\d+\]|\[file\s+\d+\]|\[post\]|\[(?:check|payment)\])\s*$/i;
 
 function concatUint8Arrays(parts) {
   const arrays = parts.map((part) => part instanceof Uint8Array ? part : new Uint8Array(part ?? []));
@@ -19309,16 +18736,6 @@ function isTonRpcVerificationUnavailableForOwnVaultActionError(error) {
     || /TON RPC verification unavailable|RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message);
 }
 
-function isTonRpcGetGlobalDisagreementError(error) {
-  const message = String(error?.message ?? error ?? '');
-  return error?.code === 'RPC_DISAGREEMENT' && /get_global/i.test(message);
-}
-
-function isTonRpcSoftVaultGlobalReadError(error) {
-  return isTonRpcVerificationUnavailableForOwnVaultActionError(error)
-    || isTonRpcGetGlobalDisagreementError(error);
-}
-
 function isTonRpcVerificationSoftReadError(error) {
   const message = String(error?.message ?? error ?? '');
   return error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
@@ -19351,15 +18768,6 @@ async function callWithDegradedTransportReadFallback(readStrict, readUnverified)
   } catch (error) {
     if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
     if (!tonRpcVerificationStructurallyDegraded()) throw error;
-    return readUnverified();
-  }
-}
-
-async function callWithVerificationUnavailableReadFallback(readStrict, readUnverified) {
-  try {
-    return await readStrict();
-  } catch (error) {
-    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
     return readUnverified();
   }
 }
@@ -19445,21 +18853,6 @@ function isExpectedVaultProviderUnavailable(error) {
 // never bites normal reads.
 const CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS = 8_000;
 
-// Hard ceiling for the WHOLE Vault-open read burst (wallet balances + vault user + global). Under degraded
-// RPC (gateway slow/unreachable -> keyless toncenter fallback: serial ~1 rps + 60s backoff + verify:true
-// cross-check + retries) the burst can accumulate to MINUTES, which left refreshVaultNow awaiting forever
-// (observed on iOS: op=vault stuck ~148s, heartbeat alive, the Vault tab dead). Past this deadline the Vault
-// renders with whatever is cached, shows "RPC busy, retrying", and lets the background reads update later —
-// so the tab can NEVER hang open.
-const VAULT_OPEN_READ_DEADLINE_MS = 12_000;
-// Short TTL for BACKGROUND/display Vault reads (get_user/get_global for the dashboard + airdrop). With Orbs
-// gone, ALL reads share one toncenter budget, and these reads were cacheTtlMs:0 (cache-bypass) so the SAME
-// get_user/get_global fetched by the dashboard, the airdrop refresh and the nav-balance path each hit the
-// network separately within one second -> a slow Vault open + extra 429s. A small TTL lets the transport's
-// runGetMethod cache collapse those duplicate reads. Funds-critical reads (pre-sign nonce/charge, post-tx
-// confirm) KEEP cacheTtlMs:0 at their own sites; and sendBoc clears the read cache, so a balance change
-// after one of our own actions still shows fresh (this only dedups the steady/display refresh path).
-const VAULT_DISPLAY_READ_CACHE_TTL_MS = 8_000;
 // Overall backstop for the WHOLE refreshVaultNow (dashboard + activation + stats jobs). The dashboard read
 // deadline above un-freezes the balance render, but the activation/stats jobs do the same verify:true reads
 // and would otherwise keep op='vault' + the single-flight lock held for minutes under degraded RPC. Past
@@ -19475,10 +18868,6 @@ function unverifiedCriticalChainReadOptions() {
     cacheTtlMs: 0,
     queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS,
   };
-}
-
-function optionalBalanceText(value, formatter) {
-  return value === null || value === undefined ? '-' : formatter(value);
 }
 
 function extractTonWalletBalance(value) {
@@ -19828,14 +19217,6 @@ function refreshVaultMoveWidget() {
   refreshNavVaultBalance();
 }
 
-// Hard ceiling per deferred Vault read, so a hung read (e.g. the iOS v2-GET GRAM read) can never latch the
-// single-flight guard and starve later refreshes. Resolves to null on timeout.
-const VAULT_DEFERRED_READ_TIMEOUT_MS = 10_000;
-// Single-flight for the deferred Vault reads (get_global + external GRAM/ATH). refreshVaultNow resolves
-// before this fire-and-forget chain finishes, so every Vault open / 60s auto-refresh would otherwise stack
-// overlapping reads (re-introducing the concurrency we are removing). Cleared in finally so a thrown/timed-
-// out read never latches it (the deferred values would then never reload until a page reload).
-let vaultDeferredReadInFlight = false;
 async function resolveAthMasterProvider() {
   const provider = globalThis.plathoAthMasterProvider
     ?? createAthMasterTonRpcProvider({ athMasterAddress: requireAthMasterAddress() });
@@ -19925,13 +19306,6 @@ async function refreshAthProtocolStatsRun() {
     noteTonRpcRateLimit(error);
     await refreshAthFlushState().catch(() => {});
     return athProtocolState;
-  }
-}
-
-function queueAthProtocolStatsRefresh() {
-  refreshAthProtocolStats().catch(() => {});
-  for (const delayMs of VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS) {
-    setTimeout(() => refreshAthProtocolStats().catch(() => {}), delayMs);
   }
 }
 
@@ -20778,94 +20152,11 @@ async function submitVaultReplaceMessagingKeys() {
 const VAULT_PUBLISH_STATUS_SUBMITTED = 'vault-publish-submitted';
 const VAULT_PUBLISH_STATUS_PARTIAL = 'vault-publish-partial';
 const CAPSULEHUB_PUBLISH_STATUS_CONFIRMED = 'capsulehub-publish-confirmed';
-const PUBLISH_PART_STATUS_BUILT = 'built';
-const PUBLISH_PART_STATUS_SENDING = 'sending';
 const PUBLISH_PART_STATUS_SENT = 'sent';
 const PUBLISH_PART_STATUS_VAULT_SUBMITTED = 'vault_submitted';
 const PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED = 'capsulehub_confirmed';
-const PUBLISH_PART_STATUS_FAILED = 'failed';
 const PUBLISH_PART_STATUS_UNKNOWN = 'unknown';
 const VAULT_PUBLISH_PARTIAL_ERROR_CODE = 'PLATHO_VAULT_PUBLISH_PARTIAL';
-const CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT = 32;
-const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8;
-// Real-relay (HTTP 200) re-poke tail. Chain forensics 2026-07-02: a 35KB external CAN include in <=20s, and
-// every 200 answer to a re-POST proves toncenter DROPPED the previous queued copy — so a proven-not-landed
-// external (fresh nonce read said currentNonce === clientNonce) is re-poked every 10s, not 35s. Idempotent:
-// the contract pre-accept-rejects a replayed nonce, so an extra POST can never double-spend.
-// 3.5s: with max_charge-variant rotation EVERY retry is a REAL broadcast (a new root hash beats all ~60s
-// dedup layers), so the productive floor is just a few block-times — no reason to wait 10s+.
-const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 3_500;
-const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 20;
-// Past the fast budget healing must NOT stop (the old silent stop left a dropped external with ZERO re-POSTs
-// from ~3min to the 10-min terminal — the owner's 4/6.5-min image sends): fall back to an indefinite slow
-// poke, bounded by the age terminals (<= ~18 more idempotent POSTs worst case).
-const PRIVATE_PUBLISH_BROADCAST_SLOW_POKE_AFTER_MS = 30_000;
-// Duplicate answers ("BoC still queued") and persistent 16453 fleet-races past their fast windows keep the OLD
-// conservative tail: each such answer is a native red 500 in the console, so a wedged toncenter is poked (and
-// logged) sparsely, not every 10s.
-const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_TAIL_AFTER_MS = 35_000;
-// A re-broadcast POST that bounced 16453 while the READ pool says currentNonce === clientNonce is a
-// toncenter fleet race: the send node's emulation state lags the read pool by a block. The external was
-// NOT relayed (structural pre-accept reject, never mempooled), so retry QUICKLY — the send node catches
-// up within seconds — but paced (not the zero first-heal cooldown) so a lagging node is not hammered on
-// every ~1s confirm pass. After a few races fall back to the full 35s cooldown.
-const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_RETRY_AFTER_MS = 3_500;
-const PRIVATE_PUBLISH_BROADCAST_NONCE_RACE_FAST_LIMIT = 6;
-// A client-aborted (TIMEOUT) send POST is ambiguous — the upload may have fully reached toncenter and
-// be queued (observed 2026-07-11: an aborted ~47KB upload landed about a minute later) — and each
-// attempt can hold the serial pump up to the size-scaled ceiling. So timeout-aborts pace on the short
-// race cooldown while fresh (a slow spell usually eases within a few attempts), rotate the max_charge
-// variant every attempt via broadcastPassIndex (a same-bytes re-POST of a possibly-delivered body is a
-// ~60s-dedup no-op), and fall back to the sparse 35s tail past this limit. They do NOT burn retryCount:
-// the relay budget tracks REAL 200 relays only.
-const PRIVATE_PUBLISH_BROADCAST_TIMEOUT_ABORT_FAST_LIMIT = 6;
-// "duplicate message" = the BoC is queued at toncenter. On the sub-second chain a LIVE queued copy lands in
-// ~1-3s, so if ~4 block-times pass with the nonce unmoved the copy is likely stalled/dropped and a re-poke is
-// productive. Poke every ~4s for the first few duplicates (heals the ACK-no-deliver mode in seconds), then
-// fall back to the conservative 35s tail so a genuinely wedged toncenter is not poked (and does not log a
-// native red 500) every 4s all the way to the age terminal. Idempotent + skipIfRateLimited throughout.
-const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_RETRY_AFTER_MS = 4_000;
-const PRIVATE_PUBLISH_BROADCAST_DUPLICATE_FAST_LIMIT = 6;
-const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 * 1000;
-// 8s (was 4s): the pre-re-broadcast nonce read is get_user on the heavy Vault contract; toncenter answers it
-// in <1s when healthy but 4-8s during a load spike, and a 4s timeout made that read fail (observed console
-// TIMEOUT 'TON RPC request timed out after 4000 ms') -> retryUnconfirmedVaultPublishBroadcasts returns 0 -> a
-// bounced 2nd capsule is never re-broadcast until toncenter reads recover (the intermittent multi-minute drag).
-// 8s (the recovery tier) lets a slow-but-alive read through so the re-broadcast proceeds; a healthy read is
-// unaffected (it returns in <1s regardless of the ceiling).
-const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 8 * 1000;
-// BASE tier only: sendVaultExternalBoc raises every sendBoc ceiling to the external's size-scaled
-// physics floor (+1s per 4KB of base64 body, 30s cap — see vaultSendBocRequestTimeoutMs). The flat
-// 8s alone starved big media externals: a ~36KB batch POST that toncenter answers in 10-20s under
-// load was aborted every heal pass forever (v755).
-const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 * 1000;
-// Hard cap of the size-scaled sendBoc fetch ceiling (see vaultSendBocRequestTimeoutMs): the longest a
-// single POST may hold the serial pump.
-const VAULT_SEND_BOC_TIMEOUT_MAX_MS = 30 * 1000;
-// The heal pass's queue tier (its nonce read AND its POST) carries a +15s margin OVER the max POST
-// ceiling: a pass enqueued right after ANOTHER driver's max-size POST started must SURVIVE that hold
-// (with aging + critical priority it dequeues right behind it). At exactly the cap the read lost the
-// race to its own queue budget on the boundary and the whole pass returned 0.
-const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = VAULT_SEND_BOC_TIMEOUT_MAX_MS + 15 * 1000;
-const PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS = 30 * 1000;
-const PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS = 60 * 1000;
-
-function publishHashPlain(value) {
-  if (value === undefined || value === null || value === '') return null;
-  if (typeof value === 'string') {
-    const text = value.trim().toLowerCase().replace(/^0x/, '');
-    if (/^[0-9a-f]+$/.test(text)) return text.padStart(64, '0');
-  }
-  try {
-    return BigInt(value).toString(16).padStart(64, '0');
-  } catch {
-    return null;
-  }
-}
-
-function publishIdForPart(part) {
-  return publishHashPlain(part?.publishId ?? part?.publish_id);
-}
 
 function publishStatePendingCount(publishState) {
   return (publishState?.parts ?? []).filter((item) => (
@@ -20953,91 +20244,6 @@ function isVaultPublishPartialError(error) {
   return error?.code === VAULT_PUBLISH_PARTIAL_ERROR_CODE;
 }
 
-// Physics-scaled ceiling for a sendBoc POST. The flat tiers (8s heal / 15s transport default) are
-// calibrated for ~1-2KB text externals; a multi-part media batch external is a 35-88KB base64 JSON
-// upload plus a proportionally heavier toncenter-side pre-accept emulation, and during a toncenter
-// slow spell the healthy answer for one takes 10-20s (observed 2026-07-11: a 236KiB file's batches,
-// externalBytes 35619, looped 'timed out after 8000 ms' for MINUTES — every heal POST was aborted
-// client-side just before toncenter answered; one aborted upload still LANDED later, proving the
-// endpoint was slow, not dead). Aborting below the physics floor guarantees ZERO forward progress —
-// the same POST dies the same death forever — while a raised ceiling costs nothing when healthy
-// (the answer still arrives in <1s regardless of the ceiling). +1s per 4KB of wire body (~a 32kbps
-// uplink floor; note the incident's externalBytes 35619 is DECODED bytes ≈ 47.5K base64 chars on the
-// wire, so it scales as 12 ticks, not 9), capped at VAULT_SEND_BOC_TIMEOUT_MAX_MS (defined with the
-// broadcast tiers above: the heal queue tier carries a +15s margin over this cap, so a pass queued
-// behind another driver's max-size POST survives the hold).
-const VAULT_SEND_BOC_TIMEOUT_PER_4KB_MS = 1_000;
-// The transport default, imported so the two cannot silently diverge; used for callers that pass no
-// explicit ceiling. NOTE: a caller-passed 0 is coerced to this base too — the transport's "0 = no
-// client abort" escape hatch is intentionally not honored for vault sends (an unbounded POST would
-// hold the serial pump indefinitely).
-const VAULT_SEND_BOC_TIMEOUT_BASE_MS = TON_RPC_REQUEST_TIMEOUT_MS;
-
-async function readVaultPublishNonce(provider, owner, options = {}) {
-  if (!provider?.getUser) return null;
-  if (options.ignoreNonceBarrier !== true) await awaitVaultPublishNonceBarrier();
-  const user = await provider.getUser(owner, {
-    vaultAddress: requireVaultAddress(),
-    verify: options.verify !== false,
-    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
-    // Critical by default (pre-sign / heal-gating reads). The burst nonce WATCH passes 'messages':
-    // purely observational polling must never outrank the send POST or the heal driver's own read.
-    priority: options.priority ?? 'critical',
-    cacheTtlMs: 0,
-    requestTimeoutMs: options.requestTimeoutMs ?? options.timeoutMs,
-    queueTimeoutMs: options.queueTimeoutMs,
-  });
-  const nonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
-  raiseVaultPublishNonceFloor(owner, nonce);
-  return nonce;
-}
-
-async function waitForVaultPublishNonce(provider, owner, expectedNonce, options = {}) {
-  const timeoutMs = Number(options.timeoutMs ?? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS);
-  const deadline = Date.now() + (Number.isFinite(timeoutMs) && timeoutMs > 0
-    ? Math.floor(timeoutMs)
-    : VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS);
-  // Post-broadcast nonce polling is observational: the publish outcome is
-  // re-authenticated by CapsuleHub confirmation, while dual-provider reads
-  // of a value that changes during the hot window turn legitimate
-  // block-height skew into RPC_DISAGREEMENT failures. Poll unverified.
-  const readOptions = {
-    ...options,
-    ignoreNonceBarrier: true,
-    verify: false,
-    allowUnverifiedCriticalRead: true,
-  };
-  let lastNonce = null;
-  let lastError = null;
-  let sawNonceRead = false;
-  for (;;) {
-    try {
-      lastNonce = await readVaultPublishNonce(provider, owner, readOptions);
-      lastError = null;
-      sawNonceRead = true;
-      if (lastNonce === null || lastNonce >= expectedNonce) break;
-    } catch (error) {
-      // The external is already broadcast; transient RPC trouble (rate
-      // limits, provider disagreement, a blocked gateway failing over) must
-      // not fail the publish. Keep polling until the deadline decides.
-      if (!isTonRpcRecoverableReadError(error) && !isTonRpcRateLimitError(error)) throw error;
-      lastError = error;
-    }
-    const remainingMs = deadline - Date.now();
-    if (remainingMs <= 0) break;
-    let pollMs = VAULT_PUBLISH_NONCE_POLL_MS;
-    if (lastError && isTonRpcRateLimitError(lastError)) {
-      pollMs = Math.max(pollMs, Math.min(tonRpcLimitBackoffMs(lastError), remainingMs));
-    }
-    await delay(Math.max(250, Math.min(pollMs, remainingMs)));
-  }
-  if (lastNonce !== null && lastNonce >= expectedNonce) return lastNonce;
-  if (sawNonceRead && lastNonce === null) return lastNonce;
-  const error = new Error('Vault publish was not confirmed after broadcast');
-  error.code = 'NETWORK_ERROR';
-  if (lastError) error.cause = lastError;
-  throw error;
-}
 
 function privateMessageHasPublishAttempt(message) {
   return (message?.publishState?.parts ?? []).some((part) => publishPartEligibleForChainConfirmation(part));
@@ -21128,41 +20334,6 @@ function publishStateHasRetryableSendParts(publishState) {
   return (publishState?.parts ?? []).some((part) => !publishPartAlreadyAttempted(part));
 }
 
-// Age for the give-up terminals (v763): time since the LAST observed forward progress — the chain
-// nonce advancing under this message's passes, or its own parts landing/confirming — never earlier
-// than the message's creation. Creation-anchored age buried messages sitting DEEP in a MOVING queue
-// (their age passed the deadline long before their turn while every pass proved others were landing)
-// and made a manual Retry oscillate back to red within seconds (re-arm -> one pass -> "age >=
-// deadline" -> red again; the owner pressed Retry 3-5x per message). Progress-anchored age decays
-// only when the queue is actually stalled.
-function privatePublishNoProgressAgeMs(message) {
-  const createdMs = Number(messageCreatedAtMs(message)) || 0;
-  const progressMs = Number(message?.publishState?.queueProgressAt ?? 0) || 0;
-  const anchor = Math.max(createdMs, progressMs);
-  return anchor > 0 ? Math.max(0, Date.now() - anchor) : privatePendingPublishConfirmAgeMs(message);
-}
-
-function publishPartNeedsBroadcastRetry(part) {
-  return (
-    part?.status === PUBLISH_PART_STATUS_SENT
-    || part?.status === PUBLISH_PART_STATUS_UNKNOWN
-  )
-    && typeof part.externalBoc === 'string'
-    && part.externalBoc.length > 0
-    && part.clientNonce !== undefined
-    && part.clientNonce !== null;
-}
-
-// The broadcast is provably FAILING (not merely slow-to-confirm) when there is at least one in-flight
-// external still awaiting broadcast AND every such part currently carries a broadcast error. part.error is
-// set when a (re-)broadcast throws/5xx-es and is cleared to null the moment a (re-)broadcast SUCCEEDS
-// (setPublishPartStatus -> SENT), so a part whose external actually relayed never counts as failing — this
-// is what keeps a broadcasting-fine-but-slow send on the patient confirm path instead of the early terminal.
-function publishStateBroadcastIsFailing(publishState) {
-  const pending = (publishState?.parts ?? []).filter((part) => publishPartNeedsBroadcastRetry(part));
-  return pending.length > 0 && pending.every((part) => Boolean(part.error));
-}
-
 function privateSendRetryKey(message) {
   if (!message.privateSendRetryKey) {
     privateSendRetrySeq += 1;
@@ -21212,15 +20383,6 @@ function publishStateUpdatedAtMs(publishState) {
 function privatePendingPublishAgeMs(message) {
   const timestamp = publishStateUpdatedAtMs(message?.publishState) ?? messageCreatedAtMs(message);
   return timestamp === null ? 0 : Math.max(0, Date.now() - timestamp);
-}
-
-// STABLE pending age for the confirm cap: anchored on the message creation time, NOT publishState
-// .updatedAt (which each confirm pass bumps, resetting privatePendingPublishAgeMs). This survives
-// reloads, so a long-stuck no-progress publish surfaces a Retry button promptly instead of restarting
-// its 24-attempt budget every session.
-function privatePendingPublishConfirmAgeMs(message) {
-  const createdAtMs = messageCreatedAtMs(message);
-  return createdAtMs === null ? 0 : Math.max(0, Date.now() - createdAtMs);
 }
 
 function isStalePrivatePendingPublish(message) {
@@ -21403,17 +20565,7 @@ function stopPartialPrivatePublishRecovery(context, error = { message: 'partial 
 // with a clean slate, which is exactly the wanted semantics. Public records are REBUILT objects
 // (feed-cache rebuilds detach references), so the public side keys by `${channelId}:${localId}`.
 const privatePublishConfirmPassRanThisSession = new WeakSet();
-const publicPublishConfirmPassRanThisSession = new Set();
 
-// SINGLE-FLIGHT guards (v764): a resume/visibility sweep can fire while a pass for the SAME message
-// is already running — the private timer DELETES its jobs entry BEFORE the pass runs, so the jobs map
-// cannot see an in-flight pass, and the overlapping duplicate then reads the same head counters and
-// fires the SAME max_charge variant POST (a guaranteed ~60s-dedup no-op that holds the serial pump)
-// while double-stamping retry budgets — the owner's duplicated 'first heal POST' timeline lines. A
-// skipped duplicate loses nothing: the in-flight pass always ends by scheduling the next pass or
-// stopping. Keyed like the session sets (stable per-message key / `${channelId}:${localId}`).
-const privatePublishConfirmPassKeysInFlight = new Set();
-const publicPublishConfirmPassKeysInFlight = new Set();
 
 function hasPendingPrivatePublishConfirmation(message) {
   return privateMessageHasPublishAttempt(message)
@@ -22132,26 +21284,6 @@ function patchPublicPublishBadgesInPlace(job, item) {
   const text = (item.publishState ? publishStateMeta(item.publishState) : null) || status;
   for (const badge of badges) badge.textContent = text;
   return true;
-}
-
-// Remove an optimistic local record (user-cancelled publish: the composer restores the draft instead).
-function removeLocalPublicPendingRecord(ref) {
-  const located = findLocalPublicPendingRecord(ref.channelId, ref.localId);
-  if (!located) return;
-  const cached = publicChannelFeedCache?.[ref.channelId]?.feed ?? publicChannelFeedCache?.[ref.channelId] ?? null;
-  if (!cached) return;
-  const feed = { ...cached, posts: [...(cached.posts ?? [])] };
-  if (located.kind === 'post') {
-    feed.posts.splice(located.postIndex, 1);
-  } else {
-    const post = { ...feed.posts[located.postIndex], comments: [...(feed.posts[located.postIndex].comments ?? [])] };
-    post.comments.splice(located.commentIndex, 1);
-    feed.posts[located.postIndex] = post;
-  }
-  feed.updatedAt = new Date().toISOString();
-  publicChannelFeedCache = { ...publicChannelFeedCache, [ref.channelId]: { feed, syncedAt: feed.updatedAt } };
-  commitPublicChannelFeedCache();
-  renderPublicSurface({ anchorUnread: false });
 }
 
 function resumePendingPublicPublishConfirmations() {
