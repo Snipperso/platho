@@ -308,6 +308,15 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
       await transactionDone(tx);
       return openMessageHistoryRecords(key, records);
     },
+    // Deleting a message means deleting it HERE too. Removing it only from the in-memory thread leaves the record in
+    // durable history, and the next restore merges it straight back — the user's delete would silently undo itself.
+    async deleteMessage(id) {
+      if (!id) return false;
+      const tx = db.transaction(MESSAGE_STORE_NAME, 'readwrite');
+      tx.objectStore(MESSAGE_STORE_NAME).delete(String(id));
+      await transactionDone(tx);
+      return true;
+    },
     get type() {
       return 'indexeddb';
     },
@@ -347,6 +356,10 @@ export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
         .filter((record) => !filter.threadId || record.threadId === filter.threadId)
         .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
       return openMessageHistoryRecords(key, selected);
+    },
+    async deleteMessage(id) {
+      if (!id) return false;
+      return records.delete(String(id));
     },
     dumpEncryptedRecords() {
       return safeClone([...records.values()]);

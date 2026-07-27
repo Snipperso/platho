@@ -209,11 +209,44 @@ describe('self-notes lane (named RecoveryShard slots)', () => {
 
     // Funds are checked against the number of slots this save actually writes, before signing.
     expect(app).toMatch(/RECOVERY_PUBLISH_VALUE \* BigInt\(built\.publishes\.length\) \+ WALLET_FEE_HEADROOM_NANOTONS/);
-    // A snapshot identical to what is already stored writes nothing and still reports the note delivered.
-    expect(app).toMatch(/if \(built\.publishes\.length === 0\) \{ markDirectSendPublished\(thread, message\); return \{ selfNote: true, wrote: 0 \}; \}/);
+    // A snapshot identical to what is already stored writes nothing and still reports the note delivered — the
+    // publish helper returns 0 slots written, which is a SUCCESS, and the send path marks the note published anyway.
+    expect(app).toMatch(/if \(built\.publishes\.length === 0\) return 0;/);
+    expect(app).toMatch(/const wrote = await publishSelfNotesSnapshotForThread\(thread\);[\s\S]{0,40}?markDirectSendPublished\(thread, message\);/);
     // Every user-facing notes string is localized (no developer text reaching the composer status).
     for (const key of ['notes.walletLocked', 'notes.rpcUnavailable', 'notes.full', 'notes.restoreIncomplete']) {
       expect(app.includes(`t('${key}')`), `${key} must be surfaced through the localizer`).toBe(true);
     }
+  });
+
+  it('NOTES-14: deleting a note removes it from BOTH copies, and puts it back if the chain write fails', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const store = readFileSync('web/encrypted-message-store.mjs', 'utf8');
+    const del = app.slice(app.indexOf('async function deleteSelfNoteFromUi'), app.indexOf('async function retryPrivateMessageFromUi'));
+
+    // Delete is offered on EVERY note (a notepad's primary action), and it is the only way out of a full notepad.
+    expect(app).toMatch(/if \(isRealSavedThread\(thread\)\) \{[\s\S]{0,400}?remove\.textContent = t\('notes\.delete'\)/);
+
+    // Held by the SAME guard as a save: deleting rewrites the snapshot, so it carries the identical hazard of
+    // overwriting chunks an incomplete restore could not see.
+    expect(del).toMatch(/if \(selfNotesRestoreIncomplete\) \{[\s\S]{0,120}?return; \}/);
+    // Confirmed before anything is removed.
+    expect(del).toMatch(/const confirmed = await openActionDialog\([\s\S]{0,340}?if \(!confirmed\) return;/);
+
+    // BOTH durable copies: the chain snapshot AND the local encrypted history. A record left in history is merged
+    // back on the next restore, which would silently undo the delete.
+    expect(del).toMatch(/await publishSelfNotesSnapshotForThread\(thread\);/);
+    expect(del).toMatch(/encryptedMessageStore\?\.deleteMessage\?\.\(message\.localHistoryId\)/);
+    expect(store).toMatch(/async deleteMessage\(id\) \{[\s\S]{0,200}?tx\.objectStore\(MESSAGE_STORE_NAME\)\.delete\(String\(id\)\)/);
+    expect(store).toMatch(/async deleteMessage\(id\) \{[\s\S]{0,120}?return records\.delete\(String\(id\)\);/);
+
+    // A failed chain write puts the note BACK — a local view that quietly disagrees with the durable copy is worse
+    // than a failed delete.
+    expect(del).toMatch(/catch \(error\) \{[\s\S]{0,400}?insertThreadMessage\(thread, message\);/);
+
+    // The send path and the delete path publish through the SAME snapshot function — that is what keeps the funds
+    // check, the packing and the overflow refusal identical on both.
+    expect(app).toMatch(/async function publishSelfNotesSnapshotForThread\(thread\)/);
+    expect((app.match(/await publishSelfNotesSnapshotForThread\(thread\)/g) ?? []).length).toBe(2);
   });
 });
