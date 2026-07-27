@@ -170,6 +170,7 @@ import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mj
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
 import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=1';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=1';
 import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=1';
 import {
   publicChannelPartitionKey,
@@ -11442,6 +11443,7 @@ async function bootConvKeyStore() {
   }
   await restoreConvKeysFromRecoveryIfEmpty();
   await restorePrefsFromRecoveryIfFresh();
+  await restoreSelfNotesFromRecovery();
 }
 
 // A fresh device / reinstall has an EMPTY conv key store — the IndexedDB is gone but the seed re-derives the recovery
@@ -11496,6 +11498,58 @@ async function restorePrefsFromRecoveryIfFresh() {
     }
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[prefs] recovery restore failed', error);
+  }
+}
+
+// TRUE when the last notes restore could not read every chunk. A save built on a partial view would overwrite the
+// chunks it could not see, so it is held until a clean read clears this. Reset per restore attempt, never sticky.
+let selfNotesRestoreIncomplete = false;
+
+/**
+ * Restore "My notes" from the self lane. Reads every notes chunk by its fixed seed-derived address (no scan), merges
+ * what it finds into the Saved thread and persists the result locally.
+ *
+ * MERGE, never replace: a device may hold notes that were written while it was offline and are not on chain yet, and
+ * an UNCLEAN read (a chunk that would not load) must never look like "there were no notes". mergeNotes dedups by
+ * (timestamp, text), so re-running this adds nothing.
+ */
+async function restoreSelfNotesFromRecovery() {
+  const seed = plathoWallet?.seed;
+  if (!seed) return;
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return;   // no transport yet — retry on the next unlock/visible
+  const thread = threads.find((item) => isRealSavedThread(item));
+  if (!thread) return;
+  try {
+    const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+    const readBody = createRecoveryBodyReader((call) => transport.runGetMethod(call));
+    const { notes, clean } = await restoreNotes({ seed, readView, readBody });
+    selfNotesRestoreIncomplete = !clean;
+    if (notes.length === 0) return;
+    const merged = mergeNotes(selfNotesFromThread(thread), notes);
+    const known = new Set(selfNotesFromThread(thread).map((note) => `${note.at}:${note.text}`));
+    let added = 0;
+    for (const note of merged) {
+      if (known.has(`${note.at}:${note.text}`)) continue;
+      insertThreadMessage(thread, {
+        type: 'out', text: note.text, meta: 'published', ...localMessageOrderFields(note.at),
+      });
+      added += 1;
+    }
+    if (added === 0) return;
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
+    // An unclean read means a chunk did not load: the local notepad is now a SUPERSET of what we could see, so the
+    // next save must not be built from it as if it were complete. It is not — a chunk we failed to read still holds
+    // notes, and prepareNotesBackup would rewrite that slot with a snapshot that omits them.
+    // An unclean read means a chunk did not load. The local notepad is now a SUPERSET of what we could see, so a
+    // save built from it would rewrite the unread slot with a snapshot that omits its notes — the exact silent loss
+    // this lane exists to prevent. BLOCK saving until a clean read succeeds; the notes keep accumulating locally.
+    selfNotesRestoreIncomplete = !clean;
+    if (!clean) console.warn('[notes] restore was incomplete — some chunks did not load; saving is held');
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[notes] recovery restore failed', error);
   }
 }
 
@@ -12338,6 +12392,10 @@ function isFatalPrivateSendError(error) {
     // two shortfalls by CODE (assertConnectedAthAtLeast / assertWalletGramAtLeast) — match those, not their prose.
     || error?.code === 'PLATHO_ATH_REQUIRED'
     || error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+    // A full notepad and a held save are equally deterministic: retrying changes nothing until the USER acts
+    // (deletes notes) or a later restore reads cleanly. An auto-retry loop against either just burns RPC budget.
+    || error?.code === 'PLATHO_NOTES_FULL'
+    || error?.code === 'PLATHO_NOTES_RESTORE_INCOMPLETE'
     || isVaultPublishPartialError(error)
     || /not enough ath to|wallet needs ~.* gram to|activate platho account|recipient .*not activated|is not registered|ownership is not authoritative|local platho signing key is not ready|wallet required|provider is not configured|cannot price publish|deployment manifest/i.test(message);
 }
@@ -21086,11 +21144,74 @@ async function attemptConvMessagePublishDirect(context) {
 }
 
 async function attemptPrivateComposerMessagePublish(context) {
+  // A note to YOURSELF is not a conversation and cannot ride the CONV lane at all: that lane derives its bucket from
+  // the DIRECTION between two keyIds, and self==self has none (conversationOrder refuses it by construction). Notes go
+  // to the self lane the crypto layer reserves for self-data — named RecoveryShard slots, deterministic from the seed.
+  if (isRealSavedThread(context?.thread)) return publishSelfNoteSnapshot(context);
   // clean-17 direct-pay: a CONV message is sealed to the recipient's KeyShard bundle and published straight from the
   // wallet into the conversation-direction RecordShard (attemptConvMessagePublishDirect). The removed Vault→CapsuleHub
   // publish machinery (publishState, publish nonce, confirm retry) is fully off the live send path; the composer
   // send handler still coordinates keyless sync + surfaces errors via settlePrivateComposerSendError around this call.
   return attemptConvMessagePublishDirect(context);
+}
+
+/**
+ * Publish the whole "My notes" snapshot to the self lane. Unlike a CONV send this is not a per-message publish: the
+ * note is ALREADY in the thread (the composer inserted it optimistically before calling here), so what goes on chain
+ * is the current note list, packed into the named slots. Only chunks whose content actually changed are written, so a
+ * new note usually costs ONE slot write.
+ *
+ * The notepad has a hard, measured ceiling (~7.4 KB per slot × the slot range). A full notepad REFUSES the write with
+ * a localized message instead of dropping the oldest note: these are the user's notes and losing them quietly is the
+ * failure this lane exists to prevent.
+ */
+async function publishSelfNoteSnapshot(context) {
+  const { thread, message } = context;
+  const seed = plathoWallet?.seed;
+  if (!seed) throw new Error(t('notes.walletLocked'));
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) throw new Error(t('notes.rpcUnavailable'));
+
+  // A save on top of an incomplete read would overwrite the chunks that read could not see. Refuse instead — the
+  // note is already in the thread locally, and the next clean restore unblocks saving.
+  if (selfNotesRestoreIncomplete) {
+    const error = new Error(t('notes.restoreIncomplete'));
+    error.code = 'PLATHO_NOTES_RESTORE_INCOMPLETE';
+    throw error;
+  }
+  const notes = selfNotesFromThread(thread);
+  const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+  let built;
+  try {
+    built = await prepareNotesBackup({ seed, notes, readView, value: RECOVERY_PUBLISH_VALUE });
+  } catch (error) {
+    if (error?.code !== 'PLATHO_NOTES_FULL') throw error;
+    const full = new Error(t('notes.full'));
+    full.code = 'PLATHO_NOTES_FULL';
+    throw full;
+  }
+  // Nothing changed on chain (the note was empty, or an identical snapshot is already stored): the local insert IS
+  // the save, so report it delivered rather than leaving the message spinning forever.
+  if (built.publishes.length === 0) { markDirectSendPublished(thread, message); return { selfNote: true, wrote: 0 }; }
+
+  await assertWalletGramAtLeast(
+    RECOVERY_PUBLISH_VALUE * BigInt(built.publishes.length) + WALLET_FEE_HEADROOM_NANOTONS, 'save a note');
+  await sendPlathoWalletTransaction(plathoWallet, {
+    messages: built.publishes.map((publish) => ({
+      address: publish.to, amount: publish.value, bounce: true,
+      payload: tonCell.bytesToBase64(tonCell.serializeBoc(publish.body)), stateInit: publish.init,
+    })),
+  }, { transport });
+  markDirectSendPublished(thread, message);
+  return { selfNote: true, wrote: built.publishes.length };
+}
+
+/** The note list a thread carries, oldest first: its own text messages, without the ones that carry no text. */
+function selfNotesFromThread(thread) {
+  return (thread?.messages ?? [])
+    .map((message) => ({ at: messageCreatedAtMs(message) ?? 0, text: String(message?.text ?? '') }))
+    .filter((note) => note.text.trim().length > 0)
+    .sort((a, b) => a.at - b.at);
 }
 
 // clean-17 direct-pay: a send either broadcasts as ONE wallet transfer or throws. The Vault-era outcomes this
