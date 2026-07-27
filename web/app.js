@@ -11821,11 +11821,6 @@ async function awaitVaultPublishNonceBarrier() {
   }
 }
 
-function vaultPublishNonceFloor(owner) {
-  const key = rawWalletAddress(owner) ?? String(owner ?? '');
-  return vaultPublishNonceFloorByOwner.get(key) ?? 0n;
-}
-
 function raiseVaultPublishNonceFloor(owner, nonce) {
   if (nonce === null || nonce === undefined) return;
   const key = rawWalletAddress(owner) ?? String(owner ?? '');
@@ -13311,22 +13306,6 @@ function isRecoverablePrivateSendError(error) {
   return isTonRpcTransientError(error) && !isFatalPrivateSendError(error);
 }
 
-function isAmbiguousTonRpcBroadcastError(error) {
-  const message = String(error?.message ?? error ?? '');
-  // App-level definitive rejections (bad BOC / bad nonce / underfunded) only ever
-  // arrive as client-side <500 responses. A 5xx is a server/upstream failure whose
-  // delivery is UNKNOWN even if its body happens to contain one of these words, so
-  // gate the keyword hard-fail to <500 and let 5xx fall through to ambiguous →
-  // confirm-via-read (never falsely mark a possibly-delivered external as rejected).
-  if (Number(error?.status ?? error?.response?.status ?? 0) < 500
-    && /rejected|bad request|invalid boc|invalid message|exit code|not enough vault ton|nonce/i.test(message)) return false;
-  if (isTonRpcRateLimitError(error)) return false;
-  if (Number(error?.status ?? error?.response?.status ?? 0) >= 500) return true;
-  return error?.code === 'TIMEOUT'
-    || error?.code === 'NETWORK_ERROR'
-    || /HTTP 5\d\d|timeout|network|failed to fetch|fetch failed|backoff|request aborted|bad gateway|service unavailable|gateway timeout|upstream request failed/i.test(message);
-}
-
 // Vault exit code 16453 = the publish path's throwUnless(clientNonce == publish_nonce) (contracts/Vault.tact).
 // AMBIGUOUS even on a re-broadcast sent right after reading currentNonce === clientNonce: toncenter is a
 // FLEET — POST /message is emulated against the SEND node's own state, which can lag the read pool by a
@@ -13346,22 +13325,6 @@ function isVaultPublishNonceConsumedError(error) {
 // and can never genuinely appear on these paths.
 const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES = Object.freeze([16037, 16135, 16233, 16249, 16262, 16611, 16711, 16808]);
 const VAULT_SINGLE_EXTERNAL_NONCE_REJECT_RE = new RegExp(`\\b(?:${VAULT_SINGLE_EXTERNAL_NONCE_REJECT_CODES.join('|')})\\b`);
-
-// A DEFINITIVE not-relayed verdict for a single-external broadcast 5xx: toncenter's emulation rejected
-// the external pre-accept on the receiver's nonce gate, so it was never queued/relayed by that node and
-// its nonce was NOT consumed. Deliberately STRICT, failing safe toward AMBIGUOUS (= the caller's old
-// raise-floor-and-wait behavior): (1) the exit-code CONTEXT is required, never a bare number anywhere in
-// a proxy error page — a false "definitely rejected" on a funds-moving external invites a user retry of
-// a possibly-delivered action (double execution), while a false "ambiguous" costs at most the old floor
-// overshoot; (2) it never fires when an EARLIER transport attempt's delivery is unknown
-// (tonRpcPriorDeliveryAmbiguous, stamped by callSend): a TIMEOUT'd primary upload can still be delivered
-// later, so a lagging fallback node's nonce reject does not prove that no copy is in flight.
-function isDefinitiveVaultSingleExternalNonceReject(error) {
-  if (error?.tonRpcPriorDeliveryAmbiguous === true) return false;
-  const text = String(error?.responseBody ?? error?.message ?? '');
-  if (!/exit\s*_?code/i.test(text)) return false;
-  return VAULT_SINGLE_EXTERNAL_NONCE_REJECT_RE.test(text);
-}
 
 // toncenter "cannot send external message : duplicate message" = the SAME BoC is already queued in its
 // mempool (an earlier broadcast of this exact external is still being processed). The external IS in flight,
@@ -20015,13 +19978,6 @@ async function callWithVerificationUnavailableReadFallback(readStrict, readUnver
   }
 }
 
-async function readConnectedVaultGlobalForOwnVaultAction(provider) {
-  return callWithDegradedTransportReadFallback(
-    () => loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() }),
-    () => loadConnectedVaultGlobal({ provider, ...unverifiedCriticalChainReadOptions() }),
-  );
-}
-
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -20344,20 +20300,6 @@ function isAthWalletNotDeployedError(error) {
   return /get-method exit code -13|cskip_no_state|no state|nonexist|Missing ATH wallet owner|Missing ATH master address/i.test(message);
 }
 
-function requireVaultUsernameMintRoute(global) {
-  if (global?.username_registry_bound !== true) {
-    throw new Error('Vault username payments are not enabled on this deployment yet');
-  }
-  const configuredRegistry = requireBasechainAddress(requireUsernameRegistryAddress(), 'UsernameRegistry');
-  const boundRegistry = global.username_registry_address
-    ? requireBasechainAddress(global.username_registry_address, 'Vault UsernameRegistry')
-    : null;
-  if (boundRegistry !== configuredRegistry) {
-    throw new Error('Vault username Registry binding does not match this app config');
-  }
-  return configuredRegistry;
-}
-
 function criticalChainReadOptions() {
   // Critical reads are dual-provider verified while verification is actually
   // possible. When every verifier transport is dead or blocked for this
@@ -20371,152 +20313,6 @@ function criticalChainReadOptions() {
 
 function criticalCapsuleHubReadOptions(address) {
   return { capsuleHubAddress: address, ...criticalChainReadOptions() };
-}
-
-function requireManifestHashMatch(value, label) {
-  const expectedManifest = uint256ConfigValue(requireVaultDeploymentManifestHash(), 'Vault deployment manifest hash');
-  if (BigInt(value ?? 0n) !== expectedManifest) {
-    throw new Error(`${label} deployment manifest hash does not match this app config`);
-  }
-}
-
-async function requireUsernameRegistryVaultRoute(global, options = {}) {
-  const registry = requireVaultUsernameMintRoute(global);
-  const provider = await resolveUsernameRegistryProvider();
-  if (!provider?.getGlobal || !provider.getAthWalletAddress) {
-    throw new Error('UsernameRegistry provider cannot verify Vault binding');
-  }
-  const expectedAthMaster = appConfig.ath?.masterAddress
-    ? requireBasechainAddress(appConfig.ath.masterAddress, 'ATHMaster')
-    : null;
-  const athMasterProvider = expectedAthMaster ? await resolveAthMasterProvider() : null;
-  const readOptions = options.allowUnverifiedRead === true
-    ? {
-      verify: false,
-      allowUnverifiedCriticalRead: true,
-      priority: 'critical',
-      cacheTtlMs: 0,
-    }
-    : criticalChainReadOptions();
-  // Sequential, not Promise.all: 2-3 concurrent toncenter reads stall the iOS run loop (v509 class). These are
-  // pure UsernameRegistry route-verify reads — reading them one at a time yields identical values (this runs on
-  // the username-mint pre-sign path; serializing touches no nonce/sign/broadcast logic).
-  const registryGlobal = await provider.getGlobal({ address: registry, ...readOptions });
-  const derivedOfficialWallet = await provider.getAthWalletAddress(registry, { address: registry, ...readOptions });
-  const appMasterOfficialWallet = athMasterProvider
-    ? (await athMasterProvider.getWalletAddress(registry, { address: expectedAthMaster, ...readOptions })) ?? null
-    : null;
-  if (registryGlobal.sealed !== true) throw new Error('UsernameRegistry is not sealed on this network');
-  if (registryGlobal.official_ath_wallet_bound !== true) throw new Error('UsernameRegistry official ATH wallet is not bound');
-  requireManifestHashMatch(registryGlobal.deployment_manifest_hash, 'UsernameRegistry');
-  const officialWallet = requireBasechainAddress(registryGlobal.official_ath_wallet_address, 'UsernameRegistry official ATH wallet');
-  const derivedWallet = requireBasechainAddress(derivedOfficialWallet, 'UsernameRegistry derived ATH wallet');
-  if (officialWallet !== derivedWallet) {
-    throw new Error('UsernameRegistry official ATH wallet is not the derived registry wallet');
-  }
-  if (expectedAthMaster) {
-    const appDerivedWallet = requireBasechainAddress(appMasterOfficialWallet, 'ATHMaster derived UsernameRegistry ATH wallet');
-    if (officialWallet !== appDerivedWallet) {
-      throw new Error('UsernameRegistry official ATH wallet ATHMaster binding does not match this app config');
-    }
-  }
-  let officialWalletData = null;
-  try {
-    officialWalletData = await createAthWalletTonRpcProvider({ athWalletAddress: officialWallet }).getWalletData({
-      address: officialWallet,
-      ...readOptions,
-    });
-  } catch (error) {
-    if (!isAthWalletNotDeployedError(error)) throw error;
-  }
-  if (officialWalletData) {
-    const officialWalletOwner = requireBasechainAddress(officialWalletData.owner_address, 'UsernameRegistry official ATH wallet owner');
-    if (officialWalletOwner !== registry) {
-      throw new Error('UsernameRegistry official ATH wallet owner does not match registry');
-    }
-    const walletAthMaster = officialWalletData.ath_master_address
-      ? requireBasechainAddress(officialWalletData.ath_master_address, 'UsernameRegistry official ATH wallet ATHMaster')
-      : null;
-    if (expectedAthMaster && walletAthMaster !== expectedAthMaster) {
-      throw new Error('UsernameRegistry official ATH wallet ATHMaster binding does not match this app config');
-    }
-  }
-  return registry;
-}
-
-async function requireUsernameRegistryVaultRouteForOwnVaultAction(global) {
-  return requireUsernameRegistryVaultRoute(global);
-}
-
-async function assertVaultUsernameMintCanStart(owner, username, priceAtomic) {
-  const provider = await resolveVaultChainProvider();
-  // Sequential, not Promise.all: concurrent get_user + get_global stall the iOS run loop (v509 class). Pure
-  // pre-sign balance/route reads — sequential preserves the same user/global; nonce/sign/broadcast run later.
-  const user = await readFreshConnectedVaultUserForOwnVaultAction(provider);
-  const global = await readConnectedVaultGlobalForOwnVaultAction(provider);
-  await requireUsernameRegistryVaultRouteForOwnVaultAction(global);
-  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate Platho account before minting a username');
-  }
-  requireVaultAuthSecretKey();
-  const vaultTon = vaultTonBalanceNanotons(user);
-  const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
-  if (vaultTon < USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS) {
-    throw new Error(`Not enough Vault GRAM: need ${formatTonNanotons(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS)} GRAM hold, have ${formatTonNanotons(vaultTon)} GRAM`);
-  }
-  if (vaultAth < priceAtomic) {
-    throw new Error(`Not enough Vault ATH: need ${formatAthAtomic(priceAtomic)} ATH, have ${formatAthAtomic(vaultAth)} ATH`);
-  }
-  rememberConnectedVaultUser(user);
-  return { user, global, username, priceAtomic, vaultTon, vaultAth };
-}
-
-async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
-  requireNoPendingServiceWorkerAppShellReload();
-  const provider = await resolveVaultChainProvider();
-  // Sequential, not Promise.all: concurrent get_global + get_user stall the iOS run loop (v509 class). Pure
-  // pre-sign reads — sequential returns the same global/user, and reading user LAST keeps it the freshest read
-  // before signing. The nonce floor / barrier / send-lock / sendBoc all run later in submitVaultAuthExternal*.
-  const global = await readConnectedVaultGlobalForOwnVaultAction(provider);
-  const rawUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
-  const registry = await requireUsernameRegistryVaultRouteForOwnVaultAction(global);
-  const user = rememberConnectedVaultUser(rawUser);
-  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate Platho account before minting a username');
-  }
-  requireVaultAuthSecretKey();
-  const vaultTon = vaultTonBalanceNanotons(user);
-  const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
-  if (vaultTon < USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS) {
-    throw new Error(`Not enough Vault GRAM: need ${formatTonNanotons(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS)} GRAM hold, have ${formatTonNanotons(vaultTon)} GRAM`);
-  }
-  if (vaultAth < priceAtomic) {
-    throw new Error(`Not enough Vault ATH: need ${formatAthAtomic(priceAtomic)} ATH, have ${formatAthAtomic(vaultAth)} ATH`);
-  }
-  const submission = await submitVaultAuthExternalWithNonceConfirmation({
-    provider,
-    owner,
-    user,
-    buildExternal: (clientNonce) => buildVaultUsernameMintExternalBoc({
-      owner_wallet: owner,
-      client_nonce: clientNonce,
-      max_ton_charge: USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
-      username_registry_address: registry,
-      username,
-      signingSecretKey: requireVaultAuthSecretKey(),
-      deploymentManifestHash: requireVaultDeploymentManifestHash(),
-    }, {
-      vaultAddress: requireVaultAddress(),
-    }),
-  });
-  globalThis.plathoLastVaultUsernameMint = {
-    ...submission,
-    owner,
-    registry,
-    username,
-    priceAtomic,
-  };
-  return submission;
 }
 
 async function refreshWalletTonBalanceForProfile() {
@@ -21429,86 +21225,6 @@ async function resolveRecipientWalletForThread(thread) {
   throw new Error('Recipient wallet route is not available');
 }
 
-async function submitVaultMessage(type, params, options = {}) {
-  requireNoPendingServiceWorkerAppShellReload();
-  const message = createVaultWalletMessage(type, params, {
-    vaultAddress: requireVaultAddress(),
-    ...options,
-  });
-  const transaction = createWalletTransaction(message);
-  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
-  globalThis.plathoLastVaultTransaction = { type, params, message, transaction, result };
-  markNavVaultBalancePending('wallet transaction submitted', {
-    resetRetry: true,
-    retry: true,
-    retryDelayMs: 2_000,
-  });
-  return result;
-}
-
-async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, user, buildExternal }) {
-  let clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
-  const nonceFloor = vaultPublishNonceFloor(owner);
-  if (clientNonce < nonceFloor) clientNonce = nonceFloor;
-  const external = await buildExternal(clientNonce);
-  let result = null;
-  let ambiguousBroadcast = false;
-  let broadcastError = null;
-  try {
-    result = await sendVaultExternalBoc(external);
-    raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
-  } catch (error) {
-    // Surface WHY toncenter rejected the Vault AUTH external (activation/key/profile/username ops) — the last
-    // broadcast path without a [platho] warn, so a bare "500" here (e.g. exit 16453 nonce race) is diagnosable.
-    console.warn('[platho] vault auth external broadcast failed', {
-      status: error?.status ?? null,
-      code: error?.code ?? null,
-      detail: error?.responseBody ?? shortUiErrorText(error, 'auth broadcast failed'),
-      clientNonce: String(clientNonce),
-    });
-    // A 500 whose body carries THIS path's Vault pre-accept nonce reject (per-receiver exit codes — see
-    // isDefinitiveVaultSingleExternalNonceReject; 16453 belongs to the BATCH receiver and never appears
-    // here) is toncenter's own emulation verdict: the external was rejected BEFORE acceptance and never
-    // queued/relayed, so its nonce was NOT consumed by this attempt. The batch publish path keeps
-    // treating such 500s as ambiguous — it RETAINS the signed external and the heal loop reconciles
-    // either way — but this single-external path retains nothing: ratcheting the floor on a proven
-    // pre-accept reject is pure overshoot (the v756-review liveness wedge: during a publish burst an
-    // auth action signs at the floor, bounces "too early", the floor climbs past a nonce nothing will
-    // ever consume, and every later auth external signs above the chain and bounces in turn — stuck
-    // until a reload resets the in-memory floor). Throwing the definitive error also closes the "too
-    // late" false-success: if the nonce was consumed by ANOTHER action, the old ambiguous flow saw the
-    // nonce advance and reported this action as maybe-landed when it definitively never executed.
-    // Double-spend-safe: the floor's invariant is "never sign below a CONSUMED nonce" — a pre-accept
-    // reject consumed nothing; a nonce consumed elsewhere is re-observed by every pre-sign read; and
-    // the matcher refuses when ANY earlier transport attempt's delivery was ambiguous (a delivered
-    // first copy + a lagging fallback node's bounce must keep the old raise-floor-and-wait flow, which
-    // correctly reports the FIRST attempt as landed instead of inviting a double-executing retry).
-    if (!isAmbiguousTonRpcBroadcastError(error) || isDefinitiveVaultSingleExternalNonceReject(error)) throw error;
-    ambiguousBroadcast = true;
-    broadcastError = error;
-    raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
-  }
-  let nonceWaitError = null;
-  try {
-    await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
-  } catch (error) {
-    if (ambiguousBroadcast || result) {
-      nonceWaitError = error;
-    } else {
-      throw error;
-    }
-  }
-  return {
-    external,
-    result,
-    clientNonce,
-    ambiguousBroadcast,
-    broadcastError: broadcastError ? String(broadcastError?.message ?? broadcastError) : null,
-    confirmationPending: Boolean(nonceWaitError),
-    nonceWaitError: nonceWaitError ? String(nonceWaitError?.message ?? nonceWaitError) : null,
-  };
-}
-
 // clean-17 direct-pay username mint values (proven by tests/username-registry-ath-wallet-integration.test.ts). The mint
 // deploys a UsernameNFTItem, so it needs far more than an avatar pointer write: the registry retains ~0.91 TON (100-year
 // item endowment). notify carries that downstream; the request is notify + forwarding fees; the ATH wallet refunds every
@@ -21527,11 +21243,10 @@ async function submitUsernameMintDirect(username) {
   setUsernameMintStatus(t('username.checkingAvailability'));
   await readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username);
   assertNoPendingUsernameMintRetry(username, owner);
-  // Affordability from the user's OWN ATH jetton wallet (NOT the Vault balance the synthesized activation user lacks).
-  const athBalance = await loadConnectedAthWalletBalance();
-  if (athBalance < priceAtomic) {
-    throw new Error(`Not enough ATH: need ${formatAthAtomic(priceAtomic)} ATH, have ${formatAthAtomic(athBalance)} ATH`);
-  }
+  // Affordability from the user's OWN ATH jetton wallet, through the shared direct-pay pre-flight (fail-closed:
+  // an unreadable jetton wallet must not become "go ahead and mint"). This used to be an inline copy; the avatar
+  // lane grew the same check and the two are now one primitive.
+  await assertConnectedAthAtLeast(priceAtomic, 'mint a name');
   setUsernameMintStatus(t('username.signing'));
   const athWalletAddress = await loadConnectedAthWalletAddress();
   const athRequest = createAthWalletMessage('ATHTransferRequestRegistryMintUsername', {
@@ -21571,31 +21286,10 @@ async function submitUsernameMintDirect(username) {
 async function submitUsernameMint() {
   const username = await requestUsernameMintName();
   if (!username) return null;
-  if (privateLaneDirectPayEnabled()) return submitUsernameMintDirect(username);   // clean-17 direct-pay: user's ATH wallet pays
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const registry = requireBasechainAddress(requireUsernameRegistryAddress(), 'UsernameRegistry');
-  const provider = await resolveUsernameRegistryProvider();
-  const priceAtomic = await readUsernameMintPriceForOwnVaultAction(provider, registry, username);
-  setUsernameMintStatus(t('username.checkingAvailability'));
-  await readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username);
-  assertNoPendingUsernameMintRetry(username, owner);
-  await assertVaultUsernameMintCanStart(owner, username, priceAtomic);
-  setUsernameMintStatus(t('username.signingThroughVault'));
-  const result = await submitVaultUsernameMint({
-    owner,
-    username,
-    priceAtomic,
-  });
-  rememberPendingUsernameMint(username, owner, result);
-  setUsernameMintStatus(result.confirmationPending === true ? t('username.mintSubmittedFinalizing') : t('username.mintFinalizing'));
-  autoLinkMintedUsername(username, owner, {
-    attempts: USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS,
-    delayMs: USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS,
-  }).catch((error) => {
-    setUsernameMintStatus(t('username.mintSubmittedLinkAfterSync'));
-    console.error(error);
-  });
-  return result;
+  // clean-17 direct-pay: the mint is paid from the user's OWN ATH wallet straight to UsernameRegistry
+  // (submitUsernameMintDirect). The removed Vault half read the Vault user/global, verified a Vault->registry
+  // route and signed a Vault auth external — none of which exists once the wallet pays the registry itself.
+  return submitUsernameMintDirect(username);
 }
 
 async function submitAthDueFlush() {
@@ -21918,28 +21612,10 @@ async function submitKeyShardRegisterDirect() {
 }
 
 async function submitVaultRegisterMessagingKeys() {
-  if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
-  if (privateLaneDirectPayEnabled()) return submitKeyShardRegisterDirect();   // clean-17 direct-pay register
-  const provider = await resolveVaultChainProvider();
-  const user = await readFreshConnectedVaultUser(provider);
-  if (user.current_key_id && BigInt(user.current_key_id) !== 0n) {
-    vaultDraftStatus.textContent = t('vault.active');
-    return null;
-  }
-  const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
-  if (!(await confirmPlathoAccountActivation(user, { needsKeyBackup }))) return null;
-  // Only force the key export when this wallet key has never been backed up (a freshly created wallet). An
-  // imported or already-exported wallet is provably backed up (markWalletKeyBackupDone cleared the flag), so
-  // don't make the user re-download it just to activate.
-  if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
-  vaultDraftStatus.textContent = t('vault.signing');
-  const result = await submitVaultMessage('RegisterMessagingKeys', localVaultDraft.message, {
-    userExists: user.exists === true,
-  });
-  plathoAccountActivationPending = true;
-  vaultDraftStatus.textContent = t('vault.activationSent');
-  queueVaultPostTransactionRefresh({ pollActivation: true });
-  return result;
+  // clean-17 direct-pay: messaging keys are published straight into the owner's KeyShard from their wallet
+  // (submitKeyShardRegisterDirect); sender() == owner_wallet is the shard's whole authorisation. The removed
+  // half built a Vault RegisterMessagingKeys auth external.
+  return submitKeyShardRegisterDirect();
 }
 
 async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = {}) {
@@ -21988,46 +21664,11 @@ async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = 
 }
 
 async function submitVaultReplaceMessagingKeys() {
-  if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
-  // clean-17 INTERIM: key ROTATION is not yet wired to the KeyShard replace (KSG1 at KS_MIN_REPLACE_VALUE). Refuse under
-  // direct-pay so this never issues a live external + funds to the DEPRECATED Vault at cutover. [activation review: rotation misroutes to dead Vault]
-  if (privateLaneDirectPayEnabled()) throw new Error('Key rotation is not yet available on direct-pay (KeyShard replace path pending)');
-  const provider = await resolveVaultChainProvider();
-  const user = await loadConnectedVaultUser({
-    provider,
-    verify: true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
-  const currentKeyId = BigInt(user.current_key_id ?? 0n);
-  if (user.exists !== true || currentKeyId === 0n) {
-    setText(vaultRotateStatus, t('vault.activateAccountFirst'));
-    return null;
-  }
-  const requiredTon = estimateVaultAttachedValueNanotons('ReplaceMessagingKeys', localVaultDraft.message);
-  const tonBalance = BigInt(user.ton_balance ?? user.tonBalance ?? 0n);
-  if (tonBalance < requiredTon) {
-    throw new Error(`Vault GRAM balance is too low for key rotation; need ${formatTonNanotons(requiredTon)} GRAM`);
-  }
-  setText(vaultRotateStatus, t('vault.signing'));
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const submission = await submitVaultAuthExternalWithNonceConfirmation({
-    provider,
-    owner,
-    user,
-    buildExternal: (clientNonce) => buildVaultReplaceMessagingKeysExternalBoc({
-      ...localVaultDraft.message,
-      owner_wallet: owner,
-      client_nonce: clientNonce,
-      signingSecretKey: requireVaultAuthSecretKey(),
-    }, {
-      vaultAddress: requireVaultAddress(),
-      deploymentManifestHash: requireVaultDeploymentManifestHash(),
-    }),
-  });
-  globalThis.plathoLastVaultReplaceMessagingKeysExternal = submission;
-  setText(vaultRotateStatus, submission.confirmationPending ? t('vault.keyUpdateSubmittedConfirming') : t('vault.keyUpdateSent'));
-  return submission;
+  // clean-17: there is nothing to rotate. The messaging keys are DERIVED deterministically from the wallet
+  // seed with frozen info strings, so a "replace" would re-register the same keys; re-registration that DOES
+  // matter (stale keys on the shard) is folded into submitKeyShardRegisterDirect. The button is hidden under
+  // direct pay; this throw is the fail-closed backstop for any programmatic caller.
+  throw new Error('Key rotation is not yet available on direct-pay (KeyShard replace path pending)');
 }
 
 const VAULT_PUBLISH_STATUS_SUBMITTED = 'vault-publish-submitted';
@@ -25706,19 +25347,17 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
   return result;
 }
 
+// Console/debug surface. It carries only what a human can still MEANINGFULLY call: the direct-pay entry points
+// and the message builders. Vault-era entries were removed as their lanes collapsed — an export that resolves to
+// a dead branch is worse than no export, because it reads as a supported way in.
 globalThis.plathoVaultTransactions = {
-  createVaultWalletMessage,
   createAthWalletMessage,
   createPublicPostPayload,
   createWalletTransaction,
-  submitVaultMessage,
   submitUsernameMint,
-  submitVaultUsernameMint,
   submitAthDueFlush,
   submitProfileAvatarUpdate,
   submitVaultRegisterMessagingKeys,
-  submitVaultReplaceMessagingKeys,
-  refreshVaultDashboard,
   syncPrivateCapsulesFromChain,
 };
 
