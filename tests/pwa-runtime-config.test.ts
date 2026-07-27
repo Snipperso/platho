@@ -1391,28 +1391,10 @@ describe('PWA runtime config guard', () => {
   });
 
 
-  it('PWA-INSUFFICIENT-GRAM-01: an underfunded Vault stops the confirm re-broadcast loop with a "top up GRAM" terminal', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    // The signed-hold helper reads the persisted per-batch maxCharge (deduped) for parts still needing rebroadcast.
-    expect(app).toMatch(/function privatePublishStateSignedHoldNanotons\(publishState\)/);
-    expect(app).toMatch(/seenBatches\.has\(batchKey\)/);
-    // Before re-broadcasting, the confirm executor reads the LIVE Vault GRAM balance when nothing landed and every
-    // in-flight external is failing; if it can't cover the signed hold, it terminal-stops with INSUFFICIENT_VAULT_GRAM
-    // instead of hammering /message with 500s.
-    const runSource = app.slice(
-      app.indexOf('async function runPrivatePublishConfirmationRetry'),
-      app.indexOf('const broadcastRetries = await retryUnconfirmedPrivatePublishBroadcasts'),
-    );
-    expect(runSource).toMatch(/publishStateBroadcastIsFailing\(message\.publishState\)/);
-    // Uses the CACHED vault balance (same source as the composer cost line), NOT a fresh chain read — a fresh read
-    // fails exactly when the RPC is unavailable (the moment broadcasts 5xx), which silently defeated the gate.
-    expect(runSource).toMatch(/const cachedVaultUser = currentVaultUserSource\(\)/);
-    expect(runSource).toMatch(/vaultTonBalanceNanotons\(cachedVaultUser\) < signedHold/);
-    expect(runSource).not.toMatch(/readFreshConnectedVaultUserForOwnVaultAction/);
-    expect(runSource).toMatch(/code: 'INSUFFICIENT_VAULT_GRAM'/);
-    // The terminal status tells the user to top up; the gate is double-spend-safe (it only stops a re-broadcast).
-    expect(app).toMatch(/error\?\.code === 'INSUFFICIENT_VAULT_GRAM'\) return 'Insufficient Vault GRAM — top up in Vault, then retry'/);
-  });
+  // PWA-INSUFFICIENT-GRAM-01 removed with the Vault confirm re-broadcast loop: "an underfunded Vault stops the loop
+  // with a top-up terminal" describes a loop that re-POSTed a Vault batch until its receipt confirmed. Direct pay
+  // has no such loop; underfunding is caught BEFORE signing by assertWalletGramAtLeast / assertConnectedAthAtLeast
+  // (pinned in PWA-PUBLIC-DIRECT-01 and PWA-CONFIG-06B), which is strictly earlier and cheaper than a terminal.
 
   // PWA-SEND-01 removed with the Vault publish trunk: the network-surcharge cap gate + high-surcharge confirm
   // guarded the Vault publish HOLD (contract charge + surcharge, refundable). Direct sends pay plain TON message
@@ -1512,58 +1494,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/privatePublishConfirmStopped/);
   });
 
-  it('PWA-SEND-02C: partial private send retries unsent capsule parts', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const settleSource = app.slice(
-      app.indexOf('async function settlePrivateComposerSendError'),
-      app.indexOf('async function runPrivateSendRetry'),
-    );
-    const markAwaitingSource = app.slice(
-      app.indexOf('function markPublishStateAwaitingPartsForRetry'),
-      app.indexOf('function markStaleUnconfirmedPublishPartsForRetry'),
-    );
-
-    expect(app).toMatch(/function publishPartAlreadyAttempted\(part\)/);
-    expect(app).toMatch(/function publishPartHadPriorChainAttempt\(part\)/);
-    expect(app).toMatch(/function publishPartEligibleForChainConfirmation\(part\)/);
-    expect(app).toMatch(/privateMessageHasPublishAttempt\(message\)[\s\S]*publishPartEligibleForChainConfirmation\(part\)/);
-    expect(app).toMatch(/function publishStateHasRetryableSendParts\(publishState\)/);
-    expect(app).toMatch(/function ensurePendingPrivateSendRetry\(thread, message/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS = 2 \* 60 \* 1000/);
-    expect(app).toMatch(/function markPublishStateAwaitingPartsForRetry\(publishState/);
-    expect(app).toMatch(/function publishPartCanFreshSendRetry\(part\)/);
-    expect(app).toMatch(/function markStaleUnconfirmedPublishPartsForRetry\(message/);
-    expect(app).toMatch(/return markPublishStateAwaitingPartsForRetry\(publishState, reason\)/);
-    expect(app).toMatch(/if \(part\.clientNonce !== undefined && part\.clientNonce !== null\) return false/);
-    expect(app).toMatch(/typeof part\.externalBoc === 'string' && part\.externalBoc\.length > 0/);
-    expect(markAwaitingSource).toMatch(/if \(!publishPartCanFreshSendRetry\(part\)\) continue/);
-    expect(markAwaitingSource).not.toMatch(/publishPartAwaitingCapsuleHubConfirmation\(part\)/);
-    expect(app).toMatch(/clearPublishPartSignedAttempt\(part\)/);
-    expect(app).toMatch(/retryPreviousStatus:\s*previousStatus/);
-    expect(app).toMatch(/publishState\.status = 'built'/);
-    expect(app).toMatch(/some\(\(part\) => !publishPartAlreadyAttempted\(part\)\)/);
-    const staleRetrySource = app.slice(
-      app.indexOf('function markStaleUnconfirmedPublishPartsForRetry'),
-      app.indexOf('function privateSendRetryKey'),
-    );
-    expect(staleRetrySource).not.toMatch(/parts\.length <= 1/);
-    expect(staleRetrySource).not.toMatch(/confirmedCount <= 0/);
-    // The VPB2 per-batch already-attempted skip (never re-send a batch external whose items were attempted, which
-    // would re-publish and re-charge them) went with the Vault publish trunk. Its direct-pay counterpart is the
-    // wallet-level rule below: an AMBIGUOUS broadcast hands back the signed BOC (error.builtBoc, bound to that
-    // seqno) and the retry re-broadcasts THAT byte-for-byte instead of signing a fresh one — the chain then runs
-    // it at most once. A fresh signature under a new seqno would double-publish a landed message.
-    expect(app).toMatch(/if \(!message\.convDirectSend\?\.boc && error\?\.builtBoc\) message\.convDirectSend = \{ boc: error\.builtBoc/);
-    const walletSend = readFileSync('web/platho-wallet.mjs', 'utf8');
-    expect(walletSend).toMatch(/error\.builtBoc = built\.boc; error\.builtSeqno = seqno;/);
-    // clean-17: the live private send is direct-pay (attemptConvMessagePublishDirect); the composer wrapper
-    // attemptPrivateComposerMessagePublish no longer carries the Vault capsule-reuse/publishState body, so the
-    // former attemptSource assertions (capsule reuse, createCapsulePublishState) were dropped. The orphaned Vault
-    // retry machinery pinned above stays until its follow-up removal batch.
-    // The PARTIAL-publish fan-out (a Vault publishState with some parts landed) is gone with the publishState
-    // itself; a direct send either broadcasts whole or throws, so a recoverable error simply re-schedules.
-    expect(settleSource).toMatch(/if \(isRecoverablePrivateSendError\(error\)\) \{[\s\S]*schedulePrivateSendRetry\(context, error\);/);
-  });
+  // PWA-SEND-02C removed with the per-part publish state: "retry the UNSENT parts" only means something when a
+  // message is N independently-signed externals. A direct message is ONE wallet transfer — it is sent or it is not,
+  // and its retry re-broadcasts the same signed BOC (PWA-CONV-DELIVERY-01 #6, PUBLISH-RETRY-01).
 
   it('PWA-SEND-02D: reload/focus resumes pending private send retries, not only confirmation polling', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -1630,8 +1563,6 @@ describe('PWA runtime config guard', () => {
     // slice). Under direct pay it is wired at the app's resume hooks instead — assert the hooks, not a count
     // over a function that no longer contains them.
     expect(app.match(/resumePendingPrivateSendRetries\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
-    expect(confirmRunSource).toMatch(/const sendRetryScheduled = ensurePendingPrivateSendRetry\(thread, message/);
-    expect(confirmRunSource).toMatch(/Retrying unsent capsule parts/);
     expect(sendRetrySource).toMatch(/function ensurePendingPrivateSendRetry\(thread, message/);
     expect(sendRetrySource).toMatch(/function revivePartialPrivateSendRetry\(message\)/);
     expect(sendRetrySource).toMatch(/privatePartialSendRetryExpired\(message\)/);
@@ -1642,7 +1573,6 @@ describe('PWA runtime config guard', () => {
     expect(scheduleSendSource).toMatch(/attempt >= privateSendRetryMaxAttempts\(error, message\)/);
     expect(scheduleSendSource).toMatch(/PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED/);
     expect(scheduleSendSource).toMatch(/stopPartialPrivatePublishRecovery\(context/);
-    expect(confirmRunSource).toMatch(/stopPartialPrivatePublishRecovery\(context\)/);
     expect(pendingConfirmSource).toMatch(/!privatePartialSendRetryExpired\(message\)/);
     expect(sendRetrySource).toMatch(/privateSendRetryJobs\.has\(existingKey\)/);
     expect(app).toMatch(/const hasStoredCapsules = \(Array\.isArray\(message\?\.capsules\) && message\.capsules\.length > 0\) \|\| Boolean\(message\?\.capsule\)/);
@@ -1929,13 +1859,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(!needsKey\) vaultSendInFlightUntil = 0/);
     expect(app).toMatch(/if \(vaultSendInFlightUntil === 0\) vaultSendInFlightUntil = now \+ SEND_LOCK_MAX_GRACE_MS/);
     expect(app).toMatch(/function shouldIgnoreTransientWalletLock\(\)[\s\S]*shouldDeferLockForActiveSend\(\)/);
-    // Axis C: keyless resume uses the persisted PUBLIC sender address; refuses if a different account unlocked.
-    // (The publishState.ownerWallet STAMP was written by prepareCapsulesThroughVault, which is gone; the reader
-    // below still fails closed on a mismatch and falls back to the live wallet when no stamp is present.)
-    expect(app).toMatch(/function resolvePublishOwner\(publishState\)[\s\S]*rawWalletAddress\(live\) !== rawWalletAddress\(stored\)\) return null/);
-    expect(app).toMatch(/const owner = options\.owner \?\? resolvePublishOwner\(publishState\);\s*if \(!owner\) return 0/);
-    expect(app).toMatch(/owner = resolvePublishOwner\(publishState\);\s*if \(!owner\) return \{ resigned: 0, confirmed: 0 \}/);
-    expect(app).toMatch(/confirmCapsuleHubPublishEntries\(message\.publishState, \{ \.\.\.confirmOptions, owner: resolvePublishOwner\(message\.publishState\) \}\)/);
+    // Axis C (keyless resume of a Vault publish under the persisted owner address) went with the Vault publish:
+    // there is no publishState to resume and no auth key to avoid using. The lock deferral above — the half that
+    // is about the WALLET key during a direct send — is the part that still has a subject.
   });
 
   it('PWA-WALLET-LOCK-TIMING-01: wallet auto-lock timers relaxed per owner (idle 30min, TG background 5min, send grace 10min)', () => {
@@ -2573,32 +2499,10 @@ describe('PWA runtime config guard', () => {
   // once is retried by construction; an unreadable capsule is counted as skipped and the scan reports itself
   // incomplete (scanComplete:false) instead of silently claiming to be up to date.
 
-  it('PWA-DOUBLEPUBLISH-01: a possibly-delivered external is never fresh-re-signed under a new nonce', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const prove = app.slice(
-      app.indexOf('async function provePublishPartAbsentFromSenderIndex'),
-      app.indexOf('async function recoverDroppedSignedPublishParts'),
-    );
-    const recover = app.slice(
-      app.indexOf('async function recoverDroppedSignedPublishParts'),
-      app.indexOf('function privateSendRetryKey'),
-    );
-    // The absence proof that authorizes a fresh re-sign is private-only and rests
-    // on a VERIFIED read; in degraded verification it returns 'inconclusive' (no re-sign).
-    expect(prove).toMatch(/if \(publishPartKind\(part\) !== 'private'\) return 'inconclusive'/);
-    expect(prove).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) return 'inconclusive'/);
-    expect(prove).toMatch(/verify: true, allowUnverifiedCriticalRead: false/);
-    // Dropped-recovery never re-signs a public part, never re-signs on a non-'absent'
-    // verdict, and cross-checks a VERIFIED receipt before clearing the signed attempt.
-    expect(recover).toMatch(/if \(publishPartKind\(part\) !== 'private'\) continue/);
-    expect(recover).toMatch(/if \(verdict !== 'absent'\) continue/);
-    expect(recover).toMatch(/readBatchPublishReceipt\(chainProvider, vaultAddress, owner, clientNonce, \{/);
-    expect(recover).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.CONFIRMED/);
-    // The clear+reset (fresh re-sign) happens only after the receipt is missing/EVICTED.
-    expect(recover).toMatch(/status !== BATCH_PUBLISH_RECEIPT_STATUS\.EVICTED\) \{\s*\n\s*continue/);
-    // The ambiguous-broadcast nonce-floor ratchet is still shared by every remaining Vault external path (the
-    // per-BATCH raise lived in the deleted publish trunk).
-  });
+  // PWA-DOUBLEPUBLISH-01 removed with the fresh-sign-vs-re-broadcast split it policed. That split existed because a
+  // Vault part carried its own nonce and could be re-signed under a new one. Direct pay makes the same guarantee
+  // structurally: the external is bound to the wallet seqno (chain executes it at most once) and an ambiguous
+  // broadcast returns the signed BOC for verbatim re-broadcast — pinned in PUBLISH-RETRY-01 and PWA-CONV-DELIVERY-01.
 
   it('PWA-SEND-RELIABILITY-01: burst-send hardening — no false-fail, no dual-broadcast, no read storm', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -2733,68 +2637,9 @@ describe('PWA runtime config guard', () => {
     expect(confirmationSource).toMatch(/candidateProvider\.getPublicEntry\(entryId, readOptions\)/);
   });
 
-  it('RT-PWA-CAPS-001: publish confirmation cannot mark CapsuleHub confirmed from unverified reads, and the receipt-ring read is verified fail-closed', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const confirmationSource = app.slice(
-      app.indexOf('async function confirmVaultBatchReceiptsFromPublishState'),
-      app.indexOf('function vaultSendBocRequestTimeoutMs'),
-    );
-    // The receipt-ring confirm: the authoritative single-read answer for a batch's fate.
-    const receiptSource = app.slice(
-      app.indexOf('async function confirmVaultBatchReceiptsFromPublishState'),
-      app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode'),
-    );
-    const strictStart = app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode');
-    const directConfirmStart = app.indexOf('async function confirmCapsuleHubPublishEntries(publishState, options = {})');
-    const strictSource = app.slice(
-      strictStart,
-      directConfirmStart,
-    );
-    const retrySource = app.slice(
-      app.indexOf('async function runPrivatePublishConfirmationRetry'),
-      app.indexOf('function hasPendingPrivatePublishConfirmation'),
-    );
-
-    expect(strictSource).toMatch(/const readOptions = publishConfirmReadOptions\(address, options\)/);
-    expect(app).toMatch(/function publishConfirmReadOptions\(address, options = \{\}\)[\s\S]*const out = criticalCapsuleHubReadOptions\(address\)/);
-    // The CapsuleHub entry-scan recovery never trusts unverified critical reads to confirm.
-    expect(strictSource).not.toMatch(/capsuleHubMessageSyncReadOptions|allowUnverifiedCriticalRead/);
-    // The receipt-ring read is VERIFIED (dual-provider) fail-closed: a CAPSULEHUB_CONFIRMED transition must
-    // never rest on a single unverified replica.
-    expect(receiptSource).toMatch(/const readOptions = \{\s*verify: true,/);
-    expect(receiptSource).not.toMatch(/allowUnverifiedCriticalRead:\s*true/);
-    expect(receiptSource).toMatch(/readBatchPublishReceipt\(provider, vaultAddress, owner, batch\.nonce, readOptions\)/);
-    // v699 receipt gate: under a FRESH heal nonce read (value stamped alongside the timestamp), batches with
-    // nonce >= the proven floor are provably unlanded — their verified 2-HTTP receipt read is skipped. The
-    // gate only DEFERS reads (fail-open when the proof is stale/absent); it can never confirm anything.
-    // Backstops: proof expiry re-checked PER BATCH, and a 30s PROBE pass reads receipts anyway (a single
-    // stale nonce replica renewing the proof forever must not starve the verified receipt backstop).
-    expect(receiptSource).toMatch(/provenUnlandedFloorNonce = BigInt\(publishState\.lastBroadcastRetryNonceReadValue\)/);
-    expect(receiptSource).toMatch(/nonceProofAgeMs >= 0 && nonceProofAgeMs < 10_000/);
-    expect(receiptSource).toMatch(/probeAgeMs >= 0 && probeAgeMs < 30_000/);
-    expect(receiptSource).toMatch(/publishState\.lastReceiptGateProbeAt = Date\.now\(\);/);
-    expect(receiptSource).toMatch(/if \(provenUnlandedFloorNonce !== null && Date\.now\(\) < nonceProofExpiresAt && batch\.nonce >= provenUnlandedFloorNonce\) continue;/);
-    expect(app).toMatch(/publishState\.lastBroadcastRetryNonceReadOkAt = Date\.now\(\);\s*publishState\.lastBroadcastRetryNonceReadValue = String\(currentNonce\);/);
-    expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.CONFIRMED/);
-    expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.REJECTED/);
-    expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.BOUNCED/);
-    expect(receiptSource).toMatch(/firstEntryId \+ BigInt\(batchPartIndex\)/);
-    expect(receiptSource).toMatch(/confirmedBy:\s*'vault_batch_receipt'/);
-    expect(confirmationSource).toMatch(/const requirePublishIdMatch = group\.kind === 'public'/);
-    expect(confirmationSource).toMatch(/publishEntryMatchesPart\(entry, part, \{ allowPublishIdMismatch, requirePublishIdMatch \}\)/);
-    expect(confirmationSource).not.toMatch(/group\.kind === 'public' && Boolean\(part\.authorWallet \?\? part\.author_wallet\)/);
-    expect(directConfirmStart).toBeGreaterThan(strictStart);
-    expect(confirmationSource).toMatch(/async function confirmCapsuleHubPublishEntries\(publishState, options = \{\}\)[\s\S]*return confirmCapsuleHubPublishEntriesWithReadMode\(publishState, options\.hot === true/);
-    expect(strictSource).toMatch(/if \(options\.skipBatchReceipt !== true\)[\s\S]*confirmVaultBatchReceiptsFromPublishState/);
-    expect(confirmationSource).toMatch(/scanLimit: options\.scanLimit \?\? CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT/);
-    expect(retrySource).toMatch(/await recoverDroppedSignedPublishParts\(message\)/);
-    expect(retrySource).toMatch(/if \(message\.publishState\?\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\)[\s\S]*schedulePrivatePublishConfirmationRetry\(context\)/);
-    expect(retrySource).toMatch(/const softVerification = isTonRpcRecoverableReadError\(error\)/);
-    expect(retrySource).toMatch(/if \(!rateLimited && !softVerification\) console\.error\(error\)/);
-    expect(retrySource).toMatch(/message\.privatePublishConfirmLastResult = softVerification \? 'rpc delayed' : 'error'/);
-    // The whole Vault avatar confirm ladder (mobilized loop + finalize + entry-scan recovery) went at cutover:
-    // a direct avatar publish is confirmed by its own wallet transfer — see PWA-CONFIG-06B.
-  });
+  // RT-PWA-CAPS-001 removed with the CapsuleHub publish confirmation: it required a verified, fail-closed read
+  // before marking a Vault batch confirmed. The direct lane's equivalent — never claim delivery without an
+  // authoritative read, never false-red on an inconclusive one — is pinned in PWA-CONV-DELIVERY-01.
 
   // RT-PWA-CAPS-001B removed with the CapsuleHub publish/confirm model: it pinned repairing STALE PENDING parts by
   // matching payload hashes against entries of the shared log. A direct-pay send has no publishState to repair —
@@ -2830,8 +2675,6 @@ describe('PWA runtime config guard', () => {
     // its own vault read burst and concurrent background reads stall the iOS run loop (v509 pattern).
     expect(autoSyncSource).toMatch(/if \(privateOutboundWorkActive\(\) \|\| privatePublishConfirmJobs\.size > 0 \|\| plathoAccountActivationPending\) \{/);
     expect(autoSyncSource).toMatch(/scheduleMessageAutoSync\(PRIVATE_OUTBOUND_SYNC_PAUSE_MS\)/);
-    expect(confirmSource).toMatch(/const endPrivateOutboundWork = beginPrivateOutboundWork\(\)/);
-    expect(confirmSource).toMatch(/finally \{[\s\S]*endPrivateOutboundWork\(\);[\s\S]*\}/);
     expect(app).toMatch(/const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 2_500/);
   });
 
@@ -3430,7 +3273,6 @@ describe('PWA runtime config guard', () => {
     // All three live drivers (private pass, private resume sweep, public shim) use the scaled deadline.
     // Two of the three drivers that shared this deadline (the private confirm retry and the public confirm
     // pass) went with the publishState they healed; the channel-profile heal keeps it.
-    expect(app.match(/>= publishConfirmNoProgressDeadlineMs\(/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
     // The partial-retry window stays ABOVE the scaled terminal (old relation: 15min = 6min + 9min slack).
     expect(app).toMatch(/publishConfirmNoProgressDeadlineMs\(message\?\.publishState\) \+ 9 \* 60 \* 1000/);
     // Batch K's position-scaled background nonce wait went with the Vault publish trunk: direct sends order by
@@ -5749,9 +5591,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function confirmProfileAvatarPointer'),
       app.indexOf('async function submitProfileAvatarUpdate'),
     );
-    expect(confirmSource).toMatch(/enqueueAvatarChainRead\(\(\) => readCurrentProfileAvatarPointerResultFromChain\(owner, \{ required: false \}\)\)/);
-    expect(confirmSource).toMatch(/if \(!read\.ok\) continue;/);
-    expect(confirmSource).toMatch(/setAvatarNode\(profileAvatar, 'P', imageUrl\)/);
     expect(app).toMatch(/const PROFILE_AVATAR_POINTER_CONFIRM_DEADLINE_MS = 120 \* 1000/);
     // DETERMINISTIC streamId: a retry of the same image in the same era merges with the parts already on the
     // shard instead of orphaning them. The era is in the preimage so a re-upload after retention can still
