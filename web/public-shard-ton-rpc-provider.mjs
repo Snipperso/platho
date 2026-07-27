@@ -19,7 +19,7 @@
 // It reuses the shared transport (runGetMethod through the app's pump, readAccountStates for the batched sweep,
 // the /messages reader) rather than inventing a path — one queue per client key is what the rate model rests on.
 
-import { computeCellHashAndDepth, beginCell, parseBocBase64 } from './pwa-contract-transactions.mjs?v=33';
+import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo } from './pwa-contract-transactions.mjs?v=33';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
 
 export class PublicShardTonRpcProviderError extends Error {
@@ -249,37 +249,98 @@ export function createPublicShardTonRpcProvider(options = {}) {
      * newest first — bodyCell is the raw inbound message body, source the sender address. web/shard-rpc's
      * createShardMessagesReader yields the cells; a thin wrapper adds the per-message source.
      */
-    async readPosts(shardAddress, { readMessagesWithSource, fromId = 0n, maxCount = 96n, callOptions = {} } = {}) {
+    async readPosts(shardAddress, { readMessagesWithSource, fromId = null, maxCount = 96n, callOptions = {}, entryCount = null } = {}) {
       if (typeof readMessagesWithSource !== 'function') {
         throw new PublicShardTonRpcProviderError('readPosts requires a readMessagesWithSource(address) function');
       }
       const raw = parseTonAddress(shardAddress).raw;
-      const page = await this.getPage(raw, fromId, maxCount, callOptions);
-      if (page.rows.length === 0) return { entry_count: page.entry_count, posts: [] };
-
-      const commitToRow = new Map(page.rows.map((r) => [r.body_commit.toString(), r]));
+      // TAIL-ANCHORED BY DEFAULT. get_page(0, …) returns the OLDEST rows (the contract's own words: "Row i is
+      // entry (from_id + i)") while /messages is served NEWEST-first with a limit — two windows anchored at
+      // OPPOSITE ends of the same shard. MEASURED against a real PublicShard (tests/public-lane-read-window):
+      // at 120 entries the reader returned entries 0..95 and the channel's 24 newest posts were invisible; at
+      // 260 the windows stopped overlapping entirely and the shard read back EMPTY — every paid post gone from
+      // the feed, silently. A caller that genuinely wants an older slice passes fromId explicitly.
+      let start;
+      let known = entryCount === null ? null : BigInt(entryCount);
+      if (fromId === null) {
+        if (known === null) {
+          // A zero-row page is the cheapest entry_count probe: same getter, no rows, no gas cliff.
+          known = BigInt((await this.getPage(raw, 0n, 0n, callOptions)).entry_count ?? 0n);
+        }
+        if (known <= 0n) return { entry_count: known ?? 0n, posts: [] };
+        start = known > BigInt(maxCount) ? known - BigInt(maxCount) : 0n;
+      } else {
+        start = BigInt(fromId);
+      }
+      // The bodies are read ONCE and reused across pages: /messages is the expensive call, get_page is cheap.
       const messages = await readMessagesWithSource(raw);
-      const posts = [];
-      const claimed = new Set();
-      for (const message of messages) {
-        const parsed = parsePublicPublish(message.bodyCell);
-        if (!parsed) continue;                          // a top-up, bounce or foreign message, not a publish
-        const commit = (await publicBodyCommit(parsed.header, parsed.body)).toString();
-        const row = commitToRow.get(commit);
-        if (!row || claimed.has(commit)) continue;      // not an accepted entry, or a duplicate already matched
-        claimed.add(commit);
-        posts.push({
-          entry_id: row.entry_id,
-          created_at: row.created_at,
-          publisher: message.source ? parseTonAddress(message.source).raw : null,
-          header: parsed.header,
-          body: parsed.body,
-        });
+      const matchRows = async (rows) => {
+        const commitToRow = new Map(rows.map((r) => [r.body_commit.toString(), r]));
+        const out = [];
+        const claimed = new Set();
+        for (const message of messages) {
+          const parsed = parsePublicPublish(message.bodyCell);
+          if (!parsed) continue;                          // a top-up, bounce or foreign message, not a publish
+          const commit = (await publicBodyCommit(parsed.header, parsed.body)).toString();
+          const row = commitToRow.get(commit);
+          if (!row || claimed.has(commit)) continue;      // not an accepted entry, or a duplicate already matched
+          claimed.add(commit);
+          out.push({
+            entry_id: row.entry_id,
+            created_at: row.created_at,
+            publisher: message.source ? parseTonAddress(message.source).raw : null,
+            header: parsed.header,
+            body: parsed.body,
+          });
+        }
+        return out;
+      };
+
+      let posts = [];
+      let entryCountSeen = 0n;
+      let cursor = start;
+      // MULTIPART STRADDLE. A tail window can begin in the MIDDLE of a multi-entry post, and every assembler
+      // above this layer DROPS a group whose parts are not all present (assemblePublicParts, assembleAvatarParts)
+      // — so a large post sitting on the boundary would vanish silently, which is the same class of loss the
+      // tail anchoring above exists to stop. Extend one page backwards when a stream in the window is
+      // incomplete. ONE extra page always suffices: a message is capped at 16 parts and an avatar at 16, both
+      // far below a 96-row page. An explicit fromId means the caller asked for a precise slice — never extend it.
+      for (let pageIndex = 0; pageIndex < 2; pageIndex += 1) {
+        const page = await this.getPage(raw, cursor, maxCount, callOptions);
+        entryCountSeen = page.entry_count;
+        if (page.rows.length === 0) break;
+        // Pages OVERLAP when the extension clamps to 0 (a window starting at 6 extends to 0..95, re-reading
+        // 6..95), so merge by entry_id — a duplicated part would otherwise inflate a stream past its part_count
+        // and make an incomplete group look complete.
+        const merged = new Map();
+        for (const post of [...(await matchRows(page.rows)), ...posts]) merged.set(String(post.entry_id), post);
+        posts = [...merged.values()];
+        if (fromId !== null || cursor === 0n) break;
+        if (!hasIncompletePublicStream(posts)) break;
+        cursor = cursor > BigInt(maxCount) ? cursor - BigInt(maxCount) : 0n;
       }
       posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
-      return { entry_count: page.entry_count, posts };
+      return { entry_count: entryCountSeen, posts };
     },
   };
+}
+
+// Does the window hold a multipart stream whose parts are not all present? Single-part entries (the common
+// case: text posts, comments, beacon cards) can never be incomplete, so they cost nothing here.
+function hasIncompletePublicStream(posts) {
+  const groups = new Map();
+  for (const post of posts) {
+    const info = readPublicPartHeaderInfo(post.header);
+    if (!info || Number(info.partCount ?? 1) <= 1) continue;
+    const key = String(info.streamId ?? '').toLowerCase();
+    const group = groups.get(key) ?? { expected: Number(info.partCount), seen: new Set() };
+    group.seen.add(Number(info.partIndex ?? 0));
+    groups.set(key, group);
+  }
+  for (const group of groups.values()) {
+    if (group.seen.size < group.expected) return true;
+  }
+  return false;
 }
 
 const PUBLIC_PUBLISH_OPCODE = 0x50535031;   // "PSP1" — message(0x50535031) PublicPublish

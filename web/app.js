@@ -27186,7 +27186,7 @@ function retryPublicPublishFromUi(item, kind) {
 // A FAILED badge becomes clickable (role/button semantics). It requires a publishState, so under direct pay —
 // where publishState is always null — the badge is inert: a direct publish has no signed external parked for
 // re-broadcast, and its failure is already terminal at the call site. Re-arming this badge is what the public
-// re-broadcast follow-up (roadmap: ACK-без-доставки) has to solve; do not read the inertness as "nothing was
+// re-broadcast follow-up (roadmap: ACK-without-delivery) has to solve; do not read the inertness as "nothing was
 // signed", which was the Vault-era meaning of a missing publishState.
 function wirePublicPublishRetryBadge(statusBadge, item, kind) {
   if (!String(item?.publishStatus ?? '').endsWith('failed') || !item?.publishState) return;

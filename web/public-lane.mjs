@@ -67,7 +67,9 @@ export function createPublicLane({
 
   const readStates = (addresses) => readAccountStates(addresses, { request: statesRequest });
   /** posts of one shard, authenticated: get_page + /messages(+source) matched by commit. */
-  const readShardPosts = (address) => provider.readPosts(address, { readMessagesWithSource });
+  // Reads the shard's NEWEST window (readPosts anchors at the tail and extends one page back when a multipart
+  // post straddles the boundary). `entryCount` lets a caller that already read get_view skip the probe getter.
+  const readShardPosts = (address, options = {}) => provider.readPosts(address, { readMessagesWithSource, ...options });
 
   return {
     /**
@@ -97,7 +99,9 @@ export function createPublicLane({
 
       const byWallet = new Map();
       for (const bucket of ranked.slice(0, topBuckets)) {
-        const { posts } = await readShardPosts(bucket.address);
+        // entryCount is already known from the ranking read above — hand it over so readPosts skips its own
+        // entry_count probe and still anchors its window at the NEWEST announcements.
+        const { posts } = await readShardPosts(bucket.address, { entryCount: bucket.entryCount });
         for (const post of posts) {
           if (!post.publisher) continue;
           const key = addrKey(post.publisher);
