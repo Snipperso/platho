@@ -61,7 +61,6 @@ const factory = new Function(`
   ${extractFunction('publishPartAlreadyAttempted')}
   ${extractFunction('publishPartHadPriorChainAttempt')}
   ${extractFunction('publishPartEligibleForChainConfirmation')}
-  ${extractFunction('publishPartAwaitingCapsuleHubConfirmation')}
   ${extractFunction('publishStateHasLandedUnconfirmedPart')}
   ${extractFunction('publishStateHasRetryableSendParts')}
   ${extractFunction('publishPartCanFreshSendRetry')}
@@ -69,7 +68,7 @@ const factory = new Function(`
   ${extractFunction('publishPartSignedAndUnconfirmed')}
   return {
     publishHashPlain, publishIdForPart, publishPartAlreadyAttempted, publishPartHadPriorChainAttempt,
-    publishPartEligibleForChainConfirmation, publishPartAwaitingCapsuleHubConfirmation,
+    publishPartEligibleForChainConfirmation,
     publishStateHasLandedUnconfirmedPart, publishStateHasRetryableSendParts,
     publishPartCanFreshSendRetry, publishPartNeedsBroadcastRetry, publishPartSignedAndUnconfirmed,
   };
@@ -81,7 +80,6 @@ const P = factory() as {
   publishPartAlreadyAttempted: (part: any) => boolean;
   publishPartHadPriorChainAttempt: (part: any) => boolean;
   publishPartEligibleForChainConfirmation: (part: any) => boolean;
-  publishPartAwaitingCapsuleHubConfirmation: (part: any) => boolean;
   publishStateHasLandedUnconfirmedPart: (state: any) => boolean;
   publishStateHasRetryableSendParts: (state: any) => boolean;
   publishPartCanFreshSendRetry: (part: any) => boolean;

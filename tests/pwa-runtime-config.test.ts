@@ -1347,96 +1347,49 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toMatch(/platho\.profile\.avatar\.publishRecovery/);
   });
 
-  it('PWA-PRIVATE-CONFIRM-RETRY-01: stuck multi-part private confirm is bounded and ends in a durable terminal red status', () => {
+  it('PWA-CONV-DELIVERY-01: a direct send is verified or honestly reddened — never left falsely green', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // The private publish-confirm auto-retry is bounded by AGE-based terminals (decoupled from the poll cadence,
-    // so tight ~1s polling never trips them early): past the no-progress deadline with nothing fully confirmed it
-    // STOPS and surfaces a durable Retry instead of spinning on "submitted N/N, confirming" forever. v648: the
-    // deadline is PART-COUNT SCALED (the flat 6-min constant was the 2-capsule calibration). v763: the age is
-    // QUEUE-PROGRESS anchored (chain-nonce advance / own parts landing), not creation-anchored — a message deep
-    // in a MOVING queue must never be buried, nor a manual Retry oscillate back to red within seconds.
-    expect(app).toMatch(/function privatePublishNoProgressAgeMs\(message\)/);
-    expect(app).toMatch(/publishState\.queueProgressAt = Date\.now\(\)/);
-    expect(app).toMatch(/privatePublishNoProgressAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\.publishState\)/);
-    expect(app).toMatch(/Number\(message\.publishState\?\.confirmedCount \?\? 0\) === 0/);
-    expect(app).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
-    expect(app).toMatch(/error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'\) return 'not confirmed: chain confirmation timed out'/);
-    // Early actionable terminal when the broadcast is provably erroring (nothing landed): "RPC broadcast
-    // unavailable" surfaces after PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS (AGE-based) instead of spinning
-    // to the full deadline, gated by publishStateBroadcastIsFailing so a fine-but-slow send is never killed.
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS = 2 \* 60 \* 1000/);
-    expect(app).toMatch(/function publishStateBroadcastIsFailing\(publishState\)/);
-    expect(app).toMatch(/privatePublishNoProgressAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS[\s\S]*publishStateBroadcastIsFailing\(message\.publishState\)/);
-    expect(app).toMatch(/code: 'BROADCAST_REJECTED'/);
-    expect(app).toMatch(/error\?\.code === 'BROADCAST_REJECTED'\) return 'not confirmed: RPC broadcast unavailable'/);
-    // STABLE-age trigger: a long-stuck no-progress message surfaces Retry without restarting the
-    // per-session attempt budget (the age is anchored on message creation, not publishState.updatedAt).
-    // v632 (owner-directed): the no-progress terminal = the computed factual maximum (~5.5min worst keyless
-    // 2-cap ladder) + margin. v648: that figure became the 2-part point of the part-count-scaled formula
-    // (base 60s + 150s per part); the flat constant remains as the pre-publishState fallback only.
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 6 \* 60 \* 1000/);
-    expect(app).toMatch(/function publishConfirmNoProgressDeadlineMs\(publishState\)/);
-    expect(app).toMatch(/function privatePendingPublishConfirmAgeMs\(message\)/);
-    expect(app).toMatch(/const createdAtMs = messageCreatedAtMs\(message\)/);
-    // Resume surfaces Retry for an already-stuck no-progress message — AFTER one healing pass this
-    // session (v760): the old instant-stop buried a recoverable queue right at reload (drivers never
-    // ran once, so "reload to recover" silently did nothing). The age terminals (scheduler a+b, resume,
-    // and the public driver symmetrically) share the one-pass grace; the pass marks itself in a
-    // finally, so a FAILED RPC attempt also counts — a persistent outage still terminates instead of
-    // rescheduling forever. The PARTIAL-expiry stopper is deliberately NOT gated (review: gating it
-    // deadlocked expired partials into a driverless zombie; its terminal keeps the manual Retry).
-    const resumeSrc = app.slice(
-      app.indexOf('function resumePendingPrivatePublishConfirmations'),
-      app.indexOf('function hasPendingPrivateSendRetry'),
+    // This replaces the two Vault confirm-driver guards (PWA-PRIVATE-CONFIRM-RETRY-01, RT-VCAPS-001). Their
+    // machine healed a publishState the direct lane never creates; the mechanism that actually decides a direct
+    // send's fate is the CONV delivery confirm — and it had NO guard at all until this one.
+    const confirm = app.slice(
+      app.indexOf('async function runConvDeliveryConfirm'),
+      app.indexOf('function markConvDeliveryUnlanded'),
     );
-    expect(resumeSrc).toMatch(/privatePublishNoProgressAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\?\.publishState\)/);
-    expect(resumeSrc).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
-    expect(resumeSrc).toMatch(/privatePublishConfirmPassRanThisSession\.has\(message\)\s*\n\s*&& privateMessageHasPublishAttempt\(message\)/);
-    expect(app).toMatch(/const privatePublishConfirmPassRanThisSession = new WeakSet\(\);/);
-    expect(app).toMatch(/const publicPublishConfirmPassRanThisSession = new Set\(\);/);
-    expect(app).toMatch(/\} finally \{[\s\S]{0,400}privatePublishConfirmPassRanThisSession\.add\(message\);\s*\n\s*\}/);
-    expect(app).toMatch(/if \(privatePublishConfirmPassRanThisSession\.has\(message\)\s*\n\s*&& message\.publishState\?\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED/);
-    // The partial-expiry stopper must stay UNGATED (a gated stop + no armed driver = driverless zombie).
-    expect(app).not.toMatch(/!forcedStop && !privatePublishConfirmPassRanThisSession\.has\(message\)/);
-    expect(app).toMatch(/publicPublishConfirmPassRanThisSession\.has\(passKey\)/);
-    expect(app).toMatch(/publicPublishConfirmPassRanThisSession\.add\(passKey\);/);
-    // v764: SINGLE-FLIGHT per message/record — an in-flight pass is invisible to the jobs map (the
-    // timer deletes its entry before running), so overlapping resume sweeps duplicated the same
-    // variant POST ('first heal POST' x2-3 per nonce in the owner's timelines). The wrapper skips a
-    // duplicate; the in-flight pass always ends by scheduling or stopping, so nothing is lost.
-    expect(app).toMatch(/const privatePublishConfirmPassKeysInFlight = new Set\(\);/);
-    expect(app).toMatch(/const publicPublishConfirmPassKeysInFlight = new Set\(\);/);
-    expect(app).toMatch(/if \(privatePublishConfirmPassKeysInFlight\.has\(singleFlightKey\)\) return;/);
-    expect(app).toMatch(/await runPrivatePublishConfirmationRetryPass\(context\);/);
-    expect(app).toMatch(/if \(publicPublishConfirmPassKeysInFlight\.has\(singleFlightKey\)\) return;/);
-    expect(app).toMatch(/await runPublicPublishConfirmationPassInner\(job\);/);
-    expect(resumeSrc).toMatch(/privatePublishConfirmPassKeysInFlight\.has\(existingKey\)/);
-    // v762: corrupt persisted stops self-heal on resume (stopped + non-confirmed + NO manual Retry →
-    // re-stop via the standard path: honest red terminal + working idempotent Retry; genuinely-stale
-    // 24h+ no-action terminals stay as designed), and the pass never overwrites a mid-pass terminal
-    // back to a live green meta (the source of the unrevivable stopped+green zombie).
-    expect(resumeSrc).toMatch(/message\?\.privateManualRetryAvailable !== true\s*\n\s*&& !isStalePrivatePendingPublishConfirmation\(message\)/);
-    expect(app).toMatch(/if \(message\.privatePublishConfirmStopped === true\s*\n\s*&& message\.publishState\?\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\) \{\s*\n\s*return;\s*\n\s*\}/);
-    // Stopping marks the message for manual recovery (the Retry button's render condition).
-    const stopSource = app.slice(
-      app.indexOf('function stopPrivatePublishConfirmationRetry'),
-      app.indexOf('function stopPartialPrivatePublishRecovery'),
+    const rearm = app.slice(
+      app.indexOf('function rearmConvDeliveryConfirms'),
+      app.indexOf('async function attemptConvMessagePublishDirect'),
     );
-    expect(stopSource).toMatch(/message\.privatePublishConfirmStopped = true/);
-    // Broadcast-unacknowledged / confirm-exhausted now offers a SAFE manual Retry: it re-broadcasts the same
-    // already-signed fixed-nonce external (idempotent — a re-used nonce is contract-rejected, and a secretly
-    // landed external is detected by the confirm read), which unsticks the send once the RPC broadcaster
-    // recovers. Local Cancel stays gated by privateMessageCanLocalCancel (false while a publish attempt
-    // exists — the nonce slot is committed, so discarding would orphan it).
-    expect(stopSource).toMatch(/const broadcastRetryable = error\?\.code === 'BROADCAST_REJECTED'[\s\S]*?error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'[\s\S]*?error\?\.code === 'INSUFFICIENT_VAULT_GRAM'/);
-    expect(stopSource).toMatch(/message\.privateManualRetryAvailable = broadcastRetryable/);
-    expect(stopSource).toMatch(/message\.privateCancelAvailable = broadcastRetryable && privateMessageCanLocalCancel\(message\)/);
-    // The Retry path clears the per-part re-broadcast budget so the same-nonce external re-sends at once.
-    expect(app).toMatch(/function resetPublishBroadcastBudgetForManualRetry\(publishState\)/);
-    expect(app).toMatch(/resetPublishBroadcastBudgetForManualRetry\(message\.publishState\)/);
-    // 'not confirmed: ...' resolves to a 'failed' status key — the durable red terminal status.
-    expect(app).toMatch(/text\.includes\('not confirmed'\)/);
+
+    // 1. RESOLVED STATES ARE TERMINAL — a verified/unlanded message is never re-polled.
+    expect(confirm).toMatch(/if \(message\.convDelivery === 'verified' \|\| message\.convDelivery === 'unlanded'\) return;/);
+    // 2. PROOF upgrades to verified (the shard stored my commits).
+    expect(confirm).toMatch(/message\.convDelivery = 'verified';/);
+    // 3. A RED terminal needs BOTH: the external is provably dead (past max age) AND the read was authoritative
+    // (scan reached the bottom, or the shard is past my seq so it never accepted it). An inconclusive read at the
+    // deadline leaves the optimistic green — a false red on an endpoint outage would be worse than a late truth.
+    expect(confirm).toMatch(/if \(ageMs >= CONV_CONFIRM_MAX_AGE_MS\) \{\s*\n\s*if \(res\.complete \|\| res\.seqShort\) markConvDeliveryUnlanded\(thread, message\);/);
+    // 4. The red terminal is a STATUS, not a button (the owner's chosen model).
+    expect(app).toMatch(/message\.meta = 'not delivered: the shard did not store it — resend';/);
+    expect(app).toMatch(/message\.privateManualRetryAvailable = false;/);
+    // 5. IT SURVIVES A RELOAD: the timers do not, but convDirectSend is persisted with the message and the
+    // re-arm sweep restarts every unresolved confirm inside a bounded age window. Without this a bounced send
+    // reloaded before its terminal would stay green forever = silent loss.
+    expect(app).toMatch(/convDirectSend: safeJsonClone\(message\.convDirectSend\) \?\? null,/);
+    expect(rearm).toMatch(/if \(message\.convDelivery === 'verified' \|\| message\.convDelivery === 'unlanded'\) continue;/);
+    expect(rearm).toMatch(/if \(\(Date\.now\(\) - Number\(send\.at \?\? 0\)\) >= CONV_CONFIRM_REARM_MAX_AGE_MS\) continue;/);
+    expect(rearm).toMatch(/armConvDeliveryConfirm\(thread, message, 0\);/);
+    // 6. A RETRY RE-BROADCASTS THE SAME EXTERNAL rather than rebuilding: same seq, same capsule, at most once on
+    // chain. Rebuilding would consume a fresh conversation seq and could double-publish a landed message.
+    const direct = app.slice(
+      app.indexOf('async function attemptConvMessagePublishDirect'),
+      app.indexOf('async function attemptPrivateComposerMessagePublish'),
+    );
+    expect(direct.length).toBeGreaterThan(0);
+    expect(direct).toMatch(/if \(captured\?\.boc && \(Date\.now\(\) - captured\.at\) <= DIRECT_SEND_REBROADCAST_WINDOW_MS\)/);
+    expect(direct).toMatch(/transport\.sendBoc\(\{ boc: captured\.boc, walletAddress: plathoWallet\.address \}\)/);
   });
+
 
   it('PWA-INSUFFICIENT-GRAM-01: an underfunded Vault stops the confirm re-broadcast loop with a "top up GRAM" terminal', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -1579,7 +1532,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS = 2 \* 60 \* 1000/);
     expect(app).toMatch(/function markPublishStateAwaitingPartsForRetry\(publishState/);
     expect(app).toMatch(/function publishPartCanFreshSendRetry\(part\)/);
-    expect(app).toMatch(/function publishPartAwaitingCapsuleHubConfirmation\(part\)/);
     expect(app).toMatch(/function markStaleUnconfirmedPublishPartsForRetry\(message/);
     expect(app).toMatch(/return markPublishStateAwaitingPartsForRetry\(publishState, reason\)/);
     expect(app).toMatch(/if \(part\.clientNonce !== undefined && part\.clientNonce !== null\) return false/);
@@ -1680,7 +1632,6 @@ describe('PWA runtime config guard', () => {
     expect(app.match(/resumePendingPrivateSendRetries\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(confirmRunSource).toMatch(/const sendRetryScheduled = ensurePendingPrivateSendRetry\(thread, message/);
     expect(confirmRunSource).toMatch(/Retrying unsent capsule parts/);
-    expect(resumeConfirmSource).toMatch(/ensurePendingPrivateSendRetry\(thread, message/);
     expect(sendRetrySource).toMatch(/function ensurePendingPrivateSendRetry\(thread, message/);
     expect(sendRetrySource).toMatch(/function revivePartialPrivateSendRetry\(message\)/);
     expect(sendRetrySource).toMatch(/privatePartialSendRetryExpired\(message\)/);
@@ -1693,7 +1644,6 @@ describe('PWA runtime config guard', () => {
     expect(scheduleSendSource).toMatch(/stopPartialPrivatePublishRecovery\(context/);
     expect(confirmRunSource).toMatch(/stopPartialPrivatePublishRecovery\(context\)/);
     expect(pendingConfirmSource).toMatch(/!privatePartialSendRetryExpired\(message\)/);
-    expect(resumeConfirmSource).toMatch(/stopPartialPrivatePublishRecovery\(\{ thread, message \}\)/);
     expect(sendRetrySource).toMatch(/privateSendRetryJobs\.has\(existingKey\)/);
     expect(app).toMatch(/const hasStoredCapsules = \(Array\.isArray\(message\?\.capsules\) && message\.capsules\.length > 0\) \|\| Boolean\(message\?\.capsule\)/);
     expect(app).toMatch(/function privateMessageHasPartialRetryablePublish\(message\)/);
@@ -2850,48 +2800,9 @@ describe('PWA runtime config guard', () => {
   // matching payload hashes against entries of the shared log. A direct-pay send has no publishState to repair —
   // its confirmation is the wallet transfer plus the CONV delivery confirm (armConvDeliveryConfirm).
 
-  it('RT-VCAPS-001: already-submitted private publishes keep a long background confirmation window', () => {
-    const app = readFileSync('web/app.js', 'utf8');
-    const confirmationRetry = app.slice(
-      app.indexOf('function schedulePrivatePublishConfirmationRetry'),
-      app.indexOf('function hasPendingPrivatePublishConfirmation'),
-    );
-    const sendRetry = app.slice(
-      app.indexOf('function schedulePrivateSendRetry'),
-      app.indexOf('function privatePublishConfirmStoppedStatusText'),
-    );
-    const resumeSource = app.slice(
-      app.indexOf('function resumePendingPrivatePublishConfirmations'),
-      app.indexOf('function clearPrivateMessageManualRecovery'),
-    );
-
-    expect(app).toMatch(/const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 \* 60 \* 60 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS = 30 \* 1000/);
-    expect(app).toMatch(/privatePublishConfirmNextAt/);
-    expect(app).toMatch(/privatePublishConfirmLastResult/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS = 2 \* 60 \* 1000/);
-    expect(app).toMatch(/function isStalePrivatePendingPublishConfirmation\(message\)/);
-    expect(app).toMatch(/function markStaleUnconfirmedPublishPartsForRetry\(message/);
-    expect(app).toMatch(/function shouldRunImmediatePrivatePublishConfirmation\(message\)/);
-    expect(app).toMatch(/function scheduleImmediatePrivatePublishConfirmation\(context\)/);
-    expect(confirmationRetry).toMatch(/isStalePrivatePendingPublishConfirmation\(message\)/);
-    expect(confirmationRetry).toMatch(/markStaleUnconfirmedPublishPartsForRetry\(message, 'missing CapsuleHub entry'\)/);
-    expect(confirmationRetry).toMatch(/PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS/);
-    expect(confirmationRetry).toMatch(/PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS/);
-    expect(confirmationRetry).toMatch(/confirmTimedOut/);
-    expect(confirmationRetry).toMatch(/const sendRetryScheduled = ensurePendingPrivateSendRetry\(thread, message/);
-    expect(confirmationRetry).toMatch(/Retrying unsent capsule parts/);
-    // A multi-part publish that never FULLY confirms STOPS at the AGE-based no-progress deadline (decoupled from
-    // the poll cadence) and surfaces a manual Retry instead of spinning forever on "submitted N/N, confirming".
-    // The manual Retry for a fully-submitted message re-confirms (never re-publishes), so no double-send regression.
-    expect(confirmationRetry).toMatch(/privatePublishNoProgressAgeMs\(message\) >= publishConfirmNoProgressDeadlineMs\(message\.publishState\)[\s\S]{0,200}stopPrivatePublishConfirmationRetry/);
-    expect(confirmationRetry).toMatch(/const delayMs = privatePublishConfirmDelayMs\(message, error\)/);
-    expect(sendRetry).toMatch(/isStalePrivatePendingPublish\(message\) && !privateMessageHasPublishAttempt\(message\)/);
-    expect(resumeSource).toMatch(/isStalePrivatePendingPublishConfirmation\(message\)/);
-    expect(resumeSource).toMatch(/scheduleImmediatePrivatePublishConfirmation\(\{/);
-    expect(resumeSource).toMatch(/!privateMessageHasPublishAttempt\(message\)/);
-  });
-
+  // RT-VCAPS-001 removed with the Vault confirm driver: "an already-submitted publish keeps a long
+  // background confirmation window" described polling a publishState the direct lane never creates. Its
+  // successor — the CONV delivery confirm and its 24h re-arm window — is pinned in PWA-CONV-DELIVERY-01.
   // RT-VCAPS-002 removed with the Vault publish trunk: it pinned the CapsuleHub-global preflight before signing a
   // Vault publish external (sealed / vault_bound / manifest hash / FeeAccumulator binding). A direct publish is
   // addressed to a shard derived from the wallet + epoch and needs no Hub global read at all.
@@ -3517,7 +3428,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PUBLISH_CONFIRM_NO_PROGRESS_PER_PART_MS = 150 \* 1000;/);
     expect(app).toMatch(/function publishConfirmNoProgressDeadlineMs\(publishState\)/);
     // All three live drivers (private pass, private resume sweep, public shim) use the scaled deadline.
-    expect(app.match(/>= publishConfirmNoProgressDeadlineMs\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // Two of the three drivers that shared this deadline (the private confirm retry and the public confirm
+    // pass) went with the publishState they healed; the channel-profile heal keeps it.
+    expect(app.match(/>= publishConfirmNoProgressDeadlineMs\(/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
     // The partial-retry window stays ABOVE the scaled terminal (old relation: 15min = 6min + 9min slack).
     expect(app).toMatch(/publishConfirmNoProgressDeadlineMs\(message\?\.publishState\) \+ 9 \* 60 \* 1000/);
     // Batch K's position-scaled background nonce wait went with the Vault publish trunk: direct sends order by
@@ -4807,7 +4720,6 @@ describe('PWA runtime config guard', () => {
     // threaded through every plan/build/retry path, and the PUBLIC surface reads its OWN draft.
     expect(app).toMatch(/const shareDraft = privateShareDraft \? \{ \.\.\.privateShareDraft \} : null;/);
     expect(app).toMatch(/extras\.shareDraft === undefined \? privateShareDraft : extras\.shareDraft/);
-    expect(app).toMatch(/shareDraft: context\.shareDraft \?\? context\.message\?\.privateDraft\?\.shareDraft \?\? null,/);
     expect(app).toMatch(/composerBlocksFromDraft\(text, normalizePublicImageAttachments\(attachments\), null, publicCommentReplyTo, normalizePrivateFileAttachments\(fileAttachments\), publicShareDraft\)/);
     // A share-only draft (no typed text) IS a sendable message: the block builder pushes it even alone, and the
     // private empty-submit early-return lets it through.

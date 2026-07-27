@@ -6561,7 +6561,6 @@ function appendPublicItemComments(article, item) {
       statusBadge.textContent = (comment.publishState ? publishStateMeta(comment.publishState) : null) || comment.publishStatus;
       // Patch anchor for the status-only fast path (a publish tick updates this text in place, no rebuild).
       if (comment.id) statusBadge.dataset.publishLocalId = String(comment.id);
-      wirePublicPublishRetryBadge(statusBadge, comment, 'comment');
       commentMeta.append(statusBadge);
     }
     commentAuthorRow.append(commentAvatar, commentMeta);
@@ -7351,7 +7350,6 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
     statusBadge.textContent = (item.publishState ? publishStateMeta(item.publishState) : null) || item.publishStatus;
     // Patch anchor for the status-only fast path (a publish tick updates this text in place, no rebuild).
     if (item.id) statusBadge.dataset.publishLocalId = String(item.id);
-    wirePublicPublishRetryBadge(statusBadge, item, 'post');
     meta.append(statusBadge);
   }
   // The channel "about" (description + tags) button and the "Display as" chevron live top-right in the author
@@ -12269,7 +12267,6 @@ async function restoreEncryptedMessageHistory() {
     if (changed) {
       renderThreads();
       renderConversation();
-      resumePendingPrivatePublishConfirmations();
       resumePendingPublicPublishConfirmations();
       resumePendingPrivateSendRetries();
     }
@@ -22676,12 +22673,6 @@ function publishStateHasRetryableSendParts(publishState) {
   return (publishState?.parts ?? []).some((part) => !publishPartAlreadyAttempted(part));
 }
 
-function publishPartAwaitingCapsuleHubConfirmation(part) {
-  return part?.status === PUBLISH_PART_STATUS_SENT
-    || part?.status === PUBLISH_PART_STATUS_UNKNOWN
-    || part?.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED;
-}
-
 // A part in VAULT_SUBMITTED has had its nonce CONSUMED on-chain (the Vault processed its external), so it HAS
 // landed and is only awaiting the Vault->Hub->Vault ACK to flip CAPSULEHUB_CONFIRMED. Counts as "in-flight" for
 // privatePublishConfirmDelayMs so the confirm poll stays on the active cadence instead of the background one.
@@ -22770,22 +22761,6 @@ function privatePublishStateSignedHoldNanotons(publishState) {
     try { total += BigInt(part.maxCharge); } catch { /* skip a malformed charge */ }
   }
   return total;
-}
-
-// On an explicit user Retry of a broadcast-unacknowledged publish, clear the per-part re-broadcast budget
-// (count + cooldown) so the already-signed, fixed-nonce external is re-sent immediately. Idempotent and
-// double-spend-safe: a re-used nonce is contract-rejected, and retryUnconfirmedVaultPublishBroadcasts reads
-// the chain nonce FIRST (a landed external is detected and marked VAULT_SUBMITTED, never re-sent).
-function resetPublishBroadcastBudgetForManualRetry(publishState) {
-  for (const part of publishState?.parts ?? []) {
-    if (!publishPartNeedsBroadcastRetry(part)) continue;
-    part.broadcastRetryCount = 0;
-    part.broadcastNonceRaceCount = 0;
-    part.broadcastDuplicateRelayCount = 0;
-    part.broadcastTimeoutAbortCount = 0;
-    part.broadcastBudgetExhaustedWarned = false;
-    part.lastBroadcastAt = null;
-  }
 }
 
 function publishPartLastBroadcastAgeMs(part) {
@@ -23706,35 +23681,6 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   privatePublishConfirmJobs.set(key, { timer, context });
 }
 
-function shouldRunImmediatePrivatePublishConfirmation(message) {
-  const parts = message?.publishState?.parts ?? [];
-  return hasPendingPrivatePublishConfirmation(message)
-    && (isFreshPrivatePublishConfirmation(message)
-      || privatePendingPublishAgeMs(message) >= PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS)
-    && parts.some((part) => publishPartAwaitingCapsuleHubConfirmation(part) || publishPartHadPriorChainAttempt(part));
-}
-
-function scheduleImmediatePrivatePublishConfirmation(context) {
-  const { thread, message } = context;
-  if (!thread?.messages?.includes(message) || !shouldRunImmediatePrivatePublishConfirmation(message)) return false;
-  const key = privatePublishConfirmRetryKey(message);
-  const previous = privatePublishConfirmJobs.get(key);
-  if (previous?.timer) window.clearTimeout(previous.timer);
-  context.confirmAttempt = 0;
-  message.privatePublishConfirmAttempt = 0;
-  const scheduledAt = Date.now();
-  message.privatePublishConfirmLastScheduledAt = new Date(scheduledAt).toISOString();
-  message.privatePublishConfirmDelayMs = 0;
-  message.privatePublishConfirmNextAt = new Date(scheduledAt).toISOString();
-  message.privatePublishConfirmLastResult = 'immediate';
-  const timer = window.setTimeout(() => {
-    privatePublishConfirmJobs.delete(key);
-    runPrivatePublishConfirmationRetry(context).catch((confirmError) => console.error(confirmError));
-  }, 0);
-  privatePublishConfirmJobs.set(key, { timer, context });
-  return true;
-}
-
 // One-full-pass-per-session grace for the AGE give-up terminals (v760): a RELOAD must give every
 // pending publish one REAL healing attempt (fresh nonce read + re-broadcast + confirm + the
 // dropped-recovery machinery) BEFORE any age-based terminal may stop its driver. Without it, a queue
@@ -23928,70 +23874,6 @@ function hasPendingPrivatePublishConfirmation(message) {
     && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED;
 }
 
-function resumePendingPrivatePublishConfirmations() {
-  if (document.hidden) return;
-  for (const thread of threads) {
-    for (const message of thread.messages ?? []) {
-      if (stopPartialPrivatePublishRecovery({ thread, message })) continue;
-      // Reconcile a CORRUPT persisted stop (v762): a driver-stopped, non-confirmed message MUST carry
-      // the manual Retry — it is the durable-terminal design's only escape hatch (resume never re-arms
-      // a stopped driver). The v758-era mid-pass overwrite race persisted stopped flags with a live
-      // green 'confirming' meta and a cleared Retry: an invisible, unrevivable zombie (the owner's
-      // frozen queue). Re-stop through the standard path — honest red terminal + working idempotent
-      // Retry. Genuinely-stale (24h+) no-action terminals are left as designed.
-      if (message?.privatePublishConfirmStopped === true
-        && privateMessageHasPublishAttempt(message)
-        && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-        && message?.privateManualRetryAvailable !== true
-        && !isStalePrivatePendingPublishConfirmation(message)) {
-        stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain confirmation timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
-        continue;
-      }
-      ensurePendingPrivateSendRetry(thread, message, {
-        message: 'resume missing capsule parts',
-        code: 'NETWORK_ERROR',
-      });
-      if (privateMessageHasPublishAttempt(message)
-        && message?.privatePublishConfirmStopped !== true
-        && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-        && isStalePrivatePendingPublishConfirmation(message)) {
-        stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
-        continue;
-      }
-      // A publish that is NOT fully confirmed and has been pending past the no-progress deadline (stable,
-      // reload-surviving age anchored on messageCreatedAtMs) surfaces the durable red terminal on resume —
-      // but ONLY after this session gave it one real healing pass (v760): the old instant-stop buried a
-      // recoverable queue right at reload (reload-did-not-help — the drivers never ran once). The
-      // driver armed below runs the pass; its own age terminals (gated the same way) then decide. This
-      // covers a PARTIAL multi-external publish (confirmedCount in [1, partCount-1]) too — the
-      // confirmedCount===0 gate is intentionally absent so a one-of-two-landed image cannot hang forever.
-      if (privatePublishConfirmPassRanThisSession.has(message)
-        && privateMessageHasPublishAttempt(message)
-        && message?.privatePublishConfirmStopped !== true
-        && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-        && privatePublishNoProgressAgeMs(message) >= publishConfirmNoProgressDeadlineMs(message?.publishState)) {
-        stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
-        continue;
-      }
-      if (!hasPendingPrivatePublishConfirmation(message)) continue;
-      const existingKey = message.privatePublishConfirmRetryKey;
-      // A scheduled job OR an in-flight pass (invisible to the jobs map — the timer deletes its entry
-      // before running) both mean the driver is live: do not start an overlapping one (v764).
-      if (existingKey && (privatePublishConfirmJobs.has(existingKey) || privatePublishConfirmPassKeysInFlight.has(existingKey))) continue;
-      if (scheduleImmediatePrivatePublishConfirmation({
-        thread,
-        message,
-        confirmAttempt: 0,
-      })) continue;
-      schedulePrivatePublishConfirmationRetry({
-        thread,
-        message,
-        confirmAttempt: Number(message.privatePublishConfirmAttempt ?? 0) || 0,
-      });
-    }
-  }
-}
-
 // Read-only console diagnostics for stuck outbound publishes (v761): one row per NON-confirmed
 // message with a publishState, surfacing every predicate the resume/scheduler paths consult — the
 // exact data needed to see WHY a pending message is (not) being driven, without a diagnostic build.
@@ -24133,42 +24015,22 @@ function privateMessageManualActionsElement(thread, message) {
 async function retryPrivateMessageFromUi(thread, message) {
   if (!thread?.messages?.includes(message)) return;
   clearPrivateSendRetry(message);
-  clearPrivatePublishConfirmRetry(message);
   clearPrivateMessageManualRecovery(message);
   message.privateSendRetryStopped = false;
   message.privateSendRetryStoppedAt = null;
-  message.privatePublishConfirmStopped = false;
-  message.privatePublishConfirmStoppedAt = null;
   message.privateSendRetryAttempt = 0;
-  message.privatePublishConfirmAttempt = 0;
-  message.meta = privateMessageHasPublishAttempt(message)
-    ? publishStateMeta(message.publishState)
-    : 'sending';
+  message.meta = 'sending';
   thread.state = 'pending';
   refreshThreadAfterMessageChange(thread);
   renderThreads();
   renderConversation();
 
+  // clean-17 direct-pay: ONE path. The two Vault branches that used to sit here both keyed on a publishState —
+  // re-arming the publish-nonce re-broadcast for an already-signed external, and pre-checking the Vault hold
+  // before re-sending — and the direct lane never creates one. The idempotent re-broadcast survives where it
+  // belongs: inside attemptConvMessagePublishDirect, keyed on the captured signed BOC (same seqno, at most once).
   const context = privateSendRetryContextForMessage(thread, message);
   try {
-    if (privateMessageHasPublishAttempt(message) && !publishStateHasRetryableSendParts(message.publishState)) {
-      // Re-arm the idempotent same-nonce re-broadcast immediately (clear the per-part budget/cooldown) so a
-      // user Retry after a broadcast-unavailable terminal re-sends the already-signed external right away.
-      resetPublishBroadcastBudgetForManualRetry(message.publishState);
-      await runPrivatePublishConfirmationRetry(context);
-      return;
-    }
-    if (!privateMessageHasPublishAttempt(message) && !context.paymentIntentCreated && !privateLaneDirectPayEnabled()) {
-      const plan = privateComposerSendPlan(context.text, context.attachments, context.senderOptions, {
-        paymentCheck: context.paymentDraft,
-        replyDraft: context.replyDraft ?? context.message?.privateDraft?.replyDraft ?? null,
-        shareDraft: context.shareDraft ?? context.message?.privateDraft?.shareDraft ?? null,
-        fileAttachments: context.fileAttachments ?? context.message?.privateDraft?.fileAttachments ?? [],
-      });
-      await assertVaultHasPrivatePublishHold(context.selectedSuite, plan, {
-        allowOwnVaultActionReadFallback: Boolean(context.paymentDraft),
-      });
-    }
     await runPrivateSendRetry(context);
   } catch (error) {
     await settlePrivateComposerSendError(context, error);
@@ -24743,168 +24605,6 @@ function removeLocalPublicPendingRecord(ref) {
   renderPublicSurface({ anchorUnread: false });
 }
 
-function stopPublicPublishConfirmation(job, patch = null) {
-  const key = `${job.channelId}:${job.localId}`;
-  const existing = publicPublishConfirmJobs.get(key);
-  if (existing?.timer) window.clearTimeout(existing.timer);
-  publicPublishConfirmJobs.delete(key);
-  if (patch) persistPublicPublishProgress(job, patch);
-}
-
-function schedulePublicPublishConfirmationPass(job, delayMs) {
-  const key = `${job.channelId}:${job.localId}`;
-  const existing = publicPublishConfirmJobs.get(key);
-  if (existing?.timer) window.clearTimeout(existing.timer);
-  job.timer = window.setTimeout(() => {
-    runPublicPublishConfirmationPass(job).catch((error) => console.error(error));
-  }, Math.max(250, delayMs));
-  publicPublishConfirmJobs.set(key, job);
-}
-
-// Manual Retry for a terminaled public publish (v649) — the badge itself is the affordance (owner rule: no extra
-// Retry/Dismiss buttons). Mirrors retryPrivateMessageFromUi's already-signed branch: re-arm the per-part broadcast
-// budget on the persisted publishState (same-nonce re-broadcast is contract-idempotent — the first pass's fresh
-// nonce READ flips a late-landed send straight to confirmed) and start a FRESH driver job (createdAt now, so the
-// part-count-scaled age terminal opens a new window). This is also the session's nonce-floor escape hatch: a
-// terminal with deferred never-POSTed batches previously left the floor raised past the chain nonce until reload.
-function retryPublicPublishFromUi(item, kind) {
-  const channelId = item?.channelId;
-  const localId = item?.id;
-  if (!channelId || !localId || !item?.publishState) return;
-  console.info('[platho] send timeline', { event: 'public publish manual retry', key: `${channelId}:${localId}` });
-  resetPublishBroadcastBudgetForManualRetry(item.publishState);
-  persistPublicPublishProgress({ channelId, localId, publishState: item.publishState }, {
-    publishStatus: publishStateMeta(item.publishState) || 'public publish submitted',
-  });
-  startPublicPublishConfirmation({ channelId, localId, kind, createdAt: Date.now(), publishState: item.publishState });
-}
-
-// A FAILED badge becomes clickable (role/button semantics). It requires a publishState, so under direct pay —
-// where publishState is always null — the badge is inert: a direct publish has no signed external parked for
-// re-broadcast, and its failure is already terminal at the call site. Re-arming this badge is what the public
-// re-broadcast follow-up (roadmap: ACK-without-delivery) has to solve; do not read the inertness as "nothing was
-// signed", which was the Vault-era meaning of a missing publishState.
-function wirePublicPublishRetryBadge(statusBadge, item, kind) {
-  if (!String(item?.publishStatus ?? '').endsWith('failed') || !item?.publishState) return;
-  statusBadge.classList.add('public-publish-status--retryable');
-  statusBadge.title = t('public.retryPublish');
-  statusBadge.setAttribute('role', 'button');
-  statusBadge.tabIndex = 0;
-  const retry = (event) => {
-    event.stopPropagation();
-    retryPublicPublishFromUi(item, kind);
-  };
-  statusBadge.addEventListener('click', retry);
-  statusBadge.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    retry(event);
-  });
-}
-
-function startPublicPublishConfirmation(record) {
-  if (!record?.channelId || !record?.localId || !record?.publishState) return;
-  const job = {
-    channelId: record.channelId,
-    localId: record.localId,
-    kind: record.kind ?? 'post',
-    createdAt: Number(record.createdAt) || Date.now(),
-    publishState: record.publishState,
-    timer: null,
-  };
-  console.info('[platho] send timeline', { event: 'public publish confirm driver started', key: `${job.channelId}:${job.localId}` });
-  schedulePublicPublishConfirmationPass(job, PRIVATE_PUBLISH_CONFIRM_SETTLE_MS);
-}
-
-async function runPublicPublishConfirmationPass(job) {
-  // Single-flight per record (v764, symmetric with the private driver — see the guard sets there).
-  const singleFlightKey = `${job.channelId}:${job.localId}`;
-  if (publicPublishConfirmPassKeysInFlight.has(singleFlightKey)) return;
-  publicPublishConfirmPassKeysInFlight.add(singleFlightKey);
-  try {
-    await runPublicPublishConfirmationPassInner(job);
-  } finally {
-    publicPublishConfirmPassKeysInFlight.delete(singleFlightKey);
-  }
-}
-
-async function runPublicPublishConfirmationPassInner(job) {
-  // Re-locate first: record gone, or already merged with its on-chain twin (entryId set / bodyHash merge in
-  // mergeLocalPendingPublicFeed) -> quiet success stop.
-  const located = findLocalPublicPendingRecord(job.channelId, job.localId);
-  if (!located || !isPendingPublicFeedItem(located.item)) {
-    stopPublicPublishConfirmation(job);
-    return;
-  }
-  // Don't fight the serial pump while a chain sync pass is in flight (same rule as the private driver).
-  if (privateChainSyncPromise) {
-    schedulePublicPublishConfirmationPass(job, 2_500);
-    return;
-  }
-  const publishState = job.publishState;
-  // Progress-anchored age (v763, symmetric with the private driver): the queue-progress stamp lives on
-  // the shared publishState, so a public record deep in a moving queue is not buried either.
-  const ageMs = Date.now() - Math.max(Number(job.createdAt) || 0, Number(publishState?.queueProgressAt ?? 0) || 0);
-  const passKey = `${job.channelId}:${job.localId}`;
-  // Age terminals before RPC — but only after ONE completed pass this session (v760, symmetric with
-  // the private driver): a reload must attempt healing before it may give up, else a queue that aged
-  // while wedged comes back pre-buried. The resume-after-long-offline RPC cost stays bounded: each
-  // stale record gets exactly one pass (a couple of reads) before its terminal may fire.
-  if (publicPublishConfirmPassRanThisSession.has(passKey)
-    && publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-    && ageMs >= publishConfirmNoProgressDeadlineMs(publishState)) {
-    console.warn('[platho] public publish: no-progress terminal', { key: passKey });
-    stopPublicPublishConfirmation(job, { publishStatus: 'public publish failed' });
-    setPublicStatus('publish failed');
-    return;
-  }
-  if (publicPublishConfirmPassRanThisSession.has(passKey)
-    && Number(publishState?.confirmedCount ?? 0) === 0
-    && Number(publishState?.submittedCount ?? 0) === 0
-    && ageMs >= PRIVATE_PUBLISH_CONFIRM_BROADCAST_FAIL_AFTER_MS
-    && publishStateBroadcastIsFailing(publishState)) {
-    console.warn('[platho] public publish: broadcast-unavailable terminal', { key: passKey });
-    stopPublicPublishConfirmation(job, { publishStatus: 'public publish failed' });
-    setPublicStatus('publish failed');
-    return;
-  }
-  let passError = null;
-  try {
-    await retryUnconfirmedVaultPublishBroadcasts(publishState, {
-      deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
-      readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
-      sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
-      queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
-    });
-    await confirmCapsuleHubPublishEntries(publishState, {
-      deadlineMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS,
-      requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
-      queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
-      owner: resolvePublishOwner(publishState),
-    });
-  } catch (error) {
-    passError = error;
-    noteTonRpcRateLimit(error);
-  } finally {
-    // A real healing attempt was made this session (even a failed RPC counts): age terminals allowed.
-    publicPublishConfirmPassRanThisSession.add(passKey);
-  }
-  if (publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    const entryId = publishState.parts?.find((part) => part?.entryId !== undefined && part?.entryId !== null)?.entryId ?? null;
-    stopPublicPublishConfirmation(job, {
-      publishStatus: null,
-      ...(entryId === null ? {} : { entryId: String(entryId) }),
-    });
-    setPublicStatus(job.kind === 'comment' ? 'comment published' : 'public published');
-    return;
-  }
-  persistPublicPublishProgress(job);
-  // Same cadence engine as private: the shim exposes exactly what privatePublishConfirmDelayMs reads
-  // (publishState + createdAtMs), honoring 429 backoffs, settle/active/unlanded/stretch windows.
-  const delayMs = privatePublishConfirmDelayMs({ publishState, createdAtMs: job.createdAt }, passError);
-  schedulePublicPublishConfirmationPass(job, delayMs);
-}
-
 function resumePendingPublicPublishConfirmations() {
   const channels = publicChannelFeedCache ?? {};
   for (const [channelId, entry] of Object.entries(channels)) {
@@ -24914,17 +24614,13 @@ function resumePendingPublicPublishConfirmations() {
       for (const { item, kind } of candidates) {
         if (!isPendingPublicFeedItem(item)) continue;
         const createdAt = Date.parse(item.createdAt ?? '') || Date.now();
-        // A record stuck at the optimistic pre-publishState stage (reload mid-signing) has nothing to heal —
-        // terminal it once past the no-progress deadline instead of showing 'sending' forever.
-        if (!item?.publishState) {
-          if (Date.now() - createdAt >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
-            persistPublicPublishProgress({ channelId, localId: item.id, publishState: null }, { publishStatus: 'public publish failed' });
-          }
-          continue;
+        // clean-17 direct-pay: a public record NEVER carries a publishState (that was the Vault batch's healing
+        // state), so the only thing to do on resume is to terminal a record that has been sitting in its
+        // optimistic 'sending' state past the no-progress deadline — instead of showing 'sending' forever. The
+        // Vault confirm driver that used to be started for a publishState record is gone with the state itself.
+        if (Date.now() - createdAt >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
+          persistPublicPublishProgress({ channelId, localId: item.id, publishState: null }, { publishStatus: 'public publish failed' });
         }
-        const key = `${channelId}:${item.id}`;
-        if (publicPublishConfirmJobs.has(key)) continue;
-        startPublicPublishConfirmation({ channelId, localId: item.id, kind, createdAt, publishState: item.publishState });
       }
     }
   }
@@ -25895,7 +25591,6 @@ window.addEventListener('pagehide', () => {
 });
 window.addEventListener('pageshow', () => {
   clearTelegramBackgroundLockTimer();
-  resumePendingPrivatePublishConfirmations();
   resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
   scheduleWalletUnlockPrompt();
@@ -25911,7 +25606,6 @@ window.addEventListener('pageshow', () => {
 });
 window.addEventListener('focus', () => {
   clearTelegramBackgroundLockTimer();
-  resumePendingPrivatePublishConfirmations();
   resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
   scheduleMessageAutoSync(2_000);
