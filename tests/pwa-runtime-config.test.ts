@@ -516,9 +516,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function downloadEncryptedWalletKeyBackup\(/);
     expect(app).toMatch(/if \(walletKeyBackupPendingForStoredWallet\(\)\) \{\s*\n\s*openQuickStartAtBackup\(\);/);
     expect(app).toMatch(/if \(needsKeyBackup\) \{ await downloadEncryptedWalletKeyBackup\(\); \}/);
-    expect(enCopy).toMatch(/Save wallet key backup/);
-    expect(enCopy).toMatch(/Save encrypted key/);
-    expect(enCopy).toMatch(/browser storage can be cleared, especially on iPhone Safari/);
+    // The copy that explains WHY lives on the quick-start backup step, which is the surface the user is actually
+    // sent to (the standalone dialog's copy went with the dialog).
+    expect(enCopy).toMatch(/Back up your wallet key/);
+    expect(enCopy).toMatch(/Browser storage can be cleared - especially on iPhone Safari/);
     expect(app).toMatch(/encryptedWalletRecordFromBackup/);
     expect(app).toMatch(/exportEncryptedWalletKeyFile/);
     expect(app).toMatch(/importEncryptedWalletKeyFile/);
@@ -1040,9 +1041,8 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toMatch(/Checking Vault balance/);
     expect(app).toMatch(/privateComposerKnownVaultTonShortfall/);
     expect(app).toMatch(/networkFeeSurchargeNanotons/);
-    expect(enCopy).toMatch(/surcharge is retained by CapsuleHub reserve/);
-    expect(enCopy).toMatch(/not accrued_plato_fee_ton at publish time/);
-    expect(enCopy).toMatch(/Surplus reserve may later be swept by protocol reserve rules/);
+    // (The surcharge copy explained where a CapsuleHub reserve surplus went. There is no reserve and no surcharge
+    // under direct pay — the publisher pays the message value and the fee flows through the shard to the pool.)
     expect(app).toMatch(/function privateImageAttachmentPartCount/);
     expect(app).toMatch(/partCounter: kind === 'private' \? privateImageAttachmentPartCount : imageAttachmentPartCount/);
     expect(app).toMatch(/partCounter: options\.partCounter/);
