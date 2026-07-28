@@ -13,13 +13,13 @@ Status: DERIVED_MAINNET_BUYBACKBURN_ADDRESSES
 
 ## Derived Addresses
 
-- buybackBurnAddress: EQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLdXm
-- buybackBurnOfficialAthWalletAddress: EQCnrpPVN52HrlBkRwoD8FO14Gj3hFHvF-0sQVSfiQL8YgaQ
+- buybackBurnAddress: EQDfPnzkob6Qk_GRVSfoSosQIuWmtmRt80Jck5EPkqNSEvjJ
+- buybackBurnOfficialAthWalletAddress: EQDTsrb4dTKhcWniK6HLiuJpIqO5vsf8PKxnwTGyuMARMhE7
 
 ## StateInit Hashes
 
-- buybackBurnStateInitHash: 683ae1d3d0d86665f1db9bfc0eaae8f7840d416143bce042a8a90f97f3952b2d
-- buybackBurnOfficialAthWalletStateInitHash: a7ae93d5379d87ae5064470a03f053b5e068f78451ef17ed2c41549f8902fc62
+- buybackBurnStateInitHash: df3e7ce4a1be9093f1915527e84a8b1022e5a6b6646df3425c93910f92a35212
+- buybackBurnOfficialAthWalletStateInitHash: d3b2b6f87532a17169e22ba1cb8ae26922a3b9bec7fc3cac67c131b2b8c01132
 
 ## Blockers
 
@@ -28,5 +28,5 @@ Status: DERIVED_MAINNET_BUYBACKBURN_ADDRESSES
 ## M20F Collector Inputs
 
 - athMasterAddress: EQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcANe
-- buybackBurnAddress: EQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLdXm
-- buybackBurnOfficialAthWalletAddress: EQCnrpPVN52HrlBkRwoD8FO14Gj3hFHvF-0sQVSfiQL8YgaQ
+- buybackBurnAddress: EQDfPnzkob6Qk_GRVSfoSosQIuWmtmRt80Jck5EPkqNSEvjJ
+- buybackBurnOfficialAthWalletAddress: EQDTsrb4dTKhcWniK6HLiuJpIqO5vsf8PKxnwTGyuMARMhE7

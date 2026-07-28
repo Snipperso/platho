@@ -830,7 +830,9 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         ton_treasury_receiver_address: 'REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         genesis_config_hash: 'required: 64 lowercase hex market stability launch controller hash',
-        pricing_frozen: false,
+        // clean-17: the healthy value is TRUE — the price is a compile-time constant, so the view reports frozen
+        // from birth and no ceremony step sets it.
+        pricing_frozen: true,
         reserve_due_ath: '0',
         reserve_funded_total_ath: '0',
         treasury_due_ton: '0',
@@ -1306,8 +1308,13 @@ export function verifyMainnetGenesisSnapshot(
   }
   checkBase(issues, manifest, marketSeller, 'market_stability_seller', 'market_stability_seller', 'market_stability_seller');
   checkSealed(issues, manifest, marketSeller, 'market_stability_seller');
-  if (marketSeller.pricing_frozen !== false) {
-    issues.push(issue('MARKET_STABILITY_SELLER_PRICING_FROZEN_AT_GENESIS', 'market_stability_seller.pricing_frozen must be false at final genesis; pricing freezes once after the 15% activity distribution / pool-launch gate.'));
+  // clean-17: pricing_frozen is TRUE FROM BIRTH and there is no state behind it. The price became a CONSTANT, so
+  // the view reports frozen because it simply is — MarketStabilitySeller.tact:118 says it outright ("no
+  // pricing_frozen field: the price is a constant, so there is no ceremony to record and no state that a single
+  // key could ever set wrong"). The clean-15 expectation below was correct for a contract that stored a price and
+  // froze it once, post-distribution; against a clean-17 genesis it would fail on a healthy deployment.
+  if (marketSeller.pricing_frozen !== true) {
+    issues.push(issue('MARKET_STABILITY_SELLER_PRICING_NOT_FROZEN_AT_GENESIS', 'market_stability_seller.pricing_frozen must be true from genesis in clean-17: the price is a compile-time constant, not a stored input that a ceremony sets.'));
   }
   if (!isHex64(marketSeller.genesis_config_hash) || /^0{64}$/i.test(marketSeller.genesis_config_hash)) {
     issues.push(issue('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISSING', 'market_stability_seller.genesis_config_hash must retain the non-zero one-time launch controller hash until post-pool pricing freeze.'));
