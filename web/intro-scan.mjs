@@ -15,7 +15,7 @@
 // scan_pub) on-chain, and X25519(eph_sec, scan_pub) == X25519(scan_sec, eph_pub), so the recipient's
 // computePrivateScanViewTag(scan_sec, eph_pub) reproduces it. No secret leaves the client.
 
-import { computePrivateScanViewTag } from './crypto/platho-crypto.mjs';
+import { computePrivateScanViewTag } from './crypto/platho-crypto.mjs?v=12';
 
 /**
  * Stage-1 filter over a batch of intro entries.

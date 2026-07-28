@@ -18,7 +18,7 @@ import { createIntroCursorStore } from './intro-cursor-store.mjs?v=1';
 import { createScanPageReader, createEntryReader, fetchIntroCapsule } from './intro-transport.mjs?v=1';
 import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
 import { readAccountStates } from './shard-reader.mjs?v=1';
-import { introShardAddress } from './shard-discovery.mjs?v=1';
+import { introShardAddress } from './shard-discovery.mjs?v=3';
 
 /**
  * Build the INTRO receive lane.

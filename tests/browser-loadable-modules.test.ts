@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -100,7 +100,57 @@ describe('BROWSER-LOADABLE-MODULES — the shipping client path loads without a 
 
     const reference = readFileSync('web/publish-builder.mjs', 'utf8');
     expect(reference, 'the reference must keep deriving independently').toMatch(/from '@ton\/core'/);
+    // The `\?[^']*` is load-bearing: written without it this matched only the bare specifier, so adding a
+    // `?v=3` cache-buster would have made the guard stop guarding while still passing.
     expect(reference, 'the reference must not borrow the browser derivation')
-      .not.toMatch(/from '\.\/shard-discovery\.mjs'/);
+      .not.toMatch(/from '\.\/shard-discovery\.mjs(\?[^']*)?'/);
+  });
+
+  it('BROWSER-LOAD-03: every module is imported under ONE specifier — a second form is a second download', () => {
+    // './x.mjs' and './x.mjs?v=1' are DIFFERENT modules to a browser: it fetches, parses and instantiates the
+    // file twice, and the service worker precaches by exact URL, so whichever form is not in its list also costs
+    // a network round-trip on every cold start. MEASURED before this was unified: the three biggest modules were
+    // each pulled twice — platho-crypto (164 KB), pwa-contract-transactions (99 KB), platho-wallet (30 KB) —
+    // roughly 350 KB of duplicate JavaScript downloaded and re-parsed on startup, which on the slow devices this
+    // project cares about is paid in parse time, not just bytes.
+    //
+    // Today every divergent module is stateless, so the duplicates were pure waste rather than a bug. That is the
+    // reason to hold the line NOW: add a cache or a counter to any of them later and the two copies diverge
+    // silently, with no error to trace. The rule is one form per module, and when versions differ the HIGHEST
+    // wins — downgrading would serve a returning user a stale copy out of their HTTP cache.
+    const files: string[] = [];
+    (function walkDir(dir: string) {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const p = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) { if (entry.name !== 'vendor') walkDir(p); }
+        else if (/\.(mjs|js)$/.test(entry.name)) files.push(p);
+      }
+    })('web');
+
+    const forms = new Map<string, Map<string, string[]>>();   // target -> form -> importers
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8');
+      for (const m of source.matchAll(/(?:from|import)\s*\(?\s*['"](\.[^'"]+)['"]/g)) {
+        const spec = m[1];
+        const bare = spec.split('?')[0];
+        const target = relative(process.cwd(), resolve(dirname(file), bare)).replace(/\\/g, '/');
+        if (!existsSync(target)) continue;
+        const form = spec.includes('?') ? spec.slice(spec.indexOf('?')) : '(no suffix)';
+        if (!forms.has(target)) forms.set(target, new Map());
+        const byForm = forms.get(target)!;
+        if (!byForm.has(form)) byForm.set(form, []);
+        byForm.get(form)!.push(file);
+      }
+    }
+
+    const split = [...forms].filter(([, byForm]) => byForm.size > 1);
+    const report = split
+      .map(([target, byForm]) => `  ${target} is imported ${byForm.size} ways:\n`
+        + [...byForm].map(([form, importers]) => `      ${form}  <- ${importers.join(', ')}`).join('\n'))
+      .join('\n');
+    expect(split.length, split.length ? `\n${report}\n` : '').toBe(0);
+
+    // Sanity: the scan must actually have found imports, or an empty result would pass for the wrong reason.
+    expect(forms.size, 'the specifier scan must reach the module graph').toBeGreaterThan(50);
   });
 });

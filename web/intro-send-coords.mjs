@@ -11,7 +11,7 @@
 // the created_at match (including the race where another sender's publish bumped the entryId).
 
 import { chooseIntroBucket } from './intro-bucket.mjs?v=1';
-import { introShardAddress } from './shard-discovery.mjs?v=1';
+import { introShardAddress } from './shard-discovery.mjs?v=3';
 
 /** next_id (fill) of an (epoch, bucket) shard — how many intros it already holds — and 0 for a shard that does not
  *  exist yet (readScanPage returns null for a structurally-absent account). */

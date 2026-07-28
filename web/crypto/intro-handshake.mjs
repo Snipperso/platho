@@ -38,7 +38,7 @@ import {
   MLKEM768_PUBLIC_KEY_BYTES,
   KEY_ID_BYTES,
   X25519_PUBLIC_KEY_BYTES,
-} from './conv-routing.mjs';
+} from './conv-routing.mjs?v=1';
 
 // ---- FROZEN pins (audit-critical, clean-17 genesis) ----
 // V2/PIH2 vs the clean-16 V1/PIH1: the payload + transcript gained senderMlKemPublicKeyHash and the payload gained the

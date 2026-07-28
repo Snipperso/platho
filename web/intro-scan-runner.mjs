@@ -20,10 +20,10 @@
 //     degrades on its own as the network grows.
 //   - Nothing runs while the app is hidden. Background polling is battery the user did not agree to spend.
 
-import { INTRO_READ_SPACE } from './shard-discovery.mjs';
+import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=3';
 import { scanIntroWindow, INTRO_SCAN_EPOCHS_BACK, INTRO_SCAN_EPOCHS_FORWARD } from './intro-receive.mjs';
-import { planIntroScan, DEFAULT_POLICY } from './intro-scan-policy.mjs';
-import { pruneCursors, pruneDelivered, deliveryKey } from './intro-cursor-store.mjs';
+import { planIntroScan, DEFAULT_POLICY } from './intro-scan-policy.mjs?v=1';
+import { pruneCursors, pruneDelivered, deliveryKey } from './intro-cursor-store.mjs?v=1';
 
 export const epochNow = (nowMs) => Math.floor(nowMs / 1000 / 86400);
 
