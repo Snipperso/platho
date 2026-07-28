@@ -14,8 +14,9 @@
 // nothing can fill up. State here is FIXED SIZE — there is not a single map in this contract, which is why the
 // ceiling is not raised but removed.
 //
-// It also makes resolution cheaper than the registry was: toncenter's accountStates batches >=700 addresses in
-// ONE request and omits accounts that never existed, so a client resolves a whole contact list in a single call
+// It also makes resolution cheaper than the registry was: toncenter's accountStates is capped by URL LENGTH
+// (64 KiB), NOT by an address count — 1149 url-safe friendly addresses fit in ONE request (raw hex: only 850) —
+// and accounts that never existed are omitted, so a client resolves a whole contact list in a single call
 // instead of one getter per contact (runGetMethod does not batch at all).
 //
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────
