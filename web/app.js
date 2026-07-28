@@ -168,6 +168,9 @@ import { readAccountStates } from './shard-reader.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
 // clean-17 first-contact (INTRO) send.
 import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=1';
+import {
+  serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
+} from './intro-send-state.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
@@ -11152,6 +11155,8 @@ function serializeMessageForHistory(message) {
     // idempotent re-broadcast). Without persistence a bounced green reloaded before the 8-min terminal froze green
     // forever = silent loss. convDirectSend is JSON-safe (commits are hex strings). [confirm review: persistence]
     convDirectSend: safeJsonClone(message.convDirectSend) ?? null,
+    // The INTRO half of the same guarantee — see web/intro-send-state.mjs for what a reload used to cost.
+    introDirectSend: serializeIntroDirectSend(message.introDirectSend),
     convDelivery: message.convDelivery ?? null,
     attachment: message.attachment ?? null,
     profileVersion: message.profileVersion ?? 0,
@@ -11384,6 +11389,9 @@ async function restoreEncryptedMessageHistory() {
         localHistoryId: item.id,
         localHistoryCreatedAt: item.createdAt,
       };
+      // Byte and BigInt fields do not survive JSON, so the stored INTRO send state is decoded rather than spread.
+      // Without this the revived value looks present but is unusable, which is worse than absent.
+      if (message.introDirectSend) message.introDirectSend = reviveIntroDirectSend(message.introDirectSend);
       ensureMessageOrderFields(message, item.createdAt);
       insertThreadMessage(thread, message);
       refreshThreadAfterMessageChange(thread);
@@ -20646,13 +20654,31 @@ globalThis.plathoDebugPendingPublishes = () => {
   return rows;
 };
 
+/**
+ * A direct-pay send that is safe to resume automatically after a reload.
+ *
+ * This is the clean-17 counterpart of the publishState/capsules test below it: direct pay produces NEITHER, so the
+ * old predicate answered "nothing pending" for every direct send and the auto-retry simply stopped existing across
+ * a reload. Resuming requires proof on three axes — nothing was broadcast, the message can be rebuilt faithfully,
+ * and a retry really was in flight (privateSendRetryAttempt only advances when one was scheduled). The age bound
+ * is the shared one: isStalePrivatePendingPublish falls back to the message's creation time when there is no
+ * publishState, so a direct send goes stale 10 minutes after it was composed, exactly like its Vault-era sibling.
+ */
+function directPaySendRetryResumable(message) {
+  return privateLaneDirectPayEnabled()
+    && !directSendReachedWallet(message)
+    && message?.privateManualRetryAvailable !== true
+    && Number(message?.privateSendRetryAttempt ?? 0) > 0
+    && sendContentSurvivesReload(message);
+}
+
 function hasPendingPrivateSendRetry(message) {
+  if (messageStatusKey(message) === 'failed') return false;
+  if (message?.privateSendRetryStopped === true) return false;
+  if (isStalePrivatePendingPublish(message) && !privateMessageHasPublishAttempt(message)) return false;
   const hasStoredCapsules = (Array.isArray(message?.capsules) && message.capsules.length > 0) || Boolean(message?.capsule);
-  return messageStatusKey(message) !== 'failed'
-    && message?.privateSendRetryStopped !== true
-    && (!isStalePrivatePendingPublish(message) || privateMessageHasPublishAttempt(message))
-    && publishStateHasRetryableSendParts(message?.publishState)
-    && hasStoredCapsules;
+  if (publishStateHasRetryableSendParts(message?.publishState) && hasStoredCapsules) return true;
+  return directPaySendRetryResumable(message);
 }
 
 function resumePendingPrivateSendRetries() {
