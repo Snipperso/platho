@@ -129,7 +129,7 @@ All launch roles must be finalized in the manifest before mainnet rehearsal.
 | `market_stability_reserve_funder` | Funds the `60,000,000 ATH` MarketStabilitySeller reserve through the official ATH notification path. |
 | `ath_long_term_vesting_official_ath_wallet` | Deterministic `ATHWallet(owner = ATHVesting, master = ATHMaster)`, funded exactly with `10,000,000 ATH` before final genesis. |
 | `buyback_burn_official_ath_wallet` | Deterministic `ATHWallet(owner = BuybackBurn, master = ATHMaster)`, used for STON.fi ATH output and burn. |
-| `vault_official_ath_wallet` | Deterministic `ATHWallet(owner = Vault, master = ATHMaster)`, funded exactly for the activity airdrop before final genesis. |
+| `airdrop_pool_official_ath_wallet` | Deterministic `ATHWallet(owner = AirdropPool, master = ATHMaster)`, funded exactly for the activity airdrop before final genesis. Replaces the clean-15 `vault_official_ath_wallet`; `Vault` no longer exists. |
 
 There is no privileged buyback executor in the current model. `ExecuteBuybackChunk`, recovery, recycle, and retry flows are permissionless but constrained by route freeze, frozen quote/minOut, phase, value, and accounting guards.
 
@@ -228,8 +228,10 @@ Keep deploy order simple and auditable.
 6. Deploy staged contracts:
    - `BuybackBurn`;
    - `MarketStabilitySeller`;
-   - `CapsuleHub`;
-   - `Vault`;
+   - `AirdropPool` — the clean-17 custodian of the 15M activity airdrop. It **replaces `Vault`**, which no longer
+     exists (neither does `CapsuleHub`: the public/avatar lane is the lazily-deployed `PublicShard`, not a genesis
+     contract). Deployed STAGED: `manifest_hash = 0`, `config_hash = 0`, unsealed — its address must not depend on
+     the manifest hash that commits to its address, so the real hash is bound at `AirdropSealGenesis`;
    - `UsernameRegistry`;
    - `ProfileRegistry`.
 7. Perform pre-seal bindings by `genesis_controller_one_shot` (except the FeeAccumulator leg, noted below):
@@ -247,13 +249,20 @@ Keep deploy order simple and auditable.
    - `FeeAccumulator.BindShardCode.shard_code`, `FeeAccumulator.BindIntroShardCode.intro_shard_code`, `FeeAccumulator.BindPublicShardCode.public_shard_code`, `FeeAccumulator.BindTicketCode.ticket_code` — the four lane/ticket CODE binds, **all signed by `ton_treasury_receiver`** (same `requireTreasury` gate 15050 as the pool bind above). Each carries the compiled code cell, and the packet records its hash. **Without them the sink rejects EVERY capsule fee (gate 15055) and every `TicketRedeem` (15060): publishing still appears to succeed, but 0 GRAM reaches the pool and the 15M ATH activity airdrop is permanently unreachable.**
    - `UsernameRegistry.BindOfficialAthWallet`;
    - `ProfileRegistry.BindProfileOfficialAthWallet`.
-8. Fund the genesis-backed official ATH wallets before AirdropPool becomes usable:
-   - transfer exactly `15,000,000 ATH` from the treasury ATH wallet to `vault_official_ath_wallet`;
-   - transfer exactly `10,000,000 ATH` from the treasury ATH wallet to `ath_long_term_vesting_official_ath_wallet`.
+8. Fund the genesis-backed official ATH wallets — these are packet steps `F01` and `F02`, and they are signed
+   **BEFORE the seals in step 10, not after**. The dry-run packet lists them in a separate `funding_messages`
+   array that appears AFTER `control_messages`, so working the file top to bottom would seal first. Do not.
+   The whole point of the ordering is that an unsealed contract can still be corrected: if a transfer lands on a
+   wrongly-derived wallet and the contracts are already sealed, the mistake is permanent.
+   - `F01`: transfer exactly `15,000,000 ATH` from the treasury ATH wallet to `airdrop_pool_official_ath_wallet`;
+   - `F02`: transfer exactly `10,000,000 ATH` from the treasury ATH wallet to
+     `ath_long_term_vesting_official_ath_wallet`.
+   In both, the Tonkeeper target is the **Treasury Owner ATHWallet**, and the message's recipient field is the
+   recipient OWNER contract — the official ATHWallet is derived inside ATHWallet, never addressed directly.
 9. Verify the pre-seal funding landed:
-   - `vault_official_ath_wallet.owner == Vault`;
-   - `vault_official_ath_wallet.master == ATHMaster`;
-   - `vault_official_ath_wallet.balance == 15,000,000 ATH`;
+   - `airdrop_pool_official_ath_wallet.owner == AirdropPool`;
+   - `airdrop_pool_official_ath_wallet.master == ATHMaster`;
+   - `airdrop_pool_official_ath_wallet.balance == 15,000,000 ATH`;
    - `ath_long_term_vesting_official_ath_wallet.owner == ATHVesting`;
    - `ath_long_term_vesting_official_ath_wallet.master == ATHMaster`;
    - `ath_long_term_vesting_official_ath_wallet.balance == 10,000,000 ATH`.
@@ -265,13 +274,13 @@ Keep deploy order simple and auditable.
      without them. But `get_collection_content` is gated by `throwUnless(19360, meta_sealed)`, so a collection sealed
      without metadata serves NOTHING to wallets and marketplaces: the username NFTs ship with no image and no TEP-64
      content, permanently. Confirm both getters report sealed before Phase 3 verification.
-10. Seal staged contracts only after the funding checks above pass:
-   - `Vault.SealGenesis`;
-   - `CapsuleHub.SealGenesis`;
-   - `UsernameRegistry.SealGenesis`;
-   - `ProfileRegistry.SealGenesis`;
-   - `BuybackBurn.SealBuybackBurnGenesis`;
-   - `MarketStabilitySeller.SealMarketStabilityGenesis`.
+10. Seal staged contracts only after the funding checks above pass. Exactly five seals, matching packet steps
+   `S01`–`S05` one for one — if the packet and this list ever disagree, stop and reconcile before signing:
+   - `AirdropPool.AirdropSealGenesis` (`S01`) — this is where the real manifest hash is bound;
+   - `UsernameRegistry.SealGenesis` (`S02`);
+   - `ProfileRegistry.SealGenesis` (`S03`);
+   - `BuybackBurn.SealBuybackBurnGenesis` (`S04`);
+   - `MarketStabilitySeller.SealMarketStabilityGenesis` (`S05`).
 
 Stop immediately if any post-seal binding still succeeds.
 
@@ -282,8 +291,8 @@ Before final genesis verification, only allowed genesis actions may have happene
 Required pre-seal funding and clean state:
 
 - ATHMaster treasury supply is deployed exactly once.
-- Vault official ATH wallet balance equals exactly `15,000,000 ATH`.
-- Vault has `15,000,000 ATH` airdrop remaining and zero distributed.
+- AirdropPool official ATH wallet balance equals exactly `15,000,000 ATH`.
+- AirdropPool reports `remaining_budget == 15,000,000 ATH`, `distributed_total == 0`, `claim_count == 0`.
 - ATHVesting official ATH wallet balance equals exactly `10,000,000 ATH`.
 - ATHVesting is clean: zero claimed amount, idle phase, and no pending transfer.
 - UsernameRegistry official ATH wallet balance is zero; it may still be `uninit` at the deterministic StateInit address.
@@ -311,11 +320,10 @@ npm.cmd run mainnet:genesis:verify
 - manifest hash commits to final manifest contents;
 - fixed tokenomics constants match the canonical model;
 - ATHMaster supply and treasury deployment are correct;
-- Vault airdrop backing is exact, not underfunded or overfunded;
+- AirdropPool airdrop backing is exact, not underfunded or overfunded (`funded_amount == total_pool == remaining_budget`);
 - ATHVesting schedule, beneficiary, clean state, and exact official wallet backing are correct;
-- official ATH wallets for Vault and ATHVesting are active and exactly funded;
+- official ATH wallets for AirdropPool and ATHVesting are active and exactly funded;
 - zero-balance official ATH wallets for UsernameRegistry, ProfileRegistry, BuybackBurn, and MarketStabilitySeller are either active with zero ATH or `uninit` at the deterministic StateInit address committed by the manifest;
-- CapsuleHub latest ids and accrued fee are zero;
 - Username/Profile records, dues, and pending flushes are zero;
 - FeeAccumulator buckets are zero;
 - BuybackBurn route/pending/due/totals are clean;
@@ -326,9 +334,9 @@ npm.cmd run mainnet:genesis:verify
 After clean final genesis:
 
 1. Release the production PWA only after production config, crypto review, hosting headers, and static bundle gates pass.
-2. Distribute the `15,000,000 ATH` activity airdrop through Vault.
+2. Distribute the `15,000,000 ATH` activity airdrop through AirdropPool, which accrues per publish via `FeeAccumulator` -> `AirdropTicket` -> `AirdropAccrue`. There is no bulk hand-out step: the pool pays on claim.
 3. Keep BuybackBurn route freeze, MarketStabilitySeller pricing freeze, and EnableBuybackSplit blocked during this distribution phase (the `60,000,000 ATH` seller reserve is already funded and locked at genesis).
-4. Verify `Vault.airdrop_remaining_ath == 0` and `Vault.airdrop_distributed_ath == 15,000,000 ATH`.
+4. Verify `AirdropPool.remaining_budget == 0` and `AirdropPool.distributed_total == 15,000,000 ATH`.
 
 Do not launch the initial ATH/TON pool before the activity airdrop is fully distributed. The pool
 is post-airdrop, not immediately post-genesis.
@@ -429,7 +437,7 @@ npm.cmd run buyback:enable-preflight
 
 Preflight must prove:
 
-- Vault activity airdrop remaining `== 0`;
+- AirdropPool activity airdrop `remaining_budget == 0`;
 - FeeAccumulator split is still disabled;
 - `buyback_due_ton == 0`;
 - BuybackBurn is sealed;
@@ -446,7 +454,6 @@ Only after PASS may the treasury receiver call `FeeAccumulator.EnableBuybackSpli
 
 Allowed recurring operations:
 
-- `CapsuleHub.FlushFees` to FeeAccumulator;
 - `FeeAccumulator.SplitAccumulated`;
 - `FeeAccumulator.FlushTreasuryDue`;
 - `FeeAccumulator.FlushBuybackDue` only for a complete `51.05 TON` envelope;
@@ -497,7 +504,6 @@ Verify:
 User-facing PWA flows:
 
 - wallet create, import, and seed export;
-- Vault TON/ATH deposit and withdraw;
 - key activation, rotation, and sync;
 - private messages;
 - public posts, channels, and comments;
