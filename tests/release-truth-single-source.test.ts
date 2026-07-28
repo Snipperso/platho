@@ -1,6 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+// Every code hash the genesis MANIFEST carries. The clean-15 nine plus the clean-17 five: AirdropPool is deployed
+// at genesis, and the four lazily-deployed ones are here because the CEREMONY BINDS THEM ON CHAIN
+// (FeeAccumulator.BindShardCode / BindIntroShardCode / BindPublicShardCode / BindTicketCode). A bound code hash is
+// a ceremony input — get it wrong and the fee passthrough authenticates the wrong contract for ever.
 const CURRENT_CODE_HASH_TO_MANIFEST_KEY: Record<string, string> = {
   ATHMASTER_CODE_HASH: 'ath_master',
   ATHVESTING_CODE_HASH: 'ath_vesting',
@@ -11,7 +15,19 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY: Record<string, string> = {
   PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
   USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
   USERNAME_REGISTRY_CODE_HASH: 'username_registry',
+  AIRDROP_POOL_CODE_HASH: 'airdrop_pool',
+  RECORD_SHARD_CODE_HASH: 'record_shard',
+  INTRO_SHARD_CODE_HASH: 'intro_shard',
+  PUBLIC_SHARD_CODE_HASH: 'public_shard',
+  AIRDROP_TICKET_CODE_HASH: 'airdrop_ticket',
 };
+
+// Production-critical, but with NO manifest counterpart — and that absence is correct, not an omission. The
+// ceremony binds a shard's code hash only where the fee passthrough has to authenticate the depositor; RecoveryShard
+// takes no protocol fee and KeyShard is paid registration, so neither is ever sent on chain at genesis. They still
+// belong in the production hash file: every recovery slot address derives from one and every wallet's identity
+// address from the other, so a silent change to either moves addresses the network has already published.
+const PRODUCTION_ONLY_CODE_HASH_KEYS = ['RECOVERY_SHARD_CODE_HASH', 'KEY_SHARD_CODE_HASH'];
 
 const CONTRACT_TO_CURRENT_CODE_HASH_KEY: Record<string, string> = {
   ATHMaster: 'ATHMASTER_CODE_HASH',
@@ -229,7 +245,8 @@ describe('release truth single-source guard', () => {
   it('keeps a production-only code hash file without mock or harness evidence keys', () => {
     const currentCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_CODE_HASHES.txt'));
     const productionCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_PRODUCTION_CODE_HASHES.txt'));
-    const expectedKeys = Object.keys(CURRENT_CODE_HASH_TO_MANIFEST_KEY).sort();
+    const manifestKeys = Object.keys(CURRENT_CODE_HASH_TO_MANIFEST_KEY);
+    const expectedKeys = [...manifestKeys, ...PRODUCTION_ONLY_CODE_HASH_KEYS].sort();
 
     expect(Object.keys(productionCodeHashes).sort()).toEqual(expectedKeys);
 

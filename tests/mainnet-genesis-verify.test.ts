@@ -206,7 +206,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         ton_treasury_receiver_address: addresses.market_stability_ton_treasury_receiver,
         ath_master_address: addresses.ath_master,
         genesis_config_hash: addressHashHex(addresses.market_stability_seller_initial_genesis_controller),
-        pricing_frozen: false,
+        pricing_frozen: true,
         reserve_due_ath: '60000000000000000',
         reserve_funded_total_ath: '60000000000000000',
         treasury_due_ton: '0',
@@ -1163,7 +1163,8 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
 
   it('rejects final genesis when MarketStabilitySeller is already priced or funded', () => {
     const input = finalInput();
-    input.snapshot.market_stability_seller.pricing_frozen = true;
+    // clean-17 flips this: frozen is the HEALTHY state, so the negative case is a seller reporting NOT frozen.
+    input.snapshot.market_stability_seller.pricing_frozen = false;
     input.snapshot.market_stability_seller.genesis_config_hash = '0'.repeat(64);
     input.snapshot.market_stability_seller.reserve_due_ath = '1';
     input.snapshot.market_stability_seller.reserve_funded_total_ath = '1';
@@ -1182,7 +1183,7 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     const report = verifyMainnetGenesisSnapshot(input);
 
     expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_PRICING_FROZEN_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_PRICING_NOT_FROZEN_AT_GENESIS');
     expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISSING');
     expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_NOT_FULLY_CAPITALIZED');
     expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_FULLY_CAPITALIZED');
