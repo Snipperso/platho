@@ -1,4 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { Address } from '@ton/core';
+import { readBakedFeeSinks } from '../scripts/mainnet_tx_dry_run_packet';
 import { describe, expect, it } from 'vitest';
 
 const OFFICIAL_ATH_WALLET_KEYS = [
@@ -71,6 +73,57 @@ describe('mainnet transaction dry-run packet', () => {
       const block = script.slice(Math.max(0, at - 700), at);
       expect(block, `${fn} must be signed by ton_treasury_receiver (gate 15050), not the genesis controller`)
         .toMatch(/signer_role: 'ton_treasury_receiver'/);
+    }
+  });
+
+  // Wave-7 audit, 2026-07-28. The FeeAccumulator address is baked as a COMPILE-TIME constant into four immutable,
+  // lazily-deployed contracts (RecordShard/IntroShard/PublicShard/AirdropTicket) with no bind to correct it. It was
+  // rebaked from a TEST FIXTURE's BuybackBurn literal instead of the derived address, so all four pointed at a sink
+  // this ceremony would never deploy: every capsule fee to an uninitialised address, every deposit acknowledgement
+  // refused by 13657/13685, zero credits minted, the 15M ATH airdrop dead — on contracts that cannot be changed.
+  //
+  // The existing PT-04b guard was blind BY CALIBRATION: it derived its "expected" sink from the same fixture literal.
+  // The only place the truth exists is the generator that reads the real roles, so that is where the check now lives —
+  // and it refuses to emit a packet at all on a mismatch (verified: it did refuse, naming all four contracts).
+  it('H-DEP-DRYRUN-05: the ceremony refuses to emit a packet whose FeeAccumulator the immutable contracts do not name', () => {
+    const script = readFileSync('scripts/mainnet_tx_dry_run_packet.ts', 'utf8');
+
+    expect(script, 'the baked-sink check must run inside packet derivation').toMatch(/assertBakedFeeSinksMatch\(feeAccumulatorAddress\)/);
+    // All four immutable carriers, read from the .tact SOURCE — a constant renamed out of this list would otherwise
+    // silently drop out of the check, which is the same class of blindness that let the original defect live.
+    for (const contract of ['RecordShard', 'IntroShard', 'PublicShard', 'AirdropTicket']) {
+      expect(script, `${contract}'s baked FEE SINK must be covered`).toMatch(
+        new RegExp(`'${contract}',\\s*'contracts/${contract}\\.tact'`),
+      );
+    }
+    expect(script, 'a missing constant must be a hard failure, never a skip').toMatch(/no baked FEE SINK constant found in/);
+    expect(script, 'and the mismatch must throw, not warn').toMatch(/BAKED FEE SINK MISMATCH/);
+  });
+
+  it('H-DEP-DRYRUN-06: every sink the packet names is the one the immutable contracts have baked in', () => {
+    if (!existsSync('artifacts/local/mainnet_tx_dry_run_packet.json')) return;
+    const packet = readJson('artifacts/local/mainnet_tx_dry_run_packet.json');
+
+    // Read the constants out of the .tact sources — the same four the generator checks — and compare RAW, because
+    // the packet writes non-bounceable UQ while the contracts carry bounceable EQ. Comparing the friendly strings
+    // would fail on the flag byte alone and tempt someone to weaken the check.
+    const baked = readBakedFeeSinks();
+    expect(baked.length, 'all four immutable carriers are covered').toBe(4);
+    const bakedRaw = new Set(baked.map(({ address }) => address.toRawString()));
+    expect(bakedRaw.size, 'the four contracts agree on one sink').toBe(1);
+    const expectedRaw = [...bakedRaw][0];
+
+    // Two independent places the packet names the sink, and BOTH must be it:
+    //  - AirdropBindCreditIssuer: AirdropPool accepts accruals ONLY from credit_issuer_address (gate 26110). Bind it
+    //    to anything else and the shards' fees mint credits for nobody.
+    //  - BindBuybackFeeAccumulator: the buyback side's view of the same sink.
+    const named = (packet.control_messages ?? []).flatMap((m: any) => {
+      const p = m?.body?.params ?? {};
+      return [p.credit_issuer_address, p.fee_accumulator_address].filter(Boolean);
+    });
+    expect(named.length, 'the packet names the sink at least once').toBeGreaterThan(0);
+    for (const value of named) {
+      expect(Address.parse(value).toRawString(), `packet names ${value}, contracts baked ${expectedRaw}`).toBe(expectedRaw);
     }
   });
 

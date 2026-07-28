@@ -31,7 +31,7 @@
 // FeeAccumulator can still authenticate a ticket by rebuilding its address from the bound code plus the owner.
 // Had FeeAccumulator embedded ticket code instead, its address would depend on ticket code, which depends on
 // its address — the same cycle that stops AirdropPool from simply importing RecordShard.
-const AT_FEE_SINK: Address = address("EQBOSbFHf8Iqe390MhsuN8RywBimRbzTwq8dtnN9fN4MyZOP");
+const AT_FEE_SINK: Address = address("EQAnVFHvZwSidVZ5y46nz7y4KibSp_8pHD3C1y73BJ3kQM1K");
 
 // ~100 years of config-18 basechain rent for this account (1 + code + data cells at 64,962 nanoton/cell/year)
 // plus cushion. Charged once, on the deploy that the first credit performs.

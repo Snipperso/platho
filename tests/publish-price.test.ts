@@ -30,7 +30,7 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 const cell = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCell();
 const CLOCK = 1_790_000_000;
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
-const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');
+const FA_BUYBACK = Address.parse('UQDCA1g25Mx4PpNlQNRBJhlTjCLKsBeRtGDKlQrdMGbAetlc');
 
 async function withSink() {
   const bc = await Blockchain.create();

@@ -191,6 +191,50 @@ function readAthContentCell(): Cell {
   return cells[0];
 }
 
+// THE FEE SINK IS BAKED INTO FOUR IMMUTABLE CONTRACTS, AND THIS IS THE ONLY PLACE THE CHECK CAN BE REAL.
+// RecordShard/IntroShard/PublicShard/AirdropTicket each carry the FeeAccumulator address as a COMPILE-TIME constant.
+// They are deployed lazily by users, and there is no bind to correct the value afterwards — AirdropTicket.tact says
+// so outright. The address is a pure function of the FeeAccumulator code and (ton_treasury_receiver, BuybackBurn
+// address), and BuybackBurn's address moves with the ATH metadata and the genesis controller. So editing almost
+// anything upstream silently invalidates all four constants.
+//
+// WRITTEN BECAUSE IT HAPPENED (wave-7 audit, 2026-07-28). The constants were rebaked from the TEST FIXTURE's
+// BuybackBurn literal (FA_BUYBACK) instead of the derived address, so every immutable contract pointed at a
+// FeeAccumulator this ceremony would never deploy. Consequence on sealed contracts: each capsule fee goes to an
+// uninitialised address, and the deposit acknowledgement from the REAL sink is refused by gates 13657/13685 —
+// zero credits minted, the 15M ATH airdrop dead, unfixable.
+//
+// The suite's own PT-04b guard could not see it. It compares the constant against
+// FeeAccumulator.init(FA_TREASURY, FA_BUYBACK) using that same fixture literal, so it faithfully proved the constant
+// matched a FICTIONAL sink. A guard is only worth its calibration: this one runs against the roles the ceremony will
+// actually sign with, and it refuses to emit a packet at all when they disagree.
+const BAKED_FEE_SINKS: ReadonlyArray<readonly [string, string, RegExp]> = [
+  ['RecordShard', 'contracts/RecordShard.tact', /const\s+RS_FEE_SINK:\s*Address\s*=\s*address\("([^"]+)"\)/],
+  ['IntroShard', 'contracts/IntroShard.tact', /const\s+IS_FEE_SINK:\s*Address\s*=\s*address\("([^"]+)"\)/],
+  ['PublicShard', 'contracts/PublicShard.tact', /const\s+PS_FEE_SINK:\s*Address\s*=\s*address\("([^"]+)"\)/],
+  ['AirdropTicket', 'contracts/AirdropTicket.tact', /const\s+AT_FEE_SINK:\s*Address\s*=\s*address\("([^"]+)"\)/],
+];
+
+export function readBakedFeeSinks(): Array<{ contract: string; address: Address }> {
+  return BAKED_FEE_SINKS.map(([contract, path, pattern]) => {
+    const match = pattern.exec(readFileSync(path, 'utf8'));
+    // A missing constant is a HARD failure, never a skip: a renamed constant would otherwise turn this guard off.
+    if (!match) throw new Error(`${contract}: no baked FEE SINK constant found in ${path}`);
+    return { contract, address: Address.parse(match[1]) };
+  });
+}
+
+function assertBakedFeeSinksMatch(feeAccumulatorAddress: Address) {
+  const wrong = readBakedFeeSinks().filter(({ address }) => !address.equals(feeAccumulatorAddress));
+  if (wrong.length === 0) return;
+  const detail = wrong.map(({ contract, address }) => `  ${contract}: baked ${friendly(address)}`).join('\n');
+  throw new Error(
+    'BAKED FEE SINK MISMATCH — this ceremony would deploy a FeeAccumulator the immutable contracts do not point at.\n'
+    + `  ceremony deploys: ${friendly(feeAccumulatorAddress)}\n${detail}\n`
+    + '  Rebake the constants (contracts/*.tact), rebuild those projects, regenerate web/shard-code.mjs, and re-run.',
+  );
+}
+
 function assertAddress(label: string, actual: Address, expected: Address) {
   if (!actual.equals(expected)) {
     throw new Error(`${label} address mismatch: actual=${friendly(actual)} expected=${friendly(expected)}`);
@@ -230,6 +274,7 @@ async function deriveState(draft: Draft) {
 
   const feeAccumulator = await FeeAccumulator.init(tonTreasuryReceiver, buybackBurnAddress);
   const feeAccumulatorAddress = contractAddress(0, feeAccumulator);
+  assertBakedFeeSinksMatch(feeAccumulatorAddress);
 
   // clean-17: AirdropPool replaces Vault (15M airdrop custodian), CapsuleHub is removed. Staged deploy — manifest
   // hash 0, config 0, unsealed; the real manifest hash is bound at AirdropSealGenesis (must run AFTER funding).

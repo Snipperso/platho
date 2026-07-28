@@ -19,7 +19,7 @@ import { PublicShard } from '../../build/PublicShard/PublicShard_PublicShard';
 // duplicated five times is a change that has to land five times, and it will not.
 
 export const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
-export const FA_BUYBACK = Address.parse('UQBoOuHT0NhmZfHbm_wOquj3hA1BYUO84EKoqQ-X85UrLYgj');
+export const FA_BUYBACK = Address.parse('UQDCA1g25Mx4PpNlQNRBJhlTjCLKsBeRtGDKlQrdMGbAetlc');
 export const FA_POOL = Address.parse('UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH');
 
 /**
