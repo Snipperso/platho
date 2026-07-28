@@ -96,32 +96,137 @@ export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl, r
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+// THE HISTORY WINDOW, AND WHY IT IS FILTERED SERVER-SIDE.
+//
+// Capsule bodies live in a shard's inbound transaction history, so a lane reads them with /messages?limit=N,
+// newest first. That window used to accept ANY inbound message, and a shard address is derivable by anyone —
+// a PublicShard's from the channel wallet plus the epoch tag, an IntroShard's from (epoch, bucket), which is
+// exactly what lets a stranger send a first contact at all. So a griefer could push N cheap junk messages at a
+// shard and shove the real publishes out of the window: the channel feed shows only the newest posts or
+// nothing, and on the INTRO lane fetchIntroCapsule stops finding the body for an entry that IS on chain and
+// paid for — a first contact lost silently, which is worse.
+//
+// MEASURED against live toncenter v3 on 2026-07-28, because neither fix could be written blind:
+//   • `opcode` IS a real server-side filter, and rows come back with message_content.body and source intact.
+//     It filters over the WHOLE history, not just the first page: asking for one opcode returned 50 matching
+//     rows where the unfiltered first 50 held only 40 of them.
+//   • `op`, `op_code`, `message_opcode` are SILENTLY IGNORED — FastAPI drops unknown query params, so a request
+//     that "succeeds" can be completely unfiltered. That is why support is proven by checking the ROWS, never
+//     the status code.
+//   • The opcode must be hex ("0x50535031"); a decimal value is rejected with 422.
+//   • `offset` paginates and composes with `opcode`; `limit` is accepted up to at least 1000.
+//   • An opcode no message carries returns an empty list with HTTP 200 — a clean empty, not an error.
+//
+// So the window asks for one opcode and then VERIFIES the rows. If the endpoint honoured it, one request
+// returns a window of nothing but real publishes and the griefing vector is closed at the source. If it did
+// not (a proxy, a self-hosted indexer, a future API change), the mismatch is visible in the rows themselves,
+// and the reader pages with `offset` to fill the window with real publishes instead. Both paths were listed as
+// candidates; they turn out to compose into one self-detecting reader rather than being alternatives.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// Opcodes arrive here as a Number from one lane and a BigInt from another (each lane mirrors the constant its
+// contract declares), and an indexer may report a high opcode as a NEGATIVE int32. asUintN(32) is the one
+// normalisation that makes all three comparable — and it is why this is a helper rather than an inline compare.
+const opcodeBits = (opcode) => BigInt.asUintN(32, BigInt(opcode));
+
+/** The wire form toncenter wants: lower-case hex, 0x-prefixed. MEASURED: a decimal opcode is rejected with 422. */
+const opcodeParam = (opcode) => `0x${opcodeBits(opcode).toString(16).padStart(8, '0')}`;
+
+/**
+ * Is this row PROVABLY not ours? Only a row whose opcode is present AND different qualifies.
+ *
+ * THE ASYMMETRY IS DELIBERATE AND IT IS THE SAFETY PROPERTY. A row with no opcode field is AMBIGUOUS: if the
+ * endpoint honoured our filter it is one of ours and the field simply was not decoded; if it ignored the filter
+ * it is junk. Dropping the ambiguous case would let an indexer that does not decode opcodes blind the lane
+ * completely — every real publish discarded, the feed empty, no error. Keeping it costs at worst a slot of
+ * window budget, which is exactly today's behaviour, and the body parse downstream rejects foreign bodies
+ * anyway. So the filter may only ever remove something that has identified itself as belonging to someone else.
+ */
+function rowIsForeign(row, opcode) {
+  const raw = row?.opcode;
+  if (raw === null || raw === undefined || raw === '') return false;   // ambiguous — never dropped
+  try { return opcodeBits(raw) !== opcodeBits(opcode); } catch { return false; }
+}
+
+/**
+ * One shard's inbound message rows, newest first, restricted to `opcode` when one is given.
+ *
+ * Returns `{ rows, serverFiltered, pages }`. `serverFiltered` is false when the endpoint handed back rows we
+ * did not ask for — the caller may want to know its window was assembled the expensive way.
+ */
+async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages }) {
+  const headers = { Accept: 'application/json' };
+  if (key) headers['X-API-Key'] = key;
+  const rows = [];
+  let serverFiltered = true;
+  let offset = 0;
+  let pages = 0;
+  let previousPageMark = null;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const url = new URL(base);
+    url.searchParams.set('destination', String(address));
+    url.searchParams.set('limit', String(limit));
+    url.searchParams.set('sort', 'desc');
+    if (opcode !== null && opcode !== undefined) url.searchParams.set('opcode', opcodeParam(opcode));
+    if (offset > 0) url.searchParams.set('offset', String(offset));
+
+    const response = await scheduleToncenterHttpRequest(
+      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), SCAN_REQUEST_OPTIONS);
+    if (!response) break;                       // declined by the pump: an empty pass, not an error
+    if (!response.ok) throw new Error(`messages failed with HTTP ${response.status}`);
+    const body = await response.json();
+    const pageRows = body?.messages ?? [];
+    pages += 1;
+    if (pageRows.length === 0) break;
+
+    // `offset` CAN BE IGNORED TOO, and then paging turns into an infinite supply of the same rows — the window
+    // fills with duplicates of whatever is newest, which reads as a channel repeating one post. The tell is a
+    // page identical to the one before it.
+    //
+    // FINGERPRINT THE WHOLE PAGE, NOT ITS FIRST ROW. Comparing first rows looked equivalent and was not: a flood
+    // makes consecutive pages START with indistinguishable junk, so the reader declared "no more history" and
+    // stopped one page short of the real publishes it was paging towards — the very rows it went looking for.
+    const pageMark = pageRows.map((row) => row?.hash ?? row?.message_content?.body ?? '').join('|');
+    if (offset > 0 && pageMark === previousPageMark) break;
+    previousPageMark = pageMark;
+
+    const wanted = (opcode === null || opcode === undefined)
+      ? pageRows
+      : pageRows.filter((row) => !rowIsForeign(row, opcode));
+    // A row belonging to someone else is the ONLY proof that the filter was ignored — the status code says
+    // nothing, since an unknown query parameter is dropped silently and still answers 200.
+    if (wanted.length !== pageRows.length) serverFiltered = false;
+    rows.push(...wanted);
+
+    if (rows.length >= limit) { rows.length = limit; break; }
+    if (pageRows.length < limit) break;         // the endpoint ran out of history, filtered or not
+    if (serverFiltered) break;                  // a full page of ours IS the window; nothing to page for
+    offset += pageRows.length;                  // junk in the window — page past it to fill up on real rows
+  }
+  return { rows, serverFiltered, pages };
+}
+
 /**
  * `readMessages(address)` for web/intro-transport.fetchIntroCapsule: the message bodies a shard has received,
  * as cells, newest first.
  *
  * ABSENCE IS EMPTY, NOT AN ERROR — the same rule the rest of the lane follows. A shard nobody has written to has
  * no messages, and under lazy deploy that is the ordinary case rather than a failure.
+ *
+ * `opcode` restricts the window to one message type (see the block above). Omitting it keeps the old
+ * take-everything behaviour, which is what the tests that stub the transport rely on.
  */
-export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, limit = 64 } = {}) {
+export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, limit = 64, opcode = null, maxPages = 8 } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
   return async (address) => {
     const base = resolveEndpoint('messages', endpoint);
     const key = resolveApiKey(apiKey);
-    const url = new URL(base);
-    url.searchParams.set('destination', String(address));
-    url.searchParams.set('limit', String(limit));
-    url.searchParams.set('sort', 'desc');
-    const headers = { Accept: 'application/json' };
-    if (key) headers['X-API-Key'] = key;
-    const response = await scheduleToncenterHttpRequest(
-      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), SCAN_REQUEST_OPTIONS);
-    if (!response) return [];
-    if (!response.ok) throw new Error(`messages failed with HTTP ${response.status}`);
-    const body = await response.json();
+    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages });
     const cells = [];
-    for (const message of body?.messages ?? []) {
+    for (const message of rows) {
       const raw = message?.message_content?.body;
       if (!raw) continue;
       // A body that will not parse is not ours to interpret — skip it rather than fail the whole read. A shard's
@@ -149,25 +254,19 @@ export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, 
 // page (PS_PAGE_CAP). At 64 a shard holding 65-96 live entries would leave the oldest in-page posts with no body to
 // match, silently dropping them. 128 covers the page cap plus top-up/bounce noise; a shard busier than that needs
 // message pagination (a later refinement — logged, not silent).
-export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128 } = {}) {
+//
+// `opcode` is what keeps that budget spent on real publishes rather than on whatever a stranger chose to send —
+// see the measured block above. Each lane passes its own: PSP1 for public posts, ISP1 for first contacts, RSP1
+// for CONV capsules. Omitting it preserves the take-everything behaviour.
+export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128, opcode = null, maxPages = 8 } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
   return async (address) => {
     const base = resolveEndpoint('messages', endpoint);
     const key = resolveApiKey(apiKey);
-    const url = new URL(base);
-    url.searchParams.set('destination', String(address));
-    url.searchParams.set('limit', String(limit));
-    url.searchParams.set('sort', 'desc');
-    const headers = { Accept: 'application/json' };
-    if (key) headers['X-API-Key'] = key;
-    const response = await scheduleToncenterHttpRequest(
-      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), SCAN_REQUEST_OPTIONS);
-    if (!response) return [];
-    if (!response.ok) throw new Error(`messages failed with HTTP ${response.status}`);
-    const body = await response.json();
+    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages });
     const out = [];
-    for (const message of body?.messages ?? []) {
+    for (const message of rows) {
       const raw = message?.message_content?.body;
       if (!raw) continue;
       let bodyCell;

@@ -19,6 +19,7 @@ import { createScanPageReader, createEntryReader, fetchIntroCapsule } from './in
 import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
 import { readAccountStates } from './shard-reader.mjs?v=1';
 import { introShardAddress } from './shard-discovery.mjs?v=3';
+import { INTRO_PUBLISH_OPCODE } from './intro-codec.mjs?v=1';
 
 /**
  * Build the INTRO receive lane.
@@ -61,7 +62,11 @@ export async function createIntroLane({
   // With-source reader (not the source-free one): the INTRO publish transaction's src is the sender's wallet, which the
   // responder needs to resolve the sender's full bundle (KeyShard) for a reply. fetchIntroCapsule surfaces it, verified
   // downstream against the sender keyId. [clean17-private-lane-plan: Y reply-bundle resolution]
-  const readMessages = createShardMessagesWithSourceReader(rpc);
+  // `opcode` closes a first-contact griefing vector, and this lane is the one it hurt most. An IntroShard address
+  // is derivable by anyone — (epoch, bucket) — which is precisely what lets a stranger send a first contact, so a
+  // stranger can equally flood the bucket with cheap junk. The body of an entry that IS on chain and paid for then
+  // falls out of the newest-first window and fetchIntroCapsule returns null: the contact is lost with no error.
+  const readMessages = createShardMessagesWithSourceReader({ ...rpc, opcode: INTRO_PUBLISH_OPCODE });
   const readScanPage = createScanPageReader(runGetMethod);
   const readEntry = createEntryReader(runGetMethod);
 

@@ -21,7 +21,7 @@ import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 // MUST equal conv-publish-browser + RecordShard.tact — mirrored (not imported) so a drift is caught by the round-trip
 // pin in tests/conv-lane-read.test.ts rather than silently accepting a body from a different opcode.
-const CAPSULE_PUBLISH_OPCODE = 0x52535031n; // "RSP1"
+export const CAPSULE_PUBLISH_OPCODE = 0x52535031n; // "RSP1"
 const RS_FRAME_DOMAIN = 0x52534643n;        // "RSFC"
 const RS_WRITE_DOMAIN = 0x52535744n;        // "RSWD"
 

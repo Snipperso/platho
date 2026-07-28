@@ -18,8 +18,11 @@ import { incomingRecordShards } from './conv-discovery.mjs?v=1';
 import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=1';
 
 // Mirrors createShardMessagesWithSourceReader's default `limit`. When a single shard returns exactly this many bodies,
-// it MAY hold older ones the newest-page read did not return (the reader does not paginate yet). We cannot silently
-// assume completeness — logging keeps the truncation visible until message pagination lands. [conv-receive review]
+// it MAY hold older ones the newest-page read did not return. The reader now pages, but only to get PAST junk when an
+// endpoint ignores the opcode filter — a window legitimately full of capsules is still just the newest ones. So the
+// truncation stays worth logging rather than silently assuming completeness. What DID change: the window is now 128
+// CAPSULES rather than 128 inbound messages, since the shard's own fee deposits and top-ups no longer occupy it.
+// [conv-receive review]
 const CONV_SHARD_MESSAGE_PAGE_LIMIT = 128;
 
 /**
