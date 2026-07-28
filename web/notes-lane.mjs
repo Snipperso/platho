@@ -18,7 +18,7 @@
 import { selfRecoveryShard } from './conv-discovery.mjs?v=1';
 import { sealNotesBlob, openNotesBlob } from './recovery-blob.mjs?v=1';
 import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=1';
-import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT, addrKey } from './shard-discovery.mjs?v=1';
+import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT, addrKey } from './shard-discovery.mjs?v=3';
 import { probeActiveAddresses } from './shard-reader.mjs?v=1';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS (gate 13560). Mirrored, not imported, for the same reason the

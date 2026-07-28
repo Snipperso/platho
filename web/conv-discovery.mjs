@@ -7,10 +7,10 @@
 // key-ids (outgoingDir for A == incomingDir for B), and the RecordShard address is a pure function of (bucketKey,
 // epoch). So delivery works with no directory — proven in tests/conv-discovery.test.ts.
 
-import { outgoingBucketKey, incomingBucketKeys, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs';
+import { outgoingBucketKey, incomingBucketKeys, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=1';
 import {
   recordShardAddress, recoveryShardAddress, recoveryOwnerSlotKey, RECOVERY_MAX_SLOTS,
-} from './shard-discovery.mjs';
+} from './shard-discovery.mjs?v=3';
 
 // Portable big-endian bytes -> bigint (the on-chain bucket_key is a uint256 = the 32 HKDF bytes, big-endian).
 const bytesToInt = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };

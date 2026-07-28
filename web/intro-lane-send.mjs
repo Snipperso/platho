@@ -21,7 +21,7 @@
 
 import { buildIntroPublishBrowser } from './intro-publish-browser.mjs?v=1';
 import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=33';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=1';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=18';
 
 /** base64url → bytes (the capsule advertises ephemeralR / view material as base64url, not standard base64). */
 function b64urlToBytes(value) {

@@ -12,8 +12,8 @@
 //     recipient's delivery check rejects the capsule it just paid to publish.
 // tests/intro-publish-browser.test.ts pins both against the reference builder and against the live contract.
 
-import { beginCell } from './pwa-contract-transactions.mjs?v=1';
-import { introShardAddressBytes, introShardStateInit, rawAddress } from './shard-address.mjs?v=1';
+import { beginCell } from './pwa-contract-transactions.mjs?v=33';
+import { introShardAddressBytes, introShardStateInit, rawAddress } from './shard-address.mjs?v=3';
 import { INTRO_PUBLISH_OPCODE } from './intro-codec.mjs?v=1';
 import { assertReadableBucket } from './intro-bucket.mjs?v=1';
 
