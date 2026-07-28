@@ -194,6 +194,32 @@ describe('mainnet transaction dry-run packet', () => {
     }
   });
 
+  // Wave-8 audit, 2026-07-28, MEASURED. The very first genesis step, D02 `ATHMaster.DeployTreasurySupply`, needs
+  // ATHMaster to already hold TON of its OWN: the downstream send carries the full ATHWallet StateInit with
+  // SendPayFwdFeesSeparately, and that forward fee comes out of balance while the handler refunds everything the
+  // gate did not require. Measured in tests/ath-wallet-derivation.test.ts (GENESIS-ACTION-01..03): with 2,000,000
+  // of its own the ACTION phase fails rc37 and NOT ONE of the 100M ATH is minted — while COMPUTE exits 0, so an
+  // operator watching exit codes sees success. Sending more value does not help; the excess is refunded.
+  //
+  // The ceremony is safe today only because D01 funds the master with 500,000,000 — a number chosen for other
+  // reasons and connected to this requirement by nothing. Connect it.
+  it('H-DEP-DRYRUN-09: D01 funds ATHMaster far above the balance D02 actually requires', () => {
+    if (!existsSync('artifacts/local/mainnet_tx_dry_run_packet.json')) return;
+    const packet = readJson('artifacts/local/mainnet_tx_dry_run_packet.json');
+
+    const d01 = (packet.deploy_contracts ?? []).find((s: any) => /ATHMaster/i.test(s.contract ?? ''));
+    expect(d01, 'the packet must deploy ATHMaster').toBeTruthy();
+    const funded = BigInt(d01.value_nanotons_recommended ?? d01.value_nanotons_min ?? d01.value ?? 0);
+
+    // Measured floor: 2,000,000 fails, 3,000,000 succeeds. Demand an order of magnitude of headroom rather than
+    // the bare threshold — the true cost is a forward fee over a 77-cell StateInit and moves with the fee config.
+    const MEASURED_FAILING = 2_000_000n;
+    const MEASURED_PASSING = 3_000_000n;
+    expect(funded, `D01 funds ATHMaster with ${funded}; D02 aborts in ACTION below ${MEASURED_PASSING}`)
+      .toBeGreaterThanOrEqual(MEASURED_PASSING * 10n);
+    expect(funded, 'and must never sit near the measured failing point').toBeGreaterThan(MEASURED_FAILING * 10n);
+  });
+
   it('H-DEP-DRYRUN-01: script derives every official ATHWallet StateInit used by final genesis', () => {
     const script = readFileSync('scripts/mainnet_tx_dry_run_packet.ts', 'utf8');
 

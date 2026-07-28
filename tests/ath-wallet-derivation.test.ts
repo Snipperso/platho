@@ -400,3 +400,82 @@ describe('ATH wallet derivation profile', () => {
     expect((await wallet.getGetWalletData()).balance).toBe(0n);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// GENESIS-ACTION — the FIRST step of the ceremony, and the phase its gate does not look at.
+//
+// MEASURED 2026-07-28 (wave-8 audit). `DeployTreasurySupply` gate 14124 checks context().value >= 5,000,000.
+// That is not the binding constraint. The handler keeps only ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE out of the
+// message and refunds `context().value - required_value` — but the downstream send carries the FULL ATHWallet
+// StateInit with SendPayFwdFeesSeparately, whose forward fee comes out of BALANCE, not out of `value`. The
+// refund is computed without subtracting that fee, so it asks for more than remains and ACTION fails.
+//
+// Two things make this worth pinning rather than reasoning about:
+//   1. COMPUTE exits 0 and treasury_supply_deployed is set — then the whole transaction aborts and rolls back.
+//      Anyone checking the exit code sees success while zero of the 100M ATH was minted.
+//   2. Sending MORE does not help: the excess is refunded, so it never becomes balance.
+//
+// The production ceremony is safe — but only by a number nobody had tied to this one: D01 funds ATHMaster with
+// 500,000,000 before D02 arrives. These tests pin the real requirement, so lowering that value reds here.
+// The same mistake already exists in a rehearsal script: scripts/tier2_p1_deploy_ath.ts sends deploy+mint as a
+// SINGLE 1.5 GRAM message, and by this measurement that path cannot work at any value.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+async function runGenesisSupply(masterOwnBalance: bigint, sentValue: bigint) {
+  const blockchain = await Blockchain.create();
+  blockchain.now = 1_790_000_000;
+  const treasuryOwner = await blockchain.treasury('genesis-action-owner');
+  const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
+  const masterInit = await ATHMaster.init(treasuryOwner.address, content);
+  const masterAddress = contractAddress(0, masterInit);
+
+  await blockchain.setShardAccount(masterAddress, createShardAccount({
+    address: masterAddress, code: masterInit.code, data: masterInit.data,
+    balance: masterOwnBalance, workchain: 0,
+  }));
+
+  const master = blockchain.openContract(new ATHMaster(masterAddress, masterInit));
+  const walletAddress = contractAddress(0, await ATHWallet.init(0n, treasuryOwner.address, masterAddress));
+
+  const result = await master.send(treasuryOwner.getSender(), { value: sentValue }, {
+    $$type: 'DeployTreasurySupply', query_id: 1n, response_destination: treasuryOwner.address,
+  } as DeployTreasurySupply);
+
+  const tx: any = result.transactions.find((t: any) =>
+    t.inMessage?.info?.dest?.toString() === masterAddress.toString() && t.description?.type === 'generic');
+
+  return {
+    computeExit: tx?.description?.computePhase?.exitCode,
+    aborted: tx?.description?.aborted,
+    actionCode: tx?.description?.actionPhase?.resultCode,
+    walletState: (await blockchain.getContract(walletAddress)).accountState?.type ?? 'uninit',
+  };
+}
+
+describe('GENESIS-ACTION — DeployTreasurySupply needs BALANCE, and gate 14124 does not check it', () => {
+  it('GENESIS-ACTION-01: a master holding only its own 2,000,000 aborts in ACTION while COMPUTE reports success', async () => {
+    for (const balance of [0n, ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE]) {
+      const r = await runGenesisSupply(balance, ATH_GENESIS_SUPPLY_REQUIRED_VALUE);
+      expect(r.computeExit, `balance ${balance}: COMPUTE succeeds — this is what makes the failure look like success`).toBe(0);
+      expect(r.aborted, `balance ${balance}: the transaction still aborts`).toBe(true);
+      expect(r.actionCode, `balance ${balance}: ACTION fails with 37 (not enough Toncoin)`).toBe(37);
+      expect(r.walletState, `balance ${balance}: not one ATH is minted`).toBe('uninit');
+    }
+  }, 120_000);
+
+  it('GENESIS-ACTION-02: 3,000,000 of own balance is enough — the requirement is balance, not message value', async () => {
+    const r = await runGenesisSupply(3_000_000n, ATH_GENESIS_SUPPLY_REQUIRED_VALUE);
+    expect(r.aborted, 'the same message succeeds once the master can cover the forward fee').toBe(false);
+    expect(r.actionCode).toBe(0);
+    expect(r.walletState, 'the treasury wallet is deployed and credited').toBe('active');
+  }, 60_000);
+
+  it('GENESIS-ACTION-03: sending MORE does not fix it — the excess is refunded, so it never becomes balance', async () => {
+    // 0.5 GRAM, a hundred times the gate's minimum, against a master with nothing of its own.
+    const r = await runGenesisSupply(0n, 500_000_000n);
+    expect(r.computeExit).toBe(0);
+    expect(r.aborted, 'value cannot substitute for balance').toBe(true);
+    expect(r.actionCode).toBe(37);
+    expect(r.walletState).toBe('uninit');
+  }, 60_000);
+});
