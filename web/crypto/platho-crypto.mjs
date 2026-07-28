@@ -253,6 +253,36 @@ export async function computePrivateScanViewTag(scanSecretKey, ephemeralScanPubl
   return deriveStealthViewTag(scanShared, ephemeralPub);
 }
 
+// The SCAN variant of the above, and the reason it exists: `r` in an IntroShard entry is attacker-controlled.
+// IntroShard stores it as an opaque uint256 and cannot validate it — TVM has no cheap Curve25519 membership check,
+// and storing the point opaquely is a deliberate lane decision. So anyone may publish a DEGENERATE point (r = 0 is
+// enough) for the price of one publish, and X25519 against it yields the all-zero shared secret, which both belts
+// reject: vendored noble throws inside the ladder, and assertNonZeroSharedSecret is the second belt behind it.
+//
+// A throw is correct for a sender, who chose its own inputs — but fatal for a recipient scanning STRANGERS' entries:
+// one poisoned record on a page that every user must read would abort the whole scan pass, before the runner ever
+// saves its cursors, so the next pass re-reads the same page and dies again. First contact would stop network-wide.
+// Returning null lets the scan skip exactly that record and lose nothing: a genuine sender never publishes a
+// degenerate point, so a skipped entry was never addressed to anyone.
+//
+// Only the ECDH is guarded. Lengths are validated ABOVE the try, so once they hold, the sole remaining failure inside
+// deriveX25519SharedSecret is the degenerate point; the HKDF stays OUTSIDE it deliberately, because a WebCrypto fault
+// is an environment failure, not attacker data, and swallowing it would turn a broken client into one that silently
+// reports "no first contacts ever arrived".
+export async function privateScanViewTagOrNull(scanSecretKey, ephemeralScanPublicKey) {
+  const scanSecret = assertBytes('scanSecretKey', toUint8Array(scanSecretKey), X25519_SECRET_KEY_BYTES);
+  const ephemeralPub = typeof ephemeralScanPublicKey === 'bigint'
+    ? writeBigUintBytes(ephemeralScanPublicKey, 32, 'ephemeralScanPublicKey')
+    : assertBytes('ephemeralScanPublicKey', toUint8Array(ephemeralScanPublicKey), 32);
+  let scanShared;
+  try {
+    scanShared = deriveX25519SharedSecret(scanSecret, ephemeralPub);
+  } catch {
+    return null;
+  }
+  return deriveStealthViewTag(scanShared, ephemeralPub);
+}
+
 function base64urlEncode(bytes) {
   const input = toUint8Array(bytes);
   if (typeof Buffer !== 'undefined') {

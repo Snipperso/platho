@@ -1499,6 +1499,14 @@ function currentReplayDbName(walletAddress = plathoWallet?.address) {
   return walletScopedIndexedDbName(LEGACY_REPLAY_DB_NAME, walletAddress);
 }
 
+// The INTRO lane's replay guard gets its OWN database, deliberately not the one above. The private-capsule guard keys
+// on capsule ids; this one keys on intro nonces. Sharing a keyspace would let an accidental collision mark a genuine
+// first contact as already-seen and drop it silently — the one failure this lane cannot afford, since an INTRO is
+// paid for and arrives once.
+function currentIntroReplayDbName(walletAddress = plathoWallet?.address) {
+  return walletScopedIndexedDbName('platho-intro-replay-v1', walletAddress);
+}
+
 // The direct-pay CONV lane's sealed K_root store lives in a WALLET-SCOPED IndexedDB so one wallet's conversation keys
 // never bleed into another's ([[cross-wallet-identity-bleed]]); the seal key is device-local within that DB.
 function currentConvKeyDbName(walletAddress = plathoWallet?.address) {
@@ -11627,10 +11635,28 @@ async function runRecoveryFreezeSweep() {
   }
 }
 
+// The INTRO replay guard, made to survive a reload. openIntroCapsuleFromChainCells says outright that the intro nonce
+// is the ONLY thing standing between the lane and a byte-identical replay: the transcript signature, the keyId binding
+// and the confirm tag are all valid on a replay by construction, because it IS the original capsule. Holding that
+// nonce set in memory meant every reload re-armed the lane with an EMPTY guard, so anyone could re-publish a captured
+// INTRO and have it accepted as new — a duplicate first message, and a second adoption of the same K_root.
+// Wallet-scoped like every other local store, so one wallet's nonces never answer for another's.
+async function bootIntroReplayGuard() {
+  if (!privateLaneDirectPayEnabled() || !plathoWallet?.address) return;
+  try {
+    introReplayGuard = await createIndexedDbReplayStore({ dbName: currentIntroReplayDbName() });
+  } catch (error) {
+    // Memory is the honest fallback, not a silent one: the lane still runs, but it forgets across reloads.
+    console.warn('[intro] persistent replay guard unavailable, using memory (replays survive a reload)', error);
+    if (!introReplayGuard) introReplayGuard = createMemoryReplayStore();
+  }
+}
+
 async function bootWalletScopedLocalStores() {
   await bootReplayStore();
   await bootEncryptedMessageHistory();
   await bootConvKeyStore();
+  await bootIntroReplayGuard();   // BEFORE armIntroReceiveLane, so the handler captures the persistent guard
   rearmRecoveryBackupIfDirty();   // re-fire a backup a background-lock cancelled before it landed (now that restore ran)
   runRecoveryFreezeSweep().catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[recovery] freeze sweep failed', error); });
   if (plathoWallet?.address) activeRuntimeWalletAddress = plathoWallet.address;
