@@ -6,7 +6,8 @@
 import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=1';
 import { sealRecoveryBlob, openRecoveryBlob, sealPrefsBlob, openPrefsBlob } from './recovery-blob.mjs?v=1';
 import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=1';
-import { RECOVERY_MAX_SLOTS, PREFS_NAMED_SLOT_INDEX } from './shard-discovery.mjs?v=1';
+import { RECOVERY_MAX_SLOTS, PREFS_NAMED_SLOT_INDEX, addrKey } from './shard-discovery.mjs?v=1';
+import { probeActiveAddresses } from './shard-reader.mjs?v=1';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS — the immutable on-chain cap on the blob's cell tree (gate 13560).
 // Mirrored (not imported) so an over-cap backup is refused CLIENT-SIDE before it bounces on chain and is mis-recorded.
@@ -54,8 +55,19 @@ function countCells(cell) {
  * while later slots stay live, and stopping early would silently drop every conversation above the hole (the one loss
  * this lane exists to prevent). A slot that is unbound / unreadable / sealed under a different seed is skipped.
  * Returns { map, found } — `map` is the merged conversation key store map, `found` lists the slots that yielded records.
+ *
+ * `readStates` (optional) IS WHAT MAKES THIS AFFORDABLE. Without it this is 256 get-method calls — one per slot,
+ * none of which batch (an array of addresses is a 422) — and almost every one of them asks about a slot the user
+ * never bound. With it, ONE accountStates call over all 256 addresses says which slots exist at all (the whole
+ * space fits a single request: the limit is URL length, and 256 url-safe friendly addresses are ~15 KB against a
+ * 64 KiB wall), and only those are read. A typical restore drops from 256 requests to about six.
+ *
+ * THE PREFILTER MAY ONLY EVER NARROW A KNOWN-COMPLETE ANSWER. If the batch cannot be trusted, probeActiveAddresses
+ * returns null and this falls back to probing all 256 — slow, exactly as before, never wrong. Skipping a bound slot
+ * on a bad batch would report a clean empty restore, and the next backup would then overwrite the chain with a
+ * partial map: the user's conversations, gone, with no error anywhere.
  */
-export async function restoreConvKeysFromRecovery({ seed, readView, readBody }) {
+export async function restoreConvKeysFromRecovery({ seed, readView, readBody, readStates = null }) {
   if (typeof readView !== 'function' || typeof readBody !== 'function') {
     throw new Error('restoreConvKeysFromRecovery requires readView/readBody');
   }
@@ -63,7 +75,12 @@ export async function restoreConvKeysFromRecovery({ seed, readView, readBody }) 
   const merged = new Map();
   const found = [];
   let clean = true;   // FALSE if ANY read threw — an unclean restore may be MISSING on-chain conversations
-  for (const slot of slots) {
+  const active = await probeActiveAddresses(slots.map((s) => s.address), readStates);
+  // A slot with no live account is a slot get_view would answer "unbound" for (it aborts with exit -13 on a
+  // code-less account and the reader maps that to null), so dropping it here is the same outcome for less money —
+  // and, like that path, it is a CLEAN absence, not a failed read.
+  const probe = active ? slots.filter((slot) => active.has(addrKey(slot.address))) : slots;
+  for (const slot of probe) {
     let view;
     try { view = await readView(slot.address); } catch { clean = false; continue; }
     if (!view?.bound) continue;                    // fresh / never-written slot — nothing to restore, keep probing
@@ -91,12 +108,17 @@ export async function restoreConvKeysFromRecovery({ seed, readView, readBody }) 
  * must not trigger a needless re-publish. Only slots present in localSlotIndices are considered: an emptied slot has
  * nothing to refresh, and a slot with no local data must not be rewritten from an incomplete map.
  */
-export async function staleRecoverySlots({ seed, readView, localSlotIndices, nowS, refreshAfterS }) {
+export async function staleRecoverySlots({ seed, readView, localSlotIndices, nowS, refreshAfterS, readStates = null }) {
   if (typeof readView !== 'function') throw new Error('staleRecoverySlots requires readView');
   const { slots } = await selfRecoveryShardSpace(seed);
   const stale = [];
-  for (const slot of slots) {
-    if (!localSlotIndices.has(slot.slotIndex)) continue;
+  // Only the slots the local map still occupies can be stale, so the batch asks about those and no more. A slot
+  // with no live account is unbound — a content change will bind it, so there is nothing to refresh and nothing
+  // to learn from a get_view. Batch untrusted (null) -> read them all, exactly as before.
+  const mine = slots.filter((slot) => localSlotIndices.has(slot.slotIndex));
+  const active = await probeActiveAddresses(mine.map((slot) => slot.address), readStates);
+  const probe = active ? mine.filter((slot) => active.has(addrKey(slot.address))) : mine;
+  for (const slot of probe) {
     let view;
     try { view = await readView(slot.address); } catch { continue; }
     if (!view?.bound) continue;                                    // never-written slot — a content change will bind it
