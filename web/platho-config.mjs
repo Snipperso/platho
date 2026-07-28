@@ -178,7 +178,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     brandNetworkLabel: 'mainnet',
     chatCountLabel: 'Private chats',
     publicSubtitle: 'Public channels',
-    vaultSubtitle: 'Vault',
+    walletSubtitle: 'Wallet',
     profileHandle: 'Profile',
     identityName: 'No wallet',
     identitySubtitle: 'Create or import a wallet',
@@ -189,9 +189,6 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     walletLabel: 'v5r1 mainnet',
     networkLabel: 'mainnet',
     localStateLabel: 'device only',
-    vaultCards: [],
-    vaultActions: [],
-    ledgerRows: [],
   },
   preview: {
     threads: [],

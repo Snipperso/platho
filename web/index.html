@@ -48,9 +48,9 @@
             <span class="icon icon-chat"></span>
             <span data-i18n="nav.private">Private</span>
           </button>
-          <button class="rail-item" type="button" data-tab="vault" aria-label="Vault" title="Vault" data-i18n-aria-label="common.vault" data-i18n-title="common.vault">
-            <span class="icon icon-vault"></span>
-            <span data-i18n="common.vault">Vault</span>
+          <button class="rail-item" type="button" data-tab="wallet" aria-label="Wallet" title="Wallet" data-i18n-aria-label="common.wallet" data-i18n-title="common.wallet">
+            <span class="icon icon-wallet"></span>
+            <span data-i18n="common.wallet">Wallet</span>
           </button>
           <button class="rail-item" type="button" data-tab="profile" aria-label="Profile" title="Profile" data-i18n-aria-label="nav.profile" data-i18n-title="nav.profile">
             <span class="icon icon-user"></span>
@@ -318,11 +318,11 @@
           </form>
         </section>
 
-        <section class="content-pane vault-pane view-panel" data-panel="vault" aria-label="Vault" data-i18n-aria-label="common.vault">
+        <section class="content-pane wallet-pane view-panel" data-panel="wallet" aria-label="Wallet" data-i18n-aria-label="common.wallet">
           <header class="pane-header inline">
             <div class="pane-title-block">
               <h1>Platho.app</h1>
-              <p id="vaultSubtitle" data-i18n="common.vault">Vault</p>
+              <p id="walletSubtitle" data-i18n="common.wallet">Wallet</p>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -335,15 +335,68 @@
             </div>
           </header>
 
-          <div class="vault-scroll-content">
-            <div class="action-grid" id="actionGrid"></div>
-
-            <div class="vault-pocket-note">
-              <strong data-i18n="vault.pocketNoteTitle">Wallet and Vault are separate for security.</strong>
-              <span data-i18n="vault.pocketNoteBody">Your wallet pays gas and holds funds outside the app. Vault holds only the funds you move there for encrypted checks, payments, and ATH discounts.</span>
+          <div class="wallet-scroll-content">
+            <!-- The headline balances reuse the rail-corner refresh path verbatim: it fills every
+                 [data-nav-vault-ton]/[data-nav-vault-ath] node and toggles is-pending on every
+                 [data-nav-vault-balance] container, so these cards need no JavaScript of their own and can never
+                 disagree with the number in the rail. -->
+            <div class="wallet-headline is-pending" data-nav-vault-balance aria-hidden="true">
+              <article class="wallet-headline-card">
+                <span data-i18n="wallet.walletGram">Wallet GRAM</span>
+                <strong data-nav-vault-ton>0 GRAM</strong>
+              </article>
+              <article class="wallet-headline-card">
+                <span>ATH</span>
+                <strong data-nav-vault-ath>0 ATH</strong>
+              </article>
             </div>
 
-            <div class="ledger" id="ledgerRows"></div>
+            <section class="profile-section" aria-label="ATH">
+              <h2>ATH</h2>
+              <div class="profile-stat-list">
+                <div class="profile-stat-row">
+                  <span data-i18n="profile.activityDropIssued">Activity drop issued</span>
+                  <strong id="athDropIssuedStatus">-</strong>
+                </div>
+                <div class="profile-stat-row">
+                  <span data-i18n="profile.currentSupply">Current supply</span>
+                  <strong id="athSupplyStatus">-</strong>
+                </div>
+              </div>
+              <div class="settings-list">
+                <button id="flushAthButton" type="button"><span data-i18n="profile.flushAth">Flush ATH</span><strong class="profile-action-status" id="flushAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
+              </div>
+            </section>
+
+            <section class="profile-section" aria-label="Wallet" data-i18n-aria-label="common.wallet">
+              <h2 data-i18n="common.wallet">Wallet</h2>
+              <div class="settings-list">
+                <button id="walletBackupWarning" class="wallet-backup-warning" type="button" hidden><span data-i18n="wallet.keyNotBackedUp">Wallet key not backed up</span><strong data-i18n="wallet.saveNow">Save now</strong></button>
+                <button id="createWalletButton" type="button"><span data-i18n="wallet.create">Create wallet</span><strong id="createWalletStatus" data-i18n="wallet.statusRecommended">recommended</strong></button>
+                <button id="importWalletButton" type="button"><span data-i18n="wallet.import">Import wallet</span><strong id="importWalletStatus" data-i18n="wallet.status24Words">24 words</strong></button>
+                <button id="unlockWalletButton" type="button"><span data-i18n="wallet.unlock">Unlock wallet</span><strong id="unlockWalletStatus" data-i18n="wallet.statusNotStored">not stored</strong></button>
+                <button id="changeWalletPasswordButton" type="button"><span data-i18n="wallet.changePassword">Change password</span><strong id="changeWalletPasswordStatus" data-i18n="wallet.statusEncrypted">encrypted</strong></button>
+                <div class="wallet-ton-group" aria-label="Wallet GRAM" data-i18n-aria-label="wallet.walletGram">
+                  <button id="walletTonBalanceButton" type="button"><span data-i18n="wallet.walletGram">Wallet GRAM</span><strong id="walletTonBalanceStatus">-</strong></button>
+                  <button id="receiveWalletTonButton" type="button"><span data-i18n="wallet.receiveGram">Receive GRAM</span><strong id="receiveWalletTonStatus" data-i18n="wallet.statusQr">QR</strong></button>
+                  <button id="sendWalletTonButton" type="button"><span data-i18n="wallet.sendGram">Send GRAM</span><strong id="sendWalletTonStatus" data-i18n="wallet.statusWallet">wallet</strong></button>
+                </div>
+                <button id="exportWalletKeyButton" type="button"><span data-i18n="wallet.exportKey">Export wallet key</span><strong id="exportWalletKeyStatus" data-i18n="wallet.statusEncryptedFile">encrypted file</strong></button>
+                <button id="importWalletKeyButton" type="button"><span data-i18n="wallet.importKey">Import wallet key</span><strong id="importWalletKeyStatus" data-i18n="wallet.statusFile">file</strong></button>
+                <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
+                <label class="settings-select-row" for="walletDisplayModeSelect">
+                  <span data-i18n="wallet.displayAs">Display as</span>
+                  <select id="walletDisplayModeSelect" aria-label="Wallet display mode" data-i18n-aria-label="wallet.displayMode">
+                    <option value="address" data-i18n="wallet.optionAddress">Address</option>
+                    <option value="platho_nft" data-i18n="wallet.optionPlathoName">Platho name</option>
+                  </select>
+                  <strong id="walletDisplayModeStatus" data-i18n="wallet.statusAddress">address</strong>
+                </label>
+                <button id="exportWalletSeedButton" type="button"><span data-i18n="wallet.exportRecoveryPhrase">Export recovery phrase</span><strong id="walletAddressStatus" data-i18n="wallet.statusNotCreated">not created</strong></button>
+                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
+                <button id="clearLocalDataButton" type="button"><span data-i18n="wallet.clearLocalData">Clear local data</span><strong id="clearLocalDataStatus" data-i18n="wallet.statusDeviceOnly">device only</strong></button>
+              </div>
+            </section>
           </div>
         </section>
 
@@ -392,36 +445,6 @@
               </div>
             </section>
 
-            <section class="profile-section" aria-label="Wallet" data-i18n-aria-label="common.wallet">
-              <h2 data-i18n="common.wallet">Wallet</h2>
-              <div class="settings-list">
-                <button id="walletBackupWarning" class="wallet-backup-warning" type="button" hidden><span data-i18n="wallet.keyNotBackedUp">Wallet key not backed up</span><strong data-i18n="wallet.saveNow">Save now</strong></button>
-                <button id="createWalletButton" type="button"><span data-i18n="wallet.create">Create wallet</span><strong id="createWalletStatus" data-i18n="wallet.statusRecommended">recommended</strong></button>
-                <button id="importWalletButton" type="button"><span data-i18n="wallet.import">Import wallet</span><strong id="importWalletStatus" data-i18n="wallet.status24Words">24 words</strong></button>
-                <button id="unlockWalletButton" type="button"><span data-i18n="wallet.unlock">Unlock wallet</span><strong id="unlockWalletStatus" data-i18n="wallet.statusNotStored">not stored</strong></button>
-                <button id="changeWalletPasswordButton" type="button"><span data-i18n="wallet.changePassword">Change password</span><strong id="changeWalletPasswordStatus" data-i18n="wallet.statusEncrypted">encrypted</strong></button>
-                <div class="wallet-ton-group" aria-label="Wallet GRAM" data-i18n-aria-label="wallet.walletGram">
-                  <button id="walletTonBalanceButton" type="button"><span data-i18n="wallet.walletGram">Wallet GRAM</span><strong id="walletTonBalanceStatus">-</strong></button>
-                  <button id="receiveWalletTonButton" type="button"><span data-i18n="wallet.receiveGram">Receive GRAM</span><strong id="receiveWalletTonStatus" data-i18n="wallet.statusQr">QR</strong></button>
-                  <button id="sendWalletTonButton" type="button"><span data-i18n="wallet.sendGram">Send GRAM</span><strong id="sendWalletTonStatus" data-i18n="wallet.statusWallet">wallet</strong></button>
-                </div>
-                <button id="exportWalletKeyButton" type="button"><span data-i18n="wallet.exportKey">Export wallet key</span><strong id="exportWalletKeyStatus" data-i18n="wallet.statusEncryptedFile">encrypted file</strong></button>
-                <button id="importWalletKeyButton" type="button"><span data-i18n="wallet.importKey">Import wallet key</span><strong id="importWalletKeyStatus" data-i18n="wallet.statusFile">file</strong></button>
-                <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
-                <button id="savePrefsButton" type="button"><span data-i18n="wallet.saveSubscriptions">Save subscriptions</span><strong id="savePrefsStatus" data-i18n="wallet.statusNotSaved">not saved</strong></button>
-                <label class="settings-select-row" for="walletDisplayModeSelect">
-                  <span data-i18n="wallet.displayAs">Display as</span>
-                  <select id="walletDisplayModeSelect" aria-label="Wallet display mode" data-i18n-aria-label="wallet.displayMode">
-                    <option value="address" data-i18n="wallet.optionAddress">Address</option>
-                    <option value="platho_nft" data-i18n="wallet.optionPlathoName">Platho name</option>
-                  </select>
-                  <strong id="walletDisplayModeStatus" data-i18n="wallet.statusAddress">address</strong>
-                </label>
-                <button id="exportWalletSeedButton" type="button"><span data-i18n="wallet.exportRecoveryPhrase">Export recovery phrase</span><strong id="walletAddressStatus" data-i18n="wallet.statusNotCreated">not created</strong></button>
-                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
-                <button id="clearLocalDataButton" type="button"><span data-i18n="wallet.clearLocalData">Clear local data</span><strong id="clearLocalDataStatus" data-i18n="wallet.statusDeviceOnly">device only</strong></button>
-              </div>
-            </section>
 
             <section class="profile-section" aria-label="Messages" data-i18n-aria-label="chat.messages">
               <h2 data-i18n="chat.messages">Messages</h2>
@@ -455,6 +478,9 @@
                     <option value="enabled" data-i18n="public.commentsAllowedNotRecommended">Allowed - not recommended</option>
                   </select>
                 </label>
+                <!-- Moved out of the Wallet block: saving subscriptions is a public-channels action that happens to
+                     cost gas, not a wallet function. It belongs where a user goes looking for it. -->
+                <button id="savePrefsButton" type="button"><span data-i18n="wallet.saveSubscriptions">Save subscriptions</span><strong id="savePrefsStatus" data-i18n="wallet.statusNotSaved">not saved</strong></button>
               </div>
             </section>
 
@@ -480,22 +506,6 @@
               </div>
             </section>
 
-            <section class="profile-section" aria-label="ATH">
-              <h2>ATH</h2>
-              <div class="profile-stat-list">
-                <div class="profile-stat-row">
-                  <span data-i18n="profile.currentSupply">Current supply</span>
-                  <strong id="athSupplyStatus">-</strong>
-                </div>
-                <div class="profile-stat-row">
-                  <span data-i18n="profile.activityDropIssued">Activity drop issued</span>
-                  <strong id="athDropIssuedStatus">-</strong>
-                </div>
-              </div>
-              <div class="settings-list">
-                <button id="flushAthButton" type="button"><span data-i18n="profile.flushAth">Flush ATH</span><strong class="profile-action-status" id="flushAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
-              </div>
-            </section>
 
             </div>
           </div>

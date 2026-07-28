@@ -221,17 +221,25 @@ describe('PWA runtime config guard', () => {
     expect(provider?.resolveWallet).toBeTypeOf('function');
   });
 
-  it('PWA-CONFIG-01A: Vault preview UI does not expose internal readiness artifacts', () => {
-    const vaultText = JSON.stringify({
-      cards: PLATHO_APP_CONFIG.ui.vaultCards,
-      rows: PLATHO_APP_CONFIG.ui.ledgerRows,
-      subtitle: PLATHO_APP_CONFIG.ui.vaultSubtitle,
-    });
+  it('PWA-CONFIG-01A: the Wallet tab exposes no internal readiness artifacts', () => {
+    // The Vault tab became the WALLET tab. Its three preview arrays (vaultCards / vaultActions / ledgerRows) are
+    // gone: they had been empty ever since the Vault contract was removed, their DOM anchors were deleted with it,
+    // and their renderers were unreachable — the tab rendered nothing but a note describing a contract that no
+    // longer exists. What this guard is actually for outlives them: nothing internal (readiness harnesses,
+    // faucets, testgivers) may reach the user-facing wallet surface.
+    const html = readFileSync('web/index.html', 'utf8');
+    const start = html.indexOf('data-panel="wallet"');
+    const walletPanel = html.slice(start, html.indexOf('data-panel="profile"'));
+    expect(start, 'the wallet panel exists').toBeGreaterThan(-1);
+    expect(walletPanel.length, 'and the slice really covers it').toBeGreaterThan(1000);
 
-    expect(PLATHO_APP_CONFIG.ui.vaultCards).toEqual([]);
-    expect(PLATHO_APP_CONFIG.ui.vaultActions).toEqual([]);
-    expect(PLATHO_APP_CONFIG.ui.ledgerRows).toEqual([]);
-    expect(vaultText).not.toMatch(/M20T|readiness|faucet|testgiver/i);
+    expect(walletPanel).not.toMatch(/M20T|readiness|faucet|testgiver/i);
+    expect(JSON.stringify(PLATHO_APP_CONFIG.ui)).not.toMatch(/M20T|readiness|faucet|testgiver/i);
+    expect(PLATHO_APP_CONFIG.ui.walletSubtitle).toBe('Wallet');
+    // The dead preview arrays must not come back with the tab they belonged to.
+    for (const key of ['vaultCards', 'vaultActions', 'ledgerRows']) {
+      expect(PLATHO_APP_CONFIG.ui, `${key} belongs to the removed Vault tab`).not.toHaveProperty(key);
+    }
   });
 
   it('PWA-CONFIG-01C: first-run preview threads do not expose internal ops fixtures', () => {
@@ -593,14 +601,14 @@ describe('PWA runtime config guard', () => {
     // header stays put), not scroll the full-height layout viewport and push the header off the top.
     expect(html).toMatch(/name="viewport"[^>]*interactive-widget=resizes-content/);
     expect(html).toMatch(/class="profile-scroll-content"/);
-    expect(html).toMatch(/class="vault-scroll-content"/);
+    expect(html).toMatch(/class="wallet-scroll-content"/);
     expect(css).toMatch(/\.profile-scroll-content/);
-    expect(css).toMatch(/\.vault-scroll-content/);
+    expect(css).toMatch(/\.wallet-scroll-content/);
     expect(css).toMatch(/overflow-y: auto/);
     // v705: overflow-y:auto alone computes overflow-x to auto, and iOS rubber-bands an auto axis even with
     // zero horizontal overflow — the Vault/Profile scrollers pin the x axis shut and hand horizontal
     // gestures back via pan-y (the same cure the chat strip / feed scrollers use).
-    expect(css).toMatch(/\.vault-scroll-content,\s*\.profile-scroll-content \{[\s\S]*?overflow-x: hidden;[\s\S]*?touch-action: pan-y;[\s\S]*?\}/);
+    expect(css).toMatch(/\.wallet-scroll-content,\s*\.profile-scroll-content \{[\s\S]*?overflow-x: hidden;[\s\S]*?touch-action: pan-y;[\s\S]*?\}/);
     expect(css).toMatch(/scrollbar-width: none/);
     expect(css).toMatch(/::-webkit-scrollbar/);
     expect(css).not.toMatch(/@media \(min-width: 901px\) and \(max-width: 1180px\)/);
@@ -634,7 +642,7 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.public-pane \.public-header-actions\s*{\s*position: absolute;\s*top: calc\(var\(--header-top-offset\) \+ var\(--header-button-inset\)\);/);
     expect(css).not.toMatch(/\.conversation-header \.docs-header-button,\s*\n?\s*\.conversation-header \.install-header-button\s*{\s*width: 40px/);
     expect(css).not.toMatch(/@media \(min-width: 680px\) and \(max-width: 900px\)/);
-    expect(css).toMatch(/\.public-pane,\s*\.vault-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: var\(--header-top-offset\) 24px 24px;/);
+    expect(css).toMatch(/\.public-pane,\s*\.wallet-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: var\(--header-top-offset\) 24px 24px;/);
     expect(css).toMatch(/\.list-pane\s*{\s*gap: 14px;\s*border-right: 0;\s*}/);
     // (v730: an explanatory comment now sits between margin and padding — the mobile composer padding is
     // inset-free because the tab bar below owns the safe area; see the mobile-block pins in PWA-MSG-01.)
@@ -866,7 +874,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/nativeCanvasWebpEncodeSupported = false/);
     expect(app).toMatch(/Image encoder did not produce WebP bytes/);
     expect(enCopy).toMatch(/avatar media is public/);
-    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="athSupplyStatus"[\s\S]*id="athDropIssuedStatus"[\s\S]*id="flushAthButton"[\s\S]*id="flushAthStatus"/);
+    // The ATH block moved to the WALLET tab with the rest of the money surface, and its two stats swapped order on
+    // purpose: "activity drop issued" is the number this user's own ATH comes from, so it leads; "current supply"
+    // is protocol context and follows. Flush stays last — it is the action, after the numbers that justify it.
+    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="athDropIssuedStatus"[\s\S]*id="athSupplyStatus"[\s\S]*id="flushAthButton"[\s\S]*id="flushAthStatus"/);
+    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
+    expect(walletPanel, 'the ATH block lives in the Wallet tab now').toMatch(/id="flushAthButton"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
     expect(html).toMatch(/id="syncMessagesButton"/);
     expect(html).not.toMatch(/id="keySuiteStatus"/);
@@ -921,8 +934,15 @@ describe('PWA runtime config guard', () => {
     expect(html).not.toMatch(/id="burnAthButton"/);
     expect(html).not.toMatch(/>Burn ATH</);
     expect(html).toMatch(/Flush ATH/);
-    expect(html).toMatch(/Wallet and Vault are separate for security/);
+    // The "Wallet and Vault are separate for security" note is GONE with the Vault tab. It described a contract
+    // that no longer exists and funds that can no longer be moved anywhere — the one thing in it that is still
+    // true (the ATH protocol-fee discount) is not a Vault property at all: the discount scales with the ATH
+    // balance in the WALLET and unlocks when the activity airdrop is fully distributed (athDiscountBps).
+    expect(html).not.toMatch(/Wallet and Vault are separate for security/);
+    expect(html).not.toMatch(/vault\.pocketNote/);
     expect(html).toMatch(/data-nav-vault-balance/);
+    // The headline balances are driven by the SAME refresh as the rail corner, so they cannot disagree with it.
+    expect(html).toMatch(/class="wallet-headline is-pending"[^>]*data-nav-vault-balance/);
     // Starts empty (space reserved, content invisible) so there is no flash of the default "0 GRAM/0 ATH".
     expect(html).toMatch(/class="rail-vault-balance is-pending"[^>]*data-nav-vault-balance/);
     expect(html).toMatch(/data-nav-vault-ton>0 GRAM<\/strong>/);
@@ -5037,7 +5057,7 @@ describe('PWA runtime config guard', () => {
     expect((app.match(/exitComposerMaximize\(\)/g) ?? []).length).toBeGreaterThanOrEqual(4);
     expect(app).toMatch(/function exitComposerMaximize\(\) \{[\s\S]*?return collapsed;/); // returns whether it collapsed
     expect(app).toMatch(/if \(exitComposerMaximize\(\)\) \{\s*syncNavBackAffordance\(\);\s*return true;/); // back consumes the nav
-    expect(app).toMatch(/exitComposerMaximize\(\);\s*\/\/ The Vault tab is gated/); // setView (tab switch) collapse
+    expect(app).toMatch(/exitComposerMaximize\(\);\s*\/\/ The Wallet tab is DELIBERATELY ungated/); // setView (tab switch) collapse
     // A cancelled public publish (price-change dialog) hands the draft back into the SAME full-screen editor, not the 144px inline one.
     expect(app).toMatch(/const draftWasMaximized = publicComposer\.classList\.contains\('is-maximized'\);/);
     expect(app).toMatch(/if \(draftWasMaximized && !publicComposer\.classList\.contains\('is-maximized'\)\)/);
@@ -5767,7 +5787,7 @@ describe('PWA runtime config guard', () => {
     // (sendVaultExternalBoc went with the Vault action externals — a direct-pay action is a plain wallet transfer,
     // and the balance it moves is refreshed by queueVaultPostTransactionRefresh above.)
     expect(app).toMatch(/function markNavVaultBalanceRetryNeeded[\s\S]*markNavVaultBalancePending\(reason, \{ retry: true \}\)/);
-    expect(app).toMatch(/if \(view === 'vault'\)/);
+    expect(app).toMatch(/if \(view === 'wallet'\)/);
     expect(app).toMatch(/scheduleVaultAutoRefresh\(2_000\)/);
     expect(app).toMatch(/delayMs === VAULT_AUTO_REFRESH_MS && !isVaultViewActive\(\)/);
     expect(app).toMatch(/document\.addEventListener\('visibilitychange'/);
@@ -6036,7 +6056,7 @@ describe('PWA runtime config guard', () => {
     expect(rebuildSrc).not.toMatch(/\} else \{\s*\n\s*activeThreadId = threads\[0\]\?\.id \?\? null;\s*\n\s*\}/);
     // 1b. Symmetric for Public: returning to the Public tab restores the open post detail instead of forcing the
     // feed — setView must NOT close the detail on tab-return; renderPublicSurface re-renders it from the cache.
-    const publicViewBranch = app.slice(app.indexOf("if (view === 'public') {", app.indexOf('function setView(view)')), app.indexOf("if (view === 'vault') {", app.indexOf('function setView(view)')));
+    const publicViewBranch = app.slice(app.indexOf("if (view === 'public') {", app.indexOf('function setView(view)')), app.indexOf("if (view === 'wallet') {", app.indexOf('function setView(view)')));
     expect(publicViewBranch).not.toMatch(/closePublicPostDetail\(\)/);
     // v753: the channel view also suppresses the tab-restore feed anchor (it overlays the feed like the detail).
     expect(publicViewBranch).toMatch(/renderPublicSurface\(\{ anchorUnread: publicPane\?\.dataset\?\.postOpen !== 'true' && publicPane\?\.dataset\?\.channelOpen !== 'true' \}\)/);
