@@ -59,7 +59,12 @@ const IS_PAIRS_PER_CELL: Int = 3;         // 1023 bits / 272 — how many (r, ta
 // body_commit preimage tag. The CONTRACT defines the commitment so publisher and scanner cannot disagree.
 const IS_BODY_DOMAIN: Int = 0x49534243;   // "ISBC"
 
-// [RE-MEASURE BEFORE SEAL] storage 64962 nanoton/cell/year (config-18, bits free).
+// [MEASURED 2026-07-28 — G8 gate CLEARED on the current artifacts, re-proved on every run by
+//  tests/conv-intro-rent-solvency.test.ts. Worst-case birth (gate 13684 admits epoch-1, so the life is 14 days,
+//  not 13): retained 2_510_000 vs rent 62_293 at one intro = 40.3x, and 2_740_000 vs 234_220 at twenty-four
+//  = 11.7x. This lane has the widest margin of the four, because its shard dies in a fortnight while carrying a
+//  base endowment sized like its year-living siblings.]
+// storage 64962 nanoton/cell/year (config-18, bits free).
 //   intro endowment: an intro no longer lives one week. Per-entry eviction is gone, so an entry persists until
 //     the whole shard is retired at (epoch+2)*86400 + IS_INTRO_RETENTION + IS_RETIRE_SLACK — about THIRTEEN
 //     days from the epoch, not seven. The old derivation (4 cells x 64962 x 7/365 x 1.5 -> 8000) therefore
