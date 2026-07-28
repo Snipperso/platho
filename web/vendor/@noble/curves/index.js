@@ -30,7 +30,7 @@ import { ristretto255_oprf } from '../curves/ed25519.js';
 import { decaf448_oprf } from '../curves/ed448.js';
 
 // utils
-import { bytesToHex, hexToBytes, concatBytes } from '@noble/curves/abstract/utils.js';
+import { bytesToHex, hexToBytes, concatBytes } from '../curves/abstract/utils.js';
 import { Field } from '../curves/abstract/modular.js';
 ```
  */
