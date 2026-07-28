@@ -24,7 +24,7 @@
 // runs against a stub transport and a fixed clock, the way the intro lane does.
 
 import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
-import { readAccountStates } from './shard-reader.mjs?v=1';
+import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=1';
 import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=1';
 import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=1';
 import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=3';
@@ -70,6 +70,44 @@ export function createPublicLane({
   const provider = createPublicShardTonRpcProvider({ transport: { runGetMethod } });
 
   const readStates = (addresses) => readAccountStates(addresses, { request: statesRequest });
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  // THREAD SNAPSHOT CACHE — reopening a post must not re-read comments that cannot have changed.
+  //
+  // The CapsuleHub path had incremental reads: a snapshot boundary let an unchanged thread come back with ZERO
+  // body reads. The shard loader lost that and re-read the whole thread on every open — cheaper than the Hub
+  // (a shard per post, not one shared log) but still two RPC calls per era shard, every time, for a thread
+  // nobody had touched.
+  //
+  // KEYED ON THE CHANGE MARKER, NOT ON entry_count. The roadmap proposed entry_count, and it would work, but it
+  // costs a get_page probe per shard to learn. `last_transaction_lt` says the same thing STRICTLY EARLIER: it
+  // already arrives in the batched accountStates call this read makes anyway, so an unchanged thread now costs
+  // exactly the one request it takes to prove it is unchanged. The marker is monotonic per account and moves on
+  // any inbound transaction, so it can be stale in the harmless direction only (a bounced write re-reads for
+  // nothing); it cannot report "unchanged" for a shard that accepted a comment.
+  //
+  // PER SHARD, not per thread: a post's comments accumulate across era shards, so a year-old thread with one new
+  // comment re-reads one shard and serves the rest from the snapshot.
+  const THREAD_SNAPSHOT_MAX = 256;                 // ~256 era-shards of comments; bounded so a long session cannot grow it
+  const threadSnapshots = new Map();               // addrKey -> { marker, posts }
+
+  function readThreadSnapshot(key, marker) {
+    const hit = threadSnapshots.get(key);
+    if (!hit || hit.marker !== marker) return null;
+    threadSnapshots.delete(key);                   // reinsert: Map keeps insertion order, so this is the LRU bump
+    threadSnapshots.set(key, hit);
+    return hit.posts;
+  }
+
+  function writeThreadSnapshot(key, marker, posts) {
+    threadSnapshots.delete(key);
+    threadSnapshots.set(key, { marker, posts });
+    while (threadSnapshots.size > THREAD_SNAPSHOT_MAX) {
+      const oldest = threadSnapshots.keys().next();
+      if (oldest.done) break;
+      threadSnapshots.delete(oldest.value);
+    }
+  }
   /** posts of one shard, authenticated: get_page + /messages(+source) matched by commit. */
   // Reads the shard's NEWEST window (readPosts anchors at the tail and extends one page back when a multipart
   // post straddles the boundary). `entryCount` lets a caller that already read get_view skip the probe getter.
@@ -184,7 +222,13 @@ export function createPublicLane({
         // 'uninit'), and get_page on an uninit account throws exit -13 — a publicly-derivable touched address would
         // otherwise defeat a bare size check and break the read.
         if (!state || state.status !== 'active') continue;
+        const key = addrKey(address);
+        const marker = changeMarkerOf(state);
+        // Nothing has been written to this shard since we last read it, so its comments are exactly what we hold.
+        const snapshot = readThreadSnapshot(key, marker);
+        if (snapshot) { posts.push(...snapshot); continue; }
         const { posts: shardPosts } = await readShardPosts(address);
+        writeThreadSnapshot(key, marker, shardPosts);
         posts.push(...shardPosts);
       }
       return posts;
