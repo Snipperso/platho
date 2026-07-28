@@ -121,7 +121,7 @@ const PS_PROTOCOL_FEE: Int = 10000000;
 // GENESIS ORDERING (this constant makes it real): FeeAccumulator code -> its address -> shard constants -> shard
 // code -> shard addresses -> BindPublicShardCode. Adding lane 2 to FeeAccumulator CHANGES its code hash and
 // therefore this address; PT-04b derives it fresh rather than comparing a literal, so a drift bounces loudly.
-const PS_FEE_SINK: Address = address("EQBOSbFHf8Iqe390MhsuN8RywBimRbzTwq8dtnN9fN4MyZOP");
+const PS_FEE_SINK: Address = address("EQAnVFHvZwSidVZ5y46nz7y4KibSp_8pHD3C1y73BJ3kQM1K");
 const PS_FEE_SINK_DEPOSIT_RESERVE: Int = 2600000;  // mirror of FEEACCUMULATOR_CAPSULE_FEE_EXEC_RESERVE — drift => bounce
 const PS_FEE_SINK_FWD_RESERVE: Int = 200000;       // slack returns to the publisher, so generosity is free
 const PS_FEE_TRANSPORT: Int = PS_FEE_SINK_DEPOSIT_RESERVE + PS_FEE_SINK_FWD_RESERVE;
