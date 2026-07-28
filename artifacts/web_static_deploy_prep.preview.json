@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-28T15:16:07.455Z",
+  "generatedAt": "2026-07-28T15:49:00.496Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -1368,19 +1368,13 @@
   "blockers": [],
   "warnings": [
     "STATIC_PACKAGE_IS_NON_PRODUCTION",
-    "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH",
-    "PWA_FINAL_MANIFEST_HASH_MISMATCH"
+    "MAINNET_GENESIS_NOT_VERIFIED"
   ],
   "productionFindings": [
     {
-      "id": "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH",
-      "file": "artifacts/mainnet_genesis_verify_input.json",
-      "message": "MAINNET_GENESIS_VERIFIED=true must match current build code hashes: ath_master, ath_vesting, ath_wallet, buyback_burn, market_stability_seller, fee_accumulator, profile_registry, username_nft_item, username_registry."
-    },
-    {
-      "id": "PWA_FINAL_MANIFEST_HASH_MISMATCH",
-      "file": "web/platho-config.mjs",
-      "message": "PWA vault.deploymentManifestHash must match the verified final genesis manifest hash."
+      "id": "MAINNET_GENESIS_NOT_VERIFIED",
+      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
+      "message": "Current release candidate has no verified final mainnet genesis evidence."
     }
   ]
 }

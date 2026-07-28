@@ -1311,4 +1311,40 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('BUYBACK_LAUNCH_CONTROLLER_HASH_MISMATCH');
   });
+
+  // MEASURED 2026-07-28 while rebaselining onto clean-17: feeding this verifier a snapshot from an older generation
+  // did not produce a report at all — it threw `Cannot read properties of undefined (reading 'address')` and wrote
+  // nothing. On ceremony day that is a stack trace instead of the name of the missing contract, at the exact moment
+  // the tool exists to be trusted, holding a snapshot that is expensive to re-take.
+  //
+  // Nine sections already had dedicated MISSING_*_SNAPSHOT codes (asserted by the tests above); these six primary
+  // contracts never got them, which is precisely why they threw.
+  for (const section of ['ath_master', 'airdrop_pool', 'fee_accumulator', 'buyback_burn', 'username_registry', 'profile_registry']) {
+    it(`reports a named issue instead of throwing when snapshot.${section} is absent`, () => {
+      const input = finalInput() as any;
+      delete input.snapshot[section];
+
+      // The throw is the actual regression under test: assert it does not happen before looking at the report.
+      let report!: ReturnType<typeof verifyMainnetGenesisSnapshot>;
+      expect(() => { report = verifyMainnetGenesisSnapshot(input); }, `snapshot.${section} must not crash the verifier`).not.toThrow();
+
+      expect(report.mainnet_genesis_verified).toBe(false);
+      expect(report.status, 'an incomplete snapshot is not the same failure as a chain/manifest mismatch')
+        .toBe('BLOCKED_SNAPSHOT_INCOMPLETE');
+      expect(report.issue_codes).toContain(`SNAPSHOT_SECTION_MISSING_${section.toUpperCase()}`);
+    });
+  }
+
+  it('still gives the precise MISSING_*_SNAPSHOT diagnosis for sections that have their own code', () => {
+    // Guard against the gate above swallowing the finer-grained codes: an official ATHWallet has its own issue and
+    // must keep reporting it, with the full run of checks (not an early return).
+    const input = finalInput() as any;
+    delete input.snapshot.airdrop_pool_official_ath_wallet;
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.issue_codes).toContain('MISSING_AIRDROP_POOL_OFFICIAL_ATH_WALLET_SNAPSHOT');
+    expect(report.issue_codes).not.toContain('SNAPSHOT_SECTION_MISSING_AIRDROP_POOL_OFFICIAL_ATH_WALLET');
+    expect(report.status).toBe('BLOCKED_GENESIS_MISMATCH');
+  });
 });
