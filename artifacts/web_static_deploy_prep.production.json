@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-28T12:13:36.991Z",
+  "generatedAt": "2026-07-28T13:56:07.394Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 219,
-    "totalBytes": 5549385,
-    "bundleSha256": "c2012d1b1cc1b119aa4688cf3bc0e4dd27a31f78d9a9fb7320067e77d703ecb8",
+    "totalBytes": 5549381,
+    "bundleSha256": "95cd851467d836c8e3cc43b765838d15edb45289843d22963fa5cc2efdb58b70",
     "files": [
       {
         "path": "app.js",
@@ -909,8 +909,8 @@
       },
       {
         "path": "vendor/@noble/curves/index.js",
-        "bytes": 1407,
-        "sha256": "415cf2d76a58b1bf50e3f6e0f915d87894e3abdf009a257c95005535cb670701"
+        "bytes": 1403,
+        "sha256": "1e83504780d34fee6fc904f05425d319511653dcc8a5d79fdd6198291fe0ac83"
       },
       {
         "path": "vendor/@noble/curves/misc.js",
