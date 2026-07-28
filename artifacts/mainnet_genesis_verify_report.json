@@ -1,16 +1,33 @@
 {
   "document": "PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT",
-  "status": "MAINNET_GENESIS_VERIFIED",
+  "status": "BLOCKED_GENESIS_MISMATCH",
   "generated_at": "DETERMINISTIC_ARTIFACT",
-  "mainnet_genesis_verified": true,
+  "mainnet_genesis_verified": false,
   "input_source": "artifacts/mainnet_genesis_verify_input.json",
-  "input_sha256": "fe7c9659bf7143d719b2c43a196355f9731c177f2532268707359fe9ffcec7f7",
+  "input_sha256": "7896adeb8e3bd31261685daae3e07c1ccaad1d8135d8e7413d5402cb9bd75241",
   "evidence_refs": {
     "getterSnapshotSource": "live-rpc/platho-toncenter/2026-07-07T16:23:49.766Z",
     "codeHashProofSource": "artifacts/CURRENT_CODE_HASHES.txt#sha256=4fec55803bd8b8c3753c048acbed493c19c794d3be3ae8a338084d276c946dcd",
     "finalManifestSource": "artifacts/local/mainnet_final_manifest_draft.json#manifest_hash_hex=d9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16"
   },
-  "issue_codes": [],
-  "issues": [],
+  "issue_codes": [
+    "SNAPSHOT_SECTION_MISSING_AIRDROP_POOL",
+    "CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST",
+    "MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT"
+  ],
+  "issues": [
+    {
+      "code": "SNAPSHOT_SECTION_MISSING_AIRDROP_POOL",
+      "message": "snapshot.airdrop_pool is absent. This input does not describe that contract, so genesis cannot be verified against it — the snapshot is from a different generation than the manifest."
+    },
+    {
+      "code": "CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST",
+      "message": "Final genesis evidence does not belong to the current local build: ath_master: current=6cbf3e996bb89614821761e3b5abf9f9be956e2fa046d2a9e9001c8601b88887, manifest=1a0856b150d4eca477bdac094b2fd86e4a7dcd7d09825945fe9b230abf090544; ath_vesting: current=8ced72d1deaef94211da6aad03c16a4f64d0deca27777168ae6883dfba0f8265, manifest=0bbfdff71413182f0fade6026cdf99c2ea923a80b6f8b56d7d3c2b8416d3c968; ath_wallet: current=bbe3157b05b8d9cc7bae1a3aacd690301e3a16a45a0657b96fb28fdfcf442f50, manifest=042e3ac22f441e988a2652cb346f61f61c10263d87c688e237ec00c03fac1466; buyback_burn: current=5b38507b980df160b228fc7b810658ab53591c9263823794de5525b056c8cf64, manifest=0bb107f3d56c001e42e99c7d0cf7b0131f42e792c31ee0728dbcd0c805972b19; market_stability_seller: current=1beee6994d8ee37b7ff9822b4043af1f801cc49258455ade0bf5196b8f9a9759, manifest=0ead15750d003e7b527609cb4ee787c1fa13f5a29c6de1dedf1b07f309009d2f; fee_accumulator: current=855bdeb2b9335bf418099b03abd6a561b149d128a8ddd5c1508e2e42a348a855, manifest=593bbab3c38ab877a123459111a3a2f63464c7b74d63db0ff4c1cabddba2ee53; profile_registry: current=a8cc51ee1ded5eadc603a0a7de62749237a4bd0c8c668823c1e6098f6f61e14d, manifest=96b823bb85145e3311c43a871013b8b227bc265121e1941f1dc686aeff11b292; username_nft_item: current=0a4cbac7aaa5899c12d4e2e72126aa8381f4c90ab1e3f547f49f7bfab9746ef1, manifest=eccbea500b135059a1a46bae5c833b28ad263aae0258a146e9f98d8f7b843910; username_registry: current=80356c6136995f847e0b602ea69070a9032802b8d027ba76409112a6391f3ca3, manifest=89cf045874c3dc415409d702d51906cf6e8ce1f8ae9cf1bd64e6bf0c6b254570; airdrop_pool: current=0e84798aed50f58e2c5acdc72822adb7c919b9901d71b4f13da116a44a570c40, manifest=missing."
+    },
+    {
+      "code": "MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT",
+      "message": "Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=d9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16 local_draft=6597cfe4ce6bc07861a5f7484dd3459d8a91ef597db747afa9c7833e9005f336 production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification."
+    }
+  ],
   "checked_manifest_hash": "d9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16"
 }

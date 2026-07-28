@@ -212,7 +212,11 @@ export interface MainnetGenesisVerifyInput {
 
 export interface MainnetGenesisVerifyReport {
   document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT';
-  status: 'BLOCKED_MISSING_INPUT' | 'BLOCKED_GENESIS_MISMATCH' | 'MAINNET_GENESIS_VERIFIED';
+  // BLOCKED_SNAPSHOT_INCOMPLETE is distinct from BLOCKED_GENESIS_MISMATCH on purpose: a mismatch means the chain
+  // disagrees with the manifest, an incomplete snapshot means the input does not describe the contracts at all
+  // (typically a snapshot from an older generation). Collapsing them would tell an operator to go re-verify a
+  // deployment when the real answer is "you handed me the wrong file".
+  status: 'BLOCKED_MISSING_INPUT' | 'BLOCKED_SNAPSHOT_INCOMPLETE' | 'BLOCKED_GENESIS_MISMATCH' | 'MAINNET_GENESIS_VERIFIED';
   generated_at: 'DETERMINISTIC_ARTIFACT';
   mainnet_genesis_verified: boolean;
   input_source: string | null;
@@ -600,8 +604,21 @@ function checkBase(
   addressKey: string,
   codeHashKey: string,
 ) {
-  addAddressEq(issues, `${contractKey.toUpperCase()}_ADDRESS_MISMATCH`, snapshot.address, manifest.addresses[addressKey], `${contractKey}.address`);
-  addEq(issues, `${contractKey.toUpperCase()}_CODE_HASH_MISMATCH`, snapshot.code_hash?.toLowerCase(), manifest.code_hashes[codeHashKey], `${contractKey}.code_hash`);
+  // A manifest that simply LACKS the entry must produce an issue, not a crash. Measured 2026-07-28: running this
+  // verifier against a manifest from an older generation threw `Cannot read properties of undefined (reading
+  // 'address')` and wrote no report at all — so on the real ceremony an operator with an incomplete manifest would
+  // get a stack trace instead of the name of the missing contract, at the exact moment the tool exists to be trusted.
+  // Fail loudly and by name; the mismatch checks below then compare against a value that is present.
+  if (manifest.addresses?.[addressKey] === undefined) {
+    issues.push(issue(`${contractKey.toUpperCase()}_MANIFEST_ADDRESS_MISSING`, `manifest.addresses.${addressKey} is absent, so ${contractKey}.address cannot be verified. The manifest does not describe this contract.`));
+  } else {
+    addAddressEq(issues, `${contractKey.toUpperCase()}_ADDRESS_MISMATCH`, snapshot.address, manifest.addresses[addressKey], `${contractKey}.address`);
+  }
+  if (manifest.code_hashes?.[codeHashKey] === undefined) {
+    issues.push(issue(`${contractKey.toUpperCase()}_MANIFEST_CODE_HASH_MISSING`, `manifest.code_hashes.${codeHashKey} is absent, so ${contractKey}.code_hash cannot be verified. The manifest does not describe this contract.`));
+  } else {
+    addEq(issues, `${contractKey.toUpperCase()}_CODE_HASH_MISMATCH`, snapshot.code_hash?.toLowerCase(), manifest.code_hashes[codeHashKey], `${contractKey}.code_hash`);
+  }
 }
 
 function checkRequiredStateInitHash(issues: Issue[], manifest: ManifestLike, key: string, label: string) {
@@ -1137,6 +1154,45 @@ export function verifyMainnetGenesisSnapshot(
   ];
   for (const [code, value, label] of snapshotBasechainChecks) {
     addBasechainAddress(issues, code, value, label);
+  }
+
+  // EVERY per-field check below dereferences its snapshot section unconditionally. A snapshot that simply does not
+  // describe a contract therefore threw — measured 2026-07-28 while rebaselining onto clean-17: feeding the verifier
+  // the clean-15 input produced `Cannot read properties of undefined (reading 'address')`, no report file, and no hint
+  // as to which contract was missing. That is the worst possible behaviour for a tool whose entire job is to be
+  // trusted on ceremony day, when the operator is holding a snapshot they cannot re-take cheaply.
+  //
+  // Name the missing sections and stop. Stopping is not a weakening: with a section absent there is nothing to
+  // compare, and continuing would only bury the real answer under a hundred derived mismatches.
+  //
+  // ONLY the six PRIMARY contracts are gated here. Nine sections — every official ATHWallet, plus
+  // ath_long_term_vesting and market_stability_seller — already have their own dedicated MISSING_*_SNAPSHOT issue
+  // further down, with tests that assert those exact codes; sweeping them into this gate would silently replace a
+  // precise diagnosis with a generic one. These six simply never got that treatment, which is why they threw.
+  // (The two mechanisms should converge eventually; until then this list is the smaller, safer half.)
+  const GATED_SNAPSHOT_SECTIONS = [
+    'ath_master', 'airdrop_pool', 'fee_accumulator', 'buyback_burn', 'username_registry', 'profile_registry',
+  ];
+  const missingSections = GATED_SNAPSHOT_SECTIONS.filter((name) => (s as any)?.[name] === undefined);
+  if (missingSections.length > 0) {
+    for (const name of missingSections) {
+      issues.push(issue(
+        `SNAPSHOT_SECTION_MISSING_${name.toUpperCase()}`,
+        `snapshot.${name} is absent. This input does not describe that contract, so genesis cannot be verified against it — the snapshot is from a different generation than the manifest.`,
+      ));
+    }
+    return {
+      document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT',
+      status: 'BLOCKED_SNAPSHOT_INCOMPLETE',
+      generated_at: 'DETERMINISTIC_ARTIFACT',
+      mainnet_genesis_verified: false,
+      input_source: metadata.inputSource ?? null,
+      input_sha256: metadata.inputSha256 ?? null,
+      evidence_refs: input.evidenceRefs ?? null,
+      issue_codes: issues.map((i) => i.code),
+      issues,
+      checked_manifest_hash: manifest.manifest_hash_hex ?? null,
+    };
   }
 
   checkBase(issues, manifest, s.ath_master, 'ath_master', 'ath_master', 'ath_master');
