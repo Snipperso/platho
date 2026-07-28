@@ -132,6 +132,20 @@ export async function fetchIntroCapsule({ address, entryId, readEntry, readMessa
   if (!entry?.exists) return null;
   const wanted = BigInt(entry.body_commit);
 
+  // EVERY matching row is collected, not just the first, and the OLDEST one wins. Rows arrive newest-first, so the
+  // last match in this loop is the earliest publish.
+  //
+  // WHY (wave-7 audit): IntroShard does not store the publisher, so the sender's wallet can only come from the shard's
+  // message history — and anyone who reads a published INTRO off the chain can re-publish those exact bytes into the
+  // same shard. Their row hashes to the SAME body_commit and, being newer, used to win. The reply then resolved the
+  // WRONG KeyShard; resolvePeerBundleFromKeyShardView fails closed on the keyId mismatch, so nothing is impersonated —
+  // but the responder could never reply, permanently, for the price of one publish.
+  //
+  // Oldest-wins is not a heuristic, it is the ordering the attack cannot beat: a copy must be READ before it can be
+  // made, so a replay is always strictly newer than the genuine publish. The cells themselves are interchangeable —
+  // every match reproduces the same body_commit, hence the same header0/body — so only the source differs.
+  let capsuleCells = null;
+  const sources = [];
   for (const item of await readMessages(address)) {
     // readMessages may yield plain body Cells (source-free reader) or { bodyCell, source } (with-source reader). The
     // source is the INTRO publish transaction's src = the SENDER's wallet (direct-pay), which the responder needs to
@@ -142,12 +156,25 @@ export async function fetchIntroCapsule({ address, entryId, readEntry, readMessa
     let parsed;
     try { parsed = parseIntroPublish(message); } catch { continue; }            // not an IntroPublish; skip
     if ((await introBodyCommitBrowser(parsed.header0, parsed.body)) !== wanted) continue;
-    // created_at is the CONTRACT-STAMPED time from the entry (IntroShard stamps now(); get_entry returns it). It MUST
-    // be surfaced: re-INTRO K_root adoption orders on it, and it is the only recency value BOTH sides read identically
-    // — a local clock would let the two sides disagree on which re-INTRO is newest and silently fork the conversation.
-    return { header0: parsed.header0, body: parsed.body, r: parsed.r, viewTag: parsed.viewTag, bodyCommit: wanted, created_at: entry.created_at, source };
+    if (!capsuleCells) capsuleCells = { header0: parsed.header0, body: parsed.body, r: parsed.r, viewTag: parsed.viewTag };
+    if (source) sources.push(source);
   }
-  return null;   // the entry exists but its transaction is beyond what this endpoint retains
+  if (!capsuleCells) return null;   // the entry exists but its transaction is beyond what this endpoint retains
+
+  // created_at is the CONTRACT-STAMPED time from the entry (IntroShard stamps now(); get_entry returns it). It MUST
+  // be surfaced: re-INTRO K_root adoption orders on it, and it is the only recency value BOTH sides read identically
+  // — a local clock would let the two sides disagree on which re-INTRO is newest and silently fork the conversation.
+  //
+  // sourceCandidates is oldest-first, so a reply that still fails the keyId check (the genuine row aged out of this
+  // endpoint's window, leaving only replays) has somewhere to look instead of dying silently.
+  const candidates = [...sources].reverse();
+  return {
+    ...capsuleCells,
+    bodyCommit: wanted,
+    created_at: entry.created_at,
+    source: candidates.length ? candidates[0] : null,
+    sourceCandidates: candidates,
+  };
 }
 
 /**

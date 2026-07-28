@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-28T14:56:04.690Z",
+  "generatedAt": "2026-07-28T15:00:55.588Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 219,
-    "totalBytes": 5554009,
-    "bundleSha256": "ba12838d6eea47bf992c324c3280b74af7ab59e46e2d283e2ffdcf290b560e06",
+    "totalBytes": 5555614,
+    "bundleSha256": "73c27e37f347ce0da1884a5b1978a47afdf205e11b0eff4673b386f4fcdea680",
     "files": [
       {
         "path": "app.js",
@@ -559,8 +559,8 @@
       },
       {
         "path": "intro-transport.mjs",
-        "bytes": 10298,
-        "sha256": "8975d1ab58a672e782e9318b44bcd3327009ec38451300c5feec3aa49d38ba5b"
+        "bytes": 11903,
+        "sha256": "132f05c204192891ccc3424c878d91f971fcf023c6f0b93b58248916a82ab747"
       },
       {
         "path": "key-shard-register-browser.mjs",
