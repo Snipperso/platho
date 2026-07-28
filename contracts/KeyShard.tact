@@ -90,7 +90,12 @@ const KS_KEY_ID_DOMAIN: Int = 0x4b455949;          // "KEYI" — unchanged from 
 const KS_REPLACE_KEYS_SIGNING_DOMAIN: Int = 0x4b534b31;  // "KSK1" — DIFFERENT from KeyRegistry's "KRK1" on purpose:
 // a signature made for the old registry must not verify here, and vice versa.
 
-// [RE-MEASURE BEFORE SEAL] Storage is 64962 nanoton/cell/year (config-18 after the Apr-2026 switch, bits free).
+// [MEASURED 2026-07-28 — G8 gate CLEARED. KS-RENT-01 reads the storage phase on the current artifacts: the
+//  45_000_000 endowment against a MEASURED 3_507_957/year funds 12.83 years, over the 10 this form promises.
+//  The basis differs from the shard lanes ON PURPOSE: a KeyShard has no retire instant, so there is no fixed
+//  life to take a 1.5x margin over. Years-funded IS its margin, and KeyShardTopUpStorageReserve is the path that
+//  extends it.]
+// Storage is 64962 nanoton/cell/year (config-18 after the Apr-2026 switch, bits free).
 // A shard occupies its own CODE as well as its data — that is the price of not being a singleton, and it is the
 // number that decides whether this form is affordable at all. MEASURED 2026-07-20 on the built artifacts:
 // the shard form in this project costs 12-20 code cells (AirdropTicket 12, RecordShard/RecoveryShard 17,
@@ -115,7 +120,7 @@ const KS_AVATAR_WRITE_GAS: Int = 8000000;
 // with no wallet action — the same self-attestation shape as UsernameNFTItem's proof path. Sized exactly like it:
 // a fixed forward reserve, an exec reserve, and a cap so the shard can never be turned into a value relay. Value
 // rides in from the caller and the shard NEVER pays from its storage endowment.
-// [RE-MEASURE BEFORE SEAL] Exec is 4M, not the item's 1M, because the proof body is a larger cell tree (full
+// [MEASURED — pinned by KS-PROVE-05, see the last line of this note.] Exec is 4M, not the item's 1M, because the proof body is a larger cell tree (full
 // bundle + ML-KEM snake + avatar pointer). MEASURED at the min-value boundary (value = FORWARD + EXEC) with an
 // initialised receiver: this tx's gas ~1.37M + separate fwd fee ~0.63M = ~2.0M. At exec=2M the shard netted only
 // +3331 nanoton — the "never pays from endowment" invariant held by a hair and would flip negative on any mainnet

@@ -50,7 +50,13 @@ const RS_RETENTION: Int = 31536000;
 const RS_FRAME_DOMAIN: Int = 0x52534643;   // "RSFC"
 const RS_WRITE_DOMAIN: Int = 0x52535744;   // "RSWD" — the write-authorization digest preimage
 
-// [RE-MEASURE BEFORE SEAL] Storage is 64962 nanoton/cell/year (config-18, bits free).
+// [MEASURED 2026-07-28 — G8 gate CLEARED on the current artifacts, and now re-proved on every run by
+//  tests/conv-intro-rent-solvency.test.ts rather than resting on the note below. Worst-case birth (gate 13656
+//  admits epoch-1, so the life is 3 days + retention, not 2): retained 3_800_000 vs rent 1_375_418 at one record
+//  = 2.76x, and 7_100_000 vs 3_536_790 at twelve = 2.01x. Both clear the 1.5x rule. The reserve arithmetic
+//  reconciles exactly — 3_500_000 base + n x 300_000 — which is what confirms the measurement read this contract
+//  and not a float left on top of it.]
+// Storage is 64962 nanoton/cell/year (config-18, bits free).
 //   record endowment: 3 MEASURED cells x 64962 x 1yr x 1.5 = 292_329 -> 300_000 (the record lives 1 year).
 //     The earlier "2 cells" figure lost the G8 1.5x margin by coincidence: 2 x 64962 x 1.5 == 3 x 64962 == 194_886,
 //     so the number looked right while the real margin was 1.026x. config-18 is a SCHEDULE and has already moved
