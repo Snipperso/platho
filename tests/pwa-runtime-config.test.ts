@@ -1526,7 +1526,15 @@ describe('PWA runtime config guard', () => {
     expect(resumeSource).toMatch(/function hasPendingPrivateSendRetry\(message\)/);
     expect(resumeSource).toMatch(/publishStateHasRetryableSendParts\(message\?\.publishState\)/);
     expect(resumeSource).toMatch(/message\?\.privateSendRetryStopped !== true/);
-    expect(resumeSource).toMatch(/!isStalePrivatePendingPublish\(message\)/);
+    // The staleness bound is still there, now as an early return rather than a term in an && chain (the predicate
+    // grew a second, direct-pay branch). Same rule by De Morgan: a stale message with no publish attempt is out.
+    expect(resumeSource).toMatch(/if \(isStalePrivatePendingPublish\(message\) && !privateMessageHasPublishAttempt\(message\)\) return false;/);
+    // And it must guard BOTH branches — a direct-pay resume that skipped the age bound would revive a send the
+    // user gave up on ten minutes ago.
+    const predicate = resumeSource.slice(resumeSource.indexOf('function hasPendingPrivateSendRetry'));
+    const predicateBody = predicate.slice(0, predicate.indexOf('\n}\n') + 3);
+    expect(predicateBody.indexOf('isStalePrivatePendingPublish'))
+      .toBeLessThan(predicateBody.indexOf('directPaySendRetryResumable'));
     expect(app).toMatch(/privateSendRetryAttempt/);
     expect(resumeSource).toMatch(/const hasStoredCapsules = \(Array\.isArray\(message\?\.capsules\) && message\.capsules\.length > 0\) \|\| Boolean\(message\?\.capsule\)/);
     expect(resumeSource).toMatch(/function resumePendingPrivateSendRetries\(\)/);
@@ -6337,6 +6345,28 @@ describe('PWA runtime config guard', () => {
     const syncIdx = app.indexOf('beginMessageSyncUi();', readyIdx);
     expect(readyIdx).toBeGreaterThan(-1);
     expect(syncIdx).toBeGreaterThan(readyIdx);
+  });
+
+  it('persists and revives the INTRO send state, and never rebuilds a send that reached the wallet', () => {
+    // The two halves of the first-contact fix, pinned where they are wired rather than where they are defined.
+    // Persisting without reviving stores a K_root that comes back as an index-keyed object; reviving without
+    // persisting reads a field nothing ever wrote. Either way the message looks handled and is not.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app, 'the pending INTRO send goes to the encrypted history')
+      .toMatch(/introDirectSend: serializeIntroDirectSend\(message\.introDirectSend\)/);
+    expect(app, 'and is decoded on the way back — a spread would leave bytes as numeric-keyed objects')
+      .toMatch(/if \(message\.introDirectSend\) message\.introDirectSend = reviveIntroDirectSend\(message\.introDirectSend\);/);
+
+    // The auto-resume may only ever fire for a send that never reached the wallet AND reproduces exactly.
+    const resumable = app.slice(app.indexOf('function directPaySendRetryResumable('));
+    const body = resumable.slice(0, resumable.indexOf('\n}\n') + 3);
+    expect(body, 'nothing broadcast — otherwise the confirm and the idempotent re-broadcast own it')
+      .toMatch(/!directSendReachedWallet\(message\)/);
+    expect(body, 'and no attachment bytes that a rebuild would silently drop')
+      .toMatch(/sendContentSurvivesReload\(message\)/);
+    expect(body, 'and a retry really was in flight when the page went away')
+      .toMatch(/Number\(message\?\.privateSendRetryAttempt \?\? 0\) > 0/);
+    expect(body, 'an exhausted send stays the user\'s call').toMatch(/privateManualRetryAvailable !== true/);
   });
 
   it('keeps the public lane MEMOISED, so the state it carries can actually be used', () => {

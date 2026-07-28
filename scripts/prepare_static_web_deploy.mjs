@@ -68,6 +68,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'conv-reply-bundle.mjs',
   'intro-lane.mjs',
   'intro-lane-send.mjs',
+  'intro-send-state.mjs',
   'intro-receive-handler.mjs',
   'intro-send-coords.mjs',
   'intro-transport.mjs',
