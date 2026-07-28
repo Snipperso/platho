@@ -137,7 +137,7 @@ button:disabled,
 .thread-list,
 .public-feed,
 .message-strip,
-.vault-scroll-content,
+.wallet-scroll-content,
 .profile-scroll-content {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -147,7 +147,7 @@ button:disabled,
 .thread-list::-webkit-scrollbar,
 .public-feed::-webkit-scrollbar,
 .message-strip::-webkit-scrollbar,
-.vault-scroll-content::-webkit-scrollbar,
+.wallet-scroll-content::-webkit-scrollbar,
 .profile-scroll-content::-webkit-scrollbar {
   display: none;
 }
@@ -2135,7 +2135,7 @@ a .avatar.has-image,
 }
 
 .public-pane,
-.vault-pane,
+.wallet-pane,
 .profile-pane {
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 14px;
@@ -2168,9 +2168,49 @@ a .avatar.has-image,
   grid-row: 1;
 }
 
-.vault-pane {
+.wallet-pane {
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+/* The two headline balances. They are driven by the SAME refresh that fills the rail corner, so they follow its
+   pending rule too: the block keeps its layout slot and stays invisible until a real balance lands (no spinner —
+   the header sync indicator already signals activity), then fades in via .rail-vault-balance-reveal. */
+.wallet-headline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.wallet-headline.is-pending {
+  opacity: 0;
+}
+
+.wallet-headline-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid rgba(48, 213, 176, 0.16);
+  border-radius: 14px;
+  background: var(--surface, rgba(255, 255, 255, 0.03));
+}
+
+.wallet-headline-card span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wallet-headline-card strong {
+  color: var(--text);
+  /* Big by request, but it must not push a long value out of the card on a narrow phone: clamp scales it down
+     rather than letting "1234.5678 GRAM" overflow or clip. */
+  font-size: clamp(20px, 5.2vw, 30px);
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .profile-pane {
@@ -2183,7 +2223,7 @@ a .avatar.has-image,
   padding-bottom: 0;
 }
 
-.vault-scroll-content,
+.wallet-scroll-content,
 .profile-scroll-content {
   display: grid;
   align-content: start;
@@ -4463,6 +4503,7 @@ button.feed-item:hover {
 .icon-chat { --mask: url("./assets/icons/chat-outline.svg"); }
 .icon-broadcast { --mask: url("./assets/icons/broadcast.svg"); }
 .icon-vault { --mask: url("./assets/icons/vault.svg"); }
+.icon-wallet { --mask: url("./assets/icons/wallet.svg"); }
 .icon-user { --mask: url("./assets/icons/user.svg"); }
 .icon-eye { --mask: url("./assets/icons/eye.svg"); }
 .icon-eye-off { --mask: url("./assets/icons/eye-off.svg"); }
@@ -4632,7 +4673,7 @@ button.feed-item:hover {
   }
 
   .public-pane,
-  .vault-pane,
+  .wallet-pane,
   .profile-pane,
   .list-pane {
     padding: var(--header-top-offset) 24px 24px;

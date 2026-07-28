@@ -712,13 +712,10 @@ const publicPostDetailTitle = document.querySelector('#publicPostDetailTitle');
 const publicPostDetailSubtitle = document.querySelector('#publicPostDetailSubtitle');
 const publicPostBackButton = document.querySelector('#publicPostBackButton');
 const publicPostAuthorIdentityButton = document.querySelector('#publicPostAuthorIdentityButton');
-const vaultSubtitle = document.querySelector('#vaultSubtitle');
+const walletSubtitle = document.querySelector('#walletSubtitle');
 const navVaultTonBalances = [...document.querySelectorAll('[data-nav-vault-ton]')];
 const navVaultAthBalances = [...document.querySelectorAll('[data-nav-vault-ath]')];
 const navVaultBalanceContainers = [...document.querySelectorAll('[data-nav-vault-balance]')];
-const balanceGrid = document.querySelector('#balanceGrid');
-const actionGrid = document.querySelector('#actionGrid');
-const ledgerRows = document.querySelector('#ledgerRows');
 const profileHandle = document.querySelector('#profileHandle');
 const profileAvatar = document.querySelector('#profileAvatar');
 const identityName = document.querySelector('#identityName');
@@ -4001,7 +3998,7 @@ async function copyTextToClipboard(text) {
 function renderPaneHeaders() {
   setText(chatCountLabel, t('nav.privateChats'));
   setText(publicSubtitle, t('nav.publicChannels'));
-  setText(vaultSubtitle, t('nav.vault'));
+  setText(walletSubtitle, t('common.wallet'));
   setText(profileHandle, t('nav.profile'));
 }
 
@@ -4868,7 +4865,7 @@ function syncNowForCurrentScreen() {
     runManualPrivateMessageSync();
     return;
   }
-  if (view === 'vault') {
+  if (view === 'wallet') {
     refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
       const rateLimited = noteTonRpcRateLimit(error);
       setVaultStatus(rateLimited ? 'RPC busy, retrying' : 'sync blocked');
@@ -8206,62 +8203,8 @@ async function confirmPublicCommentsRisk() {
   return result !== null;
 }
 
-function renderVaultCards(cards) {
-  if (!balanceGrid) return;
-  balanceGrid.replaceChildren();
-  const visibleCards = cards ?? [];
-  balanceGrid.hidden = visibleCards.length === 0;
-  for (const card of visibleCards) {
-    const article = document.createElement('article');
-    article.className = `balance-card${card.tone ? ` ${card.tone}` : ''}`;
-    const label = document.createElement('span');
-    label.textContent = card.label ?? '';
-    const value = document.createElement('strong');
-    value.textContent = card.value ?? '';
-    const caption = document.createElement('small');
-    caption.textContent = card.caption ?? '';
-    article.append(label, value, caption);
-    balanceGrid.append(article);
-  }
-}
 
-function renderVaultActions(actions) {
-  if (!actionGrid) return;
-  actionGrid.replaceChildren();
-  const visibleActions = actions ?? [];
-  actionGrid.hidden = visibleActions.length === 0;
-  for (const action of visibleActions) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    if (action.id) button.dataset.action = action.id;
-    appendIcon(button, action.icon ?? 'bolt');
-    button.append(document.createTextNode(action.label ?? ''));
-    actionGrid.append(button);
-  }
-}
 
-function renderLedgerRows(rows) {
-  if (!ledgerRows) return;
-  ledgerRows.replaceChildren();
-  const visibleRows = rows ?? [];
-  ledgerRows.hidden = visibleRows.length === 0;
-  for (const row of visibleRows) {
-    const item = document.createElement('div');
-    item.className = 'ledger-row';
-    const icon = document.createElement('span');
-    icon.className = `ledger-icon ${row.tone ?? 'cyan'}`;
-    const body = document.createElement('div');
-    const title = document.createElement('strong');
-    title.textContent = row.title ?? '';
-    const detail = document.createElement('small');
-    detail.textContent = row.detail ?? '';
-    const value = document.createElement('span');
-    value.textContent = row.value ?? '';
-    body.append(title, detail);
-    item.append(icon, body, value);
-    ledgerRows.append(item);
-  }
-}
 
 function renderConfiguredShell() {
   const ui = appConfig.ui ?? {};
@@ -8276,9 +8219,6 @@ function renderConfiguredShell() {
   setText(walletRuntimeLabel, ui.walletLabel);
   setText(localStateLabel, ui.localStateLabel);
   setText(networkRuntimeLabel, ui.networkLabel ?? appConfig.network?.label);
-  renderVaultCards(ui.vaultCards);
-  renderVaultActions(ui.vaultActions);
-  renderLedgerRows(ui.ledgerRows);
 }
 
 function clonePreviewThreads() {
@@ -15118,18 +15058,6 @@ async function clearPlathoLocalData() {
 // Shown dark-grey (.is-locked) + disabled with an explanatory title. Activation lives in the PROFILE tab, so
 // nothing needed to activate is behind this gate. Re-runs on every refreshMessagingControls (incl. right after
 // activation), so it unlocks the moment the account goes active.
-function refreshVaultTabLock() {
-  const locked = !hasActivePlathoAccount();
-  for (const item of railItems) {
-    if (item.dataset.tab !== 'vault') continue;
-    item.classList.toggle('is-locked', locked);
-    item.disabled = locked;
-    item.setAttribute('aria-disabled', locked ? 'true' : 'false');
-    item.title = locked ? t('vault.activateAccountFirstTooltip') : t('nav.vault');
-  }
-  // Never sit on a locked Vault view (a stale deep-link / a just-de-activated edge): fall back to Public.
-  if (locked && appShell?.dataset.view === 'vault') setView('public');
-}
 
 function refreshMessagingControls() {
   const accountActive = hasActivePlathoAccount();
@@ -15224,16 +15152,10 @@ function refreshMessagingControls() {
   // for the whole public composer row, no scattered weaker writes.
   refreshPublicSendButtonState();
   renderAthFlushStatus();
-  for (const button of actionGrid?.querySelectorAll('button[data-action]') ?? []) {
-    button.disabled = !plathoWallet || !signedActionsReady;
-  }
   railItems.forEach((item) => {
     item.disabled = false;
     item.title = item.getAttribute('aria-label') ?? '';
   });
-  // AFTER the blanket rail re-enable above (which would otherwise undo the gate): lock the Vault tab until the
-  // account is activated.
-  refreshVaultTabLock();
   refreshVaultMoveWidget();
   refreshComposerCostStatus();
   refreshConversationSubtitle();
@@ -15244,9 +15166,8 @@ function setView(view) {
   // Switching tabs leaves the composing context — collapse a full-screen composer so its fixed overlay can't cover
   // the tab the user switched to (the rail is reachable via keyboard / TG even though the overlay covers it visually).
   exitComposerMaximize();
-  // The Vault tab is gated until activation (see refreshVaultTabLock) — a programmatic/deep-link attempt to
-  // open it un-activated falls back to Public.
-  if (view === 'vault' && !hasActivePlathoAccount()) view = 'public';
+  // The Wallet tab is DELIBERATELY ungated: creating or importing a wallet, and activating the account, are the
+  // first things a new user does, and they live here. Locking it until activation would lock the way in.
   appShell.dataset.view = view;
   if (view !== 'chats') {
     appShell.dataset.chatOpen = 'false';
@@ -15280,7 +15201,7 @@ function setView(view) {
     // anchorUnread only applies to the feed scroll, so skip it while a detail (or a channel view) is restored.
     renderPublicSurface({ anchorUnread: publicPane?.dataset?.postOpen !== 'true' && publicPane?.dataset?.channelOpen !== 'true' });
   }
-  if (view === 'vault') {
+  if (view === 'wallet') {
     refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
       const rateLimited = noteTonRpcRateLimit(error);
       setVaultStatus(rateLimited ? 'RPC busy, retrying' : 'sync blocked');
@@ -19361,7 +19282,7 @@ function queueAthFlushPostTransactionRefresh() {
 }
 
 function isVaultViewActive() {
-  return appShell?.dataset?.view === 'vault';
+  return appShell?.dataset?.view === 'wallet';
 }
 
 function clearVaultAutoRefreshTimer() {
