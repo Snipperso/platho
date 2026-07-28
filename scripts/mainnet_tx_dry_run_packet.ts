@@ -797,7 +797,18 @@ async function buildDryRunPacket(draft: Draft) {
     }));
     return {
       id: funding.id,
+      // NOT last, despite living in a separate array printed after the seals. The real constraint is a SANDWICH,
+      // and both edges are enforced on chain:
+      //   B06 (AirdropBindAthMaster) -> THIS -> off-chain balance verify -> S01 (AirdropSealGenesis)
+      // Too early: the pool's AthTransferNotification hits gate 26011 (ath_master_bound) / 26019 (sender must be the
+      // pool's OWN bound wallet), the notification bounces, and funded_amount stays 0 while 15M ATH sits in the
+      // wallet — after which S01 throws 26044 forever and the pool can never be sealed.
+      // Too late: S01 throws 26044 (funded_amount == AIRDROP_TOTAL_POOL) — loud, but mid-ceremony on a one-shot
+      // controller message.
+      // The phase NAME says "final" only in the sense of final genesis; it does not mean "sign these last".
       phase: 'final_genesis_funding',
+      must_be_signed_after: 'B06',
+      must_be_signed_before: 'S01',
       signer_role: 'ath_treasury_owner',
       signer_address: friendly(derived.addresses.athTreasuryOwner),
       target_address: friendly(derived.addresses.treasuryOwnerAthWallet),
@@ -822,6 +833,20 @@ async function buildDryRunPacket(draft: Draft) {
     lifecycle_stage: 'pre_execution_tx_dry_run_template',
     lifecycle_note: 'production_deploy_executed=false means this local dry-run packet is a pre-execution template; live release truth comes from mainnet_genesis_verify_report.json after fresh verification.',
     source_draft_generated_at: draft.generated_at,
+    // THE ORDER IS PART OF THE DESIGN, AND THE FILE LAYOUT DOES NOT EXPRESS IT. Funding lives in its own array
+    // printed after control_messages (which ends with the seals), so an operator working this file top to bottom
+    // would sign the seals before the funding. State the canonical sequence explicitly, once, where it cannot be
+    // missed. Audited 2026-07-28: both edges of the funding step are enforced on chain (26011/26019 below it,
+    // 26044 above it), so a wrong order fails loudly rather than silently — but failing loudly mid-ceremony on a
+    // one-shot controller message is still the thing this line exists to prevent.
+    execution_order: [
+      { step: 1, phase: 'deploy_contracts', note: 'D01..D09. ATHMaster first; FeeAccumulator before any shard address is derived.' },
+      { step: 2, phase: 'deploy_treasury_supply', note: 'D02. The 100M genesis supply reaches the Treasury Owner ATHWallet.' },
+      { step: 3, phase: 'pre_seal_binding', note: 'B01..B16. All one-shot. B06 must precede the funding: without ath_master_bound the pool refuses the deposit notification.' },
+      { step: 4, phase: 'final_genesis_funding', note: 'F01..F02. AFTER B06, BEFORE S01 — not last, despite appearing last in this file.' },
+      { step: 5, phase: 'off_chain_verification', note: 'Read the official ATH wallet balances and AirdropPool.funded_amount. This is the last point at which a mistake is still correctable.' },
+      { step: 6, phase: 'seal', note: 'S01..S05. Irreversible. Never seal-then-fund: AirdropSealGenesis gate 26044 requires funded_amount == 15M.' },
+    ],
     manifest_hash_hex: mh,
     treasury_owner_ath_wallet: {
       address: friendly(derived.addresses.treasuryOwnerAthWallet),

@@ -127,6 +127,73 @@ describe('mainnet transaction dry-run packet', () => {
     }
   });
 
+  // Ceremony STEP ORDER is a seal gate in its own right ("bind treasury before funding; fund -> off-chain verify ->
+  // seal, never seal-then-fund"). Audited 2026-07-28. Two things were wrong, and neither was in the contracts:
+  //
+  //  1. The packet prints funding in its own array AFTER control_messages, which ends with the five seals, and calls
+  //     its phase `final_genesis_funding`. Both cues point at "sign these last". The real constraint is a sandwich —
+  //     B06 -> funding -> verify -> S01 — with BOTH edges enforced on chain (26011/26019 below, 26044 above).
+  //  2. The runbook, the document a human actually follows, still told the operator to deploy and seal `Vault` and
+  //     `CapsuleHub`: contracts deleted in clean-17. It also funded `vault_official_ath_wallet`. Seventeen mentions.
+  //     The ceremony SCRIPTS were clean-17 already — only the prose had drifted, which is the failure mode where
+  //     nothing goes red.
+  it('H-DEP-DRYRUN-07: the packet states its own execution order, and funding sits between the binds and the seals', () => {
+    if (!existsSync('artifacts/local/mainnet_tx_dry_run_packet.json')) return;
+    const packet = readJson('artifacts/local/mainnet_tx_dry_run_packet.json');
+
+    const order: string[] = (packet.execution_order ?? []).map((s: any) => s.phase);
+    expect(order, 'the packet must carry an explicit execution order').not.toEqual([]);
+    const at = (phase: string) => order.indexOf(phase);
+    expect(at('pre_seal_binding'), 'binds come before funding').toBeLessThan(at('final_genesis_funding'));
+    expect(at('final_genesis_funding'), 'funding comes before the off-chain verification').toBeLessThan(at('off_chain_verification'));
+    expect(at('off_chain_verification'), 'and verification comes before the seals — never seal-then-fund').toBeLessThan(at('seal'));
+
+    // Every phase that real steps use must appear in the stated order, or the order silently omits work.
+    const usedPhases = new Set<string>([
+      ...(packet.control_messages ?? []).map((m: any) => m.phase),
+      ...(packet.funding_messages ?? []).map((m: any) => m.phase),
+    ].filter(Boolean));
+    for (const phase of usedPhases) expect(order, `phase ${phase} is used but not placed in execution_order`).toContain(phase);
+
+    // The funding steps must name their own prerequisites, since the file layout argues the opposite.
+    for (const f of packet.funding_messages ?? []) {
+      expect(f.must_be_signed_after, `${f.id} must name the bind it depends on`).toBe('B06');
+      expect(f.must_be_signed_before, `${f.id} must name the seal it must precede`).toBe('S01');
+    }
+  });
+
+  it('H-DEP-DRYRUN-08: the runbook seals exactly the contracts the packet seals, and none that no longer exist', () => {
+    if (!existsSync('artifacts/local/mainnet_tx_dry_run_packet.json')) return;
+    const packet = readJson('artifacts/local/mainnet_tx_dry_run_packet.json');
+    const runbook = readFileSync('DEPLOYMENT_RUNBOOK.md', 'utf8');
+
+    const packetSeals = (packet.control_messages ?? [])
+      .filter((m: any) => m.phase === 'seal')
+      .map((m: any) => String(m.body?.label ?? ''));
+    expect(packetSeals.length, 'the packet seals five staged contracts').toBe(5);
+
+    // Step 10 of Phase 2 is the operator's seal list. Take it verbatim rather than searching the whole document,
+    // so historical prose ("replaces Vault, which no longer exists") cannot satisfy or break this check.
+    const start = runbook.indexOf('10. Seal staged contracts only after the funding checks above pass');
+    expect(start, 'the runbook must still carry the seal step').toBeGreaterThan(0);
+    const block = runbook.slice(start, runbook.indexOf('\n\n', start));
+
+    for (const label of packetSeals) {
+      expect(block, `the runbook must list ${label} in its seal step`).toContain(label);
+    }
+    // And nothing extra: a contract named here but absent from the packet is either deleted or unbuilt, and the
+    // operator would go looking for a transaction that does not exist.
+    // `Seal` is not always the start of the message name: AirdropPool's is `AirdropSealGenesis`.
+    const runbookSeals = [...block.matchAll(/`([A-Za-z]+\.[A-Za-z]*Seal[A-Za-z]*)`/g)].map((m) => m[1]);
+    expect(new Set(runbookSeals), 'runbook and packet seal sets must be identical').toEqual(new Set(packetSeals));
+
+    // The contracts named must actually exist in this generation.
+    for (const label of runbookSeals) {
+      const contract = label.split('.')[0];
+      expect(existsSync(`contracts/${contract}.tact`), `${contract} is sealed by the runbook but has no contract source`).toBe(true);
+    }
+  });
+
   it('H-DEP-DRYRUN-01: script derives every official ATHWallet StateInit used by final genesis', () => {
     const script = readFileSync('scripts/mainnet_tx_dry_run_packet.ts', 'utf8');
 

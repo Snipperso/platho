@@ -359,21 +359,31 @@ describe('v1 on-chain message source of truth', () => {
     }
   });
 
-  it('SPEC-MSG-SOURCE-03E: deployment runbook funds Vault activity backing before Vault and CapsuleHub seal', () => {
+  it('SPEC-MSG-SOURCE-03E: deployment runbook funds the airdrop backing before the seals', () => {
+    // REBASELINED onto clean-17 2026-07-28. This guard was pinned to `Vault.SealGenesis` and `CapsuleHub.SealGenesis`
+    // — two contracts deleted in clean-17 — so it was enforcing the ordering of a generation that no longer exists
+    // while the runbook it guards had drifted to instruct deploying and sealing them. A guard aimed at a deleted
+    // contract is not a weak guard, it is an absent one.
     const runbook = read('DEPLOYMENT_RUNBOOK.md');
-    const vaultFunding = runbook.indexOf('vault_official_ath_wallet.balance == 15,000,000 ATH');
+    const airdropFunding = runbook.indexOf('airdrop_pool_official_ath_wallet.balance == 15,000,000 ATH');
     const vestingFunding = runbook.indexOf('ath_long_term_vesting_official_ath_wallet.balance == 10,000,000 ATH');
-    const vaultSeal = runbook.indexOf('`Vault.SealGenesis`');
-    const capsuleSeal = runbook.indexOf('`CapsuleHub.SealGenesis`');
+    const airdropSeal = runbook.indexOf('`AirdropPool.AirdropSealGenesis`');
 
     expect(runbook).toMatch(/Deploy, Pre-Seal Binding, And Pre-Seal Funding/);
     expect(runbook).toMatch(/Seal staged contracts only after the funding checks above pass/);
     expect(runbook).toMatch(/Final Genesis Verification/);
     expect(runbook).not.toMatch(/Final Genesis Funding And Verification/);
-    expect(vaultFunding).toBeGreaterThanOrEqual(0);
-    expect(vestingFunding).toBeGreaterThanOrEqual(0);
-    expect(vaultSeal).toBeGreaterThan(vaultFunding);
-    expect(capsuleSeal).toBeGreaterThan(vaultFunding);
+    expect(airdropFunding, 'the runbook verifies the airdrop backing landed').toBeGreaterThanOrEqual(0);
+    expect(vestingFunding, 'and the vesting backing').toBeGreaterThanOrEqual(0);
+    expect(airdropSeal, 'the pool seal must come after its funding is verified — gate 26044 enforces the same thing on chain')
+      .toBeGreaterThan(airdropFunding);
+    expect(airdropSeal, 'and after the vesting funding check').toBeGreaterThan(vestingFunding);
+
+    // The deleted generation must not creep back into the operator's instructions. Historical prose is allowed to
+    // mention them (the runbook explains what AirdropPool replaces); an INSTRUCTION to seal them is not.
+    expect(runbook).not.toMatch(/`Vault\.SealGenesis`/);
+    expect(runbook).not.toMatch(/`CapsuleHub\.SealGenesis`/);
+    expect(runbook).not.toMatch(/vault_official_ath_wallet\.balance/);
   });
 
   it('SPEC-MSG-SOURCE-04: username authority is registry name-to-item plus current item owner, not item-only', () => {
