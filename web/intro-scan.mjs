@@ -15,7 +15,12 @@
 // scan_pub) on-chain, and X25519(eph_sec, scan_pub) == X25519(scan_sec, eph_pub), so the recipient's
 // computePrivateScanViewTag(scan_sec, eph_pub) reproduces it. No secret leaves the client.
 
-import { computePrivateScanViewTag } from './crypto/platho-crypto.mjs?v=12';
+// privateScanViewTagOrNull, NOT computePrivateScanViewTag: every entry here came from a STRANGER, and `r` is an
+// opaque uint256 the contract cannot validate. A degenerate point makes X25519 throw, and a throw inside this loop
+// aborts the caller's whole pass before its cursors are saved — so one 0.0153-GRAM publish would stop first contact
+// for the entire network, permanently, since the next pass re-reads the same page. Skipping loses nothing: a real
+// sender never publishes a point that cannot produce a shared secret, so such a record was addressed to no one.
+import { privateScanViewTagOrNull } from './crypto/platho-crypto.mjs?v=12';
 
 /**
  * Stage-1 filter over a batch of intro entries.
@@ -26,7 +31,8 @@ import { computePrivateScanViewTag } from './crypto/platho-crypto.mjs?v=12';
 export async function scanIntros(scanSecretKey, entries) {
   const candidates = [];
   for (const e of entries) {
-    const tag = await computePrivateScanViewTag(scanSecretKey, BigInt(e.r));
+    const tag = await privateScanViewTagOrNull(scanSecretKey, BigInt(e.r));
+    if (tag === null) continue;
     if ((tag & 0xffff) === (Number(e.view_tag) & 0xffff)) {
       candidates.push(e);
     }
@@ -38,7 +44,8 @@ export async function scanIntros(scanSecretKey, entries) {
 export async function scanIntroIndices(scanSecretKey, entries) {
   const out = [];
   for (let i = 0; i < entries.length; i += 1) {
-    const tag = await computePrivateScanViewTag(scanSecretKey, BigInt(entries[i].r));
+    const tag = await privateScanViewTagOrNull(scanSecretKey, BigInt(entries[i].r));
+    if (tag === null) continue;
     if ((tag & 0xffff) === (Number(entries[i].view_tag) & 0xffff)) out.push(i);
   }
   return out;

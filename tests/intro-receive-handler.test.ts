@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createMessagingIdentity, exportPublicKeyBundle, createEncryptedIntroCapsule } from '../web/crypto/platho-crypto.mjs';
 import { createMemoryConvKeyStore } from '../web/conv-key-store.mjs';
+import { createMemoryReplayStore } from '../web/replay-store.mjs';
 import { createIntroReceiveHandler } from '../web/intro-receive-handler.mjs';
 import { parseBocBase64 } from '../web/pwa-contract-transactions.mjs';
 
@@ -101,5 +103,63 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     };
     await expect(onIntro(frankenstein), 'a mismatched header/body cannot open').rejects.toThrow();
     expect(store.getConversation(recipient.encryptionKeyPair.keyId, sender.encryptionKeyPair.keyId), 'nothing stored for a rejected forgery').toBeNull();
+  });
+
+  // ── IRH-04/05: the replay guard has to OUTLIVE a reload (wave-7 audit) ─────────────────────────────────────
+  // openIntroCapsuleFromChainCells states it plainly: the intro nonce is the ONLY thing that stops a byte-identical
+  // replay, because the transcript signature, the keyId binding and the confirm tag are all valid on a replay by
+  // construction — it IS the original capsule, re-published by anyone who read it off the chain. The app used to arm
+  // the lane with a MEMORY guard, so every reload started with an empty nonce set.
+
+  it('IRH-04: a guard that survives the reload rejects the replayed capsule; a fresh one accepts it', async () => {
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, { firstMessageBytes: utf8('первый контакт') });
+    const delivery = () => asScanCapsule(built, 1_790_000_000, '0:' + 'ab'.repeat(32));
+
+    // A store that persists across handler instances is exactly what an IndexedDB-backed guard gives the app.
+    const persistentGuard = createMemoryReplayStore();
+    const handlerBeforeReload = createIntroReceiveHandler({
+      recipientKeyPair: recipient.encryptionKeyPair,
+      convKeyStore: createMemoryConvKeyStore(),
+      introReplayGuard: persistentGuard,
+    });
+    expect((await handlerBeforeReload(delivery())).adoption, 'the genuine first contact lands').toBe('created');
+
+    // Reload: a NEW handler and a NEW conv key store, but the SAME guard — the attacker re-publishes the capsule.
+    const handlerAfterReload = createIntroReceiveHandler({
+      recipientKeyPair: recipient.encryptionKeyPair,
+      convKeyStore: createMemoryConvKeyStore(),
+      introReplayGuard: persistentGuard,
+    });
+    await expect(handlerAfterReload(delivery()), 'a surviving guard refuses the replay').rejects.toThrow();
+
+    // And the control: with a guard that forgot everything, the very same replay is accepted as new. This is the
+    // behaviour the app shipped before the fix, and it is why the guard must not be memory-only.
+    const forgetfulHandler = createIntroReceiveHandler({
+      recipientKeyPair: recipient.encryptionKeyPair,
+      convKeyStore: createMemoryConvKeyStore(),
+      introReplayGuard: createMemoryReplayStore(),
+    });
+    expect((await forgetfulHandler(delivery())).adoption, 'a forgotten nonce set re-accepts the replay').toBe('created');
+  });
+
+  it('IRH-05: the app arms the INTRO lane with a PERSISTENT replay guard, in its own database', () => {
+    // A behavioural test on the handler proves nothing about the app if the app hands it a memory store. Read the
+    // shipping source: the boot path must build an IndexedDB guard, and it must run before the lane is armed.
+    const app = readFileSync(new URL('../web/app.js', import.meta.url), 'utf8');
+
+    expect(app, 'a boot step builds the persistent intro guard').toMatch(
+      /introReplayGuard\s*=\s*await\s+createIndexedDbReplayStore\(\s*\{\s*dbName:\s*currentIntroReplayDbName\(\)/,
+    );
+    // Its own database: sharing the private-capsule replay keyspace could mark a real first contact as already-seen.
+    expect(app, 'the intro guard has a database of its own').toMatch(/currentIntroReplayDbName[\s\S]{0,400}?platho-intro-replay-v1/);
+    expect(app.includes("walletScopedIndexedDbName('platho-intro-replay-v1'"), 'and it is wallet-scoped').toBe(true);
+
+    // Ordering: the guard must be built before armIntroReceiveLane runs, or the lane captures the memory fallback.
+    const bootIdx = app.indexOf('await bootIntroReplayGuard()');
+    const armIdx = app.indexOf('armIntroReceiveLane().catch');
+    expect(bootIdx, 'the boot step is wired into the unlock path').toBeGreaterThan(0);
+    expect(bootIdx, 'and it runs before the lane is armed').toBeLessThan(armIdx);
   });
 });

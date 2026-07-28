@@ -63,4 +63,46 @@ describe('INTRO-SCAN — recipient finds their own intros, leak-free', () => {
     // 16-bit tag -> ~1/65536 chance of a spurious match; overwhelmingly this is empty. (Stage-2 decrypt would drop it.)
     expect(found.length).toBe(0);
   });
+
+  // ── SCAN-04/05: a stranger's DEGENERATE point must not be able to stop the scan (wave-7 audit, three lenses) ──
+  //
+  // `r` is an opaque uint256 in IntroShard: TVM has no cheap Curve25519 membership check, so the contract admits any
+  // 32 bytes and always will — it is immutable. X25519 against a low-order point yields the all-zero shared secret,
+  // which vendored noble rejects inside the ladder. Before the fix that throw propagated out of scanIntros, aborting
+  // the caller's whole pass BEFORE its cursors were saved, so the next pass re-read the same poisoned page and died
+  // again. One publish (~0.0153 GRAM) would have stopped first contact for every user, permanently.
+  //
+  // The defence has to live here forever, because the contract cannot ever refuse such an r.
+
+  it('SCAN-04: a poisoned entry (r = 0) is skipped, and the genuine intro on the same page is still found', async () => {
+    const me = x25519Key();
+    const mine = await introFor(me.sec, x25519Key(), 0xBEEFn);
+
+    // The attacker publishes into the same bucket page the victim must read. r = 0 is the cheapest degenerate point.
+    const poison = { r: 0n, view_tag: 0n, body_commit: 0xDEADn };
+
+    // Poison BEFORE the real record: the pre-fix loop died on it and never reached the genuine one.
+    const found = await scanIntros(me.sec, [poison, mine]);
+    expect(found.length, 'the genuine intro survives a poisoned page').toBe(1);
+    expect(found[0].body_commit).toBe(0xBEEFn);
+
+    const idx = await scanIntroIndices(me.sec, [poison, mine]);
+    expect(idx, 'index scan skips the poison and points at the real entry').toEqual([1]);
+  });
+
+  it('SCAN-05: a page of NOTHING but degenerate points returns empty instead of throwing', async () => {
+    const me = x25519Key();
+    // Every known low-order Curve25519 point drives the ladder to the all-zero secret. An attacker can fill a page.
+    const lowOrder = [0n, 1n, 325606250916557431795983626356110631294008115727848805560023387167927233504n];
+    const page = lowOrder.map((r, i) => ({ r, view_tag: 0n, body_commit: BigInt(i) }));
+    await expect(scanIntros(me.sec, page)).resolves.toEqual([]);
+  });
+
+  it('SCAN-06: a broken environment still throws — the skip must not swallow real failures', async () => {
+    // The mirror risk of SCAN-04: if the guard swallowed everything, a client with a bad scan secret would report
+    // "no first contacts" forever instead of failing. Only the ECDH is guarded, so a malformed secret still throws.
+    const shortSecret = new Uint8Array(31);
+    const entry = await introFor(x25519Key().sec, x25519Key(), 1n);
+    await expect(scanIntros(shortSecret, [entry])).rejects.toThrow(/scanSecretKey/);
+  });
 });
