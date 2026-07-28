@@ -26,6 +26,7 @@
 import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
 import { readAccountStates } from './shard-reader.mjs?v=1';
 import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=1';
+import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=1';
 import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=3';
 import {
   publicBeaconScanAddresses,
@@ -62,7 +63,10 @@ export function createPublicLane({
 
   const rpc = { endpoint, apiKey, fetch: fetchImpl ?? undefined };
   const statesRequest = createShardStatesRequest(rpc);
-  const readMessagesWithSource = createShardMessagesWithSourceReader(rpc);
+  // `opcode` keeps the 128-row window spent on real posts. A channel's shard address is publicly derivable
+  // (partition key from the wallet + epoch tag), so anyone could send it 128 cheap messages and push every paid
+  // post out of the newest-first window — the feed would show only the freshest posts, or nothing at all.
+  const readMessagesWithSource = createShardMessagesWithSourceReader({ ...rpc, opcode: PUBLIC_PUBLISH_OPCODE });
   const provider = createPublicShardTonRpcProvider({ transport: { runGetMethod } });
 
   const readStates = (addresses) => readAccountStates(addresses, { request: statesRequest });

@@ -162,7 +162,7 @@ import { outgoingRecordShard } from './conv-discovery.mjs?v=1';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
 import { createConvReadLane } from './conv-lane.mjs?v=1';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded } from './conv-lane-read.mjs?v=1';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=1';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=1';
 import { readAccountStates } from './shard-reader.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
@@ -10782,7 +10782,12 @@ async function syncConvCapsulesFromShards() {
   const transport = globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
   const selfKeyId = localRecipientKeyPair.keyId;
-  const lane = createConvReadLane({ readMessagesWithSource: createShardMessagesWithSourceReader() });
+  // A RecordShard address is derived from the conversation's K_root, so a stranger cannot address it and cannot
+  // grief this window the way a public or intro shard can be griefed. The opcode filter still earns its place:
+  // the shard's own fee deposits and top-ups stop consuming the 128-row budget, so the window holds 128 CAPSULES.
+  const lane = createConvReadLane({
+    readMessagesWithSource: createShardMessagesWithSourceReader({ opcode: CAPSULE_PUBLISH_OPCODE }),
+  });
   const epochNow = epochFromCreatedAtSeconds(Math.floor(Date.now() / 1000));
   // Per-tick cheap heal (Saved-only form, no args): a session whose thread routing was poisoned MID-flight
   // self-corrects on the next sync instead of needing a full re-unlock. This ran on every CapsuleHub sync tick
