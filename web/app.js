@@ -163,7 +163,8 @@ import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
 import { createConvReadLane } from './conv-lane.mjs?v=1';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded } from './conv-lane-read.mjs?v=1';
-import { createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=1';
+import { readAccountStates } from './shard-reader.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
 // clean-17 first-contact (INTRO) send.
 import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=1';
@@ -11449,6 +11450,31 @@ async function bootConvKeyStore() {
 // (and must never be backed up over the fuller on-chain blob). [RECOVERY restore; recovery-wiring review #1/#2]
 let convRecoveryRestoreAttempted = false;   // a CLEAN restore (or clean-empty scan) completed — do not re-scan
 let convRecoveryBackupAllowed = false;      // the local map is known ⊇ the on-chain blob → safe to overwrite it
+
+/**
+ * The batched state reader the SELF lanes (recovery, notes) use to collapse a per-slot scan into ONE request.
+ *
+ * Recovery restore probes 256 slot addresses and notes probes 8, and get-methods do not batch at all — an array of
+ * addresses is a 422 — so without this a fresh-device restore is 256 sequential calls, nearly all of them asking
+ * about slots the user never bound. accountStates does batch, and the whole 256-slot space fits ONE request.
+ *
+ * BUILT STRICT, DELIBERATELY. These callers read absence as proof that a slot was never written and then skip it,
+ * so an answer that merely LOOKS empty is a claim about the user's data. Strict makes a request that did not run
+ * throw instead of resolving to an empty account list, and skipping is off with priority 'critical' because a
+ * restore is the user waiting on their conversations, not a background sweep that can be dropped. If anything here
+ * is unavailable this returns null and every caller falls back to probing slot by slot — slower, never wrong.
+ */
+function createSelfSlotStatesReader() {
+  try {
+    const request = createShardStatesRequest({
+      strict: true,
+      requestOptions: { priority: 'critical', skipIfRateLimited: false },
+    });
+    return (addresses) => readAccountStates(addresses, { request });
+  } catch {
+    return null;
+  }
+}
 async function restoreConvKeysFromRecoveryIfEmpty() {
   if (convRecoveryRestoreAttempted || !convKeyStore || !plathoWallet?.seed) return;
   if (convKeyStore.snapshot().size > 0) {
@@ -11462,7 +11488,9 @@ async function restoreConvKeysFromRecoveryIfEmpty() {
   try {
     const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
     const readBody = createRecoveryBodyReader((call) => transport.runGetMethod(call));
-    const { map, found, clean } = await restoreConvKeysFromRecovery({ seed: plathoWallet.seed, readView, readBody });
+    const { map, found, clean } = await restoreConvKeysFromRecovery({
+      seed: plathoWallet.seed, readView, readBody, readStates: createSelfSlotStatesReader(),
+    });
     const imported = map.size > 0 ? await convKeyStore.importConversations(map) : 0;
     globalThis.plathoLastConvRecoveryRestore = { imported, slots: found.length, clean, at: new Date().toISOString() };
     if (clean) {
@@ -11519,7 +11547,7 @@ async function restoreSelfNotesFromRecovery() {
   try {
     const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
     const readBody = createRecoveryBodyReader((call) => transport.runGetMethod(call));
-    const { notes, clean } = await restoreNotes({ seed, readView, readBody });
+    const { notes, clean } = await restoreNotes({ seed, readView, readBody, readStates: createSelfSlotStatesReader() });
     selfNotesRestoreIncomplete = !clean;
     if (notes.length === 0) return;
     const merged = mergeNotes(selfNotesFromThread(thread), notes);
@@ -11617,7 +11645,7 @@ async function runRecoveryFreezeSweep() {
     const localSlotIndices = new Set(partitionRecoveryMap(convKeyStore.snapshot()).keys());
     if (localSlotIndices.size === 0) return;
     const stale = await staleRecoverySlots({
-      seed: plathoWallet.seed, readView, localSlotIndices,
+      seed: plathoWallet.seed, readView, localSlotIndices, readStates: createSelfSlotStatesReader(),
       nowS: Math.floor(Date.now() / 1000), refreshAfterS: RECOVERY_REFRESH_AFTER_S,
     });
     for (const idx of stale) convRecoveryDirtySlots.add(idx);
@@ -21241,7 +21269,9 @@ async function publishSelfNotesSnapshotForThread(thread) {
   const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
   let built;
   try {
-    built = await prepareNotesBackup({ seed, notes, readView, value: RECOVERY_PUBLISH_VALUE });
+    built = await prepareNotesBackup({
+      seed, notes, readView, value: RECOVERY_PUBLISH_VALUE, readStates: createSelfSlotStatesReader(),
+    });
   } catch (error) {
     if (error?.code !== 'PLATHO_NOTES_FULL') throw error;
     const full = new Error(t('notes.full'));

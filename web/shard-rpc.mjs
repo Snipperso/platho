@@ -56,10 +56,24 @@ const resolveApiKey = (explicit) => explicit ?? globalThis.plathoToncenterApiKey
  *
  * It hands us a path with the addresses already encoded, so this only has to put it on the right host, add the
  * key, and go through the pump.
+ *
+ * TWO CALLERS WITH OPPOSITE NEEDS, WHICH IS WHY THE OPTIONS EXIST.
+ *
+ *   A background SCAN (INTRO, PUBLIC) wants to be skippable: a pass that cannot get through right now is not
+ *   worth queueing behind the user's own reads, and an empty pass costs nothing because the next pass is a
+ *   minute away and the cursor makes it cheap. That is the default.
+ *
+ *   A SELF-LANE PROBE (recovery restore, notes restore) uses absence as PROOF that a slot was never written, and
+ *   then skips reading it. For that caller an empty answer is not a cheap non-event — it is a claim about the
+ *   user's data, and a wrong one destroys it. `strict` makes this reader refuse to manufacture that claim: a
+ *   request that did not actually run THROWS instead of resolving to an empty account list, so the caller's
+ *   fail-safe (probeActiveAddresses -> null -> probe everything) engages. Pair it with
+ *   `requestOptions: { skipIfRateLimited: false }` so the request waits its turn rather than being dropped.
  */
-export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl } = {}) {
+export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl, requestOptions = null, strict = false } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
+  const options = requestOptions ? Object.freeze({ ...SCAN_REQUEST_OPTIONS, ...requestOptions }) : SCAN_REQUEST_OPTIONS;
   return async ({ path }) => {
     const base = resolveEndpoint('accountStates', endpoint);
     const key = resolveApiKey(apiKey);
@@ -70,8 +84,13 @@ export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl } 
     const headers = { Accept: 'application/json' };
     if (key) headers['X-API-Key'] = key;
     const response = await scheduleToncenterHttpRequest(
-      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), SCAN_REQUEST_OPTIONS);
-    if (!response) return { accounts: [] };            // skipped by the rate limiter: an empty pass, not an error
+      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), options);
+    if (!response) {
+      // The request never ran. For a scan that is an empty pass; for a strict caller it must NOT look like
+      // "these accounts do not exist" — that is the exact shape of a silent data loss.
+      if (strict) throw new Error('accountStates: the request did not run (rate-limited or dropped) — absence is not proven');
+      return { accounts: [] };
+    }
     if (!response.ok) throw new Error(`accountStates failed with HTTP ${response.status}`);
     return response.json();
   };

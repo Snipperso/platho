@@ -18,7 +18,8 @@
 import { selfRecoveryShard } from './conv-discovery.mjs?v=1';
 import { sealNotesBlob, openNotesBlob } from './recovery-blob.mjs?v=1';
 import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=1';
-import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT } from './shard-discovery.mjs?v=1';
+import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT, addrKey } from './shard-discovery.mjs?v=1';
+import { probeActiveAddresses } from './shard-reader.mjs?v=1';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS (gate 13560). Mirrored, not imported, for the same reason the
 // recovery lane mirrors it: an over-cap blob BOUNCES on chain, and a fire-and-forget caller would record the bounce
@@ -115,7 +116,7 @@ export async function packNotes(seed, notes) {
  * A read that THROWS propagates: publishing at seq 0 against a bound slot would bounce on the anti-rollback gate,
  * and silently skipping the chunk would drop notes.
  */
-export async function prepareNotesBackup({ seed, notes, readView, value }) {
+export async function prepareNotesBackup({ seed, notes, readView, value, readStates = null }) {
   if (typeof readView !== 'function') throw new Error('prepareNotesBackup requires readView');
   const { chunks, overflow } = await packNotes(seed, notes);
   if (overflow.length > 0) {
@@ -124,10 +125,20 @@ export async function prepareNotesBackup({ seed, notes, readView, value }) {
     error.overflow = overflow;
     throw error;
   }
+  const slots = [];
+  for (let index = 0; index < NOTES_NAMED_SLOT_COUNT; index += 1) slots.push(await notesChunkSlot(seed, index));
+  // THE PREFILTER IS ALLOWED TO SKIP A READ, NEVER A WRITE. Most saves touch one chunk and leave the other seven
+  // empty and unbound, so a batch pass lets the empty tail cost nothing instead of a get_view each. But a chunk we
+  // are about to WRITE is always read for real: its seq is the anti-rollback floor, and publishing at seq 1 into a
+  // slot that turned out to be bound BOUNCES — the caller fires and forgets, so that lands as a recorded success
+  // with the notes silently dropped. Cheaper reads are worth having; a cheaper write is not.
+  const active = await probeActiveAddresses(slots.map((slot) => slot.address), readStates);
   const publishes = [];
   for (let index = 0; index < NOTES_NAMED_SLOT_COUNT; index += 1) {
     const chunkNotes = chunks[index] ?? [];
-    const slot = await notesChunkSlot(seed, index);
+    const slot = slots[index];
+    // Nothing to write here and no live account to clear: there is no question a get_view could answer.
+    if (chunkNotes.length === 0 && active && !active.has(addrKey(slot.address))) continue;
     const view = await readView(slot.address);
     const bound = view?.bound === true;
     // A trailing chunk that is empty AND was never bound needs no write at all.
@@ -157,14 +168,21 @@ export async function prepareNotesBackup({ seed, notes, readView, value }) {
  * NOT treat that as "no notes" and must NOT publish a snapshot built from it, which would overwrite the chunks this
  * pass could not see. An unbound slot is a clean empty (nothing was ever written there).
  */
-export async function restoreNotes({ seed, readView, readBody }) {
+export async function restoreNotes({ seed, readView, readBody, readStates = null }) {
   if (typeof readView !== 'function' || typeof readBody !== 'function') {
     throw new Error('restoreNotes requires readView/readBody');
   }
   const notes = [];
   let clean = true;
+  const slots = [];
+  for (let index = 0; index < NOTES_NAMED_SLOT_COUNT; index += 1) slots.push(await notesChunkSlot(seed, index));
+  // One batched state read replaces up to eight get_views. A chunk with no live account was never written, which
+  // is what get_view would report anyway — a CLEAN empty, so `clean` stays true. An untrusted batch yields null
+  // and every chunk is probed as before: the shortcut can change the cost, never the notes.
+  const active = await probeActiveAddresses(slots.map((slot) => slot.address), readStates);
   for (let index = 0; index < NOTES_NAMED_SLOT_COUNT; index += 1) {
-    const slot = await notesChunkSlot(seed, index);
+    const slot = slots[index];
+    if (active && !active.has(addrKey(slot.address))) continue;
     let view;
     try { view = await readView(slot.address); } catch { clean = false; continue; }
     if (!view?.bound) continue;                       // never written — keep probing, later chunks may exist

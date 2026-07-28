@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-27T20:50:14.140Z",
+  "generatedAt": "2026-07-28T05:59:53.602Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 217,
-    "totalBytes": 5519880,
-    "bundleSha256": "b9be3c2c9aaebf6625a007fc347d3c549277ed2f2b23faab6b2f41edac418edf",
+    "totalBytes": 5529101,
+    "bundleSha256": "3532353a1bfad29df87bd6d39dd2b92d75e4a11671875a21ab971a3e3ed15487",
     "files": [
       {
         "path": "app.js",
-        "bytes": 1150692,
-        "sha256": "5aba16d8f77bcbac24f902cb876ec1bab04b67e4395be3df6e7d9f5bb9b9a77e"
+        "bytes": 1152308,
+        "sha256": "28ee7f7f1878e49258f05958db276bf5b8c51053836fffc3a268e13eecb34d4e"
       },
       {
         "path": "assets/icons/about.svg",
@@ -579,8 +579,8 @@
       },
       {
         "path": "notes-lane.mjs",
-        "bytes": 9772,
-        "sha256": "90eb9ba956b90d30e1720a8dcaf7c2373e05c6398368f5a799dedb23d7414be9"
+        "bytes": 11428,
+        "sha256": "83adbaabd8ceab3c6d39b8b1a5f2ddd037150138f3232fe3335b9df7f92b3074"
       },
       {
         "path": "platho-config.mjs",
@@ -659,8 +659,8 @@
       },
       {
         "path": "recovery-lane.mjs",
-        "bytes": 12036,
-        "sha256": "910132c5613c551d6dca11a75f57b37af3ca3b911fbee7d10116b328525d01e4"
+        "bytes": 14119,
+        "sha256": "87defb27e0090bb46902032785f65dc69de7ce878a9ad5d3e7c336fbc780d838"
       },
       {
         "path": "recovery-publish-browser.mjs",
@@ -694,13 +694,13 @@
       },
       {
         "path": "shard-reader.mjs",
-        "bytes": 5629,
-        "sha256": "80193d53663fd502bcf78d4301a9e5d0e901d30441d38f71332760fc7f6f7f67"
+        "bytes": 8071,
+        "sha256": "2507fa362d3b19196fa7075eee0bd5e3e040aa7131349b54f41d008dac71287b"
       },
       {
         "path": "shard-rpc.mjs",
-        "bytes": 9126,
-        "sha256": "73f532351b8d51797c255b058f0d2b666e63acfe616df82f8f4ec98a8202eaac"
+        "bytes": 10550,
+        "sha256": "6cb880bc442ba76fbe9a0d62ed9d77e25727311a61c65b402e6cc2f045c0c3b6"
       },
       {
         "path": "styles.css",

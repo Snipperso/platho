@@ -6,7 +6,7 @@
 // live toncenter v3 on 2026-07-18 the two ways of asking are two orders of magnitude apart:
 //
 //   runGetMethod   one address per call. An array of addresses is rejected (422). No batch form exists.
-//   accountStates  >= 1000 addresses per call, capped by URL LENGTH (64 KiB), not by any address count.
+//   accountStates  1149 addresses per call, capped by URL LENGTH (64 KiB), not by any address count.
 //
 // So the scan is driven by batched accountStates, and the per-bucket getter (IntroShard.get_scan_page) is used
 // only where it wins: fetching the NEW entries of a bucket already known to have changed, since a state read
@@ -98,3 +98,44 @@ export function changedSince(states, seen = new Map()) {
 
 /** The marker to remember for `changedSince` — kept in one place so the two sides cannot drift apart. */
 export const changeMarkerOf = (state) => String(state.lastLt ?? state.dataHash);
+
+/**
+ * A LIVE account — one that actually carries code, so a get-method against it will run.
+ *
+ * ACTIVE, NOT MERELY PRESENT. readAccountStates reports touched-but-uninit accounts too: anyone can send a
+ * coin to a publicly-derivable address and leave a 525 B row behind, and a get-method on that row still aborts
+ * with exit -13. A bare presence check would therefore be spoofable by a stranger. Frozen counts as not-live for
+ * the same reason — a frozen account has no code either. One definition, used by every lane, so the public feed
+ * and the self lanes cannot drift into disagreeing about what "exists" means.
+ */
+export const isActiveAccountState = (state) => state?.status === 'active';
+
+/**
+ * Which of `addresses` are live, in ONE request — the pre-pass that turns an N-address probe into 1 + (however
+ * many are real). Returns a Set of addrKeys, or **null when the answer must not be trusted**.
+ *
+ * NULL IS THE WHOLE SAFETY CONTRACT, so read this before using it. Callers use this to SKIP work, and the skips
+ * are irreversible in the worst way: a self-lane restore that wrongly skips a bound slot reports "nothing was
+ * backed up" and the next backup then overwrites the chain with a partial map — silent, permanent loss of the
+ * user's conversations. So absence from the response may only mean "not on chain" when the response is KNOWN
+ * COMPLETE. Every failure path (throw, rate-limit skip, a non-Map answer from a stubbed reader) returns null
+ * instead, and null means "I learned nothing — probe everything the slow way". The optimisation can then only
+ * ever change the COST of an answer, never the answer.
+ *
+ * The counterpart obligation lives in the transport: the request this runs on must be built strict, so that a
+ * skipped request throws rather than resolving to an empty account list. See shard-rpc.createShardStatesRequest.
+ */
+export async function probeActiveAddresses(addresses, readStates) {
+  if (typeof readStates !== 'function') return null;
+  if (!Array.isArray(addresses) || addresses.length === 0) return new Set();
+  let states;
+  try {
+    states = await readStates(addresses);
+  } catch {
+    return null;                       // a read I could not complete is NEVER "these addresses are empty"
+  }
+  if (!(states instanceof Map)) return null;
+  const active = new Set();
+  for (const [key, state] of states) if (isActiveAccountState(state)) active.add(key);
+  return active;
+}

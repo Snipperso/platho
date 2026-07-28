@@ -83,6 +83,21 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
       .rejects.toThrow(/HTTP 503/);
   });
 
+  it('RPC-04B: a STRICT reader refuses to turn a request that never ran into an empty account list', async () => {
+    // RPC-03 is right for a background scan and WRONG for the self lanes. Those read absence as proof that a slot
+    // was never written and then skip it, so an empty answer is a claim about the user's data — and manufacturing
+    // it from a declined request is how a restore silently loses conversations. Strict makes the difference
+    // explicit: the same declined request that reads as "nothing here" for a scan must raise for a prober, so the
+    // caller's fallback (probe every slot the slow way) engages instead.
+    const declined = async () => null as any;                 // the pump declining, exactly as in RPC-03
+    const scan = createShardStatesRequest({ endpoint: ENDPOINT, fetch: declined });
+    expect((await readAccountStates(['0:' + '44'.repeat(32)], { request: scan })).size).toBe(0);
+
+    const strict = createShardStatesRequest({ endpoint: ENDPOINT, fetch: declined, strict: true });
+    await expect(readAccountStates(['0:' + '44'.repeat(32)], { request: strict }))
+      .rejects.toThrow(/absence is not proven/);
+  });
+
   it('RPC-05: the messages reader returns cells, skips what it cannot parse, and never throws on junk', async () => {
     // A shard's history carries plain top-ups, bounces and the fee deposit alongside publishes. One unreadable
     // body must not fail the whole read, or a single odd transaction hides every capsule behind it.
