@@ -6338,4 +6338,23 @@ describe('PWA runtime config guard', () => {
     expect(readyIdx).toBeGreaterThan(-1);
     expect(syncIdx).toBeGreaterThan(readyIdx);
   });
+
+  it('keeps the public lane MEMOISED, so the state it carries can actually be used', () => {
+    // The lane used to be rebuilt on every one of its six call sites. That is invisible until something inside
+    // the lane keeps state — and then it is worse than visible, it is silent: the thread snapshot cache (an
+    // unchanged comment thread must not be re-read) would be born empty on every call and never hit once, while
+    // the lane's own tests pass and the app quietly does all the work it was meant to skip.
+    const app = readFileSync('web/app.js', 'utf8');
+    const reader = app.slice(app.indexOf('function directPublicLaneReader()'));
+    const body = reader.slice(0, reader.indexOf('\n}\n') + 3);
+    expect(body, 'the built lane is remembered').toMatch(/publicLaneReaderInstance\s*=\s*createPublicLane\(/);
+    expect(body, 'and returned again while the transport is the same object')
+      .toMatch(/if \(publicLaneReaderInstance && publicLaneReaderTransport === transport\) return publicLaneReaderInstance;/);
+    // Keyed on the transport OBJECT: changing the toncenter API key drops and rebuilds it, and the rebuilt one is
+    // a different object, so the lane and everything cached under the old key go with it.
+    expect(body, 'a dropped transport clears the memo rather than serving a lane bound to a dead one')
+      .toMatch(/publicLaneReaderInstance = null;\s*\n\s*publicLaneReaderTransport = null;/);
+    expect(app.match(/createPublicLane\(/g)?.length, 'exactly one construction site')
+      .toBe(1);
+  });
 });

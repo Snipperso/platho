@@ -8053,8 +8053,10 @@ function buildDiscoveryCtaCard() {
 // clean-17 comment read (gated): a post's comments live in its THREAD shard (address = f(post_uid), and post_uid
 // folds the parent's channel_pk + channel epoch_tag + entry_id). The opened post carries channelEpochTag/authorWallet
 // from the shard feed, so the thread is O(1) derivable — no parent index, no chain walk.
-// NOTE (era window): readThreadComments reads the CURRENT thread era only; comments written in a later era land in a
-// different thread shard. Within a 30-day thread era this is complete; a cross-era window is a public-lane refinement.
+// NOTE (era window): readThreadComments scans EVERY thread era from the post's own era up to now, in one batched
+// accountStates call — reading only the current era silently dropped every earlier comment. Shards whose change
+// marker has not moved since the last open are served from the lane's snapshot cache, so reopening an untouched
+// thread reads no bodies at all.
 async function loadPublicPostCommentsFromShards(item) {
   const lane = directPublicLaneReader();
   if (!lane) return { comments: [], degraded: true };
@@ -9168,13 +9170,29 @@ async function discoverChannels(options = {}) {
 // (+ plathoToncenterApiKey), exactly as intro-transport does in production; passing a final URL here is what once
 // made the messages reader query /accountStates and silently return null bodies. Built per sync (cheap) so it always
 // picks up the current transport after a wallet/endpoint switch.
+// THE LANE IS MEMOISED, AND THAT IS LOAD-BEARING, NOT TIDINESS. It used to be rebuilt on every call — all six
+// call sites — which meant any state the lane keeps was born empty and died unused. The thread snapshot cache
+// inside it (an unchanged comment thread must not be re-read) would have been a silent no-op: correct-looking
+// code, tests passing on the lane in isolation, and not one cache hit in the app.
+//
+// Keyed on the TRANSPORT OBJECT ITSELF. Changing the toncenter API key drops and rebuilds the transport, and the
+// rebuilt one is a different object, so the lane (and every snapshot read through the old key) is rebuilt with it.
+let publicLaneReaderInstance = null;
+let publicLaneReaderTransport = null;
 function directPublicLaneReader() {
   const transport = globalThis.plathoTonRpcTransport;
-  if (!transport?.runGetMethod) return null;
-  return createPublicLane({
+  if (!transport?.runGetMethod) {
+    publicLaneReaderInstance = null;
+    publicLaneReaderTransport = null;
+    return null;
+  }
+  if (publicLaneReaderInstance && publicLaneReaderTransport === transport) return publicLaneReaderInstance;
+  publicLaneReaderTransport = transport;
+  publicLaneReaderInstance = createPublicLane({
     runGetMethod: (call) => transport.runGetMethod(call),
     now: () => Math.floor(Date.now() / 1000),
   });
+  return publicLaneReaderInstance;
 }
 
 // ── clean-17 INTRO receive lane (gated behind privateLane.directPay) ──────────────────────────────────────────
