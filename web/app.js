@@ -21482,6 +21482,55 @@ function patchPublicPublishBadgesInPlace(job, item) {
   return true;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+// AN AMBIGUOUS PUBLIC BROADCAST IS NOT A FAILURE, and calling it one is what costs the user money.
+//
+// toncenter can answer 200 and not deliver, and a throw out of sendBoc leaves the external in exactly the same
+// undecided state: it may already be on chain. The Vault path healed this with a re-broadcast + confirm driver.
+// The direct public path had neither, so it wrote "public publish failed" over a post that might exist — and the
+// only move that leaves the user is to post again, which DOUBLE-PUBLISHES it: two paid records, both authentic,
+// no way to tell them apart. If it genuinely never landed, nothing ever resent it.
+//
+// The CONV lane already solves this and the public lane simply never got the same treatment: keep the SIGNED
+// external and re-broadcast it verbatim. It is bound to ONE seqno, so the chain runs it AT MOST ONCE however many
+// times it is sent — which is what makes resending safe where re-posting is not.
+//
+// Chain confirmation needs nothing new: the feed merge already retires a pending record once its chain twin with
+// the same bodyHash appears. So the record stays PENDING (not "failed") while the external is still valid, and the
+// existing no-progress deadline remains the honest terminal for the case where it really did not land.
+const PUBLIC_REBROADCAST_MIN_INTERVAL_MS = 20_000;   // resume fires on every focus/pageshow; don't hammer the RPC
+
+/**
+ * The patch for a throw that MAY have landed — or null when the failure is unambiguous.
+ *
+ * platho-wallet attaches error.builtBoc only once an external has been signed and handed to sendBoc. Its absence
+ * therefore means the attempt died BEFORE the broadcast (build, funding, address derivation): nothing was signed,
+ * nothing is on chain, and "failed" is the honest word. Its presence means the opposite may be true.
+ */
+function publicAmbiguousPublishPatch(error, status) {
+  if (!error?.builtBoc) return null;
+  return {
+    publishStatus: status,
+    publicDirectSend: { boc: error.builtBoc, at: Date.now(), seqno: error.builtSeqno ?? null, rebroadcastAt: null },
+  };
+}
+
+/**
+ * Re-send a retained external. Stamps the attempt BEFORE sending so a failure cannot turn the next focus into a
+ * broadcast loop, and swallows transport errors: the next pass retries while the window is open, and the deadline
+ * terminal closes it out afterwards.
+ */
+async function rebroadcastPublicPublish(job, retained) {
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.sendBoc || !plathoWallet?.address || !retained?.boc) return;
+  persistPublicPublishProgress(job, { publicDirectSend: { ...retained, rebroadcastAt: Date.now() } });
+  try {
+    await transport.sendBoc({ boc: retained.boc, walletAddress: plathoWallet.address });
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[public] re-broadcast of a retained external failed', error);
+  }
+}
+
 function resumePendingPublicPublishConfirmations() {
   const channels = publicChannelFeedCache ?? {};
   for (const [channelId, entry] of Object.entries(channels)) {
@@ -21491,10 +21540,24 @@ function resumePendingPublicPublishConfirmations() {
       for (const { item, kind } of candidates) {
         if (!isPendingPublicFeedItem(item)) continue;
         const createdAt = Date.parse(item.createdAt ?? '') || Date.now();
+        // A RETAINED EXTERNAL OUTRANKS THE DEADLINE. An ambiguous broadcast kept its signed external, and while
+        // that external is still valid the right move is to send it AGAIN — not to declare a failure over a post
+        // that may be on chain. Same seqno, so the chain runs it at most once; if it had already landed, the feed
+        // merge retires this record when the twin appears.
+        const retained = item.publicDirectSend;
+        const retainedAgeMs = retained?.boc ? Date.now() - Number(retained.at ?? 0) : null;
+        if (retainedAgeMs !== null && retainedAgeMs <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
+          if (Date.now() - Number(retained.rebroadcastAt ?? 0) >= PUBLIC_REBROADCAST_MIN_INTERVAL_MS) {
+            void rebroadcastPublicPublish({ channelId, localId: item.id, publishState: null }, retained);
+          }
+          continue;
+        }
         // clean-17 direct-pay: a public record NEVER carries a publishState (that was the Vault batch's healing
-        // state), so the only thing to do on resume is to terminal a record that has been sitting in its
-        // optimistic 'sending' state past the no-progress deadline — instead of showing 'sending' forever. The
-        // Vault confirm driver that used to be started for a publishState record is gone with the state itself.
+        // state), so the only thing left on resume is to terminal a record that has been sitting in its optimistic
+        // 'sending' state past the no-progress deadline — instead of showing 'sending' forever. The external's
+        // validity window (5.5 min) closes BEFORE this deadline (6 min), so a retained send always gets its
+        // re-broadcasts first and this stays the honest last word. The Vault confirm driver that used to be started
+        // for a publishState record is gone with the state itself.
         if (Date.now() - createdAt >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
           persistPublicPublishProgress({ channelId, localId: item.id, publishState: null }, { publishStatus: 'public publish failed' });
         }
@@ -21790,8 +21853,11 @@ async function submitPublicPostDirect(draft = null) {
   try {
     result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, parts);
   } catch (error) {
-    if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'public publish failed' });
-    setPublicStatus('public publish failed');
+    // An external that was SIGNED and handed to sendBoc may already be on chain: keep it and resend, never call it
+    // failed (see publicAmbiguousPublishPatch). A clear pre-broadcast failure still terminals immediately.
+    const ambiguous = publicAmbiguousPublishPatch(error, 'public publish unconfirmed, retrying');
+    if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, ambiguous ?? { publishStatus: 'public publish failed' });
+    setPublicStatus(ambiguous ? 'public publish unconfirmed, retrying' : 'public publish failed');
     throw error;
   }
   // Keep a TRUTHFY publishStatus: it is what marks the record pending (isPendingPublicFeedItem), and a pending
@@ -21891,8 +21957,10 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
   try {
     result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, parts);
   } catch (error) {
-    if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'comment failed' });
-    setPublicStatus('comment failed');
+    // Same rule as the post path — a signed external is retained and resent, not written off.
+    const ambiguous = publicAmbiguousPublishPatch(error, 'comment unconfirmed, retrying');
+    if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, ambiguous ?? { publishStatus: 'comment failed' });
+    setPublicStatus(ambiguous ? 'comment unconfirmed, retrying' : 'comment failed');
     throw error;
   }
   if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'comment published, confirming' });

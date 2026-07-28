@@ -6347,6 +6347,35 @@ describe('PWA runtime config guard', () => {
     expect(syncIdx).toBeGreaterThan(readyIdx);
   });
 
+  it('treats an AMBIGUOUS public broadcast as retryable, never as a failure', () => {
+    // Calling an undecided broadcast "failed" is what costs the user money: the post may be on chain, and the only
+    // move the UI leaves is to post again — which double-publishes it, two paid records, indistinguishable. Both
+    // publish paths must retain the signed external instead and let the resume re-send it under the same seqno.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    const ambiguous = app.match(/const ambiguous = publicAmbiguousPublishPatch\(error, '[^']+'\);/g) ?? [];
+    expect(ambiguous.length, 'both the post and the comment path classify the throw').toBe(2);
+    expect(app.match(/ambiguous \?\? \{ publishStatus: '[^']*failed' \}/g)?.length,
+      'and each falls back to the honest terminal only when nothing was signed').toBe(2);
+
+    // The patch is gated on a SIGNED external — its absence is the proof that nothing reached the chain.
+    const patch = app.slice(app.indexOf('function publicAmbiguousPublishPatch('));
+    expect(patch.slice(0, patch.indexOf('\n}\n')), 'no builtBoc means a clear pre-broadcast failure')
+      .toMatch(/if \(!error\?\.builtBoc\) return null;/);
+
+    // The resume re-broadcasts while the external is still valid, and only then falls through to the terminal.
+    const resume = app.slice(app.indexOf('function resumePendingPublicPublishConfirmations('));
+    const body = resume.slice(0, resume.indexOf('\n}\n') + 3);
+    const rebroadcastIdx = body.indexOf('rebroadcastPublicPublish(');
+    const terminalIdx = body.indexOf("publishStatus: 'public publish failed'");
+    expect(rebroadcastIdx, 'the resume knows how to re-send').toBeGreaterThan(-1);
+    expect(terminalIdx, 'and still knows how to give up').toBeGreaterThan(rebroadcastIdx);
+    expect(body, 'bounded by the external validity window, not by the give-up deadline')
+      .toMatch(/retainedAgeMs <= DIRECT_SEND_REBROADCAST_WINDOW_MS/);
+    expect(body, 'and throttled, because the resume fires on every focus')
+      .toMatch(/PUBLIC_REBROADCAST_MIN_INTERVAL_MS/);
+  });
+
   it('persists and revives the INTRO send state, and never rebuilds a send that reached the wallet', () => {
     // The two halves of the first-contact fix, pinned where they are wired rather than where they are defined.
     // Persisting without reviving stores a K_root that comes back as an index-keyed object; reviving without

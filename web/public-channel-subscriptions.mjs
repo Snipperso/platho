@@ -153,6 +153,13 @@ export function readPublicChannelFeedCache(storage) {
 // the next sync; only the light text/metadata is cached. (Private message history is in IndexedDB, unaffected.)
 function omitHeavyFeedMediaForPersist(key, value) {
   if (key === 'imageUrl' || key === 'avatarImageUrl' || key === 'url') return undefined;
+  // A retained signed external (publicDirectSend.boc) is kept for the idempotent re-broadcast of an ambiguous
+  // publish, and it stays IN MEMORY ONLY. It can run to tens of KB for a media post, and this whole cache is one
+  // localStorage value whose write FAILS SILENTLY on quota — so persisting it would trade an unconfirmed post for
+  // the loss of the entire cached feed. The re-broadcast therefore covers the case it can (focus/visibility while
+  // the tab lives, which is exactly when a 200-without-delivery surfaces); after a reload the record falls back to
+  // the no-progress deadline terminal, as before.
+  if (key === 'boc') return undefined;
   return value;
 }
 
