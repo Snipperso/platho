@@ -258,6 +258,35 @@ describe('PWA public channel subscriptions', () => {
     expect(raw).toContain('"text":"kept"');
   });
 
+  it('PUBLIC-SUB-MEDIA-STRIP-02: a retained signed external is NOT persisted either — it stays in memory', () => {
+    // An ambiguous public broadcast keeps its signed external so the resume can re-send it verbatim (same seqno,
+    // so the chain runs it at most once). That external must never reach this value: it runs to tens of KB for a
+    // media post, and THIS WHOLE CACHE IS ONE localStorage ENTRY whose write fails SILENTLY on quota — persisting
+    // it would trade one unconfirmed post for the loss of the entire cached feed, which is the worse bargain.
+    // The rest of the record is persisted, so the pending post still survives a reload and still terminals on the
+    // no-progress deadline; only the in-session re-broadcast depends on the in-memory copy.
+    const store = new Map();
+    const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) };
+    const cached = {
+      'wallet:abc': { feed: { posts: [{
+        id: 'p1', text: 'a post awaiting confirmation',
+        publishStatus: 'public publish unconfirmed, retrying',
+        publicDirectSend: { boc: 'te6ccg'.repeat(8000), at: 1_790_000_000_000, seqno: 12, rebroadcastAt: null },
+        comments: [],
+      }] } },
+    };
+    writePublicChannelFeedCache(storage, cached);
+    const raw = store.get(PUBLIC_CHANNEL_FEED_CACHE_KEY) ?? '';
+
+    expect(raw, 'the external itself is gone').not.toContain('te6ccg');
+    expect(raw, 'and so is its key').not.toContain('"boc"');
+    expect(raw.length, 'what is left is small — the whole point').toBeLessThan(1000);
+    // The record and everything the deadline terminal needs are still there.
+    expect(raw).toContain('"publishStatus":"public publish unconfirmed, retrying"');
+    expect(raw).toContain('"seqno":12');
+    expect(raw).toContain('"text":"a post awaiting confirmation"');
+  });
+
   it('PUBLIC-SUB-04: stored unsubscribe is preserved and not re-seeded on every reload', () => {
     const state = normalizePublicChannelSubscriptions({
       version: 1,
