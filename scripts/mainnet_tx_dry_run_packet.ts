@@ -89,7 +89,15 @@ const DEPLOY_VALUE_OVERRIDE_NANOTONS: Record<string, string> = {
   ATHVesting: '1500000000',
 };
 const CONTROL_VALUE_RECOMMENDED_NANOTONS = '50000000';
-const DEPLOY_TREASURY_SUPPLY_VALUE_RECOMMENDED_NANOTONS = '10000000';
+// [RAISED 2026-07-29, wave-8 HIGH: 10M -> 620M] This one transaction both mints the 100,000,000 ATH and creates the
+// treasury ATH wallet that holds all of it, and after the change in ATHMaster everything above the master's own
+// 8,000,000 exec reserve is FORWARDED to that wallet as its permanent endowment instead of being refunded.
+//
+// MEASURED: the treasury wallet's rent is 5,132,011 nanoton a year. The token has to outlive the 100-year vesting
+// schedule, so 100 years of rent is 513,201,100; 620,000,000 covers that plus the master's 8,000,000 and the
+// wallet's own genesis gas, with room to spare. At the old 10,000,000 the wallet was left holding 1,624,999 — into
+// storage debt inside the first year, with the entire supply inside it and no redeploy possible, ever.
+const DEPLOY_TREASURY_SUPPLY_VALUE_RECOMMENDED_NANOTONS = '620000000';
 // Floor = ATHWallet plain ATHTransferRequest required_value (contracts/ATHWallet.tact:549):
 // EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+NOTIFY_STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M)=48M.
 // Raised 30M->48M / 40M->58M to track the NOTIFY_STORAGE_ENDOWMENT 2M->20M endowment raise; recommended carries a 10M buffer for forward fees.

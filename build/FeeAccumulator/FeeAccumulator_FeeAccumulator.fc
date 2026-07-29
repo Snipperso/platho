@@ -44,29 +44,32 @@ builder $AirdropAccrue$_store(builder build_0, (int, slice, int) v) inline;
 ;; $AirdropAccrue$_store_cell
 cell $AirdropAccrue$_store_cell((int, slice, int) v, builder b) inline;
 
+;; $AirdropAccrue$_load_bounced
+(slice, ((int))) $AirdropAccrue$_load_bounced(slice sc_0) inline;
+
 ;; $FeeAccumulator$_store
-builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) v) inline;
+builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) v) inline;
 
 ;; $FeeAccumulator$_load
-(slice, ((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int))) $FeeAccumulator$_load(slice sc_0) inline;
+(slice, ((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int))) $FeeAccumulator$_load(slice sc_0) inline;
 
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $FeeAccumulatorStateView$_to_external
-(int, int, int, int, slice, slice, int) $FeeAccumulatorStateView$_to_external(((int, int, int, int, slice, slice, int)) v) inline;
+(int, int, int, int, slice, slice, int, int, int, int) $FeeAccumulatorStateView$_to_external(((int, int, int, int, slice, slice, int, int, int, int)) v) inline;
 
 ;; $FeeAccumulator$init$_load
 (slice, ((slice, slice))) $FeeAccumulator$init$_load(slice sc_0) inline;
 
 ;; $FeeAccumulator$_contract_init
-(slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $FeeAccumulator$_contract_init(slice $treasury_receiver_address, slice $buyback_burn_address) impure inline;
+(slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $FeeAccumulator$_contract_init(slice $treasury_receiver_address, slice $buyback_burn_address) impure inline;
 
 ;; $FeeAccumulator$_contract_load
-(slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $FeeAccumulator$_contract_load() impure inline;
+(slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $FeeAccumulator$_contract_load() impure inline;
 
 ;; $FeeAccumulator$_contract_store
-() $FeeAccumulator$_contract_store((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) v) impure inline;
+() $FeeAccumulator$_contract_store((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) v) impure inline;
 
 ;; $Cell$_fun_asSlice
 slice $Cell$_fun_asSlice(cell $self) impure inline;
@@ -78,25 +81,25 @@ slice $global_newAddress(int $chain, int $hash) impure inline;
 slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
 
 ;; $FeeAccumulator$_fun_requireTreasury
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), ()) $FeeAccumulator$_fun_requireTreasury((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self) impure inline_ref;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), ()) $FeeAccumulator$_fun_requireTreasury((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self) impure inline_ref;
 
 ;; $FeeAccumulator$_fun_deriveFromBoundCode
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_deriveFromBoundCode((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, cell $code, cell $data) impure inline_ref;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_deriveFromBoundCode((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, cell $code, cell $data) impure inline_ref;
 
 ;; $FeeAccumulator$_fun_laneShardAddress
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_laneShardAddress((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, int $lane, int $arg0, int $arg1) impure inline_ref;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_laneShardAddress((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, int $lane, int $arg0, int $arg1) impure inline_ref;
 
 ;; $FeeAccumulator$_fun_laneCodeBound
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), int) $FeeAccumulator$_fun_laneCodeBound((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, int $lane) impure inline_ref;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), int) $FeeAccumulator$_fun_laneCodeBound((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, int $lane) impure inline_ref;
 
 ;; $FeeAccumulator$_fun_ticketAddress
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_ticketAddress((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, slice $owner) impure inline_ref;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_ticketAddress((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, slice $owner) impure inline_ref;
 
-;; $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton
-((int, int, int, int, slice, slice, int)) $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton(int $accumulated_ton, int $treasury_due_ton, int $buyback_due_ton, int $buyback_split_enabled, slice $treasury_receiver_address, slice $buyback_burn_address, int $storage_reserve_ton) inline;
+;; $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id
+((int, int, int, int, slice, slice, int, int, int, int)) $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id(int $accumulated_ton, int $treasury_due_ton, int $buyback_due_ton, int $buyback_split_enabled, slice $treasury_receiver_address, slice $buyback_burn_address, int $storage_reserve_ton, int $buyback_due_last_increase_at, int $failed_accrual_count, int $last_failed_accrual_purchase_id) inline;
 
 ;; $FeeAccumulator$_fun_get_state
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), (int, int, int, int, slice, slice, int)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self) impure inline_ref;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), (int, int, int, int, slice, slice, int, int, int, int)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self) impure inline_ref;
 
 ;; $SendParameters$_constructor_to_value_mode_bounce_code_data_body
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce_code_data_body(slice $to, int $value, int $mode, int $bounce, cell $code, cell $data, cell $body) inline;
@@ -311,6 +314,10 @@ int $global_myBalance() impure asm """
     SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
 """;
 
+int $global_now() impure asm """
+    NOW
+""";
+
 builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
     STSLICER
 """;
@@ -437,31 +444,36 @@ cell $AirdropAccrue$_store_cell((int, slice, int) v, builder b) inline {
     return $AirdropAccrue$_store(b, v).end_cell();
 }
 
+(slice, ((int))) $AirdropAccrue$_load_bounced(slice sc_0) inline {
+    var v'purchase_id = sc_0~load_uint(64);
+    return (sc_0, (v'purchase_id));
+}
+
 ((int, slice, int)) $AirdropAccrue$_constructor_purchase_id_buyer_credits_k(int $purchase_id, slice $buyer, int $credits_k) inline {
     return ($purchase_id, $buyer, $credits_k);
 }
 
 ;;
 ;; Type: FeeAccumulatorStateView
-;; TLB: _ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 buyback_split_enabled:bool treasury_receiver_address:address buyback_burn_address:address storage_reserve_ton:int257 = FeeAccumulatorStateView
+;; TLB: _ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 buyback_split_enabled:bool treasury_receiver_address:address buyback_burn_address:address storage_reserve_ton:int257 buyback_due_last_increase_at:int257 failed_accrual_count:int257 last_failed_accrual_purchase_id:int257 = FeeAccumulatorStateView
 ;;
 
-(int, int, int, int, slice, slice, int) $FeeAccumulatorStateView$_to_external(((int, int, int, int, slice, slice, int)) v) inline {
-    var (v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'treasury_receiver_address, v'buyback_burn_address, v'storage_reserve_ton) = v; 
-    return (v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'treasury_receiver_address, v'buyback_burn_address, v'storage_reserve_ton);
+(int, int, int, int, slice, slice, int, int, int, int) $FeeAccumulatorStateView$_to_external(((int, int, int, int, slice, slice, int, int, int, int)) v) inline {
+    var (v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'treasury_receiver_address, v'buyback_burn_address, v'storage_reserve_ton, v'buyback_due_last_increase_at, v'failed_accrual_count, v'last_failed_accrual_purchase_id) = v; 
+    return (v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'treasury_receiver_address, v'buyback_burn_address, v'storage_reserve_ton, v'buyback_due_last_increase_at, v'failed_accrual_count, v'last_failed_accrual_purchase_id);
 }
 
-((int, int, int, int, slice, slice, int)) $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton(int $accumulated_ton, int $treasury_due_ton, int $buyback_due_ton, int $buyback_split_enabled, slice $treasury_receiver_address, slice $buyback_burn_address, int $storage_reserve_ton) inline {
-    return ($accumulated_ton, $treasury_due_ton, $buyback_due_ton, $buyback_split_enabled, $treasury_receiver_address, $buyback_burn_address, $storage_reserve_ton);
+((int, int, int, int, slice, slice, int, int, int, int)) $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id(int $accumulated_ton, int $treasury_due_ton, int $buyback_due_ton, int $buyback_split_enabled, slice $treasury_receiver_address, slice $buyback_burn_address, int $storage_reserve_ton, int $buyback_due_last_increase_at, int $failed_accrual_count, int $last_failed_accrual_purchase_id) inline {
+    return ($accumulated_ton, $treasury_due_ton, $buyback_due_ton, $buyback_split_enabled, $treasury_receiver_address, $buyback_burn_address, $storage_reserve_ton, $buyback_due_last_increase_at, $failed_accrual_count, $last_failed_accrual_purchase_id);
 }
 
 ;;
 ;; Type: FeeAccumulator
-;; TLB: _ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 buyback_split_enabled:bool storage_reserve_ton:coins shard_code:Maybe ^cell intro_shard_code:Maybe ^cell ticket_code:Maybe ^cell airdrop_pool_address:address public_shard_code:Maybe ^cell accrual_seq:uint64 = FeeAccumulator
+;; TLB: _ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 buyback_split_enabled:bool storage_reserve_ton:coins buyback_due_last_increase_at:uint64 failed_accrual_count:uint32 last_failed_accrual_purchase_id:uint64 shard_code:Maybe ^cell intro_shard_code:Maybe ^cell ticket_code:Maybe ^cell airdrop_pool_address:address public_shard_code:Maybe ^cell accrual_seq:uint64 = FeeAccumulator
 ;;
 
-builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) v) inline {
-    var (v'treasury_receiver_address, v'buyback_burn_address, v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'storage_reserve_ton, v'shard_code, v'intro_shard_code, v'ticket_code, v'airdrop_pool_address, v'public_shard_code, v'accrual_seq) = v;
+builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) v) inline {
+    var (v'treasury_receiver_address, v'buyback_burn_address, v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'storage_reserve_ton, v'buyback_due_last_increase_at, v'failed_accrual_count, v'last_failed_accrual_purchase_id, v'shard_code, v'intro_shard_code, v'ticket_code, v'airdrop_pool_address, v'public_shard_code, v'accrual_seq) = v;
     build_0 = build_0.store_slice(v'treasury_receiver_address);
     build_0 = build_0.store_slice(v'buyback_burn_address);
     build_0 = build_0.store_uint(v'accumulated_ton, 128);
@@ -470,6 +482,9 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
     build_0 = build_0.store_int(v'buyback_split_enabled, 1);
     var build_1 = begin_cell();
     build_1 = build_1.store_varuint16(v'storage_reserve_ton);
+    build_1 = build_1.store_uint(v'buyback_due_last_increase_at, 64);
+    build_1 = build_1.store_uint(v'failed_accrual_count, 32);
+    build_1 = build_1.store_uint(v'last_failed_accrual_purchase_id, 64);
     build_1 = build_1.store_maybe_ref(v'shard_code);
     build_1 = build_1.store_maybe_ref(v'intro_shard_code);
     build_1 = build_1.store_maybe_ref(v'ticket_code);
@@ -480,7 +495,7 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
     return build_0;
 }
 
-(slice, ((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int))) $FeeAccumulator$_load(slice sc_0) inline {
+(slice, ((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int))) $FeeAccumulator$_load(slice sc_0) inline {
     var v'treasury_receiver_address = sc_0~load_msg_addr();
     var v'buyback_burn_address = sc_0~load_msg_addr();
     var v'accumulated_ton = sc_0~load_uint(128);
@@ -489,13 +504,16 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
     var v'buyback_split_enabled = sc_0~load_int(1);
     slice sc_1 = sc_0~load_ref().begin_parse();
     var v'storage_reserve_ton = sc_1~load_varuint16();
+    var v'buyback_due_last_increase_at = sc_1~load_uint(64);
+    var v'failed_accrual_count = sc_1~load_uint(32);
+    var v'last_failed_accrual_purchase_id = sc_1~load_uint(64);
     var v'shard_code = sc_1~load_maybe_ref();
     var v'intro_shard_code = sc_1~load_maybe_ref();
     var v'ticket_code = sc_1~load_maybe_ref();
     var v'airdrop_pool_address = sc_1~__tact_load_address_opt();
     var v'public_shard_code = sc_1~load_maybe_ref();
     var v'accrual_seq = sc_1~load_uint(64);
-    return (sc_0, (v'treasury_receiver_address, v'buyback_burn_address, v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'storage_reserve_ton, v'shard_code, v'intro_shard_code, v'ticket_code, v'airdrop_pool_address, v'public_shard_code, v'accrual_seq));
+    return (sc_0, (v'treasury_receiver_address, v'buyback_burn_address, v'accumulated_ton, v'treasury_due_ton, v'buyback_due_ton, v'buyback_split_enabled, v'storage_reserve_ton, v'buyback_due_last_increase_at, v'failed_accrual_count, v'last_failed_accrual_purchase_id, v'shard_code, v'intro_shard_code, v'ticket_code, v'airdrop_pool_address, v'public_shard_code, v'accrual_seq));
 }
 
 (slice, ((slice, slice))) $FeeAccumulator$init$_load(slice sc_0) inline {
@@ -504,7 +522,7 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
     return (sc_0, (v'treasury_receiver_address, v'buyback_burn_address));
 }
 
-(slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $FeeAccumulator$_contract_load() impure inline {
+(slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $FeeAccumulator$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
@@ -517,7 +535,7 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
     }
 }
 
-() $FeeAccumulator$_contract_store((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) v) impure inline {
+() $FeeAccumulator$_contract_store((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) v) impure inline {
     builder b = begin_cell();
     b = b.store_int(true, 1);
     b = $FeeAccumulator$_store(b, v);
@@ -528,8 +546,8 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
 ;; Contract FeeAccumulator functions
 ;;
 
-(slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $FeeAccumulator$_contract_init(slice $treasury_receiver_address, slice $buyback_burn_address) impure inline {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
+(slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $FeeAccumulator$_contract_init(slice $treasury_receiver_address, slice $buyback_burn_address) impure inline {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
     $self'shard_code = null();
     $self'intro_shard_code = null();
     $self'ticket_code = null();
@@ -543,44 +561,47 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int, in
     $self'buyback_due_ton = 0;
     $self'buyback_split_enabled = false;
     $self'storage_reserve_ton = 0;
-    return ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq);
+    $self'buyback_due_last_increase_at = 0;
+    $self'failed_accrual_count = 0;
+    $self'last_failed_accrual_purchase_id = 0;
+    return ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq);
 }
 
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), ()) $FeeAccumulator$_fun_requireTreasury((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self) impure inline_ref {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), ()) $FeeAccumulator$_fun_requireTreasury((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self) impure inline_ref {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
     throw_unless(15050, ( equal_slices_bits(__tact_context_get_sender(), $self'treasury_receiver_address) ));
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), ());
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), ());
 }
 
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_deriveFromBoundCode((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, cell $code, cell $data) impure inline_ref {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_deriveFromBoundCode((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, cell $code, cell $data) impure inline_ref {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
     var $fresh$ret_0 = $global_contractAddressExt(0, $code, $data);
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_0);
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_0);
 }
 
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_laneShardAddress((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, int $lane, int $arg0, int $arg1) impure inline_ref {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_laneShardAddress((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, int $lane, int $arg0, int $arg1) impure inline_ref {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
     cell $code = (($lane == 0) ? $self'shard_code : (($lane == 1) ? $self'intro_shard_code : $self'public_shard_code));
-    var $fresh$ret_1 = ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_deriveFromBoundCode($code, $Builder$_fun_endCell(store_int(store_int(store_uint($global_beginCell(), 0, 1), $arg0, 257), $arg1, 257)));
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_1);
+    var $fresh$ret_1 = ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_deriveFromBoundCode($code, $Builder$_fun_endCell(store_int(store_int(store_uint($global_beginCell(), 0, 1), $arg0, 257), $arg1, 257)));
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_1);
 }
 
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), int) $FeeAccumulator$_fun_laneCodeBound((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, int $lane) impure inline_ref {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), int) $FeeAccumulator$_fun_laneCodeBound((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, int $lane) impure inline_ref {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
     var $fresh$ret_2 = (($lane == 0) ? (~ null?($self'shard_code)) : (($lane == 1) ? (~ null?($self'intro_shard_code)) : (~ null?($self'public_shard_code))));
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_2);
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_2);
 }
 
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_ticketAddress((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, slice $owner) impure inline_ref {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
-    var $fresh$ret_3 = ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_deriveFromBoundCode($self'ticket_code, $Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint($global_beginCell(), 0, 1), $owner)));
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_3);
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), slice) $FeeAccumulator$_fun_ticketAddress((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self, slice $owner) impure inline_ref {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
+    var $fresh$ret_3 = ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_deriveFromBoundCode($self'ticket_code, $Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint($global_beginCell(), 0, 1), $owner)));
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_3);
 }
 
-((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int), (int, int, int, int, slice, slice, int)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self) impure inline_ref {
-    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
-    var $fresh$ret_4 = $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton($self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'treasury_receiver_address, $self'buyback_burn_address, $self'storage_reserve_ton);
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_4);
+((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int), (int, int, int, int, slice, slice, int, int, int, int)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int, int, int, int, int, int, cell, cell, cell, slice, cell, int) $self) impure inline_ref {
+    var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)) = $self;
+    var $fresh$ret_4 = $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id($self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'treasury_receiver_address, $self'buyback_burn_address, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id);
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq), $fresh$ret_4);
 }
 
 ;;
@@ -613,7 +634,7 @@ _ %get_state() method_id(86957) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq) = $FeeAccumulator$_contract_load();
+    var ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq) = $FeeAccumulator$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) {
@@ -629,7 +650,17 @@ _ %get_state() method_id(86957) {
             throw_unless(15032, ( equal_slices_bits(__tact_context_get_sender(), $self'buyback_burn_address) ));
             throw_unless(15033, ($msg'amount > 0));
             $self'buyback_due_ton = $self'buyback_due_ton + $msg'amount;
-            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+            $self'buyback_due_last_increase_at = $global_now();
+            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+            return ();
+        }
+        
+        ;; Bounced handler for AirdropAccrue message
+        if (op == 0x41445210) {
+            var ($msg'purchase_id) = in_msg~$AirdropAccrue$_load_bounced();
+            $self'failed_accrual_count = $self'failed_accrual_count + 1;
+            $self'last_failed_accrual_purchase_id = $msg'purchase_id;
+            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
             return ();
         }
         
@@ -646,57 +677,57 @@ _ %get_state() method_id(86957) {
         throw_unless(15001, ($msg'amount > 0));
         throw_unless(15002, ($Context$_get_value(__tact_context_get()) >= ($msg'amount + 400000)));
         $self'accumulated_ton = $self'accumulated_ton + $msg'amount;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
     ;; Receive BindShardCode message
     if (op == 0xfa110001) {
         var $msg'shard_code = in_msg~load_ref();
-        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
+        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
         throw_unless(15051, null?($self'shard_code));
         $self'shard_code = $msg'shard_code;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
     ;; Receive BindIntroShardCode message
     if (op == 0xfa110004) {
         var $msg'intro_shard_code = in_msg~load_ref();
-        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
+        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
         throw_unless(15057, null?($self'intro_shard_code));
         $self'intro_shard_code = $msg'intro_shard_code;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
     ;; Receive BindTicketCode message
     if (op == 0xfa110002) {
         var $msg'ticket_code = in_msg~load_ref();
-        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
+        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
         throw_unless(15052, null?($self'ticket_code));
         $self'ticket_code = $msg'ticket_code;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
     ;; Receive BindAirdropPool message
     if (op == 0xfa110003) {
         var $msg'airdrop_pool_address = in_msg~load_msg_addr();
-        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
+        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
         throw_unless(15053, null?($self'airdrop_pool_address));
         $self'airdrop_pool_address = $msg'airdrop_pool_address;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
     ;; Receive BindPublicShardCode message
     if (op == 0xfa110005) {
         var $msg'public_shard_code = in_msg~load_ref();
-        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
+        ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_requireTreasury();
         throw_unless(15059, null?($self'public_shard_code));
         $self'public_shard_code = $msg'public_shard_code;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
@@ -709,14 +740,14 @@ _ %get_state() method_id(86957) {
         var $msg'publisher = in_msg~load_msg_addr();
         throw_unless(15054, ($msg'amount > 0));
         throw_unless(15058, ( (($msg'lane >= 0)) ? (($msg'lane <= 2)) : (false) ));
-        throw_unless(15055, ( (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_laneCodeBound($msg'lane)) ? (( equal_slices_bits(__tact_context_get_sender(), ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_laneShardAddress($msg'lane, $msg'init_arg0, $msg'init_arg1)) )) : (false) ));
+        throw_unless(15055, ( (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_laneCodeBound($msg'lane)) ? (( equal_slices_bits(__tact_context_get_sender(), ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_laneShardAddress($msg'lane, $msg'init_arg0, $msg'init_arg1)) )) : (false) ));
         throw_unless(15056, ($Context$_get_value(__tact_context_get()) >= ($msg'amount + 2600000)));
         $self'accumulated_ton = $self'accumulated_ton + $msg'amount;
         if ((~ null?($self'ticket_code))) {
             cell $data = $Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint($global_beginCell(), 0, 1), $msg'publisher));
-            $global_send($SendParameters$_constructor_to_value_mode_bounce_code_data_body(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_ticketAddress($msg'publisher), 600000, 1, false, $self'ticket_code, $data, $TicketCredit$_store_cell($TicketCredit$_constructor_(), begin_cell())));
+            $global_send($SendParameters$_constructor_to_value_mode_bounce_code_data_body(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_ticketAddress($msg'publisher), 600000, 1, false, $self'ticket_code, $data, $TicketCredit$_store_cell($TicketCredit$_constructor_(), begin_cell())));
         }
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
@@ -725,13 +756,13 @@ _ %get_state() method_id(86957) {
         var $msg'credits_k = in_msg~load_uint(32);
         var $msg'owner = in_msg~load_msg_addr();
         throw_unless(15060, ( ((~ null?($self'ticket_code))) ? ((~ null?($self'airdrop_pool_address))) : (false) ));
-        throw_unless(15061, ( equal_slices_bits(__tact_context_get_sender(), ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_ticketAddress($msg'owner)) ));
-        throw_unless(15062, ($msg'credits_k > 0));
+        throw_unless(15061, ( equal_slices_bits(__tact_context_get_sender(), ($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq)~$FeeAccumulator$_fun_ticketAddress($msg'owner)) ));
+        throw_unless(15062, ( (($msg'credits_k > 0)) ? (($msg'credits_k <= 1000)) : (false) ));
         throw_unless(15063, ($Context$_get_value(__tact_context_get()) >= 62000000));
         $self'accrual_seq = $self'accrual_seq + 1;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'airdrop_pool_address, 60000000, 1, true, $AirdropAccrue$_store_cell($AirdropAccrue$_constructor_purchase_id_buyer_credits_k($self'accrual_seq, $msg'owner, $msg'credits_k), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), (($Context$_get_value(__tact_context_get()) - 60000000) - 2000000), 1, false, $TicketRedeemAck$_store_cell($TicketRedeemAck$_constructor_credits_k($msg'credits_k), begin_cell())));
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
@@ -744,7 +775,7 @@ _ %get_state() method_id(86957) {
         ifnot ($self'buyback_split_enabled) {
             $self'accumulated_ton = 0;
             $self'treasury_due_ton = $self'treasury_due_ton + $amount;
-            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+            $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
             return ();
         }
         int $treasury_amount = (($amount * 5000) / 10000);
@@ -752,7 +783,8 @@ _ %get_state() method_id(86957) {
         $self'accumulated_ton = 0;
         $self'treasury_due_ton = $self'treasury_due_ton + $treasury_amount;
         $self'buyback_due_ton = $self'buyback_due_ton + $buyback_amount;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $self'buyback_due_last_increase_at = $global_now();
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
@@ -767,7 +799,7 @@ _ %get_state() method_id(86957) {
             $self'accumulated_ton = 0;
         }
         $self'buyback_split_enabled = true;
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
@@ -780,7 +812,7 @@ _ %get_state() method_id(86957) {
         throw_unless(15022, ($Context$_get_value(__tact_context_get()) >= 5000000));
         $self'treasury_due_ton = $self'treasury_due_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'treasury_receiver_address, $msg'amount, false, 1, null()));
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
@@ -793,7 +825,19 @@ _ %get_state() method_id(86957) {
         throw_unless(15035, ($Context$_get_value(__tact_context_get()) >= 7000000));
         $self'buyback_due_ton = $self'buyback_due_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'buyback_burn_address, ($msg'amount + 2000000), true, 1, $AcceptBurnReserve$_store_cell($AcceptBurnReserve$_constructor_amount($msg'amount), begin_cell())));
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        return ();
+    }
+    
+    ;; Receive ReclassifyStuckBuybackRemainder message
+    if (op == 0x41445214) {
+        var $_ = empty_tuple();
+        throw_unless(15070, ($self'buyback_due_ton > 0));
+        throw_unless(15071, ($self'buyback_due_ton < 51050000000));
+        throw_unless(15072, ($global_now() > ($self'buyback_due_last_increase_at + 31536000)));
+        $self'treasury_due_ton = $self'treasury_due_ton + $self'buyback_due_ton;
+        $self'buyback_due_ton = 0;
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
@@ -801,7 +845,7 @@ _ %get_state() method_id(86957) {
     if (op == 0x87a2d2c7) {
         var $msg = empty_tuple();
         $self'storage_reserve_ton = $self'storage_reserve_ton + $Context$_get_value(__tact_context_get());
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
@@ -814,14 +858,14 @@ _ %get_state() method_id(86957) {
         $self'accumulated_ton = $self'accumulated_ton + (($held - $accounted) - 1000000);
         $global_nativeReserve($held, 2);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(15099);
-        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'buyback_split_enabled, $self'storage_reserve_ton, $self'buyback_due_last_increase_at, $self'failed_accrual_count, $self'last_failed_accrual_purchase_id, $self'shard_code, $self'intro_shard_code, $self'ticket_code, $self'airdrop_pool_address, $self'public_shard_code, $self'accrual_seq));
         return ();
     }
     ;; Throw if not handled

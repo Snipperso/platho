@@ -3,7 +3,7 @@ Contract: ATHWallet
 BoC Size: 6429 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 46
+Total structures: 47
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -178,8 +178,12 @@ TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pendin
 Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint64}>,pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint64}>}`
 
 ### DeployTreasurySupply
-TL-B: `deploy_treasury_supply#41544807 query_id:uint64 response_destination:address = DeployTreasurySupply`
+TL-B: `deploy_treasury_supply#41544809 query_id:uint64 response_destination:address = DeployTreasurySupply`
 Signature: `DeployTreasurySupply{query_id:uint64,response_destination:address}`
+
+### ATHMasterTopUpStorageReserve
+TL-B: `ath_master_top_up_storage_reserve#4154480a  = ATHMasterTopUpStorageReserve`
+Signature: `ATHMasterTopUpStorageReserve{}`
 
 ### ATHJettonDataView
 TL-B: `_ total_supply:int257 mintable:bool admin_address:address jetton_content:^cell jetton_wallet_code:^cell = ATHJettonDataView`

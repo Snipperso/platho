@@ -5,13 +5,37 @@
 import "./ATHWallet.tact";
 
 const ATH_TOTAL_SUPPLY_ATOMIC: Int = 100000000000000000;
-const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE: Int = 2000000;
-const ATH_MASTER_EXCESS_REFUND_MIN_VALUE: Int = 100000;
+// [RAISED 2026-07-29, wave-8 HIGH: 2M -> 8M] What this transaction keeps to pay for ITSELF. The genesis credit is
+// sent with SendPayFwdFeesSeparately and carries a FULL ATHWallet StateInit — MEASURED at 77 cells / 47,218 bits —
+// so its forward fee is charged to the master's BALANCE on top of the value, not out of it. MEASURED for that
+// transaction: 754,268 of gas and 3,826,734 of action-phase forward fees, about 4,580,000 against a 2,000,000 gate.
+// The shortfall used to be met only by whatever the master happened to be holding from its own deploy, and paying
+// more did not help because every nanoton above required_value was refunded. Worse, an ACTION-phase failure (rc37)
+// carries NO exit code, so nothing in the ceremony's checks would have shown why the 100,000,000 ATH mint failed.
+// At 8,000,000 the inbound message funds the whole transaction on its own, with the measured cost covered ~1.75x.
+const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE: Int = 8000000;
+const ATH_MASTER_EXCESS_REFUND_MIN_VALUE: Int = 100000; // still used by the bounced genesis leg below
 
-message(0x41544807) DeployTreasurySupply {
+// "ATH"+0x09 — [CHANGED 2026-07-29, wave-8 LOW] was 0x41544807, which is ALSO ATHWalletTopUpStorageReserve. Both
+// declarations reach one compilation module through the ATHWallet import above, and Tact did not object: the built
+// ABI shows header 1096042503 for both. The collision is asymmetric and the dangerous direction is silent — a genesis
+// mint aimed by mistake at an ATH wallet is accepted by that wallet's field-less top-up receiver, which never checks
+// the body is exhausted, and reports SUCCESS. (The other direction is caught: parsing query_id+Address off an empty
+// body runs out of bits.) Moving this one is free — DeployTreasurySupply is sent once, by our own ceremony.
+message(0x41544809) DeployTreasurySupply {
     query_id: Int as uint64;
     response_destination: Address;
 }
+
+// "ATH"+0x0A — [ADDED 2026-07-29, wave-8 MED] the master had no way to be topped up at all.
+//
+// After genesis not one handler leaves value behind: ATHBurnNotification and the bounced leg both forward the
+// remainder with SendRemainingValue, and 14121 closes DeployTreasurySupply forever. The fallback throws 13001, so an
+// ordinary BOUNCEABLE transfer bounces straight back instead of funding the account — only the non-bounceable form
+// happened to work, and by accident rather than design. Meanwhile rent runs regardless: MEASURED 6,236,368 a year
+// for the account plus 93 code cells plus data. This contract is never to be redeployed under any circumstance, so
+// the deficit is unrecoverable by construction. Permissionless, like every other top-up receiver in this codebase.
+message(0x4154480A) ATHMasterTopUpStorageReserve {}
 
 struct ATHJettonDataView {
     total_supply: Int;
@@ -68,9 +92,20 @@ contract ATHMaster {
         throwUnless(14121, !self.treasury_supply_deployed);
         throwUnless(14122, msg.response_destination == self.treasury_owner);
         throwUnless(14123, self.total_supply == ATH_TOTAL_SUPPLY_ATOMIC);
-        let downstream_value: Int = ATH_GENESIS_SUPPLY_EXEC_RESERVE + ATH_GENESIS_SUPPLY_ACK_VALUE;
-        let required_value: Int = downstream_value + ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE;
+        let required_value: Int = ATH_GENESIS_SUPPLY_EXEC_RESERVE + ATH_GENESIS_SUPPLY_ACK_VALUE
+            + ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE;
         throwUnless(14124, context().value >= required_value);
+        // [CHANGED 2026-07-29, wave-8 MED] Was pinned to 3,000,000 with everything above required_value refunded to
+        // the owner, which made it IMPOSSIBLE to endow the treasury wallet through the only path that creates it.
+        // That wallet holds 100% of the supply and is never redeployable, and its rent is MEASURED at 5,132,011 a
+        // year — against the 1,624,999 it was left with after paying its own gas and ack. It would have gone into
+        // storage debt inside the first year, with the entire 100,000,000 ATH inside it.
+        //
+        // Scaling instead of refunding turns the ceremony's own send value into the wallet's endowment: the wallet's
+        // gate 14403 accepts anything at or above the floor and keeps the remainder, so a century of rent is funded
+        // by sending it, with no second mechanism to build and nothing extra to remember after the seal. See
+        // DEPLOY_TREASURY_SUPPLY_VALUE_RECOMMENDED_NANOTONS, raised in the same change.
+        let downstream_value: Int = context().value - ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE;
 
         self.treasury_supply_deployed = true;
 
@@ -90,16 +125,10 @@ contract ATHMaster {
             }.toCell()
         });
 
-        let excess: Int = context().value - required_value;
-        if (excess >= ATH_MASTER_EXCESS_REFUND_MIN_VALUE) {
-            message(MessageParameters {
-                to: msg.response_destination,
-                value: excess,
-                bounce: false,
-                mode: SendDefaultMode,
-                body: null
-            });
-        }
+    }
+
+    receive(_: ATHMasterTopUpStorageReserve) {
+        // Accept TON for storage reserve only. Supply, treasury owner and content are immutable.
     }
 
     bounced(msg: bounced<ATHGenesisSupplyCredit>) {
