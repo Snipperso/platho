@@ -15,7 +15,7 @@ import { encodeTonAddressSliceBoc, decodeTonAddressSliceBoc } from '../web/ton-r
 // Two things here can fail SILENTLY and neither raises an error at the call site:
 //   * reading the wrong ACCOUNT — the address is derived, not looked up, so a wrong derivation is a live empty
 //     account and every user simply appears to have no keys and no avatar (KSRPC-01);
-//   * reading the wrong FIELD — the view is 24 flat stack items, so a decoder that drifted by one would hand
+//   * reading the wrong FIELD — the view is 25 flat stack items, so a decoder that drifted by one would hand
 //     callers an encryption key where a nonce belongs (KSRPC-02).
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -55,6 +55,7 @@ const fullViewStack = (avatarVersion: bigint) => [
   num(2n),                                        // 21 avatar_part_count
   num(1n),                                        // 22 avatar_media_format
   num(1_700_000_777n),                            // 23 avatar_updated_at
+  num(20_000_000n),                               // 24 rotation_min_balance
 ];
 
 describe('KeyShard TON RPC provider', () => {
@@ -109,7 +110,7 @@ describe('KeyShard TON RPC provider', () => {
     expect((view as any).auth_pubkey).toBeUndefined();
 
     expect(() => decodeKeyShardViewStack({ stack: fullViewStack(5n).slice(0, 16) }, decodeTonAddressSliceBoc))
-      .toThrow(/expected 24 stack items/);
+      .toThrow(/expected 25 stack items/);
   });
 
   it('KSRPC-03: a wallet that never bought an avatar reports no avatar, not a zeroed one', async () => {

@@ -22,7 +22,7 @@ PROGRAM{
   DECLPROC $KeyShard$_fun_computeKeyId
   DECLPROC $KeyShard$_fun_requireEmptyEnvelopePadding
   DECLPROC $KeyShard$_fun_writeBundle
-  DECLPROC $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at
+  DECLPROC $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at_rotation_min_balance
   DECLPROC $KeyShard$_fun_get_view
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
@@ -356,26 +356,6 @@ PROGRAM{
       2DROP
       FALSE
     }>
-    DUP
-    10 PUSHINT
-        CDATASIZE
-    s0 s2 XCHG
-    10 NEQINT
-    IFJMP:<{
-      4 BLKDROP
-      FALSE
-    }>
-    9472 PUSHINT
-    NEQ
-    IFJMP:<{
-      3 BLKDROP
-      FALSE
-    }>
-    9 NEQINT
-    IFJMP:<{
-      2DROP
-      FALSE
-    }>
     WHILE:<{
       OVER
       0 GTINT
@@ -601,48 +581,57 @@ PROGRAM{
     s8 s0 s7 XCHG3
     s0 s2 XCHG
   }>
-  $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at PROCINLINE:<{
+  $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at_rotation_min_balance PROCINLINE:<{
   }>
   $KeyShard$_fun_get_view PROCREF:<{
     57000000 PUSHINT
     12000000 PUSHINT
-    22 s() PUSH
-    s0 s2 XCHG
-    25 s() PUSH
-    s0 s2 XCHG
+    20000000 PUSHINT
     23 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    22 s() PUSH
-    s0 s2 XCHG
-    37 s() PUSH
+    s0 s3 XCHG
+    26 s() PUSH
+    s0 s3 XCHG
+    24 s() PUSH
+    s0 s3 XCHG
     23 s() PUSH
+    s0 s3 XCHG
     23 s() PUSH
+    s0 s3 XCHG
     23 s() PUSH
+    s0 s3 XCHG
     23 s() PUSH
+    s0 s3 XCHG
     23 s() PUSH
+    s0 s3 XCHG
     23 s() PUSH
+    s0 s3 XCHG
     23 s() PUSH
-    $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at INLINECALLDICT
+    s0 s3 XCHG
+    23 s() PUSH
+    s0 s3 XCHG
+    23 s() PUSH
+    s0 s3 XCHG
+    23 s() PUSH
+    s0 s3 XCHG
+    23 s() PUSH
+    s1 s3 s3 XCHG3
+    38 s() PUSH
+    SWAP
+    24 s() PUSH
+    SWAP
+    24 s() PUSH
+    SWAP
+    24 s() PUSH
+    SWAP
+    24 s() PUSH
+    SWAP
+    24 s() PUSH
+    SWAP
+    24 s() PUSH
+    SWAP
+    24 s() PUSH
+    SWAP
+    $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at_rotation_min_balance INLINECALLDICT
   }>
   $MessageParameters$_constructor_to_value_mode_bounce PROCINLINE:<{
     s1 s3 XCHG
@@ -660,38 +649,40 @@ PROGRAM{
   %get_view PROC:<{
     $KeyShard$_contract_load INLINECALLDICT
     $KeyShard$_fun_get_view INLINECALLDICT
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
-    24 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    25 s() POP
+    s1 24 s() XCHG
     s0 23 s() XCHG
-    s0 22 s() XCHG
+    s1 22 s() XCHG
     s0 21 s() XCHG
-    s0 20 s() XCHG
+    s1 20 s() XCHG
     s0 19 s() XCHG
-    s0 18 s() XCHG
+    s1 18 s() XCHG
     s0 17 s() XCHG
-    s0 16 s() XCHG
-    15 -ROLL
+    s1 16 s() XCHG
+    s0 s15 XCHG
+    13 2 BLKSWAP
     $KeyShardView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -843,14 +834,30 @@ PROGRAM{
       s0 32 s() XCHG
       $KeyShard$_fun_writeBundle INLINECALLDICT
       18 s() POP
-      s0 22 s() XCHG
+          BALANCE FIRST
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      SUB
+      s0 23 s() XCHG
       IF:<{
-        0 PUSHINT
-      }>ELSE<{
+        s0 22 s() XCHG
         45000000 PUSHINT
+        LESS
+        IF:<{
+          45000000 PUSHINT
+          2 PUSHINT
+              RAWRESERVE
+        }>ELSE<{
+          0 PUSHINT
+          6 PUSHINT
+              RAWRESERVE
+        }>
+      }>ELSE<{
+        22 s() POP
+        45000000 PUSHINT
+        6 PUSHINT
+            RAWRESERVE
       }>
-      6 PUSHINT
-          RAWRESERVE
       __tact_context_get_sender INLINECALLDICT
       0 PUSHINT
       130 PUSHINT
@@ -1258,6 +1265,11 @@ PROGRAM{
       17 s() PUSH
       EQUAL
       s1 s2 XCHG
+      THROWANYIFNOT
+      22138 PUSHINT
+          BALANCE FIRST
+      20000000 PUSHINT
+      GEQ
       THROWANYIFNOT
           ACCEPT
       s0 s15 XCHG
