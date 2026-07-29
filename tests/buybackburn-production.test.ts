@@ -749,7 +749,19 @@ describe('Production BuybackBurn candidate', () => {
     expect(addressRaw(decoded.refundAddress)).toBe(addressRaw(env.buyback.address));
     expect(addressRaw(swap.refundAddress)).toBe(addressRaw(env.buyback.address));
     expect(addressRaw(swap.excessesAddress)).toBe(addressRaw(env.buyback.address));
-    expect(addressRaw(swap.details.receiverAddress)).toBe(addressRaw(env.officialAthWallet));
+    // RECEIVER IS AN OWNER, NOT A WALLET. Until 2026-07-29 this line asserted `env.officialAthWallet` and so PINNED
+    // the defect it should have caught: STON.fi's `receiverAddress` is the destination of a standard jetton transfer,
+    // and ATHWallet.tact derives the credited wallet as `derive_wallet_address(msg.destination)`. Naming our own ATH
+    // wallet there put the bought ATH into ATHWallet(owner = ATHWallet(owner = BuybackBurn)) — unspendable — and sent
+    // the credit notification `to: self.owner_address`, i.e. into our ATH wallet, which has no
+    // JettonTransferNotification receiver, so gate 22300 here never fired and the buy never settled. It must be the
+    // same address as refund/excesses above, which is exactly what the official SDK does (all three default to
+    // `userWalletAddress`); the ask-side WALLET is the separate `askJettonWalletAddress` slot, asserted below —
+    // and that one is STON.fi's own ATH wallet (gate 22133), never ours, which is the second reason a wallet address
+    // has no business in the receiver slot.
+    expect(addressRaw(swap.details.receiverAddress)).toBe(addressRaw(env.buyback.address));
+    expect(addressRaw(swap.details.receiverAddress)).not.toBe(addressRaw(env.officialAthWallet));
+    expect(addressRaw(swap.askJettonWalletAddress)).toBe(addressRaw(env.stonfiAskJettonWallet));
     expect(swap.details.minAskAmount).toBe('95000');
     expect(swap.details.dexCustomPayloadForwardGasAmount).toBe(BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS.toString());
     expect(swap.details.hasDexCustomPayload).toBe(true);

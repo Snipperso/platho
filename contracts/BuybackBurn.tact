@@ -316,7 +316,16 @@ contract BuybackBurn {
     fun stonfiSwapPayload(queryId: Int, deadline: Int, dexMinOut: Int): Cell {
         let details: Cell = beginCell()
             .storeCoins(dexMinOut)
-            .storeAddress(self.official_ath_wallet_address)
+            // STON.fi v2.1 `receiverAddress`: the jetton-transfer DESTINATION, i.e. an OWNER, exactly like the
+            // `refundAddress`/`excessesAddress` slots above — the SDK defaults all three to `userWalletAddress`.
+            // The ask-side WALLET is a separate field and already occupies its own outer slot
+            // (`ask_jetton_wallet_address`, below). This slot held `official_ath_wallet_address` until 2026-07-29,
+            // which is our OWN ATH wallet: ATHWallet.tact derives the recipient as
+            // `derive_wallet_address(msg.destination)`, so the bought ATH landed in ATHWallet(owner = ATHWallet(owner
+            // = BuybackBurn)) — a wallet owned by a wallet, unspendable forever — and the credit notification went
+            // `to: self.owner_address`, i.e. to our ATH wallet, which has no JettonTransferNotification receiver at
+            // all. The notification never reached gate 22300 here, so the buy never settled.
+            .storeAddress(myAddress())
             .storeCoins(BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS_NANOTONS)
             .storeBit(true)
             .storeRef(self.stonfiRouteNotifyPayload(queryId))

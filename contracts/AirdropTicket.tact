@@ -33,9 +33,14 @@
 // its address — the same cycle that stops AirdropPool from simply importing RecordShard.
 const AT_FEE_SINK: Address = address("EQBekf1HwT0rQzEenYOaCNsNG-POIWZCbt9NScyMsawU0jr7");
 
-// ~100 years of config-18 basechain rent for this account (1 + code + data cells at 64,962 nanoton/cell/year)
-// plus cushion. Charged once, on the deploy that the first credit performs.
-const AT_BASE_ENDOWMENT: Int = 40000000;
+// [DELETED 2026-07-29] There was an AT_BASE_ENDOWMENT = 40,000,000 here, described as "~100 years of rent,
+// charged once on the deploy that the first credit performs". It was charged NOWHERE — the only occurrence in
+// the whole tree was its own declaration — and both halves of the claim were wrong anyway: this account holds
+// 15 cells, not the 3 the estimate assumed, so its rent is a MEASURED 974,433/year and 40,000,000 would have
+// bought 41 years rather than 100. A constant that documents a payment nobody makes is worse than no constant:
+// it tells the next reader the account is endowed when it is deployed by its first credit with 402,532 and
+// keeps +401,599 per credit thereafter. It is not endowed. What makes that survivable is TicketUnjam, whose
+// value stays in the account precisely because it sends nothing — see AT_INFLIGHT_DEADMAN_GRACE_SECONDS.
 
 // The minimum batch a claim may deliver. 10 credits = 100 ATH — enough to mint an avatar or a username, which is
 // the smallest amount worth one delivery. [OWNER 2026-07-24: minimum 10; 100 ATH is exactly what an avatar/username
@@ -52,6 +57,30 @@ const AT_MAX_CREDITS_PER_CLAIM: Int = 1000;
 // What a claim must carry: the redeem hop, FeeAccumulator's own execution, the AirdropAccrue leg (AirdropPool
 // gate 26114 demands 60,000,000 and REFUSES at 59,000,000 — measured), and forward fees for both hops.
 const AT_CLAIM_MIN_VALUE: Int = 63000000;
+
+// How long a claim may stay in flight before its owner may declare it dead and clear the interlock.
+//
+// WHY THIS EXISTS — MEASURED 2026-07-29, whole chain, real FeeAccumulator and real AirdropPool:
+// TicketRedeemAck is the only thing that clears in_flight on a SUCCESSFUL claim, it is sent bounce:false, and
+// FeeAccumulator funds it with a RESIDUAL (inbound - 60,000,000 accrue leg - 2,000,000 own reserve). At exactly
+// AT_CLAIM_MIN_VALUE that residual is 539,131, against an ack whose own compute costs 196,134 (2,942 gas units).
+// Meanwhile this account is never endowed: it is deployed BY its first credit and keeps only what a credit
+// leaves behind — measured 402,532 on the deploy and +401,599 per credit after — against 974,433/year of rent
+// (15 cells at 64,962). So a ticket that stops publishing runs its balance to zero and then accrues DEBT.
+// The claim does NOT pay that debt off: its whole inbound value leaves again with the redeem, so the debt is
+// still standing when the ack arrives, the debt eats the 539,131, and the ack cannot run.
+// MEASURED, ticket with 12 credits (balance 4,820,121), by age at claim time:
+//     1,800 days  ack exit 0        in_flight cleared        (healthy)
+//     1,950 days  ack exit -14      in_flight STUCK at 12    (out of gas)
+//     2,005 days+ compute SKIPPED   in_flight STUCK at 12    (no exit code at all — invisible to exit-code checks)
+// and from ~5.34 years on it never recovers, because the debt only grows. The claim itself SUCCEEDS: the pool
+// pays the ATH out. What is lost is the ticket: 27011 refuses every later claim and 27031 refuses every export,
+// so all FUTURE credits are stranded AND the clean-18 migration hook this contract exists to provide is dead.
+// Topping the account up afterwards does not help — nothing clears in_flight once the one ack has died.
+//
+// A grace long enough to be unmistakable: a real settlement completes inside one chain of transactions, seconds
+// after the claim, so seven days cannot race an honest redeem. Same TTL ATHWallet uses for its stale pendings.
+const AT_INFLIGHT_DEADMAN_GRACE_SECONDS: Int = 604800;
 
 // What an ExportCredits must carry to fund the one hop to the clean-18 successor plus the successor's own
 // adoption. The successor funds its own DEPLOY at migration time (this ticket cannot know clean-18's code cell,
@@ -103,10 +132,18 @@ message(0x41544333) TicketRedeem {
     owner: Address;
 }
 
+// "ATC7" — the owner declares a claim that never settled dead and releases the interlock. Carries nothing: the
+// ticket already knows what is in flight and when it went there.
+message(0x41544337) TicketUnjam {}
+
 struct AirdropTicketView {
     owner: Address;
     credits: Int;
     in_flight: Int;
+    // When the in-flight claim started, so a client can show the owner exactly when TicketUnjam becomes available
+    // instead of leaving them to guess. 0 whenever in_flight is 0.
+    in_flight_at: Int;
+    unjam_grace_seconds: Int;
     min_claim_credits: Int;
     max_credits_per_claim: Int;
     claim_min_value: Int;
@@ -119,11 +156,15 @@ contract AirdropTicket {
     // deliver the same credits twice, and restored on bounce. Deliberately a plain counter and not a map: a
     // claim is settled or bounced within the same chain of transactions, so there is never more than one.
     in_flight: Int as uint32;
+    // Stamped when credits go into flight, cleared when they come back. The dead-man clock for TicketUnjam —
+    // see AT_INFLIGHT_DEADMAN_GRACE_SECONDS for the measurement that makes it necessary.
+    in_flight_at: Int as uint32;
 
     init(owner: Address) {
         self.owner = owner;
         self.credits = 0;
         self.in_flight = 0;
+        self.in_flight_at = 0;
     }
 
     // Byte-for-byte AirdropPool.isBasechainAddress (AirdropPool.tact:201). A masterchain successor would be
@@ -157,6 +198,21 @@ contract AirdropTicket {
     // The owner pulls. Permissioned to the owner alone: a stranger triggering claims could otherwise force a
     // publisher's credits out in wasteful 64-credit dribbles, burning the delivery cost this contract exists to
     // amortise.
+    //
+    // A CLAIM IS ACKED BEFORE THE POOL HAS ACCEPTED IT. FeeAccumulator emits the accrual and the ack in the SAME
+    // transaction, so a pool refusal bounces to FeeAccumulator — which has no bounced<AirdropAccrue> handler, and
+    // could not have a useful one anyway: a bounce preserves 224 bits and `buyer` alone is 267. By then this
+    // ticket has already zeroed the credits and cleared the interlock, so a refusal destroys them silently.
+    // AUDITED 2026-07-29, every way the pool can refuse:
+    //   26111 masterchain buyer  — impossible, gate 27003 refuses to credit such a ticket at all
+    //   26112 credits_k range    — impossible, AT_MIN_CLAIM_CREDITS / AT_MAX_CREDITS_PER_CLAIM bound it here
+    //   26114 payout gas         — impossible, FeeAccumulator sends a fixed 60,000,000 its own 15063 guarantees
+    //   budget exhausted         — NOT a refusal: since W3-002 the pool pays the remainder and returns, no throw
+    //   26110 wrong distributor  — REACHABLE, and only this one: it is what the clean-18 ADR9 rebind DOES.
+    // So the single surviving hazard is claiming after the pool has been repointed at the clean-18 sink. That is
+    // exactly what TicketExportCredits exists to avoid, and it is a CLIENT obligation to prefer it: read the
+    // pool's bound distributor, and if it is no longer the FeeAccumulator this ticket redeems through, export
+    // instead of claiming. A claim made after the rebind loses the credits and nothing on-chain can restore them.
     receive(_: TicketClaim) {
         throwUnless(27010, sender() == self.owner);
         throwUnless(27011, self.in_flight == 0);
@@ -171,6 +227,7 @@ contract AirdropTicket {
         }
         self.credits -= k;
         self.in_flight = k;
+        self.in_flight_at = now();
 
         message(MessageParameters {
             to: AT_FEE_SINK,
@@ -186,6 +243,7 @@ contract AirdropTicket {
     bounced(msg: bounced<TicketRedeem>) {
         self.credits += msg.credits_k;
         self.in_flight = 0;
+        self.in_flight_at = 0;
     }
 
     // Migration export — move unclaimed credits to the owner's clean-18 ticket. See TicketExportCredits above.
@@ -205,6 +263,12 @@ contract AirdropTicket {
         throwUnless(27031, self.in_flight == 0);
         throwUnless(27032, self.credits > 0);
         throwUnless(27033, self.isBasechainAddress(msg.to));
+        // Not to ourselves. `receive(_: Slice) {}` below tolerates unknown bodies rather than bouncing them —
+        // deliberately, so a stray message cannot bounce-loop — and TicketCreditsMigrated is an unknown body HERE,
+        // because only the clean-18 successor implements it. So an export addressed to this very ticket is
+        // ACCEPTED and swallowed by that catch-all after credits have already been zeroed, and every credit is
+        // gone with no bounce to restore them. One mistyped destination in a migration tool would do it.
+        throwUnless(27035, msg.to != myAddress());
         // Fail-closed in COMPUTE, before any state change, exactly as TicketClaim does.
         throwUnless(27034, context().value >= AT_EXPORT_MIN_VALUE);
 
@@ -232,6 +296,27 @@ contract AirdropTicket {
     receive(_: TicketRedeemAck) {
         throwUnless(27020, sender() == AT_FEE_SINK);
         self.in_flight = 0;
+        self.in_flight_at = 0;
+    }
+
+    // The claim's settlement never came back. See AT_INFLIGHT_DEADMAN_GRACE_SECONDS for the measurement: the ack
+    // is funded by a residual and this account is never endowed, so a ticket left idle long enough is jammed by
+    // its own storage debt — silently, because the ack is bounce:false and its compute is SKIPPED rather than
+    // failed. Without this hook that jam is permanent and takes the clean-18 migration hook down with it.
+    //
+    // This CANNOT double-deliver. TicketClaim already moved the credits out of `credits` and into `in_flight`;
+    // clearing the interlock does not put them back, so the only thing a later claim can deliver is credits that
+    // arrived AFTERWARDS. And if the redeem's bounce ever does turn up, its handler restores those credits and
+    // clears the interlock again — the correct outcome, since a bounce means the pool never paid.
+    //
+    // Owner-gated for the same reason TicketClaim is: the interlock is the owner's to release, and nothing is
+    // gained by letting a stranger race it.
+    receive(_: TicketUnjam) {
+        throwUnless(27040, sender() == self.owner);
+        throwUnless(27041, self.in_flight > 0);
+        throwUnless(27042, now() > self.in_flight_at + AT_INFLIGHT_DEADMAN_GRACE_SECONDS);
+        self.in_flight = 0;
+        self.in_flight_at = 0;
     }
 
     receive() {}           // plain TON top-up — also how anyone may keep this account alive
@@ -242,6 +327,8 @@ contract AirdropTicket {
             owner: self.owner,
             credits: self.credits,
             in_flight: self.in_flight,
+            in_flight_at: self.in_flight_at,
+            unjam_grace_seconds: AT_INFLIGHT_DEADMAN_GRACE_SECONDS,
             min_claim_credits: AT_MIN_CLAIM_CREDITS,
             max_credits_per_claim: AT_MAX_CREDITS_PER_CLAIM,
             claim_min_value: AT_CLAIM_MIN_VALUE,

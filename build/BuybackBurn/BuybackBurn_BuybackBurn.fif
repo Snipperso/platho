@@ -636,7 +636,7 @@ PROGRAM{
     SWAP
     s0 39 s() XCHG
         STVARUINT16
-    33 s() PUSH
+        MYADDR
         STSLICER
     55000000 PUSHINT
         STVARUINT16

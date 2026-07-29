@@ -295,6 +295,22 @@ describe('AIRDROP TICKET — credits cannot be minted, and cannot be lost', () =
     expect(view.in_flight, 'and nothing went in flight').toBe(0n);
   });
 
+  it('TICKET-11b: an export addressed to this very ticket is refused instead of burning every credit', async () => {
+    // The catch-all `receive(_: Slice) {}` tolerates unknown bodies rather than bouncing them, and
+    // TicketCreditsMigrated IS an unknown body here — only the clean-18 successor implements it. So before gate
+    // 27035 an export pointed at this ticket was ACCEPTED and swallowed AFTER credits had been zeroed: no bounce,
+    // no restore, every credit gone. One mistyped destination in a migration tool is the whole failure.
+    const { bc, owner, ticket } = await setup();
+    await credit(bc, ticket, 80);
+
+    await ticket.send(owner.getSender(), { value: AT_EXPORT_MIN_VALUE },
+      { $$type: 'TicketExportCredits', to: ticket.address } as any);
+
+    const view = await ticket.getGetTicket();
+    expect(view.credits, 'the export must be refused in COMPUTE, before credits are zeroed').toBe(80n);
+    expect(view.in_flight, 'and nothing went in flight').toBe(0n);
+  });
+
   it('TICKET-12: a bounced export returns the credits exactly once — a mistimed migration loses nothing', async () => {
     const { bc, owner, stranger, ticket } = await setup();
     await credit(bc, ticket, 90);
