@@ -3219,6 +3219,92 @@ PROGRAM{
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER
+    1096042504 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s4 XCHG
+      64 LDU
+      LDMSGADDR
+      DROP
+      14250 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      12000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s3 s6 s0 XCHG3
+      s6 s(-1) PUXC
+      $ATHWallet$_fun_compute_pending_outgoing_key INLINECALLDICT
+      OVER
+      257 PUSHINT
+      s2 PUSH
+      __tact_dict_get_int_cell INLINECALLDICT
+      $PendingAthOutgoingTransfer$_load_opt INLINECALLDICT
+      14251 PUSHINT
+      OVER
+      ISNULL
+      NOT
+      THROWANYIFNOT
+      $PendingAthOutgoingTransfer$_not_null INLINECALLDICT
+      s3 POP
+      14252 PUSHINT
+          NOW
+      s0 s4 XCHG
+      2592000 PUSHINT
+      ADD
+      s1 s4 XCHG
+      GREATER
+      s1 s3 XCHG
+      THROWANYIFNOT
+      s2 s3 XCHG2
+      257 PUSHINT
+          DICTIDEL
+      DROP
+      s6 s1 XCPU
+      ADD
+          MYADDR
+      s3 s(-1) PUXC
+      SDEQ
+      NOT
+      IF:<{
+        0 PUSHINT
+        64 PUSHINT
+        s0 s9 XCHG
+        TRUE
+        s0 s4 XCHG
+        $ATHTransferFailed$_constructor_query_id_amount INLINECALLDICT
+        NEWC
+        $ATHTransferFailed$_store_cell INLINECALLDICT
+        s9 s3 s0 XCHG3
+        $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+            STZEROES
+            // → Stack state
+            // s0: Builder
+            // s1: `body`
+            // s2: `mode`
+            STDICT
+            ENDC
+            SWAP
+            SENDRAWMSG
+      }>ELSE<{
+        s7 POP
+        2DROP
+      }>
+      3 ROLL
+      $ATHWallet$_contract_store INLINECALLDICT
+    }>
+    OVER
     1194171774 PUSHINT
     EQUAL
     IFJMP:<{

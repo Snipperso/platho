@@ -74,6 +74,20 @@ const DEFAULT_OUTPUT_MD = join(ARTIFACTS_LOCAL_DIR, 'MAINNET_TX_DRY_RUN_PACKET.m
 const ATH_METADATA_PATH = join(process.cwd(), 'artifacts', 'ath_metadata_content.json');
 
 const DEPLOY_VALUE_RECOMMENDED_NANOTONS = '500000000';
+// [ADDED 2026-07-29, wave-8 MED] Per-contract overrides where the flat 0.5 GRAM does not cover the contract's own
+// lifetime rent. ATHVesting is the one contract whose schedule is a CENTURY long and which can go years without
+// receiving a single message, so nothing tops it up along the way.
+//
+// MEASURED from build/ATHVesting/ATHVesting_ATHVesting.code.boc: 113 distinct code cells (62,008 bits) plus a data
+// cell that spills in two at 1321 bits of fields — about 115 account cells. At the project's frozen storage rate of
+// 64,962 nanoton per cell-year that is ~7,470,000 a year, so ~747,000,000 across the 100 periods of the schedule.
+// The flat 500,000,000 left it short by a quarter of a GRAM and the account would have died around year 67, with the
+// 10,000,000 ATH still inside and no way to reach it. 1.5 GRAM covers the century at twice the measured rent, which
+// is the honest margin for a number that cannot be revised after the seal. See ATH_VESTING_LOCAL_EXEC_RESERVE, raised
+// in the same change, which additionally lets each claim retain about a year of rent as it passes through.
+const DEPLOY_VALUE_OVERRIDE_NANOTONS: Record<string, string> = {
+  ATHVesting: '1500000000',
+};
 const CONTROL_VALUE_RECOMMENDED_NANOTONS = '50000000';
 const DEPLOY_TREASURY_SUPPLY_VALUE_RECOMMENDED_NANOTONS = '10000000';
 // Floor = ATHWallet plain ATHTransferRequest required_value (contracts/ATHWallet.tact:549):
@@ -403,7 +417,7 @@ async function buildDryRunPacket(draft: Draft) {
     signer_address: friendly(roleAddress(draft, signerRole as string)),
     target_address: friendly(target as Address),
     target_raw_address: raw(target as Address),
-    value_nanotons_recommended: DEPLOY_VALUE_RECOMMENDED_NANOTONS,
+    value_nanotons_recommended: DEPLOY_VALUE_OVERRIDE_NANOTONS[contract as string] ?? DEPLOY_VALUE_RECOMMENDED_NANOTONS,
     body: null,
     state_init: stateInitArtifact(init as ContractInit),
     safety_check: 'Tonkeeper preview target address and StateInit hash must match this packet before signing.',

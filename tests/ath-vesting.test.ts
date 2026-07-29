@@ -361,6 +361,63 @@ describe('ATHVesting', () => {
     expect(state.last_terminal_query_id).toBe(1n);
   });
 
+  it('ATH-VEST-06: overpaying now pushes the surplus DOWNSTREAM instead of being refunded, and the claim retains a year of rent', async () => {
+    const env = await setup();
+    env.blockchain.now = START_TIME + YEAR_SECONDS;
+
+    const overpay = toNano('0.5');
+    const before = (await env.blockchain.getContract(env.vesting.address)).balance;
+    const res = await env.vesting.send(env.caller.getSender(), { value: overpay }, {
+      $$type: 'ClaimAthVesting',
+      query_id: 1n,
+      amount: YEAR_UNLOCK_ATH,
+    } as ClaimAthVesting);
+
+    // The downstream leg scales with what was paid rather than sitting at the frozen 58,000,000 literal. That is the
+    // only handle this contract has if validator-voted gas and forward fees drift over a hundred-year schedule.
+    const leg = res.transactions
+      .flatMap((t: any) => t.outMessages?.values?.() ?? [])
+      .find((m: any) => m.info?.dest?.equals?.(env.officialAthWalletAddress));
+    expect(leg).toBeTruthy();
+    expect(leg!.info.value.coins).toBeGreaterThan(58_000_000n);
+
+    // And nothing was handed back to the caller: the surplus travels to the beneficiary's wallet, whose own excess
+    // returns here and pays rent.
+    const refundToCaller = res.transactions
+      .flatMap((t: any) => t.outMessages?.values?.() ?? [])
+      .find((m: any) => m.info?.dest?.equals?.(env.caller.address));
+    expect(refundToCaller).toBeUndefined();
+
+    // MEASURED: the claim leaves behind at least one year of this contract's rent (~7,470,000 at 115 cells x 64,962),
+    // where the old 2,000,000 reserve left essentially nothing after gas.
+    const after = (await env.blockchain.getContract(env.vesting.address)).balance;
+    expect(after - before).toBeGreaterThan(7_470_000n);
+  });
+
+  it('ATH-VEST-07: the contract refuses to exist outside basechain, where its own ATH wallet would be unreachable', async () => {
+    const blockchain = await Blockchain.create();
+    blockchain.now = START_TIME;
+    const beneficiary = await blockchain.treasury('ath-vesting-wc-beneficiary');
+    const master = fixtureAddress('ATH_MASTER');
+    const init = await ATHVesting.init(master, beneficiary.address, BigInt(START_TIME));
+
+    // Same StateInit, masterchain address: deriveAthWalletAddress takes the workchain from myAddress(), so the
+    // official wallet would derive into -1 too, and ATHWallet's gate 14600 demands a basechain owner.
+    const mcAddress = contractAddress(-1, init);
+    expect(mcAddress.workChain).toBe(-1);
+    await blockchain.setShardAccount(mcAddress, createShardAccount({
+      address: mcAddress,
+      code: init.code,
+      data: init.data,
+      balance: toNano('2'),
+      workchain: -1,
+    }));
+    const vesting = blockchain.openContract(new ATHVesting(mcAddress, init));
+
+    // The init gate makes the account unusable rather than silently stranding 10,000,000 ATH in it.
+    await expect(vesting.getGetVestingConfig()).rejects.toThrow();
+  });
+
   it('ATH-VEST-05: master, beneficiary, and start time are immutable constructor facts', async () => {
     const env = await setup();
     const config = await env.vesting.getGetVestingConfig();

@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: ATHWallet
-BoC Size: 6231 bytes
+BoC Size: 6429 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 45
+Total structures: 46
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -152,6 +152,10 @@ Signature: `JettonExcesses{query_id:uint64}`
 ### ATHWalletTopUpStorageReserve
 TL-B: `ath_wallet_top_up_storage_reserve#41544807  = ATHWalletTopUpStorageReserve`
 Signature: `ATHWalletTopUpStorageReserve{}`
+
+### ATHRecoverStuckOutgoing
+TL-B: `ath_recover_stuck_outgoing#41544808 query_id:uint64 recipient_wallet:address = ATHRecoverStuckOutgoing`
+Signature: `ATHRecoverStuckOutgoing{query_id:uint64,recipient_wallet:address}`
 
 ### ATHWalletDataView
 TL-B: `_ balance:int257 owner_address:address ath_master_address:address jetton_wallet_code:^cell = ATHWalletDataView`

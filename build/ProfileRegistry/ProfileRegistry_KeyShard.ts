@@ -2499,6 +2499,59 @@ export function dictValueParserATHWalletTopUpStorageReserve(): DictionaryValue<A
     }
 }
 
+export type ATHRecoverStuckOutgoing = {
+    $$type: 'ATHRecoverStuckOutgoing';
+    query_id: bigint;
+    recipient_wallet: Address;
+}
+
+export function storeATHRecoverStuckOutgoing(src: ATHRecoverStuckOutgoing) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042504, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.recipient_wallet);
+    };
+}
+
+export function loadATHRecoverStuckOutgoing(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042504) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _recipient_wallet = sc_0.loadAddress();
+    return { $$type: 'ATHRecoverStuckOutgoing' as const, query_id: _query_id, recipient_wallet: _recipient_wallet };
+}
+
+export function loadTupleATHRecoverStuckOutgoing(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _recipient_wallet = source.readAddress();
+    return { $$type: 'ATHRecoverStuckOutgoing' as const, query_id: _query_id, recipient_wallet: _recipient_wallet };
+}
+
+export function loadGetterTupleATHRecoverStuckOutgoing(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _recipient_wallet = source.readAddress();
+    return { $$type: 'ATHRecoverStuckOutgoing' as const, query_id: _query_id, recipient_wallet: _recipient_wallet };
+}
+
+export function storeTupleATHRecoverStuckOutgoing(source: ATHRecoverStuckOutgoing) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.recipient_wallet);
+    return builder.build();
+}
+
+export function dictValueParserATHRecoverStuckOutgoing(): DictionaryValue<ATHRecoverStuckOutgoing> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHRecoverStuckOutgoing(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHRecoverStuckOutgoing(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ATHWalletDataView = {
     $$type: 'ATHWalletDataView';
     balance: bigint;
@@ -4932,6 +4985,7 @@ const KeyShard_types: ABIType[] = [
     {"name":"JettonTransferNotification","header":1935855772,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"sender","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"JettonExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWalletTopUpStorageReserve","header":1096042503,"fields":[]},
+    {"name":"ATHRecoverStuckOutgoing","header":1096042504,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"jetton_wallet_code","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
@@ -4991,6 +5045,7 @@ const KeyShard_opcodes = {
     "JettonTransferNotification": 1935855772,
     "JettonExcesses": 3576854235,
     "ATHWalletTopUpStorageReserve": 1096042503,
+    "ATHRecoverStuckOutgoing": 1096042504,
     "KeyShardRegisterKeys": 1263748913,
     "KeyShardReplaceKeys": 1263748914,
     "KeyShardTopUpStorageReserve": 1263748916,
@@ -5045,6 +5100,8 @@ export const ATH_GENESIS_SUPPLY_EXEC_RESERVE = 2000000n;
 export const ATH_GENESIS_SUPPLY_ACK_VALUE = 1000000n;
 export const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 1096044105n;
 export const ATH_OUTGOING_TRANSFER_ID_DOMAIN = 1096044359n;
+export const ATH_OUTGOING_STUCK_RECOVERY_GRACE_SECONDS = 2592000n;
+export const ATH_OUTGOING_STUCK_RECOVERY_MIN_VALUE = 12000000n;
 export const ATH_NOTIFY_REFUND_QUERY_DOMAIN = 1096045126n;
 export const ATH_QUERY_ID_MOD = 18446744073709551616n;
 export const ATH_SENDER_KEY_MOD = 1461501637330902918203684832716283019655932542976n;

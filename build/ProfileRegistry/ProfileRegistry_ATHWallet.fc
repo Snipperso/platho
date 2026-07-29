@@ -1875,6 +1875,25 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         return ();
     }
     
+    ;; Receive ATHRecoverStuckOutgoing message
+    if (op == 0x41544808) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'recipient_wallet = in_msg~load_msg_addr();
+        throw_unless(14250, ($Context$_get_value(__tact_context_get()) >= 12000000));
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_outgoing_key($msg'query_id, $msg'recipient_wallet);
+        tuple $pendingOpt = $PendingAthOutgoingTransfer$_load_opt(__tact_dict_get_int_cell($self'pending_outgoing_transfers, 257, $pending_key));
+        throw_unless(14251, (~ null?($pendingOpt)));
+        var ($pending'recipient_wallet, $pending'response_destination, $pending'amount, $pending'created_at) = $PendingAthOutgoingTransfer$_not_null($pendingOpt);
+        throw_unless(14252, ($global_now() > ($pending'created_at + 2592000)));
+        $self'pending_outgoing_transfers~__tact_dict_delete_int(257, $pending_key);
+        $self'balance = $self'balance + $pending'amount;
+        if (( ~ equal_slices_bits($pending'response_destination, $global_myAddress()) )) {
+            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($pending'response_destination, 0, 64, true, $ATHTransferFailed$_store_cell($ATHTransferFailed$_constructor_query_id_amount($msg'query_id, $pending'amount), begin_cell())));
+        }
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers));
+        return ();
+    }
+    
     ;; Receive AthTransferNotificationAck message
     if (op == 0x472d9d7e) {
         var $msg'query_id = in_msg~load_uint(64);
