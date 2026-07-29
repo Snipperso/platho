@@ -1511,4 +1511,116 @@ describe('Production BuybackBurn candidate', () => {
     await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
     expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(0n);
   });
+
+  it('SWEEP-06: [wave-8 HIGH] a sweep RE-ARMS the dead-man — it cannot latch open and drain every future envelope', async () => {
+    // THE DEFECT THIS PINS. The gate used to read last_burn_at, which only a successful burn could move, and a burn
+    // needs an envelope that this very permissionless sweep drains the moment it lands. So one quiet year — low
+    // revenue, a late EnableBuybackSplit, a post-seal route freeze — made the predicate true FOREVER, and every
+    // subsequent 51.05 GRAM of protocol revenue was drainable to the treasury wallet by any passer-by. The burn
+    // programme would have become a treasury income stream with no way back.
+    const env = await setup();
+    await freezeAndSeal(env);
+    const sealNow = env.blockchain.now ?? 0;
+    await acceptReserve(env);
+
+    env.blockchain.now = sealNow + DEADMAN_SWEEP_GRACE_SECONDS + 100;
+    const sweepNow = env.blockchain.now;
+    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton, 'the first sweep still works').toBe(0n);
+    expect((await env.buyback.getGetBuybackBurnState()).deadman_armed_at, 'and re-arms the clock').toBe(BigInt(sweepNow));
+
+    // The next envelope arrives. Before the fix this was drainable immediately, forever.
+    await acceptReserve(env);
+    env.blockchain.now = sweepNow + 60;
+    const again = await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    expect(buybackExit(again, env.buyback.address), 'the second sweep must wait out a fresh grace').toBe(22542);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton, 'the envelope survives').toBe(ENVELOPE);
+
+    // And the mechanism can actually use it — which is the whole point of re-arming.
+    await executeBuyback(env, 1n);
+    expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
+  });
+
+  it('SWEEP-07: [wave-8 HIGH] a post-seal route freeze arms the grace — it cannot burn down while burning is impossible', async () => {
+    // AcceptBurnReserve refuses everything until route_frozen (22200), and FreezeBuybackRoute is permitted AFTER
+    // seal. So a grace started at seal could expire entirely during a period when the contract was structurally
+    // incapable of burning anything, handing the dead-man a head start it never earned.
+    const env = await setup();
+    await bindAndSealWithoutRoute(env);
+    const sealNow = env.blockchain.now ?? 0;
+
+    env.blockchain.now = sealNow + DEADMAN_SWEEP_GRACE_SECONDS + 100;
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env));
+    const freezeNow = env.blockchain.now;
+    expect((await env.buyback.getGetBuybackBurnState()).deadman_armed_at, 'the freeze is where the mechanism becomes capable').toBe(BigInt(freezeNow));
+
+    await acceptReserve(env);
+    const early = await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    expect(buybackExit(early, env.buyback.address), 'the seal-era grace must not carry over').toBe(22542);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
+
+    env.blockchain.now = freezeNow + DEADMAN_SWEEP_GRACE_SECONDS + 100;
+    await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton, 'and only the freeze-era grace opens it').toBe(0n);
+  });
+
+  it('SWEEP-08: [wave-8 LOW] the sweep leg is NON-bounceable, so a bounce cannot desynchronise the zeroed accounting', async () => {
+    // reserve_due_ton and route_refund_due_ton are zeroed in the SAME transaction that sends. A bounce would put
+    // the value back in the balance while the bookkeeping stayed at zero — ExecuteBuybackChunk then fails 22212,
+    // RecycleRouteRefundReserve fails 22361, and since a sweep now re-arms the dead-man nothing could move that
+    // money for another full grace. The body is a comment, so no bounced receiver could ever repair it.
+    const env = await setup();
+    await freezeAndSeal(env);
+    const sealNow = env.blockchain.now ?? 0;
+    await acceptReserve(env);
+
+    env.blockchain.now = sealNow + DEADMAN_SWEEP_GRACE_SECONDS + 100;
+    const res = await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, { $$type: 'SweepStuckReserveToTreasury' } as SweepStuckReserveToTreasury);
+    const leg = findTransaction(res.transactions, { from: env.buyback.address, to: env.sweepTreasury.address });
+    expect(leg, 'the sweep must actually reach the treasury').toBeDefined();
+    expect((leg as any).inMessage.info.bounce, 'and must not be bounceable').toBe(false);
+  });
+
+  it('REFUND-BODY-01: [wave-8 HIGH] a route refund is credited whatever body it carries', async () => {
+    // The empty receive() matches only op == 0 with at most 32 bits, so the whole refund path used to rest on an
+    // UNVERIFIED assumption about the shape of what STON.fi's pTON wallet sends back on a failed swap —
+    // artifacts/M20T_STONFI_REFUND_TOPOLOGY_CHECK_RU.md settles the ADDRESS but says outright that the empirical
+    // run was never made and the deployed v2.1 binary is not public. A refund carrying an excesses op or a text
+    // comment would have hit exit 130 before any of our code ran and, being bounceable, taken ~50 GRAM back into
+    // STON.fi — once per failed swap, on a contract that can never be patched.
+    const env = await setup();
+    await freezeAndSeal(env);
+    const before = (await env.buyback.getGetBuybackBurnState()).route_refund_due_ton;
+
+    // Sent RAW, not through the typed wrapper: the whole point is a body the contract does not declare.
+    // a) a text comment
+    const commentBody = beginCell().storeUint(0, 32).storeStringTail('stonfi refund').endCell();
+    const commented = await env.stonfiPtonWallet.send({
+      to: env.buyback.address, value: toNano('50'), body: commentBody, bounce: true,
+    });
+    expect(buybackExit(commented, env.buyback.address), 'a commented refund must be accepted').toBe(0);
+
+    // b) an arbitrary binary op — the excesses opcode standing in for anything the router might attach
+    const opBody = beginCell().storeUint(0xd53276db, 32).storeUint(7n, 64).endCell();
+    const opRefund = await env.stonfiPtonWallet.send({
+      to: env.buyback.address, value: toNano('50'), body: opBody, bounce: true,
+    });
+    expect(buybackExit(opRefund, env.buyback.address), 'so must one carrying an op').toBe(0);
+
+    const after = (await env.buyback.getGetBuybackBurnState()).route_refund_due_ton;
+    expect(after, 'and both must be CREDITED, not merely tolerated').toBeGreaterThan(before + toNano('99'));
+  });
+
+  it('REFUND-BODY-02: a body from a NON-whitelisted sender is still refused, so unrelated junk keeps bouncing', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    const before = (await env.buyback.getGetBuybackBurnState()).route_refund_due_ton;
+
+    const res = await env.attacker.send({
+      to: env.buyback.address, value: toNano('50'),
+      body: beginCell().storeUint(0, 32).storeStringTail('not a refund').endCell(), bounce: true,
+    });
+    expect(buybackExit(res, env.buyback.address), 'the whitelist still governs').toBe(22999);
+    expect((await env.buyback.getGetBuybackBurnState()).route_refund_due_ton, 'nothing credited').toBe(before);
+  });
 });

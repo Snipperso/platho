@@ -45,6 +45,7 @@ const ATH_BURN_REQUEST_VALUE = 30_000_000n;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 50_000_000n;
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
+const BURN_DEADMAN_GRACE_SECONDS = 21600; // BUYBACK_STUCK_BURN_DEADMAN_GRACE_SECONDS
 const PHASE_PENDING_ATH_BURN = 2n;
 
 function routeRefundCredit(value: bigint): bigint {
@@ -179,6 +180,9 @@ async function forcePendingAthBurn(
     treasury_address: env.sweepTreasury.address,
     treasury_bound: true,
     last_burn_at: BigInt(env.blockchain.now ?? 0),
+    // [2026-07-29] The dead-man gate reads its OWN clock now, not last_burn_at — see the wave-8 fix in
+    // contracts/BuybackBurn.tact. This fixture forges post-seal state by hand, so it must carry both.
+    deadman_armed_at: BigInt(env.blockchain.now ?? 0),
     referral_value_bps: 0n,
     buyback_min_ath_out_per_50_ton_atomic: 95_000n,
     evidence_quote_out_atomic_ath: 100_000n,
@@ -191,6 +195,7 @@ async function forcePendingAthBurn(
     pending_route_refund_start_ton: 0n,
     pending_dex_min_out_atomic_ath: 95_000n,
     pending_received_ath_atomic: amount,
+    pending_burn_at: BigInt(env.blockchain.now ?? 0),
     route_refund_due_ton: 0n,
     ath_burn_retry_due_atomic: 0n,
     last_terminal_query_id: queryId - 1n,
@@ -234,6 +239,9 @@ async function forceSealedUnfrozenPostSealState(
     treasury_address: env.sweepTreasury.address,
     treasury_bound: true,
     last_burn_at: BigInt(env.blockchain.now ?? 0),
+    // [2026-07-29] The dead-man gate reads its OWN clock now, not last_burn_at — see the wave-8 fix in
+    // contracts/BuybackBurn.tact. This fixture forges post-seal state by hand, so it must carry both.
+    deadman_armed_at: BigInt(env.blockchain.now ?? 0),
     referral_value_bps: 0n,
     buyback_min_ath_out_per_50_ton_atomic: 0n,
     evidence_quote_out_atomic_ath: 0n,
@@ -246,6 +254,7 @@ async function forceSealedUnfrozenPostSealState(
     pending_route_refund_start_ton: 0n,
     pending_dex_min_out_atomic_ath: 0n,
     pending_received_ath_atomic: 0n,
+    pending_burn_at: 0n,
     route_refund_due_ton: 0n,
     ath_burn_retry_due_atomic: 0n,
     last_terminal_query_id: 0n,
@@ -360,6 +369,12 @@ async function sendStonfiAthNotify(
     forward_ton_amount: notifyValue,
     forward_payload: beginCell().endCell().asSlice(),
   } as JettonTransfer);
+}
+
+function exitOf(res: any, dest: Address): number {
+  const tx: any = res.transactions.find(
+    (t: any) => t.inMessage?.info?.type === 'internal' && t.inMessage?.info?.dest?.toString() === dest.toString());
+  return Number(tx?.description?.computePhase?.exitCode ?? -999);
 }
 
 describe('BuybackBurn auth and negative matrix', () => {
@@ -728,5 +743,47 @@ describe('BuybackBurn auth and negative matrix', () => {
     expect(state.pending_received_ath_atomic).toBe(0n);
     expect(totals.executed_buyback_count).toBe(1n);
     expect(totals.burned_ath_total_atomic).toBe(123_456n);
+  });
+
+  it('BURN-DEADMAN-01: [wave-8 MED] PENDING_ATH_BURN has a time-only exit, so a lost reply cannot brick the contract', async () => {
+    // THE DEFECT THIS PINS. That phase had exactly three ways out and all three were the DELIVERY of a reply:
+    // ATHBurnFinalized, ATHBurnFailed, or a bounce of our own ATHBurn. ATHMaster sends the finalization with
+    // bounce:true and has no bounced handler for it, so a receiver-side failure here simply evaporated and the
+    // contract stayed in PENDING_ATH_BURN forever — 22211 kills ExecuteBuybackChunk, 22360 kills the recycle,
+    // 22540 kills the sweep, and genesis_config_hash is already zeroed so no controller can help. Meanwhile
+    // AcceptBurnReserve does not check the phase and keeps pouring 51.05 GRAM into a contract that can neither
+    // spend nor release it. F11 gave PENDING_STONFI_SWAP exactly this guarantee; the burn phase simply lacked it.
+    const env = await setup();
+    await forcePendingAthBurn(env, 7n, 123_456n);
+    const stuckAt = env.blockchain.now ?? 0;
+
+    const tooEarly = await env.buyback.send(env.operator.getSender(), { value: toNano('0.05') }, {
+      $$type: 'RecoverStuckAthBurn', query_id: 7n,
+    } as any);
+    expect(exitOf(tooEarly, env.buyback.address), 'a live burn settles in seconds and must not be pre-empted').toBe(22382);
+    expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_ATH_BURN);
+
+    const wrongId = await env.buyback.send(env.operator.getSender(), { value: toNano('0.05') }, {
+      $$type: 'RecoverStuckAthBurn', query_id: 8n,
+    } as any);
+    expect(exitOf(wrongId, env.buyback.address), 'and it must name the cycle it is recovering').toBe(22381);
+
+    env.blockchain.now = stuckAt + BURN_DEADMAN_GRACE_SECONDS + 1;
+    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'RecoverStuckAthBurn', query_id: 7n,
+    } as any);
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase, 'past the grace ANY sender can unstick it — nothing is paid out, so this is safe').toBe(PHASE_IDLE);
+    expect(state.pending_query_id).toBe(0n);
+    expect(state.pending_burn_at).toBe(0n);
+    // We cannot know whether the ATH burned or not, so it stays retryable. If it DID burn, the retry fails at the
+    // wallet, returns as ATHBurnFailed and re-credits — loud and harmless. Losing real ATH to avoid that would be
+    // the wrong trade.
+    expect(state.ath_burn_retry_due_atomic, 'the ATH must remain accounted for').toBe(123_456n);
+
+    // And the contract is genuinely usable again.
+    const state2 = await env.buyback.getGetBuybackBurnState();
+    expect(state2.phase).toBe(PHASE_IDLE);
   });
 });

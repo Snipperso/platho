@@ -37,6 +37,17 @@ const BUYBACK_ROUTE_REFUND_RECOVERY_MIN_NANOTONS: Int = 49000000000;
 // never pre-empt a live swap; it exists only to guarantee the buyback mechanism is NEVER permanently bricked when a
 // failed-swap refund arrives from a non-whitelisted sender or nets below the 49-TON RecoverStonfiRouteRefund floor.
 const BUYBACK_STUCK_SWAP_DEADMAN_GRACE_SECONDS: Int = 21600;
+// [ADDED 2026-07-29, wave-8 MED] The SAME guarantee for PENDING_ATH_BURN, which had no time-only exit at all.
+// That phase had exactly three ways out and every one of them was the delivery of a reply: ATHBurnFinalized from
+// ATHMaster, ATHBurnFailed from our wallet, or a bounce of our own ATHBurn. If any of those failed to be accepted
+// — ATHMaster sends ATHBurnFinalized with bounce:true and has no bounced handler for it, so a receiver-side
+// COMPUTE failure here simply evaporates — the contract stayed in PENDING_ATH_BURN forever: 22211 kills
+// ExecuteBuybackChunk, 22360 kills RecycleRouteRefundReserve, 22540 kills the sweep, and genesis_config_hash is
+// already zeroed so no controller can help. Meanwhile AcceptBurnReserve does NOT check the phase and keeps
+// pouring 51.05 GRAM envelopes into a contract that can no longer spend or release them. The comment above F11
+// states the requirement out loud — the mechanism must NEVER be irreversibly bricked — and the second phase
+// simply did not have it. A burn round trip completes in seconds, so this can never pre-empt a live one.
+const BUYBACK_STUCK_BURN_DEADMAN_GRACE_SECONDS: Int = 21600;
 const BUYBACK_PHASE_IDLE: Int = 0;
 const BUYBACK_PHASE_PENDING_STONFI_SWAP: Int = 1;
 const BUYBACK_PHASE_PENDING_ATH_BURN: Int = 2;
@@ -113,6 +124,10 @@ message(0x42595353) RecoverStuckStonfiSwap { // "BYSS" — F11 time-only dead-ma
     query_id: Int as uint64;
 }
 
+message(0x42595342) RecoverStuckAthBurn { // "BYSB" — the same time-only dead-man for a stuck PENDING_ATH_BURN
+    query_id: Int as uint64;
+}
+
 // clean-16 L6/#15: permissionless dead-man that returns the STRANDED reserve to the immutable treasury once the
 // route is presumed dead (no successful burn for BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS). No params: the destination is
 // the genesis-bound treasury, never caller-chosen — so this can recover funds but can never steal or redirect them.
@@ -159,10 +174,12 @@ struct BuybackBurnStateView {
     pending_route_refund_start_ton: Int;
     pending_dex_min_out_atomic_ath: Int;
     pending_received_ath_atomic: Int;
+    pending_burn_at: Int;
     route_refund_due_ton: Int;
     ath_burn_retry_due_atomic: Int;
     last_terminal_query_id: Int;
     last_burn_at: Int;
+    deadman_armed_at: Int;
 }
 
 struct BuybackBurnTotalsView {
@@ -190,7 +207,21 @@ contract BuybackBurn {
     // clean-16 L6/#15 (sweep-only): immutable dead-man sweep sink + liveness clock.
     treasury_address: Address;
     treasury_bound: Bool;
-    last_burn_at: Int as uint64; // set at seal + on every successful ATH burn; drives the dead-man grace
+    last_burn_at: Int as uint64; // set at seal + on every successful ATH burn — informational, NOT the sweep gate
+    // What gate 22542 actually reads: the last moment this mechanism was handed a fresh chance to work.
+    //
+    // [FIX 2026-07-29, wave-8 HIGH x2] The sweep used to read last_burn_at directly, which measured the wrong
+    // thing twice over. First, "no burn for a year" is not "the route is dead" — it is equally "there was no
+    // revenue to burn", and FeeAccumulator delivers one 51.05-GRAM envelope at a time only after
+    // EnableBuybackSplit. Second, and worse, the predicate LATCHED: once true it could never go false, because
+    // only a burn cleared it and a burn needs an envelope that the very same permissionless sweep drains first.
+    // So after one quiet year every future envelope was drainable to the treasury forever and the burn programme
+    // was silently converted into a treasury income stream. Arming this separately, and re-arming it on a sweep,
+    // means each sweep buys the mechanism another full grace period in which to work unimpeded.
+    //
+    // It is also armed at a POST-SEAL route freeze: AcceptBurnReserve refuses everything until route_frozen
+    // (22200), so a grace that started at seal could burn down entirely while burning was structurally impossible.
+    deadman_armed_at: Int as uint64;
     referral_value_bps: Int as uint16;
     buyback_min_ath_out_per_50_ton_atomic: Int as uint128;
     evidence_quote_out_atomic_ath: Int as uint128;
@@ -203,6 +234,8 @@ contract BuybackBurn {
     pending_route_refund_start_ton: Int as uint128;
     pending_dex_min_out_atomic_ath: Int as uint128;
     pending_received_ath_atomic: Int as uint128;
+    // When PENDING_ATH_BURN was entered — the dead-man clock for RecoverStuckAthBurn. 0 outside that phase.
+    pending_burn_at: Int as uint64;
     route_refund_due_ton: Int as uint128;
     ath_burn_retry_due_atomic: Int as uint128;
     last_terminal_query_id: Int as uint64;
@@ -230,6 +263,8 @@ contract BuybackBurn {
         self.treasury_address = ath_master_address; // placeholder until BindBuybackTreasury; seal requires the real bind
         self.treasury_bound = false;
         self.last_burn_at = 0;
+        self.deadman_armed_at = 0;
+        self.pending_burn_at = 0;
         self.referral_value_bps = 0;
         self.buyback_min_ath_out_per_50_ton_atomic = 0;
         self.evidence_quote_out_atomic_ath = 0;
@@ -291,6 +326,23 @@ contract BuybackBurn {
         throwUnless(22043, dexMinOut <= quoteOut);
     }
 
+    // [AUDITED 2026-07-29, wave-8 HIGH — ACCEPTED, NOT FIXED] These two gates pin the executable min_ask_amount to
+    // the pair frozen at ceremony time, forever. Combined with 22042 (dexMinOut >= 95% of quoteOut) that means the
+    // swap can only clear while ATH has not appreciated more than ~5.26% against GRAM since the freeze — and this
+    // contract exists to buy and burn ATH, i.e. to push that price up. Left as it is, on purpose:
+    //
+    //   * Relaxing min_out over time is the only admin-free alternative, and it opens a sandwich window exactly as
+    //     wide as the relaxation. The protection these gates provide is against a caller (this entrypoint is
+    //     permissionless) executing into a manipulated pool.
+    //   * The OWNER HAS ALREADY RULED on this exact trade-off for the structurally identical case — see the
+    //     comment on BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS: a rebindable route cannot be made zero-theft, so buyback
+    //     DEATH is the accepted non-fatal outcome and the dead-man sweep is the safety net. A route that still
+    //     exists but can no longer clear its floor reaches the same accepted end state by another road.
+    //   * That safety net is what must actually work, and as of this audit it does: the sweep no longer latches
+    //     open, so a dead buyback returns its revenue to the treasury once per grace period instead of having
+    //     every envelope drained the moment it lands.
+    //
+    // Recorded here rather than left to be rediscovered: this is a known, priced consequence, not an oversight.
     fun requireFrozenExecutionQuote(quoteOut: Int, dexMinOut: Int) {
         self.validateMinOut(quoteOut, dexMinOut);
         throwUnless(22046, quoteOut == self.evidence_quote_out_atomic_ath);
@@ -364,6 +416,7 @@ contract BuybackBurn {
         self.pending_route_refund_start_ton = 0;
         self.pending_dex_min_out_atomic_ath = 0;
         self.pending_received_ath_atomic = 0;
+        self.pending_burn_at = 0;
     }
 
     fun finishPendingCycle() {
@@ -467,6 +520,9 @@ contract BuybackBurn {
         self.route_frozen = true;
         if (self.sealed) {
             self.genesis_config_hash = 0;
+            // Nothing could be funded before this moment — AcceptBurnReserve refuses at 22200 while the route is
+            // unfrozen — so this is where the mechanism actually becomes capable, and where its grace must start.
+            self.deadman_armed_at = now();
         }
     }
 
@@ -482,6 +538,7 @@ contract BuybackBurn {
         }
         self.sealed = true;
         self.last_burn_at = now(); // start the dead-man grace clock at seal (no burns yet)
+        self.deadman_armed_at = now();
     }
 
     receive(msg: AcceptBurnReserve) {
@@ -549,6 +606,7 @@ contract BuybackBurn {
 
         self.phase = BUYBACK_PHASE_PENDING_ATH_BURN;
         self.pending_received_ath_atomic = msg.amount;
+        self.pending_burn_at = now();
         self.creditRouteNotifySurplus(context().value, BUYBACK_ROUTE_NOTIFY_MIN_VALUE);
 
         self.sendAthBurn(msg.query_id, msg.amount);
@@ -565,6 +623,7 @@ contract BuybackBurn {
         self.burned_ath_total_atomic += msg.amount;
         self.executed_buyback_count += 1;
         self.last_burn_at = now(); // L6/#15: a successful burn proves the route is alive -> resets the dead-man grace
+        self.deadman_armed_at = now();
         self.finishPendingCycle();
     }
 
@@ -593,6 +652,7 @@ contract BuybackBurn {
         self.pending_query_id = msg.query_id;
         self.pending_dex_min_out_atomic_ath = msg.amount;
         self.pending_received_ath_atomic = msg.amount;
+        self.pending_burn_at = now();
         self.sendAthBurn(msg.query_id, msg.amount);
     }
 
@@ -623,6 +683,23 @@ contract BuybackBurn {
         self.finishPendingCycle();
     }
 
+    // The dead-man for PENDING_ATH_BURN, mirroring F11 above. Time-only and permissionless: it pays nothing out
+    // and cannot pre-empt a live burn, which settles within seconds.
+    //
+    // The ATH is credited back to ath_burn_retry_due_atomic because we CANNOT know which side failed: if the burn
+    // never happened the ATH is still in our wallet and must stay retryable, and if it did happen the retry simply
+    // fails at the wallet, comes back as ATHBurnFailed, and re-credits — visible and harmless. Losing real ATH to
+    // avoid a retry that fails loudly would be the wrong trade.
+    receive(msg: RecoverStuckAthBurn) {
+        self.requireSealed();
+        throwUnless(22384, context().value >= BUYBACK_ROUTE_REFUND_RECOVERY_EXEC_RESERVE);
+        throwUnless(22380, self.phase == BUYBACK_PHASE_PENDING_ATH_BURN);
+        throwUnless(22381, msg.query_id == self.pending_query_id);
+        throwUnless(22382, now() > self.pending_burn_at + BUYBACK_STUCK_BURN_DEADMAN_GRACE_SECONDS);
+        self.ath_burn_retry_due_atomic += self.pending_received_ath_atomic;
+        self.finishPendingCycle();
+    }
+
     receive(msg: RecycleRouteRefundReserve) {
         self.requireSealed();
         throwUnless(22363, self.route_frozen);
@@ -635,26 +712,45 @@ contract BuybackBurn {
         self.reserve_due_ton += BUYBACK_FUNDING_ENVELOPE_NANOTONS;
     }
 
-    // clean-16 L6/#15: permissionless dead-man. When no successful burn has landed for BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS
-    // the STON.fi route is presumed dead (a live route burns; every burn resets last_burn_at). Anyone may then return the
+    // clean-16 L6/#15: permissionless dead-man. When the mechanism has had a full BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS
+    // with a fresh chance and still burned nothing, the STON.fi route is presumed dead. Anyone may then return the
     // stranded reserve to the IMMUTABLE genesis-bound treasury — the destination is not caller-chosen, so this recovers
     // funds but can never steal or redirect them. phase==IDLE guarantees no in-flight swap/burn references live state.
-    // Terminal: the stranded accounting is zeroed; a late bounce/refund re-credits route_refund_due_ton and is re-sweepable
-    // (a fresh grace is NOT required once the route is already past the dead-man threshold).
+    //
+    // [FIX 2026-07-29, wave-8 HIGH x2] This gate used to read last_burn_at, and the old comment here claimed "a fresh
+    // grace is NOT required once the route is already past the dead-man threshold". That was the defect, stated out
+    // loud: the predicate LATCHED. Only a burn could clear it, a burn needs an envelope, and this permissionless
+    // sweep drains every envelope the moment it lands — so after one quiet year (low revenue, a late
+    // EnableBuybackSplit, or a post-seal route freeze, during all of which burning is impossible) the buyback was
+    // dead forever and every future 51.05 GRAM of protocol revenue flowed to the treasury wallet instead. Re-arming
+    // here is what makes the presumption falsifiable: each sweep hands the mechanism another full grace period to
+    // work in. The cost is that a late refund arriving right after a sweep waits out a fresh grace before it can be
+    // swept — which is the same guarantee the first sweep gave, and meanwhile it stays recyclable into a working
+    // buyback through RecycleRouteRefundReserve, which is the better outcome anyway.
     receive(msg: SweepStuckReserveToTreasury) {
         self.requireSealed();
         throwUnless(22541, self.treasury_bound);
         throwUnless(22540, self.phase == BUYBACK_PHASE_IDLE);
-        throwUnless(22542, now() > self.last_burn_at + BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS);
+        throwUnless(22542, now() > self.deadman_armed_at + BUYBACK_DEADMAN_SWEEP_GRACE_SECONDS);
         let bal: Int = myBalance();
         throwUnless(22545, bal > BUYBACK_SWEEP_STORAGE_FLOOR_NANOTONS);
         let payable: Int = bal - BUYBACK_SWEEP_STORAGE_FLOOR_NANOTONS;
         self.reserve_due_ton = 0;
         self.route_refund_due_ton = 0;
+        self.deadman_armed_at = now();
+        // [FIX 2026-07-29, wave-8 LOW] bounce was TRUE here, and a bounce would have desynchronised the very
+        // accounting this transaction just zeroed: the value returns to our balance while reserve_due_ton and
+        // route_refund_due_ton stay at 0, so ExecuteBuybackChunk fails 22212, RecycleRouteRefundReserve fails
+        // 22361, and — now that a sweep re-arms the dead-man — nothing could move that money for another full
+        // grace period. The body is a comment, so no bounced receiver can exist to repair it. Non-bounceable is
+        // the right shape for this leg: the destination is bound once, pre-seal, under the genesis controller and
+        // gated basechain and non-self, and if it is merely not deployed yet the value simply waits at that
+        // address for the wallet that owns it, rather than ricocheting into a contract that can no longer account
+        // for it.
         message(MessageParameters {
             to: self.treasury_address,
             value: payable,
-            bounce: true,
+            bounce: false,
             mode: SendPayFwdFeesSeparately,
             body: "buyback-deadman-sweep".asComment()
         });
@@ -685,6 +781,29 @@ contract BuybackBurn {
     }
 
     receive() {
+        self.acceptRouteRefundOrThrow();
+    }
+
+    // [ADDED 2026-07-29, wave-8 HIGH] The same acceptance for a refund carrying ANY body.
+    //
+    // The empty receive() above matches only op == 0 with a body of at most 32 bits, so until this existed the
+    // whole refund path rested on an assumption about the SHAPE of what STON.fi's pTON wallet sends back on a
+    // failed swap — and that assumption was never verified. artifacts/M20T_STONFI_REFUND_TOPOLOGY_CHECK_RU.md
+    // settled the ADDRESS (slot #1, the router-owned pTON wallet) but states in as many words that the empirical
+    // run was never made and that STON.fi has not published the deployed v2.1 binary. A refund carrying an
+    // excesses op, a router payload, or a plain text comment would have hit exit 130 BEFORE any of our code ran,
+    // and because such a message is bounceable the ~50 GRAM would have ricocheted back into STON.fi and left the
+    // protocol — once per failed swap, on a contract nobody can ever patch.
+    //
+    // Accepting any body from the three whitelisted route addresses removes the assumption instead of betting on
+    // it. Everything else still throws 22999, so unrelated junk keeps bouncing as before, and value that really
+    // does come from the route is credited to route_refund_due_ton where it belongs rather than being refused on
+    // the grounds of its wrapper.
+    receive(_: Slice) {
+        self.acceptRouteRefundOrThrow();
+    }
+
+    fun acceptRouteRefundOrThrow() {
         if (self.sealed && self.route_frozen) {
             if (sender() == self.stonfi_pton_wallet_address || sender() == self.stonfi_router_address || sender() == self.stonfi_pool_address_ton_ath) {
                 self.creditRouteRefundValue(context().value);
@@ -730,10 +849,12 @@ contract BuybackBurn {
             pending_route_refund_start_ton: self.pending_route_refund_start_ton,
             pending_dex_min_out_atomic_ath: self.pending_dex_min_out_atomic_ath,
             pending_received_ath_atomic: self.pending_received_ath_atomic,
+            pending_burn_at: self.pending_burn_at,
             route_refund_due_ton: self.route_refund_due_ton,
             ath_burn_retry_due_atomic: self.ath_burn_retry_due_atomic,
             last_terminal_query_id: self.last_terminal_query_id,
-            last_burn_at: self.last_burn_at
+            last_burn_at: self.last_burn_at,
+            deadman_armed_at: self.deadman_armed_at
         };
     }
 
