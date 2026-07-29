@@ -87,6 +87,19 @@ const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
 const ATH_OUTGOING_TRANSFER_ID_DOMAIN: Int = 0x41544F47; // "ATOG"
+
+// [ADDED 2026-07-29, wave-8 HIGH] Grace before a stranger may unwind a pending_outgoing_transfers entry.
+//
+// A legitimate entry lives for SECONDS: the recipient wallet credits the ATH and sends send_source_wallet_ack in the
+// SAME transaction that acks the requester, and that ack deletes the entry here. Nothing legitimate holds one open.
+// 30 days is therefore not a tuned figure but a deliberate absurdity — it is longer than ATH_REGISTRY_PENDING_TTL
+// (the longest escrow window anywhere in this contract) by more than four times, so no honest flow can ever reach it.
+const ATH_OUTGOING_STUCK_RECOVERY_GRACE_SECONDS: Int = 2592000; // 30 days
+// The unwind emits ATHTransferFailed into a counterparty that will do real work with it (MarketStabilitySeller
+// refunds the buyer, the registries unwind an escrow), so the caller must fund that leg. Sized from this contract's
+// own largest receiver reserve plus a response ack, not guessed.
+const ATH_OUTGOING_STUCK_RECOVERY_MIN_VALUE: Int = ATH_OWNER_REQUEST_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE
+    + ATH_REGISTRY_RESPONSE_ACK_VALUE;
 const ATH_NOTIFY_REFUND_QUERY_DOMAIN: Int = 0x41545246; // "ATRF"
 const ATH_QUERY_ID_MOD: Int = 18446744073709551616;
 const ATH_SENDER_KEY_MOD: Int = 1461501637330902918203684832716283019655932542976; // 2^160
@@ -334,6 +347,30 @@ message(0xD53276DB) JettonExcesses {
 }
 
 message(0x41544807) ATHWalletTopUpStorageReserve {} // "ATH"+0x07 — F11/#2: no-authority storage-reserve top-up
+
+// "ATH"+0x08 — [ADDED 2026-07-29, wave-8 HIGH] unwind an outgoing transfer that can no longer terminate.
+//
+// WHY THIS EXISTS. Every contract that spends ATH through this wallet — ATHVesting, MarketStabilitySeller,
+// FeeAccumulator, both registries — parks itself in a PENDING phase until one of ATHTransferAck / ATHTransferFailed /
+// bounced<ATHTransferRequest> comes back. If none ever does, that phase is terminal: the counterparty freezes forever,
+// and for MarketStabilitySeller that freezes the entire 60,000,000 ATH reserve together with a buyer's paid TON.
+// Since a contract is IMMUTABLE after seal, the exit has to exist before the seal or it never exists.
+//
+// WHY IT CANNOT LOSE OR DOUBLE-SPEND. The obvious escape — let the stuck counterparty time out on its own — forces it
+// to GUESS whether the ATH moved, and both guesses are wrong: crediting the claim destroys a tranche, releasing it
+// pays twice. This wallet never has to guess, because the pending entry IS the answer. It is written before the
+// internal transfer leaves (store_pending_outgoing) and deleted the moment the recipient's ack arrives, and the
+// recipient emits that ack in the SAME transaction as the requester's. So an entry still present after the grace
+// proves the transfer did not complete, and the unwind — balance restored here, ATHTransferFailed to the RECORDED
+// response_destination — is the truth, not a bet. If the transfer did complete, there is no entry and 14251 refuses.
+//
+// WHY IT IS PERMISSIONLESS. It reads its destination out of storage and can never be pointed anywhere by the caller;
+// the ATH returns to this wallet's own balance, so there is nothing for a caller to take. It must be open precisely
+// because the counterparty is usually the frozen party, and an owner-only exit would be locked behind the freeze.
+message(0x41544808) ATHRecoverStuckOutgoing {
+    query_id: Int as uint64;
+    recipient_wallet: Address;
+}
 
 // TEP-74 standard get_wallet_data shape: positional 4-tuple {int balance, slice owner, slice jetton_master,
 // cell jetton_wallet_code}. The 4th field (jetton_wallet_code) is what indexers (tonapi) + wallets (Tonkeeper)
@@ -1146,6 +1183,35 @@ contract ATHWallet {
         throwUnless(14242, pending.amount == msg.amount);
         throwUnless(14243, sender() == pending.recipient_wallet);
         self.pending_outgoing_transfers.del(pending_key);
+    }
+
+    receive(msg: ATHRecoverStuckOutgoing) {
+        throwUnless(14250, context().value >= ATH_OUTGOING_STUCK_RECOVERY_MIN_VALUE);
+        let pending_key: Int = self.compute_pending_outgoing_key(msg.query_id, msg.recipient_wallet);
+        let pendingOpt: PendingAthOutgoingTransfer? = self.pending_outgoing_transfers.get(pending_key);
+        // No entry means the transfer already terminated. There is nothing stuck and nothing to give back; unwinding
+        // anyway is exactly the double-spend this receiver exists to avoid.
+        throwUnless(14251, pendingOpt != null);
+        let pending: PendingAthOutgoingTransfer = pendingOpt!!;
+        throwUnless(14252, now() > pending.created_at + ATH_OUTGOING_STUCK_RECOVERY_GRACE_SECONDS);
+
+        self.pending_outgoing_transfers.del(pending_key);
+        self.balance += pending.amount;
+
+        if (pending.response_destination != myAddress()) {
+            message(MessageParameters {
+                to: pending.response_destination,
+                value: 0,
+                mode: SendRemainingValue,
+                // Bounceable on purpose, matching restore_bounced_outgoing: a counterparty that refuses this returns
+                // the value rather than swallowing it. This wallet's own state is already correct either way.
+                bounce: true,
+                body: ATHTransferFailed {
+                    query_id: msg.query_id,
+                    amount: pending.amount
+                }.toCell()
+            });
+        }
     }
 
     receive(msg: AthTransferNotificationAck) {

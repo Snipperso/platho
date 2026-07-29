@@ -9,8 +9,15 @@ const ATH_VESTING_PERIOD_UNLOCK_AMOUNT: Int = 100000000000000; // 100,000 ATH at
 const ATH_VESTING_PERIOD_COUNT: Int = 100;
 const ATH_VESTING_PERIOD_SECONDS: Int = 31536000;
 const ATH_VESTING_TRANSFER_REQUEST_VALUE: Int = 58000000; // raised 40M->58M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the beneficiary ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M, +10M margin.
-const ATH_VESTING_LOCAL_EXEC_RESERVE: Int = 2000000;
-const ATH_VESTING_EXCESS_REFUND_MIN_VALUE: Int = 100000;
+// [RAISED 2026-07-29, wave-8 MED: 2M -> 10M] This is what a claim LEAVES BEHIND, and it is the only inflow this
+// contract has. MEASURED from build/ATHVesting/ATHVesting_ATHVesting.code.boc: 113 distinct code cells plus a data
+// cell that spills at 1321 bits of fields, so ~115 account cells; at the project's frozen 64,962 nanoton per cell-year
+// that is ~7,470,000 nanoton of rent PER YEAR, i.e. ~747,000,000 over the 100-year schedule. At 2,000,000 a claim,
+// net of gas and two forward fees, the schedule funded almost none of its own rent. At 10,000,000 an annual claim
+// retains roughly one year of it. This is a belt, not the trousers: a beneficiary who claims once a decade retains
+// once a decade, so the DEPLOY value must still pre-fund the century on its own — see the D06 note in
+// scripts/mainnet_tx_dry_run_packet.ts, raised in the same change.
+const ATH_VESTING_LOCAL_EXEC_RESERVE: Int = 10000000;
 const ATH_VESTING_PHASE_IDLE: Int = 0;
 const ATH_VESTING_PHASE_PENDING_TRANSFER: Int = 1;
 const UINT64_MAX: Int = 18446744073709551615;
@@ -63,6 +70,15 @@ contract ATHVesting {
         throwUnless(24000, masterStd.workchain == 0);
         throwUnless(24001, beneficiaryStd.workchain == 0);
         throwUnless(24002, start_time > 0);
+        // [ADDED 2026-07-29, wave-8 LOW] The master's and the beneficiary's workchains were checked; this contract's
+        // own was not — even though deriveAthWalletAddress takes the workchain for the OFFICIAL wallet straight out of
+        // myAddress(). Deployed off basechain, the vesting wallet derives into that same foreign workchain while
+        // ATHWallet's own gate 14600 demands a basechain owner, so the wallet refuses every request and the entire
+        // 10,000,000 ATH is unspendable on an immutable contract. A helper isBasechainAddress() sat here written for
+        // exactly this check and called nowhere — the gate was designed and then not installed — so the check is now
+        // inlined (init cannot call contract methods) and the helper is deleted rather than left looking like a guard.
+        let selfStd: StdAddress = parseStdAddress(myAddress().asSlice());
+        throwUnless(24003, selfStd.workchain == 0);
         self.ath_master_address = ath_master_address;
         self.beneficiary_address = beneficiary_address;
         self.start_time = start_time;
@@ -73,11 +89,6 @@ contract ATHVesting {
         self.pending_recipient_ath_wallet = beneficiary_address;
         self.pending_created_at = 0;
         self.last_terminal_query_id = 0;
-    }
-
-    fun isBasechainAddress(address: Address): Bool {
-        let std: StdAddress = parseStdAddress(address.asSlice());
-        return std.workchain == 0;
     }
 
     fun deriveAthWalletAddress(owner: Address): Address {
@@ -137,20 +148,6 @@ contract ATHVesting {
         self.last_terminal_query_id = queryId;
     }
 
-    fun refundExcess(destination: Address, amount: Int) {
-        if (amount < ATH_VESTING_EXCESS_REFUND_MIN_VALUE) {
-            return;
-        }
-
-        message(MessageParameters {
-            to: destination,
-            value: amount,
-            bounce: false,
-            mode: SendPayFwdFeesSeparately,
-            body: null
-        });
-    }
-
     receive(msg: ClaimAthVesting) {
         throwUnless(24100, self.phase == ATH_VESTING_PHASE_IDLE);
         throwUnless(24101, msg.query_id > 0);
@@ -168,9 +165,22 @@ contract ATHVesting {
         self.pending_recipient_ath_wallet = recipientWallet;
         self.pending_created_at = now();
 
+        // [CHANGED 2026-07-29, wave-8 MED] The downstream budget used to be the flat ATH_VESTING_TRANSFER_REQUEST_VALUE
+        // with every nanoton above requiredValue refunded to the caller, which meant OVERPAYING COULD NOT PUSH A CLAIM
+        // THROUGH. On a contract that is immutable for a hundred years that is the wrong default: gas and forward fees
+        // are voted by validators (configs 20/21/24/25) and every floor downstream — the wallet's 48,000,000 request
+        // floor, gate 14212's arrival minimum — is a frozen literal. ATHWallet itself takes the opposite approach one
+        // hop later (downstream_value = context().value - ATH_OWNER_REQUEST_EXEC_RESERVE), so the owner there can
+        // always force an operation through by paying more. This lane now behaves the same way, and the constant stays
+        // as the FLOOR that gate 24106 enforces rather than as a ceiling.
+        //
+        // Nothing is lost by not refunding: surplus travels to the beneficiary's wallet, which returns its own excess
+        // to response_destination — this contract — where it lands on the balance and pays rent. (That inbound refund
+        // has a null body and so hits receive() and throws 24999, but it is non-bounceable, so the value is credited
+        // before compute runs and stays. Documented, not relied upon for correctness.)
         message(MessageParameters {
             to: self.ownAthWalletAddress(),
-            value: ATH_VESTING_TRANSFER_REQUEST_VALUE,
+            value: context().value - ATH_VESTING_LOCAL_EXEC_RESERVE,
             bounce: true,
             mode: SendPayFwdFeesSeparately,
             body: ATHTransferRequest {
@@ -180,8 +190,6 @@ contract ATHVesting {
                 response_destination: myAddress()
             }.toCell()
         });
-
-        self.refundExcess(sender(), context().value - requiredValue);
     }
 
     receive(msg: ATHTransferAck) {

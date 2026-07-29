@@ -225,9 +225,20 @@ contract MarketStabilitySeller {
         return self.ceilDiv(numerator, MARKET_STABILITY_TRANCHE_ATH);
     }
 
+    // [CHANGED 2026-07-29, wave-8 MED] Was `queryId == last_terminal_query_id + 1` — an EXACT number the buyer had to
+    // read with a getter and then win a race to use. With the buy lane permissionless and only one sale in flight,
+    // that made the whole 690,000 GRAM lane grievable for 60,000,001 nanoton a cycle: an observer watches for a
+    // terminal, takes the one next number with a 1-unit dust buy (ceilDiv prices it at 1 nanoton), and every honest
+    // buyer in that round bounces on 23013. Nobody lost money, but the lane was unusable for ~0.06 GRAM a turn.
+    //
+    // Monotonicity is what the sequence was actually FOR — it is what stops a terminal from being replayed against a
+    // later sale — and `>` preserves it exactly. What it drops is the requirement to guess the number, so a buyer may
+    // pick anything ahead of the last terminal (a timestamp, say) and no longer has an exact slot to be raced out of.
+    // The single in-flight slot still exists, so a dust buy can still occupy it for one round trip; that costs the
+    // attacker the same 60,000,001 and delays an honest buyer by seconds instead of bouncing them.
     fun requireNextQueryId(queryId: Int) {
         throwUnless(23012, queryId < UINT64_MAX);
-        throwUnless(23013, queryId == self.last_terminal_query_id + 1);
+        throwUnless(23013, queryId > self.last_terminal_query_id);
     }
 
     fun recordTerminalQueryId(queryId: Int) {
@@ -444,6 +455,32 @@ contract MarketStabilitySeller {
             value: msg.amount,
             bounce: false,
             mode: SendPayFwdFeesSeparately,
+            body: null
+        });
+
+        // [ADDED 2026-07-29, wave-8 LOW] Give the caller's own value back, so it cannot fund the leg above.
+        //
+        // Flushing is permissionless, and 23262 only ever required the caller to SEND 2,000,000 while 23263 allowed
+        // flushing exactly 2,000,000. At that ratio the inbound value covered the outbound leg exactly: the treasury
+        // received its 2,000,000, treasury_due_ton fell by 2,000,000, and the contract's own nanotons never moved.
+        // Repeat until the due hits zero, 23261 then forbids every further flush, and the real sale proceeds are
+        // sealed inside a contract that has no other outgoing TON path at all. Nobody profits — the griefer pays the
+        // treasury exactly what they strand — which is why looking for a motive would have missed it entirely.
+        //
+        // A balance check cannot catch this: money is fungible, so a contract that is over-funded relative to its due
+        // looks identical to one that is correctly funded. Bounding the inbound value with a hard cap would catch it,
+        // but a hard cap on an immutable contract is the more dangerous bug — one validator vote raising gas past the
+        // cap and the entire proceeds are stranded for good, which is the very outcome being prevented. Returning the
+        // change needs no cap and no ratio: what the caller sends, the caller gets back, so subsidy is not expressible.
+        //
+        // MEASURED, not assumed — SendRemainingValue after an explicit leg has drained a balance elsewhere in this
+        // codebase (FeeAccumulator) and behaved correctly in another (ATHWallet), so MSTAB-07 asserts the contract's
+        // balance falls by the flushed amount and no more, with the caller made whole.
+        message(MessageParameters {
+            to: sender(),
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue | SendIgnoreErrors,
             body: null
         });
     }

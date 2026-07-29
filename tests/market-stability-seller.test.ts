@@ -17,6 +17,7 @@ import {
   SealMarketStabilityGenesis,
 } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
 import {
+  ATHRecoverStuckOutgoing,
   ATHTransferRequestWithNotify,
   ATHWallet,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
@@ -594,6 +595,135 @@ describe('MarketStabilitySeller', () => {
     expect(state.treasury_due_ton).toBe(0n);
     expect(state.last_terminal_query_id).toBe(0n);
     expect(totals.sold_ath_total).toBe(0n);
+  });
+
+  it('MSTAB-02D: a recipient that never acks froze the whole reserve — the wallet-side unwind frees it and repays the buyer', async () => {
+    const env = await setup();
+    await bindAndSeal(env);
+    await fundReserve(env, TRANCHE);
+
+    // The realistic stuck shape, unlike MSTAB-02C above: the Seller's OWN wallet is the genuine ATHWallet (its address
+    // is code-derived, so nothing else can ever live there), and it is the RECIPIENT that swallows the internal
+    // transfer without acking and without bouncing. The Seller then has no terminal coming and no clock of its own.
+    const recipientAthWallet = contractAddress(0, await ATHWallet.init(0n, env.recipient.address, env.athMaster));
+    const mockInit = await MockAthWalletNoAck.init();
+    await env.blockchain.setShardAccount(recipientAthWallet, createShardAccount({
+      address: recipientAthWallet,
+      code: mockInit.code,
+      data: mockInit.data,
+      balance: toNano('1'),
+      workchain: recipientAthWallet.workChain,
+    }));
+
+    const price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
+    const buyerBefore = await env.buyer.getBalance();
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 1n,
+      amount: TRANCHE,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+
+    // Frozen: the buyer paid, the reserve is gone from the books, and SealMarketStabilityGenesis left no
+    // administrative command that could ever unstick it.
+    let state = await env.seller.getGetMarketStabilitySellerState();
+    expect(state.phase).toBe(1n);
+    expect(state.reserve_due_ath).toBe(0n);
+    expect(await env.buyer.getBalance()).toBeLessThan(buyerBefore - price);
+
+    const sellerWallet = await officialSellerAthWallet(env);
+    expect((await sellerWallet.getGetWalletData()).balance).toBe(0n);
+
+    // 30 days later anyone may unwind it at the wallet, which is the only party that knows the transfer never landed.
+    env.blockchain.now = 1_700_000_000 + 2_592_000 + 1;
+    await sellerWallet.send(env.flusher.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ATHRecoverStuckOutgoing',
+      query_id: 1n,
+      recipient_wallet: recipientAthWallet,
+    } as ATHRecoverStuckOutgoing);
+
+    // The ATH is back in the Seller's wallet AND back on its books, the phase is free, and the buyer was repaid the
+    // principal — the sale simply never happened. Nothing was sold twice and nothing was written off.
+    expect((await sellerWallet.getGetWalletData()).balance).toBe(TRANCHE);
+    state = await env.seller.getGetMarketStabilitySellerState();
+    expect(state.phase).toBe(0n);
+    expect(state.reserve_due_ath).toBe(TRANCHE);
+    expect(state.treasury_due_ton).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(1n);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(0n);
+    expect(await env.buyer.getBalance()).toBeGreaterThan(buyerBefore - price);
+  });
+
+  it('MSTAB-07: a flush moves the CONTRACT\'s money, never the caller\'s, and the caller is made whole', async () => {
+    const env = await setup();
+    await bindAndSeal(env);
+    await fundReserve(env, TRANCHE);
+
+    const amount = 1n; // 1 atomic unit of ATH — priced by ceilDiv at 1 nanoton
+    const price = await env.seller.getGetQuoteTonForAmount(amount);
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 1n,
+      amount,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+
+    const due = (await env.seller.getGetMarketStabilitySellerState()).treasury_due_ton;
+    expect(due).toBe(price);
+
+    // The grief: pay the flush yourself. Before the change return, the inbound value covered the outgoing leg exactly,
+    // so the due fell while the contract's own nanotons stayed — and once the due hits zero, 23261 seals them in.
+    const sellerBefore = (await env.blockchain.getContract(env.seller.address)).balance;
+    const flusherBefore = await env.flusher.getBalance();
+    const funded = toNano('0.5');
+    await env.seller.send(env.flusher.getSender(), { value: funded }, {
+      $$type: 'FlushMarketStabilityTreasuryTon',
+      amount: due,
+    } as FlushMarketStabilityTreasuryTon);
+
+    const sellerAfter = (await env.blockchain.getContract(env.seller.address)).balance;
+    const flusherAfter = await env.flusher.getBalance();
+
+    expect((await env.seller.getGetMarketStabilitySellerState()).treasury_due_ton).toBe(0n);
+
+    // MEASURED both directions. The contract really paid: its balance fell, and it did not rise by the funded amount.
+    expect(sellerAfter).toBeLessThan(sellerBefore);
+    // And SendRemainingValue did NOT drain it — the drop stays within the flushed amount plus a few fees, nowhere near
+    // the 0.5 GRAM that was sent in. This is the half of the assertion that catches an over-send.
+    expect(sellerBefore - sellerAfter).toBeLessThan(due + toNano('0.02'));
+    // The caller got their funding back, minus gas only — so there is nothing left to subsidise a flush with.
+    expect(flusherBefore - flusherAfter).toBeLessThan(toNano('0.02'));
+  });
+
+  it('MSTAB-08: a buyer no longer has to guess the exact next query id, but a used one is still refused', async () => {
+    const env = await setup();
+    await bindAndSeal(env);
+    await fundReserve(env, TRANCHE);
+
+    // Far ahead of last_terminal_query_id + 1: under the old rule this bounced on 23013, which is what made the lane
+    // grievable — an attacker only had to take the one number that worked.
+    const price = await env.seller.getGetQuoteTonForAmount(1n);
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 987654n,
+      amount: 1n,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+
+    let state = await env.seller.getGetMarketStabilitySellerState();
+    expect(state.phase).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(987654n);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(1n);
+
+    // Monotonicity is what the sequence was for, and it survives: at or below the last terminal is still refused.
+    const res = await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 987654n,
+      amount: 1n,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+    expect(findTransaction(res.transactions, { on: env.seller.address, exitCode: 23013 })).toBeTruthy();
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(1n);
   });
 
   it('MSTAB-03: rejects over-cap reserve funding and over-tranche buys before mutation', async () => {
