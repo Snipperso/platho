@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: UsernameNFTItem
-BoC Size: 1948 bytes
+BoC Size: 2132 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 23
@@ -46,8 +46,8 @@ TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
 ### InitializeUsernameItem
-TL-B: `initialize_username_item#554e494e owner_wallet:address username_len:uint8 username:remainder<slice> = InitializeUsernameItem`
-Signature: `InitializeUsernameItem{owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+TL-B: `initialize_username_item#554e494e owner_wallet:address mint_nonce:uint64 username_len:uint8 username:remainder<slice> = InitializeUsernameItem`
+Signature: `InitializeUsernameItem{owner_wallet:address,mint_nonce:uint64,username_len:uint8,username:remainder<slice>}`
 
 ### ResendDeployedAck
 TL-B: `resend_deployed_ack#639cfc6c  = ResendDeployedAck`
@@ -66,8 +66,8 @@ TL-B: `username_ownership_proof#554e504f query_id:uint64 name_hash:uint256 owner
 Signature: `UsernameOwnershipProof{query_id:uint64,name_hash:uint256,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
 
 ### UsernameItemDeployedAck
-TL-B: `username_item_deployed_ack#bba3ec19 name_hash:uint256 owner_wallet:address = UsernameItemDeployedAck`
-Signature: `UsernameItemDeployedAck{name_hash:uint256,owner_wallet:address}`
+TL-B: `username_item_deployed_ack#bba3ec19 name_hash:uint256 owner_wallet:address mint_nonce:uint64 = UsernameItemDeployedAck`
+Signature: `UsernameItemDeployedAck{name_hash:uint256,owner_wallet:address,mint_nonce:uint64}`
 
 ### NftTransfer
 TL-B: `nft_transfer#5fcc3d14 query_id:uint64 payload:remainder<slice> = NftTransfer`
@@ -94,8 +94,8 @@ TL-B: `_ marker:uint8 metadata:dict<uint256, ^cell> = UsernameNftOnchainContent`
 Signature: `UsernameNftOnchainContent{marker:uint8,metadata:dict<uint256, ^cell>}`
 
 ### UsernameNFTItem$Data
-TL-B: `_ initialized:bool owner_wallet:address username_registry_address:address name_hash:uint256 username_len:uint8 username:^cell = UsernameNFTItem`
-Signature: `UsernameNFTItem{initialized:bool,owner_wallet:address,username_registry_address:address,name_hash:uint256,username_len:uint8,username:^cell}`
+TL-B: `_ initialized:bool owner_wallet:address username_registry_address:address name_hash:uint256 username_len:uint8 username:^cell init_owner_wallet:address init_mint_nonce:uint64 = UsernameNFTItem`
+Signature: `UsernameNFTItem{initialized:bool,owner_wallet:address,username_registry_address:address,name_hash:uint256,username_len:uint8,username:^cell,init_owner_wallet:address,init_mint_nonce:uint64}`
 
 ## Get methods
 Total get methods: 2

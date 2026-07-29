@@ -37,6 +37,7 @@ const usernameSlice = (name: string) => beginCell().storeBuffer(Buffer.from(name
 const initMsg = (owner: Address, name: string) => ({
   $$type: 'InitializeUsernameItem' as const,
   owner_wallet: owner,
+  mint_nonce: 1n,
   username_len: BigInt(Buffer.from(name, 'ascii').length),
   username: usernameSlice(name),
 });
@@ -83,6 +84,7 @@ describe('THE ITEM IS THE RECORD — what name_records duplicates', () => {
       body: beginCell()
         .storeUint(0x554E494E, 32)
         .storeAddress(second)
+        .storeUint(2, 64)   // mint_nonce — hand-mirrored wire layout; omitting it made this exit 9, not 18011
         .storeUint(5, 8)
         .storeSlice(usernameSlice('taken'))
         .endCell(),

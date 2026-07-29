@@ -146,6 +146,7 @@ struct PendingUsernameMint {
     item_address: Address;
     item_deploy_value: Int as uint128;
     created_at: Int as uint64;
+    mint_nonce: Int as uint64;
 }
 
 struct UsernameRegistryGlobalView {
@@ -244,6 +245,7 @@ contract UsernameRegistry {
     deployment_manifest_hash: Int as uint256;
     genesis_config_hash: Int as uint256;
     pending_mint_count: Int as uint64;
+    mint_seq: Int as uint64;   // monotonic pending-mint nonce; see gate 19137
     treasury_due_ath: Int as uint128;
     burn_due_ath: Int as uint128;
     pending_mints: map<Int, PendingUsernameMint>;
@@ -276,6 +278,7 @@ contract UsernameRegistry {
         self.deployment_manifest_hash = deployment_manifest_hash;
         self.genesis_config_hash = genesis_config_hash;
         self.pending_mint_count = 0;
+        self.mint_seq = 0;
         self.treasury_due_ath = 0;
         self.burn_due_ath = 0;
         self.pending_treasury_flush_count = 0;
@@ -482,6 +485,10 @@ contract UsernameRegistry {
         let item_address: Address = self.deriveItemAddress(name_hash);
         throwUnless(19123, !self.pending_item_to_name_hash.exists(item_address));
 
+        // [ADDED 2026-07-29, wave-8 HIGH] Strictly increasing, so no two pending mints ever share a nonce and an ACK
+        // can name the one initialization it actually came from. See the UsernameItemDeployedAck receiver.
+        self.mint_seq += 1;
+
         self.pending_mints.set(name_hash, PendingUsernameMint {
             query_id: query_id,
             sender_key: sender_key,
@@ -490,7 +497,8 @@ contract UsernameRegistry {
             price_paid: amount,
             item_address: item_address,
             item_deploy_value: USERNAME_NFT_ITEM_DEPLOY_RESERVE,
-            created_at: now()
+            created_at: now(),
+            mint_nonce: self.mint_seq
         });
         self.pending_item_to_name_hash.set(item_address, name_hash);
         self.pending_mint_count += 1;
@@ -505,6 +513,7 @@ contract UsernameRegistry {
             data: item_init.data,
             body: InitializeUsernameItem {
                 owner_wallet: owner_wallet,
+                mint_nonce: self.mint_seq,
                 username_len: username_len,
                 username: username
             }.toCell()
@@ -541,12 +550,33 @@ contract UsernameRegistry {
         self.sealed = true;
     }
 
+    // The 56 art keys, and only those. Kept next to the gate that uses it so the two cannot drift apart.
+    fun isValidArtKey(key: Int): Bool {
+        if (key == 45) { return true; }                       // '-'
+        if ((key >= 48) && (key <= 57)) { return true; }      // '0'..'9'
+        if (key == 95) { return true; }                       // '_'
+        if ((key >= 97) && (key <= 122)) { return true; }     // 'a'..'z'
+        if ((key >= 200) && (key <= 209)) { return true; }    // caption digits
+        if ((key >= 300) && (key <= 307)) { return true; }    // statics
+        return false;
+    }
+
     // UploadArt: the genesis controller stores one art part (plain-snake path-`d`) until the art
     // is sealed. DECOUPLED from the genesis seal so mint/integration flows can seal the genesis
     // without art; SealArt locks the art for production once all 56 parts are present.
     receive(msg: UploadArt) {
         self.requireGenesisController();
         throwUnless(19061, !self.art_sealed);
+        // [ADDED 2026-07-29, wave-8 MED] key is a uint16 and every one of its 65,536 values was accepted, while
+        // art_count only ever goes UP — there is no art.del and no decrement anywhere in this contract. SealArt
+        // demands art_count == 56 EXACTLY. So a single upload with a key outside the working set pushed the count
+        // past 56 permanently, 19060 could never pass again, and genesis verification asserts art_sealed == true.
+        // The registry's address derives from its code and init arguments, so there is no retry that is not a
+        // different registry. The twin handler below already had its range gate (19072); this one did not.
+        //
+        // The set is VERIFIED against artifacts/username_art_v2/art_payload.json, not transcribed from a comment:
+        // 45 ('-'), 48-57 ('0'-'9'), 95 ('_'), 97-122 ('a'-'z'), 200-209 (caption digits), 300-307 (statics) = 56.
+        throwUnless(19062, self.isValidArtKey(msg.key));
         if (self.art.get(msg.key) == null) {
             self.art_count += 1;
         }
@@ -608,6 +638,20 @@ contract UsernameRegistry {
         throwUnless(19133, self.isBasechainAddress(msg.owner_wallet));
         throwUnless(19134, pending.item_address == sender());
         throwUnless(19136, msg.owner_wallet == pending.owner_wallet);
+        // [ADDED 2026-07-29, wave-8 HIGH] The ACK must come from the initialization THIS pending mint caused.
+        //
+        // Nothing else in this receiver establishes freshness. The item initializes exactly once (its gate 18011),
+        // so a name that already exists can never produce a new ACK — yet ResendDeployedAck is open to anyone, for
+        // 4,000,000, without limit, and used to replay an ACK carrying the item's current owner. Whenever that owner
+        // matched a later pending mint's owner_wallet — a repeat purchase of one's own name, a gift to a wallet that
+        // already holds it, a client retry after an unseen confirmation — 19136 was satisfied by coincidence and the
+        // registry finalized a mint that had not happened: price booked to treasury_due/burn_due, the payer's ATH
+        // acked as ACCEPTED, and the genuine bounce arriving afterwards dying on 19140 because the pending was gone.
+        // The buyer paid and received nothing, permanently, and it cost the attacker 4,000,000 nanoton.
+        //
+        // The nonce is issued here and stored by the item at initialization, so a replay reports the nonce of the
+        // initialization that really occurred — never the one this pending mint is waiting for.
+        throwUnless(19137, msg.mint_nonce == pending.mint_nonce);
 
         let pendingToFinalize: PendingUsernameMint = self.clearPendingMint(msg.name_hash);
 

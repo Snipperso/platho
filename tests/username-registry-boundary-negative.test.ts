@@ -331,6 +331,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
     await item.send(blockchain.sender(registry.address), { value: ITEM_ACK_FORWARD_RESERVE + ITEM_ACK_EXEC_RESERVE }, {
       $$type: 'InitializeUsernameItem',
       owner_wallet: ownerWallet,
+      mint_nonce: 1n,
       username_len: 6n,
       username: usernameSlice('itemok'),
     } as InitializeUsernameItem);

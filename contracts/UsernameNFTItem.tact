@@ -18,6 +18,9 @@ const USERNAME_ITEM_METADATA_KEY_DESCRIPTION: Int = 0xc9046f7a37ad0ea7cee7335598
 
 message(0x554E494E) InitializeUsernameItem {
     owner_wallet: Address;
+    // [ADDED 2026-07-29, wave-8 HIGH] Identifies WHICH pending mint this initialization belongs to. It sits before
+    // `username` because that field is `as remaining` and nothing can follow it.
+    mint_nonce: Int as uint64;
     username_len: Int as uint8;
     username: Slice as remaining;
 }
@@ -51,6 +54,7 @@ message(0x554E504F) UsernameOwnershipProof {
 message(0xBBA3EC19) UsernameItemDeployedAck {
     name_hash: Int as uint256;
     owner_wallet: Address;
+    mint_nonce: Int as uint64;
 }
 
 // TEP-62 NFT transfer surface. The body after query_id is parsed manually because
@@ -101,6 +105,18 @@ contract UsernameNFTItem {
     name_hash: Int as uint256;
     username_len: Int as uint8;
     username: Cell;
+    // [ADDED 2026-07-29, wave-8 HIGH] What the ACK must report, frozen at initialization.
+    //
+    // sendDeployedAck used to read the LIVE owner_wallet, which NftTransfer rewrites without knowing whether the
+    // registry ever accepted the ACK. A resend after a transfer therefore carried the new owner, failed the
+    // registry's 19136, and made recovery of an unfinished mint impossible forever. And with ResendDeployedAck open
+    // to anyone for 4,000,000, an ACK from an item initialized long ago could finalize a LATER pending mint whose
+    // owner_wallet happened to match — buying a name already owned by the same wallet, a gift to a wallet that
+    // already holds it, or a client retry. The registry then booked the price, acked the payer's ATH as accepted,
+    // and the genuine bounce that followed died on 19140 because the pending was already gone. Payment taken, no
+    // NFT, no refund. The nonce makes an ACK say which initialization it came from, and there is only ever one.
+    init_owner_wallet: Address;
+    init_mint_nonce: Int as uint64;
 
     init(username_registry_address: Address, name_hash: Int) {
         throwUnless(18001, name_hash != 0);
@@ -110,6 +126,8 @@ contract UsernameNFTItem {
         self.name_hash = name_hash;
         self.username_len = 0;
         self.username = beginCell().endCell();
+        self.init_owner_wallet = username_registry_address;
+        self.init_mint_nonce = 0;
     }
 
     fun isBasechainAddress(address: Address): Bool {
@@ -208,7 +226,8 @@ contract UsernameNFTItem {
             mode: SendPayFwdFeesSeparately,
             body: UsernameItemDeployedAck {
                 name_hash: self.name_hash,
-                owner_wallet: self.owner_wallet
+                owner_wallet: self.init_owner_wallet,
+                mint_nonce: self.init_mint_nonce
             }.toCell()
         });
     }
@@ -223,6 +242,8 @@ contract UsernameNFTItem {
 
         self.initialized = true;
         self.owner_wallet = msg.owner_wallet;
+        self.init_owner_wallet = msg.owner_wallet;
+        self.init_mint_nonce = msg.mint_nonce;
         self.username_len = msg.username_len;
         self.username = beginCell().storeSlice(msg.username).endCell();
 

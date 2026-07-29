@@ -149,6 +149,7 @@ async function deployItem(name = 'platho') {
   await item.send(blockchain.sender(registryAddress), { value: ITEM_ACK_RESEND_RESERVE }, {
     $$type: 'InitializeUsernameItem',
     owner_wallet: ownerWallet,
+    mint_nonce: 1n,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
   } as InitializeUsernameItem);
@@ -176,6 +177,7 @@ describe('UsernameNFTItem v1 milestone', () => {
     await validItem.send(registry.getSender(), { value: ITEM_ACK_RESEND_RESERVE }, {
       $$type: 'InitializeUsernameItem',
       owner_wallet: ownerWallet,
+      mint_nonce: 1n,
       username_len: 8n,
       username: usernameSlice('name_1-x'),
     } as InitializeUsernameItem);
@@ -197,6 +199,7 @@ describe('UsernameNFTItem v1 milestone', () => {
     await invalidItem.send(registry.getSender(), { value: ITEM_ACK_RESEND_RESERVE }, {
       $$type: 'InitializeUsernameItem',
       owner_wallet: ownerWallet,
+      mint_nonce: 1n,
       username_len: 8n,
       username: usernameSlice('Name_1-x'),
     } as InitializeUsernameItem);

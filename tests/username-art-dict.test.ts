@@ -61,6 +61,25 @@ async function uploadAll(registry: any, controller: any, keys?: number[]) {
 }
 
 describe('UsernameRegistry art-dict (option B)', () => {
+  it('ART-KEY-01: a key outside the 56-part set is refused, because art_count only ever goes UP', async () => {
+    // SealArt demands art_count == 56 EXACTLY, and there is no art.del and no decrement anywhere in the contract.
+    // So one upload with a stray key used to push the count past 56 permanently — 19060 could never pass again,
+    // genesis verification asserts art_sealed == true, and the registry's address derives from its code and init
+    // arguments, so "deploy another one" is a different registry. The twin UploadCollectionMeta had its range gate
+    // (19072) from the start; this handler did not.
+    const { registry, controller } = await deployRegistry();
+
+    for (const stray of [0n, 44n, 58n, 96n, 123n, 199n, 210n, 299n, 308n, 65535n]) {
+      const res = await registry.send(controller.getSender(), { value: toNano('0.05') }, {
+        $$type: 'UploadArt', key: stray, data: plainSnake('00'),
+      });
+      const tx: any = res.transactions.find((t: any) => t.inMessage?.info?.dest?.equals?.(registry.address));
+      expect(tx?.description?.computePhase?.exitCode, `key ${stray} must be refused`).toBe(19062);
+    }
+
+    expect(await registry.getGetArtCount(), 'not one stray key was counted').toBe(0n);
+  });
+
   it('ART-01: get_nft_content image_data == reference SVG after uploading all 56 parts', async () => {
     const { blockchain, registry, controller, addr } = await deployRegistry();
     await uploadAll(registry, controller);
