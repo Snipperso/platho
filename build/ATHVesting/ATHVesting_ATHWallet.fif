@@ -749,7 +749,7 @@ PROGRAM{
   $ATHWallet$_fun_notify_transfer_value PROCREF:<{
     1000000 PUSHINT
     ADD
-    1000000 PUSHINT
+    4000000 PUSHINT
     ADD
     7000000 PUSHINT
     ADD
@@ -759,7 +759,7 @@ PROGRAM{
   $ATHWallet$_fun_registry_notify_transfer_value PROCREF:<{
     3000000 PUSHINT
     ADD
-    1000000 PUSHINT
+    4000000 PUSHINT
     ADD
     7000000 PUSHINT
     ADD
@@ -883,7 +883,7 @@ PROGRAM{
   $ATHTransferAck$_constructor_query_id_amount PROCINLINE:<{
   }>
   $ATHWallet$_fun_send_source_wallet_ack PROCREF:<{
-    1000000 PUSHINT
+    4000000 PUSHINT
     1 PUSHINT
     s0 s4 XCHG
     FALSE
@@ -2313,7 +2313,7 @@ PROGRAM{
         GEQ
       }>
       THROWANYIFNOT
-      30000000 PUSHINT
+      33000000 PUSHINT
       s10 PUSH
       ADD
       21000000 PUSHINT
@@ -2457,7 +2457,7 @@ PROGRAM{
       14212 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      26000000 PUSHINT
+      29000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s2 s4 XCPU
@@ -2489,7 +2489,7 @@ PROGRAM{
           SWAP
           SENDRAWMSG
       __tact_context_get_sender INLINECALLDICT
-      1000000 PUSHINT
+      4000000 PUSHINT
       1 PUSHINT
       s0 s7 XCHG
       FALSE
@@ -2566,7 +2566,7 @@ PROGRAM{
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
         s9 PUSH
-        1000000 PUSHINT
+        4000000 PUSHINT
         ADD
         7000000 PUSHINT
         ADD
@@ -2610,7 +2610,7 @@ PROGRAM{
         14717 PUSHINT
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
-        23000000 PUSHINT
+        26000000 PUSHINT
         GEQ
         THROWANYIFNOT
         s1 s2 XCPU
@@ -2628,7 +2628,7 @@ PROGRAM{
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       s0 s7 XCHG
-      1000000 PUSHINT
+      4000000 PUSHINT
       ADD
       1000000 PUSHINT
       ADD
@@ -2716,7 +2716,7 @@ PROGRAM{
       s8 PUSH
       1000000 PUSHINT
       ADD
-      1000000 PUSHINT
+      4000000 PUSHINT
       ADD
       7000000 PUSHINT
       ADD
@@ -2814,7 +2814,7 @@ PROGRAM{
           SWAP
           SENDRAWMSG
       __tact_context_get_sender INLINECALLDICT
-      1000000 PUSHINT
+      4000000 PUSHINT
       1 PUSHINT
       s0 s4 XCHG
       FALSE
@@ -2886,7 +2886,7 @@ PROGRAM{
       s5 PUSH
       3000000 PUSHINT
       ADD
-      1000000 PUSHINT
+      4000000 PUSHINT
       ADD
       7000000 PUSHINT
       ADD
@@ -2973,7 +2973,7 @@ PROGRAM{
           SWAP
           SENDRAWMSG
       __tact_context_get_sender INLINECALLDICT
-      1000000 PUSHINT
+      4000000 PUSHINT
       1 PUSHINT
       s0 s4 XCHG
       FALSE
@@ -3051,7 +3051,7 @@ PROGRAM{
       s8 PUSH
       3000000 PUSHINT
       ADD
-      1000000 PUSHINT
+      4000000 PUSHINT
       ADD
       7000000 PUSHINT
       ADD
@@ -3134,7 +3134,7 @@ PROGRAM{
           SWAP
           SENDRAWMSG
       __tact_context_get_sender INLINECALLDICT
-      1000000 PUSHINT
+      4000000 PUSHINT
       1 PUSHINT
       s0 s4 XCHG
       FALSE

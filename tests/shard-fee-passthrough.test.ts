@@ -42,7 +42,7 @@ const RS_DEPLOY_MIN_VALUE = 19_100_000n; // + RS_BASE_ENDOWMENT 3_500_000, charg
 const IS_MIN_VALUE = 15_310_000n;        //    10_000 + 2_500_000 + 10_000_000 + 2_800_000
 
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
-const FA_BUYBACK = Address.parse('UQDCA1g25Mx4PpNlQNRBJhlTjCLKsBeRtGDKlQrdMGbAetlc');
+const FA_BUYBACK = Address.parse('UQAGgJ-yDmmPgSdFmuNDLYeQmPAdx2sZaq3wKtT7TS5DlFml');
 const FA_POOL = Address.parse('UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH');
 
 /** The data cell of an AirdropTicket owned by `owner` — lazy-init flag plus the single init argument. */

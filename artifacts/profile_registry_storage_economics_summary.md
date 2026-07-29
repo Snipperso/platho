@@ -4,7 +4,7 @@ Status: **PASS**
 
 Sandbox evidence for the two properties that survived the 2026-07-21 pointer move: the registry account does NOT grow with the number of profiles (it used to grow 5.0000 cells each, capping the product at 13,076 profiles silently), and a settled purchase does not cost the registry TON. Per-profile storage endowments are gone with the state they funded; the buyer KeyShard funds its own rent, measured in tests/key-shard.test.ts KS-RENT-01. This is not a mainnet rent oracle; it is a release gate.
 
-ProfileRegistry code hash: `a8cc51ee1ded5eadc603a0a7de62749237a4bd0c8c668823c1e6098f6f61e14d`
+ProfileRegistry code hash: `8cf1577a88e4c1c46641008244430820670906cdd17d63dc04de86dc2a32533a`
 
 | Case | Owners | Updates | Retained delta | Registry cells | Cells per owner |
 |---|---:|---:|---:|---:|---:|

@@ -17,7 +17,10 @@ const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2_000_000n;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE = 2_000_000n;
 const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1_000_000n;
 const ATH_INTERNAL_TRANSFER_ACK_VALUE = 3_000_000n;
-const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1_000_000n;
+// Raised 1M -> 4M on 2026-07-29: it funds the ONLY path that clears pending_outgoing_transfers, and at 1M that
+// path ran out of gas past ~4 000 entries while failing silently (bounce:false). See the constant's comment in
+// contracts/ATHWallet.tact for the measurement.
+const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 4_000_000n;
 const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE = 21_000_000n;
 const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 20_000_000n;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 7_000_000n;

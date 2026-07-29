@@ -35,8 +35,11 @@ const OP_PROFILE_AVATAR_NOTIFICATION = 0xA11A7002;
 
 /** The declared floor in ATHWallet.tact — the whole point of this file is that it is high enough. */
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 45_000_000n;
-/** What gate 14212 demands on arrival at the payer's wallet. */
-const REFUND_ARRIVAL_FLOOR = 26_000_000n;
+/** What gate 14212 demands on arrival at the payer's wallet. Mirrors the contract: EXEC 2M + ACK 3M + SOURCE_ACK
+ *  4M + NOTIFY_STORAGE_ENDOWMENT 20M. Was 26M until SOURCE_ACK was raised 1M -> 4M on 2026-07-29 (it funds the only
+ *  path that clears pending_outgoing_transfers, and at 1M that path silently ran out of gas past ~4 000 entries).
+ *  14212 composes that constant, so this floor moves with it — and the notify floor above must still clear it. */
+const REFUND_ARRIVAL_FLOOR = 29_000_000n;
 
 function fixtureAddress(label: string): Address {
   return new Address(0, createHash('sha256').update(`PLATHO.V1.REFUNDFLOOR.${label}`).digest());

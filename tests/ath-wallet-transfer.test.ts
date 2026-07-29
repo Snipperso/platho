@@ -686,7 +686,11 @@ describe('ATH wallet transfer profile', () => {
     const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
 
-    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.084') }, {
+    // 0.084 -> 0.087 on 2026-07-29: gate 14314 composes ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE, raised 1M -> 4M,
+    // so this call's floor moved 74M -> 77M by construction. The old figure sat just above the OLD floor, so it now
+    // refuses in COMPUTE and nothing is debited — which would have quietly turned these tests from "the debit
+    // happens, and what we examine is what comes after" into "no transfer ever occurred".
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.087') }, {
       $$type: 'ATHTransferRequestWithNotify',
       query_id: queryId,
       amount: 100n,
@@ -1194,7 +1198,11 @@ describe('ATH wallet transfer profile', () => {
     const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
     const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
 
-    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.084') }, {
+    // 0.084 -> 0.087 on 2026-07-29: gate 14314 composes ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE, raised 1M -> 4M,
+    // so this call's floor moved 74M -> 77M by construction. The old figure sat just above the OLD floor, so it now
+    // refuses in COMPUTE and nothing is debited — which would have quietly turned these tests from "the debit
+    // happens, and what we examine is what comes after" into "no transfer ever occurred".
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.087') }, {
       $$type: 'ATHTransferRequestWithNotify',
       query_id: queryId,
       amount: 100n,

@@ -3,7 +3,7 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "ath_wallet": "bbe3157b05b8d9cc7bae1a3aacd690301e3a16a45a0657b96fb28fdfcf442f50"
+    "ath_wallet": "591289edc1df5fce99b028a10ed9dfc35d865bf07598dea42ec2361721641e6f"
   },
   "note": "Sandbox evidence that finalized/pruned ATH notification tombstones retain at least ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT after conservatively subtracting the terminal ACK/prune caller value. This is not a mainnet rent oracle; it is release evidence that the value envelope preserves tombstone backing across supported notification variants.",
   "required_tombstone_endowment_nanotons": "20000000",
@@ -11,7 +11,7 @@
     {
       "label": "NORMAL_NOTIFY_ACK",
       "terminal": "ack",
-      "inbound_value_nanotons": "74000000",
+      "inbound_value_nanotons": "77000000",
       "terminal_caller_value_nanotons": "1000000",
       "raw_balance_delta_nanotons": "24937462",
       "retained_excluding_terminal_value_nanotons": "23937462",
@@ -25,7 +25,7 @@
     {
       "label": "VAULT_USERNAME_NOTIFY_ACK",
       "terminal": "ack",
-      "inbound_value_nanotons": "76000000",
+      "inbound_value_nanotons": "79000000",
       "terminal_caller_value_nanotons": "1000000",
       "raw_balance_delta_nanotons": "25975662",
       "retained_excluding_terminal_value_nanotons": "24975662",
@@ -39,7 +39,7 @@
     {
       "label": "VAULT_PROFILE_NOTIFY_ACK",
       "terminal": "ack",
-      "inbound_value_nanotons": "76000000",
+      "inbound_value_nanotons": "79000000",
       "terminal_caller_value_nanotons": "1000000",
       "raw_balance_delta_nanotons": "25894261",
       "retained_excluding_terminal_value_nanotons": "24894261",
@@ -53,7 +53,7 @@
     {
       "label": "NORMAL_NOTIFY_STALE_PRUNE",
       "terminal": "prune",
-      "inbound_value_nanotons": "74000000",
+      "inbound_value_nanotons": "77000000",
       "terminal_caller_value_nanotons": "2000000",
       "raw_balance_delta_nanotons": "27022805",
       "retained_excluding_terminal_value_nanotons": "25022805",

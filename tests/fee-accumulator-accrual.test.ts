@@ -20,7 +20,7 @@ import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 
 // The address AirdropTicket names in AT_FEE_SINK and RecordShard in RS_FEE_SINK. In production FeeAccumulator
 // genuinely occupies it; here it is placed there directly, which is what makes the ticket's own gate meaningful.
-const FEE_SINK = Address.parse('EQAnVFHvZwSidVZ5y46nz7y4KibSp_8pHD3C1y73BJ3kQM1K');
+const FEE_SINK = Address.parse('EQBekf1HwT0rQzEenYOaCNsNG-POIWZCbt9NScyMsawU0jr7');
 const RS_PROTOCOL_FEE = 10_000_000n;
 const OP_TICKET_CREDIT = 0x41544331;
 
