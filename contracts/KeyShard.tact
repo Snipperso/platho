@@ -114,6 +114,18 @@ const KS_MIN_REPLACE_VALUE: Int = KS_REGISTER_GAS;
 // this message pays gas only. That is also why 22202 requires registration first — see the receiver.
 const KS_AVATAR_WRITE_GAS: Int = 8000000;
 
+// The balance a shard must still hold before it will ACCEPT an external rotation.
+//
+// [ADDED 2026-07-29, wave-8 HIGH] acceptMessage() raises the gas limit to balance/gas_price, so a shard whose
+// rent has eaten its endowment accepts a perfectly honest, correctly signed rotation, runs out of gas partway
+// through, and — because commit() has already run — reports the transaction as SUCCESSFUL while draining what
+// was left to zero and rotating nothing. The owner loses the remainder and is told nothing. Worse, the nonce
+// never burns, so the same public external stays valid and any observer can re-run it against every partial
+// top-up. Checking the balance BEFORE acceptMessage moves that whole failure off-chain: the external is simply
+// not accepted, the shard pays nothing, and the client is told to top up first (get_view publishes this floor
+// so it can). MEASURED cost of the accepted path is below; this is a multiple of it.
+const KS_ROTATION_MIN_BALANCE: Int = 20000000;
+
 // [MIGRATION HOOK] A redeploy gives ProfileRegistry a NEW address, and this shard's address is a function of it
 // (see init), so every KeyShard moves and a wallet's published key bundle + avatar pointer would be orphaned.
 // KeyShardProveOwnership lets the shard state its own PUBLIC identity to the next generation so it can adopt it
@@ -240,6 +252,12 @@ struct KeyShardView {
     avatar_part_count: Int;
     avatar_media_format: Int;
     avatar_updated_at: Int;
+    // APPENDED, never inserted: web/key-shard-ton-rpc-provider.mjs decodes this getter POSITIONALLY and asserts an
+    // exact item count, so a field added anywhere but the end silently hands callers the wrong value — a key used
+    // to ENCRYPT read out of an avatar slot. This is the balance a shard must still hold before it will ACCEPT an
+    // external rotation, published so a client tops the shard up FIRST rather than watching an external be refused
+    // with no transaction to look at.
+    rotation_min_balance: Int;
     // auth_pubkey is NEVER returned — the privacy invariant inherited from KeyRegistry. It authorises rotation;
     // advertising it would hand an observer the exact key to attack.
 }
@@ -327,13 +345,21 @@ contract KeyShard {
         }
     }
 
+    // The NON-throwing twin of validatePqPubkeyCell, for the external rotation path where a throw is not
+    // survivable — see the comment on that path for why.
+    //
+    // [FIX 2026-07-29, wave-8 CRIT] This used to open with `pqPubkey.computeDataSize(KS_MLKEM768_PUBKEY_SNAKE_CELLS)`.
+    // That compiles to a NON-QUIET CDATASIZE, which THROWS exit 8 when the tree is larger than the bound — inside a
+    // function whose entire contract is that it returns a Bool. The rotation receiver was written around the promise
+    // that everything after its commit() is a silent `return`, and this one line broke that promise, turning an
+    // oversized ML-KEM ref tree into a throw that a committed transaction reports as SUCCESS while the shard pays
+    // the gas and the nonce never burns. Anyone could then replay that public external until the shard's rent was
+    // gone. The check is dropped rather than made quiet because the walk below already subsumes it: it verifies
+    // every cell's bit count AND its ref count along the chain, ending on refs()==0, so an extra cell or an extra
+    // ref anywhere fails it. The walk is bounded because pqLen is pinned to KS_MLKEM768_PUBKEY_LEN before we are
+    // called, and it cannot throw: every loadRef is guarded by the refs() check immediately above it.
     fun isValidPqPubkeyCell(pqLen: Int, cryptoSuiteMask: Int, pqPubkey: Cell): Bool {
         if (cryptoSuiteMask != KS_CRYPTO_SUITE_HYBRID) { return false; }
-        let size: DataSize = pqPubkey.computeDataSize(KS_MLKEM768_PUBKEY_SNAKE_CELLS);
-        if (size.cells != KS_MLKEM768_PUBKEY_SNAKE_CELLS) { return false; }
-        if (size.bits != KS_MLKEM768_PUBKEY_SNAKE_BITS) { return false; }
-        if (size.refs != KS_MLKEM768_PUBKEY_SNAKE_REFS) { return false; }
-
         let cursor: Cell = pqPubkey;
         let remaining: Int = pqLen;
         while (remaining > 0) {
@@ -435,7 +461,21 @@ contract KeyShard {
         // a ceiling and strands every later top-up. A REPLACEMENT adds no state, so its increment is ZERO:
         // reserving the base endowment again would silently swallow the caller's change on every rotation and
         // let the shard accrete a fresh endowment per key change.
-        nativeReserve(wasRegistered ? 0 : KS_BASE_ENDOWMENT, ReserveAtMost | ReserveAddOriginalBalance);
+        //
+        // [FIX 2026-07-29, wave-8 LOW] The replacement branch used to be UNCONDITIONALLY zero-increment, which is
+        // right for a healthy shard and wrong for a starved one: an owner trying to rescue their own identity with
+        // the most obvious action — re-register, attaching a GRAM — got a silently green transaction and their
+        // whole GRAM back as change, while the shard carried on freezing. Re-registration now tops a DEPLETED
+        // shard back up to the base endowment and returns only the surplus. A healthy shard is unchanged, so this
+        // still cannot accrete a fresh endowment per key change.
+        let priorBalance: Int = myBalance() - context().value;
+        if (!wasRegistered) {
+            nativeReserve(KS_BASE_ENDOWMENT, ReserveAtMost | ReserveAddOriginalBalance);
+        } else if (priorBalance < KS_BASE_ENDOWMENT) {
+            nativeReserve(KS_BASE_ENDOWMENT, ReserveAtMost);
+        } else {
+            nativeReserve(0, ReserveAtMost | ReserveAddOriginalBalance);
+        }
         message(MessageParameters { to: sender(), value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 
@@ -577,11 +617,22 @@ contract KeyShard {
         throwUnless(22133, signedShardHash == shardSlice.loadUint(256));
         let signedNonce: Int = signedPayload.loadUint(64);
         throwUnless(22135, signedNonce == self.rotation_nonce);
+        // BEFORE accepting, not after: everything above this line is paid for by the network's external credit,
+        // so a shard too poor to finish the work refuses the message instead of burning its remainder on it.
+        throwUnless(22138, myBalance() >= KS_ROTATION_MIN_BALANCE);
 
         acceptMessage();
-        // Burn the nonce FIRST and commit, so a replay of this exact payload cannot be re-run even if the work
-        // below bails out. Everything after commit() is a silent `return` rather than a throw for the same
-        // reason: a throw would roll the nonce back.
+        // Burn the nonce and commit. READ THIS BEFORE CHANGING ANYTHING BELOW.
+        //
+        // Tact writes `self` to c4 only at the END of a receiver, so this commit() fixes c4 as it stood on ENTRY:
+        // the increment above is still only a local at this instant. That is fine for the `return` paths — they
+        // fall through to the normal store — but it means a THROW after this line does NOT roll the nonce back
+        // into a safe state; it leaves c4 at the pre-increment value while COMMIT has already told the network the
+        // transaction succeeded. The shard pays the gas, the nonce survives, and the external stays replayable by
+        // anyone. [2026-07-29] That is exactly what wave 8 found: computeDataSize inside isValidPqPubkeyCell threw
+        // exit 8 on an oversized ML-KEM tree (fixed at the source), and an under-funded shard threw -14 (fixed by
+        // the pre-accept balance floor). So the rule below is not a style preference, it is load-bearing:
+        // EVERYTHING AFTER THIS LINE MUST BE A SILENT `return`, AND NOTHING IT CALLS MAY THROW.
         self.rotation_nonce += 1;
         commit();
 
@@ -639,7 +690,8 @@ contract KeyShard {
             avatar_stream_id: self.avatar_stream_id,
             avatar_part_count: self.avatar_part_count,
             avatar_media_format: self.avatar_media_format,
-            avatar_updated_at: self.avatar_updated_at
+            avatar_updated_at: self.avatar_updated_at,
+            rotation_min_balance: KS_ROTATION_MIN_BALANCE
         };
     }
 }

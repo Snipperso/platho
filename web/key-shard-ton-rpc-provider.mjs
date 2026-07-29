@@ -82,8 +82,8 @@ function readStackAddress(stack, index, name, decodeAddressSliceBoc) {
 export function decodeKeyShardViewStack(result, decodeAddressSliceBoc) {
   const stack = result?.stack ?? result?.result?.stack;
   if (!Array.isArray(stack)) throw new KeyShardTonRpcProviderError('TON get-method response did not include a stack');
-  if (stack.length !== 24) {
-    throw new KeyShardTonRpcProviderError(`KeyShard get_view ABI mismatch: expected 24 stack items, got ${stack.length}`);
+  if (stack.length !== 25) {
+    throw new KeyShardTonRpcProviderError(`KeyShard get_view ABI mismatch: expected 25 stack items, got ${stack.length}`);
   }
   return {
     exists: readStackBool(stack, 0, 'KeyShard exists'),
@@ -110,6 +110,10 @@ export function decodeKeyShardViewStack(result, decodeAddressSliceBoc) {
     avatar_part_count: readStackInt(stack, 21, 'KeyShard avatar part count'),
     avatar_media_format: readStackInt(stack, 22, 'KeyShard avatar media format'),
     avatar_updated_at: readStackInt(stack, 23, 'KeyShard avatar updated at'),
+    // [2026-07-29] Appended by the wave-8 rotation fix. The contract refuses an external rotation below this
+    // balance BEFORE accepting it, so the shard never pays for work it cannot finish; a client that wants a
+    // rotation to land must top the shard up to at least this first.
+    rotation_min_balance: readStackInt(stack, 24, 'KeyShard rotation min balance'),
   };
 }
 

@@ -36,7 +36,7 @@ builder $KeyShard$_store(builder build_0, (slice, slice, int, int, int, int, int
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $KeyShardView$_to_external
-(int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int) $KeyShardView$_to_external(((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int)) v) inline;
+(int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int, int) $KeyShardView$_to_external(((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int, int)) v) inline;
 
 ;; $KeyShard$init$_load
 (slice, ((slice, slice))) $KeyShard$init$_load(slice sc_0) inline;
@@ -74,11 +74,11 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 ;; $KeyShard$_fun_writeBundle
 ((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), ()) $KeyShard$_fun_writeBundle((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self, int $keyGeneration, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref;
 
-;; $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at
-((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int)) $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at(int $exists, slice $owner_wallet, int $key_id, int $key_generation, int $rotation_nonce, int $enc_pubkey, int $sign_pubkey, int $scan_pubkey, int $pq_kem_pubkey_hash, int $pq_kem_pubkey_len, cell $pq_kem_pubkey, int $crypto_suite_mask, int $created_at, int $created_lt, int $min_register_value, int $min_replace_value, slice $profile_registry, int $avatar_version, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $avatar_media_format, int $avatar_updated_at) inline;
+;; $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at_rotation_min_balance
+((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int, int)) $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at_rotation_min_balance(int $exists, slice $owner_wallet, int $key_id, int $key_generation, int $rotation_nonce, int $enc_pubkey, int $sign_pubkey, int $scan_pubkey, int $pq_kem_pubkey_hash, int $pq_kem_pubkey_len, cell $pq_kem_pubkey, int $crypto_suite_mask, int $created_at, int $created_lt, int $min_register_value, int $min_replace_value, slice $profile_registry, int $avatar_version, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $avatar_media_format, int $avatar_updated_at, int $rotation_min_balance) inline;
 
 ;; $KeyShard$_fun_get_view
-((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), (int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int)) $KeyShard$_fun_get_view((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), (int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int, int)) $KeyShard$_fun_get_view((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
 
 ;; $MessageParameters$_constructor_to_value_mode_bounce
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce(slice $to, int $value, int $mode, int $bounce) inline;
@@ -121,6 +121,10 @@ int $global_checkSignature(int $hash, slice $signature, int $publicKey) impure a
 
 slice $global_myAddress() impure asm """
     MYADDR
+""";
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
 """;
 
 () $global_nativeReserve(int $amount, int $mode) impure asm """
@@ -297,16 +301,16 @@ cell $KeyShardOwnershipProof$_store_cell((int, slice, int, int, int, int, int, i
 
 ;;
 ;; Type: KeyShardView
-;; TLB: _ exists:bool owner_wallet:address key_id:int257 key_generation:int257 rotation_nonce:int257 enc_pubkey:int257 sign_pubkey:int257 scan_pubkey:int257 pq_kem_pubkey_hash:int257 pq_kem_pubkey_len:int257 pq_kem_pubkey:^cell crypto_suite_mask:int257 created_at:int257 created_lt:int257 min_register_value:int257 min_replace_value:int257 profile_registry:address avatar_version:int257 avatar_hash:int257 avatar_entry_id:int257 avatar_stream_id:int257 avatar_part_count:int257 avatar_media_format:int257 avatar_updated_at:int257 = KeyShardView
+;; TLB: _ exists:bool owner_wallet:address key_id:int257 key_generation:int257 rotation_nonce:int257 enc_pubkey:int257 sign_pubkey:int257 scan_pubkey:int257 pq_kem_pubkey_hash:int257 pq_kem_pubkey_len:int257 pq_kem_pubkey:^cell crypto_suite_mask:int257 created_at:int257 created_lt:int257 min_register_value:int257 min_replace_value:int257 profile_registry:address avatar_version:int257 avatar_hash:int257 avatar_entry_id:int257 avatar_stream_id:int257 avatar_part_count:int257 avatar_media_format:int257 avatar_updated_at:int257 rotation_min_balance:int257 = KeyShardView
 ;;
 
-(int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int) $KeyShardView$_to_external(((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int)) v) inline {
-    var (v'exists, v'owner_wallet, v'key_id, v'key_generation, v'rotation_nonce, v'enc_pubkey, v'sign_pubkey, v'scan_pubkey, v'pq_kem_pubkey_hash, v'pq_kem_pubkey_len, v'pq_kem_pubkey, v'crypto_suite_mask, v'created_at, v'created_lt, v'min_register_value, v'min_replace_value, v'profile_registry, v'avatar_version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'avatar_media_format, v'avatar_updated_at) = v; 
-    return (v'exists, v'owner_wallet, v'key_id, v'key_generation, v'rotation_nonce, v'enc_pubkey, v'sign_pubkey, v'scan_pubkey, v'pq_kem_pubkey_hash, v'pq_kem_pubkey_len, v'pq_kem_pubkey, v'crypto_suite_mask, v'created_at, v'created_lt, v'min_register_value, v'min_replace_value, v'profile_registry, v'avatar_version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'avatar_media_format, v'avatar_updated_at);
+(int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int, int) $KeyShardView$_to_external(((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int, int)) v) inline {
+    var (v'exists, v'owner_wallet, v'key_id, v'key_generation, v'rotation_nonce, v'enc_pubkey, v'sign_pubkey, v'scan_pubkey, v'pq_kem_pubkey_hash, v'pq_kem_pubkey_len, v'pq_kem_pubkey, v'crypto_suite_mask, v'created_at, v'created_lt, v'min_register_value, v'min_replace_value, v'profile_registry, v'avatar_version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'avatar_media_format, v'avatar_updated_at, v'rotation_min_balance) = v; 
+    return (v'exists, v'owner_wallet, v'key_id, v'key_generation, v'rotation_nonce, v'enc_pubkey, v'sign_pubkey, v'scan_pubkey, v'pq_kem_pubkey_hash, v'pq_kem_pubkey_len, v'pq_kem_pubkey, v'crypto_suite_mask, v'created_at, v'created_lt, v'min_register_value, v'min_replace_value, v'profile_registry, v'avatar_version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'avatar_media_format, v'avatar_updated_at, v'rotation_min_balance);
 }
 
-((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int)) $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at(int $exists, slice $owner_wallet, int $key_id, int $key_generation, int $rotation_nonce, int $enc_pubkey, int $sign_pubkey, int $scan_pubkey, int $pq_kem_pubkey_hash, int $pq_kem_pubkey_len, cell $pq_kem_pubkey, int $crypto_suite_mask, int $created_at, int $created_lt, int $min_register_value, int $min_replace_value, slice $profile_registry, int $avatar_version, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $avatar_media_format, int $avatar_updated_at) inline {
-    return ($exists, $owner_wallet, $key_id, $key_generation, $rotation_nonce, $enc_pubkey, $sign_pubkey, $scan_pubkey, $pq_kem_pubkey_hash, $pq_kem_pubkey_len, $pq_kem_pubkey, $crypto_suite_mask, $created_at, $created_lt, $min_register_value, $min_replace_value, $profile_registry, $avatar_version, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $avatar_media_format, $avatar_updated_at);
+((int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int, int)) $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at_rotation_min_balance(int $exists, slice $owner_wallet, int $key_id, int $key_generation, int $rotation_nonce, int $enc_pubkey, int $sign_pubkey, int $scan_pubkey, int $pq_kem_pubkey_hash, int $pq_kem_pubkey_len, cell $pq_kem_pubkey, int $crypto_suite_mask, int $created_at, int $created_lt, int $min_register_value, int $min_replace_value, slice $profile_registry, int $avatar_version, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $avatar_media_format, int $avatar_updated_at, int $rotation_min_balance) inline {
+    return ($exists, $owner_wallet, $key_id, $key_generation, $rotation_nonce, $enc_pubkey, $sign_pubkey, $scan_pubkey, $pq_kem_pubkey_hash, $pq_kem_pubkey_len, $pq_kem_pubkey, $crypto_suite_mask, $created_at, $created_lt, $min_register_value, $min_replace_value, $profile_registry, $avatar_version, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $avatar_media_format, $avatar_updated_at, $rotation_min_balance);
 }
 
 ;;
@@ -471,19 +475,6 @@ builder $KeyShard$_store(builder build_0, (slice, slice, int, int, int, int, int
         var $fresh$ret_0 = false;
         return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_0);
     }
-    var ($size'cells, $size'bits, $size'refs) = $Cell$_fun_computeDataSize($pqPubkey, 10);
-    if (($size'cells != 10)) {
-        var $fresh$ret_1 = false;
-        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_1);
-    }
-    if (($size'bits != 9472)) {
-        var $fresh$ret_2 = false;
-        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_2);
-    }
-    if (($size'refs != 9)) {
-        var $fresh$ret_3 = false;
-        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_3);
-    }
     cell $cursor = $pqPubkey;
     int $remaining = $pqLen;
     while (($remaining > 0)) {
@@ -495,30 +486,30 @@ builder $KeyShard$_store(builder build_0, (slice, slice, int, int, int, int, int
         }
         slice $cursorSlice = $Cell$_fun_beginParse($cursor);
         if (($Slice$_fun_bits($cursorSlice) != ($chunkBytes * 8))) {
-            var $fresh$ret_4 = false;
-            return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_4);
+            var $fresh$ret_1 = false;
+            return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_1);
         }
         if (($remaining > $chunkBytes)) {
             if (($Slice$_fun_refs($cursorSlice) != 1)) {
-                var $fresh$ret_5 = false;
-                return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_5);
+                var $fresh$ret_2 = false;
+                return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_2);
             }
             $cursor = $cursorSlice~$Slice$_fun_loadRef();
         } elseif ($Slice$_fun_refs($cursorSlice)) {
-            var $fresh$ret_6 = false;
-            return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_6);
+            var $fresh$ret_3 = false;
+            return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_3);
         }
         $remaining = $remaining - $chunkBytes;
     }
-    var $fresh$ret_7 = true;
-    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_7);
+    var $fresh$ret_4 = true;
+    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_4);
 }
 
 ((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), int) $KeyShard$_fun_isBasechainAddress((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self, slice $address) impure inline_ref {
     var (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at)) = $self;
     var ($std'workchain, $std'address) = $global_parseStdAddress($Address$_fun_asSlice($address));
-    var $fresh$ret_8 = ($std'workchain == 0);
-    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_8);
+    var $fresh$ret_5 = ($std'workchain == 0);
+    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_5);
 }
 
 ((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), ()) $KeyShard$_fun_validateKeyProfile((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref {
@@ -536,38 +527,38 @@ builder $KeyShard$_store(builder build_0, (slice, slice, int, int, int, int, int
 ((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), int) $KeyShard$_fun_isValidKeyProfile((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self, int $encPubkey, int $signPubkey, int $scanPubkey, int $pqHash, int $pqLen, cell $pqPubkey, int $cryptoSuiteMask) impure inline_ref {
     var (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at)) = $self;
     ifnot ($encPubkey) {
+        var $fresh$ret_6 = false;
+        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_6);
+    }
+    ifnot ($signPubkey) {
+        var $fresh$ret_7 = false;
+        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_7);
+    }
+    ifnot ($scanPubkey) {
+        var $fresh$ret_8 = false;
+        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_8);
+    }
+    if (($cryptoSuiteMask != 2)) {
         var $fresh$ret_9 = false;
         return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_9);
     }
-    ifnot ($signPubkey) {
+    ifnot ($pqHash) {
         var $fresh$ret_10 = false;
         return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_10);
     }
-    ifnot ($scanPubkey) {
+    if (($pqLen != 1184)) {
         var $fresh$ret_11 = false;
         return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_11);
     }
-    if (($cryptoSuiteMask != 2)) {
-        var $fresh$ret_12 = false;
-        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_12);
-    }
-    ifnot ($pqHash) {
-        var $fresh$ret_13 = false;
-        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_13);
-    }
-    if (($pqLen != 1184)) {
-        var $fresh$ret_14 = false;
-        return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_14);
-    }
-    var $fresh$ret_15 = ($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at)~$KeyShard$_fun_isValidPqPubkeyCell($pqLen, $cryptoSuiteMask, $pqPubkey);
-    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_15);
+    var $fresh$ret_12 = ($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at)~$KeyShard$_fun_isValidPqPubkeyCell($pqLen, $cryptoSuiteMask, $pqPubkey);
+    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_12);
 }
 
 ((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), int) $KeyShard$_fun_computeKeyId((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self, int $keyGeneration, int $encPubkey, int $signPubkey, int $pqHash, int $pqLen, int $cryptoSuiteMask) impure inline_ref {
     var (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at)) = $self;
     cell $keyFields = $Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), $encPubkey, 256), $signPubkey, 256), $pqHash, 256));
-    var $fresh$ret_16 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($keyFields, store_uint(store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 1262836041, 32), $self'owner_wallet), $keyGeneration, 32), $pqLen, 16), $cryptoSuiteMask, 16))));
-    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_16);
+    var $fresh$ret_13 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($keyFields, store_uint(store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 1262836041, 32), $self'owner_wallet), $keyGeneration, 32), $pqLen, 16), $cryptoSuiteMask, 16))));
+    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_13);
 }
 
 ((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), ()) $KeyShard$_fun_requireEmptyEnvelopePadding((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self, slice $padding) impure inline {
@@ -594,10 +585,10 @@ builder $KeyShard$_store(builder build_0, (slice, slice, int, int, int, int, int
     return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), ());
 }
 
-((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), (int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int)) $KeyShard$_fun_get_view((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int), (int, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, slice, int, int, int, int, int, int, int, int)) $KeyShard$_fun_get_view((slice, slice, int, int, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
     var (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at)) = $self;
-    var $fresh$ret_17 = $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at($self'registered, $self'owner_wallet, $self'key_id, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, 57000000, 12000000, $self'profile_registry, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at);
-    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_17);
+    var $fresh$ret_14 = $KeyShardView$_constructor_exists_owner_wallet_key_id_key_generation_rotation_nonce_enc_pubkey_sign_pubkey_scan_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_min_register_value_min_replace_value_profile_registry_avatar_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_avatar_media_format_avatar_updated_at_rotation_min_balance($self'registered, $self'owner_wallet, $self'key_id, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, 57000000, 12000000, $self'profile_registry, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at, 20000000);
+    return (($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at), $fresh$ret_14);
 }
 
 ;;
@@ -660,7 +651,14 @@ _ %get_view() method_id(76114) {
         int $keyGeneration = ($wasRegistered ? ($self'key_generation + 1) : 0);
         ($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at)~$KeyShard$_fun_writeBundle($keyGeneration, $msg'enc_pubkey, $msg'sign_pubkey, $msg'scan_pubkey, $msg'pq_kem_pubkey_hash, $msg'pq_kem_pubkey_len, $msg'pq_kem_pubkey, $msg'crypto_suite_mask);
         $self'auth_pubkey = $msg'auth_pubkey;
-        $global_nativeReserve(($wasRegistered ? 0 : 45000000), 6);
+        int $priorBalance = ($global_myBalance() - $Context$_get_value(__tact_context_get()));
+        ifnot ($wasRegistered) {
+            $global_nativeReserve(45000000, 6);
+        } elseif (($priorBalance < 45000000)) {
+            $global_nativeReserve(45000000, 2);
+        } else {
+            $global_nativeReserve(0, 6);
+        }
         $global_message($MessageParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $KeyShard$_contract_store(($self'owner_wallet, $self'profile_registry, $self'registered, $self'key_id, $self'auth_pubkey, $self'key_generation, $self'rotation_nonce, $self'enc_pubkey, $self'sign_pubkey, $self'scan_pubkey, $self'pq_kem_pubkey_hash, $self'pq_kem_pubkey_len, $self'pq_kem_pubkey, $self'crypto_suite_mask, $self'created_at, $self'created_lt, $self'avatar_version, $self'avatar_hash, $self'avatar_entry_id, $self'avatar_stream_id, $self'avatar_part_count, $self'avatar_media_format, $self'avatar_updated_at));
         return ();
@@ -754,6 +752,7 @@ _ %get_view() method_id(76114) {
         throw_unless(22133, ($signedShardHash == $shardSlice~load_uint(256)));
         int $signedNonce = $signedPayload~load_uint(64);
         throw_unless(22135, ($signedNonce == $self'rotation_nonce));
+        throw_unless(22138, ($global_myBalance() >= 20000000));
         $global_acceptMessage();
         $self'rotation_nonce = $self'rotation_nonce + 1;
         $global_commit();
