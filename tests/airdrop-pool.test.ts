@@ -303,6 +303,44 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     expect(g.remaining_budget, 'the budget is capped at the airdrop, never more').toBe(TOTAL_POOL);
   }, 180_000);
 
+  it('AIRDROP-TON-EXIT-01: [wave-8 LOW] native TON stranded by payouts can reach the treasury, and only it', async () => {
+    // Until AirdropSweepUnaccountedTon existed, NO receiver in this contract sent native TON: both payout legs
+    // carry a fixed constant and the residual sweep moves ATH through the wallet, not the balance. So the gap
+    // between the 60,000,000 gate 26114 demands and what a payout really costs welded itself into the account —
+    // measured at 11,624,530 per delivery — on the one contract ADR9 forbids ever redeploying.
+    const { pool, treasury, distributor } = await setup(blockchain);
+    const buyer = await blockchain.treasury('ton-exit-buyer');
+
+    const before = (await blockchain.getContract(pool.address)).balance;
+    for (let i = 1; i <= 3; i += 1) {
+      expect(exitOf(await pool.send(distributor.getSender(), { value: toNano('0.3') }, {
+        $$type: 'AirdropAccrue', purchase_id: BigInt(i), buyer: buyer.address, credits_k: 10n,
+      } as any), pool.address)).toBe(0);
+    }
+    const stranded = (await blockchain.getContract(pool.address)).balance;
+    expect(stranded, 'the fixture must really strand TON, or this proves nothing').toBeGreaterThan(before);
+
+    const budgetBefore = (await pool.getGetGlobal()).remaining_budget;
+    const distributedBefore = (await pool.getGetGlobal()).distributed_total;
+    const treasuryBefore = (await blockchain.getContract(treasury.address)).balance;
+
+    const stranger = await blockchain.treasury('ton-exit-sweeper');
+    expect(exitOf(await pool.send(stranger.getSender(), { value: toNano('0.05') },
+      { $$type: 'AirdropSweepUnaccountedTon' } as any), pool.address),
+      'permissionless is safe here: the destination is bound at genesis, never caller-chosen').toBe(0);
+
+    expect((await blockchain.getContract(treasury.address)).balance,
+      'the TON must actually reach the treasury').toBeGreaterThan(treasuryBefore);
+    const left = (await blockchain.getContract(pool.address)).balance;
+    expect(left, 'and a storage endowment must stay behind').toBeGreaterThanOrEqual(90_000_000n);
+    expect(left, 'but not the surplus').toBeLessThan(stranded);
+
+    // It must not touch the airdrop in any way.
+    const g = await pool.getGetGlobal();
+    expect(g.remaining_budget, 'the ATH budget is untouched').toBe(budgetBefore);
+    expect(g.distributed_total, 'and so is the distribution counter').toBe(distributedBefore);
+  }, 180_000);
+
   it('AIRDROP-GAS-01: an under-funded accrual BOUNCES in COMPUTE — it never fails silently in ACTION', async () => {
     // This test exists because the first cut of this payout shipped the exact bug the whole codebase hunts. It used
     // nativeReserve(base, ReserveAtMost|ReserveAddOriginalBalance) + SendRemainingBalance, which forwards
