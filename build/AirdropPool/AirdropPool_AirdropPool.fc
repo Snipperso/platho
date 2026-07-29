@@ -24,10 +24,10 @@ cell $ATHTransferRequest$_store_cell((int, int, slice, slice) v, builder b) inli
 (slice, ((int, int))) $ATHTransferRequest$_load_bounced(slice sc_0) inline;
 
 ;; $AirdropPool$_store
-builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) v) inline;
+builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) v) inline;
 
 ;; $AirdropPool$_load
-(slice, ((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int))) $AirdropPool$_load(slice sc_0) inline;
+(slice, ((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int))) $AirdropPool$_load(slice sc_0) inline;
 
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
@@ -39,31 +39,31 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 (slice, ((slice, int, int, int))) $AirdropPool$init$_load(slice sc_0) inline;
 
 ;; $AirdropPool$_contract_init
-(int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $AirdropPool$_contract_init(slice $genesis_controller_address, int $deployment_manifest_hash, int $genesis_config_hash, int $sealed) impure inline;
+(int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $AirdropPool$_contract_init(slice $genesis_controller_address, int $deployment_manifest_hash, int $genesis_config_hash, int $sealed) impure inline;
 
 ;; $AirdropPool$_contract_load
-(int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $AirdropPool$_contract_load() impure inline;
+(int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $AirdropPool$_contract_load() impure inline;
 
 ;; $AirdropPool$_contract_store
-() $AirdropPool$_contract_store((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) v) impure inline;
+() $AirdropPool$_contract_store((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) v) impure inline;
 
 ;; $AirdropPool$_fun_requireController
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireController((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self) impure inline_ref;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireController((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self) impure inline_ref;
 
 ;; $AirdropPool$_fun_requireUnsealed
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireUnsealed((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self) impure inline_ref;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireUnsealed((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self) impure inline_ref;
 
 ;; $AirdropPool$_fun_requireSealed
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireSealed((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self) impure inline_ref;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireSealed((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self) impure inline_ref;
 
 ;; $AirdropPool$_fun_isBasechainAddress
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), int) $AirdropPool$_fun_isBasechainAddress((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self, slice $a) impure inline_ref;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), int) $AirdropPool$_fun_isBasechainAddress((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self, slice $a) impure inline_ref;
 
 ;; $AirdropGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_ath_master_address_pool_ath_wallet_address_credit_issuer_address_treasury_address_ath_per_credit_total_pool_funded_amount_remaining_budget_distributed_total_claim_count_sealed_at_ath_master_bound_credit_issuer_bound_treasury_bound
 ((int, int, int, slice, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int)) $AirdropGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_ath_master_address_pool_ath_wallet_address_credit_issuer_address_treasury_address_ath_per_credit_total_pool_funded_amount_remaining_budget_distributed_total_claim_count_sealed_at_ath_master_bound_credit_issuer_bound_treasury_bound(int $sealed, int $deployment_manifest_hash, int $genesis_config_hash, slice $genesis_controller_address, slice $ath_master_address, slice $pool_ath_wallet_address, slice $credit_issuer_address, slice $treasury_address, int $ath_per_credit, int $total_pool, int $funded_amount, int $remaining_budget, int $distributed_total, int $claim_count, int $sealed_at, int $ath_master_bound, int $credit_issuer_bound, int $treasury_bound) inline;
 
 ;; $AirdropPool$_fun_get_global
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), (int, int, int, slice, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int)) $AirdropPool$_fun_get_global((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self) impure inline_ref;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), (int, int, int, slice, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int)) $AirdropPool$_fun_get_global((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self) impure inline_ref;
 
 ;; $SendParameters$_constructor_to_value_mode_bounce_body
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline;
@@ -237,11 +237,11 @@ cell $ATHTransferRequest$_store_cell((int, int, slice, slice) v, builder b) inli
 
 ;;
 ;; Type: AirdropPool
-;; TLB: _ sealed:bool genesis_controller_address:address deployment_manifest_hash:uint256 genesis_config_hash:uint256 ath_master_address:address pool_ath_wallet_address:address ath_master_bound:bool credit_issuer_address:address credit_issuer_bound:bool treasury_address:address treasury_bound:bool funded_amount:uint128 remaining_budget:uint128 distributed_total:uint128 claim_count:uint64 sealed_at:uint64 payout_seq:uint64 = AirdropPool
+;; TLB: _ sealed:bool genesis_controller_address:address deployment_manifest_hash:uint256 genesis_config_hash:uint256 ath_master_address:address pool_ath_wallet_address:address ath_master_bound:bool credit_issuer_address:address credit_issuer_bound:bool treasury_address:address treasury_bound:bool funded_amount:uint128 remaining_budget:uint128 distributed_total:uint128 claim_count:uint64 sealed_at:uint64 payout_seq:uint64 last_accrual_at:uint64 = AirdropPool
 ;;
 
-builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) v) inline {
-    var (v'sealed, v'genesis_controller_address, v'deployment_manifest_hash, v'genesis_config_hash, v'ath_master_address, v'pool_ath_wallet_address, v'ath_master_bound, v'credit_issuer_address, v'credit_issuer_bound, v'treasury_address, v'treasury_bound, v'funded_amount, v'remaining_budget, v'distributed_total, v'claim_count, v'sealed_at, v'payout_seq) = v;
+builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) v) inline {
+    var (v'sealed, v'genesis_controller_address, v'deployment_manifest_hash, v'genesis_config_hash, v'ath_master_address, v'pool_ath_wallet_address, v'ath_master_bound, v'credit_issuer_address, v'credit_issuer_bound, v'treasury_address, v'treasury_bound, v'funded_amount, v'remaining_budget, v'distributed_total, v'claim_count, v'sealed_at, v'payout_seq, v'last_accrual_at) = v;
     build_0 = build_0.store_int(v'sealed, 1);
     build_0 = build_0.store_slice(v'genesis_controller_address);
     build_0 = build_0.store_uint(v'deployment_manifest_hash, 256);
@@ -261,12 +261,13 @@ builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice
     build_2 = build_2.store_uint(v'claim_count, 64);
     build_2 = build_2.store_uint(v'sealed_at, 64);
     build_2 = build_2.store_uint(v'payout_seq, 64);
+    build_2 = build_2.store_uint(v'last_accrual_at, 64);
     build_1 = store_builder_ref(build_1, build_2);
     build_0 = store_builder_ref(build_0, build_1);
     return build_0;
 }
 
-(slice, ((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int))) $AirdropPool$_load(slice sc_0) inline {
+(slice, ((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int))) $AirdropPool$_load(slice sc_0) inline {
     var v'sealed = sc_0~load_int(1);
     var v'genesis_controller_address = sc_0~load_msg_addr();
     var v'deployment_manifest_hash = sc_0~load_uint(256);
@@ -286,7 +287,8 @@ builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice
     var v'claim_count = sc_2~load_uint(64);
     var v'sealed_at = sc_2~load_uint(64);
     var v'payout_seq = sc_2~load_uint(64);
-    return (sc_0, (v'sealed, v'genesis_controller_address, v'deployment_manifest_hash, v'genesis_config_hash, v'ath_master_address, v'pool_ath_wallet_address, v'ath_master_bound, v'credit_issuer_address, v'credit_issuer_bound, v'treasury_address, v'treasury_bound, v'funded_amount, v'remaining_budget, v'distributed_total, v'claim_count, v'sealed_at, v'payout_seq));
+    var v'last_accrual_at = sc_2~load_uint(64);
+    return (sc_0, (v'sealed, v'genesis_controller_address, v'deployment_manifest_hash, v'genesis_config_hash, v'ath_master_address, v'pool_ath_wallet_address, v'ath_master_bound, v'credit_issuer_address, v'credit_issuer_bound, v'treasury_address, v'treasury_bound, v'funded_amount, v'remaining_budget, v'distributed_total, v'claim_count, v'sealed_at, v'payout_seq, v'last_accrual_at));
 }
 
 (slice, ((slice, int, int, int))) $AirdropPool$init$_load(slice sc_0) inline {
@@ -297,7 +299,7 @@ builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice
     return (sc_0, (v'genesis_controller_address, v'deployment_manifest_hash, v'genesis_config_hash, v'sealed));
 }
 
-(int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $AirdropPool$_contract_load() impure inline {
+(int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $AirdropPool$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
@@ -310,7 +312,7 @@ builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice
     }
 }
 
-() $AirdropPool$_contract_store((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) v) impure inline {
+() $AirdropPool$_contract_store((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) v) impure inline {
     builder b = begin_cell();
     b = b.store_int(true, 1);
     b = $AirdropPool$_store(b, v);
@@ -321,8 +323,8 @@ builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice
 ;; Contract AirdropPool functions
 ;;
 
-(int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $AirdropPool$_contract_init(slice $genesis_controller_address, int $deployment_manifest_hash, int $genesis_config_hash, int $sealed) impure inline {
-    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
+(int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $AirdropPool$_contract_init(slice $genesis_controller_address, int $deployment_manifest_hash, int $genesis_config_hash, int $sealed) impure inline {
+    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
     $self'sealed = $sealed;
     $self'genesis_controller_address = $genesis_controller_address;
     $self'deployment_manifest_hash = $deployment_manifest_hash;
@@ -340,38 +342,39 @@ builder $AirdropPool$_store(builder build_0, (int, slice, int, int, slice, slice
     $self'claim_count = 0;
     $self'sealed_at = 0;
     $self'payout_seq = 0;
-    return ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq);
+    $self'last_accrual_at = 0;
+    return ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at);
 }
 
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireController((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self) impure inline_ref {
-    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)) = $self;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireController((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)) = $self;
     throw_unless(26033, ( equal_slices_bits(__tact_context_get_sender(), $self'genesis_controller_address) ));
-    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq), ());
+    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at), ());
 }
 
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireUnsealed((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self) impure inline_ref {
-    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)) = $self;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireUnsealed((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)) = $self;
     throw_unless(26034, (~ $self'sealed));
-    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq), ());
+    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at), ());
 }
 
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireSealed((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self) impure inline_ref {
-    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)) = $self;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), ()) $AirdropPool$_fun_requireSealed((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)) = $self;
     throw_unless(26100, $self'sealed);
-    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq), ());
+    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at), ());
 }
 
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), int) $AirdropPool$_fun_isBasechainAddress((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self, slice $a) impure inline_ref {
-    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)) = $self;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), int) $AirdropPool$_fun_isBasechainAddress((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self, slice $a) impure inline_ref {
+    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)) = $self;
     slice $s = $Address$_fun_asSlice($a);
     var $fresh$ret_0 = ($s~load_uint(11) == 1024);
-    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq), $fresh$ret_0);
+    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at), $fresh$ret_0);
 }
 
-((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int), (int, int, int, slice, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int)) $AirdropPool$_fun_get_global((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int) $self) impure inline_ref {
-    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)) = $self;
+((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int), (int, int, int, slice, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int)) $AirdropPool$_fun_get_global((int, slice, int, int, slice, slice, int, slice, int, slice, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)) = $self;
     var $fresh$ret_2 = $AirdropGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_ath_master_address_pool_ath_wallet_address_credit_issuer_address_treasury_address_ath_per_credit_total_pool_funded_amount_remaining_budget_distributed_total_claim_count_sealed_at_ath_master_bound_credit_issuer_bound_treasury_bound($self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'ath_master_address, $self'pool_ath_wallet_address, $self'credit_issuer_address, $self'treasury_address, 10000000000, 15000000000000000, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'ath_master_bound, $self'credit_issuer_bound, $self'treasury_bound);
-    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq), $fresh$ret_2);
+    return (($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at), $fresh$ret_2);
 }
 
 ;;
@@ -404,7 +407,7 @@ _ %get_global() method_id(126899) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq) = $AirdropPool$_contract_load();
+    var ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at) = $AirdropPool$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) {
@@ -417,7 +420,7 @@ _ %get_global() method_id(126899) {
         ;; Bounced handler for ATHTransferRequest message
         if (op == 0x41544810) {
             var ($_'query_id, $_'amount) = in_msg~$ATHTransferRequest$_load_bounced();
-            $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+            $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
             return ();
         }
         
@@ -433,13 +436,13 @@ _ %get_global() method_id(126899) {
         in_msg~skip_bits(32);
         var $msg'ath_master_address = in_msg~load_msg_addr();
         var $msg'pool_ath_wallet_address = in_msg~load_msg_addr();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireUnsealed();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireController();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireUnsealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireController();
         throw_unless(26010, (~ $self'ath_master_bound));
         $self'ath_master_address = $msg'ath_master_address;
         $self'pool_ath_wallet_address = $msg'pool_ath_wallet_address;
         $self'ath_master_bound = true;
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
@@ -447,12 +450,12 @@ _ %get_global() method_id(126899) {
     if (op == 0x41445202) {
         in_msg~skip_bits(32);
         var $msg'credit_issuer_address = in_msg~load_msg_addr();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireUnsealed();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireController();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireUnsealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireController();
         throw_unless(26012, (~ $self'credit_issuer_bound));
         $self'credit_issuer_address = $msg'credit_issuer_address;
         $self'credit_issuer_bound = true;
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
@@ -460,12 +463,12 @@ _ %get_global() method_id(126899) {
     if (op == 0x41445203) {
         in_msg~skip_bits(32);
         var $msg'treasury_address = in_msg~load_msg_addr();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireUnsealed();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireController();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireUnsealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireController();
         throw_unless(26017, (~ $self'treasury_bound));
         $self'treasury_address = $msg'treasury_address;
         $self'treasury_bound = true;
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
@@ -474,14 +477,14 @@ _ %get_global() method_id(126899) {
         in_msg~skip_bits(32);
         var $msg'deployment_manifest_hash = in_msg~load_uint(256);
         var $msg'credit_issuer_address = in_msg~load_msg_addr();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireSealed();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireController();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireSealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireController();
         throw_unless(26013, ($msg'deployment_manifest_hash == $self'deployment_manifest_hash));
         throw_unless(26014, $self'credit_issuer_bound);
-        throw_unless(26015, ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_isBasechainAddress($msg'credit_issuer_address));
+        throw_unless(26015, ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_isBasechainAddress($msg'credit_issuer_address));
         throw_unless(26016, ( ~ equal_slices_bits($msg'credit_issuer_address, $global_myAddress()) ));
         $self'credit_issuer_address = $msg'credit_issuer_address;
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
@@ -492,12 +495,12 @@ _ %get_global() method_id(126899) {
         var $msg'sender_key = in_msg~load_uint(160);
         var $msg'amount = in_msg~load_uint(128);
         var $msg'sender_wallet = in_msg~load_msg_addr();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireUnsealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireUnsealed();
         throw_unless(26011, $self'ath_master_bound);
         throw_unless(26019, ( equal_slices_bits(__tact_context_get_sender(), $self'pool_ath_wallet_address) ));
         $self'funded_amount = ($self'funded_amount + $msg'amount);
         $self'remaining_budget = ($self'remaining_budget + $msg'amount);
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
@@ -505,17 +508,20 @@ _ %get_global() method_id(126899) {
     if (op == 0x41445204) {
         in_msg~skip_bits(32);
         var $msg'deployment_manifest_hash = in_msg~load_uint(256);
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireUnsealed();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireController();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireUnsealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireController();
         throw_unless(26040, ($msg'deployment_manifest_hash > 1));
         throw_unless(26041, $self'ath_master_bound);
         throw_unless(26042, $self'credit_issuer_bound);
         throw_unless(26043, $self'treasury_bound);
-        throw_unless(26044, ($self'funded_amount == 15000000000000000));
+        throw_unless(26044, ($self'funded_amount >= 15000000000000000));
+        if (($self'remaining_budget > 15000000000000000)) {
+            $self'remaining_budget = 15000000000000000;
+        }
         $self'deployment_manifest_hash = $msg'deployment_manifest_hash;
         $self'sealed = true;
         $self'sealed_at = $global_now();
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
@@ -525,15 +531,15 @@ _ %get_global() method_id(126899) {
         var $msg'purchase_id = in_msg~load_uint(64);
         var $msg'buyer = in_msg~load_msg_addr();
         var $msg'credits_k = in_msg~load_uint(32);
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireSealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireSealed();
         throw_unless(26110, ( equal_slices_bits(__tact_context_get_sender(), $self'credit_issuer_address) ));
-        throw_unless(26111, ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_isBasechainAddress($msg'buyer));
+        throw_unless(26111, ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_isBasechainAddress($msg'buyer));
         throw_unless(26112, ( (($msg'credits_k >= 1)) ? (($msg'credits_k <= 1000)) : (false) ));
         int $payout = ($msg'credits_k * 10000000000);
         if (($self'remaining_budget < $payout)) {
             $payout = (($self'remaining_budget / 10000000000) * 10000000000);
             ifnot ($payout) {
-                $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+                $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
                 return ();
             }
         }
@@ -542,8 +548,9 @@ _ %get_global() method_id(126899) {
         $self'distributed_total = ($self'distributed_total + $payout);
         $self'claim_count = ($self'claim_count + 1);
         $self'payout_seq = ($self'payout_seq + 1);
+        $self'last_accrual_at = $global_now();
         $global_send($SendParameters$_constructor_to_value_mode_bounce_body($self'pool_ath_wallet_address, 50000000, 1, false, $ATHTransferRequest$_store_cell($ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination($self'payout_seq, $payout, $msg'buyer, $global_myAddress()), begin_cell())));
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
@@ -551,7 +558,7 @@ _ %get_global() method_id(126899) {
     if (op == 0x41445211) {
         in_msg~skip_bits(32);
         var $_ = empty_tuple();
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
@@ -559,23 +566,24 @@ _ %get_global() method_id(126899) {
     if (op == 0x41445212) {
         in_msg~skip_bits(32);
         var $_ = empty_tuple();
-        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq)~$AirdropPool$_fun_requireSealed();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireSealed();
         throw_unless(26140, ($global_now() >= ($self'sealed_at + 315360000)));
+        throw_unless(26143, ($global_now() >= ($self'last_accrual_at + 31536000)));
         throw_unless(26141, ($self'remaining_budget > 0));
         int $residual = $self'remaining_budget;
         $self'remaining_budget = 0;
         $self'payout_seq = ($self'payout_seq + 1);
         throw_unless(26142, ($Context$_get_value(__tact_context_get()) >= 60000000));
         $global_send($SendParameters$_constructor_to_value_mode_bounce_body($self'pool_ath_wallet_address, 50000000, 1, false, $ATHTransferRequest$_store_cell($ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination($self'payout_seq, $residual, $self'treasury_address, $global_myAddress()), begin_cell())));
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
-        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }
     ;; Receiver fallback
-    $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq));
+    $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
 }
