@@ -411,7 +411,7 @@ PROGRAM{
       $ATHMaster$_contract_store INLINECALLDICT
     }>
     OVER
-    1096042503 PUSHINT
+    1096042505 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
@@ -438,35 +438,39 @@ PROGRAM{
       100000000000000000 PUSHINT
       EQUAL
       THROWANYIFNOT
-      3000000 PUSHINT
-      5000000 PUSHINT
+      11000000 PUSHINT
       14124 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      s2 PUSH
+      ROT
       GEQ
       THROWANYIFNOT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      8000000 PUSHINT
+      SUB
       TRUE
       0 PUSHINT
           MYADDR
-      s6 s(-1) PUXC
+      s5 s(-1) PUXC
       $ATHWallet$_init_child INLINECALLDICT
-      s6 PUSH
-      s4 s8 XCHG
-      s9 s3 s3 XCHG3
-      s0 s7 XCHG
+      s5 PUSH
+      s4 s7 XCHG
+      s8 s3 s3 XCHG3
+      s0 s6 XCHG
       $ATHMaster$_fun_derive_wallet_address INLINECALLDICT
       TRUE
+      s6 s5 XCPU
       1 PUSHINT
-      s8 s6 s12 XCPU2
+      s0 s12 XCHG
       $ATHGenesisSupplyCredit$_constructor_query_id_amount_response_destination INLINECALLDICT
       NEWC
       $ATHGenesisSupplyCredit$_store_cell INLINECALLDICT
-      s2 s6 XCHG
-      s5 s7 XCHG
+      s1 s6 XCHG
+      s5 s8 XCHG
       s1 s4 XCHG
-      s3 s8 XCHG
-      s11 s9 s0 XCHG3
+      s3 s10 XCHG
+      s9 s7 s0 XCHG3
       $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -534,44 +538,19 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      __tact_context_get INLINECALLDICT
-      $Context$_get_value INLINECALLDICT
-      s0 s4 XCHG2
-      SUB
-      DUP
-      100000 PUSHINT
-      GEQ
-      IF:<{
-        s1 s5 XCHG
-        FALSE
-        0 PUSHINT
-        PUSHNULL
-        $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
-            NEWC
-            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
-            1 STI               // store `bounce`
-            b{000} STSLICECONST // store bounced = false and src = addr_none
-            STSLICE             // store `to`
-            SWAP
-            STGRAMS             // store `value`
-            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
-            STZEROES
-            // → Stack state
-            // s0: Builder
-            // s1: `body`
-            // s2: `mode`
-            STDICT
-            ENDC
-            SWAP
-            SENDRAWMSG
-      }>ELSE<{
-        DROP
-        s4 POP
-      }>
-      3 ROLL
+      2SWAP
       $ATHMaster$_contract_store INLINECALLDICT
     }>
     s5 POP
+    DUP
+    1096042506 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s3 POP
+      s0 s0 s3 XCHG3
+      $ATHMaster$_contract_store INLINECALLDICT
+    }>
     0 EQINT
     s0 s4 XCHG
     33 LESSINT

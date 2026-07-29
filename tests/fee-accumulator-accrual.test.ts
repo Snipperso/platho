@@ -154,5 +154,15 @@ describe('FEE ACCUMULATOR ACCRUAL — a capsule fee becomes a credit, and only a
     const drained = before - after;
     expect(drained, `the sink balance fell by ${drained} — it is funding the 60M accrue leg from its own balance`)
       .toBeLessThan(5_000_000n);
+
+    // [TIGHTENED 2026-07-29, wave-8 MED] The bound above passes at a leak of 4,999,999 per redeem and never
+    // establishes the SIGN, which is the whole question: FEEACCUMULATOR_REDEEM_EXEC_RESERVE is a fixed 2,000,000
+    // while this handler pays gas AND two forward fees, both charged to balance under SendPayGasSeparately, and
+    // nothing in the handler debits a bucket — so a shortfall comes straight out of the backing invariant, silently
+    // and with no COMPUTE-phase trace. The file's own measurements (one derivation + one leg = 1,020,134 of gas and
+    // 485,401 of fees) put the estimate for one derivation + TWO legs at 1.7M–2.2M against that 2,000,000, which is
+    // exactly the range where the sign cannot be reasoned out. So measure it, and pin the direction, not a ceiling.
+    expect(drained, `MEASURED balance delta across one redeem: ${-drained} (positive means the reserve covers it)`)
+      .toBeLessThanOrEqual(0n);
   });
 });

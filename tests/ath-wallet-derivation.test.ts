@@ -9,7 +9,7 @@ import { ATHWallet, ATHGenesisSupplyCredit, storeATHGenesisSupplyCredit } from '
 
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const ATH_GENESIS_SUPPLY_DOWNSTREAM_VALUE = 3_000_000n;
-const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE = 2_000_000n;
+const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE = 8_000_000n; // raised 2M -> 8M, wave-8: see the GENESIS-ACTION block
 const ATH_GENESIS_SUPPLY_REQUIRED_VALUE = ATH_GENESIS_SUPPLY_DOWNSTREAM_VALUE + ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE;
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -245,7 +245,11 @@ describe('ATH wallet derivation profile', () => {
     expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
   });
 
-  it('ATH Master deploys treasury supply without trapping caller overpayment in the treasury ATH wallet', async () => {
+  // [INVERTED 2026-07-29, wave-8 MED] This used to assert the opposite — that overpayment must NOT reach the treasury
+  // wallet — which described the refund that has now been removed. Refunding was the defect: this send is the only
+  // path that ever creates the wallet holding 100% of the supply, and it is never redeployable, so refusing to let
+  // the ceremony endow it left it with 1,624,999 against a MEASURED 5,132,011 of rent a year.
+  it('ATH Master forwards DeployTreasurySupply overpayment INTO the treasury ATH wallet as its rent endowment', async () => {
     const blockchain = await Blockchain.create();
     const treasuryOwner = await blockchain.treasury('ath-genesis-overpay-treasury-owner');
     const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
@@ -273,7 +277,8 @@ describe('ATH wallet derivation profile', () => {
     } as DeployTreasurySupply);
 
     expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
-    expect(await contractBalance(blockchain, treasuryWalletAddress)).toBeLessThan(toNano('0.01'));
+    // 0.2 GRAM sent, 8,000,000 kept by the master for its own gas and forward fees: the rest is the wallet's.
+    expect(await contractBalance(blockchain, treasuryWalletAddress)).toBeGreaterThan(toNano('0.18'));
   });
 
   it('ATH Master tiny DeployTreasurySupply overpayment does not cancel genesis credit', async () => {
@@ -404,21 +409,24 @@ describe('ATH wallet derivation profile', () => {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // GENESIS-ACTION — the FIRST step of the ceremony, and the phase its gate does not look at.
 //
-// MEASURED 2026-07-28 (wave-8 audit). `DeployTreasurySupply` gate 14124 checks context().value >= 5,000,000.
-// That is not the binding constraint. The handler keeps only ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE out of the
-// message and refunds `context().value - required_value` — but the downstream send carries the FULL ATHWallet
-// StateInit with SendPayFwdFeesSeparately, whose forward fee comes out of BALANCE, not out of `value`. The
-// refund is computed without subtracting that fee, so it asks for more than remains and ACTION fails.
+// MEASURED 2026-07-28, FIXED 2026-07-29. These three tests were written to PIN a defect, and now pin its absence.
 //
-// Two things make this worth pinning rather than reasoning about:
-//   1. COMPUTE exits 0 and treasury_supply_deployed is set — then the whole transaction aborts and rolls back.
-//      Anyone checking the exit code sees success while zero of the 100M ATH was minted.
-//   2. Sending MORE does not help: the excess is refunded, so it never becomes balance.
+// What was wrong. Gate 14124 checked context().value >= 5,000,000, which was not the binding constraint. The handler
+// kept only ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE (2,000,000) out of the message and refunded everything above
+// required_value — while the downstream send carries the FULL ATHWallet StateInit with SendPayFwdFeesSeparately,
+// whose forward fee is charged to BALANCE on top of `value`. MEASURED: 754,268 of gas and 3,826,734 of forward fees
+// against a 2,000,000 reserve. Two things made it nasty: COMPUTE exited 0 with treasury_supply_deployed set before
+// the whole transaction aborted and rolled back, so an exit-code check saw success while zero of the 100,000,000 ATH
+// was minted; and sending MORE did not help, because the excess was refunded and never became balance. It worked in
+// production only by a number nobody had tied to it — D01 happens to fund ATHMaster with 500,000,000 first.
 //
-// The production ceremony is safe — but only by a number nobody had tied to this one: D01 funds ATHMaster with
-// 500,000,000 before D02 arrives. These tests pin the real requirement, so lowering that value reds here.
-// The same mistake already exists in a rehearsal script: scripts/tier2_p1_deploy_ath.ts sends deploy+mint as a
-// SINGLE 1.5 GRAM message, and by this measurement that path cannot work at any value.
+// What changed. The reserve is now 8,000,000, covering the measured cost ~1.75x, so the inbound message pays for its
+// own transaction and the master's balance stops being a hidden precondition. The refund is gone: the surplus is
+// FORWARDED to the treasury wallet as its permanent rent endowment, which is the only path that ever creates that
+// wallet. These tests therefore now assert the inverse of what they used to.
+//
+// Still true and still unfixed elsewhere: scripts/tier2_p1_deploy_ath.ts sends deploy+mint as a SINGLE message,
+// which cannot work at any value — a rehearsal script, not the ceremony packet.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 async function runGenesisSupply(masterOwnBalance: bigint, sentValue: bigint) {
@@ -449,33 +457,66 @@ async function runGenesisSupply(masterOwnBalance: bigint, sentValue: bigint) {
     aborted: tx?.description?.aborted,
     actionCode: tx?.description?.actionPhase?.resultCode,
     walletState: (await blockchain.getContract(walletAddress)).accountState?.type ?? 'uninit',
+    walletBalance: (await blockchain.getContract(walletAddress)).balance,
   };
 }
 
-describe('GENESIS-ACTION — DeployTreasurySupply needs BALANCE, and gate 14124 does not check it', () => {
-  it('GENESIS-ACTION-01: a master holding only its own 2,000,000 aborts in ACTION while COMPUTE reports success', async () => {
+describe('ATHMaster storage top-up', () => {
+  it('MASTER-TOPUP-01: an ordinary bounceable top-up now funds the master instead of bouncing off 13001', async () => {
+    const blockchain = await Blockchain.create();
+    blockchain.now = 1_790_000_000;
+    const funder = await blockchain.treasury('ath-master-topup-funder');
+    const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
+    const masterInit = await ATHMaster.init(funder.address, content);
+    const masterAddress = contractAddress(0, masterInit);
+    await blockchain.setShardAccount(masterAddress, createShardAccount({
+      address: masterAddress, code: masterInit.code, data: masterInit.data,
+      balance: toNano('0.05'), workchain: 0,
+    }));
+    const master = blockchain.openContract(new ATHMaster(masterAddress, masterInit));
+
+    // After genesis no handler leaves value here — both remaining legs forward the remainder with SendRemainingValue
+    // and 14121 closes DeployTreasurySupply forever — while rent runs at a MEASURED 6,236,368 a year on a contract
+    // that is never to be redeployed. Before this receiver existed the fallback threw 13001, so the ordinary
+    // bounceable transfer a wallet sends to a known contract came straight back.
+    const before = await contractBalance(blockchain, masterAddress);
+    await master.send(funder.getSender(), { value: toNano('1'), bounce: true }, {
+      $$type: 'ATHMasterTopUpStorageReserve',
+    } as any);
+    const after = await contractBalance(blockchain, masterAddress);
+    expect(after - before, 'a century of rent can be delivered in one ordinary transfer').toBeGreaterThan(toNano('0.99'));
+  });
+});
+
+describe('GENESIS-ACTION — DeployTreasurySupply pays for itself, and its surplus endows the treasury wallet', () => {
+  it('GENESIS-ACTION-01: a master holding NOTHING of its own now completes the mint at the gate minimum', async () => {
     for (const balance of [0n, ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE]) {
       const r = await runGenesisSupply(balance, ATH_GENESIS_SUPPLY_REQUIRED_VALUE);
-      expect(r.computeExit, `balance ${balance}: COMPUTE succeeds — this is what makes the failure look like success`).toBe(0);
-      expect(r.aborted, `balance ${balance}: the transaction still aborts`).toBe(true);
-      expect(r.actionCode, `balance ${balance}: ACTION fails with 37 (not enough Toncoin)`).toBe(37);
-      expect(r.walletState, `balance ${balance}: not one ATH is minted`).toBe('uninit');
+      expect(r.computeExit, `balance ${balance}: COMPUTE succeeds`).toBe(0);
+      expect(r.aborted, `balance ${balance}: and so does ACTION — no rc37 rollback behind a green exit code`).toBe(false);
+      expect(r.actionCode, `balance ${balance}: ACTION clean`).toBe(0);
+      expect(r.walletState, `balance ${balance}: the 100,000,000 ATH is minted`).toBe('active');
     }
   }, 120_000);
 
-  it('GENESIS-ACTION-02: 3,000,000 of own balance is enough — the requirement is balance, not message value', async () => {
-    const r = await runGenesisSupply(3_000_000n, ATH_GENESIS_SUPPLY_REQUIRED_VALUE);
-    expect(r.aborted, 'the same message succeeds once the master can cover the forward fee').toBe(false);
+  it('GENESIS-ACTION-02: the master\'s own balance is no longer a hidden precondition', async () => {
+    // The old requirement was ~3,000,000 of PRE-EXISTING balance, tied to nothing the gate checked and satisfied in
+    // production only because D01 funds the master first. One nanoton of its own is now enough.
+    const r = await runGenesisSupply(1n, ATH_GENESIS_SUPPLY_REQUIRED_VALUE);
+    expect(r.aborted).toBe(false);
     expect(r.actionCode).toBe(0);
     expect(r.walletState, 'the treasury wallet is deployed and credited').toBe('active');
   }, 60_000);
 
-  it('GENESIS-ACTION-03: sending MORE does not fix it — the excess is refunded, so it never becomes balance', async () => {
-    // 0.5 GRAM, a hundred times the gate's minimum, against a master with nothing of its own.
-    const r = await runGenesisSupply(0n, 500_000_000n);
+  it('GENESIS-ACTION-03: sending MORE now ENDOWS the treasury wallet instead of bouncing off a refund', async () => {
+    // 0.62 GRAM — the ceremony's raised D02 value — against a master with nothing of its own.
+    const r = await runGenesisSupply(0n, 620_000_000n);
     expect(r.computeExit).toBe(0);
-    expect(r.aborted, 'value cannot substitute for balance').toBe(true);
-    expect(r.actionCode).toBe(37);
-    expect(r.walletState).toBe('uninit');
+    expect(r.aborted, 'value now funds the transaction it pays for').toBe(false);
+    expect(r.actionCode).toBe(0);
+    expect(r.walletState).toBe('active');
+    // The surplus landed where the supply lives. At the MEASURED 5,132,011 a year this is a century of rent, which
+    // is what the 100-year vesting schedule requires of a wallet that can never be redeployed.
+    expect(r.walletBalance, 'the wallet holds a century of its own rent').toBeGreaterThan(513_201_100n);
   }, 60_000);
 });

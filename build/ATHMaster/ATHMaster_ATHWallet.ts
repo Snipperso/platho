@@ -2897,7 +2897,7 @@ export type DeployTreasurySupply = {
 export function storeDeployTreasurySupply(src: DeployTreasurySupply) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(1096042503, 32);
+        b_0.storeUint(1096042505, 32);
         b_0.storeUint(src.query_id, 64);
         b_0.storeAddress(src.response_destination);
     };
@@ -2905,7 +2905,7 @@ export function storeDeployTreasurySupply(src: DeployTreasurySupply) {
 
 export function loadDeployTreasurySupply(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1096042503) { throw Error('Invalid prefix'); }
+    if (sc_0.loadUint(32) !== 1096042505) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
     const _response_destination = sc_0.loadAddress();
     return { $$type: 'DeployTreasurySupply' as const, query_id: _query_id, response_destination: _response_destination };
@@ -2937,6 +2937,47 @@ export function dictValueParserDeployTreasurySupply(): DictionaryValue<DeployTre
         },
         parse: (src) => {
             return loadDeployTreasurySupply(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type ATHMasterTopUpStorageReserve = {
+    $$type: 'ATHMasterTopUpStorageReserve';
+}
+
+export function storeATHMasterTopUpStorageReserve(src: ATHMasterTopUpStorageReserve) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042506, 32);
+    };
+}
+
+export function loadATHMasterTopUpStorageReserve(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042506) { throw Error('Invalid prefix'); }
+    return { $$type: 'ATHMasterTopUpStorageReserve' as const };
+}
+
+export function loadTupleATHMasterTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'ATHMasterTopUpStorageReserve' as const };
+}
+
+export function loadGetterTupleATHMasterTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'ATHMasterTopUpStorageReserve' as const };
+}
+
+export function storeTupleATHMasterTopUpStorageReserve(source: ATHMasterTopUpStorageReserve) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserATHMasterTopUpStorageReserve(): DictionaryValue<ATHMasterTopUpStorageReserve> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHMasterTopUpStorageReserve(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHMasterTopUpStorageReserve(src.loadRef().beginParse());
         }
     }
 }
@@ -3220,7 +3261,8 @@ const ATHWallet_types: ABIType[] = [
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
-    {"name":"DeployTreasurySupply","header":1096042503,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"DeployTreasurySupply","header":1096042505,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"ATHMasterTopUpStorageReserve","header":1096042506,"fields":[]},
     {"name":"ATHJettonDataView","header":null,"fields":[{"name":"total_supply","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"mintable","type":{"kind":"simple","type":"bool","optional":false}},{"name":"admin_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"jetton_content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"jetton_wallet_code","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"ATHMaster$Data","header":null,"fields":[{"name":"total_supply","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"treasury_supply_deployed","type":{"kind":"simple","type":"bool","optional":false}}]},
 ]
@@ -3254,7 +3296,8 @@ const ATHWallet_opcodes = {
     "JettonExcesses": 3576854235,
     "ATHWalletTopUpStorageReserve": 1096042503,
     "ATHRecoverStuckOutgoing": 1096042504,
-    "DeployTreasurySupply": 1096042503,
+    "DeployTreasurySupply": 1096042505,
+    "ATHMasterTopUpStorageReserve": 1096042506,
 }
 
 const ATHWallet_getters: ABIGetter[] = [
@@ -3319,7 +3362,7 @@ export const ATH_PENDING_NOTIFICATION_TTL = 86400n;
 export const ATH_REGISTRY_PENDING_TTL = 604800n;
 export const JETTON_EXCESSES_VALUE = 1000000n;
 export const ATH_TOTAL_SUPPLY_ATOMIC = 100000000000000000n;
-export const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE = 2000000n;
+export const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE = 8000000n;
 export const ATH_MASTER_EXCESS_REFUND_MIN_VALUE = 100000n;
 
 export class ATHWallet implements Contract {

@@ -145,6 +145,15 @@ message(0x41544334) TicketRedeemAck {
 
 // Mirrors AirdropPool.AirdropAccrue — declared locally with its opcode rather than imported, the same way
 // RecordShard declares DepositProtocolFee. Importing would drag AirdropPool's code in and rebuild the cycle.
+// Mirrors AIRDROP_MAX_CREDITS_PER_ACCRUAL in AirdropPool.tact and AT_MAX_CREDITS_PER_CLAIM in AirdropTicket.tact.
+// Three copies of one number across three immutable contracts is exactly the shape that has already drifted once in
+// this codebase, so it is named here rather than written as a literal, and ACCRUE-WIRE pins the three together.
+const AIRDROP_MAX_CREDITS_PER_ACCRUAL_MIRROR: Int = 1000;
+// A year with no inbound value at all on the buyback lane before its unspendable remainder may be reclassified.
+const FEEACCUMULATOR_BUYBACK_REMAINDER_INACTIVITY: Int = 31536000;
+
+message(0x41445214) ReclassifyStuckBuybackRemainder {}
+
 message(0x41445210) AirdropAccrue {
     purchase_id: Int as uint64;
     buyer: Address;
@@ -167,6 +176,11 @@ struct FeeAccumulatorStateView {
     treasury_receiver_address: Address;
     buyback_burn_address: Address;
     storage_reserve_ton: Int;   // deliberate top-ups, tracked so SweepUnaccounted cannot mistake them for surplus
+    // APPENDED, never inserted: a positional decoder reads this struct by slot, so a field added anywhere but the end
+    // silently hands every later reader the wrong value.
+    buyback_due_last_increase_at: Int;
+    failed_accrual_count: Int;
+    last_failed_accrual_purchase_id: Int;
 }
 
 contract FeeAccumulator {
@@ -177,6 +191,9 @@ contract FeeAccumulator {
     buyback_due_ton: Int as uint128;
     buyback_split_enabled: Bool;
     storage_reserve_ton: Int as coins;
+    buyback_due_last_increase_at: Int as uint64;
+    failed_accrual_count: Int as uint32;
+    last_failed_accrual_purchase_id: Int as uint64;
     // Airdrop accrual wiring, all bound at genesis. Nullable rather than flagged: an unbound code cell is
     // exactly the "accrual is off" state, and the deposit path below simply skips crediting — so a genesis
     // that never binds them yields a working fee accumulator with no airdrop, not a broken one.
@@ -203,6 +220,9 @@ contract FeeAccumulator {
         self.buyback_due_ton = 0;
         self.buyback_split_enabled = false;
         self.storage_reserve_ton = 0;
+        self.buyback_due_last_increase_at = 0;
+        self.failed_accrual_count = 0;
+        self.last_failed_accrual_purchase_id = 0;
     }
 
     receive(msg: DepositProtocolFee) {
@@ -329,7 +349,12 @@ contract FeeAccumulator {
     receive(msg: TicketRedeem) {
         throwUnless(15060, self.ticket_code != null && self.airdrop_pool_address != null);
         throwUnless(15061, sender() == self.ticketAddress(msg.owner));
-        throwUnless(15062, msg.credits_k > 0);
+        // [ADDED 2026-07-29, wave-8 HIGH] The upper bound is AirdropPool's (gate 26112) and it is mirrored here so a
+        // redeem that the pool would refuse fails in COMPUTE and BOUNCES — restoring the ticket's credits through
+        // machinery that already exists — instead of being forwarded and then silently swallowed by the missing
+        // bounce path. AirdropTicket already caps k, so this is unreachable today; a gate whose correctness depends
+        // on a different immutable contract keeping a promise is the kind that stops holding after one edit.
+        throwUnless(15062, msg.credits_k > 0 && msg.credits_k <= AIRDROP_MAX_CREDITS_PER_ACCRUAL_MIRROR);
         // Fail-closed in COMPUTE so an underfunded redeem BOUNCES and the ticket restores the credits, rather
         // than failing in ACTION where the credits would simply be gone.
         throwUnless(15063, context().value >= FEEACCUMULATOR_ACCRUE_LEG_VALUE + FEEACCUMULATOR_REDEEM_EXEC_RESERVE);
@@ -378,6 +403,7 @@ contract FeeAccumulator {
         self.accumulated_ton = 0;
         self.treasury_due_ton += treasury_amount;
         self.buyback_due_ton += buyback_amount;
+        self.buyback_due_last_increase_at = now();
     }
 
     receive(msg: EnableBuybackSplit) {
@@ -432,6 +458,51 @@ contract FeeAccumulator {
         throwUnless(15032, sender() == self.buyback_burn_address);
         throwUnless(15033, msg.amount > 0);
         self.buyback_due_ton += msg.amount;
+        self.buyback_due_last_increase_at = now();
+    }
+
+    // [ADDED 2026-07-29, wave-8 MED] The only way a buyback remainder can ever leave this contract.
+    //
+    // Gate 15034 demands msg.amount == BUYBACK_FUNDING_ENVELOPE_NANOTONS EXACTLY, and it has to: BuybackBurn's own
+    // gate 22202 demands the same, because 51.05 GRAM is one complete execution envelope and half an envelope buys
+    // nothing. So any buyback_due below that figure is unspendable — and there was no way back either. SplitAccumulated
+    // only moves value INTO the bucket, and SweepUnaccounted counts buyback_due as accounted and by construction
+    // cannot touch it. The symmetric treasury leg has a remainder escape at 15023; this lane simply lacked one.
+    //
+    // The naive fix — allow a partial flush — is wrong twice over: BuybackBurn refuses it, and even if it did not,
+    // anyone could drain the buyback allocation into the treasury by calling this after every split that happens to
+    // land short. So this is a DEAD-MAN, not a valve: the clock is stamped on every increase, and the remainder only
+    // becomes reclassifiable after a full year in which the lane received nothing at all. Ordinary operation re-arms
+    // it constantly and can never reach it. Permissionless for the usual reason — the destination is the genesis-bound
+    // treasury bucket and no caller can point it anywhere.
+    receive(_: ReclassifyStuckBuybackRemainder) {
+        throwUnless(15070, self.buyback_due_ton > 0);
+        throwUnless(15071, self.buyback_due_ton < BUYBACK_FUNDING_ENVELOPE_NANOTONS);
+        throwUnless(15072, now() > self.buyback_due_last_increase_at + FEEACCUMULATOR_BUYBACK_REMAINDER_INACTIVITY);
+        self.treasury_due_ton += self.buyback_due_ton;
+        self.buyback_due_ton = 0;
+    }
+
+    // [ADDED 2026-07-29, wave-8 HIGH] AirdropAccrue is sent bounce:true and had NO bounced handler, so the generated
+    // router took the unmatched-bounce path and did `return ()` — a refusal at the pool was accepted here as success.
+    // TicketRedeemAck goes out in the SAME transaction, unconditionally, so by then the ticket has already debited the
+    // publisher's credits and cleared its in-flight interlock; bounced<TicketRedeem> can no longer fire because the
+    // redeem itself succeeded. The credits were destroyed WITH NO TRACE ANYWHERE, which is the part that mattered.
+    //
+    // What this can and cannot do. It cannot restore them: only the first 224 bits of a bounced body survive, which
+    // covers the opcode and purchase_id (96 bits) but not `buyer`, an Address at 267 bits — and there is no map from
+    // purchase_id to buyer to look it up in, deliberately, because an unbounded one is its own defect. What it does is
+    // make the condition OBSERVABLE and countable instead of invisible, and that is worth the two fields.
+    //
+    // Reachability, measured rather than assumed: of the pool's refusals, 26111/26114 and exhaustion are impossible,
+    // and 26112 (credits_k > 1000) is unreachable because AirdropTicket caps k at AT_MAX_CREDITS_PER_CLAIM before
+    // sending — gate 15062 below now mirrors that cap anyway, so this contract stops trusting a distant one's
+    // discipline. That leaves 26110, the ADR9 distributor rebind, whose ordering obligation — export every ticket's
+    // credits BEFORE rebinding — is recorded in AirdropPool.tact and AirdropTicket.tact and enforced by nothing on
+    // chain. If this counter is ever non-zero, that obligation was missed and the amount is knowable off-chain.
+    bounced(msg: bounced<AirdropAccrue>) {
+        self.failed_accrual_count += 1;
+        self.last_failed_accrual_purchase_id = msg.purchase_id;
     }
 
     receive(msg: TopUpStorageReserve) {
@@ -483,7 +554,10 @@ contract FeeAccumulator {
             buyback_split_enabled: self.buyback_split_enabled,
             treasury_receiver_address: self.treasury_receiver_address,
             buyback_burn_address: self.buyback_burn_address,
-            storage_reserve_ton: self.storage_reserve_ton
+            storage_reserve_ton: self.storage_reserve_ton,
+            buyback_due_last_increase_at: self.buyback_due_last_increase_at,
+            failed_accrual_count: self.failed_accrual_count,
+            last_failed_accrual_purchase_id: self.last_failed_accrual_purchase_id
         };
     }
 

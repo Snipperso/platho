@@ -561,24 +561,27 @@ _ %get_wallet_address(slice $owner_address) method_id(103289) {
     }
     
     ;; Receive DeployTreasurySupply message
-    if (op == 0x41544807) {
+    if (op == 0x41544809) {
         var $msg'query_id = in_msg~load_uint(64);
         var $msg'response_destination = in_msg~load_msg_addr();
         throw_unless(14120, ( equal_slices_bits(__tact_context_get_sender(), $self'treasury_owner) ));
         throw_unless(14121, (~ $self'treasury_supply_deployed));
         throw_unless(14122, ( equal_slices_bits($msg'response_destination, $self'treasury_owner) ));
         throw_unless(14123, ($self'total_supply == 100000000000000000));
-        int $downstream_value = 3000000;
-        int $required_value = ($downstream_value + 2000000);
+        int $required_value = 11000000;
         throw_unless(14124, ($Context$_get_value(__tact_context_get()) >= $required_value));
+        int $downstream_value = ($Context$_get_value(__tact_context_get()) - 8000000);
         $self'treasury_supply_deployed = true;
         var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $self'treasury_owner, $global_myAddress());
         slice $treasury_wallet = ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)~$ATHMaster$_fun_derive_wallet_address($self'treasury_owner);
         $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($treasury_wallet, $downstream_value, true, 1, $wallet_init'code, $wallet_init'data, $ATHGenesisSupplyCredit$_store_cell($ATHGenesisSupplyCredit$_constructor_query_id_amount_response_destination($msg'query_id, $self'total_supply, $msg'response_destination), begin_cell())));
-        int $excess = ($Context$_get_value(__tact_context_get()) - $required_value);
-        if (($excess >= 100000)) {
-            $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($msg'response_destination, $excess, false, 0, null()));
-        }
+        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed));
+        return ();
+    }
+    
+    ;; Receive ATHMasterTopUpStorageReserve message
+    if (op == 0x4154480a) {
+        var $_ = empty_tuple();
         $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed));
         return ();
     }

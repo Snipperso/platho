@@ -327,8 +327,13 @@ export function buildPacket(draft: Draft) {
       signer_address: role(draft, 'ath_treasury_owner'),
       action: 'Call ATHMaster.DeployTreasurySupply',
       target_address: address(draft, 'ath_master'),
-      value_nanotons_min: '5000000',
-      stop_check: 'Treasury owner ATH wallet receives exactly 100M ATH; treasury_supply_deployed=true.',
+      // [RAISED 2026-07-29, wave-8 HIGH: 5M -> 620M] The old floor understated this transaction's own cost (MEASURED
+      // 754,268 gas + 3,826,734 of action-phase forward fees for a message carrying the full ATHWallet StateInit) and,
+      // since ATHMaster now forwards the surplus instead of refunding it, this value IS the treasury wallet's
+      // permanent endowment — 100 years of its MEASURED 5,132,011/year rent. See ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE
+      // and DEPLOY_TREASURY_SUPPLY_VALUE_RECOMMENDED_NANOTONS, raised in the same change.
+      value_nanotons_min: '620000000',
+      stop_check: 'Treasury owner ATH wallet receives exactly 100M ATH; treasury_supply_deployed=true; the wallet is left holding at least 500,000,000 nanoton of rent endowment.',
     },
     {
       id: 'D03',
