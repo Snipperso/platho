@@ -43,9 +43,22 @@ const PROFILE_AVATAR_SETTLE_EXEC_RESERVE: Int = 5000000;
 // A pending write is cleared by the ack or by the bounce, both of which arrive within seconds. This TTL exists
 // only for the case where NEITHER does — and it refunds rather than merely forgetting, because a stranded entry
 // otherwise costs 3 cells of this account FOREVER, which is the second, independent consumer of the same 65536
-// budget that the flush maps already demonstrated. Deliberately as long as ATH_REGISTRY_PENDING_TTL: pruning a
-// LIVE pending would refund a buyer whose avatar did land, so the window must be far beyond any real settlement.
-const PROFILE_AVATAR_WRITE_STALE_TTL: Int = 604800; // 7 days
+// budget that the flush maps already demonstrated. Pruning a LIVE pending would refund a buyer whose avatar did
+// land, so the window must be far beyond any real settlement — a day already is, by four orders of magnitude.
+//
+// [FIX 2026-07-29, wave-8 MED] This was 604800, chosen to be "as long as ATH_REGISTRY_PENDING_TTL". Equal was
+// exactly wrong. Both clocks measure the same purchase, but the WALLET stamps its created_at in the transaction
+// that accepts the ATH and fans out the notification, while this registry stamps its own one transaction LATER,
+// on receiving that notification. So registry.created_at >= wallet.created_at always, and with equal TTLs the
+// wallet's PruneStaleNotification — permissionless, and asking only 2,000,000 — opens no later than 21531 here,
+// normally a block earlier. A watcher prunes the wallet's escrow first; this registry then abandons the write and
+// sends its refund into a wallet that no longer has the record, which throws 14332 and bounces back to a registry
+// that has no bounced<AthTransferNotificationRefund> receiver, so it vanishes. The buyer's ATH stays in the
+// official wallet's balance, uncounted by treasury_due or burn_due, and the avatar is never written.
+// UsernameRegistry never had this problem because its USERNAME_PENDING_MINT_STALE_TTL is 86400 against the
+// wallet's 604800 — the registry always refunds first. That asymmetry is what showed this was an oversight rather
+// than a decision, and the fix is simply to match the lane that was right.
+const PROFILE_AVATAR_WRITE_STALE_TTL: Int = 86400; // 24 hours — MUST stay well under ATH_REGISTRY_PENDING_TTL
 const PROFILE_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE: Int = 100000;
 const PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE: Int = 2000000;

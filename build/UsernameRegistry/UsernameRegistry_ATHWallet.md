@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: ATHWallet
-BoC Size: 6207 bytes
+BoC Size: 6231 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 77

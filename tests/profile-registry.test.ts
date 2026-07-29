@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
@@ -1033,4 +1034,33 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect((await ctx.officialAthWallet.getGetPendingNotification(3402n, senderKey(payer.address, 3402n))).exists,
       'and the refused notification leaves no pending residue').toBe(false);
   });
+
+  it('PROF-TTL-ORDER-01: this registry must be able to refund BEFORE the wallet may prune the escrow', async () => {
+    // An ORDERING between two files, which is why it is pinned as one. Both clocks measure the same purchase, but
+    // the WALLET stamps created_at in the transaction that accepts the ATH and fans out the notification, while
+    // this registry stamps its own one transaction LATER, on receiving that notification. So the registry's stamp
+    // is never earlier, and with EQUAL TTLs — which is what shipped — the wallet's permissionless
+    // PruneStaleNotification opens no later than 21531 here, normally a block sooner. Prune first and the refund
+    // that follows hits a wallet with no record: 14332, bounced back to a registry with no
+    // bounced<AthTransferNotificationRefund> receiver, silently gone. The buyer's ATH then sits in the official
+    // wallet's balance, counted by neither treasury_due nor burn_due, and no avatar was written. Attack cost:
+    // 2,000,000. UsernameRegistry never had this because its TTL is 86400 against the wallet's 604800.
+    const readConst = (file: string, name: string) => {
+      // `\\d`, not `\d`: a template literal eats the backslash and the pattern silently becomes `(d+)`.
+      const m = new RegExp(`const ${name}: Int = (\\d+);`).exec(readFileSync(file, 'utf8'));
+      expect(m, `${name} must exist in ${file}`).not.toBeNull();
+      return Number(m![1]);
+    };
+    const registryTtl = readConst('contracts/ProfileRegistry.tact', 'PROFILE_AVATAR_WRITE_STALE_TTL');
+    const walletTtl = readConst('contracts/ATHWallet.tact', 'ATH_REGISTRY_PENDING_TTL');
+    const usernameTtl = readConst('contracts/UsernameRegistry.tact', 'USERNAME_PENDING_MINT_STALE_TTL');
+
+    expect(registryTtl, 'the registry must get its refund in first — EQUAL is not good enough')
+      .toBeLessThan(walletTtl);
+    // And by a real margin, not one block: the registry's stamp lags by at least a transaction.
+    expect(walletTtl - registryTtl, 'the gap must be a margin, not a rounding error').toBeGreaterThanOrEqual(3600);
+    // Both registry lanes should behave the same way; the asymmetry is what exposed this in the first place.
+    expect(usernameTtl, 'the username lane was already correct and stays the reference').toBeLessThan(walletTtl);
+  });
+
 });
