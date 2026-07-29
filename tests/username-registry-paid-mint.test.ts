@@ -415,7 +415,12 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(global.burn_due_ath).toBe(PRICE_6_PLUS / 2n);
   });
 
-  it('RT-UNAMEITEM-003: resend after transfer before finalization is rejected without mutating pending due', async () => {
+  // [INVERTED 2026-07-29, wave-8 MED] This used to assert that a resend after an NFT transfer is REJECTED at 19136,
+  // which was the defect, not the guarantee: the ACK body read the LIVE owner_wallet, so one ordinary transfer made
+  // an unfinished mint unrecoverable FOREVER — ResendDeployedAck exists precisely to recover it, PrunePendingUsernameMint
+  // throws 19307 unconditionally, and no other path clears a pending mint. The ACK now carries the owner frozen at
+  // initialization plus the nonce of the pending mint that caused it, so the resend does what it is for.
+  it('RT-UNAMEITEM-003: a resend after transfer still FINALIZES the mint it belongs to — recovery is not lost to a transfer', async () => {
     const { blockchain, registry, officialAthWallet, vaultAddress } = await deploySealedRegistry();
     const caller = await blockchain.treasury('username-resend-before-finalization-caller');
     const ownerA = fixtureAddress('USERNAME_RESEND_RACE_OWNER_A');
@@ -451,24 +456,73 @@ describe('UsernameRegistry paid mint milestone', () => {
       from: item.address,
       to: registry.address,
       op: 0xBBA3EC19,
-      success: false,
-      exitCode: 19136,
+      success: true,
     })).toBeDefined();
-    // Rejecting the resend must not touch the pending mint. Note the ORDERING the item-is-the-record model makes
-    // explicit: the item is already live and initialized at this point — it was deployed one iterator step ago —
-    // while the registry has NOT yet finalised. "Minted" (the item) and "finalised" (pending cleared, dues
-    // credited) are now visibly two different facts, and only the second is what this resend must not disturb.
-    // The deleted name_record_count conflated them; pending_mints, which does clear itself, is the real subject.
-    expect(pending.exists).toBe(true);
-    expect(pending.owner_wallet.equals(ownerA)).toBe(true);
+    // The ORDERING the item-is-the-record model makes explicit: the item is already live and initialized here — it
+    // was deployed one iterator step ago — while the registry has NOT yet finalised. "Minted" (the item) and
+    // "finalised" (pending cleared, dues credited) are two different facts, and the resend closes the second.
+    // The mint genuinely happened — this very pending mint deployed and initialized the item one step ago — so
+    // finalizing is the correct outcome and the later transfer is just an ordinary transfer of a name the buyer
+    // legitimately received. What must NOT happen is a resend finalizing some OTHER pending mint; that is gate 19137.
+    expect(pending.exists, 'the pending mint is resolved, not stranded').toBe(false);
     expect((await readItemRecord(blockchain, registry.address, hash)).minted).toBe(true);
-    expect(afterGlobal.pending_mint_count).toBe(beforeGlobal.pending_mint_count);
-    expect(afterGlobal.treasury_due_ath).toBe(beforeGlobal.treasury_due_ath);
-    expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
+    expect(afterGlobal.pending_mint_count).toBe(beforeGlobal.pending_mint_count - 1n);
+    expect(afterGlobal.treasury_due_ath, 'the price is booked').toBeGreaterThan(beforeGlobal.treasury_due_ath);
+    expect(afterGlobal.burn_due_ath).toBeGreaterThan(beforeGlobal.burn_due_ath);
 
     expect((await mintIterator.next()).done).toBe(false);
     expect((await readItemRecord(blockchain, registry.address, hash)).minted).toBe(true);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
+  });
+
+  it('RT-UNAMEITEM-004: a STALE ack from a long-initialized item cannot finalize a later mint (gate 19137)', async () => {
+    // The attack finding #33 describes. name_records was deleted, so a repeat purchase of an ALREADY MINTED name is
+    // now accepted by the registry: it books a pending mint and deploys to an item that is already alive, which
+    // refuses at 18011 and bounces — and that bounce is what refunds the buyer's ATH. ResendDeployedAck is open to
+    // anyone for 4,000,000, and the ack used to carry only (name_hash, current owner). Whenever the buyer was the
+    // wallet that already owns the name — buying one's own name again, a gift to the holder, a client retry — 19136
+    // matched by coincidence, the registry finalized a mint that never happened, and the genuine bounce arriving
+    // afterwards died on 19140 with the pending already cleared. Paid in full, nothing delivered, no refund.
+    const { blockchain, registry, officialAthWallet, vaultAddress } = await deploySealedRegistry();
+    const attacker = await blockchain.treasury('username-stale-ack-attacker');
+    const owner = fixtureAddress('USERNAME_STALE_ACK_OWNER');
+    const hash = nameHash('staleak');
+    const itemAddress = await registry.getGetUsernameItemAddress(hash);
+    const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
+
+    // First mint, carried all the way through: the item is live and the registry has finalised.
+    await sendMint(registry, officialAthWallet, owner, 'staleak', PRICE_6_PLUS);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
+    expect((await item.getGetState()).initialized).toBe(true);
+
+    // Second purchase of the same name, to the SAME wallet — the case where the old owner check matched by luck.
+    const iter = await blockchain.sendMessageIter(internalMessage(
+      officialAthWallet.address,
+      registry.address,
+      toNano('1.2'),
+      vaultMintNotificationBody(owner, 'staleak', PRICE_6_PLUS, vaultAddress),
+    ), { allowParallel: true });
+    expect((await iter.next()).done).toBe(false);
+    expect((await registry.getGetPendingMint(hash)).exists, 'the duplicate is pending, awaiting its bounce').toBe(true);
+
+    const before = await registry.getGetGlobal();
+    const resend = await item.send(attacker.getSender(), { value: 4_000_000n }, {
+      $$type: 'ResendDeployedAck',
+    } as ResendDeployedAck);
+    const after = await registry.getGetGlobal();
+
+    // The item's ack reports the nonce of the initialization that actually happened — the FIRST one — so it cannot
+    // stand in for this pending mint. Nothing is booked and the pending survives to be refunded by its own bounce.
+    expect(findTransaction(resend.transactions, {
+      from: item.address,
+      to: registry.address,
+      op: 0xBBA3EC19,
+      success: false,
+      exitCode: 19137,
+    }), 'the stale ack is refused on the nonce, not on luck').toBeDefined();
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(true);
+    expect(after.treasury_due_ath, 'no price booked for a mint that did not happen').toBe(before.treasury_due_ath);
+    expect(after.burn_due_ath).toBe(before.burn_due_ath);
   });
 
   it('USERNAME-REG-M10-06: accepted official mint notification sends ATH notification ACK back to official wallet', async () => {

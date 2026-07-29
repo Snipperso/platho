@@ -67,6 +67,7 @@ async function deployItem(name = 'platho') {
   await item.send(blockchain.sender(registryAddress), { value: ITEM_ACK_RESEND_RESERVE }, {
     $$type: 'InitializeUsernameItem',
     owner_wallet: ownerWallet,
+    mint_nonce: 1n,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
   } as InitializeUsernameItem);

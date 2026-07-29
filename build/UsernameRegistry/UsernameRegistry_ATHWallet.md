@@ -46,8 +46,8 @@ TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
 ### InitializeUsernameItem
-TL-B: `initialize_username_item#554e494e owner_wallet:address username_len:uint8 username:remainder<slice> = InitializeUsernameItem`
-Signature: `InitializeUsernameItem{owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+TL-B: `initialize_username_item#554e494e owner_wallet:address mint_nonce:uint64 username_len:uint8 username:remainder<slice> = InitializeUsernameItem`
+Signature: `InitializeUsernameItem{owner_wallet:address,mint_nonce:uint64,username_len:uint8,username:remainder<slice>}`
 
 ### ResendDeployedAck
 TL-B: `resend_deployed_ack#639cfc6c  = ResendDeployedAck`
@@ -66,8 +66,8 @@ TL-B: `username_ownership_proof#554e504f query_id:uint64 name_hash:uint256 owner
 Signature: `UsernameOwnershipProof{query_id:uint64,name_hash:uint256,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
 
 ### UsernameItemDeployedAck
-TL-B: `username_item_deployed_ack#bba3ec19 name_hash:uint256 owner_wallet:address = UsernameItemDeployedAck`
-Signature: `UsernameItemDeployedAck{name_hash:uint256,owner_wallet:address}`
+TL-B: `username_item_deployed_ack#bba3ec19 name_hash:uint256 owner_wallet:address mint_nonce:uint64 = UsernameItemDeployedAck`
+Signature: `UsernameItemDeployedAck{name_hash:uint256,owner_wallet:address,mint_nonce:uint64}`
 
 ### NftTransfer
 TL-B: `nft_transfer#5fcc3d14 query_id:uint64 payload:remainder<slice> = NftTransfer`
@@ -94,8 +94,8 @@ TL-B: `_ marker:uint8 metadata:dict<uint256, ^cell> = UsernameNftOnchainContent`
 Signature: `UsernameNftOnchainContent{marker:uint8,metadata:dict<uint256, ^cell>}`
 
 ### UsernameNFTItem$Data
-TL-B: `_ initialized:bool owner_wallet:address username_registry_address:address name_hash:uint256 username_len:uint8 username:^cell = UsernameNFTItem`
-Signature: `UsernameNFTItem{initialized:bool,owner_wallet:address,username_registry_address:address,name_hash:uint256,username_len:uint8,username:^cell}`
+TL-B: `_ initialized:bool owner_wallet:address username_registry_address:address name_hash:uint256 username_len:uint8 username:^cell init_owner_wallet:address init_mint_nonce:uint64 = UsernameNFTItem`
+Signature: `UsernameNFTItem{initialized:bool,owner_wallet:address,username_registry_address:address,name_hash:uint256,username_len:uint8,username:^cell,init_owner_wallet:address,init_mint_nonce:uint64}`
 
 ### ATHBurn
 TL-B: `ath_burn#41544801 query_id:uint64 amount:uint128 response_destination:address = ATHBurn`
@@ -254,8 +254,8 @@ TL-B: `username_registry_top_up_storage_reserve#0aba5f1d  = UsernameRegistryTopU
 Signature: `UsernameRegistryTopUpStorageReserve{}`
 
 ### PendingUsernameMint
-TL-B: `_ query_id:uint64 sender_key:uint160 owner_wallet:address name_hash:uint256 price_paid:uint128 item_address:address item_deploy_value:uint128 created_at:uint64 = PendingUsernameMint`
-Signature: `PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64}`
+TL-B: `_ query_id:uint64 sender_key:uint160 owner_wallet:address name_hash:uint256 price_paid:uint128 item_address:address item_deploy_value:uint128 created_at:uint64 mint_nonce:uint64 = PendingUsernameMint`
+Signature: `PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64,mint_nonce:uint64}`
 
 ### UsernameRegistryGlobalView
 TL-B: `_ sealed:bool official_ath_wallet_bound:bool deployment_manifest_hash:int257 genesis_config_hash:int257 official_ath_wallet_address:address genesis_controller_address:address pending_mint_count:int257 treasury_due_ath:int257 burn_due_ath:int257 pending_treasury_flush_count:int257 pending_burn_flush_count:int257 pending_mint_stale_ttl:int257 = UsernameRegistryGlobalView`
@@ -314,8 +314,8 @@ TL-B: `seal_collection_meta#73631e46  = SealCollectionMeta`
 Signature: `SealCollectionMeta{}`
 
 ### UsernameRegistry$Data
-TL-B: `_ official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 pending_mint_count:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 pending_mints:dict<int, ^PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64}> pending_item_to_name_hash:dict<address, int> pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint64}> pending_burn_flush_count:uint64 genesis_controller_address:address art:dict<uint16, ^cell> art_count:uint16 art_sealed:bool meta:dict<uint16, ^cell> meta_count:uint16 meta_sealed:bool = UsernameRegistry`
-Signature: `UsernameRegistry{official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,pending_mint_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,pending_mints:dict<int, ^PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64}>,pending_item_to_name_hash:dict<address, int>,pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint64}>,pending_burn_flush_count:uint64,genesis_controller_address:address,art:dict<uint16, ^cell>,art_count:uint16,art_sealed:bool,meta:dict<uint16, ^cell>,meta_count:uint16,meta_sealed:bool}`
+TL-B: `_ official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 pending_mint_count:uint64 mint_seq:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 pending_mints:dict<int, ^PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64,mint_nonce:uint64}> pending_item_to_name_hash:dict<address, int> pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint64}> pending_burn_flush_count:uint64 genesis_controller_address:address art:dict<uint16, ^cell> art_count:uint16 art_sealed:bool meta:dict<uint16, ^cell> meta_count:uint16 meta_sealed:bool = UsernameRegistry`
+Signature: `UsernameRegistry{official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,pending_mint_count:uint64,mint_seq:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,pending_mints:dict<int, ^PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64,mint_nonce:uint64}>,pending_item_to_name_hash:dict<address, int>,pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint64}>,pending_burn_flush_count:uint64,genesis_controller_address:address,art:dict<uint16, ^cell>,art_count:uint16,art_sealed:bool,meta:dict<uint16, ^cell>,meta_count:uint16,meta_sealed:bool}`
 
 ## Get methods
 Total get methods: 2

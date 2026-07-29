@@ -170,6 +170,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: ownerWallet,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
 
     // FINALISED. Was `get_name_record(hash).exists === true` plus a counter; the pending entry cleared and the
@@ -195,6 +196,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: wrongOwner,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
 
     // Was: assert no name record appeared for the wrong owner. Now assert the GATE that stops it — the ACK is
@@ -217,6 +219,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: ownerWallet,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
 
     expect(findTransaction(rightAck.transactions, {
@@ -301,6 +304,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: ownerWallet,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
 
     global = await ctx.registry.getGetGlobal();

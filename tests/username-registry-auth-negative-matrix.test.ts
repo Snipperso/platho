@@ -175,6 +175,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: ownerWallet,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
     // Was: name_record_count still 0 — i.e. the forged ACK finalised no mint. There is no global
     // counter any more, and the stronger claim is the one the chain answers directly: the item for
@@ -196,6 +197,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: ownerWallet,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
 
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
@@ -218,6 +220,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: wrongOwner,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
 
     // The wrong-owner ACK is refused at gate 19136 and changes nothing: no name exists, the mint is
@@ -236,6 +239,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: mintOwner,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
 
     // Was: a NameRecord appeared carrying { item_address, minter_wallet, registered_at }. Nothing
@@ -279,6 +283,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       $$type: 'UsernameItemDeployedAck',
       name_hash: hash,
       owner_wallet: transferredOwner,
+      mint_nonce: 1n,
     } as UsernameItemDeployedAck);
 
     const afterPending = await ctx.registry.getGetPendingMint(hash);
