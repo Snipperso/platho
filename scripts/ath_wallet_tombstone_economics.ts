@@ -19,7 +19,9 @@ const ATH_SENDER_KEY_MOD = 1n << 160n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 45_000_000n;
 const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1_000_000n;
 const ATH_REGISTRY_RESPONSE_ACK_VALUE = 3_000_000n;
-const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1_000_000n;
+// Mirrors contracts/ATHWallet.tact: raised 1M -> 4M on 2026-07-29 (it funds the only path that clears
+// pending_outgoing_transfers, and at 1M that path silently ran out of gas past ~4 000 entries).
+const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 4_000_000n;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 7_000_000n;
 const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 20_000_000n;
 const ATH_PRUNE_NOTIFICATION_EXEC_RESERVE = 2_000_000n;

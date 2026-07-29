@@ -5,13 +5,31 @@
 const ATH_TRANSFER_NOTIFY_ACK_VALUE: Int = 1000000;
 const ATH_REGISTRY_RESPONSE_ACK_VALUE: Int = 3000000;
 const ATH_INTERNAL_TRANSFER_ACK_VALUE: Int = 3000000;
-const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE: Int = 1000000;
+// [MEASURED 2026-07-29, raised 1M -> 4M] THIS FUNDS THE ONLY PATH THAT CLEARS pending_outgoing_transfers, and that
+// map has no bound, no prune and no getter. The value IS the gas budget: ATHWallet never calls accept_message, so an
+// incoming internal message may burn at most value/gas_price units — 1M bought exactly 15 000 at 66.667/unit.
+// Clearing costs a hash plus a dict get and delete on a 257-bit key, and that grows with the DEPTH of the tree.
+// Measured in the sandbox (worst of 24 sampled keys per size):
+//     N=1 -> 6 499 gas | N=2000 -> 14 724 (276 spare) | N=4000 -> 14 999 and exit -14 on 2 of 24
+//     N=6000 -> 6 of 24 fail | N=9000 -> 10 of 24 fail
+// Past ~4 000 entries the ack simply runs out of gas. It is sent bounce:false, so nobody — not the sender, not the
+// recipient, not the client — learns anything; the entry becomes PERMANENT while sending keeps working on a budget
+// 48x larger. Each stuck entry deepens the tree, so the failing fraction grows: a one-way ratchet toward the
+// ~65 536-cell account ceiling, on an immutable contract, invisible from outside because there is no getter.
+// 4M buys 60 000 units — 4x the measured ceiling, and ~71 tree levels at the measured ~748 gas per level, i.e.
+// beyond any depth an account can physically hold. It also puts this path above ATH_PRUNE_NOTIFICATION_EXEC_RESERVE
+// (2M), which does the same dict work on the BOUNDED sibling map and was funded twice as well as this one.
+// Raising it costs the caller: the constant is composed into gates 14212/14314/14563/14663/14714/14717 and into
+// required_value, so every funding floor moves with it by construction — which is exactly why it is safe to raise.
+const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE: Int = 4000000;
 const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE: Int = 21000000;
 const ATH_REGISTRY_PROFILE_AVATAR_FWD_FEE_ALLOWANCE: Int = 2000000;
 // [MEASURED 2026-07-20, raised 30M -> 45M] This floor is what keeps a REFUSED registry purchase refundable.
 // When a registry throws, the notification bounces and the ATH goes home as an ATHInternalTransfer funded by
-// SendRemainingValue out of what bounced — and the payer's own wallet gates that arrival at 14212 (2M + 3M + 1M +
-// 20M = 26M). The sender-side gate on the same money, 14335, only demands 12M, so between the two there is a
+// SendRemainingValue out of what bounced — and the payer's own wallet gates that arrival at 14212
+// (2M + 3M + 4M + 20M = 29M; it was 26M until the source-ack constant above was raised 1M -> 4M on 2026-07-29,
+// and 14212 composes that constant, so the gate moved with it). The sender-side gate on the same money, 14335,
+// only demands 12M, so between the two there is a
 // window where the refund is SENT, arrives under-funded, throws, and the buyer's ATH is stranded on the
 // registry's official wallet. Immutable after seal, so the floor has to be measured, not modelled.
 //
@@ -23,8 +41,11 @@ const ATH_REGISTRY_PROFILE_AVATAR_FWD_FEE_ALLOWANCE: Int = 2000000;
 // The refusing transaction's gas is paid out of the notification, and dictionary gas grows with DEPTH, so the
 // overhead rises as the product grows: ~+46,667 per doubling at the 800-profile point, i.e. ~6.9M extrapolated at
 // a million profiles. A floor calibrated on an empty registry would decay into the stranding window silently,
-// years after the seal. 45M leaves ~38M on arrival against the 26M gate (~1.47x) and tolerates the refusal
-// overhead nearly TRIPLING before anyone loses money.
+// years after the seal. 45M leaves ~38.6M on arrival against the now-29M gate (~1.33x) and tolerates the refusal
+// overhead growing ~2.5x (to ~16M) before anyone loses money. It was ~1.47x / nearly-triple against the old 26M
+// gate; the source-ack raise consumed part of that headroom deliberately, and the remaining margin still covers
+// the extrapolated ~6.9M overhead at a million profiles more than twice over. Re-check this line if either
+// constant moves again — the two are coupled through 14212 and nothing else states it.
 const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 45000000;
 // [COMMENT CORRECTED 2026-07-19] This used to be justified as rent for one `processed_notifications` entry — the
 // permanent replay tombstone, which was DELETED (see the state declaration below for why). What still justifies it
