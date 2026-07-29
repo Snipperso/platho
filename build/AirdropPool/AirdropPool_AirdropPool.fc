@@ -71,6 +71,9 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 ;; $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination
 ((int, int, slice, slice)) $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination(int $query_id, int $amount, slice $recipient, slice $response_destination) inline;
 
+;; $MessageParameters$_constructor_to_value_bounce_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
+
 
 ;; AirdropPool_AirdropPool.stdlib.fc
 global (int, slice, int, slice) __tact_context;
@@ -88,6 +91,30 @@ slice __tact_context_get_sender() inline {
 
 slice $global_myAddress() impure asm """
     MYADDR
+""";
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
 """;
 
 () $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
@@ -171,6 +198,12 @@ int $global_now() impure asm """
 
 slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
 
+;; AirdropPool_AirdropPool.constants.fc
+;; Cell kp9Zo2/gYne+K02dlsvJsKYkzIrNNuFR3XuPl36Zvhw=
+cell __gen_cell_cell_929f59a36fe06277be2b4d9d96cbc9b0a624cc8acd36e151dd7b8f977e99be1c() asm """
+    B{b5ee9c724101010100230000420000000061697264726f702d756e6163636f756e7465642d746f6e2d7377656570824db886} B>boc PUSHREF
+""";
+
 ;; AirdropPool_AirdropPool.storage.fc
 ;;
 ;; Type: Context
@@ -189,6 +222,15 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline {
     return ($mode, $body, null(), null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
 }
 
 ;;
@@ -575,6 +617,20 @@ _ %get_global() method_id(126899) {
         $self'payout_seq = ($self'payout_seq + 1);
         throw_unless(26142, ($Context$_get_value(__tact_context_get()) >= 60000000));
         $global_send($SendParameters$_constructor_to_value_mode_bounce_body($self'pool_ath_wallet_address, 50000000, 1, false, $ATHTransferRequest$_store_cell($ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination($self'payout_seq, $residual, $self'treasury_address, $global_myAddress()), begin_cell())));
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
+        return ();
+    }
+    
+    ;; Receive AirdropSweepUnaccountedTon message
+    if (op == 0x41445213) {
+        in_msg~skip_bits(32);
+        var $_ = empty_tuple();
+        ($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at)~$AirdropPool$_fun_requireSealed();
+        throw_unless(26150, $self'treasury_bound);
+        int $floor = 100000000;
+        int $bal = $global_myBalance();
+        throw_unless(26151, ($bal > $floor));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'treasury_address, ($bal - $floor), false, 1, __gen_cell_cell_929f59a36fe06277be2b4d9d96cbc9b0a624cc8acd36e151dd7b8f977e99be1c()));
         $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
         return ();
     }

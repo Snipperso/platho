@@ -67,9 +67,29 @@ message(0x41445202) AirdropBindCreditIssuer {           // "ADR2" — the SOLE a
 //
 // A contract is IMMUTABLE after seal, so this hook cannot be added later. Its scope is deliberately the narrowest
 // thing that solves the problem: it repoints the distributor and NOTHING else. It cannot move coins, cannot change
-// the accrual rate, cannot touch the treasury or the ATH master. The worst a compromised controller achieves is
-// directing future accruals to a distributor of its choosing — which is bad, and is strictly less bad than the
-// alternative of the allocation being unreachable forever.
+// the accrual rate, cannot touch the treasury or the ATH master.
+//
+// [CORRECTED 2026-07-29, wave-8 HIGH] The old wording here — "the worst a compromised controller achieves is
+// directing FUTURE accruals" — understated the radius, and understating it is how a reader talks themselves out of
+// protecting the key. The named address does not merely receive future accruals: AirdropAccrue authenticates
+// nothing but sender(), so a distributor may immediately write itself the ENTIRE remaining budget, in
+// AIRDROP_MAX_CREDITS_PER_ACCRUAL-sized calls, to any basechain buyer it likes. This hook is therefore worth
+// exactly 15,000,000 ATH to whoever holds the controller key, and that key must be treated accordingly.
+// It stays, because the alternative — an allocation unreachable forever after the next redeploy — is worse, and
+// because a distributor is by construction the thing allowed to pay out. What changed is the honesty of the note.
+//
+// TWO CONSEQUENCES OF USING IT, both real and neither on-chain-enforced:
+//   * purchase_id (below) is declared and READ NOWHERE. There is no replay guard here at all; the pool delegates
+//     it entirely to the distributor, and the comment that promised otherwise referred to CreditIssuer, which
+//     clean-17 deleted. FeeAccumulator does not replay (it increments its own accrual_seq), so this is dead
+//     weight rather than a hole — but it is dead weight that reads like a guard, which is worse than absent.
+//     Not removed: the message layout is mirrored byte-for-byte in FeeAccumulator and enforced by ACCRUE-WIRE-02.
+//   * AT_FEE_SINK is baked into the code of every clean-17 AirdropTicket, so a ticket always redeems through the
+//     OLD FeeAccumulator. After a rebind the old sink still runs and still emits AirdropAccrue, which this pool
+//     then refuses at 26110 — and the bounce dies, because FeeAccumulator has no bounced handler for that opcode.
+//     The ticket was acked in the same transaction as the accrual leg, so the publisher's credits are simply gone.
+//     The ordering "export every ticket's credits FIRST, rebind SECOND" is a CLIENT obligation; nothing on chain
+//     enforces it. Recorded identically in AirdropTicket.tact above TicketClaim.
 message(0x41445239) AirdropRebindCreditIssuer {
     deployment_manifest_hash: Int as uint256;
     credit_issuer_address: Address;
@@ -110,6 +130,22 @@ message(0x41445210) AirdropAccrue {
 message(0x41445211) AirdropTopUpStorageReserve {}       // permissionless self-financing top-up
 
 message(0x41445212) AirdropSweepResidualToTreasury {}   // permissionless dead-man after AIRDROP_SWEEP_GRACE
+
+// "ADRT" — return the native TON this contract accumulates but can never otherwise spend.
+//
+// [ADDED 2026-07-29, wave-8 LOW] Until this existed, no receiver in the contract sent native TON at all: both
+// payout legs carry a FIXED AIRDROP_ATHWALLET_LEG_GAS, and AirdropSweepResidualToTreasury moves ATH through the
+// wallet, not the balance. So the gap between the 60,000,000 that gate 26114 demands and what a payout actually
+// costs settled here permanently — MEASURED at 11,624,530 nanoton retained per delivery, the same figure whether
+// the delivery carries 1 credit or 1000 — as did the genesis notification value and every
+// AirdropTopUpStorageReserve. Across an airdrop of this size that is real money welded into a contract ADR9
+// forbids ever redeploying.
+//
+// Shaped like BuybackBurn's sweep and for the same reasons: the destination is the treasury BOUND AT GENESIS and
+// never caller-chosen, so this recovers funds and can never steal or redirect them; it is therefore safely
+// permissionless. It touches no ATH and no accounting — remaining_budget, distributed_total and claim_count are
+// untouched — so it cannot interact with the airdrop itself. A storage endowment is always left behind.
+message(0x41445213) AirdropSweepUnaccountedTon {}
 
 // Mirror of ATHWallet's interface (op + layout MUST match).
 message(0x41544810) ATHTransferRequest {
@@ -406,6 +442,23 @@ contract AirdropPool {
                 recipient: self.treasury_address,
                 response_destination: myAddress(),
             }.toCell(),
+        });
+    }
+
+    receive(_: AirdropSweepUnaccountedTon) {
+        self.requireSealed();
+        throwUnless(26150, self.treasury_bound);
+        let floor: Int = AIRDROP_BASE_STORAGE_ENDOWMENT;
+        let bal: Int = myBalance();
+        throwUnless(26151, bal > floor);
+        message(MessageParameters {
+            to: self.treasury_address,
+            value: bal - floor,
+            // Non-bounceable for the same reason BuybackBurn's sweep is: the destination is genesis-bound and
+            // gated, and a ricochet into a contract with no accounting for native TON helps nobody.
+            bounce: false,
+            mode: SendPayFwdFeesSeparately,
+            body: "airdrop-unaccounted-ton-sweep".asComment()
         });
     }
 
