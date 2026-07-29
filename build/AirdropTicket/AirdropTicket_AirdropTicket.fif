@@ -17,7 +17,7 @@ PROGRAM{
   DECLPROC $AirdropTicket$_contract_load
   DECLPROC $AirdropTicket$_contract_store
   DECLPROC $AirdropTicket$_fun_isBasechainAddress
-  DECLPROC $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value
+  DECLPROC $AirdropTicketView$_constructor_owner_credits_in_flight_in_flight_at_unjam_grace_seconds_min_claim_credits_max_credits_per_claim_claim_min_value
   DECLPROC $AirdropTicket$_fun_get_ticket
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $TicketRedeem$_constructor_credits_k_owner
@@ -68,8 +68,9 @@ PROGRAM{
     SWAP
   }>
   $AirdropTicket$_store PROCINLINE:<{
-    s2 s3 XCHG2
+    s3 s4 XCHG2
     STSLICE
+    32 STU
     32 STU
     32 STU
   }>
@@ -77,7 +78,8 @@ PROGRAM{
     LDMSGADDR
     32 LDU
     32 LDU
-    3 -ROLL
+    32 LDU
+    4 -ROLL
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -91,7 +93,7 @@ PROGRAM{
   }>
   $AirdropTicket$_contract_init PROCINLINE:<{
     0 PUSHINT
-    DUP
+    s0 s0 PUSH2
   }>
   $AirdropTicket$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -100,7 +102,7 @@ PROGRAM{
     SWAP
     IF:<{
       $AirdropTicket$_load INLINECALLDICT
-      1 3 BLKDROP2
+      1 4 BLKDROP2
     }>ELSE<{
       $AirdropTicket$init$_load INLINECALLDICT
       SWAP
@@ -113,7 +115,7 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    3 -ROLL
+    4 -ROLL
     $AirdropTicket$_store INLINECALLDICT
     ENDC
     c4 POP
@@ -124,17 +126,19 @@ PROGRAM{
     10 PUSHPOW2
     EQUAL
   }>
-  $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value PROCINLINE:<{
+  $AirdropTicketView$_constructor_owner_credits_in_flight_in_flight_at_unjam_grace_seconds_min_claim_credits_max_credits_per_claim_claim_min_value PROCINLINE:<{
   }>
   $AirdropTicket$_fun_get_ticket PROCREF:<{
+    604800 PUSHINT
     10 PUSHINT
     1000 PUSHINT
     63000000 PUSHINT
-    s5 PUSH
-    s3 s5 XCPU
-    s3 s5 XCPU
-    s0 s3 XCHG
-    $AirdropTicketView$_constructor_owner_credits_in_flight_min_claim_credits_max_credits_per_claim_claim_min_value INLINECALLDICT
+    s7 PUSH
+    s4 s7 XCPU
+    s4 s7 XCPU
+    s4 s7 XCPU
+    s0 s4 XCHG
+    $AirdropTicketView$_constructor_owner_credits_in_flight_in_flight_at_unjam_grace_seconds_min_claim_credits_max_credits_per_claim_claim_min_value INLINECALLDICT
   }>
   $MessageParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
     s4 s1 s3 XCHG3
@@ -147,7 +151,7 @@ PROGRAM{
   %get_ticket PROC:<{
     $AirdropTicket$_contract_load INLINECALLDICT
     $AirdropTicket$_fun_get_ticket INLINECALLDICT
-    3 6 BLKDROP2
+    4 8 BLKDROP2
     $AirdropTicketView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -166,9 +170,9 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $AirdropTicket$_contract_load INLINECALLDICT
-    s0 s4 XCHG
+    s0 s5 XCHG
     IFJMP:<{
-      s0 s2 XCHG
+      s0 s3 XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -186,11 +190,14 @@ PROGRAM{
       IFJMP:<{
         DROP
         s3 POP
-        s0 s2 XCHG
+        s3 POP
+        SWAP
         $TicketRedeem$_load_bounced INLINECALLDICT
         NIP
+        s1 s2 XCHG
         ADD
         0 PUSHINT
+        DUP
         $AirdropTicket$_contract_store INLINECALLDICT
       }>
       1096041270 PUSHINT
@@ -198,21 +205,20 @@ PROGRAM{
       IFJMP:<{
         $TicketCreditsMigrated$_load_bounced INLINECALLDICT
         NIP
-        s1 s2 XCHG
         ADD
-        ROT
+        s0 s0 s3 XCHG3
         $AirdropTicket$_contract_store INLINECALLDICT
       }>
-      4 BLKDROP
+      5 BLKDROP
     }>
     0 PUSHINT
-    s3 PUSH
+    s4 PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s3 PUSH
+      s4 PUSH
       32 PLDU
       SWAP
     }>
@@ -221,24 +227,27 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s2 POP
+      s3 POP
       27001 PUSHINT
       __tact_context_get_sender INLINECALLDICT
           B{b5ee9c72410101010024000043800bd23fa8f827a5686623d3b073411b61a37c79c42cc84ddbe9a939919635829a50fbb623e6} B>boc <s PUSHSLICE
       SDEQ
       THROWANYIFNOT
       27003 PUSHINT
-      s2 s3 s2 XC2PU
+      s2 PUSH
+      s4 s1 s4 XCHG3
+      s5 s3 XCHG2
       $AirdropTicket$_fun_isBasechainAddress INLINECALLDICT
-      s1 s4 XCHG
+      s1 s5 XCHG
       THROWANYIFNOT
       27002 PUSHINT
-      OVER
+      s2 PUSH
       32 PUSHPOW2DEC
       LESS
       THROWANYIFNOT
+      SWAP
       INC
-      ROT
+      s0 s1 s3 XCHG3
       $AirdropTicket$_contract_store INLINECALLDICT
     }>
     OVER
@@ -246,19 +255,20 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s2 POP
+      s3 POP
+      s3 POP
       27010 PUSHINT
       __tact_context_get_sender INLINECALLDICT
       s2 PUSH
       SDEQ
       THROWANYIFNOT
       27011 PUSHINT
-      s0 s3 XCHG
+      s0 s2 XCHG
       0 EQINT
-      s1 s3 XCHG
+      s1 s2 XCHG
       THROWANYIFNOT
       27012 PUSHINT
-      OVER
+      s2 PUSH
       9 GTINT
       THROWANYIFNOT
       27013 PUSHINT
@@ -267,27 +277,28 @@ PROGRAM{
       63000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      s0 s0 PUSH2
+      s1 s1 PUSH2
       1000 PUSHINT
       GREATER
       IF:<{
         DROP
         1000 PUSHINT
       }>
-      TUCK
+      s2 s2 XCPU
       SUB
-      OVER
+      s2 PUSH
+          NOW
           B{b5ee9c72410101010024000043800bd23fa8f827a5686623d3b073411b61a37c79c42cc84ddbe9a939919635829a50fbb623e6} B>boc <s PUSHSLICE
       0 PUSHINT
       64 PUSHINT
       TRUE
-      s6 s7 XCPU
+      s8 s7 XCPU
       $TicketRedeem$_constructor_credits_k_owner INLINECALLDICT
       NEWC
       $TicketRedeem$_store_cell INLINECALLDICT
       s3 s4 XCHG
       s1 s3 s0 XCHG3
-      s1 s6 XCHG
+      s1 s8 XCHG
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -306,7 +317,7 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      SWAP
+      3 ROLL
       $AirdropTicket$_contract_store INLINECALLDICT
     }>
     OVER
@@ -314,14 +325,14 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s2 XCHG
+      s0 s3 XCHG
       32 PUSHINT
       SDSKIPFIRST
       LDMSGADDR
       DROP
       27030 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s3 PUSH
+      s4 PUSH
       SDEQ
       THROWANYIFNOT
       27031 PUSHINT
@@ -329,14 +340,20 @@ PROGRAM{
       0 EQINT
       THROWANYIFNOT
       27032 PUSHINT
-      s3 PUSH
+      s2 PUSH
       0 GTINT
       THROWANYIFNOT
-      s0 s2 XCHG
+      s0 s3 XCHG
       27033 PUSHINT
-      s4 s3 XCPU
+      s5 s4 XCPU
       $AirdropTicket$_fun_isBasechainAddress INLINECALLDICT
-      s1 s5 XCHG
+      s1 s6 XCHG
+      THROWANYIFNOT
+      27035 PUSHINT
+          MYADDR
+      s5 s(-1) PUXC
+      SDEQ
+      NOT
       THROWANYIFNOT
       27034 PUSHINT
       __tact_context_get INLINECALLDICT
@@ -348,13 +365,13 @@ PROGRAM{
       DUP
       64 PUSHINT
       TRUE
-      s4 s5 XCPU
+      s5 s6 XCPU
       $TicketCreditsMigrated$_constructor_credits_k_owner INLINECALLDICT
       NEWC
       $TicketCreditsMigrated$_store_cell INLINECALLDICT
-      s4 s6 XCHG
+      s4 s7 XCHG
       s1 s3 s0 XCHG3
-      s1 s6 XCHG
+      s1 s5 XCHG
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -373,15 +390,15 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s0 s2 XCHG
+      s0 s0 s3 XCHG3
       $AirdropTicket$_contract_store INLINECALLDICT
     }>
-    s4 POP
+    s5 POP
     DUP
     1096041268 PUSHINT
     EQUAL
     IFJMP:<{
-      DROP
+      2DROP
       2 2 BLKDROP2
       27020 PUSHINT
       __tact_context_get_sender INLINECALLDICT
@@ -389,18 +406,48 @@ PROGRAM{
       SDEQ
       THROWANYIFNOT
       0 PUSHINT
+      DUP
+      $AirdropTicket$_contract_store INLINECALLDICT
+    }>
+    DUP
+    1096041271 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s3 POP
+      27040 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s3 PUSH
+      SDEQ
+      THROWANYIFNOT
+      27041 PUSHINT
+      s0 s3 XCHG
+      0 GTINT
+      s1 s3 XCHG
+      THROWANYIFNOT
+      27042 PUSHINT
+          NOW
+      s0 s4 XCHG
+      604800 PUSHINT
+      ADD
+      s1 s4 XCHG
+      GREATER
+      s1 s3 XCHG
+      THROWANYIFNOT
+      0 PUSHINT
+      DUP
       $AirdropTicket$_contract_store INLINECALLDICT
     }>
     0 EQINT
-    s0 s3 XCHG
+    s0 s4 XCHG
     33 LESSINT
-    s1 s3 XCHG
+    s1 s4 XCHG
     AND
     IFJMP:<{
-      s0 s2 XCHG
+      s0 s0 s3 XCHG3
       $AirdropTicket$_contract_store INLINECALLDICT
     }>
-    s0 s2 XCHG
+    s0 s0 s3 XCHG3
     $AirdropTicket$_contract_store INLINECALLDICT
   }>
 }END>c

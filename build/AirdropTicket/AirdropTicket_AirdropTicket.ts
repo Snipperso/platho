@@ -844,11 +844,54 @@ export function dictValueParserTicketRedeem(): DictionaryValue<TicketRedeem> {
     }
 }
 
+export type TicketUnjam = {
+    $$type: 'TicketUnjam';
+}
+
+export function storeTicketUnjam(src: TicketUnjam) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096041271, 32);
+    };
+}
+
+export function loadTicketUnjam(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096041271) { throw Error('Invalid prefix'); }
+    return { $$type: 'TicketUnjam' as const };
+}
+
+export function loadTupleTicketUnjam(source: TupleReader) {
+    return { $$type: 'TicketUnjam' as const };
+}
+
+export function loadGetterTupleTicketUnjam(source: TupleReader) {
+    return { $$type: 'TicketUnjam' as const };
+}
+
+export function storeTupleTicketUnjam(source: TicketUnjam) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserTicketUnjam(): DictionaryValue<TicketUnjam> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeTicketUnjam(src)).endCell());
+        },
+        parse: (src) => {
+            return loadTicketUnjam(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type AirdropTicketView = {
     $$type: 'AirdropTicketView';
     owner: Address;
     credits: bigint;
     in_flight: bigint;
+    in_flight_at: bigint;
+    unjam_grace_seconds: bigint;
     min_claim_credits: bigint;
     max_credits_per_claim: bigint;
     claim_min_value: bigint;
@@ -861,9 +904,13 @@ export function storeAirdropTicketView(src: AirdropTicketView) {
         b_0.storeInt(src.credits, 257);
         b_0.storeInt(src.in_flight, 257);
         const b_1 = new Builder();
+        b_1.storeInt(src.in_flight_at, 257);
+        b_1.storeInt(src.unjam_grace_seconds, 257);
         b_1.storeInt(src.min_claim_credits, 257);
-        b_1.storeInt(src.max_credits_per_claim, 257);
-        b_1.storeInt(src.claim_min_value, 257);
+        const b_2 = new Builder();
+        b_2.storeInt(src.max_credits_per_claim, 257);
+        b_2.storeInt(src.claim_min_value, 257);
+        b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
 }
@@ -874,30 +921,37 @@ export function loadAirdropTicketView(slice: Slice) {
     const _credits = sc_0.loadIntBig(257);
     const _in_flight = sc_0.loadIntBig(257);
     const sc_1 = sc_0.loadRef().beginParse();
+    const _in_flight_at = sc_1.loadIntBig(257);
+    const _unjam_grace_seconds = sc_1.loadIntBig(257);
     const _min_claim_credits = sc_1.loadIntBig(257);
-    const _max_credits_per_claim = sc_1.loadIntBig(257);
-    const _claim_min_value = sc_1.loadIntBig(257);
-    return { $$type: 'AirdropTicketView' as const, owner: _owner, credits: _credits, in_flight: _in_flight, min_claim_credits: _min_claim_credits, max_credits_per_claim: _max_credits_per_claim, claim_min_value: _claim_min_value };
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _max_credits_per_claim = sc_2.loadIntBig(257);
+    const _claim_min_value = sc_2.loadIntBig(257);
+    return { $$type: 'AirdropTicketView' as const, owner: _owner, credits: _credits, in_flight: _in_flight, in_flight_at: _in_flight_at, unjam_grace_seconds: _unjam_grace_seconds, min_claim_credits: _min_claim_credits, max_credits_per_claim: _max_credits_per_claim, claim_min_value: _claim_min_value };
 }
 
 export function loadTupleAirdropTicketView(source: TupleReader) {
     const _owner = source.readAddress();
     const _credits = source.readBigNumber();
     const _in_flight = source.readBigNumber();
+    const _in_flight_at = source.readBigNumber();
+    const _unjam_grace_seconds = source.readBigNumber();
     const _min_claim_credits = source.readBigNumber();
     const _max_credits_per_claim = source.readBigNumber();
     const _claim_min_value = source.readBigNumber();
-    return { $$type: 'AirdropTicketView' as const, owner: _owner, credits: _credits, in_flight: _in_flight, min_claim_credits: _min_claim_credits, max_credits_per_claim: _max_credits_per_claim, claim_min_value: _claim_min_value };
+    return { $$type: 'AirdropTicketView' as const, owner: _owner, credits: _credits, in_flight: _in_flight, in_flight_at: _in_flight_at, unjam_grace_seconds: _unjam_grace_seconds, min_claim_credits: _min_claim_credits, max_credits_per_claim: _max_credits_per_claim, claim_min_value: _claim_min_value };
 }
 
 export function loadGetterTupleAirdropTicketView(source: TupleReader) {
     const _owner = source.readAddress();
     const _credits = source.readBigNumber();
     const _in_flight = source.readBigNumber();
+    const _in_flight_at = source.readBigNumber();
+    const _unjam_grace_seconds = source.readBigNumber();
     const _min_claim_credits = source.readBigNumber();
     const _max_credits_per_claim = source.readBigNumber();
     const _claim_min_value = source.readBigNumber();
-    return { $$type: 'AirdropTicketView' as const, owner: _owner, credits: _credits, in_flight: _in_flight, min_claim_credits: _min_claim_credits, max_credits_per_claim: _max_credits_per_claim, claim_min_value: _claim_min_value };
+    return { $$type: 'AirdropTicketView' as const, owner: _owner, credits: _credits, in_flight: _in_flight, in_flight_at: _in_flight_at, unjam_grace_seconds: _unjam_grace_seconds, min_claim_credits: _min_claim_credits, max_credits_per_claim: _max_credits_per_claim, claim_min_value: _claim_min_value };
 }
 
 export function storeTupleAirdropTicketView(source: AirdropTicketView) {
@@ -905,6 +959,8 @@ export function storeTupleAirdropTicketView(source: AirdropTicketView) {
     builder.writeAddress(source.owner);
     builder.writeNumber(source.credits);
     builder.writeNumber(source.in_flight);
+    builder.writeNumber(source.in_flight_at);
+    builder.writeNumber(source.unjam_grace_seconds);
     builder.writeNumber(source.min_claim_credits);
     builder.writeNumber(source.max_credits_per_claim);
     builder.writeNumber(source.claim_min_value);
@@ -927,6 +983,7 @@ export type AirdropTicket$Data = {
     owner: Address;
     credits: bigint;
     in_flight: bigint;
+    in_flight_at: bigint;
 }
 
 export function storeAirdropTicket$Data(src: AirdropTicket$Data) {
@@ -935,6 +992,7 @@ export function storeAirdropTicket$Data(src: AirdropTicket$Data) {
         b_0.storeAddress(src.owner);
         b_0.storeUint(src.credits, 32);
         b_0.storeUint(src.in_flight, 32);
+        b_0.storeUint(src.in_flight_at, 32);
     };
 }
 
@@ -943,21 +1001,24 @@ export function loadAirdropTicket$Data(slice: Slice) {
     const _owner = sc_0.loadAddress();
     const _credits = sc_0.loadUintBig(32);
     const _in_flight = sc_0.loadUintBig(32);
-    return { $$type: 'AirdropTicket$Data' as const, owner: _owner, credits: _credits, in_flight: _in_flight };
+    const _in_flight_at = sc_0.loadUintBig(32);
+    return { $$type: 'AirdropTicket$Data' as const, owner: _owner, credits: _credits, in_flight: _in_flight, in_flight_at: _in_flight_at };
 }
 
 export function loadTupleAirdropTicket$Data(source: TupleReader) {
     const _owner = source.readAddress();
     const _credits = source.readBigNumber();
     const _in_flight = source.readBigNumber();
-    return { $$type: 'AirdropTicket$Data' as const, owner: _owner, credits: _credits, in_flight: _in_flight };
+    const _in_flight_at = source.readBigNumber();
+    return { $$type: 'AirdropTicket$Data' as const, owner: _owner, credits: _credits, in_flight: _in_flight, in_flight_at: _in_flight_at };
 }
 
 export function loadGetterTupleAirdropTicket$Data(source: TupleReader) {
     const _owner = source.readAddress();
     const _credits = source.readBigNumber();
     const _in_flight = source.readBigNumber();
-    return { $$type: 'AirdropTicket$Data' as const, owner: _owner, credits: _credits, in_flight: _in_flight };
+    const _in_flight_at = source.readBigNumber();
+    return { $$type: 'AirdropTicket$Data' as const, owner: _owner, credits: _credits, in_flight: _in_flight, in_flight_at: _in_flight_at };
 }
 
 export function storeTupleAirdropTicket$Data(source: AirdropTicket$Data) {
@@ -965,6 +1026,7 @@ export function storeTupleAirdropTicket$Data(source: AirdropTicket$Data) {
     builder.writeAddress(source.owner);
     builder.writeNumber(source.credits);
     builder.writeNumber(source.in_flight);
+    builder.writeNumber(source.in_flight_at);
     return builder.build();
 }
 
@@ -1039,7 +1101,7 @@ function initAirdropTicket_init_args(src: AirdropTicket_init_args) {
 }
 
 async function AirdropTicket_init(owner: Address) {
-    const __code = Cell.fromHex('b5ee9c7241020d01000328000114ff00f4a413f4bcf2c80b01020162020b04c0d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019afa40d31fd31f55206c1397fa400101d17020e204e3027023d74920c21f963123d70b1f01de21821041544331bae30221821041544332bae30221821041544335ba0304050700b4028020d7217021d749c21f9430d31f01de20821041544333ba8e1a303302d31f0131a070c87f01ca0055205023cecb1fcb1fc9ed54e0821041544336ba8e18d31f013112a058c87f01ca0055205023cecb1fcb1fc9ed54e05f0401ac5b32816979f8428d086002f48fea3e09e95a1988f4ec1cd046d868df1e710b321376fa6a4e64658d60a694c705f2f481697b541232db3c14f2f481697a21841fb9f2f4a458c87f01ca0055205023cecb1fcb1fc9ed540801fa5b32816982f84222c705f2f481698303c00013f2f481698421c209f2f4816985f8416f24135f03820bc14dc0bef2f453008103e8bc94308103e8de66a1218d086002f48fea3e09e95a1988f4ec1cd046d868df1e710b321376fa6a4e64658d60a6947080407f5167c8598210415443335003cb1fcb1fcec91034413016060058441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001c87f01ca0055205023cecb1fcb1fc9ed5403f88f775b028020d721fa4030816996f84223c705f2f481699724c000f2f481699823c200f2f4028169995143db3c15f2f481699af8416f24135f038209312d00bef2f4702080407f5145c8598210415443365003cb1fcb1fcec91046413016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002e0342008090a000cd30a308309ba0022c87f01ca0055205023cecb1fcb1fc9ed5400f4821041544334ba8e42306c2281698cf8428d086002f48fea3e09e95a1988f4ec1cd046d868df1e710b321376fa6a4e64658d60a694c705f2f470c87f01ca0055205023cecb1fcb1fc9ed54e0c00003c12113b08e1202c87f01ca0055205023cecb1fcb1fc9ed54e002c87f01ca0055205023cecb1fcb1fc9ed540141a12dbdda89a1a4000335f481a63fa63eaa40d8272ff4800203a2e041c5b678d86d0c001e7a8103e8820bc14dc0255135513503e17f7989');
+    const __code = Cell.fromHex('b5ee9c7241020f010003ab000114ff00f4a413f4bcf2c80b01020162020d04c6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cfa40d31fd31fd31f55306c1498fa400101d1705300e205e3027024d74920c21f963124d70b1f01de21821041544331bae30221821041544332bae30221821041544335ba0304050700c2038020d7217021d749c21f9430d31f01de20821041544333ba8e1f30333301d31f013112a07020c87f01ca0055305034cecb1fcb1fcb1fc9ed54e0821041544336ba8e1ad31f0131a04003c87f01ca0055305034cecb1fcb1fcb1fc9ed54e05f0501b85b33816979f8428d086002f48fea3e09e95a1988f4ec1cd046d868df1e710b321376fa6a4e64658d60a694c705f2f481697b2244145053db3c15f2f481697a22841fb9f2f401a44013c87f01ca0055305034cecb1fcb1fcb1fc9ed540901fc5b3333816982f84222c705f2f481698302c00012f2f481698422c209f2f4816985f8416f24135f03820bc14dc0bef2f453118103e8bc94308103e8de5122a122f8238d086002f48fea3e09e95a1988f4ec1cd046d868df1e710b321376fa6a4e64658d60a6947080407f5187c8598210415443335003cb1fcb1fcec91034060064413018441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb005502c87f01ca0055305034cecb1fcb1fcb1fc9ed5403fce3023520821041544334ba8e455b6c2281698cf8428d086002f48fea3e09e95a1988f4ec1cd046d868df1e710b321376fa6a4e64658d60a694c705f2f47020c87f01ca0055305034cecb1fcb1fcb1fc9ed54e020821041544337bae302c00004c12114b08e154003c87f01ca0055305034cecb1fcb1fcb1fc9ed54e04003080b0c02fe5b038020d721fa4030816996f84224c705f2f481699724c000f2f481699822c200f2f4038169995154db3c16f2f481699bf8285250c705b3f2f481699af8416f24135f038209312d00bef2f4702080407f5156c8598210415443365003cb1fcb1fcec91047413015441359c8cf8580ca00cf8440ce01fa02806acf40f400c9090a000cd30a308309ba003001fb004003c87f01ca0055305034cecb1fcb1fcb1fc9ed54007630338169a0f84223c705f2f48169a103c20013f2f48169a2f823048208093a80a014bc13f2f47020c87f01ca0055305034cecb1fcb1fcb1fc9ed540026c87f01ca0055305034cecb1fcb1fcb1fc9ed540147a12dbdda89a1a4000339f481a63fa63fa63eaa60d82931f4800203a2e0a601c5b678d8910e002c8208093a807a8103e8820bc14dc027514751475147042701903b');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initAirdropTicket_init_args({ $$type: 'AirdropTicket_init_args', owner })(builder);
@@ -1141,8 +1203,9 @@ const AirdropTicket_types: ABIType[] = [
     {"name":"TicketExportCredits","header":1096041269,"fields":[{"name":"to","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"TicketCreditsMigrated","header":1096041270,"fields":[{"name":"credits_k","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"TicketRedeem","header":1096041267,"fields":[{"name":"credits_k","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"AirdropTicketView","header":null,"fields":[{"name":"owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"credits","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"in_flight","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_claim_credits","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_credits_per_claim","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claim_min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"AirdropTicket$Data","header":null,"fields":[{"name":"owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"credits","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"in_flight","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"TicketUnjam","header":1096041271,"fields":[]},
+    {"name":"AirdropTicketView","header":null,"fields":[{"name":"owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"credits","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"in_flight","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"in_flight_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"unjam_grace_seconds","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"min_claim_credits","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"max_credits_per_claim","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claim_min_value","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"AirdropTicket$Data","header":null,"fields":[{"name":"owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"credits","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"in_flight","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"in_flight_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"TicketRedeemAck","header":1096041268,"fields":[{"name":"credits_k","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
 
@@ -1152,6 +1215,7 @@ const AirdropTicket_opcodes = {
     "TicketExportCredits": 1096041269,
     "TicketCreditsMigrated": 1096041270,
     "TicketRedeem": 1096041267,
+    "TicketUnjam": 1096041271,
     "TicketRedeemAck": 1096041268,
 }
 
@@ -1168,15 +1232,16 @@ const AirdropTicket_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"TicketClaim"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TicketExportCredits"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TicketRedeemAck"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"TicketUnjam"}},
     {"receiver":"internal","message":{"kind":"empty"}},
     {"receiver":"internal","message":{"kind":"any"}},
 ]
 
 export const AT_FEE_SINK = address("EQBekf1HwT0rQzEenYOaCNsNG-POIWZCbt9NScyMsawU0jr7");
-export const AT_BASE_ENDOWMENT = 40000000n;
 export const AT_MIN_CLAIM_CREDITS = 10n;
 export const AT_MAX_CREDITS_PER_CLAIM = 1000n;
 export const AT_CLAIM_MIN_VALUE = 63000000n;
+export const AT_INFLIGHT_DEADMAN_GRACE_SECONDS = 604800n;
 export const AT_EXPORT_MIN_VALUE = 20000000n;
 
 export class AirdropTicket implements Contract {
@@ -1213,7 +1278,7 @@ export class AirdropTicket implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: TicketCredit | TicketClaim | TicketExportCredits | TicketRedeemAck | null | Slice) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: TicketCredit | TicketClaim | TicketExportCredits | TicketRedeemAck | TicketUnjam | null | Slice) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TicketCredit') {
@@ -1227,6 +1292,9 @@ export class AirdropTicket implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TicketRedeemAck') {
             body = beginCell().store(storeTicketRedeemAck(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TicketUnjam') {
+            body = beginCell().store(storeTicketUnjam(message)).endCell();
         }
         if (message === null) {
             body = new Cell();

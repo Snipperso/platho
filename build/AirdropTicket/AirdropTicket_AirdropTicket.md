@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: AirdropTicket
-BoC Size: 820 bytes
+BoC Size: 951 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 18
+Total structures: 19
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -65,13 +65,17 @@ Signature: `TicketCreditsMigrated{credits_k:uint32,owner:address}`
 TL-B: `ticket_redeem#41544333 credits_k:uint32 owner:address = TicketRedeem`
 Signature: `TicketRedeem{credits_k:uint32,owner:address}`
 
+### TicketUnjam
+TL-B: `ticket_unjam#41544337  = TicketUnjam`
+Signature: `TicketUnjam{}`
+
 ### AirdropTicketView
-TL-B: `_ owner:address credits:int257 in_flight:int257 min_claim_credits:int257 max_credits_per_claim:int257 claim_min_value:int257 = AirdropTicketView`
-Signature: `AirdropTicketView{owner:address,credits:int257,in_flight:int257,min_claim_credits:int257,max_credits_per_claim:int257,claim_min_value:int257}`
+TL-B: `_ owner:address credits:int257 in_flight:int257 in_flight_at:int257 unjam_grace_seconds:int257 min_claim_credits:int257 max_credits_per_claim:int257 claim_min_value:int257 = AirdropTicketView`
+Signature: `AirdropTicketView{owner:address,credits:int257,in_flight:int257,in_flight_at:int257,unjam_grace_seconds:int257,min_claim_credits:int257,max_credits_per_claim:int257,claim_min_value:int257}`
 
 ### AirdropTicket$Data
-TL-B: `_ owner:address credits:uint32 in_flight:uint32 = AirdropTicket`
-Signature: `AirdropTicket{owner:address,credits:uint32,in_flight:uint32}`
+TL-B: `_ owner:address credits:uint32 in_flight:uint32 in_flight_at:uint32 = AirdropTicket`
+Signature: `AirdropTicket{owner:address,credits:uint32,in_flight:uint32,in_flight_at:uint32}`
 
 ### TicketRedeemAck
 TL-B: `ticket_redeem_ack#41544334 credits_k:uint32 = TicketRedeemAck`
