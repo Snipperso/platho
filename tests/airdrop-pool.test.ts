@@ -240,6 +240,69 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
       { $$type: 'AirdropSweepResidualToTreasury' } as any), pool.address)).toBe(26141);
   }, 180_000);
 
+  it('AIRDROP-SWEEP-IDLE-01: [wave-8 MED] a pool that is still PAYING cannot be swept, however old it is', async () => {
+    // The 10-year gate measures the CALENDAR, not activity: on its anniversary any passer-by could have swept the
+    // whole remaining airdrop to the treasury while distribution was running normally. A dead-man has to measure
+    // idleness. 26143 is that second condition.
+    const { pool, distributor } = await setup(blockchain);
+    const buyer = await blockchain.treasury('idle-buyer');
+    const stranger = await blockchain.treasury('idle-sweeper');
+
+    // Well past the calendar grace — but the pool pays out RIGHT NOW.
+    blockchain.now = blockchain.now! + 315360000 + 86400;
+    expect(exitOf(await pool.send(distributor.getSender(), { value: toNano('0.3') }, {
+      $$type: 'AirdropAccrue', purchase_id: 1n, buyer: buyer.address, credits_k: 10n,
+    } as any), pool.address), 'the accrual itself must succeed').toBe(0);
+    const afterAccrual = (await pool.getGetGlobal()).remaining_budget;
+    expect(afterAccrual, 'and must really have moved budget').toBeLessThan(TOTAL_POOL);
+
+    // A live pool is not stranded, so the sweep must refuse it even though the calendar says otherwise.
+    expect(exitOf(await pool.send(stranger.getSender(), { value: toNano('0.3') },
+      { $$type: 'AirdropSweepResidualToTreasury' } as any), pool.address),
+      'a pool that paid out this second is demonstrably alive').toBe(26143);
+    expect((await pool.getGetGlobal()).remaining_budget, 'and keeps its budget').toBe(afterAccrual);
+
+    // Only after a full year of silence does the residual count as stranded.
+    blockchain.now = blockchain.now! + 31536000 + 86400;
+    expect(exitOf(await pool.send(stranger.getSender(), { value: toNano('0.3') },
+      { $$type: 'AirdropSweepResidualToTreasury' } as any), pool.address)).toBe(0);
+    expect((await pool.getGetGlobal()).remaining_budget).toBe(0n);
+  }, 180_000);
+
+  it('AIRDROP-SEAL-OVERFUND-01: [wave-8 MED] one extra atomic unit must not brick the genesis seal forever', async () => {
+    // funded_amount only grows, nothing resets it, and the notification's only authentication is that it came from
+    // the pool's OWN ATH wallet — which accepts ATH from ANY holder. With the old `==` gate a stranger sending a
+    // single extra unit before the ceremony sealed made the seal impossible for good, and an unsealed pool cannot
+    // accrue at all. On the one contract ADR9 says must never be redeployed.
+    const deployer = await blockchain.treasury('ovf-deployer');
+    const poolWallet = await blockchain.treasury('ovf-pool-wallet');
+    const treasury = await blockchain.treasury('ovf-treasury');
+    const athMaster = await blockchain.treasury('ovf-ath-master');
+    const distributor = await blockchain.treasury('ovf-distributor');
+    const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false));
+    await pool.send(deployer.getSender(), { value: toNano('1') }, null);
+    const dep = (body: any, v = '0.05') => pool.send(deployer.getSender(), { value: toNano(v) }, body);
+    await dep({ $$type: 'AirdropBindAthMaster', ath_master_address: athMaster.address, pool_ath_wallet_address: poolWallet.address });
+    await dep({ $$type: 'AirdropBindCreditIssuer', credit_issuer_address: distributor.address });
+    await dep({ $$type: 'AirdropBindTreasury', treasury_address: treasury.address });
+
+    await pool.send(poolWallet.getSender(), { value: toNano('0.1') }, {
+      $$type: 'AthTransferNotification', query_id: 1n, sender_key: 0n, amount: TOTAL_POOL, sender_wallet: treasury.address,
+    } as any);
+    // The griefer: one atomic unit, from the same wallet, which anyone may cause by sending the pool ATH.
+    await pool.send(poolWallet.getSender(), { value: toNano('0.1') }, {
+      $$type: 'AthTransferNotification', query_id: 2n, sender_key: 0n, amount: 1n, sender_wallet: treasury.address,
+    } as any);
+    expect((await pool.getGetGlobal()).funded_amount, 'the fixture must really be overfunded').toBe(TOTAL_POOL + 1n);
+
+    expect(exitOf(await dep({ $$type: 'AirdropSealGenesis', deployment_manifest_hash: MANIFEST }, '0.1'), pool.address),
+      'the seal must still be reachable').toBe(0);
+    const g = await pool.getGetGlobal();
+    expect(g.sealed).toBe(true);
+    // And the ceiling is untouched: the surplus is NOT distributable.
+    expect(g.remaining_budget, 'the budget is capped at the airdrop, never more').toBe(TOTAL_POOL);
+  }, 180_000);
+
   it('AIRDROP-GAS-01: an under-funded accrual BOUNCES in COMPUTE — it never fails silently in ACTION', async () => {
     // This test exists because the first cut of this payout shipped the exact bug the whole codebase hunts. It used
     // nativeReserve(base, ReserveAtMost|ReserveAddOriginalBalance) + SendRemainingBalance, which forwards

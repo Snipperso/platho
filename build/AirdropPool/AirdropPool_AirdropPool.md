@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: AirdropPool
-BoC Size: 2196 bytes
+BoC Size: 2417 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 22
@@ -90,8 +90,8 @@ TL-B: `_ sealed:bool deployment_manifest_hash:int257 genesis_config_hash:int257 
 Signature: `AirdropGlobalView{sealed:bool,deployment_manifest_hash:int257,genesis_config_hash:int257,genesis_controller_address:address,ath_master_address:address,pool_ath_wallet_address:address,credit_issuer_address:address,treasury_address:address,ath_per_credit:int257,total_pool:int257,funded_amount:int257,remaining_budget:int257,distributed_total:int257,claim_count:int257,sealed_at:int257,ath_master_bound:bool,credit_issuer_bound:bool,treasury_bound:bool}`
 
 ### AirdropPool$Data
-TL-B: `_ sealed:bool genesis_controller_address:address deployment_manifest_hash:uint256 genesis_config_hash:uint256 ath_master_address:address pool_ath_wallet_address:address ath_master_bound:bool credit_issuer_address:address credit_issuer_bound:bool treasury_address:address treasury_bound:bool funded_amount:uint128 remaining_budget:uint128 distributed_total:uint128 claim_count:uint64 sealed_at:uint64 payout_seq:uint64 = AirdropPool`
-Signature: `AirdropPool{sealed:bool,genesis_controller_address:address,deployment_manifest_hash:uint256,genesis_config_hash:uint256,ath_master_address:address,pool_ath_wallet_address:address,ath_master_bound:bool,credit_issuer_address:address,credit_issuer_bound:bool,treasury_address:address,treasury_bound:bool,funded_amount:uint128,remaining_budget:uint128,distributed_total:uint128,claim_count:uint64,sealed_at:uint64,payout_seq:uint64}`
+TL-B: `_ sealed:bool genesis_controller_address:address deployment_manifest_hash:uint256 genesis_config_hash:uint256 ath_master_address:address pool_ath_wallet_address:address ath_master_bound:bool credit_issuer_address:address credit_issuer_bound:bool treasury_address:address treasury_bound:bool funded_amount:uint128 remaining_budget:uint128 distributed_total:uint128 claim_count:uint64 sealed_at:uint64 payout_seq:uint64 last_accrual_at:uint64 = AirdropPool`
+Signature: `AirdropPool{sealed:bool,genesis_controller_address:address,deployment_manifest_hash:uint256,genesis_config_hash:uint256,ath_master_address:address,pool_ath_wallet_address:address,ath_master_bound:bool,credit_issuer_address:address,credit_issuer_bound:bool,treasury_address:address,treasury_bound:bool,funded_amount:uint128,remaining_budget:uint128,distributed_total:uint128,claim_count:uint64,sealed_at:uint64,payout_seq:uint64,last_accrual_at:uint64}`
 
 ## Get methods
 Total get methods: 1

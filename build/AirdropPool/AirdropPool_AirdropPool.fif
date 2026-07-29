@@ -55,24 +55,25 @@ PROGRAM{
     -ROT
   }>
   $AirdropPool$_store PROCINLINE:<{
-    s1 16 s() XCHG
-    s0 17 s() XCHG
+    s1 17 s() XCHG
+    s0 18 s() XCHG
     1 STI
-    s1 s14 XCHG
+    s1 s15 XCHG
     STSLICE
-    s1 s12 XCHG
+    s1 s13 XCHG
     256 STU
-    s1 s10 XCHG
+    s1 s11 XCHG
     256 STU
-    s0 s8 XCHG
+    s0 s9 XCHG
     NEWC
     STSLICE
-    s1 s7 XCHG
+    s1 s8 XCHG
     STSLICE
-    s1 s5 XCHG
+    s1 s6 XCHG
     1 STI
-    s1 s3 XCHG
+    s1 s4 XCHG
     STSLICE
+    s1 s2 XCHG
     1 STI
     SWAP
     NEWC
@@ -81,10 +82,12 @@ PROGRAM{
     1 STI
     s1 s2 XCHG
     128 STU
-    s1 s3 XCHG
+    s1 s2 XCHG
     128 STU
     s1 s3 XCHG
     128 STU
+    s1 s3 XCHG
+    64 STU
     s1 s3 XCHG
     64 STU
     s1 s3 XCHG
@@ -119,11 +122,12 @@ PROGRAM{
     64 LDU
     64 LDU
     64 LDU
+    64 LDU
     DROP
-    s13 17 s() XCHG
-    s13 16 s() XCHG
-    s13 s15 XCHG
-    s13 s14 XCHG
+    s14 18 s() XCHG
+    s14 17 s() XCHG
+    s14 16 s() XCHG
+    s14 s15 XCHG
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -148,16 +152,16 @@ PROGRAM{
     FALSE
     0 PUSHINT
     s0 s0 s0 PUSH3
-    s0 s0 PUSH2
+    s0 s0 s0 PUSH3
+    s14 17 s() XCHG
     s13 16 s() XCHG
-    s12 s15 XCHG
-    s12 s14 XCHG
+    s13 s15 XCHG
+    s13 s14 XCHG
     s12 s13 XCHG
     s11 s12 XCHG
     s10 s11 XCHG
     s9 s10 XCHG
     s8 s9 XCHG
-    s7 s8 XCHG
   }>
   $AirdropPool$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -166,7 +170,8 @@ PROGRAM{
     SWAP
     IF:<{
       $AirdropPool$_load INLINECALLDICT
-      17 s() POP
+      18 s() POP
+      16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
     }>ELSE<{
@@ -182,6 +187,7 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
+    s0 18 s() XCHG
     s0 17 s() XCHG
     s0 16 s() XCHG
     15 -ROLL
@@ -192,19 +198,19 @@ PROGRAM{
   $AirdropPool$_fun_requireController PROCREF:<{
     26033 PUSHINT
     __tact_context_get_sender INLINECALLDICT
-    17 s() PUSH
+    18 s() PUSH
     SDEQ
     THROWANYIFNOT
   }>
   $AirdropPool$_fun_requireUnsealed PROCREF:<{
     26034 PUSHINT
-    17 s() PUSH
+    18 s() PUSH
     NOT
     THROWANYIFNOT
   }>
   $AirdropPool$_fun_requireSealed PROCREF:<{
     26100 PUSHINT
-    17 s() PUSH
+    18 s() PUSH
     THROWANYIFNOT
   }>
   $AirdropPool$_fun_isBasechainAddress PROCREF:<{
@@ -218,26 +224,30 @@ PROGRAM{
   $AirdropPool$_fun_get_global PROCREF:<{
     10000000000 PUSHINT
     15000000000000000 PUSHINT
-    18 s() PUSH
-    s0 s2 XCHG
-    17 s() PUSH
-    s0 s2 XCHG
-    17 s() PUSH
-    s0 s2 XCHG
-    20 s() PUSH
+    19 s() PUSH
     s0 s2 XCHG
     18 s() PUSH
+    s0 s2 XCHG
+    18 s() PUSH
+    s0 s2 XCHG
+    21 s() PUSH
+    s0 s2 XCHG
+    19 s() PUSH
+    s0 s2 XCHG
+    19 s() PUSH
     s0 s2 XCHG
     18 s() PUSH
     s0 s2 XCHG
     17 s() PUSH
     s0 s2 XCHG
     16 s() PUSH
-    s2 s15 s14 XCPU2
-    s15 s14 s13 PUSH3
+    16 s() PUSH
+    16 s() PUSH
+    16 s() PUSH
+    16 s() PUSH
+    26 s() PUSH
     25 s() PUSH
     24 s() PUSH
-    23 s() PUSH
     $AirdropGlobalView$_constructor_sealed_deployment_manifest_hash_genesis_config_hash_genesis_controller_address_ath_master_address_pool_ath_wallet_address_credit_issuer_address_treasury_address_ath_per_credit_total_pool_funded_amount_remaining_budget_distributed_total_claim_count_sealed_at_ath_master_bound_credit_issuer_bound_treasury_bound INLINECALLDICT
   }>
   $SendParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
@@ -269,9 +279,7 @@ PROGRAM{
     18 s() POP
     18 s() POP
     18 s() POP
-    s0 17 s() XCHG
-    s0 16 s() XCHG
-    15 -ROLL
+    18 s() POP
     $AirdropGlobalView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{
@@ -292,9 +300,9 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $AirdropPool$_contract_load INLINECALLDICT
-    s0 18 s() XCHG
+    s0 19 s() XCHG
     IFJMP:<{
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -311,21 +319,23 @@ PROGRAM{
       1096042512 PUSHINT
       EQUAL
       IFJMP:<{
+        s15 17 s() XCHG
         s14 16 s() XCHG
-        2 14 BLKSWAP
+        s13 s15 XCHG
+        2 13 BLKSWAP
         $AirdropPool$_contract_store INLINECALLDICT
       }>
       15 BLKDROP
-      2DROP
+      3 BLKDROP
     }>
     0 PUSHINT
-    17 s() PUSH
+    18 s() PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      17 s() PUSH
+      18 s() PUSH
       32 PLDU
       SWAP
     }>
@@ -334,36 +344,38 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       LDMSGADDR
       LDMSGADDR
       DROP
-      s1 17 s() XCHG
-      s0 18 s() XCHG
+      s1 18 s() XCHG
+      s0 19 s() XCHG
       $AirdropPool$_fun_requireUnsealed INLINECALLDICT
       $AirdropPool$_fun_requireController INLINECALLDICT
-      s11 POP
-      s11 POP
+      s12 POP
+      s12 POP
       26010 PUSHINT
-      s0 s9 XCHG
+      s0 s10 XCHG
       NOT
-      s1 s9 XCHG
+      s1 s10 XCHG
       THROWANYIFNOT
+      s14 16 s() XCHG
       s13 s15 XCHG
       s12 s14 XCHG
       s11 s13 XCHG
-      s10 s12 XCHG
-      s10 s11 XCHG
+      s11 s12 XCHG
       TRUE
-      s0 s10 XCHG
+      s0 s11 XCHG
+      s8 s10 XCHG
       s7 s9 XCHG
       s6 s8 XCHG
       s5 s7 XCHG
       s4 s6 XCHG
       s3 s5 XCHG
       s4 s0 s3 XCHG3
+      s0 s2 XCHG
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     OVER
@@ -371,11 +383,12 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       LDMSGADDR
       DROP
+      16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
       s13 s14 XCHG
@@ -389,25 +402,26 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 17 s() XCHG
+      s0 18 s() XCHG
       s1 s3 s0 XCHG3
       $AirdropPool$_fun_requireUnsealed INLINECALLDICT
       $AirdropPool$_fun_requireController INLINECALLDICT
-      s9 POP
+      s10 POP
       26012 PUSHINT
-      s0 s8 XCHG
+      s0 s9 XCHG
       NOT
-      s1 s8 XCHG
+      s1 s9 XCHG
       THROWANYIFNOT
+      s15 16 s() XCHG
       s14 s15 XCHG
       s13 s14 XCHG
       s12 s13 XCHG
       s11 s12 XCHG
       s10 s11 XCHG
       s9 s10 XCHG
-      s8 s9 XCHG
       TRUE
-      s0 s8 XCHG
+      s0 s9 XCHG
+      s7 s8 XCHG
       s6 s7 XCHG
       s5 s6 XCHG
       s4 s5 XCHG
@@ -420,11 +434,12 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       LDMSGADDR
       DROP
+      16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
       s13 s14 XCHG
@@ -438,16 +453,17 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 17 s() XCHG
+      s0 18 s() XCHG
       s1 s3 s0 XCHG3
       $AirdropPool$_fun_requireUnsealed INLINECALLDICT
       $AirdropPool$_fun_requireController INLINECALLDICT
-      s7 POP
+      s8 POP
       26017 PUSHINT
-      s0 s6 XCHG
+      s0 s7 XCHG
       NOT
-      s1 s6 XCHG
+      s1 s7 XCHG
       THROWANYIFNOT
+      s15 16 s() XCHG
       s14 s15 XCHG
       s13 s14 XCHG
       s12 s13 XCHG
@@ -456,9 +472,9 @@ PROGRAM{
       s9 s10 XCHG
       s8 s9 XCHG
       s7 s8 XCHG
-      s6 s7 XCHG
       TRUE
-      s0 s6 XCHG
+      s0 s7 XCHG
+      s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
       s1 s3 s0 XCHG3
@@ -469,49 +485,49 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       256 LDU
       LDMSGADDR
       DROP
-      s1 17 s() XCHG
-      s0 18 s() XCHG
+      s1 18 s() XCHG
+      s0 19 s() XCHG
       $AirdropPool$_fun_requireSealed INLINECALLDICT
       $AirdropPool$_fun_requireController INLINECALLDICT
       26013 PUSHINT
-      s0 18 s() XCHG
-      s15 PUSH
+      s0 19 s() XCHG
+      16 s() PUSH
       EQUAL
-      s1 18 s() XCHG
+      s1 19 s() XCHG
       THROWANYIFNOT
       26014 PUSHINT
-      s8 PUSH
+      s9 PUSH
       THROWANYIFNOT
       26015 PUSHINT
-      s0 17 s() XCHG
-      18 s() PUSH
+      s0 18 s() XCHG
+      19 s() PUSH
       $AirdropPool$_fun_isBasechainAddress INLINECALLDICT
-      s10 POP
-      s1 17 s() XCHG
-      s0 s9 XCHG
+      s11 POP
+      s1 18 s() XCHG
+      s0 s10 XCHG
       THROWANYIFNOT
       26016 PUSHINT
           MYADDR
-      18 s() PUSH
+      19 s() PUSH
       SWAP
       SDEQ
       NOT
       THROWANYIFNOT
+      s15 17 s() XCHG
       s14 16 s() XCHG
       s13 s15 XCHG
       s12 s14 XCHG
       s11 s13 XCHG
       s10 s12 XCHG
       s9 s11 XCHG
-      s8 s10 XCHG
-      s8 s9 XCHG
-      2 7 BLKSWAP
+      s9 s10 XCHG
+      2 8 BLKSWAP
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     OVER
@@ -519,7 +535,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       64 LDU
@@ -528,6 +544,7 @@ PROGRAM{
       NIP
       128 LDU
       DROP
+      16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
       s13 s14 XCHG
@@ -541,23 +558,24 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 17 s() XCHG
+      s0 18 s() XCHG
       s1 s3 s0 XCHG3
       $AirdropPool$_fun_requireUnsealed INLINECALLDICT
       26011 PUSHINT
-      s11 PUSH
+      s12 PUSH
       THROWANYIFNOT
       26019 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s13 PUSH
+      s14 PUSH
       SDEQ
       THROWANYIFNOT
-      s0 s5 XCHG
-      17 s() PUSH
+      s0 s6 XCHG
+      18 s() PUSH
       ADD
-      s0 17 s() XCHG
-      s1 s4 XCHG
+      s0 18 s() XCHG
+      s1 s5 XCHG
       ADD
+      16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
       s13 s14 XCHG
@@ -568,8 +586,9 @@ PROGRAM{
       s8 s9 XCHG
       s7 s8 XCHG
       s6 s7 XCHG
-      s5 s6 XCHG
-      s1 s3 s4 XCHG3
+      s0 s5 XCHG
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     OVER
@@ -577,11 +596,12 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       256 LDU
       DROP
+      16 s() 17 s() XCHG
       s15 16 s() XCHG
       s14 s15 XCHG
       s13 s14 XCHG
@@ -595,37 +615,55 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 17 s() XCHG
+      s0 18 s() XCHG
       s1 s3 s0 XCHG3
       $AirdropPool$_fun_requireUnsealed INLINECALLDICT
       $AirdropPool$_fun_requireController INLINECALLDICT
-      NIP
-      s13 POP
+      s2 POP
       s14 POP
+      s15 POP
       26040 PUSHINT
-      s15 PUSH
+      16 s() PUSH
       1 GTINT
       THROWANYIFNOT
       26041 PUSHINT
-      s8 PUSH
+      s9 PUSH
       THROWANYIFNOT
       26042 PUSHINT
-      s6 PUSH
+      s7 PUSH
       THROWANYIFNOT
       26043 PUSHINT
-      s4 PUSH
+      s5 PUSH
       THROWANYIFNOT
       26044 PUSHINT
-      s3 PUSH
+      s4 PUSH
       15000000000000000 PUSHINT
-      EQUAL
+      GEQ
       THROWANYIFNOT
+      s2 PUSH
+      15000000000000000 PUSHINT
+      GREATER
+      IF:<{
+        15000000000000000 PUSHINT
+        s3 POP
+      }>
       TRUE
           NOW
-      s1 16 s() XCHG
-      s1 s14 XCHG
+      s1 17 s() XCHG
+      s15 16 s() XCHG
       s1 s15 XCHG
-      13 ROLL
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s0 s3 s3 XCHG3
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     OVER
@@ -633,7 +671,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       64 LDU
@@ -641,51 +679,52 @@ PROGRAM{
       LDMSGADDR
       32 LDU
       DROP
-      s1 17 s() XCHG
-      s0 18 s() XCHG
+      s1 18 s() XCHG
+      s0 19 s() XCHG
       $AirdropPool$_fun_requireSealed INLINECALLDICT
       26110 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s11 PUSH
+      s12 PUSH
       SDEQ
       THROWANYIFNOT
-      s15 16 s() XCHG
-      s14 16 s() XCHG
-      s13 16 s() XCHG
-      s12 16 s() XCHG
-      s11 16 s() XCHG
-      s10 16 s() XCHG
-      s9 16 s() XCHG
-      s0 16 s() XCHG
+      16 s() 17 s() XCHG
+      s15 17 s() XCHG
+      s14 17 s() XCHG
+      s13 17 s() XCHG
+      s12 17 s() XCHG
+      s11 17 s() XCHG
+      s10 17 s() XCHG
+      s9 17 s() XCHG
+      s0 17 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       26111 PUSHINT
-      s0 17 s() XCHG
-      18 s() PUSH
+      s0 18 s() XCHG
+      19 s() PUSH
       $AirdropPool$_fun_isBasechainAddress INLINECALLDICT
-      s1 18 s() XCHG
+      s1 19 s() XCHG
       THROWANYIFNOT
       26112 PUSHINT
-      19 s() PUSH
+      20 s() PUSH
       0 GTINT
       IF:<{
-        19 s() PUSH
+        20 s() PUSH
         1000 PUSHINT
         LEQ
       }>ELSE<{
         FALSE
       }>
       THROWANYIFNOT
-      s0 18 s() XCHG
+      s0 19 s() XCHG
       10000000000 PUSHINT
       MUL
-      s3 s0 PUSH2
+      s4 s0 PUSH2
       LESS
       IF:<{
         DROP
-        s2 PUSH
+        s3 PUSH
         10000000000 PUSHINT
         DIV
         10000000000 PUSHINT
@@ -693,23 +732,18 @@ PROGRAM{
         DUP
         IFNOTJMP:<{
           DROP
-          16 s() POP
+          17 s() POP
+          s14 17 s() XCHG
           s13 16 s() XCHG
           s12 s15 XCHG
-          s11 s14 XCHG
-          s10 s13 XCHG
-          s9 s12 XCHG
-          s8 s11 XCHG
-          s7 s10 XCHG
-          s6 s9 XCHG
-          s5 s8 XCHG
-          s4 s7 XCHG
-          s3 s6 XCHG
-          s5 s1 s3 XCHG3
-          s4 s2 XCHG2
+          3 12 BLKSWAP
+          s1 s2 XCHG
           $AirdropPool$_contract_store INLINECALLDICT
           RETALT
         }>
+        17 s() POP
+      }>ELSE<{
+        17 s() POP
       }>
       26114 PUSHINT
       __tact_context_get INLINECALLDICT
@@ -717,29 +751,34 @@ PROGRAM{
       60000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      s3 s3 XCPU
+      s0 s3 XCHG
+      16 s() PUSH
       SUB
-      s2 s3 XCPU
+      s0 s2 XCHG
+      16 s() PUSH
       ADD
       SWAP
       INC
-      s0 16 s() XCHG
+      s0 18 s() XCHG
       INC
+          NOW
       50000000 PUSHINT
       1 PUSHINT
       FALSE
           MYADDR
-      s4 PUSH
-      s8 s1 s3 XCHG3
-      s0 22 s() XCHG
+      s5 PUSH
+      s0 s3 XCHG
+      s2 22 s() XCHG
+      s0 23 s() XCHG
       SWAP
       $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination INLINECALLDICT
       NEWC
       $ATHTransferRequest$_store_cell INLINECALLDICT
-      s12 PUSH
+      s13 PUSH
       s3 s1 s4 XCHG3
-      s2 20 s() XCHG
-      s6 s6 XCHG2
+      s2 21 s() XCHG
+      s0 20 s() XCHG
+      SWAP
       $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -807,6 +846,7 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      s14 17 s() XCHG
       s13 16 s() XCHG
       s12 s15 XCHG
       s11 s14 XCHG
@@ -818,19 +858,21 @@ PROGRAM{
       s5 s8 XCHG
       s4 s7 XCHG
       s3 s6 XCHG
-      s5 s4 s4 XCHG3
-      s0 s3 XCHG
+      s5 s4 XCHG2
+      s1 s3 XCHG
       $AirdropPool$_contract_store INLINECALLDICT
     }>
-    18 s() POP
+    19 s() POP
     DUP
     1094996497 PUSHINT
     EQUAL
     IFJMP:<{
       DROP
-      16 s() POP
+      17 s() POP
+      s15 17 s() XCHG
       s14 16 s() XCHG
-      2 14 BLKSWAP
+      s13 s15 XCHG
+      2 13 BLKSWAP
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     DUP
@@ -838,23 +880,32 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       DROP
-      16 s() POP
+      17 s() POP
+      s15 17 s() XCHG
       s14 16 s() XCHG
-      2 14 BLKSWAP
+      s13 s15 XCHG
+      2 13 BLKSWAP
       $AirdropPool$_fun_requireSealed INLINECALLDICT
       26140 PUSHINT
           NOW
-      s3 PUSH
+      s4 PUSH
       315360000 PUSHINT
       ADD
       GEQ
       THROWANYIFNOT
+      26143 PUSHINT
+          NOW
+      s2 PUSH
+      31536000 PUSHINT
+      ADD
+      GEQ
+      THROWANYIFNOT
       26141 PUSHINT
-      s5 PUSH
+      s6 PUSH
       0 GTINT
       THROWANYIFNOT
       0 PUSHINT
-      SWAP
+      s0 s2 XCHG
       INC
       26142 PUSHINT
       __tact_context_get INLINECALLDICT
@@ -866,14 +917,14 @@ PROGRAM{
       1 PUSHINT
       FALSE
           MYADDR
-      s4 s9 s(-1) PUXC2
-      s13 s10 PUXC
+      s4 s10 s(-1) PUXC2
+      s14 s11 PUXC
       $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination INLINECALLDICT
       NEWC
       $ATHTransferRequest$_store_cell INLINECALLDICT
-      s15 PUSH
+      16 s() PUSH
       s0 s4 XCHG
-      s9 s9 XCHG2
+      s10 s10 XCHG2
       $SendParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -941,21 +992,25 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s0 s4 XCHG
+      s1 s5 XCHG
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     0 EQINT
-    s0 17 s() XCHG
+    s0 18 s() XCHG
     33 LESSINT
-    s1 17 s() XCHG
+    s1 18 s() XCHG
     AND
     IFJMP:<{
+      s15 17 s() XCHG
       s14 16 s() XCHG
-      2 14 BLKSWAP
+      s13 s15 XCHG
+      2 13 BLKSWAP
       $AirdropPool$_contract_store INLINECALLDICT
     }>
+    s15 17 s() XCHG
     s14 16 s() XCHG
-    2 14 BLKSWAP
+    s13 s15 XCHG
+    2 13 BLKSWAP
     $AirdropPool$_contract_store INLINECALLDICT
   }>
 }END>c

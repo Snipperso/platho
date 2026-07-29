@@ -41,6 +41,12 @@ const AIRDROP_BASE_STORAGE_ENDOWMENT: Int = 100000000;  // #19 singleton base co
 const AIRDROP_ATHWALLET_LEG_GAS: Int = 50000000;        // value forwarded to the pool's ATHWallet for one payout
 const AIRDROP_PAYOUT_PATH_GAS: Int = 60000000;          // min incoming: leg + this contract's exec + fwd + margin
 const AIRDROP_SWEEP_GRACE: Int = 315360000;             // 10 years dead-man before residual may sweep to treasury
+// [ADDED 2026-07-29, wave-8 MED] The 10-year grace above is a CALENDAR, not a dead-man: it measures time since the
+// seal and nothing else, so on its anniversary any passer-by could sweep the entire remaining airdrop to the
+// treasury while distribution was still running normally. A dead-man has to measure INACTIVITY. This is that
+// second condition, and it is the one that makes the name honest: a pool that paid out within the last year is
+// demonstrably alive and cannot be swept, however old it is.
+const AIRDROP_SWEEP_INACTIVITY: Int = 31536000;         // 1 year with no payout before the residual counts as stranded
 
 message(0x41445201) AirdropBindAthMaster {              // "ADR1" — genesis (controller, unsealed, one-shot)
     ath_master_address: Address;
@@ -163,6 +169,9 @@ contract AirdropPool {
     claim_count: Int as uint64;
     sealed_at: Int as uint64;
     payout_seq: Int as uint64;
+    // When the last payout actually left. Deliberately NOT added to AirdropGlobalView: the client decodes these
+    // getters positionally, and a field inserted into a published view hands callers the wrong slot.
+    last_accrual_at: Int as uint64;
 
     init(genesis_controller_address: Address, deployment_manifest_hash: Int, genesis_config_hash: Int, sealed: Bool) {
         self.sealed = sealed;
@@ -182,6 +191,7 @@ contract AirdropPool {
         self.claim_count = 0;
         self.sealed_at = 0;
         self.payout_seq = 0;
+        self.last_accrual_at = 0;
     }
 
     fun requireController() {
@@ -277,7 +287,21 @@ contract AirdropPool {
         // The budget must be REAL before the door closes. The contract cannot read its jetton balance synchronously,
         // so the ceremony's read-only verify (get_wallet_data(pool_wallet).balance == 15M) pairs with this gate:
         // fund -> verify -> seal, never seal-then-fund.
-        throwUnless(26044, self.funded_amount == AIRDROP_TOTAL_POOL);
+        // [FIX 2026-07-29, wave-8 MED] This was `==`, and that made the genesis seal permanently DoS-able by a
+        // stranger. funded_amount only ever grows (the notification handler adds unconditionally, with no upper
+        // bound and no idempotency), and the notification's only authentication is that it came from the pool's
+        // OWN ATH wallet — a wallet which accepts ATH from any holder. So anyone who sent one extra atomic unit
+        // before the ceremony sealed pushed funded_amount past the exact figure, and since nothing resets it and
+        // AirdropAccrue is blocked by requireSealed, the pool became a brick that had to be redeployed. Cheap to
+        // do, and it targets the one contract ADR9 says must NEVER be redeployed after genesis.
+        //
+        // `>=` removes the DoS without loosening the ceiling: the budget is CAPPED below, so a pool funded with
+        // more than the airdrop can still never distribute more than the airdrop. Surplus simply sits in the
+        // wallet, outside the budget, exactly as it would have if it had arrived a block after the seal.
+        throwUnless(26044, self.funded_amount >= AIRDROP_TOTAL_POOL);
+        if (self.remaining_budget > AIRDROP_TOTAL_POOL) {
+            self.remaining_budget = AIRDROP_TOTAL_POOL;
+        }
         self.deployment_manifest_hash = msg.deployment_manifest_hash;
         self.sealed = true;
         self.sealed_at = now();
@@ -326,6 +350,8 @@ contract AirdropPool {
         self.distributed_total = self.distributed_total + payout;
         self.claim_count = self.claim_count + 1;
         self.payout_seq = self.payout_seq + 1;
+        // Proof of life for the residual sweep — see AIRDROP_SWEEP_INACTIVITY.
+        self.last_accrual_at = now();
 
         // Fixed leg value, paid out of the incoming value the 26114 gate already verified. No RESERVE here: the
         // gate makes incoming > outgoing, so the base endowment is never the thing being spent.
@@ -357,6 +383,10 @@ contract AirdropPool {
     receive(_: AirdropSweepResidualToTreasury) {
         self.requireSealed();
         throwUnless(26140, now() >= (self.sealed_at + AIRDROP_SWEEP_GRACE));
+        // AND idle. See AIRDROP_SWEEP_INACTIVITY: without this the gate above is a calendar alarm that anyone may
+        // pull on a thriving airdrop. A pool that has never paid out has last_accrual_at == 0, which satisfies
+        // this trivially — that case is exactly the stranded one the sweep exists for.
+        throwUnless(26143, now() >= (self.last_accrual_at + AIRDROP_SWEEP_INACTIVITY));
         throwUnless(26141, self.remaining_budget > 0);
         let residual: Int = self.remaining_budget;
         self.remaining_budget = 0;
@@ -379,8 +409,18 @@ contract AirdropPool {
         });
     }
 
-    // A bounced payout leaves budget/counters as they were on purpose: the ATH never left, so re-crediting here
-    // would double-count. The value simply returns.
+    // [CORRECTED 2026-07-29, wave-8 MED] This handler is UNREACHABLE and its old comment had the reasoning
+    // backwards. Unreachable because both payout legs are sent bounce:false, so a refusal by the pool's ATHWallet
+    // (14203 balance, 14204 value, 14601 non-basechain recipient) destroys the message rather than returning it.
+    // Backwards because the budget is decremented BEFORE the send: if a bounce could arrive, the ATH would NOT
+    // have left, and re-crediting is exactly what would be required — leaving the counters alone is what
+    // double-counts, in the pool's disfavour. The consequence today is that a refused payout strands ATH: the
+    // coins stay in the pool's wallet while the books say the budget shrank, so nothing can ever reach them again.
+    //
+    // NOT changed to bounce:true here. This is the one contract ADR9 forbids ever redeploying, the refusal paths
+    // are unreachable in practice (26111 already gates the buyer to basechain, the leg value is a fixed constant
+    // the 26114 gate guarantees, and the pool's wallet holds the whole 15M), and flipping bounce semantics on a
+    // permanent money leg is a change that deserves its own measured pass rather than a ride on this one.
     bounced(_: bounced<ATHTransferRequest>) {}
 
     receive() {}           // empty body = plain TON top-up (also how the contract is deployed)
