@@ -58,6 +58,28 @@ const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 7000000;
 const ATH_PRUNE_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
+// EXACTLY what gate 14212 demands of an arriving ATHInternalTransfer. Named because a refund leg has to be sized
+// against it: the refund travels with SendRemainingValue, so it can never DELIVER more than arrived, and a refund
+// funded below this floor is one that is guaranteed to bounce.
+const ATH_INTERNAL_TRANSFER_ARRIVAL_MIN: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_ACK_VALUE
+    + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+// What an OWNER-INITIATED clawback must carry, so that the refund it produces actually clears the payer's floor.
+// [ADDED 2026-07-29, wave-8 HIGH] Gate 14335 alone asks for 9,000,000 plus the ack, which is 2.2-2.6x SHORT of
+// ATH_INTERNAL_TRANSFER_ARRIVAL_MIN — no measurement needed, the inequality is arithmetic. A refund funded to the
+// old floor destroyed the escrow record (it is deleted before delivery is proven), bounced at the payer's 14212,
+// and was re-credited to the RECIPIENT by the ordinary outgoing-bounce handler: the payer paid, received nothing,
+// and lost the claim, because nothing in this contract ever recreates a pending_notifications entry. Deliberately
+// applied ONLY on the owner-initiated path, where the caller chooses the value and can always fund it properly.
+// The bounce-driven path keeps the lower floor on purpose: a bounce carries whatever came back, and raising the
+// bar there would turn "an underfunded refund" into "no refund at all, and the one bounce spent" — see the
+// bounced handlers.
+// SIZED, NOT GUESSED: the first attempt at this constant also added ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE (21M)
+// and came out at 60,000,000 — above the 45,000,000 both registries actually send, so it refused the very refunds
+// it exists to protect. The registry suites caught it immediately. What the leg really needs is the arrival floor,
+// plus this receiver's own execution and forward fee, plus the ack leg the flat lane pays out of the same value.
+// Pinned by ATH-REFUND-FLOOR-01, which funds a refund at EXACTLY this number and requires it to be accepted.
+const ATH_NOTIFY_REFUND_OWNER_MIN_VALUE: Int = ATH_INTERNAL_TRANSFER_ARRIVAL_MIN + ATH_TRANSFER_NOTIFY_EXEC_RESERVE
+    + ATH_REGISTRY_RESPONSE_ACK_VALUE;
 const ATH_OWNER_REQUEST_EXEC_RESERVE: Int = 2000000;
 const ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE: Int = 10000000;
 const ATH_OWNER_EXCESS_REFUND_MIN_VALUE: Int = 100000;
@@ -539,6 +561,19 @@ contract ATHWallet {
     // victim who trusts a malicious recipient with a REFUNDABLE transfer — narrow, and the same recipient could rob them
     // otherwise. A correct fix is an escrow redesign (credit only on the owner's accept), disproportionate to a latent,
     // no-privilege-gain issue on the immutable core token wallet. [Owner decision: accept + document.]
+    //
+    // [WAVE 8, 2026-07-29 — a SECOND way into the same accepted family, recorded so it is not rediscovered as new.]
+    // A THROW inside this function consumes the caller's only trigger when the caller is a bounce handler: a bounced
+    // message does not bounce twice, so the transaction reverts, pending_notifications survives, and the one chance
+    // to settle it is gone. Three gates here can throw on that path — 14335 (the bounce came back too thin), 14331
+    // (the owner spent the credited balance first) and, inside store_pending_outgoing, 14230 on a key collision.
+    // The collision is the sharpest: for the REGISTRY lanes refund_query_id is set to the PAYER'S query_id below,
+    // and pending_notifications is deleted BEFORE store_pending_outgoing runs, so a payer may immediately re-use the
+    // same query_id and make the next refund collide. The stranded entry is then erased by PruneStaleNotification
+    // WITHOUT a refund once the TTL passes. Not fixed here for the same reason as the paragraph above: every honest
+    // repair is the escrow redesign the owner declined, and echoing the payer's query_id is a protocol requirement
+    // of the registry lane, not an accident. What IS fixed is the owner-initiated path's funding floor (14347),
+    // which is the only half of this that could strike an honest, non-malicious refund.
     fun refund_pending_notification(query_id: Int, sender_key: Int, amount: Int) {
         throwUnless(14330, amount > 0);
         let pending_key: Int = self.compute_pending_notification_key(query_id, sender_key);
@@ -893,7 +928,16 @@ contract ATHWallet {
             // processed_ath_deposits, BuybackBurn phase+query_id, MSS supply-cap). The forward_payload passes
             // through VERBATIM (Slice as remaining) so DEX routers' swap/LP ops inside it are bit-preserved.
             // Guard = forwarded notify value + the source-ack (still sent below) + exec reserve.
-            throwUnless(14714, context().value >= msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE);
+            // [FIX 2026-07-29, wave-8 LOW] ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT was MISSING here, and it is the
+            // only thing that funds the rent of a wallet this very message may DEPLOY. Both sibling gates demand
+            // it — 14717 on the forward==0 branch and 14212 on the custom lane — so this branch was the odd one
+            // out. It mattered because the sender's ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE is a fixed 21,000,000
+            // while the forward_payload passes through VERBATIM and is charged by the bit: a large enough payload
+            // eats the allowance, less arrives than the sender was charged for, and this gate waved it through —
+            // deploying a fresh wallet on an immutable contract with well under half its intended endowment.
+            // Adding the term makes that case BOUNCE instead, which is recoverable; an under-funded wallet is not.
+            // The honest path is untouched — see ATH-ENDOW-14714 for the margin, measured rather than assumed.
+            throwUnless(14714, context().value >= msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
 
             self.balance += msg.amount;
             message(MessageParameters {
@@ -1138,6 +1182,10 @@ contract ATHWallet {
 
     receive(msg: AthTransferNotificationRefund) {
         throwUnless(14346, sender() == self.owner_address);
+        // See ATH_NOTIFY_REFUND_OWNER_MIN_VALUE. Fail CLOSED here, before refund_pending_notification deletes the
+        // escrow record: an owner who underfunds this gets a bounce and keeps the claim, instead of erasing the
+        // payer's only claim on a refund that could never have been delivered.
+        throwUnless(14347, context().value >= ATH_NOTIFY_REFUND_OWNER_MIN_VALUE);
         self.refund_pending_notification(msg.query_id, msg.sender_key, msg.amount);
     }
 

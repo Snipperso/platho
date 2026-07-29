@@ -1758,7 +1758,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14712, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'from));
         if (($msg'forward_ton_amount > 0)) {
             throw_unless(14713, ($msg'forward_ton_amount >= 45000000));
-            throw_unless(14714, ($Context$_get_value(__tact_context_get()) >= (($msg'forward_ton_amount + 4000000) + 7000000)));
+            throw_unless(14714, ($Context$_get_value(__tact_context_get()) >= ((($msg'forward_ton_amount + 4000000) + 7000000) + 20000000)));
             $self'balance = $self'balance + $msg'amount;
             $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'forward_ton_amount, 1, false, $JettonTransferNotification$_store_cell($JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload($msg'query_id, $msg'amount, $msg'from, $msg'forward_payload), begin_cell())));
         } else {
@@ -1903,6 +1903,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'amount = in_msg~load_uint(128);
         var $msg'sender_key = in_msg~load_uint(160);
         throw_unless(14346, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
+        throw_unless(14347, ($Context$_get_value(__tact_context_get()) >= 39000000));
         ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_pending_notification($msg'query_id, $msg'sender_key, $msg'amount);
         $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers));
         return ();

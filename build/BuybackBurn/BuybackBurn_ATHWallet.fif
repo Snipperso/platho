@@ -2570,6 +2570,8 @@ PROGRAM{
         ADD
         7000000 PUSHINT
         ADD
+        20000000 PUSHINT
+        ADD
         GEQ
         THROWANYIFNOT
         s3 s4 XCPU
@@ -3319,6 +3321,12 @@ PROGRAM{
       __tact_context_get_sender INLINECALLDICT
       s6 PUSH
       SDEQ
+      THROWANYIFNOT
+      14347 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      39000000 PUSHINT
+      GEQ
       THROWANYIFNOT
       s5 s7 XCHG
       s4 s6 XCHG

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
@@ -11,6 +12,7 @@ import {
   ATHInternalTransferWithNotify,
   ATHTransferRequest,
   ATHTransferRequestWithNotify,
+  JettonTransfer,
   AthTransferNotificationAck,
   AthTransferNotificationRefund,
   PruneStaleNotification,
@@ -1241,5 +1243,132 @@ describe('ATH wallet transfer profile', () => {
     expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+  });
+
+  /** A notified transfer that leaves a live escrow entry on the recipient's wallet. */
+  async function notifiedTransfer(tag: string, queryId: bigint, amount = 100n) {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury(`${tag}-source`);
+    const recipientOwner = await blockchain.treasury(`${tag}-recipient`);
+    const master = fixtureAddress(`${tag}-MASTER`);
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+    const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
+    const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
+    const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
+    const key = senderKey(sourceOwner.address, queryId);
+
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: queryId, amount, recipient: recipientOwner.address,
+      response_destination: sourceOwner.address, notify_destination: recipientOwner.address,
+      notify_value: toNano('0.045'),
+    } as ATHTransferRequestWithNotify);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+    return { blockchain, sourceOwner, recipientOwner, sourceWallet, recipientWallet, key, amount, queryId };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+  // THE REFUND FLOOR. A clawback travels with SendRemainingValue, so it can never DELIVER more than arrived,
+  // and the payer's wallet refuses anything under gate 14212's arrival floor. Gate 14335 alone asked for
+  // 9,000,000 plus the ack — 2.2-2.6x short, by arithmetic, no measurement needed. Funding a refund at that
+  // old floor DELETED the escrow record (it goes before delivery is proven), bounced at 14212, and the
+  // recipient's ordinary outgoing-bounce handler re-credited the ATH to the RECIPIENT: the payer paid,
+  // received nothing, and lost the claim forever, because nothing in this contract recreates that entry.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+  it('ATH-REFUND-FLOOR-01: a refund funded at EXACTLY the floor is delivered and accepted by the payer', async () => {
+    const env = await notifiedTransfer('ath-refund-floor-ok', 601n);
+    const FLOOR = 39_000_000n;   // ATH_NOTIFY_REFUND_OWNER_MIN_VALUE — pinned against the contract below
+
+    const res = await env.recipientWallet.send(env.recipientOwner.getSender(), { value: FLOOR }, {
+      $$type: 'AthTransferNotificationRefund',
+      query_id: env.queryId, amount: env.amount, sender_key: env.key,
+    } as AthTransferNotificationRefund);
+
+    // The floor is only worth anything if the leg it funds actually CLEARS 14212 at the other end.
+    const arrival = findTransaction(res.transactions, {
+      from: env.recipientWallet.address, to: env.sourceWallet.address, success: true,
+    });
+    expect(arrival, 'the refund must be ACCEPTED by the payer wallet, not merely sent').toBeDefined();
+    expect((await env.sourceWallet.getGetWalletData()).balance, 'and the ATH must be back with the payer').toBe(1_000n);
+    expect((await env.recipientWallet.getGetWalletData()).balance).toBe(0n);
+  });
+
+  it('ATH-REFUND-FLOOR-02: one nanoton under the floor is REFUSED, and the escrow claim survives', async () => {
+    const env = await notifiedTransfer('ath-refund-floor-short', 602n);
+
+    const res = await env.recipientWallet.send(env.recipientOwner.getSender(), { value: 39_000_000n - 1n }, {
+      $$type: 'AthTransferNotificationRefund',
+      query_id: env.queryId, amount: env.amount, sender_key: env.key,
+    } as AthTransferNotificationRefund);
+
+    expect(findTransaction(res.transactions, {
+      from: env.recipientOwner.address, to: env.recipientWallet.address, success: false, exitCode: 14347,
+    }), 'it must fail CLOSED, in COMPUTE, before the escrow record is deleted').toBeDefined();
+    expect((await env.recipientWallet.getGetPendingNotification(env.queryId, env.key)).exists,
+      'the payer keeps their claim — this is the whole point').toBe(true);
+    expect((await env.recipientWallet.getGetWalletData()).balance, 'and nothing moved').toBe(env.amount);
+  });
+
+  it('ATH-REFUND-FLOOR-00: the test mirror equals the CONTRACT, and the floor really covers the arrival gate', () => {
+    const src = readFileSync('contracts/ATHWallet.tact', 'utf8');
+    const num = (name: string) => {
+      // `\\d` and not `\d`: inside a template literal JS eats the backslash and the pattern silently becomes
+      // `(d+)`, which matches nothing — a mirror check that can only ever fail, or worse, only ever pass.
+      const m = new RegExp(`const ${name}: Int = (\\d+);`).exec(src);
+      expect(m, `${name} must exist`).not.toBeNull();
+      return BigInt(m![1]);
+    };
+    const arrival = num('ATH_INTERNAL_TRANSFER_EXEC_RESERVE') + num('ATH_INTERNAL_TRANSFER_ACK_VALUE')
+      + num('ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE') + num('ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT');
+    const floor = arrival + num('ATH_TRANSFER_NOTIFY_EXEC_RESERVE') + num('ATH_REGISTRY_RESPONSE_ACK_VALUE');
+    expect(floor, 'the two tests above hard-code this number').toBe(39_000_000n);
+    // And it must stay under what the registries actually attach, or it refuses the refunds it exists to protect.
+    expect(floor).toBeLessThanOrEqual(45_000_000n);
+    expect(src, 'gate 14347 must be on the owner-initiated path').toMatch(/throwUnless\(14347, context\(\)\.value >= ATH_NOTIFY_REFUND_OWNER_MIN_VALUE\);/);
+  });
+
+  it('ATH-ENDOW-14714: the forward>0 branch funds the endowment of the wallet it deploys, with real margin', async () => {
+    // Gate 14714 used to omit ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT, which both its siblings require and which is
+    // the ONLY thing paying the rent of a wallet this message may deploy. The sender's forward-fee allowance is a
+    // fixed 21,000,000 while the forward_payload passes through verbatim and is charged by the bit, so a large
+    // enough payload ate the allowance and this gate still waved the transfer through — deploying a fresh wallet
+    // on an immutable contract with well under half its intended endowment. Measured here rather than argued:
+    // the honest path must clear the raised gate comfortably.
+    const blockchain = await Blockchain.create();
+    blockchain.now = 1_790_000_000;
+    const sourceOwner = await blockchain.treasury('ath-endow-source');
+    const recipientOwner = await blockchain.treasury('ath-endow-recipient');
+    const master = fixtureAddress('ATH_ENDOW_MASTER');
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+
+    const recipientAddress = contractAddress(0, await ATHWallet.init(0n, recipientOwner.address, master));
+    expect((await blockchain.getContract(recipientAddress)).balance, 'the recipient wallet must NOT exist yet').toBe(0n);
+
+    const res = await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.3') }, {
+      $$type: 'JettonTransfer',
+      query_id: 701n,
+      amount: 100n,
+      destination: recipientOwner.address,
+      response_destination: sourceOwner.address,
+      custom_payload: null,
+      forward_ton_amount: 45_000_000n,
+      forward_payload: beginCell().endCell().beginParse(),
+    } as JettonTransfer);
+
+    const credit = findTransaction(res.transactions, { to: recipientAddress, success: true });
+    expect(credit, 'the honest deploy-and-credit must still pass the raised gate').toBeDefined();
+    expect((await blockchain.openContract(ATHWallet.fromAddress(recipientAddress)).getGetWalletData()).balance).toBe(100n);
+
+    // Pin the CONTRACT, not just the measurement: without this the numbers below are a literal comparing to a
+    // literal, and dropping the term from the gate would leave this test green.
+    expect(readFileSync('contracts/ATHWallet.tact', 'utf8'), 'gate 14714 must require the storage endowment')
+      .toMatch(/throwUnless\(14714,[^;]*ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT\)/);
+
+    const inbound = (credit as any).inMessage.info.value.coins as bigint;
+    const gate = 45_000_000n + 4_000_000n + 7_000_000n + 20_000_000n;   // forward + SOURCE_ACK + NOTIFY_EXEC + ENDOWMENT
+    expect(inbound, `arrived with ${inbound} against a gate of ${gate}`).toBeGreaterThanOrEqual(gate);
+    // A margin, not a near miss: if a future change to the forward-fee allowance eats this, it shows up here.
+    expect(inbound - gate, 'the honest path must clear the gate by more than a rounding error').toBeGreaterThan(5_000_000n);
   });
 });
