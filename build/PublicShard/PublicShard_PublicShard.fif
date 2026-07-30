@@ -307,6 +307,8 @@ PROGRAM{
     $PublicShard$_fun_retention INLINECALLDICT
     s1 s5 XCHG
     ADD
+    86400 PUSHINT
+    ADD
     s3 s4 XCHG
     s1 s3 s0 XCHG3
   }>
@@ -889,8 +891,6 @@ PROGRAM{
       s4 s5 XCHG2
       $PublicShard$_fun_retireAt INLINECALLDICT
       2 1 BLKDROP2
-      86400 PUSHINT
-      ADD
       s1 s4 XCHG
       GREATER
       s1 s2 XCHG

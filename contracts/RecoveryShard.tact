@@ -73,7 +73,20 @@ const RS_RECOVERY_RETENTION: Int = 94608000;      // 3 years (owner 2026-07-15).
 // Both sibling lanes were raised pre-seal for this same class of error (RecordShard at 1.026x, IntroShard at
 // 1.21x). That margin is the entire defence against a governance rate change on a contract that can never be
 // repriced.
-const RS_RECOVERY_ENDOWMENT: Int = 29600000;
+// [RAISED 2026-07-29, wave-8: 29.6M -> 30.4M] Second-order consequence of adding RS_EVICT_SEQ_ENDOWMENT below: the
+// extra nativeReserve grew this contract's code, so the per-slot rent grew with it and RENT-01 measured the 3-year
+// margin at 1.4891x — under the project's 1.5x rule. Restored by measurement, not by rounding the rule down.
+const RS_RECOVERY_ENDOWMENT: Int = 30400000;
+// [ADDED 2026-07-29, wave-8 LOW] What eviction LEAVES BEHIND so the retained seq keeps existing.
+//
+// This lane deliberately never destroys its account, because a live seq is the only thing stopping a freed slot from
+// being re-bound with the owner's own OUTDATED signed blob — rolling their K_root back to a key they had rotated away
+// from. But the payout went out with mode 128, which empties the account to exactly zero, and an emptied account still
+// pays rent on 19 code cells plus data. The anti-rollback invariant was therefore not a property of the code at all,
+// it was a bet on how long an unfunded account survives before storage debt collects it. MEASURED: 19 cells at the
+// frozen 64,962 per cell-year is ~1,234,000 a year, so this funds the high-water mark for roughly forty years — the
+// horizon that matters, since a slot outliving its owner's key rotations is exactly the case being defended.
+const RS_EVICT_SEQ_ENDOWMENT: Int = 50000000;
 // The endowment above is calibrated for EXACTLY the blob cap below, so
 // the blob MUST be capped at it. The monolith gated this as RECOVERY_MAX_SIZE_CLASS (13560); the sharded rewrite
 // dropped the gate, which let an oversized blob buy permanent storage for a fixed endowment — the slot then goes
@@ -308,6 +321,10 @@ contract RecoveryShard {
         self.bh = 0;
         self.body = emptyCell();
         self.updated_at = 0;
+        // Keep the seq alive. Reserved BEFORE the payout, so the residual the owner reclaims is what remains above
+        // the endowment rather than the whole balance; ReserveAtMost keeps this from failing if the balance is already
+        // below it. Without it, mode 128 left exactly zero behind and the invariant above was unfunded.
+        nativeReserve(RS_EVICT_SEQ_ENDOWMENT, ReserveAtMost);
         send(SendParameters{ to: msg.refund_to, value: 0, mode: SendRemainingBalance | SendIgnoreErrors, bounce: false });
     }
 

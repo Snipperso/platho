@@ -7,6 +7,8 @@ PROGRAM{
   DECLPROC __tact_string_builder_end
   DECLPROC __tact_string_builder_append
   DECLPROC __tact_dict_set_uint_cell
+  DECLPROC $ReportStaticData$_store
+  DECLPROC $ReportStaticData$_store_cell
   DECLPROC $UsernameOwnershipProof$_store
   DECLPROC $UsernameOwnershipProof$_store_cell
   DECLPROC $UsernameItemDeployedAck$_store
@@ -48,6 +50,7 @@ PROGRAM{
   DECLPROC $UsernameOwnershipProof$_constructor_query_id_name_hash_owner_wallet_username_len_username
   DECLPROC $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload
   DECLPROC $NftExcesses$_constructor_query_id
+  DECLPROC $ReportStaticData$_constructor_query_id_index_collection
   86957 DECLMETHOD %get_state
   102351 DECLMETHOD %get_nft_data
   DECLPROC recv_internal
@@ -171,6 +174,20 @@ PROGRAM{
       s1 s3 s3 XCHG3
       DICTUSETREF
     }>
+  }>
+  $ReportStaticData$_store PROCINLINE:<{
+    2339837749 PUSHINT
+    s0 s4 XCHG2
+    32 STU
+    s1 s2 XCHG
+    64 STU
+    256 STU
+    STSLICE
+  }>
+  $ReportStaticData$_store_cell PROCINLINE:<{
+    3 -ROLL
+    $ReportStaticData$_store INLINECALLDICT
+    ENDC
   }>
   $UsernameOwnershipProof$_store PROCINLINE:<{
     1431195727 PUSHINT
@@ -607,6 +624,8 @@ PROGRAM{
   }>
   $NftExcesses$_constructor_query_id PROCINLINE:<{
   }>
+  $ReportStaticData$_constructor_query_id_index_collection PROCINLINE:<{
+  }>
   %get_state PROC:<{
     $UsernameNFTItem$_contract_load INLINECALLDICT
     $UsernameNFTItem$_fun_get_state INLINECALLDICT
@@ -696,7 +715,7 @@ PROGRAM{
       18015 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      4000000 PUSHINT
+      5000000 PUSHINT
       GEQ
       THROWANYIFNOT
       TRUE
@@ -722,7 +741,7 @@ PROGRAM{
       18021 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      4000000 PUSHINT
+      5000000 PUSHINT
       GEQ
       THROWANYIFNOT
       18022 PUSHINT
@@ -996,17 +1015,57 @@ PROGRAM{
       s0 s7 XCHG
       $UsernameNFTItem$_contract_store INLINECALLDICT
     }>
-    s9 POP
-    DUP
+    OVER
     665640843 PUSHINT
     EQUAL
     IFJMP:<{
-      DROP
+      2DROP
       s7 POP
       s5 s7 XCHG
       2 5 BLKSWAP
       $UsernameNFTItem$_contract_store INLINECALLDICT
     }>
+    OVER
+    801842850 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s7 XCHG
+      64 LDU
+      DROP
+      __tact_context_get_sender INLINECALLDICT
+      0 PUSHINT
+      FALSE
+      66 PUSHINT
+      s4 s7 s8 XCPU2
+      $ReportStaticData$_constructor_query_id_index_collection INLINECALLDICT
+      NEWC
+      $ReportStaticData$_store_cell INLINECALLDICT
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s5 s7 XCHG
+      2 5 BLKSWAP
+      $UsernameNFTItem$_contract_store INLINECALLDICT
+    }>
+    s9 POP
     0 EQINT
     s0 s8 XCHG
     33 LESSINT

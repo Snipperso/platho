@@ -175,7 +175,7 @@ PROGRAM{
   }>
   $RecoveryShard$_fun_get_view PROCREF:<{
     94608000 PUSHINT
-    29600000 PUSHINT
+    30400000 PUSHINT
     8 PUSHPOW2
     79 PUSHINT
     s12 PUSH
@@ -284,7 +284,7 @@ PROGRAM{
       13572 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      37600000 PUSHINT
+      38400000 PUSHINT
       GEQ
       THROWANYIFNOT
       OVER
@@ -370,7 +370,7 @@ PROGRAM{
       s1 s9 XCHG
       THROWANYIFNOT
           NOW
-      29600000 PUSHINT
+      30400000 PUSHINT
       2 PUSHINT
           RAWRESERVE
       __tact_context_get_sender INLINECALLDICT
@@ -489,8 +489,11 @@ PROGRAM{
       0 PUSHINT
       s0 s0 s0 PUSH3
           <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
-      s1 s1 PUSH2
-      s1 s8 XCHG
+      OVER
+      50000000 PUSHINT
+      2 PUSHINT
+          RAWRESERVE
+      s7 s7 XCPU
       130 PUSHINT
       FALSE
       $SendParameters$_constructor_to_value_mode_bounce INLINECALLDICT

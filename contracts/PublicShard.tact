@@ -242,7 +242,14 @@ contract PublicShard {
     // FeeAccumulator whole (owner's 2026-07-19 decision). Clients read these from get_view, never mirror them.
     fun minValue(): Int { return self.entryEndowment() + PS_PUBLISH_GAS + PS_PROTOCOL_FEE + PS_FEE_TRANSPORT; }
     fun deployMinValue(): Int { return self.minValue() + self.baseEndowment(); }
-    fun retireAt(): Int { return (self.eraIndex() + 2) * self.eraSeconds() + self.retention(); }
+    // [CHANGED 2026-07-29, wave-8 MED] PS_RETIRE_SLACK is folded IN here, exactly as IntroShard folds its own into
+    // the expression gate 13683 reads. It used to live only inside gate 13706, so the value published in the view was
+    // a full 86,400 seconds EARLIER than the second the shard actually becomes retireable — on a field documented as
+    // "the exact second this shard becomes retireable; read it, never recompute it". Both sibling lanes are exact
+    // (RecordShard has no slack at all, IntroShard folded its in), and the slack is not lane-specific: at eraWindow=3
+    // the readable era becomes retireable PS_RETIRE_SLACK after the current era opens, so the entire beacon-scan
+    // budget rests on that day. The existing test pinned the discrepancy, which is why a green suite never showed it.
+    fun retireAt(): Int { return (self.eraIndex() + 2) * self.eraSeconds() + self.retention() + PS_RETIRE_SLACK; }
 
     // The 256-bit account hash of sender(), the idiom proven in KeyShard.tact:458-460. Basechain only: the 11-bit
     // prefix of an addr_std in workchain 0 is 0b100_00000000 = 1024.
@@ -338,7 +345,7 @@ contract PublicShard {
     // base endowment is stranded in an immortal account. Payout is the residual via mode 128, which deducts the
     // forward fee from the value so the action cannot fail at any balance including zero.
     receive(msg: RetirePublicShard) {
-        throwUnless(13706, now() > self.retireAt() + PS_RETIRE_SLACK);
+        throwUnless(13706, now() > self.retireAt());
         self.entries = emptyMap();
         self.entry_count = 0;
         send(SendParameters{

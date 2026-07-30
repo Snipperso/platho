@@ -27,8 +27,8 @@ import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShar
 
 const CLOCK = 1_790_000_000;          // inside the 64962/cell/year era
 const THREE_YEARS = 94_608_000;       // RS_RECOVERY_RETENTION
-const ENDOWMENT = 29_600_000n;        // RS_RECOVERY_ENDOWMENT (raised twice 2026-07-24 as eviction code grew)
-const MIN_VALUE = 37_600_000n;        // RS_RECOVERY_ENDOWMENT + RS_RECOVERY_PATH_GAS
+const ENDOWMENT = 30_400_000n;        // RS_RECOVERY_ENDOWMENT (raised twice 2026-07-24 as eviction code grew)
+const MIN_VALUE = 38_400_000n;        // RS_RECOVERY_ENDOWMENT + RS_RECOVERY_PATH_GAS (endowment raised in wave-8)
 const MAX_BLOB_CELLS = 79;
 const SLOT_DOMAIN = 0x52534C4Bn;
 const RECOVERY_DOMAIN = 0x42525331n;

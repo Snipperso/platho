@@ -532,8 +532,8 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     // never again be validated against a cell model that leaves something out.
     // [RAISED 2026-07-24, twice, as the W1-009 eviction code grew: 29_000_000 -> 29_300_000 (owner-signed eviction) ->
     // 29_600_000 (re-audit fix: isBasechainAddress + gate 13566 on refund_to; rent 19_683_534, old margin 1.489x).]
-    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT'), 'measured 3yr rent 19_683_534 x 1.5 = 29_525_301 -> 29_600_000').toBe(29_600_000n);
-    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(37_600_000n);
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT'), 'wave-8: RS_EVICT_SEQ_ENDOWMENT grew the code, margin fell to 1.4891x -> 30_400_000').toBe(30_400_000n);
+    expect(constOf(recov, 'RS_RECOVERY_ENDOWMENT') + constOf(recov, 'RS_RECOVERY_PATH_GAS'), 'RecoveryShard RS_MIN_VALUE').toBe(38_400_000n);
     // the STORAGE+GAS part is still materially cheaper than the old two-hop floor (7_710_000) — the hop is gone
     expect(constOf(rec, 'RS_RECORD_ENDOWMENT') + constOf(rec, 'RS_PUBLISH_GAS')).toBeLessThan(7_710_000n);
   });

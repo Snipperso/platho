@@ -33,7 +33,7 @@ const ATH_TRANSFER_EXEC_RESERVE = 48_000_000n;
 const ATH_BURN_EXEC_RESERVE = 5_000_000n;
 const DUE_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const ITEM_ACK_FORWARD_RESERVE = 3_000_000n;
-const ITEM_ACK_EXEC_RESERVE = 1_000_000n;
+const ITEM_ACK_EXEC_RESERVE = 2_000_000n;   // mirrors USERNAME_ITEM_ACK_EXEC_RESERVE, raised 1M->2M in wave-8 (gate 18015 was 56,602 short)
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.USERNAME.BOUNDARY.${label}`).digest());

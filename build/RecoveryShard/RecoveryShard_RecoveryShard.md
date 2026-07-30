@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: RecoveryShard
-BoC Size: 978 bytes
+BoC Size: 1026 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 14

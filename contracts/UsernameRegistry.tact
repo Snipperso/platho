@@ -93,6 +93,9 @@ const USERNAME_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 // Pinned by VAULT-ATH-08 in tests/vault-ath-integration.test.ts, which asserts the BUYER's balance is restored —
 // not merely that a refund was emitted.
 const USERNAME_ATH_NOTIFICATION_REFUND_VALUE: Int = 45000000;
+// [ADDED 2026-07-29, wave-8 MED] Dust floor for the TON leg of a bounced mint — below this a send costs more in fees
+// than it delivers.
+const USERNAME_TON_REFUND_MIN_VALUE: Int = 5000000;
 const USERNAME_PENDING_MINT_STALE_TTL: Int = 86400; // 24 hours
 const USERNAME_MAX_LENGTH: Int = 16;
 const USERNAME_SPLIT_BASE_BPS: Int = 10000;
@@ -673,6 +676,31 @@ contract UsernameRegistry {
 
         let cleared: PendingUsernameMint = self.clearPendingMint(nameFromItem!!);
         self.sendAthNotificationRefund(cleared.query_id, cleared.sender_key, cleared.price_paid);
+
+        // [ADDED 2026-07-29, wave-8 MED] Give the TON back too. The file header said a duplicate mint "costs one extra
+        // round trip and is refunded" — only the ATH was. Since name_records was deleted, a repeat purchase of a live
+        // name is ACCEPTED: the registry takes the payment, books a pending mint, and deploys to an item that refuses
+        // at 18011 and bounces. That bounce returned the item deploy reserve here and it simply stayed: this contract
+        // has no handler anywhere that sends TON to a payer or an owner, so roughly 0.9 GRAM per duplicate was immured
+        // in an immutable registry. Zero live users today, which is the only reason this is a MED and not worse.
+        //
+        // The amount is EXPLICIT, never SendRemainingValue: mode 64 after an earlier explicit leg has drained a
+        // balance elsewhere in this codebase, and here the earlier leg (the ATH refund) is charged to balance with
+        // fees separately. Subtracting it can go negative if the bounce came back thin, hence the floor.
+        //
+        // Destination is owner_wallet, the wallet the mint was FOR. It is the payer in every ordinary purchase; on a
+        // gift it is the recipient rather than the giver, which is imperfect and still strictly better than immuring
+        // it — the registry never learns the payer's own wallet address, only the ATH wallet's escrow key does.
+        let tonRefund: Int = context().value - USERNAME_ATH_NOTIFICATION_REFUND_VALUE;
+        if (tonRefund >= USERNAME_TON_REFUND_MIN_VALUE) {
+            message(MessageParameters {
+                to: cleared.owner_wallet,
+                value: tonRefund,
+                bounce: false,
+                mode: SendPayFwdFeesSeparately,
+                body: null
+            });
+        }
     }
 
     receive(msg: FlushTreasuryAthDue) {
