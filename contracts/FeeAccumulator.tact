@@ -433,6 +433,36 @@ contract FeeAccumulator {
             mode: SendPayFwdFeesSeparately,
             body: null
         });
+
+        // [ADDED 2026-07-30, tier-3 audit] Give the caller's own value back, so it cannot fund the leg above.
+        //
+        // 15022 only ever required the caller to SEND FEEACCUMULATOR_FLUSH_EXEC_RESERVE while 15023 allowed flushing
+        // exactly FEEACCUMULATOR_MIN_TREASURY_FLUSH_TON — the same figure. At that ratio the inbound value covered the
+        // outbound leg one for one: the treasury got its 5,000,000, treasury_due_ton fell by 5,000,000, and this
+        // contract's own nanotons never moved. Repeat until the due reaches zero and 15021 forbids every further
+        // flush. The identical shape was found in MarketStabilitySeller and fixed there first; this lane was not
+        // looked at in the same pass, which is why it is here now.
+        //
+        // Less severe HERE, and the difference is worth naming rather than glossing: SweepUnaccounted reclassifies the
+        // stranded proceeds (held stays, accounted drops, so the surplus is real) and SplitAccumulated returns them to
+        // treasury_due — so this was recoverable, permissionlessly, by anyone who noticed. Returning the change makes
+        // the subsidy inexpressible instead of merely repairable, and makes the two flush lanes read the same way.
+        // Return everything ABOVE the execution reserve, and keep the reserve itself. Returning the WHOLE inbound
+        // was my first version and it was wrong in the other direction: the contract then paid its own gas out of the
+        // backing, ~66,667 a flush, which is the same "shortfall paid silently out of the float" this file warns
+        // about elsewhere. Gate 15022 demands the reserve precisely so execution is CALLER-funded; keeping exactly
+        // that and returning the rest makes the subsidy inexpressible AND leaves the backing untouched. Caught by
+        // FEE-BACKING-02, which measures the balance delta rather than trusting either version.
+        let flushChange: Int = context().value - FEEACCUMULATOR_FLUSH_EXEC_RESERVE;
+        if (flushChange > 0) {
+            message(MessageParameters {
+                to: sender(),
+                value: flushChange,
+                bounce: false,
+                mode: SendPayFwdFeesSeparately | SendIgnoreErrors,
+                body: null
+            });
+        }
     }
 
     receive(msg: FlushBuybackDue) {
@@ -452,6 +482,20 @@ contract FeeAccumulator {
             mode: SendPayFwdFeesSeparately,
             body: AcceptBurnReserve { amount: msg.amount }.toCell()
         });
+
+        // Same shape as the treasury leg, with one difference that matters: here BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE
+        // rides OUT with the envelope, and gate 15035 makes the caller fund it deliberately. So both that and the
+        // execution reserve stay; only what the caller sent beyond them comes back.
+        let buybackChange: Int = context().value - FEEACCUMULATOR_FLUSH_EXEC_RESERVE - BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE;
+        if (buybackChange > 0) {
+            message(MessageParameters {
+                to: sender(),
+                value: buybackChange,
+                bounce: false,
+                mode: SendPayFwdFeesSeparately | SendIgnoreErrors,
+                body: null
+            });
+        }
     }
 
     bounced(msg: bounced<AcceptBurnReserve>) {

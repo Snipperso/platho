@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-30T14:17:51.369Z",
+  "generatedAt": "2026-07-30T15:29:25.229Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -10,7 +10,7 @@
   "runtime": {
     "fileCount": 219,
     "totalBytes": 5559942,
-    "bundleSha256": "e8d826e1c9841e31be1d50c42c72062c192666913242d36194df8bbe7a559669",
+    "bundleSha256": "9700d6c26aa529bab5bde00ef452913e0ea9d9451e3056219038eb9fa4bdbdce",
     "files": [
       {
         "path": "app.js",
@@ -695,7 +695,7 @@
       {
         "path": "shard-code.mjs",
         "bytes": 12214,
-        "sha256": "0854ece4a86300b370a7f74e4521f5e0391a5a7106f75a6584acf930938e7620"
+        "sha256": "55018dac44a9ec231b94232b3828d769b18600ca9d9ae838a321c6c98ea10d41"
       },
       {
         "path": "shard-discovery.mjs",

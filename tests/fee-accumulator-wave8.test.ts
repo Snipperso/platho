@@ -96,6 +96,39 @@ describe('FeeAccumulator wave-8', () => {
     expect((await env.fa.getGetState()).buyback_due_ton, 'the clock restarted at the second split').toBe(stillDue);
   });
 
+  it('FAACC-FLUSH-01: a treasury flush moves the CONTRACT balance, never the caller money', async () => {
+    // TIER-3. 15022 required only FEEACCUMULATOR_FLUSH_EXEC_RESERVE from the caller while 15023 allowed flushing
+    // exactly FEEACCUMULATOR_MIN_TREASURY_FLUSH_TON — the same 5,000,000. At that ratio the inbound covered the
+    // outbound one for one: the treasury got paid, treasury_due_ton fell, and the contract's own nanotons stayed.
+    // The identical shape was found in MarketStabilitySeller and fixed there first; this lane was not looked at in
+    // the same pass. It was recoverable here (SweepUnaccounted reclassifies the stranded proceeds and
+    // SplitAccumulated returns them) but recoverable-if-noticed is not the same as impossible.
+    const env = await setup();
+    await env.fa.send(env.publisher.getSender(), { value: toNano('1') + toNano('0.05') }, {
+      $$type: 'DepositProtocolFee', amount: toNano('1'),
+    } as any);
+    await env.fa.send(env.publisher.getSender(), { value: toNano('0.05') }, { $$type: 'SplitAccumulated' } as any);
+
+    const due = (await env.fa.getGetState()).treasury_due_ton;
+    expect(due, 'there is real protocol revenue to flush').toBeGreaterThan(0n);
+
+    const sinkBefore = (await env.bc.getContract(FEE_SINK)).balance;
+    const callerBefore = await env.publisher.getBalance();
+    const funded = toNano('0.5');
+    await env.fa.send(env.publisher.getSender(), { value: funded }, {
+      $$type: 'FlushTreasuryDue', amount: due,
+    } as any);
+    const sinkAfter = (await env.bc.getContract(FEE_SINK)).balance;
+
+    expect((await env.fa.getGetState()).treasury_due_ton, 'the due is settled').toBe(0n);
+    // MEASURED both ways: the contract really paid, and SendRemainingValue did not drain it past the flushed amount.
+    expect(sinkBefore - sinkAfter, 'the contract funded the leg out of its own balance').toBeGreaterThan(0n);
+    expect(sinkBefore - sinkAfter, 'and no more than the flushed amount plus fees').toBeLessThan(due + toNano('0.02'));
+    // The caller is made whole, so a subsidy is not expressible.
+    expect(callerBefore - (await env.publisher.getBalance()), 'the caller got their funding back')
+      .toBeLessThan(toNano('0.02'));
+  });
+
   it('FAACC-BOUNCE-01: a pool that refuses the accrual is now COUNTED instead of silently swallowed', async () => {
     const env = await setup();
 
