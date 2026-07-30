@@ -29,7 +29,7 @@ PROGRAM{
   DECLPROC $FeeAccumulator$_fun_laneShardAddress
   DECLPROC $FeeAccumulator$_fun_laneCodeBound
   DECLPROC $FeeAccumulator$_fun_ticketAddress
-  DECLPROC $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id
+  DECLPROC $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id_shard_code_bound_intro_shard_code_bound_public_shard_code_bound_ticket_code_bound_airdrop_pool_bound
   DECLPROC $FeeAccumulator$_fun_get_state
   DECLPROC $SendParameters$_constructor_to_value_mode_bounce_code_data_body
   DECLPROC $TicketCredit$_constructor_
@@ -346,16 +346,45 @@ PROGRAM{
     s4 s(-1) PUXC
     $FeeAccumulator$_fun_deriveFromBoundCode INLINECALLDICT
   }>
-  $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id PROCINLINE:<{
+  $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id_shard_code_bound_intro_shard_code_bound_public_shard_code_bound_ticket_code_bound_airdrop_pool_bound PROCINLINE:<{
   }>
   $FeeAccumulator$_fun_get_state PROCREF:<{
-    s13 s12 s11 PUSH3
-    s13 PUSH
-    19 s() PUSH
-    19 s() PUSH
-    s15 s14 s13 PUSH3
-    s15 PUSH
-    $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id INLINECALLDICT
+    s5 PUSH
+    ISNULL
+    NOT
+    s5 PUSH
+    ISNULL
+    NOT
+    s3 PUSH
+    ISNULL
+    NOT
+    s6 PUSH
+    ISNULL
+    NOT
+    s6 PUSH
+    ISNULL
+    NOT
+    18 s() PUSH
+    s0 s5 XCHG
+    18 s() PUSH
+    s0 s5 XCHG
+    18 s() PUSH
+    s0 s5 XCHG
+    18 s() PUSH
+    s0 s5 XCHG
+    24 s() PUSH
+    s0 s5 XCHG
+    24 s() PUSH
+    s0 s5 XCHG
+    20 s() PUSH
+    s0 s5 XCHG
+    20 s() PUSH
+    s0 s5 XCHG
+    20 s() PUSH
+    s0 s5 XCHG
+    20 s() PUSH
+    s0 s5 XCHG
+    $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_buyback_split_enabled_treasury_receiver_address_buyback_burn_address_storage_reserve_ton_buyback_due_last_increase_at_failed_accrual_count_last_failed_accrual_purchase_id_shard_code_bound_intro_shard_code_bound_public_shard_code_bound_ticket_code_bound_airdrop_pool_bound INLINECALLDICT
   }>
   $SendParameters$_constructor_to_value_mode_bounce_code_data_body PROCINLINE:<{
     s4 s6 XCHG
@@ -390,8 +419,22 @@ PROGRAM{
   %get_state PROC:<{
     $FeeAccumulator$_contract_load INLINECALLDICT
     $FeeAccumulator$_fun_get_state INLINECALLDICT
-    10 10 BLKDROP2
-    6 10 BLKDROP2
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    s15 POP
+    16 s() POP
+    1 14 BLKDROP2
     $FeeAccumulatorStateView$_to_external INLINECALLDICT
   }>
   recv_internal PROC:<{

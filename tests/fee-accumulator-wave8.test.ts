@@ -46,6 +46,46 @@ async function seedDust(env: Awaited<ReturnType<typeof setup>>, principal: bigin
 }
 
 describe('FeeAccumulator wave-8', () => {
+  it('FAACC-BIND-01: the five one-shot genesis binds are OBSERVABLE, because nothing else can check them', async () => {
+    // CEREMONY AUDIT. Every other contract has a seal that refuses while a bind is missing; this one has no seal, the
+    // genesis verifier does not snapshot these fields, and the getter did not report them at all. A bind missed during
+    // the ceremony is therefore silent — and permanent: each gate demands `== null`, so it cannot be re-bound, and
+    // this contract's address is baked into four immutable contracts, so it cannot be replaced. The lane's fee deposit
+    // (15055) or every TicketRedeem (15060) then refuses for good.
+    const bc = await Blockchain.create();
+    bc.now = NOW;
+    const treasury = await bc.treasury('fa8b-treasury');
+    const buyback = await bc.treasury('fa8b-buyback');
+    const pool = await bc.treasury('fa8b-pool');
+
+    const init = await FeeAccumulator.init(treasury.address, buyback.address);
+    await bc.setShardAccount(FEE_SINK, createShardAccount({
+      address: FEE_SINK, code: init.code, data: init.data, balance: toNano('5'), workchain: 0,
+    }));
+    const fa = bc.openContract(new FeeAccumulator(FEE_SINK, init));
+
+    const fresh = await fa.getGetState();
+    expect(fresh.shard_code_bound, 'a fresh sink reports every bind as missing').toBe(false);
+    expect(fresh.intro_shard_code_bound).toBe(false);
+    expect(fresh.public_shard_code_bound).toBe(false);
+    expect(fresh.ticket_code_bound).toBe(false);
+    expect(fresh.airdrop_pool_bound).toBe(false);
+
+    const bind = (body: any) => fa.send(treasury.getSender(), { value: toNano('0.1') }, body);
+    await bind({ $$type: 'BindShardCode', shard_code: (await RecordShard.init(1n, 1n)).code });
+    await bind({ $$type: 'BindTicketCode', ticket_code: (await AirdropTicket.init(treasury.address)).code });
+    await bind({ $$type: 'BindAirdropPool', airdrop_pool_address: pool.address });
+
+    // The PARTIAL state is the one that matters: three landed, two did not, and the ceremony would have had no way to
+    // see it. Now it does.
+    const partial = await fa.getGetState();
+    expect(partial.shard_code_bound).toBe(true);
+    expect(partial.ticket_code_bound).toBe(true);
+    expect(partial.airdrop_pool_bound).toBe(true);
+    expect(partial.intro_shard_code_bound, 'and the two that were skipped are visible as skipped').toBe(false);
+    expect(partial.public_shard_code_bound).toBe(false);
+  });
+
   it('FAACC-DUST-01: a sub-envelope buyback remainder cannot leave — and the dead-man is the only way out', async () => {
     const env = await setup();
     await seedDust(env, toNano('1'));

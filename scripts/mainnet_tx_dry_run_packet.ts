@@ -647,6 +647,16 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'B09',
+      // [ADDED 2026-07-30, ceremony audit] FeeAccumulator's five binds are B09 and B13..B16 — SPLIT in this file, and
+      // this contract has NO SEAL, so nothing in the ceremony refuses while one is missing. Each is one-shot
+      // (15051/15052/15053/15057/15059 demand `== null`) and this contract can never be replaced, its address being
+      // baked into four immutable contracts. A skipped bind is silent here and permanent afterwards: gate 15055 then
+      // refuses that lane's capsule fee, or 15060 refuses every TicketRedeem, with the lane's airdrop dead for good.
+      // get_state() now reports all five as booleans — verify them before signing S01.
+      order_note: 'FeeAccumulator bind 1 of 5 (B09, B13, B14, B15, B16). They are not adjacent in this file and this '
+        + 'contract has no seal to catch a missing one. After signing all five, read get_state() and check '
+        + 'shard_code_bound / intro_shard_code_bound / public_shard_code_bound / ticket_code_bound / airdrop_pool_bound '
+        + 'are all true. A missed bind cannot be repaired: the gate demands null and the contract cannot be replaced.',
       phase: 'pre_seal_binding',
       // CRITICAL: FeeAccumulator.BindAirdropPool is guarded by requireTreasury() (gate 15050, sender ==
       // treasury_receiver_address == ton_treasury_receiver). It MUST be signed by ton_treasury_receiver, NOT the
@@ -700,6 +710,12 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'B12',
+      // [ADDED 2026-07-30, ceremony audit] BuybackBurn's three binds are SPLIT in this file — B01 and B02 sit with the
+      // rest of its work, this one is ten steps further down among other contracts'. An operator working
+      // contract-by-contract rather than line-by-line signs B01, B02, then S04, and S04 refuses at gate 22509 with the
+      // treasury unbound. Nothing was written down about it. CEREMONY-ORDER-02 fails if a split group loses this note.
+      order_note: 'BuybackBurn bind 3 of 3 (B01, B02, B12). ALL THREE must be signed before S04, which refuses at '
+        + '22130 / 22131 / 22509 without them. They are not adjacent in this file.',
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -780,6 +796,7 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'S01',
+      order_note: 'Requires B06 (ath_master), B07 (credit_issuer), B08 (treasury) and the F01 funding — gates 26041 / 26042 / 26043 / 26044.',
       // Runs in the seal phase, which the ceremony executes AFTER the fund phase — AirdropSealGenesis requires
       // funded_amount == 15M (gate 26044). This seal BINDS the real manifest hash into the pool (message name is
       // AirdropSealGenesis; gate 26040 requires hash > 1).
@@ -792,6 +809,7 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'S02',
+      order_note: 'Requires B10 (official ATH wallet) — gate 19042.',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -801,6 +819,7 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'S03',
+      order_note: 'Requires B11 (official ATH wallet) — gate 21042.',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -810,6 +829,7 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'S04',
+      order_note: 'Requires B01 (fee accumulator), B02 (official ATH wallet) and B12 (treasury) — gates 22130 / 22131 / 22509. B12 is NOT adjacent to the other two in this file.',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -819,6 +839,7 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'S05',
+      order_note: 'Requires B03 (reserve funder), B04 (official ATH wallet), B05 (treasury) — gates 23140 / 23141 / 23142.',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
