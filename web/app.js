@@ -127,7 +127,8 @@ import {
   createVaultWalletMessage,
   estimateVaultAttachedValueNanotons,
   PROFILE_AVATAR_PRICE_ATH,
-  PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
+  PROFILE_AVATAR_DIRECT_NOTIFY_VALUE_NANOTONS,
+  PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS,
   PUBLIC_BODY_MEDIA_FORMATS,
   PUBLIC_POST_BODY_MAX_BYTES,
   PUBLIC_COMMENT_TEXT_MAX_BYTES,
@@ -136,7 +137,8 @@ import {
   readPublicPartHeaderInfo,
   REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
   tonCell,
-  USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
+  USERNAME_MINT_DIRECT_NOTIFY_VALUE_NANOTONS,
+  USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS,
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
@@ -12996,15 +12998,20 @@ function refreshPublicSendButtonState() {
   publicPostCommentsToggle?.classList.toggle('is-disabled', blocked);
 }
 
+// [FIXED 2026-07-30, class sweep 2] Returned USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS — 617,000,000, a Vault-era
+// figure for a contract clean-17 deleted — while the direct-pay send below actually asks the wallet to sign
+// 1,100,000,000. The user was shown 0.617 GRAM and handed a 1.1 GRAM signing request: wrong by 78%, on the screen
+// where they decide whether to trust the app.
 function estimatedUsernameMintTonFeeNanotons() {
-  return USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS;
+  return USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS;
 }
 
 function estimatedProfileAvatarTonFeeNanotons(attachment) {
   const plan = imagePartsForSend(attachment, 'profile avatar');
   const pricedProfiles = publicComposerPublishProfilesForPlan(plan);
+  // Same defect as the mint estimator above: this added the Vault-era 115,000,000 while the send attaches 200,000,000.
   return composerEstimatedMaxChargeNanotons(pricedProfiles, 1)
-    + PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS;
+    + PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS;
 }
 
 function profileAvatarTonFeeLabel(attachment) {
@@ -19698,8 +19705,11 @@ async function resolveRecipientWalletForThread(thread) {
 // deploys a UsernameNFTItem, so it needs far more than an avatar pointer write: the registry retains ~0.91 TON (100-year
 // item endowment). notify carries that downstream; the request is notify + forwarding fees; the ATH wallet refunds every
 // excess nanoton (refund_owner_excess), so an ample request is free.
-const USERNAME_MINT_DIRECT_NOTIFY_VALUE = 1_000_000_000n;
-const USERNAME_MINT_DIRECT_REQUEST_VALUE = 1_100_000_000n;
+// [MOVED 2026-07-30, class sweep 2] These now come from pwa-contract-transactions.mjs, which is also what the fee
+// ESTIMATOR reads. They used to be local literals here while the estimator used a separate Vault-era constant, so the
+// figure shown before signing and the figure actually signed were different numbers with no connection.
+const USERNAME_MINT_DIRECT_NOTIFY_VALUE = USERNAME_MINT_DIRECT_NOTIFY_VALUE_NANOTONS;
+const USERNAME_MINT_DIRECT_REQUEST_VALUE = USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS;
 
 // clean-17 DIRECT-PAY username mint: the user's OWN ATH jetton wallet pays the UsernameRegistry directly — the registry
 // is Vault-INDEPENDENT by design (UsernameRegistry.tact:588), authenticated by the official ATH wallet's transfer
@@ -19856,8 +19866,8 @@ async function submitAthDueFlush() {
 // the registry (below it the registry refuses at 21112 and refunds); the request VALUE 200M covers the ATH wallet's
 // downstream requirement (notify_value + the notify/ack/storage constants + the owner-request reserve, ~128M
 // measured) with headroom. Both are validated end-to-end in tests/ath-avatar-request AAR-02.
-const PROFILE_AVATAR_DIRECT_NOTIFY_VALUE = 66_000_000n;
-const PROFILE_AVATAR_DIRECT_REQUEST_VALUE = 200_000_000n;
+const PROFILE_AVATAR_DIRECT_NOTIFY_VALUE = PROFILE_AVATAR_DIRECT_NOTIFY_VALUE_NANOTONS;
+const PROFILE_AVATAR_DIRECT_REQUEST_VALUE = PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS;
 
 // clean-17 direct-pay avatar: publish the image bytes to the owner's AVATAR PublicShard (kind 3, PPH2 — NO
 // profileVersion/avatarHash in the header, those live only in the paid pointer) AND pay 100 ATH to ProfileRegistry,

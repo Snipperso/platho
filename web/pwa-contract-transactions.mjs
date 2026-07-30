@@ -99,19 +99,23 @@ export const PUBLIC_POST_TEXT_MAX_BYTES = PUBLIC_POST_BODY_MAX_BYTES;
 export const PUBLIC_COMMENT_TEXT_MAX_BYTES = PUBLIC_POST_BODY_MAX_BYTES;
 export const MLKEM768_PUBLIC_KEY_BYTES = 1184;
 export const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
-export const PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS = 66_000_000n; // mirrors Vault.PROFILE_AVATAR_NOTIFY_VALUE (raised 30M->66M with the ProfileRegistry endowment raise). Informational; the live attached charge is PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS.
-// Raised 61M->115M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M) and the
-// ProfileRegistry avatar-record/owner-version endowment raises (which lifted PROFILE_AVATAR_NOTIFY_VALUE 30M->66M):
-// the Vault forwards VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE (55M->109M) + 6M local exec = 115M.
-export const PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS = 115_000_000n;
-// UsernameRegistry now retains 511M nanotons per mint (6M endowment + 500M NFT-item deploy reserve [0.5 TON
-// prepaid storage, ~250+ years] + 1M ack + 4M state-growth), up from the old 32M. The Vault-funded mint hold is
-// the registry retained value plus the Vault local exec reserve (6M) and ATH-wallet forwarding overhead margin.
-// Raised 581M->617M for clean-11 (name-record endowment +36M: Vault forwards
-// VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE 575M->611M + 6M local exec = 617M). This is a signed max_ton_charge
-// CEILING, not the actual debit: the Vault charges its own fixed usernameMintTonCharge() (581M on clean-10, 617M on
-// clean-11) as long as it is <= this ceiling, so 617M is safe against BOTH genesis (clean-10 still debits 581M).
-export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 617_000_000n;
+// [REPLACED 2026-07-30, class sweep 2] Three constants used to live here — PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS,
+// PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS (115,000,000) and USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS (617,000,000) —
+// and every one of them was described in terms of a Vault that clean-17 DELETED. They were not merely stale prose:
+// app.js still fed them to the two fee ESTIMATORS while the live direct-pay send paths attached completely different
+// values, so the number a user was shown before signing was wrong by 78% for a name and 74% for an avatar.
+//
+// The values below are the ones the send path actually attaches, exported from ONE place so an estimator and a
+// transaction cannot drift apart again. PVSEND-01 pins the estimator to the attached value.
+//
+// Direct-pay username mint: the mint deploys a UsernameNFTItem, so the registry retains ~0.91 GRAM (a 100-year item
+// endowment). notify carries that downstream; the request is notify plus forwarding, and the ATH wallet refunds every
+// excess nanoton through refund_owner_excess, so an ample request costs the user nothing.
+export const USERNAME_MINT_DIRECT_NOTIFY_VALUE_NANOTONS = 1_000_000_000n;
+export const USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS = 1_100_000_000n;
+// Direct-pay profile avatar: an avatar pointer write, far cheaper than deploying an NFT item.
+export const PROFILE_AVATAR_DIRECT_NOTIFY_VALUE_NANOTONS = 66_000_000n;
+export const PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS = 200_000_000n;
 const UINT128_MOD = 1n << 128n;
 
 export const VAULT_RESERVES_NANOTONS = Object.freeze({
