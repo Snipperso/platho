@@ -28,7 +28,7 @@ import {
 // cost nothing and repeatable.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-const ITEM_ACK_RESEND_RESERVE = 4_000_000n;
+const ITEM_ACK_RESEND_RESERVE = 5_000_000n;   // gate 18015 = FORWARD(3M) + EXEC(2M); the exec reserve was raised 1M->2M in wave-8 because the old threshold was 56,602 short of the MEASURED handler cost. Underfunding it here left the item UNinitialized, so the proof path failed at 18040 four steps from the cause.
 const PROOF_FORWARD_RESERVE = 5_000_000n;
 const PROOF_EXEC_RESERVE = 1_000_000n;
 const PROOF_MIN_VALUE = PROOF_FORWARD_RESERVE + PROOF_EXEC_RESERVE;

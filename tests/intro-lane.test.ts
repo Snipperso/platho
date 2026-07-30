@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Blockchain } from '@ton/sandbox';
-import { deployFeeSink } from './helpers/fee-sink-fixture';
+import { FA_BUYBACK, deployFeeSink } from './helpers/fee-sink-fixture';
 import { toNano, beginCell, contractAddress, Address } from '@ton/core';
 import { x25519 } from '@noble/curves/ed25519.js';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
@@ -27,7 +27,6 @@ import { computePrivateScanViewTag } from '../web/crypto/platho-crypto.mjs';
 const cellOf = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCell();
 const CLOCK = 1_790_000_000;
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
-const FA_BUYBACK = Address.parse('UQAGgJ-yDmmPgSdFmuNDLYeQmPAdx2sZaq3wKtT7TS5DlFml');
 const INTRO_DEPLOY = 17_810_000n;   // IS_DEPLOY_MIN_VALUE — read from the live getter, not remembered
 
 /**

@@ -1,4 +1,4 @@
-import { Address, toNano } from '@ton/core';
+import { Address, contractAddress, toNano } from '@ton/core';
 import type { Blockchain } from '@ton/sandbox';
 import { FeeAccumulator } from '../../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { RecordShard } from '../../build/RecordShard/RecordShard_RecordShard';
@@ -19,8 +19,24 @@ import { PublicShard } from '../../build/PublicShard/PublicShard_PublicShard';
 // duplicated five times is a change that has to land five times, and it will not.
 
 export const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
-export const FA_BUYBACK = Address.parse('UQAGgJ-yDmmPgSdFmuNDLYeQmPAdx2sZaq3wKtT7TS5DlFml');
+// [REBAKED 2026-07-29, wave-8 cascade] BuybackBurn's address is DERIVED from its code, and its code changed, so this
+// is not a fixed role address — it is a copy of a derived value and it went stale. The ceremony's own figure is
+// artifacts/local/mainnet_final_manifest_draft.json -> addresses.fee_accumulator_buyback_burn, and FA-SOURCE-01 in
+// tests/fee-sink-fixture-source.test.ts pins this constant to it whenever that scaffolding is present. Baking the
+// FEE_SINK from a TEST literal instead of from the ceremony is a mistake this project has already made once, and it
+// killed the airdrop while PT-04b proved a self-consistent fiction — hence the pin rather than another hand-edit.
+export const FA_BUYBACK = Address.parse('UQAN3GQIkfjJ8ZAufZepdaAY_tdGwIOtOXHxmNtLi3uXcSzh');
 export const FA_POOL = Address.parse('UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH');
+
+/**
+ * The sink's own address, DERIVED — never a literal.
+ *
+ * It is the address the four immutable *_FEE_SINK constants name, and it is a pure function of the two inputs above
+ * plus FeeAccumulator's code. Four suites used to keep it as a hand-copied string, so every edit to FeeAccumulator
+ * left them naming an address nobody occupies — a whole class of red that reads as a protocol defect. Derived here,
+ * it cannot go stale, and FA-SOURCE-02 fails if a copy reappears anywhere.
+ */
+export const FEE_SINK = contractAddress(0, await FeeAccumulator.init(FA_TREASURY, FA_BUYBACK));
 
 /**
  * Deploy the fee sink and, unless `bind: false`, send the four genesis binds exactly as the ceremony does:

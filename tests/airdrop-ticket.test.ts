@@ -3,6 +3,7 @@ import { Address, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
 import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicket';
+import { FEE_SINK } from './helpers/fee-sink-fixture';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // AIRDROP TICKET — the per-publisher credit accumulator that makes batched delivery possible.
@@ -20,7 +21,6 @@ import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicke
 // [CORRECTED 2026-07-21] This mirror was left at the PRE-REBAKE address when the three contract-side
 // constants were rebaked on 2026-07-20. Rebaking a constant in the contracts and not in the tests that
 // mirror it turns the whole suite red for a reason that looks like a protocol defect and is not one.
-const FEE_SINK = Address.parse('EQBekf1HwT0rQzEenYOaCNsNG-POIWZCbt9NScyMsawU0jr7');
 const AT_MIN_CLAIM_CREDITS = 10n;
 const AT_MAX_CREDITS_PER_CLAIM = 1000n;
 const AT_CLAIM_MIN_VALUE = 63_000_000n;

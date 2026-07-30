@@ -3,8 +3,8 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "username_registry": "0d01ed009d3cbddcd37e098985177a2531c918aa6e1ea3567a2cb57cf88c4afb",
-    "username_nft_item": "0a4cbac7aaa5899c12d4e2e72126aa8381f4c90ab1e3f547f49f7bfab9746ef1"
+    "username_registry": "9064665be327c8920a6f36ee84baae0c037345a66c3cfc796a5a7211bac0278f",
+    "username_nft_item": "0df553413c4e61177c4a49ced30e509caeb6280b1879c29a6a71ded94b70622a"
   },
   "note": "Sandbox evidence that username mint and item recovery paths retain enough TON against the explicit V1 endowment model. This is not a mainnet rent oracle; it is a release gate against underfunded permanent UsernameRegistry records and UsernameNFTItem state.",
   "constants": {
@@ -22,44 +22,44 @@
     {
       "label": "SUCCESS_4_CHAR",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "197131397",
-      "item_balance_delta_nanotons": "825052598",
+      "raw_balance_delta_nanotons": "196722998",
+      "item_balance_delta_nanotons": "824980331",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "191131397",
-      "item_margin_vs_floor_nanotons": "809152598",
+      "retained_margin_vs_registry_endowment_nanotons": "190722998",
+      "item_margin_vs_floor_nanotons": "809080331",
       "pending_mint_count": "0"
     },
     {
       "label": "SUCCESS_5_CHAR",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "197070531",
-      "item_balance_delta_nanotons": "824997998",
+      "raw_balance_delta_nanotons": "196662130",
+      "item_balance_delta_nanotons": "824925731",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "191070531",
-      "item_margin_vs_floor_nanotons": "809097998",
+      "retained_margin_vs_registry_endowment_nanotons": "190662130",
+      "item_margin_vs_floor_nanotons": "809025731",
       "pending_mint_count": "0"
     },
     {
       "label": "SUCCESS_6_PLUS",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "197012597",
-      "item_balance_delta_nanotons": "824943398",
+      "raw_balance_delta_nanotons": "196604197",
+      "item_balance_delta_nanotons": "824871131",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "191012597",
-      "item_margin_vs_floor_nanotons": "809043398",
+      "retained_margin_vs_registry_endowment_nanotons": "190604197",
+      "item_margin_vs_floor_nanotons": "808971131",
       "pending_mint_count": "0"
     },
     {
       "label": "ITEM_DEPLOY_BOUNCE_REFUND_REQUEST",
       "kind": "item_bounce",
-      "raw_balance_delta_nanotons": "934704927",
+      "raw_balance_delta_nanotons": "150221461",
       "item_balance_delta_nanotons": "0",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "0",
-      "retained_margin_vs_registry_endowment_nanotons": "934704927",
+      "retained_margin_vs_registry_endowment_nanotons": "150221461",
       "item_margin_vs_floor_nanotons": "0",
       "pending_mint_count": "0"
     },
@@ -67,36 +67,36 @@
       "label": "ITEM_RESEND_ACK_CALLER_FUNDED",
       "kind": "item_resend",
       "raw_balance_delta_nanotons": "0",
-      "item_balance_delta_nanotons": "3020263",
+      "item_balance_delta_nanotons": "0",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "15900000",
       "retained_margin_vs_registry_endowment_nanotons": "0",
-      "item_margin_vs_floor_nanotons": "812063661",
+      "item_margin_vs_floor_nanotons": "808971131",
       "pending_mint_count": "0"
     },
     {
       "label": "ITEM_TRANSFER_EXACT_MIN",
       "kind": "item_transfer",
       "raw_balance_delta_nanotons": "0",
-      "item_balance_delta_nanotons": "11404332",
+      "item_balance_delta_nanotons": "11321798",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "15900000",
       "retained_margin_vs_registry_endowment_nanotons": "0",
-      "item_margin_vs_floor_nanotons": "820447730",
+      "item_margin_vs_floor_nanotons": "820292929",
       "pending_mint_count": "0"
     },
     {
       "label": "ITEM_TRANSFER_WITH_FORWARD",
       "kind": "item_transfer",
       "raw_balance_delta_nanotons": "0",
-      "item_balance_delta_nanotons": "11362931",
+      "item_balance_delta_nanotons": "11261331",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "15900000",
       "retained_margin_vs_registry_endowment_nanotons": "0",
-      "item_margin_vs_floor_nanotons": "820406329",
+      "item_margin_vs_floor_nanotons": "820232462",
       "pending_mint_count": "0"
     }
   ],
-  "worst_registry_margin_nanotons": "191012597",
-  "worst_item_margin_nanotons": "809043398"
+  "worst_registry_margin_nanotons": "190604197",
+  "worst_item_margin_nanotons": "808971131"
 }

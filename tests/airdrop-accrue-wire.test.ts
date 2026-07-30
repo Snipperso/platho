@@ -6,6 +6,7 @@ import { AirdropPool } from '../build/AirdropPool/AirdropPool_AirdropPool';
 import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicket';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
+import { FA_BUYBACK } from './helpers/fee-sink-fixture';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // AIRDROP-ACCRUE-WIRE — the two sides of one opcode, put in the same room.
@@ -24,7 +25,6 @@ import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 
 const CLOCK = 1_790_000_000;
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
-const FA_BUYBACK = Address.parse('UQAGgJ-yDmmPgSdFmuNDLYeQmPAdx2sZaq3wKtT7TS5DlFml');
 const OP_AIRDROP_ACCRUE = 0x41445210;
 const MANIFEST = 0x41435752455F57495245000000000000000000000000000000000000000001n;
 const TOTAL_POOL = 15_000_000_000_000_000n;   // AIRDROP_TOTAL_POOL — 15M ATH, gate 26044 wants it EXACTLY

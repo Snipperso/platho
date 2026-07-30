@@ -7,6 +7,6 @@
   "proofRefs": {
     "treasuryOwnerProof": "artifacts/mainnet_genesis_verify_input.json#manifest.addresses.ath_treasury_owner=UQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOATH",
     "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=3ca983ee125c3b0a0bb89307eb8b24d6499017e80c1cdcab390372aa8a65426e",
-    "athMasterBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=f13064144b521ad9943e488e3e75d29c56739b3d9d993c5d3a7db0d98f5c9208"
+    "athMasterBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=e06fec0f10c39460f1c09a82993b44abbe6000bdcbf627aa07f247f9064b57b3"
   }
 }

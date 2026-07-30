@@ -7,6 +7,7 @@ import { AirdropPool } from '../build/AirdropPool/AirdropPool_AirdropPool';
 import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicket';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
+import { FA_BUYBACK, FEE_SINK } from './helpers/fee-sink-fixture';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // IN-FLIGHT DEAD-MAN — the interlock that had no way out.
@@ -33,9 +34,7 @@ import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 
 const CLOCK = 1_790_000_000;
 const DAY = 24 * 3600;
-const FEE_SINK = Address.parse('EQBekf1HwT0rQzEenYOaCNsNG-POIWZCbt9NScyMsawU0jr7');
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
-const FA_BUYBACK = Address.parse('UQAGgJ-yDmmPgSdFmuNDLYeQmPAdx2sZaq3wKtT7TS5DlFml');
 const MANIFEST = 0x41435752455F57495245000000000000000000000000000000000000000001n;
 const TOTAL_POOL = 15_000_000_000_000_000n;
 const AT_CLAIM_MIN_VALUE = 63_000_000n;
