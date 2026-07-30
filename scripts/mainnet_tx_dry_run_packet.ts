@@ -87,6 +87,13 @@ const DEPLOY_VALUE_RECOMMENDED_NANOTONS = '500000000';
 // in the same change, which additionally lets each claim retain about a year of rent as it passes through.
 const DEPLOY_VALUE_OVERRIDE_NANOTONS: Record<string, string> = {
   ATHVesting: '1500000000',
+  // [ADDED 2026-07-30, tier-1 audit] The jetton master, funded for its own commitment horizon rather than for the
+  // flat default. MEASURED from build/ATHMaster/ATHMaster_ATHMaster.code.boc: 97 distinct code cells, so with the
+  // account and its data ~100 cells, and at the frozen 64,962 per cell-year that is 6,496,200 a year. The flat
+  // 500,000,000 bought 77 years — against a 100-year ATHVesting schedule, on the ONE contract in this system that
+  // can never be redeployed under any circumstance. Past that point burns stop being recorded and get_jetton_data
+  // stops answering, so every explorer, wallet and DEX loses the token's identity. 1 GRAM buys ~154 years.
+  ATHMaster: '1000000000',
 };
 const CONTROL_VALUE_RECOMMENDED_NANOTONS = '50000000';
 // [RAISED 2026-07-29, wave-8 HIGH: 10M -> 620M] This one transaction both mints the 100,000,000 ATH and creates the
