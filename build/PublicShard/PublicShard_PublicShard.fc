@@ -581,121 +581,121 @@ builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline {
 
 ((int, int, cell, int), int) $PublicShard$_fun_kindOf((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_0 = ($self'epoch_tag >> 32);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_0);
+    var $fresh$ret_1021 = ($self'epoch_tag >> 32);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1021);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_eraIndex((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_1 = ($self'epoch_tag & 4294967295);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1);
+    var $fresh$ret_1022 = ($self'epoch_tag & 4294967295);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1022);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_eraSeconds((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_2 = ((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf() < 2) ? 2592000 : 31536000);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_2);
+    var $fresh$ret_1023 = ((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf() < 2) ? 2592000 : 31536000);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1023);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_retention((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
     int $k = ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf();
     if (($k == 3)) {
-        var $fresh$ret_3 = 94608000;
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_3);
+        var $fresh$ret_1024 = 94608000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1024);
     }
     if (($k == 2)) {
-        var $fresh$ret_4 = 31536000;
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_4);
+        var $fresh$ret_1025 = 31536000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1025);
     }
-    var $fresh$ret_5 = 31536000;
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_5);
+    var $fresh$ret_1026 = 31536000;
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1026);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_entryEndowment((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
     int $k = ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf();
     if (($k == 3)) {
-        var $fresh$ret_6 = 2400000;
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_6);
+        var $fresh$ret_1027 = 2400000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1027);
     }
     if (($k == 2)) {
-        var $fresh$ret_7 = 1600000;
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_7);
+        var $fresh$ret_1028 = 1600000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1028);
     }
-    var $fresh$ret_8 = 500000;
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_8);
+    var $fresh$ret_1029 = 500000;
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1029);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_baseEndowment((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
     int $k = ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf();
     if (($k == 3)) {
-        var $fresh$ret_9 = 21800000;
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_9);
+        var $fresh$ret_1030 = 21800000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1030);
     }
     if (($k == 2)) {
-        var $fresh$ret_10 = 14500000;
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_10);
+        var $fresh$ret_1031 = 14500000;
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1031);
     }
-    var $fresh$ret_11 = 4500000;
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_11);
+    var $fresh$ret_1032 = 4500000;
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1032);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_minValue((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_12 = (((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_entryEndowment() + 2500000) + 10000000) + 2800000);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_12);
+    var $fresh$ret_1033 = (((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_entryEndowment() + 2500000) + 10000000) + 2800000);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1033);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_deployMinValue((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_13 = (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue() + ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_baseEndowment());
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_13);
+    var $fresh$ret_1034 = (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue() + ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_baseEndowment());
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1034);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_retireAt((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_14 = ((((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex() + 2) * ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds()) + ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention()) + 86400);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_14);
+    var $fresh$ret_1035 = ((((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex() + 2) * ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds()) + ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention()) + 86400);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1035);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_senderHash((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
     slice $s = $Address$_fun_asSlice(__tact_context_get_sender());
     throw_unless(13707, ($s~load_uint(11) == 1024));
-    var $fresh$ret_15 = $s~load_uint(256);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_15);
+    var $fresh$ret_1036 = $s~load_uint(256);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1036);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_bodyCommit((int, int, cell, int) $self, cell $header, cell $body) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_16 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347634756, 32), $Cell$_fun_hash($header), 256), $Cell$_fun_hash($body), 256)));
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_16);
+    var $fresh$ret_1037 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347634756, 32), $Cell$_fun_hash($header), 256), $Cell$_fun_hash($body), 256)));
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1037);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_claimedPartitionKey((int, int, cell, int) $self, int $kind, int $keyArg, int $shardSeq) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
     ifnot ($kind) {
-        var $fresh$ret_17 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347633992, 32), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_senderHash(), 256), $shardSeq, 32)));
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_17);
+        var $fresh$ret_1038 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347633992, 32), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_senderHash(), 256), $shardSeq, 32)));
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1038);
     }
     if (($kind == 1)) {
-        var $fresh$ret_18 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347638344, 32), $keyArg, 256), $shardSeq, 32)));
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_18);
+        var $fresh$ret_1039 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1347638344, 32), $keyArg, 256), $shardSeq, 32)));
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1039);
     }
     if (($kind == 2)) {
-        var $fresh$ret_19 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1347633731, 32), ($keyArg & 4294967295), 32)));
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_19);
+        var $fresh$ret_1040 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1347633731, 32), ($keyArg & 4294967295), 32)));
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1040);
     }
-    var $fresh$ret_20 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1347633494, 32), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_senderHash(), 256)));
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_20);
+    var $fresh$ret_1041 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 1347633494, 32), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_senderHash(), 256)));
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1041);
 }
 
 ((int, int, cell, int), int) $PublicShard$_fun_publisherTag((int, int, cell, int) $self, slice $publisher) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_21 = ($StdAddress$_get_address($global_parseStdAddress($Address$_fun_asSlice($publisher))) % 340282366920938463463374607431768211456);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_21);
+    var $fresh$ret_1042 = ($StdAddress$_get_address($global_parseStdAddress($Address$_fun_asSlice($publisher))) % 340282366920938463463374607431768211456);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1042);
 }
 
 ((int, int, cell, int), cell) $PublicShard$_fun_packRows((int, int, cell, int) $self, int $start, int $n) impure inline_ref {
@@ -721,8 +721,8 @@ builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline {
         }
         $remaining = ($remaining - $chunk);
     }
-    var $fresh$ret_22 = $cell;
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_22);
+    var $fresh$ret_1043 = $cell;
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1043);
 }
 
 ((int, int, cell, int), (int, int, int, cell)) $PublicShard$_fun_get_page((int, int, cell, int) $self, int $from_id, int $max_count) impure inline_ref {
@@ -730,26 +730,26 @@ builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline {
     int $start = $global_max($from_id, 0);
     int $available = (($self'entry_count > $start) ? ($self'entry_count - $start) : 0);
     int $n = $global_max(0, $global_min($global_min($max_count, 96), $available));
-    var $fresh$ret_23 = $PublicPage$_constructor_from_id_count_entry_count_rows($start, $n, $self'entry_count, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_packRows($start, $n));
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_23);
+    var $fresh$ret_1044 = $PublicPage$_constructor_from_id_count_entry_count_rows($start, $n, $self'entry_count, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_packRows($start, $n));
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1044);
 }
 
 ((int, int, cell, int), (int, slice, int, int)) $PublicShard$_fun_get_entry((int, int, cell, int) $self, int $entry_id) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
     tuple $e = $PublicEntry$_load_opt(__tact_dict_get_int_cell($self'entries, 257, $entry_id));
     if (null?($e)) {
-        var $fresh$ret_24 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(false, $global_myAddress(), 0, 0);
-        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_24);
+        var $fresh$ret_1045 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(false, $global_myAddress(), 0, 0);
+        return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1045);
     }
     var ($v'publisher, $v'body_commit, $v'created_at) = $PublicEntry$_not_null($e);
-    var $fresh$ret_25 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(true, $v'publisher, $v'body_commit, $v'created_at);
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_25);
+    var $fresh$ret_1046 = $PublicEntryView$_constructor_exists_publisher_body_commit_created_at(true, $v'publisher, $v'body_commit, $v'created_at);
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1046);
 }
 
 ((int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int, int, slice)) $PublicShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_26 = $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink($self'partition_key, $self'epoch_tag, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex(), $self'entry_count, 4096, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_deployMinValue(), 10000000, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt(), __gen_slice_address_d5c3503e45ebaa622eb24a99cd82f286d3042aaa65a54e47a6884db1859ecc06());
-    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_26);
+    var $fresh$ret_1047 = $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink($self'partition_key, $self'epoch_tag, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex(), $self'entry_count, 4096, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_deployMinValue(), 10000000, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt(), __gen_slice_address_d5c3503e45ebaa622eb24a99cd82f286d3042aaa65a54e47a6884db1859ecc06());
+    return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_1047);
 }
 
 ;;

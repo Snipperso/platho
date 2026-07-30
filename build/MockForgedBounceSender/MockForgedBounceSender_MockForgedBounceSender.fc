@@ -1,0 +1,134 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MockForgedBounceSender_MockForgedBounceSender.headers.fc
+;;
+;; Header files for MockForgedBounceSender
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $MockForgedBounceSender$_contract_init
+tuple $MockForgedBounceSender$_contract_init() impure inline;
+
+;; $MockForgedBounceSender$_contract_load
+tuple $MockForgedBounceSender$_contract_load() impure inline;
+
+;; $MockForgedBounceSender$_contract_store
+() $MockForgedBounceSender$_contract_store(tuple v) impure inline;
+
+
+;; MockForgedBounceSender_MockForgedBounceSender.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+() $global_sendRawMessage(cell $msg, int $mode) impure asm """
+    SENDRAWMSG
+""";
+
+builder $Builder$_fun_storeCoins(builder $self, int $value) impure asm """
+    STVARUINT16
+""";
+
+builder $Builder$_fun_storeRef(cell $cell, builder $self) impure asm """
+    STREF
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+;; MockForgedBounceSender_MockForgedBounceSender.storage.fc
+;;
+;; Type: MockForgedBounceSender
+;; TLB: _  = MockForgedBounceSender
+;;
+
+tuple $MockForgedBounceSender$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return null();
+    }
+    else {
+        return $MockForgedBounceSender$_contract_init();
+    }
+}
+
+() $MockForgedBounceSender$_contract_store(tuple v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MockForgedBounceSender functions
+;;
+
+tuple $MockForgedBounceSender$_contract_init() impure inline {
+    tuple $self = null();
+    return $self;
+}
+
+;;
+;; Get methods of a Contract MockForgedBounceSender
+;;
+
+;;
+;; Routing of a Contract MockForgedBounceSender
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var $self = $MockForgedBounceSender$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive ForgeBounce message
+    if (op == 0xb0117e51) {
+        var $msg'target = in_msg~load_msg_addr();
+        var $msg'body = in_msg~load_ref();
+        var $msg'attach = in_msg~load_varuint16();
+        cell $raw = $Builder$_fun_endCell($Builder$_fun_storeRef($msg'body, store_uint(store_uint(store_uint(store_uint($Builder$_fun_storeCoins($Builder$_fun_storeCoins(store_uint($Builder$_fun_storeCoins($Builder$_fun_storeAddress(store_uint(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 0, 1), 1, 1), 0, 1), 1, 1), 0, 2), $msg'target), $msg'attach), 0, 1), 0), 0), 0, 64), 0, 32), 0, 1), 1, 1)));
+        $global_sendRawMessage($raw, 0);
+        $MockForgedBounceSender$_contract_store($self);
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $MockForgedBounceSender$_contract_store($self);
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

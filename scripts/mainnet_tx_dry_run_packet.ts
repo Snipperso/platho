@@ -809,7 +809,13 @@ async function buildDryRunPacket(draft: Draft) {
     },
     {
       id: 'S02',
-      order_note: 'Requires B10 (official ATH wallet) — gate 19042.',
+      order_note: 'Requires B10 (official ATH wallet) — gate 19042 — AND BOTH ART LOCKS, which are NOT steps in this '
+        + 'packet: run `mainnet_upload_username_art.ts --broadcast --seal` (56 parts + SealArt) and then '
+        + '`mainnet_upload_collection_meta.ts --broadcast --seal` (3 parts + SealCollectionMeta) BEFORE this step, or '
+        + 'it throws 19045 / 19046. The gate exists because SealGenesis does NOT revoke the genesis controller: with '
+        + 'the locks skipped, this hot wallet keeps permanent write authority over every .ath NFT art and the '
+        + 'collection metadata, in a contract that is otherwise immutable. Confirm with get_art_sealed / '
+        + 'get_meta_sealed before signing.',
       phase: 'seal',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),

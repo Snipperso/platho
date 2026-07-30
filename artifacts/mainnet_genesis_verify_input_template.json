@@ -192,7 +192,9 @@
       "treasury_due_ath": "0",
       "burn_due_ath": "0",
       "pending_treasury_flush_count": "0",
-      "pending_burn_flush_count": "0"
+      "pending_burn_flush_count": "0",
+      "art_sealed": true,
+      "meta_sealed": true
     },
     "username_registry_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",

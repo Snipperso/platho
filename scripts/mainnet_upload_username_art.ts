@@ -7,7 +7,10 @@
  * So the registry deploys with an EMPTY `art` dict and the genesis controller uploads the 56
  * parts here (batched, each external well under the limit), then SealArt locks them one-way.
  *
- * Order in the ceremony: D09 (deploy registry) -> Bind* -> [THIS: UploadArt x56 + SealArt] -> SealGenesis.
+ * Order in the ceremony: D09 (deploy registry) -> Bind* -> [THIS: UploadArt x56 + SealArt] -> SealGenesis. That order
+ * is ENFORCED: SealGenesis throws 19045 unless art_sealed is already true. It has to be, because the seal does not
+ * revoke the genesis controller — skipping SealArt would have left this hot wallet able to rewrite the SVG every .ath
+ * NFT renders, forever, in a contract that is otherwise immutable.
  *
  * Transport: routes signed externals through the Platho gateway (rpc.platho.app), like the D09 tool.
  * DRY-RUN by default; --broadcast actually sends. Mnemonic read from a file, never logged.

@@ -1,4 +1,5 @@
 import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
+import { sealArtAndCollectionMeta } from '../tests/helpers/username-registry-genesis';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
@@ -159,9 +160,16 @@ async function setupRegistry(label: string) {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWallet,
   } as BindOfficialAthWallet);
-  // Art upload is DECOUPLED from the genesis seal (locked separately by SealArt), so the
-  // storage-economics model — which measures mint/refund value flow, not rendering — seals
-  // the genesis with an empty art dict (uploading 56 parts x 7 cases would only add latency).
+  // Art upload used to be DECOUPLED from the genesis seal, and this model sealed with an empty art dict to avoid
+  // 56 uploads x 7 cases of latency. That is no longer possible: SealGenesis throws 19045/19046 unless the art and
+  // the collection metadata are locked, because leaving them open left the genesis controller — a hot wallet —
+  // permanent write authority over every .ath NFT's art in an otherwise immutable contract.
+  //
+  // Worth recording HOW this surfaced, because it is the failure mode the gate is meant to prevent, in miniature:
+  // the seal was silently refused, the registry stayed unsealed, the mint notification hit requireSealed instead of
+  // minting, and the only symptom was a retained margin of exactly -6,000,000 — a number that looks like a funding
+  // shortfall, not a refused seal. A skipped lock reads as an economics bug.
+  await sealArtAndCollectionMeta(registry, deployer);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,

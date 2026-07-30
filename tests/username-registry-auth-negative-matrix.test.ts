@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { sealArtAndCollectionMeta } from './helpers/username-registry-genesis';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
@@ -81,6 +82,7 @@ async function deploySealedRegistryWithMockOfficial() {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: mockOfficialAddress,
   } as BindOfficialAthWallet);
+  await sealArtAndCollectionMeta(registry, deployer);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,

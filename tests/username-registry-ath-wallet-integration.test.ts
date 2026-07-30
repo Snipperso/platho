@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { sealArtAndCollectionMeta } from './helpers/username-registry-genesis';
 import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
@@ -118,6 +119,7 @@ async function setup() {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
+  await sealArtAndCollectionMeta(registry, controller);
   await registry.send(controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,

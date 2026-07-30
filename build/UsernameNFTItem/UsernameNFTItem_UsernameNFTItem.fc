@@ -627,29 +627,29 @@ builder $UsernameNFTItem$_store(builder build_0, (int, slice, slice, int, int, c
 ((int, slice, slice, int, int, cell, slice, int), int) $UsernameNFTItem$_fun_isBasechainAddress((int, slice, slice, int, int, cell, slice, int) $self, slice $address) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
     var ($std'workchain, $std'address) = $global_parseStdAddress($Address$_fun_asSlice($address));
-    var $fresh$ret_0 = ($std'workchain == 0);
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_0);
+    var $fresh$ret_312 = ($std'workchain == 0);
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_312);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), int) $UsernameNFTItem$_fun_isValidNameLength((int, slice, slice, int, int, cell, slice, int) $self, int $name_len) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
-    var $fresh$ret_1 = ( (($name_len >= 4)) ? (($name_len <= 16)) : (false) );
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_1);
+    var $fresh$ret_313 = ( (($name_len >= 4)) ? (($name_len <= 16)) : (false) );
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_313);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), int) $UsernameNFTItem$_fun_isValidUsernameBytes((int, slice, slice, int, int, cell, slice, int) $self, int $name_len, slice $username) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
     ifnot (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_isValidNameLength($name_len)) {
-        var $fresh$ret_2 = false;
-        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_2);
+        var $fresh$ret_314 = false;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_314);
     }
     if (($Slice$_fun_bits($username) != ($name_len * 8))) {
-        var $fresh$ret_3 = false;
-        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_3);
+        var $fresh$ret_315 = false;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_315);
     }
     ifnot ($Slice$_fun_refsEmpty($username)) {
-        var $fresh$ret_4 = false;
-        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_4);
+        var $fresh$ret_316 = false;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_316);
     }
     slice $cursor = $username;
     int $i = 0;
@@ -659,47 +659,47 @@ builder $UsernameNFTItem$_store(builder build_0, (int, slice, slice, int, int, c
         int $digit = ( (($ch >= 48)) ? (($ch <= 57)) : (false) );
         int $separator = ( (($ch == 45)) ? (true) : (($ch == 95)) );
         ifnot (( (( ($lower) ? (true) : ($digit) )) ? (true) : ($separator) )) {
-            var $fresh$ret_5 = false;
-            return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_5);
+            var $fresh$ret_317 = false;
+            return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_317);
         }
         $i = $i + 1;
     }
-    var $fresh$ret_6 = $Slice$_fun_empty($cursor);
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_6);
+    var $fresh$ret_318 = $Slice$_fun_empty($cursor);
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_318);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), int) $UsernameNFTItem$_fun_computeNameHash((int, slice, slice, int, int, cell, slice, int) $self, slice $username) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
-    var $fresh$ret_7 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeSlice(store_uint($global_beginCell(), 3318512854, 32), $username)));
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_7);
+    var $fresh$ret_319 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeSlice(store_uint($global_beginCell(), 3318512854, 32), $username)));
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_319);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), int) $UsernameNFTItem$_fun_tier((int, slice, slice, int, int, cell, slice, int) $self) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
     if (($self'username_len == 4)) {
-        var $fresh$ret_8 = 1;
-        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_8);
+        var $fresh$ret_320 = 1;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_320);
     }
     if (($self'username_len == 5)) {
-        var $fresh$ret_9 = 2;
-        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_9);
+        var $fresh$ret_321 = 2;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_321);
     }
-    var $fresh$ret_10 = 3;
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_10);
+    var $fresh$ret_322 = 3;
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_322);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), cell) $UsernameNFTItem$_fun_snakeNameCell((int, slice, slice, int, int, cell, slice, int) $self) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
-    var $fresh$ret_11 = $Builder$_fun_endCell(store_uint($Builder$_fun_storeSlice(store_uint($global_beginCell(), 0, 8), $Cell$_fun_beginParse($self'username)), 778138728, 32));
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_11);
+    var $fresh$ret_323 = $Builder$_fun_endCell(store_uint($Builder$_fun_storeSlice(store_uint($global_beginCell(), 0, 8), $Cell$_fun_beginParse($self'username)), 778138728, 32));
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_323);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), cell) $UsernameNFTItem$_fun_snakeDescriptionCell((int, slice, slice, int, int, cell, slice, int) $self) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
     tuple $b = __tact_string_builder_start_tail_string();
     $b~__tact_string_builder_append(__gen_slice_string_772226ccf1356301686fba4dcc4c81332c0c7470c4e5732318ac44d730bce72a());
-    var $fresh$ret_12 = __tact_string_builder_end($b);
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_12);
+    var $fresh$ret_324 = __tact_string_builder_end($b);
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_324);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), cell) $UsernameNFTItem$_fun_individualContent((int, slice, slice, int, int, cell, slice, int) $self) impure inline_ref {
@@ -707,18 +707,18 @@ builder $UsernameNFTItem$_store(builder build_0, (int, slice, slice, int, int, c
     cell $metadata = null();
     $metadata~__tact_dict_set_uint_cell(256, 59089242681608890680090686026688704441792375738894456860693970539822503415433, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_snakeNameCell());
     $metadata~__tact_dict_set_uint_cell(256, 90922719342317012409671596374183159143637506542604000676488204638996496437508, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_snakeDescriptionCell());
-    var $fresh$ret_13 = $UsernameNftOnchainContent$_store_cell($UsernameNftOnchainContent$_constructor_marker_metadata(0, $metadata), begin_cell());
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_13);
+    var $fresh$ret_325 = $UsernameNftOnchainContent$_store_cell($UsernameNftOnchainContent$_constructor_marker_metadata(0, $metadata), begin_cell());
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_325);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), slice) $UsernameNFTItem$_fun_normalizedForwardPayload((int, slice, slice, int, int, cell, slice, int) $self, slice $payload) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
     if ($Slice$_fun_empty($payload)) {
-        var $fresh$ret_14 = $Cell$_fun_beginParse($Builder$_fun_endCell($Builder$_fun_storeBit(false, $global_beginCell())));
-        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_14);
+        var $fresh$ret_326 = $Cell$_fun_beginParse($Builder$_fun_endCell($Builder$_fun_storeBit(false, $global_beginCell())));
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_326);
     }
-    var $fresh$ret_15 = $payload;
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_15);
+    var $fresh$ret_327 = $payload;
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_327);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), ()) $UsernameNFTItem$_fun_sendDeployedAck((int, slice, slice, int, int, cell, slice, int) $self) impure inline_ref {
@@ -729,14 +729,14 @@ builder $UsernameNFTItem$_store(builder build_0, (int, slice, slice, int, int, c
 
 ((int, slice, slice, int, int, cell, slice, int), (int, slice, slice, int, int, cell, int)) $UsernameNFTItem$_fun_get_state((int, slice, slice, int, int, cell, slice, int) $self) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
-    var $fresh$ret_16 = $UsernameNFTItemStateView$_constructor_initialized_owner_wallet_username_registry_address_name_hash_username_len_username_tier($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_tier());
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_16);
+    var $fresh$ret_328 = $UsernameNFTItemStateView$_constructor_initialized_owner_wallet_username_registry_address_name_hash_username_len_username_tier($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_tier());
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_328);
 }
 
 ((int, slice, slice, int, int, cell, slice, int), (int, int, slice, slice, cell)) $UsernameNFTItem$_fun_get_nft_data((int, slice, slice, int, int, cell, slice, int) $self) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)) = $self;
-    var $fresh$ret_17 = $UsernameNftDataView$_constructor_initialized_index_collection_address_owner_address_individual_content($self'initialized, $self'name_hash, $self'username_registry_address, $self'owner_wallet, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_individualContent());
-    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_17);
+    var $fresh$ret_329 = $UsernameNftDataView$_constructor_initialized_index_collection_address_owner_address_individual_content($self'initialized, $self'name_hash, $self'username_registry_address, $self'owner_wallet, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_individualContent());
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce), $fresh$ret_329);
 }
 
 ;;

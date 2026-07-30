@@ -1,0 +1,130 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/MockForgedBounceSender/MockForgedBounceSender_MockForgedBounceSender.fc` 
+PROGRAM{
+  DECLPROC $MockForgedBounceSender$_contract_init
+  DECLPROC $MockForgedBounceSender$_contract_load
+  DECLPROC $MockForgedBounceSender$_contract_store
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  $MockForgedBounceSender$_contract_init PROCINLINE:<{
+    PUSHNULL
+  }>
+  $MockForgedBounceSender$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    DROP
+    IF:<{
+      PUSHNULL
+    }>ELSE<{
+      $MockForgedBounceSender$_contract_init INLINECALLDICT
+    }>
+  }>
+  $MockForgedBounceSender$_contract_store PROCINLINE:<{
+    DROP
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    ENDC
+    c4 POP
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $MockForgedBounceSender$_contract_load INLINECALLDICT
+    s0 s2 XCHG
+    IFJMP:<{
+      2DROP
+    }>
+    0 PUSHINT
+    OVER
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      SWAP
+      32 LDU
+      s0 s2 XCHG
+    }>
+    OVER
+    2953936465 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      LDMSGADDR
+      LDREF
+      LDVARUINT16
+      DROP
+          NEWC
+      0 PUSHINT
+      SWAP
+      1 STU
+      1 PUSHINT
+      SWAP
+      1 STU
+      0 PUSHINT
+      SWAP
+      1 STU
+      1 PUSHINT
+      SWAP
+      1 STU
+      0 PUSHINT
+      SWAP
+      2 STU
+      s0 s3 XCHG2
+          STSLICER
+      ROT
+          STVARUINT16
+      0 PUSHINT
+      SWAP
+      1 STU
+      0 PUSHINT
+          STVARUINT16
+      0 PUSHINT
+          STVARUINT16
+      0 PUSHINT
+      SWAP
+      64 STU
+      0 PUSHINT
+      SWAP
+      32 STU
+      0 PUSHINT
+      SWAP
+      1 STU
+      1 PUSHINT
+      SWAP
+      1 STU
+          STREF
+          ENDC
+      0 PUSHINT
+          SENDRAWMSG
+      $MockForgedBounceSender$_contract_store INLINECALLDICT
+    }>
+    s2 POP
+    0 EQINT
+    SWAP
+    33 LESSINT
+    AND
+    IFJMP:<{
+      $MockForgedBounceSender$_contract_store INLINECALLDICT
+    }>
+    DROP
+    130 THROW
+  }>
+}END>c

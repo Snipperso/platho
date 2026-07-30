@@ -4382,6 +4382,12 @@ PROGRAM{
       SDEQ
       NOT
       THROWANYIFNOT
+      19045 PUSHINT
+      OVER
+      THROWANYIFNOT
+      19046 PUSHINT
+      17 s() PUSH
+      THROWANYIFNOT
       20 s() 22 s() XCHG
       19 s() 21 s() XCHG
       18 s() 20 s() XCHG

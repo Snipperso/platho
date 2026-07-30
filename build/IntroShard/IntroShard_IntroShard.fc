@@ -519,8 +519,8 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int) v) inline {
 
 ((int, int, cell, int), int) $IntroShard$_fun_bodyCommit((int, int, cell, int) $self, cell $h0, cell $body) impure inline_ref {
     var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
-    var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1230193219, 32), $Cell$_fun_hash($h0), 256), $Cell$_fun_hash($body), 256)));
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_0);
+    var $fresh$ret_1013 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), 1230193219, 32), $Cell$_fun_hash($h0), 256), $Cell$_fun_hash($body), 256)));
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_1013);
 }
 
 ((int, int, cell, int), cell) $IntroShard$_fun_packPairs((int, int, cell, int) $self, int $start, int $n) impure inline_ref {
@@ -546,8 +546,8 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int) v) inline {
         }
         $remaining = ($remaining - $chunk);
     }
-    var $fresh$ret_1 = $cell;
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_1);
+    var $fresh$ret_1014 = $cell;
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_1014);
 }
 
 ((int, int, cell, int), (int, int, int, cell)) $IntroShard$_fun_get_scan_page((int, int, cell, int) $self, int $from_id, int $max_count) impure inline_ref {
@@ -555,26 +555,26 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int) v) inline {
     int $start = $global_max($from_id, 0);
     int $available = (($self'next_id > $start) ? ($self'next_id - $start) : 0);
     int $n = $global_max(0, $global_min($global_min($max_count, 256), $available));
-    var $fresh$ret_2 = $IntroScanPage$_constructor_from_id_count_next_id_pairs($start, $n, $self'next_id, ($self'epoch, $self'bucket, $self'intros, $self'next_id)~$IntroShard$_fun_packPairs($start, $n));
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_2);
+    var $fresh$ret_1015 = $IntroScanPage$_constructor_from_id_count_next_id_pairs($start, $n, $self'next_id, ($self'epoch, $self'bucket, $self'intros, $self'next_id)~$IntroShard$_fun_packPairs($start, $n));
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_1015);
 }
 
 ((int, int, cell, int), (int, int, int, int, int)) $IntroShard$_fun_get_entry((int, int, cell, int) $self, int $entry_id) impure inline_ref {
     var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
     tuple $e = $IntroEntry$_load_opt(__tact_dict_get_int_cell($self'intros, 257, $entry_id));
     if (null?($e)) {
-        var $fresh$ret_3 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(false, 0, 0, 0, 0);
-        return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_3);
+        var $fresh$ret_1016 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(false, 0, 0, 0, 0);
+        return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_1016);
     }
     var ($v'r, $v'view_tag, $v'body_commit, $v'created_at) = $IntroEntry$_not_null($e);
-    var $fresh$ret_4 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(true, $v'r, $v'view_tag, $v'body_commit, $v'created_at);
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_4);
+    var $fresh$ret_1017 = $IntroEntryView$_constructor_exists_r_view_tag_body_commit_created_at(true, $v'r, $v'view_tag, $v'body_commit, $v'created_at);
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_1017);
 }
 
 ((int, int, cell, int), (int, int, int, int, int, int, int, int, int, slice)) $IntroShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
     var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
-    var $fresh$ret_5 = $IntroShardView$_constructor_epoch_bucket_next_id_retention_safe_cap_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'epoch, $self'bucket, $self'next_id, 604800, 8000, 15310000, 17810000, (((($self'epoch + 2) * 86400) + 604800) + 345600), 10000000, __gen_slice_address_d5c3503e45ebaa622eb24a99cd82f286d3042aaa65a54e47a6884db1859ecc06());
-    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_5);
+    var $fresh$ret_1018 = $IntroShardView$_constructor_epoch_bucket_next_id_retention_safe_cap_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'epoch, $self'bucket, $self'next_id, 604800, 8000, 15310000, 17810000, (((($self'epoch + 2) * 86400) + 604800) + 345600), 10000000, __gen_slice_address_d5c3503e45ebaa622eb24a99cd82f286d3042aaa65a54e47a6884db1859ecc06());
+    return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_1018);
 }
 
 ;;

@@ -242,6 +242,12 @@ function finalInput(): MainnetGenesisVerifyInput {
         burn_due_ath: '0',
         pending_treasury_flush_count: '0',
         pending_burn_flush_count: '0',
+        // The art and collection-metadata locks. SealGenesis refuses without them (19045 / 19046) precisely because
+        // the seal does NOT revoke the genesis controller: skip SealArt and a hot wallet keeps permanent write
+        // authority over the SVG every .ath NFT renders. The verifier now asserts both — the two upload scripts had
+        // claimed for months that it did, and it did not.
+        art_sealed: true,
+        meta_sealed: true,
       },
       username_registry_official_ath_wallet: {
         address: addresses.username_registry_official_ath_wallet,
@@ -960,6 +966,19 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('AIRDROP_POOL_DISTRIBUTED_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('AIRDROP_POOL_CLAIM_COUNT_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('AIRDROP_POOL_REMAINING_NOT_FULL_AT_GENESIS');
+  });
+
+  it('rejects final genesis when the username art or collection metadata was never locked', () => {
+    // Calibration, not decoration. Adding art_sealed/meta_sealed to the happy-path fixture would make the two new
+    // assertions pass without ever proving they can fail — which is exactly how this repo has shipped guards aimed
+    // at nothing three times. Each flag is knocked out on its own so neither can hide behind the other.
+    for (const flag of ['art_sealed', 'meta_sealed'] as const) {
+      const input = finalInput();
+      (input.snapshot.username_registry as any)[flag] = false;
+      const report = verifyMainnetGenesisSnapshot(input);
+      expect(report.mainnet_genesis_verified, `a genesis with ${flag} = false must NOT verify: the genesis `
+        + 'controller keeps permanent write authority over the collection until both locks are set').toBe(false);
+    }
   });
 
   it('rejects final genesis when registries or FeeAccumulator already hold records or due buckets', () => {

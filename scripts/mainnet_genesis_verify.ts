@@ -150,6 +150,8 @@ export interface MainnetGenesisVerifyInput {
       burn_due_ath: string;
       pending_treasury_flush_count: string;
       pending_burn_flush_count: string;
+      art_sealed: boolean;
+      meta_sealed: boolean;
     };
     username_registry_official_ath_wallet: BaseSnapshot & {
       owner_address: string;
@@ -884,6 +886,8 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         burn_due_ath: '0',
         pending_treasury_flush_count: '0',
         pending_burn_flush_count: '0',
+        art_sealed: true,
+        meta_sealed: true,
       },
       username_registry_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
@@ -1443,6 +1447,14 @@ export function verifyMainnetGenesisSnapshot(
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_MINTS_NOT_ZERO_AT_GENESIS', s.username_registry.pending_mint_count, 'username_registry.pending_mint_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.treasury_due_ath, 'username_registry.treasury_due_ath');
   addDecimalZero(issues, 'USERNAME_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.burn_due_ath, 'username_registry.burn_due_ath');
+  // [ADDED 2026-07-30, tier-4 HIGH] The headers of mainnet_upload_username_art.ts and mainnet_upload_collection_meta.ts
+  // both stated "Genesis verify asserts art_sealed == true" / "meta_sealed == true". It did not: get_art_sealed and
+  // get_meta_sealed were read ONLY by those two upload scripts. A skipped SealArt / SealCollectionMeta left the genesis
+  // controller — a hot wallet — permanent write authority over every .ath NFT's art and the collection metadata, and
+  // this verifier reported a clean genesis. SealGenesis now refuses without both locks (19045/19046), so these two are
+  // belt-and-braces against a snapshot taken from the wrong registry; they also make the scripts' claim true.
+  addTrue(issues, 'USERNAME_REGISTRY_ART_NOT_SEALED', s.username_registry.art_sealed, 'username_registry.art_sealed');
+  addTrue(issues, 'USERNAME_REGISTRY_COLLECTION_META_NOT_SEALED', s.username_registry.meta_sealed, 'username_registry.meta_sealed');
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_TREASURY_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_treasury_flush_count, 'username_registry.pending_treasury_flush_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_BURN_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_burn_flush_count, 'username_registry.pending_burn_flush_count');
 
