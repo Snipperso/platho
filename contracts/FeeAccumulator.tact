@@ -181,6 +181,20 @@ struct FeeAccumulatorStateView {
     buyback_due_last_increase_at: Int;
     failed_accrual_count: Int;
     last_failed_accrual_purchase_id: Int;
+    // [ADDED 2026-07-30, ceremony audit] The five ONE-SHOT genesis binds, made observable.
+    //
+    // Every other contract in the ceremony has a SEAL that refuses while a bind is missing — that is the checkpoint.
+    // This contract has no seal, the genesis verifier does not snapshot these, and until now the getter did not report
+    // them either, so nothing anywhere could tell whether all five landed. A missed bind is silent at ceremony time
+    // and permanent afterwards: 15051/15052/15053/15057/15059 each demand `== null`, so it cannot be re-bound, and
+    // this contract's address is baked into four immutable contracts, so it cannot be replaced. The failure surfaces
+    // later as gate 15055 refusing a lane's capsule fee, or 15060 refusing every TicketRedeem — with that lane's
+    // airdrop dead for good. APPENDED, never inserted: a positional decoder reads this struct by slot.
+    shard_code_bound: Bool;
+    intro_shard_code_bound: Bool;
+    public_shard_code_bound: Bool;
+    ticket_code_bound: Bool;
+    airdrop_pool_bound: Bool;
 }
 
 contract FeeAccumulator {
@@ -601,7 +615,12 @@ contract FeeAccumulator {
             storage_reserve_ton: self.storage_reserve_ton,
             buyback_due_last_increase_at: self.buyback_due_last_increase_at,
             failed_accrual_count: self.failed_accrual_count,
-            last_failed_accrual_purchase_id: self.last_failed_accrual_purchase_id
+            last_failed_accrual_purchase_id: self.last_failed_accrual_purchase_id,
+            shard_code_bound: self.shard_code != null,
+            intro_shard_code_bound: self.intro_shard_code != null,
+            public_shard_code_bound: self.public_shard_code != null,
+            ticket_code_bound: self.ticket_code != null,
+            airdrop_pool_bound: self.airdrop_pool_address != null
         };
     }
 

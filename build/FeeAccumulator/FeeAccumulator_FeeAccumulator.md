@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: FeeAccumulator
-BoC Size: 3239 bytes
+BoC Size: 3286 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 31
@@ -122,8 +122,8 @@ TL-B: `bind_public_shard_code#fa110005 public_shard_code:^cell = BindPublicShard
 Signature: `BindPublicShardCode{public_shard_code:^cell}`
 
 ### FeeAccumulatorStateView
-TL-B: `_ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 buyback_split_enabled:bool treasury_receiver_address:address buyback_burn_address:address storage_reserve_ton:int257 buyback_due_last_increase_at:int257 failed_accrual_count:int257 last_failed_accrual_purchase_id:int257 = FeeAccumulatorStateView`
-Signature: `FeeAccumulatorStateView{accumulated_ton:int257,treasury_due_ton:int257,buyback_due_ton:int257,buyback_split_enabled:bool,treasury_receiver_address:address,buyback_burn_address:address,storage_reserve_ton:int257,buyback_due_last_increase_at:int257,failed_accrual_count:int257,last_failed_accrual_purchase_id:int257}`
+TL-B: `_ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 buyback_split_enabled:bool treasury_receiver_address:address buyback_burn_address:address storage_reserve_ton:int257 buyback_due_last_increase_at:int257 failed_accrual_count:int257 last_failed_accrual_purchase_id:int257 shard_code_bound:bool intro_shard_code_bound:bool public_shard_code_bound:bool ticket_code_bound:bool airdrop_pool_bound:bool = FeeAccumulatorStateView`
+Signature: `FeeAccumulatorStateView{accumulated_ton:int257,treasury_due_ton:int257,buyback_due_ton:int257,buyback_split_enabled:bool,treasury_receiver_address:address,buyback_burn_address:address,storage_reserve_ton:int257,buyback_due_last_increase_at:int257,failed_accrual_count:int257,last_failed_accrual_purchase_id:int257,shard_code_bound:bool,intro_shard_code_bound:bool,public_shard_code_bound:bool,ticket_code_bound:bool,airdrop_pool_bound:bool}`
 
 ### FeeAccumulator$Data
 TL-B: `_ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 buyback_split_enabled:bool storage_reserve_ton:coins buyback_due_last_increase_at:uint64 failed_accrual_count:uint32 last_failed_accrual_purchase_id:uint64 shard_code:Maybe ^cell intro_shard_code:Maybe ^cell ticket_code:Maybe ^cell airdrop_pool_address:address public_shard_code:Maybe ^cell accrual_seq:uint64 = FeeAccumulator`
