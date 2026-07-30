@@ -15,6 +15,8 @@ PROGRAM{
   DECLPROC $PublicShard$_store
   DECLPROC $PublicShard$_load
   DECLPROC $Context$_get_value
+  DECLPROC $StdAddress$_get_address
+  DECLPROC $PublicEntry$_get_publisher
   DECLPROC $PublicEntry$_get_body_commit
   DECLPROC $PublicEntry$_get_created_at
   DECLPROC $PublicEntry$_not_null
@@ -37,6 +39,7 @@ PROGRAM{
   DECLPROC $PublicShard$_fun_senderHash
   DECLPROC $PublicShard$_fun_bodyCommit
   DECLPROC $PublicShard$_fun_claimedPartitionKey
+  DECLPROC $PublicShard$_fun_publisherTag
   DECLPROC $PublicShard$_fun_packRows
   DECLPROC $PublicPage$_constructor_from_id_count_entry_count_rows
   DECLPROC $PublicShard$_fun_get_page
@@ -165,6 +168,12 @@ PROGRAM{
     s1 s3 XCHG
     3 BLKDROP
   }>
+  $StdAddress$_get_address PROCINLINE:<{
+    NIP
+  }>
+  $PublicEntry$_get_publisher PROCINLINE:<{
+    2DROP
+  }>
   $PublicEntry$_get_body_commit PROCINLINE:<{
     DROP
     NIP
@@ -270,7 +279,7 @@ PROGRAM{
     3 EQINT
     IFJMP:<{
       DROP
-      21500000 PUSHINT
+      21800000 PUSHINT
     }>
     2 EQINT
     IFJMP:<{
@@ -402,6 +411,11 @@ PROGRAM{
     s3 s4 XCHG
     s1 s3 s0 XCHG3
   }>
+  $PublicShard$_fun_publisherTag PROCREF:<{
+        REWRITESTDADDR
+    $StdAddress$_get_address INLINECALLDICT
+    128 MODPOW2#
+  }>
   $PublicShard$_fun_packRows PROCREF:<{
         NEWC
         ENDC
@@ -411,7 +425,7 @@ PROGRAM{
       0 GTINT
     }>DO<{
       s2 PUSH
-      3 PUSHINT
+      2 PUSHINT
           MIN
       s4 s3 PUSH2
       ADD
@@ -444,15 +458,33 @@ PROGRAM{
         s2 PUSH
         ISNULL
         IF:<{
+          0 PUSHINT
+        }>ELSE<{
+          s2 PUSH
+          $PublicEntry$_not_null INLINECALLDICT
+          $PublicEntry$_get_created_at INLINECALLDICT
+        }>
+        SWAP
+        64 STU
+        s2 PUSH
+        ISNULL
+        IF:<{
           s2 POP
           0 PUSHINT
         }>ELSE<{
           s0 s2 XCHG
           $PublicEntry$_not_null INLINECALLDICT
-          $PublicEntry$_get_created_at INLINECALLDICT
+          $PublicEntry$_get_publisher INLINECALLDICT
+          s4 s12 XCHG
+          s3 s11 XCHG
+          s10 s9 s0 XCHG3
+          $PublicShard$_fun_publisherTag INLINECALLDICT
+          s4 s12 XCHG
+          s3 s11 XCHG
+          s10 s9 s0 XCHG3
         }>
         ROT
-        64 STU
+        128 STU
         SWAP
         INC
       }>

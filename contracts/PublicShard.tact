@@ -106,7 +106,11 @@ const PS_ENTRY_ENDOWMENT_AVATAR: Int = 2400000;
 // The ENTRY endowments already clear 1.5x (2.05x each) and are unchanged; only the BASE was short.
 const PS_BASE_ENDOWMENT_POST: Int = 4500000;      // 1.54x measured base rent
 const PS_BASE_ENDOWMENT_BEACON: Int = 14500000;   // 1.55x
-const PS_BASE_ENDOWMENT_AVATAR: Int = 21500000;   // 1.53x
+// [RAISED 2026-07-30, wave-8: 21.5M -> 21.8M] Second-order consequence of packing the publisher tag into a page row:
+// the extra code grew the account, so the AVATAR shard's ~6-year rent grew with it and PS-RENT-AVATAR measured the
+// margin at 1.4956x — under the project's 1.5x rule by 71,037 nanoton. Restored by measurement, not by rounding the
+// rule down. AVATAR is the longest-lived kind, which is why it is the one that crossed first.
+const PS_BASE_ENDOWMENT_AVATAR: Int = 21800000;   // 1.51x measured base rent
 
 const PS_PUBLISH_GAS: Int = 2500000;       // this receiver's own compute + the change-return; no ed25519 here
 
@@ -169,11 +173,25 @@ struct PublicEntryView {
 }
 
 // One getter call returns a whole page of authenticated rows, mirroring IntroShard.get_scan_page — so a feed
-// page is ONE runGetMethod per shard, not one per entry. Rows are (body_commit, created_at); the PUBLISHER is
-// NOT packed, because it is recovered from the `source` of the /messages entry whose body hashes to body_commit,
-// and forging a body to a stored commit is a sha256 preimage. ids are IMPLICIT: row i is entry (from_id + i),
-// sound because nothing removes an entry, so [0, entry_count) is contiguous.
-const PS_PAIRS_PER_CELL: Int = 3;      // (uint256 commit, uint64 created_at) = 320 bits; 3 x 320 = 960 <= 1023
+// page is ONE runGetMethod per shard, not one per entry. ids are IMPLICIT: row i is entry (from_id + i), sound
+// because nothing removes an entry, so [0, entry_count) is contiguous.
+//
+// [CHANGED 2026-07-30, wave-8 HIGH] Rows now carry a PUBLISHER TAG. They used to be (body_commit, created_at) only,
+// and the omission was justified like this: the publisher is recovered from the `source` of the /messages entry whose
+// body hashes to body_commit, and forging a body to a stored commit is a sha256 preimage. That answers the wrong
+// question. An attacker does not FORGE a body — they REPUBLISH someone else's byte for byte. Gate 13702 folds only the
+// bucket number for BEACON and only the public post_uid for THREAD; neither binds sender() at all, so the duplicate is
+// accepted and creates a SECOND entry with the SAME body_commit and publisher = attacker. The client then keys rows by
+// commit, collapses duplicates, and walks /messages NEWEST FIRST — so the attacker's copy is the one that matches, and
+// a channel is taken over in the catalogue for the price of one publish.
+//
+// The tag is the low 128 bits of the publisher's account hash. It is not an identifier, it is a CHECK: the client
+// already holds the candidate message's full source address, so it VERIFIES instead of inferring. 128 bits makes
+// finding a colliding address a 2^128 search; packing the whole 267-bit Address would put one row per cell instead of
+// two. The mirror lives in web/public-shard-ton-rpc-provider.mjs and is pinned by PS-TAG-01.
+const PS_ROW_BITS: Int = 448;          // uint256 commit + uint64 created_at + uint128 publisher_tag
+const PS_PAIRS_PER_CELL: Int = 2;      // 2 x 448 = 896 <= 1023
+const PS_PUBLISHER_TAG_MOD: Int = 340282366920938463463374607431768211456;   // 2^128
 const PS_PAGE_CAP: Int = 96;           // keep the get-method well under its gas ceiling
 
 struct PublicPage {
@@ -368,6 +386,11 @@ contract PublicShard {
 
     // Pack the (body_commit, created_at) rows of [start, start+n) into a ref-chained cell, built from the END
     // backwards so each cell can reference the one after it — verbatim shape from IntroShard.packPairs.
+    // The low 128 bits of the publisher's account hash — a checkable tag, not an identity.
+    fun publisherTag(publisher: Address): Int {
+        return parseStdAddress(publisher.asSlice()).address % PS_PUBLISHER_TAG_MOD;
+    }
+
     fun packRows(start: Int, n: Int): Cell {
         let cell: Cell = beginCell().endCell();
         let isTail: Bool = true;
@@ -379,7 +402,9 @@ contract PublicShard {
             let i: Int = 0;
             while (i < chunk) {
                 let e: PublicEntry? = self.entries.get(first + i);
-                b = b.storeUint(e == null ? 0 : e!!.body_commit, 256).storeUint(e == null ? 0 : e!!.created_at, 64);
+                b = b.storeUint(e == null ? 0 : e!!.body_commit, 256)
+                     .storeUint(e == null ? 0 : e!!.created_at, 64)
+                     .storeUint(e == null ? 0 : self.publisherTag(e!!.publisher), 128);
                 i = i + 1;
             }
             if (isTail) { cell = b.endCell(); isTail = false; }

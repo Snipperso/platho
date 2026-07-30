@@ -26,7 +26,7 @@
     },
     {
       "code": "MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT",
-      "message": "Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=d9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16 local_draft=cd1f9c6fd6c24644adc93b11b15e14850d54d6e428612e1278c3e0563e955c59 production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification."
+      "message": "Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=d9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16 local_draft=8cc691c982a32fd3df8e71784af8c8b1eaaf013debf072b34e8b9c1c2c40a4da production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification."
     }
   ],
   "checked_manifest_hash": "d9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16"

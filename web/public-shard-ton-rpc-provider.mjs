@@ -138,7 +138,22 @@ export function decodePublicShardView(result, decodeAddressSliceBoc) {
   };
 }
 
-/** get_page -> the authenticated rows. Walks the ref-chained (commit, created_at) cells, 3 per cell. */
+export const PUBLIC_ROW_BITS = 448;                    // mirrors PS_ROW_BITS in contracts/PublicShard.tact
+export const PUBLIC_PUBLISHER_TAG_MOD = 1n << 128n;    // mirrors PS_PUBLISHER_TAG_MOD
+
+/** The same low-128-bit tag the shard packs, computed from a full raw address ("0:hex64"). */
+export function publisherTagOf(rawAddress) {
+  const hex = String(rawAddress).split(':').pop();
+  return BigInt(`0x${hex}`) % PUBLIC_PUBLISHER_TAG_MOD;
+}
+
+/**
+ * get_page -> the authenticated rows. Walks the ref-chained (commit, created_at, publisher_tag) cells, 2 per cell.
+ *
+ * [CHANGED 2026-07-30, wave-8 HIGH] The row grew from 320 to 448 bits, so the packing went from 3 rows per cell to 2.
+ * This layout is MIRRORED in contracts/PublicShard.tact (PS_ROW_BITS / PS_PAIRS_PER_CELL) and the two must move
+ * together — a width mismatch here reads as an empty or garbled feed, not as an error.
+ */
 export function decodePublicPage(result) {
   const stack = extractStack(result);
   if (stack.length !== 4) {
@@ -153,15 +168,18 @@ export function decodePublicPage(result) {
   let reader = rowsCell ? cellReader(rowsCell) : null;
   for (let i = 0; i < count; i += 1) {
     if (!reader) break;
-    if (reader.remaining() < 320 && reader.refs() > 0) {
+    if (reader.remaining() < PUBLIC_ROW_BITS && reader.refs() > 0) {
       const next = reader.loadRef();
       if (!next) break;
       reader = cellReader(next);
     }
-    if (reader.remaining() < 320) break;
+    if (reader.remaining() < PUBLIC_ROW_BITS) break;
     const bodyCommit = reader.loadUint(256);
     const createdAt = reader.loadUint(64);
-    rows.push({ entry_id: fromId + BigInt(i), body_commit: bodyCommit, created_at: createdAt });
+    const publisherTag = reader.loadUint(128);
+    rows.push({
+      entry_id: fromId + BigInt(i), body_commit: bodyCommit, created_at: createdAt, publisher_tag: publisherTag,
+    });
   }
   return { from_id: fromId, count: BigInt(count), entry_count: entryCount, rows };
 }
@@ -275,7 +293,19 @@ export function createPublicShardTonRpcProvider(options = {}) {
       // The bodies are read ONCE and reused across pages: /messages is the expensive call, get_page is cheap.
       const messages = await readMessagesWithSource(raw);
       const matchRows = async (rows) => {
-        const commitToRow = new Map(rows.map((r) => [r.body_commit.toString(), r]));
+        // [CHANGED 2026-07-30, wave-8 HIGH] On a duplicate body_commit the OLDEST entry wins, not the newest.
+        //
+        // The publisher tag alone is not enough here, and that is worth spelling out: the shard genuinely accepts both
+        // publications, so BOTH rows are valid and each matches its own publisher. Keying by commit collapses them, and
+        // `new Map(rows.map(...))` kept the LAST — the squatter's. Lowest entry_id is the original by construction:
+        // entries are append-only, ids are contiguous, and nothing removes one, so the first id holding a commit is the
+        // publication that came first. The tag then binds the surviving row to the message that actually produced it.
+        const commitToRow = new Map();
+        for (const r of rows) {
+          const key = r.body_commit.toString();
+          const prev = commitToRow.get(key);
+          if (!prev || r.entry_id < prev.entry_id) commitToRow.set(key, r);
+        }
         const out = [];
         const claimed = new Set();
         for (const message of messages) {
@@ -284,11 +314,23 @@ export function createPublicShardTonRpcProvider(options = {}) {
           const commit = (await publicBodyCommit(parsed.header, parsed.body)).toString();
           const row = commitToRow.get(commit);
           if (!row || claimed.has(commit)) continue;      // not an accepted entry, or a duplicate already matched
+          // [ADDED 2026-07-30, wave-8 HIGH] VERIFY the publisher against the shard's own record instead of inferring it
+          // from whichever message happened to match first.
+          //
+          // Nothing binds sender() when an entry is appended to a BEACON or THREAD view, so anyone may republish
+          // someone else's cells byte for byte and create a SECOND entry with the SAME body_commit. Duplicates collapse
+          // in commitToRow, and `messages` arrives NEWEST FIRST — so the attacker's copy was always the one that
+          // matched, and their address became the channel's in the catalogue for the price of one publish. The shard
+          // stores the authoritative publisher; the row now carries a checkable tag of it, so a message whose source
+          // does not match the entry simply is not that entry.
+          if (!message.source) continue;
+          const source = parseTonAddress(message.source).raw;
+          if (publisherTagOf(source) !== row.publisher_tag) continue;
           claimed.add(commit);
           out.push({
             entry_id: row.entry_id,
             created_at: row.created_at,
-            publisher: message.source ? parseTonAddress(message.source).raw : null,
+            publisher: source,
             header: parsed.header,
             body: parsed.body,
           });
