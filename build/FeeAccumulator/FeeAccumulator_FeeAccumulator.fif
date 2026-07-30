@@ -1255,6 +1255,39 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      5000000 PUSHINT
+      SUB
+      DUP
+      0 GTINT
+      IF:<{
+        __tact_context_get_sender INLINECALLDICT
+        SWAP
+        FALSE
+        3 PUSHINT
+        PUSHNULL
+        $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+            STZEROES
+            // → Stack state
+            // s0: Builder
+            // s1: `body`
+            // s2: `mode`
+            STDICT
+            ENDC
+            SWAP
+            SENDRAWMSG
+      }>ELSE<{
+        DROP
+      }>
       s13 s15 XCHG
       2 13 BLKSWAP
       $FeeAccumulator$_contract_store INLINECALLDICT
@@ -1318,6 +1351,41 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      5000000 PUSHINT
+      SUB
+      2000000 PUSHINT
+      SUB
+      DUP
+      0 GTINT
+      IF:<{
+        __tact_context_get_sender INLINECALLDICT
+        SWAP
+        FALSE
+        3 PUSHINT
+        PUSHNULL
+        $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+            STZEROES
+            // → Stack state
+            // s0: Builder
+            // s1: `body`
+            // s2: `mode`
+            STDICT
+            ENDC
+            SWAP
+            SENDRAWMSG
+      }>ELSE<{
+        DROP
+      }>
       s13 s15 XCHG
       2 13 BLKSWAP
       $FeeAccumulator$_contract_store INLINECALLDICT
