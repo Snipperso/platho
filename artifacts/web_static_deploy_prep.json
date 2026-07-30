@@ -1,10 +1,10 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-30T18:15:33.678Z",
-  "mode": "production",
+  "generatedAt": "2026-07-30T21:07:06.436Z",
+  "mode": "preview",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "BLOCKED_BY_PREPROD",
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
+  "status": "PREVIEW_STATIC_PACKAGE_READY",
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
@@ -1365,10 +1365,11 @@
     "serverRuntimeIncluded": false,
     "productionMarkersCleared": false
   },
-  "blockers": [
+  "blockers": [],
+  "warnings": [
+    "STATIC_PACKAGE_IS_NON_PRODUCTION",
     "MAINNET_GENESIS_NOT_VERIFIED"
   ],
-  "warnings": [],
   "productionFindings": [
     {
       "id": "MAINNET_GENESIS_NOT_VERIFIED",
