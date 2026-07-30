@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Blockchain } from '@ton/sandbox';
-import { deployFeeSink } from './helpers/fee-sink-fixture';
+import { FA_BUYBACK, deployFeeSink } from './helpers/fee-sink-fixture';
 import { toNano, beginCell, contractAddress, Address, internal, SendMode } from '@ton/core';
 import { WalletContractV5R1 } from '@ton/ton';
 import { mnemonicToPrivateKey } from '@ton/crypto';
@@ -33,7 +33,6 @@ const RS_DEPLOY_MIN_VALUE = 19_100_000n;
 const IS_DEPLOY_MIN_VALUE = 17_810_000n;
 
 const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZAP04V5oOATH');
-const FA_BUYBACK = Address.parse('UQAGgJ-yDmmPgSdFmuNDLYeQmPAdx2sZaq3wKtT7TS5DlFml');
 
 // The sink must be BOUND, not merely deployed: gate 15055 refuses a capsule fee from a shard it cannot
 // re-derive, a publish whose fee is refused stores no record, and a shard with no records cannot pay its

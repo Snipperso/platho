@@ -5,8 +5,8 @@ import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumu
 import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicket';
 import { AirdropPool } from '../build/AirdropPool/AirdropPool_AirdropPool';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
+import { FEE_SINK } from './helpers/fee-sink-fixture';
 
-const FEE_SINK = Address.parse('EQBekf1HwT0rQzEenYOaCNsNG-POIWZCbt9NScyMsawU0jr7');
 const NOW = 1_790_000_000;
 const YEAR = 31_536_000;
 const ENVELOPE = 51_050_000_000n; // BUYBACK_FUNDING_ENVELOPE_NANOTONS

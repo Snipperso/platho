@@ -5,6 +5,7 @@ import { findTransaction } from '@ton/test-utils';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { AirdropTicket } from '../build/AirdropTicket/AirdropTicket_AirdropTicket';
 import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
+import { FEE_SINK } from './helpers/fee-sink-fixture';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // FEE ACCUMULATOR ACCRUAL — the hub that turns a published capsule into an airdrop credit.
@@ -20,7 +21,6 @@ import { RecordShard } from '../build/RecordShard/RecordShard_RecordShard';
 
 // The address AirdropTicket names in AT_FEE_SINK and RecordShard in RS_FEE_SINK. In production FeeAccumulator
 // genuinely occupies it; here it is placed there directly, which is what makes the ticket's own gate meaningful.
-const FEE_SINK = Address.parse('EQBekf1HwT0rQzEenYOaCNsNG-POIWZCbt9NScyMsawU0jr7');
 const RS_PROTOCOL_FEE = 10_000_000n;
 const OP_TICKET_CREDIT = 0x41544331;
 

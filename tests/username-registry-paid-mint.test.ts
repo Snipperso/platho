@@ -28,6 +28,9 @@ const OP_ATH_TRANSFER_NOTIFICATION_REFUND = 0x4154481E;
 // The 100M was the per-name record's rent; name_records is gone, so since 2026-07-20 it funds the REGISTRY'S
 // OWN storage instead. The number is deliberately unchanged — mint price is pinned client-side at exactly 1 TON,
 // so lowering it would return nothing to the buyer, only stop accounting for where the money goes.
+// USERNAME_ITEM_ACK_FORWARD_RESERVE + USERNAME_ITEM_ACK_EXEC_RESERVE — gate 18015/18021. The exec reserve was raised
+// 1M -> 2M in wave-8: the old 4,000,000 threshold was 56,602 short of the MEASURED cost of the handler it funds.
+const ITEM_ACK_RESEND_VALUE = 5_000_000n;
 const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 829_000_000n + 1_000_000n + 4_000_000n + 100_000_000n;
 const USERNAME_ITEM_STORAGE_FLOOR = 15_900_000n;
 
@@ -279,7 +282,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const beforeRec = await readItemRecord(blockchain, registry.address, hash);
     const beforeGlobal = await registry.getGetGlobal();
 
-    await item.send(caller.getSender(), { value: 4_000_000n }, {
+    await item.send(caller.getSender(), { value: ITEM_ACK_RESEND_VALUE }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
 
@@ -308,7 +311,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
     const beforeGlobal = await registry.getGetGlobal();
     const beforeRec = await readItemRecord(blockchain, registry.address, hash);
-    const result = await item.send(caller.getSender(), { value: 4_000_000n }, {
+    const result = await item.send(caller.getSender(), { value: ITEM_ACK_RESEND_VALUE }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
 
@@ -446,7 +449,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     } as NftTransfer);
 
     const beforeGlobal = await registry.getGetGlobal();
-    const resend = await item.send(caller.getSender(), { value: 4_000_000n }, {
+    const resend = await item.send(caller.getSender(), { value: ITEM_ACK_RESEND_VALUE }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
     const afterGlobal = await registry.getGetGlobal();
@@ -506,7 +509,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect((await registry.getGetPendingMint(hash)).exists, 'the duplicate is pending, awaiting its bounce').toBe(true);
 
     const before = await registry.getGetGlobal();
-    const resend = await item.send(attacker.getSender(), { value: 4_000_000n }, {
+    const resend = await item.send(attacker.getSender(), { value: ITEM_ACK_RESEND_VALUE }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
     const after = await registry.getGetGlobal();
