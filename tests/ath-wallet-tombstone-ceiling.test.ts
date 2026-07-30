@@ -134,4 +134,70 @@ describe('ATHWALLET GROWTH — the official wallet must not grow per purchase', 
     expect(marginal, 'a settled sale must leave NO permanent residue on the official wallet').toBe(0);
     expect(cellsAfter[SALES - 1], 'the wallet is the same size as after the first sale').toBe(cellsAfter[0]);
   }, 600_000);
+
+  it('ATHTOMB-03: MEASURED — an UNSETTLED escrow backlog, and whether it can lock the owner out of their own ATH', async () => {
+    // TIER-1 QUESTION. ATHTOMB-02 above measures SETTLED purchases, where each entry clears and the wallet returns to
+    // its original size. It says nothing about the opposite case, and neither map in this contract has a cap: no
+    // counter, no MAX_PENDING. So an outsider may hold entries OPEN — every notify-transfer credits the recipient and
+    // stores a pending_notifications entry, and only the owner's ack or a post-TTL prune removes it.
+    //
+    // Why it belongs in tier 1: this wallet's code IS the jetton wallet, so it can never be redeployed, and at the
+    // ~65536-cell account ceiling a write fails in ACTION with code 50 — compute exits 0 and the wallet reports
+    // success. If a full escrow map could also block the owner's OWN outgoing transfer (which must add an entry to
+    // the other map), an outsider could freeze somebody else's balance. That is the thing to measure, not to argue.
+    const bc = await Blockchain.create();
+    const master = fixtureAddress('ATHTOMB3_MASTER');
+    const victimOwner = await bc.treasury('athtomb3-victim');
+    const victim = await deployWallet(bc, victimOwner.address, master, 1_000_000n);
+    const victimAddress = victim.address;
+    const cellsOf = async () => {
+      const state: any = (await bc.getContract(victimAddress)).account?.account?.storage?.state;
+      return countCells(state.state.data);
+    };
+
+    const base = await cellsOf();
+    const N = 40;
+    for (let i = 0; i < N; i += 1) {
+      bc.now = 1_790_000_000 + i * 91;                      // distinct entries; identical cells would deduplicate
+      const attackerOwner = await bc.treasury(`athtomb3-att-${i}`);
+      const attacker = await deployWallet(bc, attackerOwner.address, master, 10n);
+      await attacker.send(attackerOwner.getSender(), { value: toNano('0.3') }, {
+        $$type: 'ATHTransferRequestWithNotify',
+        query_id: BigInt(7000 + i),
+        amount: 1n,                                          // one atomic unit is enough to open an entry
+        recipient: victimOwner.address,
+        response_destination: attackerOwner.address,
+        notify_destination: victimOwner.address,
+        notify_value: toNano('0.05'),
+      } as ATHTransferRequestWithNotify);
+      // deliberately NOT acked
+    }
+
+    const loaded = await cellsOf();
+    const perEntry = (loaded - base) / N;
+    const ceilingEntries = Math.floor((65536 - loaded) / Math.max(perEntry, 0.01)) + N;
+    process.stderr.write(`[ATHTOMB-03] base=${base} after ${N} unsettled=${loaded} per-entry=${perEntry.toFixed(2)} cells`
+      + `  => ~${ceilingEntries} entries to the ~65536-cell ceiling
+`);
+
+    // 1. The backlog DOES grow the account — the entries are real state, held by a stranger's choice.
+    expect(loaded, 'an unsettled escrow grows the wallet').toBeGreaterThan(base);
+
+    // 2. THE PROPERTY THAT MATTERS: the owner can still spend their own ATH with the backlog in place. If this ever
+    //    goes red, an outsider can freeze another wallet's balance, and on a never-redeployable contract that is
+    //    unrecoverable rather than inconvenient.
+    const before = (await victim.getGetWalletData()).balance;
+    const dest = await bc.treasury('athtomb3-dest');
+    const res = await victim.send(victimOwner.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ATHTransferRequest',
+      query_id: 424242n,
+      amount: 500n,
+      recipient: dest.address,
+      response_destination: victimOwner.address,
+    } as any);
+    const tx: any = res.transactions.find((t: any) => t.inMessage?.info?.dest?.equals?.(victimAddress));
+    expect(tx?.description?.computePhase?.exitCode, 'the owner-initiated spend is admitted').toBe(0);
+    expect(tx?.description?.aborted, 'and it does not abort in ACTION behind a green exit code').toBe(false);
+    expect((await victim.getGetWalletData()).balance, 'the ATH really left').toBe(before - 500n);
+  }, 300_000);
 });
