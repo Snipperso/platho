@@ -3,6 +3,16 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { PLATHO_APP_CONFIG, validatePlathoAppConfig } from '../web/platho-config.mjs';
 import {
+  CURRENT_CODE_HASH_TO_MANIFEST_KEY,
+  PRODUCTION_ONLY_CODE_HASH_KEYS,
+  PRODUCTION_CODE_HASH_KEYS,
+  CONTRACT_TO_CURRENT_CODE_HASH_KEY,
+  DEPLOY_ACTION_TO_CONTRACT,
+  POST_POOL_COMMANDS,
+  TEST_DEPLOY_TARGET_RE,
+} from './release-gate-contract-map.mjs';
+
+import {
   PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
   PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
   PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
@@ -41,69 +51,6 @@ const envChecks = [
 ];
 
 const failures = validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => ({ ...finding }));
-// [WIDENED 2026-07-31] This map had nine entries while the final manifest carries FOURTEEN code hashes, and the
-// production hash file sixteen. The five it did not know about — record_shard, intro_shard, public_shard,
-// airdrop_pool, airdrop_ticket — carry every user message and the entire 15M ATH airdrop, and the LAST production
-// gate never compared a single one of them against the manifest. It simultaneously BLOCKED on them, reporting them
-// as "extra" keys, so the gate was both blind and unpassable: the same shape as the vault/capsulehub entries it
-// used to carry, one layer up.
-const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
-  ATHMASTER_CODE_HASH: 'ath_master',
-  ATHVESTING_CODE_HASH: 'ath_vesting',
-  ATH_WALLET_CODE_HASH: 'ath_wallet',
-  BUYBACKBURN_CODE_HASH: 'buyback_burn',
-  MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
-  FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
-  PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
-  USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
-  USERNAME_REGISTRY_CODE_HASH: 'username_registry',
-  RECORD_SHARD_CODE_HASH: 'record_shard',
-  INTRO_SHARD_CODE_HASH: 'intro_shard',
-  PUBLIC_SHARD_CODE_HASH: 'public_shard',
-  AIRDROP_POOL_CODE_HASH: 'airdrop_pool',
-  AIRDROP_TICKET_CODE_HASH: 'airdrop_ticket',
-};
-
-// Deployed contracts the manifest deliberately does NOT carry a code hash for, because the ceremony neither deploys
-// nor binds them: KeyShard and RecoveryShard are created lazily by clients at addresses derived from their own code.
-// They still belong to the production hash set — leaving them out is what made the keyset check reject the file —
-// but they have no manifest counterpart to compare against, so they are listed separately rather than silently
-// dropped. tests/shard-code-hash-freeze.test.ts is what actually pins them; see the note there for why they need it
-// more than the others, not less.
-const PRODUCTION_ONLY_CODE_HASH_KEYS = Object.freeze(['KEY_SHARD_CODE_HASH', 'RECOVERY_SHARD_CODE_HASH']);
-
-const PRODUCTION_CODE_HASH_KEYS = Object.freeze(
-  [...Object.keys(CURRENT_CODE_HASH_TO_MANIFEST_KEY), ...PRODUCTION_ONLY_CODE_HASH_KEYS].sort(),
-);
-const TEST_DEPLOY_TARGET_RE = /(?:Mock|Harness|M20T)/i;
-const POST_POOL_COMMANDS = Object.freeze([
-  'npm.cmd run m20f:collect',
-  'npm.cmd run m20f:preflight',
-  'npm.cmd run market-stability:readiness',
-  'npm.cmd run buyback:enable-preflight',
-]);
-
-const CONTRACT_TO_CURRENT_CODE_HASH_KEY = {
-  ATHMaster: 'ATHMASTER_CODE_HASH',
-  ATHVesting: 'ATHVESTING_CODE_HASH',
-  BuybackBurn: 'BUYBACKBURN_CODE_HASH',
-  MarketStabilitySeller: 'MARKET_STABILITY_SELLER_CODE_HASH',
-  FeeAccumulator: 'FEEACCUMULATOR_CODE_HASH',
-  ProfileRegistry: 'PROFILE_REGISTRY_CODE_HASH',
-  UsernameNFTItem: 'USERNAME_NFT_ITEM_CODE_HASH',
-  UsernameRegistry: 'USERNAME_REGISTRY_CODE_HASH',
-};
-
-const DEPLOY_ACTION_TO_CONTRACT = {
-  'Deploy ATHMaster': 'ATHMaster',
-  'Deploy ATHVesting': 'ATHVesting',
-  'Deploy BuybackBurn': 'BuybackBurn',
-  'Deploy MarketStabilitySeller': 'MarketStabilitySeller',
-  'Deploy FeeAccumulator': 'FeeAccumulator',
-  'Deploy ProfileRegistry': 'ProfileRegistry',
-  'Deploy UsernameRegistry': 'UsernameRegistry',
-};
-
 function readTextIfExists(file) {
   const path = join(ROOT, file);
   return existsSync(path) ? readFileSync(path, 'utf8') : null;
@@ -430,7 +377,17 @@ function validateLocalMainnetDeployArtifacts() {
   if (deployPacket) {
     for (const step of deployPacket.phase_1_deploy_contracts ?? []) {
       const contract = DEPLOY_ACTION_TO_CONTRACT[step.action];
-      if (!contract) continue;
+      if (!contract) {
+        // [FIXED 2026-07-31] This was a bare `continue`. Any deploy step whose action string was absent from the map
+        // had its code hash compared against NOTHING, and said so to no one — and one was absent: D07 'Deploy
+        // AirdropPool', the contract holding the entire 15M ATH airdrop. A step that carries a code_hash and is not
+        // recognised is now a failure, so the next contract added to the ceremony cannot be skipped in silence.
+        if (step.code_hash) {
+          deployMismatches.push(`${step.id} ${step.action}: carries a code hash but no entry in `
+            + 'DEPLOY_ACTION_TO_CONTRACT, so it was never checked — add it to scripts/release-gate-contract-map.mjs');
+        }
+        continue;
+      }
       const currentKey = CONTRACT_TO_CURRENT_CODE_HASH_KEY[contract];
       const currentHash = normalizeHash(currentCodeHashes[currentKey]);
       const packetHash = normalizeHash(step.code_hash);

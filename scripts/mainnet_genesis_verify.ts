@@ -1569,6 +1569,31 @@ export function verifyMainnetGenesisSnapshot(
     if (isPlaceholder(value)) issues.push(issue(`MISSING_EVIDENCE_REF_${key.toUpperCase()}`, `${key} must point to immutable release evidence.`));
   }
 
+  // [ADDED 2026-07-31] The whole verification is "does the CHAIN agree with the manifest?", and every section of the
+  // snapshot is typed by a human into JSON — there is no collector that reads mainnet and produces this file. So the
+  // one thing that says the snapshot came from the chain at all is getterSnapshotSource, and until now it was free
+  // text: recorded in the report, never inspected. An operator who filled the snapshot FROM the manifest — the
+  // natural mistake when a check keeps failing and the manifest is the document that looks authoritative — would
+  // get MAINNET_GENESIS_VERIFIED = true out of a comparison of the manifest against itself.
+  //
+  // This cannot prove the snapshot is genuine; nothing short of hash-linked raw RPC responses could. It refuses the
+  // ONE self-referential case that is both plausible and fatal, and it names the other evidence refs by value rather
+  // than by a hardcoded filename so a renamed artefact cannot slip past.
+  const snapshotSource = String(input.evidenceRefs?.getterSnapshotSource ?? '').trim().toLowerCase();
+  if (snapshotSource && !isPlaceholder(input.evidenceRefs?.getterSnapshotSource)) {
+    const selfReferential = [input.evidenceRefs?.finalManifestSource, input.evidenceRefs?.codeHashProofSource]
+      .filter((v): v is string => typeof v === 'string' && !isPlaceholder(v))
+      .map((v) => v.split('#')[0].trim().toLowerCase())
+      .filter((v) => v.length > 0)
+      .some((other) => snapshotSource.includes(other));
+    if (selfReferential || /final_manifest|current_code_hashes|deploy_packet|dry_run/.test(snapshotSource)) {
+      issues.push(issue('GETTER_SNAPSHOT_SOURCE_IS_NOT_A_CHAIN_READ',
+        'evidenceRefs.getterSnapshotSource names the manifest or another release artefact, so the snapshot was not '
+        + 'read from the chain and this verification would compare the manifest against itself. It must reference '
+        + 'the live RPC read the getter values came from.'));
+    }
+  }
+
   return {
     document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT',
     status: issues.length === 0 ? 'MAINNET_GENESIS_VERIFIED' : 'BLOCKED_GENESIS_MISMATCH',

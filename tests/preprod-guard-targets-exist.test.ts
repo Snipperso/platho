@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
+import {
+  CONTRACT_TO_CURRENT_CODE_HASH_KEY,
+  CURRENT_CODE_HASH_TO_MANIFEST_KEY,
+  DEPLOY_ACTION_TO_CONTRACT,
+} from '../scripts/release-gate-contract-map.mjs';
 
 // THE LAST PRODUCTION GATE, and it was aimed at two contracts that no longer exist.
 //
@@ -53,14 +58,69 @@ describe('preprod guard targets exist', () => {
     const manifestKeys = Object.keys(JSON.parse(readFileSync(draftPath, 'utf8')).manifest?.code_hashes ?? {});
     expect(manifestKeys.length, 'the manifest must carry the deployed code hashes').toBeGreaterThan(10);
 
-    const compared = new Set(
-      [...GUARD.matchAll(/^\s*(\w+_CODE_HASH):\s*'(\w+)',$/gm)].map((m) => m[2]),
-    );
-    expect(compared.size, 'the sweep must find the guard manifest map').toBeGreaterThan(8);
+    // The map now lives in the single source both the gate and release-truth import; scanning the gate itself
+    // would find nothing and pass vacuously — which is the failure this whole file exists to catch.
+    const compared = new Set(Object.values(CURRENT_CODE_HASH_TO_MANIFEST_KEY as Record<string, string>));
+    expect(compared.size, 'the shared map must carry the manifest keys').toBeGreaterThan(8);
 
     const untargeted = manifestKeys.filter((k) => !compared.has(k));
     expect(untargeted, 'the final production gate never compares these manifest code hashes against anything, so a '
       + `drifted contract would ship unnoticed:\n${untargeted.join('\n')}`).toEqual([]);
+  });
+
+  it('PREPROD-HASH-04: every deploy step that carries a code hash is one the gate recognises', () => {
+    // The gate's deploy loop skipped unrecognised actions with a bare `continue`, and one WAS unrecognised:
+    // D07 'Deploy AirdropPool' — the contract holding the entire 15M ATH airdrop — had its packet code hash
+    // compared against nothing, silently, on the last check before a production deploy. Both the gate's map and
+    // this test file's copy of it were missing the entry, so nothing anywhere noticed.
+    //
+    // Derived from the PACKET, so the next contract added to the ceremony fails here rather than being skipped.
+    const packetPath = 'artifacts/local/mainnet_deploy_packet.json';
+    if (!existsSync(packetPath)) {
+      // eslint-disable-next-line no-console
+      console.warn(`[PREPROD-HASH-04] ${packetPath} absent — run npm run mainnet:deploy:packet`);
+      return;
+    }
+    const steps: any[] = JSON.parse(readFileSync(packetPath, 'utf8')).phase_1_deploy_contracts ?? [];
+    const withHash = steps.filter((s) => s?.code_hash);
+    expect(withHash.length, 'the packet must carry deploy steps with code hashes').toBeGreaterThan(6);
+
+    const unmapped = withHash
+      .filter((s) => !(s.action in (DEPLOY_ACTION_TO_CONTRACT as Record<string, string>)))
+      .map((s) => `${s.id} ${s.action}`);
+    expect(unmapped, 'these deploy steps carry a code hash the production gate never compares:\n'
+      + unmapped.join('\n')).toEqual([]);
+
+    // And each mapped contract must reach a real hash key, or the comparison silently reads undefined.
+    const unreachable = withHash
+      .map((s) => (DEPLOY_ACTION_TO_CONTRACT as Record<string, string>)[s.action])
+      .filter((c) => c && !hashKeys().has((CONTRACT_TO_CURRENT_CODE_HASH_KEY as Record<string, string>)[c]));
+    expect(unreachable, `these contracts map to a hash key CURRENT_CODE_HASHES.txt does not carry:\n${unreachable.join('\n')}`)
+      .toEqual([]);
+  });
+
+  it('PREPROD-HASH-05: the gate and this suite read ONE copy of the contract maps, not two', () => {
+    // What actually caused the blind spot: scripts/preprod_guard.mjs and tests/release-truth-single-source.test.ts
+    // each declared the same six constants. The test's manifest map listed fourteen contracts, the gate's listed
+    // nine, and the suite was green throughout because each side checked its own copy. Re-introducing a local
+    // declaration in either file re-opens exactly that, so it fails here.
+    const sources: Array<[string, string]> = [
+      ['scripts/preprod_guard.mjs', GUARD],
+      ['tests/release-truth-single-source.test.ts', readFileSync('tests/release-truth-single-source.test.ts', 'utf8')],
+    ];
+    const shared = ['CURRENT_CODE_HASH_TO_MANIFEST_KEY', 'PRODUCTION_ONLY_CODE_HASH_KEYS',
+      'CONTRACT_TO_CURRENT_CODE_HASH_KEY', 'DEPLOY_ACTION_TO_CONTRACT', 'POST_POOL_COMMANDS',
+      'TEST_DEPLOY_TARGET_RE'];
+
+    const redeclared: string[] = [];
+    for (const [file, text] of sources) {
+      for (const name of shared) {
+        if (new RegExp(`^\\s*const ${name}\\b`, 'm').test(text)) redeclared.push(`${file}: ${name}`);
+      }
+      if (!/release-gate-contract-map\.mjs/.test(text)) redeclared.push(`${file}: does not import the shared map`);
+    }
+    expect(redeclared, `these re-declare a constant that must have exactly one source:\n${redeclared.join('\n')}`)
+      .toEqual([]);
   });
 
   it('PREPROD-HASH-02: no removed contract is still named anywhere in the guard', () => {

@@ -1,63 +1,18 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import {
+  CURRENT_CODE_HASH_TO_MANIFEST_KEY,
+  PRODUCTION_ONLY_CODE_HASH_KEYS,
+  CONTRACT_TO_CURRENT_CODE_HASH_KEY,
+  DEPLOY_ACTION_TO_CONTRACT,
+  POST_POOL_COMMANDS,
+  TEST_DEPLOY_TARGET_RE,
+} from '../scripts/release-gate-contract-map.mjs';
 
-// Every code hash the genesis MANIFEST carries. The clean-15 nine plus the clean-17 five: AirdropPool is deployed
-// at genesis, and the four lazily-deployed ones are here because the CEREMONY BINDS THEM ON CHAIN
-// (FeeAccumulator.BindShardCode / BindIntroShardCode / BindPublicShardCode / BindTicketCode). A bound code hash is
-// a ceremony input — get it wrong and the fee passthrough authenticates the wrong contract for ever.
-const CURRENT_CODE_HASH_TO_MANIFEST_KEY: Record<string, string> = {
-  ATHMASTER_CODE_HASH: 'ath_master',
-  ATHVESTING_CODE_HASH: 'ath_vesting',
-  ATH_WALLET_CODE_HASH: 'ath_wallet',
-  BUYBACKBURN_CODE_HASH: 'buyback_burn',
-  MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
-  FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
-  PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
-  USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
-  USERNAME_REGISTRY_CODE_HASH: 'username_registry',
-  AIRDROP_POOL_CODE_HASH: 'airdrop_pool',
-  RECORD_SHARD_CODE_HASH: 'record_shard',
-  INTRO_SHARD_CODE_HASH: 'intro_shard',
-  PUBLIC_SHARD_CODE_HASH: 'public_shard',
-  AIRDROP_TICKET_CODE_HASH: 'airdrop_ticket',
-};
+// These six used to be declared HERE as well as in scripts/preprod_guard.mjs — the very gate this file checks.
+// They drifted: this copy carried all fourteen manifest code hashes, the gate's carried nine, and the suite stayed
+// green because each side read its own. A test and its subject agreeing about different things is not agreement.
 
-// Production-critical, but with NO manifest counterpart — and that absence is correct, not an omission. The
-// ceremony binds a shard's code hash only where the fee passthrough has to authenticate the depositor; RecoveryShard
-// takes no protocol fee and KeyShard is paid registration, so neither is ever sent on chain at genesis. They still
-// belong in the production hash file: every recovery slot address derives from one and every wallet's identity
-// address from the other, so a silent change to either moves addresses the network has already published.
-const PRODUCTION_ONLY_CODE_HASH_KEYS = ['RECOVERY_SHARD_CODE_HASH', 'KEY_SHARD_CODE_HASH'];
-
-const CONTRACT_TO_CURRENT_CODE_HASH_KEY: Record<string, string> = {
-  ATHMaster: 'ATHMASTER_CODE_HASH',
-  ATHVesting: 'ATHVESTING_CODE_HASH',
-  BuybackBurn: 'BUYBACKBURN_CODE_HASH',
-  MarketStabilitySeller: 'MARKET_STABILITY_SELLER_CODE_HASH',
-  FeeAccumulator: 'FEEACCUMULATOR_CODE_HASH',
-  ProfileRegistry: 'PROFILE_REGISTRY_CODE_HASH',
-  UsernameNFTItem: 'USERNAME_NFT_ITEM_CODE_HASH',
-  UsernameRegistry: 'USERNAME_REGISTRY_CODE_HASH',
-};
-
-const DEPLOY_ACTION_TO_CONTRACT: Record<string, string> = {
-  'Deploy ATHMaster': 'ATHMaster',
-  'Deploy ATHVesting': 'ATHVesting',
-  'Deploy BuybackBurn': 'BuybackBurn',
-  'Deploy MarketStabilitySeller': 'MarketStabilitySeller',
-  'Deploy FeeAccumulator': 'FeeAccumulator',
-  'Deploy ProfileRegistry': 'ProfileRegistry',
-  'Deploy UsernameRegistry': 'UsernameRegistry',
-};
-
-const POST_POOL_COMMANDS = [
-  'npm.cmd run m20f:collect',
-  'npm.cmd run m20f:preflight',
-  'npm.cmd run market-stability:readiness',
-  'npm.cmd run buyback:enable-preflight',
-];
-
-const TEST_DEPLOY_TARGET_RE = /(?:Mock|Harness|M20T)/i;
 
 function readText(path: string): string {
   return readFileSync(path, 'utf8');
@@ -189,6 +144,27 @@ describe('release truth single-source guard', () => {
     expect(summary.passed_tests).toBe(summary.total_tests);
     expect(summary.failed_tests).toBe(0);
     expect(summary.total_tests).toBeGreaterThan(0);
+
+    // [ADDED 2026-07-31] Everything above this line about TEST counts checks the file against itself:
+    // `passed_tests === total_tests` holds for any pair of equal numbers, including two wrong ones. Measured today:
+    // the summary claimed 1482 tests while the suite ran 1485, and this guard was green the whole time. Only
+    // discovered_test_files was ever verified externally, because tests/ can be listed.
+    //
+    // The numbers are now written by scripts/write_full_test_summary.mjs from a real `--reporter=json` run rather
+    // than typed, so requiring the provenance field is what stops a hand-edit from silently reappearing. A static
+    // count of `it(` declarations is not an alternative — 1520 of those exist against 1485 executed.
+    expect(summary.generated_from, 'the counts must come from a recorded run — regenerate with `npm run '
+      + 'evidence:suite`, do not edit them by hand').toBeTruthy();
+
+    // When the machine record is present (it is gitignored, so only locally), the summary must match it EXACTLY.
+    if (existsSync(summary.generated_from)) {
+      const run = readJson(summary.generated_from);
+      const files = Array.isArray(run.testResults) ? run.testResults : [];
+      expect(summary.total_tests, 'summary disagrees with the run it claims to come from').toBe(run.numTotalTests);
+      expect(summary.passed_tests).toBe(run.numPassedTests);
+      expect(summary.failed_tests).toBe(run.numFailedTests ?? 0);
+      expect(summary.executed_test_files).toBe(files.length);
+    }
     expect(summary.supersedes_historical_artifacts).toContain('artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt');
   });
 
