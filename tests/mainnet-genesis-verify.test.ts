@@ -968,6 +968,31 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('AIRDROP_POOL_REMAINING_NOT_FULL_AT_GENESIS');
   });
 
+  it('rejects a snapshot that names a release artefact as its own source', () => {
+    // There is NO collector that reads mainnet and produces the verifier input — every section is typed in by hand.
+    // getterSnapshotSource is the only statement that the numbers came from the chain, and it was free text the
+    // verifier recorded without ever inspecting. Filling the snapshot from the manifest is the natural mistake when
+    // a check keeps failing and the manifest is the document that looks authoritative; it turns the verification
+    // into a comparison of the manifest against itself and reports MAINNET_GENESIS_VERIFIED.
+    for (const source of [
+      'artifacts/local/mainnet_final_manifest_draft.json',
+      'artifacts/CURRENT_CODE_HASHES.txt#sha256=abc',
+      'derived from mainnet_deploy_packet',
+    ]) {
+      const input = finalInput();
+      input.evidenceRefs.getterSnapshotSource = source;
+      const report = verifyMainnetGenesisSnapshot(input);
+      expect(report.mainnet_genesis_verified, `"${source}" is not a chain read and must not verify`).toBe(false);
+      expect(report.issue_codes).toContain('GETTER_SNAPSHOT_SOURCE_IS_NOT_A_CHAIN_READ');
+    }
+
+    // And the honest case still passes, or the check would just be a second way to block every genesis.
+    const good = finalInput();
+    good.evidenceRefs.getterSnapshotSource = 'live-rpc/platho-toncenter/2026-07-31T00:00:00.000Z';
+    expect(verifyMainnetGenesisSnapshot(good).issue_codes)
+      .not.toContain('GETTER_SNAPSHOT_SOURCE_IS_NOT_A_CHAIN_READ');
+  });
+
   it('rejects final genesis when the username art or collection metadata was never locked', () => {
     // Calibration, not decoration. Adding art_sealed/meta_sealed to the happy-path fixture would make the two new
     // assertions pass without ever proving they can fail — which is exactly how this repo has shipped guards aimed
