@@ -896,7 +896,19 @@ async function buildDryRunPacket(draft: Draft) {
     id,
     purpose,
     phase: 'official_wallet_endowment',
-    must_be_signed_after: 'F02',
+    // [CORRECTED 2026-07-30, ceremony audit] This used to say must_be_signed_after: 'F02', which is wrong for two of
+    // the four and misleading for all: only W03's target is created by F02 and only W02's by F01. W01's wallet is
+    // created by the SEPARATE reserve-funding script, and W04's not until BuybackBurn's first buyback — long after
+    // genesis. So two of these steps deliberately address accounts that DO NOT EXIST YET.
+    //
+    // That is safe, and MEASURED rather than assumed (tests/ceremony-endowment-before-deploy.test.ts): value parked on
+    // an uninitialised address survives the later deploy intact. What makes it safe is the NON-BOUNCEABLE form — the
+    // counter-measurement shows the identical step signed against an EQ address returns the money and leaves the
+    // wallet on its four-and-a-half-year transfer float while the ceremony reports success. target_address is emitted
+    // through friendly(), which is UQ, and CEREMONY-W-03 pins that.
+    order_note: 'Any time after the contracts are deployed. Two of the four targets do not exist yet, which is fine: '
+      + 'the value parks on the uninit address and survives the deploy. The NON-BOUNCEABLE (UQ) target form is what '
+      + 'makes that true — signing these against an EQ address silently returns the endowment.',
     signer_role: 'ath_treasury_owner',
     signer_address: friendly(derived.addresses.athTreasuryOwner),
     target_address: friendly(wallet),
