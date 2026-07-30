@@ -346,7 +346,11 @@ contract MarketStabilitySeller {
     // clean-12 GENESIS-LOCK: funding NO LONGER requires pricing_frozen. The 60M market-maker reserve is committed +
     // locked at genesis (before the pool exists / the price is known), so it never sits under the owner's unilateral
     // control. It is cap-bounded (23205 = MARKET_STABILITY_TOTAL_RESERVE_ATH) + reserve_funder-gated (23203), and the
-    // ONLY exit is BuyMarketStabilityAth (itself gated on pricing_frozen, :388) — there is NO owner-withdrawal path, so
+    // ONLY exit is BuyMarketStabilityAth — there is NO owner-withdrawal path, so
+// [CORRECTED 2026-07-30, tier-2 audit] this used to say "itself gated on pricing_frozen, :388". There is no such
+// gate and no such field any more: the price became a compile-time constant, so the check it named cannot exist.
+// A stale line in a contract that can never be redeployed is read as the specification years later, so it is fixed
+// rather than left; the PROPERTY it describes is unchanged and stronger — no ceremony can set the price wrong.
     // once funded the reserve can only ever be sold via the rising-price tranche mechanism, never dumped.
     receive(msg: AthTransferNotification) {
         self.requireSealed();

@@ -52,8 +52,18 @@ describe('permanent account rent horizon', () => {
       packet.deploy_contracts ?? packet.phase_1_deploy_contracts ?? [];
     expect(deploys.length, 'the packet must list its deploy steps').toBeGreaterThan(5);
 
-    // ATHMaster: the jetton master. ATHVesting: 10,000,000 ATH on the 100-year schedule that DEFINES the horizon.
-    for (const project of ['ATHMaster', 'ATHVesting']) {
+    // [WIDENED 2026-07-30] Every contract that can NEVER be redeployed, not the three that had already been measured.
+    // Listing only the measured ones is precisely how ATHMaster was missed until it was measured by hand, and then
+    // MarketStabilitySeller (48 years, holding 60% of supply) and BuybackBurn (35 years) after that.
+    //   ATHMaster    — the jetton master; a redeploy is a different token.
+    //   ATHWallet    — its code IS the wallet; covered by RENT-HORIZON-02 through the treasury endowment.
+    //   ATHVesting   — 10,000,000 ATH on the 100-year schedule that DEFINES this horizon.
+    //   MSS          — 60,000,000 ATH, no clock, and no administrative command after the seal.
+    //   AirdropPool  — 15,000,000 ATH, permanent by ADR9.
+    //   BuybackBurn  — the buyback envelope behind a frozen route.
+    //   FeeAccumulator — its address is baked into four immutable contracts, so moving it orphans every shard.
+    for (const project of ['ATHMaster', 'ATHVesting', 'MarketStabilitySeller', 'AirdropPool', 'BuybackBurn',
+      'FeeAccumulator']) {
       const step = deploys.find((d) => d.contract === project);
       expect(step, `${project} must be deployed by the ceremony packet`).toBeTruthy();
       const funded = BigInt(step!.value_nanotons_recommended);

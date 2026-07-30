@@ -94,6 +94,20 @@ const DEPLOY_VALUE_OVERRIDE_NANOTONS: Record<string, string> = {
   // can never be redeployed under any circumstance. Past that point burns stop being recorded and get_jetton_data
   // stops answering, so every explorer, wallet and DEX loses the token's identity. 1 GRAM buys ~154 years.
   ATHMaster: '1000000000',
+  // [ADDED 2026-07-30, tier-2 audit] The two remaining permanent custodians, found by MEASURING all six rather than
+  // the three that had already been measured — which is how the first two instances of this class were missed.
+  //
+  // MarketStabilitySeller: 159 code cells => 10,523,844/year, so the flat 0.5 GRAM bought 48 years. It holds
+  // 60,000,000 ATH — 60% of supply — sells on NO clock at all, and after SealMarketStabilityGenesis zeroes
+  // genesis_config_hash there is no administrative command of any kind. 1.2 GRAM buys ~114 years.
+  //
+  // BuybackBurn: 215 code cells, the largest contract in the system => 14,161,716/year, so 0.5 GRAM bought just 35
+  // years — the shortest horizon of anything permanent here. 1.6 GRAM buys ~113 years.
+  //
+  // Both carry a permissionless TopUpStorageReserve, so a starved contract is recoverable IF somebody notices. That
+  // is a person remembering for a century; the deploy value is the part that does not depend on anyone.
+  MarketStabilitySeller: '1200000000',
+  BuybackBurn: '1600000000',
 };
 const CONTROL_VALUE_RECOMMENDED_NANOTONS = '50000000';
 // [RAISED 2026-07-29, wave-8 HIGH: 10M -> 620M] This one transaction both mints the 100,000,000 ATH and creates the
