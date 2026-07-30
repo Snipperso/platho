@@ -726,6 +726,34 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(1n);
   });
 
+  it('MSTAB-09: MEASURED — what TON the official ATH wallet is left with after genesis funding', async () => {
+    // TIER-2 QUESTION, and the one the contract-level rent measurements do not answer. The 60,000,000 ATH does not
+    // live in MarketStabilitySeller — it lives in its official ATHWallet, a separate account with its own rent. That
+    // wallet is created by the genesis funding transfer and, unlike the Seller, receives nothing again until a sale
+    // happens. Sales are on NO clock at all here, so "until a sale happens" can be years.
+    const env = await setup();
+    await bindAndSeal(env);
+    await fundReserve(env, TRANCHE);
+
+    const wallet = await officialSellerAthWallet(env);
+    expect((await wallet.getGetWalletData()).balance, 'the reserve really landed').toBe(TRANCHE);
+    const ton = (await env.blockchain.getContract(env.officialAthWallet)).balance;
+
+    // MEASURED: an ATHWallet is 81 code cells, so with its account and data ~84 cells; at the frozen 64,962 per
+    // cell-year that is 5,456,808 a year. Report the horizon rather than assert a number nobody measured.
+    const perYear = 5_456_808n;
+    process.stderr.write(`[MSTAB-09] official wallet TON after funding: ${ton}  => ${Number(ton) / Number(perYear)} years of rent
+`);
+
+    // THE MEASUREMENT, pinned as a fact rather than as a wish: the transfer float alone is FOUR AND A HALF years for
+    // the wallet holding 60% of supply, and no amount of overpaying the transfer changes it — everything above
+    // ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT is refunded to the sender. That is why the ceremony now carries W01..W04
+    // (RENT-HORIZON-03), and why this assertion states the shortfall instead of hiding it behind a passing threshold.
+    expect(ton, 'the transfer float alone is a handful of years — the endowment MUST come from the ceremony step')
+      .toBeLessThan(perYear * 6n);
+    expect(ton, 'and it is at least the storage endowment the transfer carries').toBeGreaterThan(20_000_000n);
+  });
+
   it('MSTAB-03: rejects over-cap reserve funding and over-tranche buys before mutation', async () => {
     const env = await setup();
     await bindAndSeal(env);
