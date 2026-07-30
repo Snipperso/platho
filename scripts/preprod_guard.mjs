@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { PLATHO_APP_CONFIG, validatePlathoAppConfig } from '../web/platho-config.mjs';
@@ -41,6 +41,12 @@ const envChecks = [
 ];
 
 const failures = validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => ({ ...finding }));
+// [WIDENED 2026-07-31] This map had nine entries while the final manifest carries FOURTEEN code hashes, and the
+// production hash file sixteen. The five it did not know about — record_shard, intro_shard, public_shard,
+// airdrop_pool, airdrop_ticket — carry every user message and the entire 15M ATH airdrop, and the LAST production
+// gate never compared a single one of them against the manifest. It simultaneously BLOCKED on them, reporting them
+// as "extra" keys, so the gate was both blind and unpassable: the same shape as the vault/capsulehub entries it
+// used to carry, one layer up.
 const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
   ATHMASTER_CODE_HASH: 'ath_master',
   ATHVESTING_CODE_HASH: 'ath_vesting',
@@ -51,9 +57,24 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
   PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
   USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
   USERNAME_REGISTRY_CODE_HASH: 'username_registry',
+  RECORD_SHARD_CODE_HASH: 'record_shard',
+  INTRO_SHARD_CODE_HASH: 'intro_shard',
+  PUBLIC_SHARD_CODE_HASH: 'public_shard',
+  AIRDROP_POOL_CODE_HASH: 'airdrop_pool',
+  AIRDROP_TICKET_CODE_HASH: 'airdrop_ticket',
 };
 
-const PRODUCTION_CODE_HASH_KEYS = Object.freeze(Object.keys(CURRENT_CODE_HASH_TO_MANIFEST_KEY).sort());
+// Deployed contracts the manifest deliberately does NOT carry a code hash for, because the ceremony neither deploys
+// nor binds them: KeyShard and RecoveryShard are created lazily by clients at addresses derived from their own code.
+// They still belong to the production hash set — leaving them out is what made the keyset check reject the file —
+// but they have no manifest counterpart to compare against, so they are listed separately rather than silently
+// dropped. tests/shard-code-hash-freeze.test.ts is what actually pins them; see the note there for why they need it
+// more than the others, not less.
+const PRODUCTION_ONLY_CODE_HASH_KEYS = Object.freeze(['KEY_SHARD_CODE_HASH', 'RECOVERY_SHARD_CODE_HASH']);
+
+const PRODUCTION_CODE_HASH_KEYS = Object.freeze(
+  [...Object.keys(CURRENT_CODE_HASH_TO_MANIFEST_KEY), ...PRODUCTION_ONLY_CODE_HASH_KEYS].sort(),
+);
 const TEST_DEPLOY_TARGET_RE = /(?:Mock|Harness|M20T)/i;
 const POST_POOL_COMMANDS = Object.freeze([
   'npm.cmd run m20f:collect',
@@ -141,20 +162,46 @@ function compactStepText(step, fields) {
     .join(' ');
 }
 
-function validateFeeAccumulatorHashAliases() {
-  const canonical = readTextIfExists('artifacts/FEEACCUMULATOR_CODE_HASH.txt');
-  const legacyAlias = readTextIfExists('artifacts/FEE_ACCUMULATOR_CODE_HASH.txt');
+// [REPLACED 2026-07-31] This used to compare exactly two files: FEEACCUMULATOR_CODE_HASH.txt against a legacy alias
+// FEE_ACCUMULATOR_CODE_HASH.txt. The alias was an ORPHAN — scripts/hash_codes.js writes one file per key present in
+// CURRENT_CODE_HASHES.txt, and the underscored spelling is not a key, so nothing ever rewrote it. It had rotted to a
+// hash from an older build, and the only thing in the repository that still read the legacy name was this check
+// itself. A gate comparing a live file against a dead one, and blocking production on the difference.
+//
+// Deleting the orphan alone would have fixed the symptom and left the class: seventeen OTHER single-value hash files
+// carry the same derived value, and any one of them could fall out of the generator's list the same way. So the pair
+// check is replaced by a family check over every artifacts/*_CODE_HASH.txt, which fails on a NEW orphan instead of
+// on the one that already happened.
+function validateCodeHashArtifactFamily() {
   const currentText = readTextIfExists('artifacts/CURRENT_CODE_HASHES.txt');
-  if (!canonical || !legacyAlias) return;
+  if (!currentText) return;
+  const current = parseKeyValueLines(currentText);
 
-  const canonicalHash = normalizeHashFileText(canonical);
-  const aliasHash = normalizeHashFileText(legacyAlias);
-  const currentHash = normalizeHash(parseKeyValueLines(currentText ?? '').FEEACCUMULATOR_CODE_HASH);
-  if (canonicalHash !== aliasHash || (currentHash && canonicalHash !== currentHash)) {
+  let files;
+  try {
+    files = readdirSync('artifacts').filter((name) => /^[A-Z0-9_]+_CODE_HASH\.txt$/.test(name));
+  } catch {
+    return;
+  }
+
+  const drifted = [];
+  for (const file of files) {
+    const key = file.slice(0, -'.txt'.length);
+    const expected = normalizeHash(current[key]);
+    const actual = normalizeHashFileText(readTextIfExists(`artifacts/${file}`) ?? '');
+    if (!expected) {
+      drifted.push(`${file}: no ${key} in CURRENT_CODE_HASHES.txt — the generator does not write this file, so it `
+        + 'can only rot; delete it or add the key');
+      continue;
+    }
+    if (expected !== actual) drifted.push(`${file}: file=${actual || 'empty'} vs current=${expected}`);
+  }
+
+  if (drifted.length > 0) {
     failures.push({
-      id: 'FEE_ACCUMULATOR_HASH_ALIAS_MISMATCH',
-      file: 'artifacts/FEEACCUMULATOR_CODE_HASH.txt',
-      message: 'FeeAccumulator canonical and legacy hash artifact filenames must remain identical and match CURRENT_CODE_HASHES.txt.',
+      id: 'CODE_HASH_ARTIFACT_FAMILY_DRIFT',
+      file: 'artifacts/CURRENT_CODE_HASHES.txt',
+      message: `Every artifacts/*_CODE_HASH.txt must be a current copy of its CURRENT_CODE_HASHES.txt entry. ${drifted.join(' | ')}`,
     });
   }
 }
@@ -189,11 +236,14 @@ function validateProductionCodeHashes(input) {
   for (const key of PRODUCTION_CODE_HASH_KEYS) {
     const productionHash = normalizeHash(productionCodeHashes[key]);
     const currentHash = normalizeHash(currentCodeHashes[key]);
-    const manifestHash = normalizeHash(input?.manifest?.code_hashes?.[CURRENT_CODE_HASH_TO_MANIFEST_KEY[key]]);
+    const manifestKey = CURRENT_CODE_HASH_TO_MANIFEST_KEY[key];
+    const manifestHash = normalizeHash(input?.manifest?.code_hashes?.[manifestKey]);
     if (!productionHash || !currentHash || productionHash !== currentHash) {
       mismatches.push(`${key}: production=${productionHash || 'missing'}, current=${currentHash || 'missing'}`);
     }
-    if (input && (!productionHash || !manifestHash || productionHash !== manifestHash)) {
+    // KeyShard and RecoveryShard have no manifest counterpart by design (see PRODUCTION_ONLY_CODE_HASH_KEYS), so
+    // comparing them against it would report a mismatch against nothing — the failure mode this gate exists to stop.
+    if (manifestKey && input && (!productionHash || !manifestHash || productionHash !== manifestHash)) {
       mismatches.push(`${key}: production=${productionHash || 'missing'}, manifest=${manifestHash || 'missing'}`);
     }
   }
@@ -691,7 +741,7 @@ for (const check of envChecks) {
 validateProductionCodeHashes();
 validateMainnetGenesisEvidence();
 validateLocalMainnetDeployArtifacts();
-validateFeeAccumulatorHashAliases();
+validateCodeHashArtifactFamily();
 validateProductionDeployPacketHasNoTestTargets();
 validateReleaseDocsPhaseOrder();
 validateCspInlineScriptPolicy();
