@@ -74,6 +74,26 @@ describe('permanent account rent horizon', () => {
     }
   });
 
+  it('RENT-HORIZON-03: the four official ATH wallets are endowed by the ceremony, not left on their transfer float', () => {
+    if (!existsSync(PACKET)) return;
+    const packet = JSON.parse(readFileSync(PACKET, 'utf8'));
+    const steps: Array<{ id: string; target_address: string; value_nanotons_recommended: string }> =
+      packet.wallet_endowment_messages ?? [];
+
+    // MEASURED (MSTAB-09): the genesis funding transfer leaves the wallet holding 60% of supply with 24,832,861 —
+    // four and a half years. Overpaying the transfer cannot help, because everything above
+    // ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT is refunded to the sender. So the endowment has to be its own ceremony
+    // step, and a step nobody checks is a step that gets dropped.
+    expect(steps.length, 'W01..W04 must endow the four protocol-owned official ATH wallets').toBe(4);
+
+    const required = BigInt(rentPerYear('ATHWallet') * HORIZON_YEARS);
+    for (const step of steps) {
+      expect(BigInt(step.value_nanotons_recommended),
+        `${step.id} (${step.target_address}) must carry ${HORIZON_YEARS} years of ATHWallet rent`)
+        .toBeGreaterThanOrEqual(required);
+    }
+  });
+
   it('RENT-HORIZON-02: the treasury ATH wallet — which holds 100% of supply — outlives the horizon too', () => {
     if (!existsSync(PACKET)) return;
     const packet = JSON.parse(readFileSync(PACKET, 'utf8'));

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { ATHMaster, storeDeployTreasurySupply } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { ATHVesting } from '../build/ATHVesting/ATHVesting_ATHVesting';
-import { ATHWallet, storeATHTransferRequest } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHWallet, storeATHTransferRequest, storeATHWalletTopUpStorageReserve } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import {
   BuybackBurn,
   storeBindBuybackFeeAccumulator,
@@ -123,6 +123,21 @@ const DEPLOY_TREASURY_SUPPLY_VALUE_RECOMMENDED_NANOTONS = '620000000';
 // EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+NOTIFY_STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M)=48M.
 // Raised 30M->48M / 40M->58M to track the NOTIFY_STORAGE_ENDOWMENT 2M->20M endowment raise; recommended carries a 10M buffer for forward fees.
 const ATH_TRANSFER_REQUEST_VALUE_MIN_NANOTONS = '48000000';
+// [ADDED 2026-07-30, tier-2 audit] What each protocol-owned official ATHWallet must be endowed with, ONCE, at genesis.
+//
+// MEASURED end to end (tests/market-stability-seller.test.ts MSTAB-09): after the genesis funding transfer the
+// MarketStabilitySeller's official wallet — the account that actually holds 60,000,000 ATH, 60% of supply — is left
+// with 24,832,861 nanoton. An ATHWallet is 81 code cells, so ~5,456,808 of rent a year: FOUR AND A HALF YEARS.
+//
+// Overpaying the transfer does NOT help, and that is the point: the endowment is pinned by
+// ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT (20,000,000) and everything above it is refunded by refund_owner_excess.
+// Raising that constant is not an option either — it is what EVERY user's transfer carries, and 20,000,000 is right
+// for an ordinary wallet that goes on receiving. These four are the exception: they receive once and then only SEND,
+// and MarketStabilitySeller sells on no clock at all, so years of silence is its normal state, not a fault.
+//
+// So the endowment is a CEREMONY step, through the permissionless ATHWalletTopUpStorageReserve the wallet already
+// carries. 600,000,000 is 100 years of measured rent with room over.
+const OFFICIAL_WALLET_ENDOWMENT_NANOTONS = '600000000';
 const ATH_TRANSFER_REQUEST_VALUE_RECOMMENDED_NANOTONS = '58000000';
 
 function sha256Hex(data: Buffer | string): string {
@@ -869,6 +884,29 @@ async function buildDryRunPacket(draft: Draft) {
     };
   });
 
+  // The four wallets that hold protocol-owned ATH and are never redeployable. The two registry wallets are
+  // deliberately NOT here: every name and avatar purchase carries a fresh 20,000,000 into them, so ordinary traffic
+  // tops them up, while these four receive once and then only send.
+  const walletEndowmentMessages = ([
+    ['W01', 'MarketStabilitySeller official ATHWallet - holds 60,000,000 ATH', derived.addresses.marketStabilitySellerOfficialAthWallet],
+    ['W02', 'AirdropPool official ATHWallet - holds 15,000,000 ATH', derived.addresses.airdropPoolOfficialAthWallet],
+    ['W03', 'ATHVesting official ATHWallet - holds 10,000,000 ATH', derived.addresses.athLongTermVestingOfficialAthWallet],
+    ['W04', 'BuybackBurn official ATHWallet - holds bought ATH awaiting burn', derived.addresses.buybackBurnOfficialAthWallet],
+  ] as Array<[string, string, Address]>).map(([id, purpose, wallet]) => ({
+    id,
+    purpose,
+    phase: 'official_wallet_endowment',
+    must_be_signed_after: 'F02',
+    signer_role: 'ath_treasury_owner',
+    signer_address: friendly(derived.addresses.athTreasuryOwner),
+    target_address: friendly(wallet),
+    target_raw_address: raw(wallet),
+    value_nanotons_recommended: OFFICIAL_WALLET_ENDOWMENT_NANOTONS,
+    body: txBody(`ATHWallet.ATHWalletTopUpStorageReserve.${id}`,
+      bodyCell(storeATHWalletTopUpStorageReserve({ $$type: 'ATHWalletTopUpStorageReserve' })), {}),
+    safety_check: 'Permissionless receiver: no authority is granted, the value simply becomes the wallet storage float. Tonkeeper target must be the official ATHWallet itself, NOT its owner contract.',
+  }));
+
   return {
     document: 'PLATHO.V1.MAINNET_TX_DRY_RUN_PACKET',
     generated_at: new Date().toISOString(),
@@ -900,6 +938,7 @@ async function buildDryRunPacket(draft: Draft) {
     deploy_contracts: deploys,
     control_messages: controlMessages,
     funding_messages: fundingMessages,
+    wallet_endowment_messages: walletEndowmentMessages,
     official_wallet_state_inits: Object.fromEntries(
       Object.entries(derived.officialWalletStateInits).map(([key, value]) => [
         key,
